@@ -74,56 +74,110 @@ Existing Kessler-only and expanded-galaxy saves still load, including active leg
 
 ## Native C++ edition and development
 
-The Windows `spaceship.exe` is now a **native C++ application**, with its own
-Win32 interface, GDI deck/chart views and C++ simulation. It does not launch the
-HTA or embed a browser/JavaScript engine. Its authored catalog is compiled in.
+The repository also contains a native C++ port of the game. It is a **work in
+progress**: Phase 0 (build system, extracted catalogue, data gate) is complete,
+Phase 1A (the action clock: drive wear, life support, crew, tasks, incidents,
+the Simulacron and commendations) is complete and verified against the
+reference, and Phase 1B (navigation, ports, contracts, projects, saves) is next.
+Until Phase 3 the client is a window, not a game, so `Spaceship.hta` remains the
+playable edition.
 
-**This is a playable migration build, not yet a feature-identical conversion.**
-Read [NATIVE-PORT.md](NATIVE-PORT.md) for implemented systems and specific parity
-gaps. The original `Spaceship.hta` is preserved as the reference edition. In
-particular, artwork, most settings and full edge-case parity remain unfinished.
-Native music/effects now play from optional bundled WAV files in `music/` and
-`sounds/`, with free toggles and volume controls on Home/Handbook. Native saves go
-in `saves/` next to the EXE, or the per-user `SpaceshipCommand\saves` directory
-when the install folder is read-only. Older per-user native slots remain loadable.
-Each gameplay control, including Stand watch, has an action-count cooldown;
-labelled cooldown readouts distinguish it from ongoing work.
-The native version now has staged crew sheets, autonomous work, selected dreams,
-free travel/scan acknowledgements and reference-tested navigation/commission rules.
-It can **import supported HTA saves**, including Windows UTF-16 files, without
-modifying the source. Unknown tasks or unmapped live cooldowns are explicitly
-refused rather than discarded. Native slots use separate files in
-`saves/` (with the per-user fallback above). See the migration notes for limitations.
-
-Build the shared native simulation, text client and tests:
+### Build
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
-./build/spaceship_console
 ```
 
-On Windows, configure with `cmake -S . -B build -A x64`, build with
-`cmake --build build --config Release`, and run `build/Release/spaceship.exe`.
-The `spaceship-windows-x64` CI artifact contains the native EXE and documentation;
-it no longer bundles or needs `Spaceship.hta`. CTest creates the actual native
-window and dispatches an action in its `--smoke-test` mode. Visual/manual gameplay
-verification on a player's Windows PC is still required.
+Everything is fetched at configure time by CMake (`FetchContent`):
+nlohmann/json 3.11.3 and Catch2 3.7.1 always; raylib 6.0, Dear ImGui 1.92.7 and
+rlImGui (the `Raylib_6_0` tag) only when the client can be built. There is no
+other runtime dependency and nothing is downloaded by the game itself.
 
-The C++ implementation is under `cpp/`. `spaceship_console` uses the same
-`Voyage` simulation as the GUI, rather than a separate stripped-down game. The
-only vendored dependency is nlohmann/json 3.11.3 (MIT). No runtime downloads are
-needed. `node tools/export-native-data.cjs` regenerates the authored catalog at
-development time; its output is committed and checked by CI.
+The client needs the platform's graphics development packages. On Debian/Ubuntu:
 
-The original interface's gameplay JavaScript is inline, and its dependency-free Node tests load it in a VM with small DOM stubs. Run those regression tests from the repository root:
+```sh
+sudo apt install libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev
+```
+
+If they are missing, configure says so and skips the client; the simulation and
+its tests still build and run. On Windows, configure with
+`cmake -S . -B build -A x64` and build `build/Release/spaceship.exe`.
+
+### Targets
+
+| Target | What it is |
+|---|---|
+| `spaceship_core` | the simulation: catalogue, state, action clock, tasks, saves. No window, no graphics |
+| `spaceship` | the Raylib + Dear ImGui client (only when the graphics packages are present) |
+| `spaceship_console` | scriptable harness that replays command scripts against the core |
+| `spaceship_tests` | CTest suite |
+
+### Content pipeline
+
+The authored catalogues live in `assets/data/*.json`. They are generated from the
+reference edition, never typed by hand:
+
+```sh
+node tools/export-data.cjs           # regenerate after an HTA content change
+node tools/export-data.cjs --check   # fail if the JSON no longer matches
+```
+
+`ctest` runs that `--check` as a test, so the committed catalogue cannot drift
+from `Spaceship.hta`. `assets/art/title.jpg` (extracted from the stylesheet's
+embedded JPEG) and `assets/fonts/` (DejaVu Sans and DejaVu Sans Mono, with their
+licence) come from the same pipeline and are committed.
+
+### Differential harness
+
+The strongest test in the repository is not a unit test. It is a replay:
+
+```sh
+node tools/trace-voyage.cjs tests/parity/voyage-01.script > reference.trace
+./build/spaceship_console   tests/parity/voyage-01.script > port.trace
+diff reference.trace port.trace
+```
+
+`tools/trace-voyage.cjs` loads the reference game in a Node VM; `spaceship_console`
+runs the C++ core. Both read the same script and print the same canonical
+snapshot — sorted keys, JavaScript number formatting, no wall-clock stamps — at
+every checkpoint. `ctest` runs each script in `tests/parity/` as a `parity.*`
+test and fails on the first byte that differs. Add a script whenever a behaviour
+is ported; the five committed voyages cover the opening loop, a 900-action
+unattended haul, the filter hand's own initiative, running out of air, and a
+payday that cannot pay everyone.
+
+Script commands: `action [text]`, `seat <slot>`, `bank`, `job <crew> <job>`,
+`purse <n>`, `trace`, and `#` comments.
+
+### Fidelity
+
+The port aims to be numerically, textually and behaviourally identical to the
+HTA: the same action costs, cooldowns, tick order, wording and save format, with
+the illustration geometry reproduced from the same coordinate tables. Visual
+differences are limited to what a different toolkit cannot reproduce (text
+metrics, border-radius arcs). `PORTING_PLAN.md` records the rules being
+preserved and the declared exceptions. Where fidelity is provable it is proven:
+the differential harness above replays the same command script through both
+editions and compares the resulting state, line by line.
+
+The original interface's gameplay JavaScript is inline, and its dependency-free
+Node tests load it in a VM with small DOM stubs. Run those regression tests from
+the repository root:
 
 ```sh
 for test in tests/*.test.cjs; do node "$test"; done
 ```
 
-The key action-flow boundary is `performAction(detail)`: a committed action increments the counter, ticks active button cooldowns once, then advances the world. Keep free navigation and presentation handlers outside that path. Wire repeatable action controls through `commandRow`, `wireAction` or `buildProgressButton`; those UI wrappers start the source control's cooldown only if the callback actually committed an action. Per-control countdowns live in `STATE.actionCooldowns`, so they are included in saves and validated/migrated with other state. `AGENTS.md` records these invariants and the expected workflow for future changes.
+The key action-flow boundary is `performAction(detail)`: a committed action
+increments the counter, ticks active button cooldowns once, then advances the
+world. Keep free navigation and presentation handlers outside that path. Wire
+repeatable action controls through `commandRow`, `wireAction` or
+`buildProgressButton`; those UI wrappers start the source control's cooldown only
+if the callback actually committed an action. Per-control countdowns live in
+`STATE.actionCooldowns`, so they are included in saves and validated/migrated
+with other state.
 
 ## Scope
 

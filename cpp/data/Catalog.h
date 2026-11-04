@@ -17,6 +17,7 @@
 #include <string>
 #include <vector>
 
+#include "core/Constants.h"
 #include "data/Types.h"
 
 namespace ship {
@@ -68,6 +69,29 @@ class Catalog {
   std::vector<Contract> contracts;
 
   std::vector<std::string> taskTypes;
+
+  // Authored starting values and definitions (Phase 1).
+  std::vector<CrewDefinition> startingCrew;
+  std::vector<StatDefinition> startingStats;
+  std::vector<IncidentType> incidentTypes;
+  std::vector<Commendation> commendations;
+  std::vector<ProjectDef> projects;
+  struct JobDefinition {
+    std::string id, label;
+    bool unique = false;
+    double wage = 0;
+    double baseAt = 0;      // jobBase()
+    std::string room;       // jobRoom map in applyJob()
+  };
+  std::vector<JobDefinition> jobDefs;
+  std::vector<Good> startingCargo;          // the hold a new voyage opens with
+  std::vector<SurveyRecordDef> startingSurvey;
+
+  std::vector<std::string> infoLabels;      // INFOS: location/contacts/life
+  std::vector<std::string> resourceLabels;  // RESOURCES, in sidebar order
+
+  // Tunables, straight out of survival.json and content.json.
+  Rules rules;
 
   const Port* FindPort(const std::string& id) const;
 };

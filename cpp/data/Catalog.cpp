@@ -100,6 +100,37 @@ DeckPlan ReadDeckPlan(const Json& hulls, const Json& corridors, const Json& room
   return plan;
 }
 
+CrewDefinition ReadCrew(const Json& object) {
+  CrewDefinition c;
+  c.id = Text(object, "id", "crew");
+  c.name = Text(object, "name", "crew");
+  c.role = Text(object, "role", "crew");
+  c.room = Text(object, "room", "crew");
+  c.activity = Text(object, "activity", "crew");
+  c.colour = Text(object, "colour", "crew");
+  c.sex = Text(object, "sex", "crew");
+  c.hair = Text(object, "hair", "crew");
+  c.hair2 = Text(object, "hair2", "crew");
+  c.skin = Text(object, "skin", "crew");
+  c.hairStyle = Text(object, "hairStyle", "crew");
+  c.health = Number(object, "health", "crew");
+  c.morale = Number(object, "morale", "crew");
+  c.fatigue = Number(object, "fatigue", "crew");
+  c.hunger = Number(object, "hunger", "crew");
+  c.wallet = Number(object, "wallet", "crew");
+  c.hungerTick = Number(object, "hungerTick", "crew");
+  c.traits = Text(object, "traits", "crew");
+  c.race = Text(object, "race", "crew");
+  c.age = static_cast<int>(Number(object, "age", "crew"));
+  c.homeworld = Text(object, "homeworld", "crew");
+  c.hobby = Text(object, "hobby", "crew");
+  c.religion = Text(object, "religion", "crew");
+  c.job = Text(object, "job", "crew");
+  c.skill = Text(object, "skill", "crew");
+  c.jobAt = Number(object, "jobAt", "crew");
+  return c;
+}
+
 Body ReadBody(const Json& object, const std::string& where) {
   Body b;
   b.id = Text(object, "id", where);
@@ -248,6 +279,53 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     c.recognizePrior = Flag(contract, "recognizePrior");
     catalog.contracts.push_back(c);
   }
+  for (const Json& incident : Field(progression, "incidents", "progression.json")) {
+    IncidentType type;
+    type.id = Text(incident, "id", "incidents");
+    type.kind = Text(incident, "kind", "incidents");
+    type.source = Text(incident, "source", "incidents");
+    type.title = Text(incident, "title", "incidents");
+    type.remedy = Text(incident, "remedy", "incidents");
+    type.first = Number(incident, "first", "incidents");
+    type.every = Number(incident, "every", "incidents");
+    for (const Json& stage : Field(incident, "stages", "incidents")) {
+      IncidentType::Stage parsed;
+      parsed.text = Text(stage, "text", "incidents/stages");
+      parsed.ticks = Number(stage, "ticks", "incidents/stages");
+      for (const char* key : {"hull", "shield", "energy", "morale"}) {
+        auto it = stage.find(key);
+        if (it != stage.end() && it->is_number()) {
+          const double v = it->get<double>();
+          if (std::string(key) == "hull") { parsed.hull = v; }
+          else if (std::string(key) == "shield") { parsed.shield = v; }
+          else if (std::string(key) == "energy") { parsed.energy = v; }
+          else { parsed.morale = v; }
+        }
+      }
+      type.stages.push_back(parsed);
+    }
+    catalog.incidentTypes.push_back(type);
+  }
+  for (const Json& award : Field(progression, "commendations", "progression.json")) {
+    Commendation c;
+    c.id = Text(award, "id", "commendations");
+    c.title = Text(award, "title", "commendations");
+    c.metric = Text(award, "metric", "commendations");
+    c.goal = Number(award, "goal", "commendations");
+    c.detail = Text(award, "detail", "commendations");
+    catalog.commendations.push_back(c);
+  }
+  for (auto it = Field(progression, "projects", "progression.json").begin();
+       it != Field(progression, "projects", "progression.json").end(); ++it) {
+    ProjectDef p;
+    p.id = it.key();
+    p.label = Text(it.value(), "label", "projects");
+    p.room = Text(it.value(), "room", "projects");
+    p.lot = Text(it.value(), "lot", "projects");
+    p.energy = Number(it.value(), "energy", "projects");
+    p.work = Number(it.value(), "work", "projects");
+    catalog.projects.push_back(p);
+  }
   catalog.counts.incidents =
       static_cast<int>(Field(progression, "incidents", "progression.json").size());
   catalog.counts.projects =
@@ -260,20 +338,122 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
   for (const Json& kind : Field(content, "taskTypes", "content.json")) {
     catalog.taskTypes.push_back(Text(kind, "type", "content.json/taskTypes"));
   }
+  for (auto it = Field(content, "cooldownRules", "content.json").begin();
+       it != Field(content, "cooldownRules", "content.json").end(); ++it) {
+    CooldownRule rule;
+    rule.actions = Number(it.value(), "actions", "cooldownRules");
+    rule.label = Text(it.value(), "label", "cooldownRules");
+    catalog.rules.cooldowns[it.key()] = rule;
+  }
   catalog.counts.wiki = static_cast<int>(Field(content, "wiki", "content.json").size());
   catalog.counts.themes = static_cast<int>(Field(content, "themes", "content.json").size());
   catalog.counts.taskTypes = static_cast<int>(catalog.taskTypes.size());
 
   // ---- crew and survival (counted now, consumed from Phase 1) ------------
   const Json crew = LoadFile(data / "crew.json");
+  for (const Json& member : Field(crew, "crew", "crew.json")) {
+    catalog.startingCrew.push_back(ReadCrew(member));
+  }
   catalog.counts.crew = static_cast<int>(Field(crew, "crew", "crew.json").size());
   catalog.counts.hires = static_cast<int>(Field(crew, "candidates", "crew.json").size());
   catalog.counts.jobs = static_cast<int>(Field(crew, "jobs", "crew.json").size());
   catalog.counts.orders = static_cast<int>(Field(crew, "orders", "crew.json").size());
+  for (const Json& job : Field(crew, "jobs", "crew.json")) {
+    Catalog::JobDefinition def;
+    def.id = Text(job, "id", "crew.json/jobs");
+    def.label = Text(job, "label", "crew.json/jobs");
+    def.unique = Flag(job, "unique");
+    def.wage = Number(job, "wage", "crew.json/jobs");
+    catalog.jobDefs.push_back(def);
+  }
+  {
+    const Json& base = Field(crew, "jobBase", "crew.json");
+    const Json& rooms = Field(crew, "jobRoom", "crew.json");
+    for (Catalog::JobDefinition& def : catalog.jobDefs) {
+      auto at = base.find(def.id);
+      if (at != base.end()) { def.baseAt = at->get<double>(); }
+      auto room = rooms.find(def.id);
+      if (room != rooms.end()) { def.room = room->get<std::string>(); }
+    }
+  }
 
   const Json survival = LoadFile(data / "survival.json");
   catalog.counts.commodities =
       static_cast<int>(Field(survival, "goods", "survival.json").size());
+
+  for (const Json& stat : Field(survival, "stats", "survival.json")) {
+    StatDefinition def;
+    def.id = Text(stat, "id", "survival.json/stats");
+    def.label = Text(stat, "label", "survival.json/stats");
+    def.value = Number(stat, "value", "survival.json/stats");
+    def.unit = Text(stat, "unit", "survival.json/stats");
+    def.colour = Text(stat, "colour", "survival.json/stats");
+    catalog.startingStats.push_back(def);
+  }
+  for (const Json& lot : Field(survival, "goods", "survival.json")) {
+    Good g;
+    g.id = Text(lot, "id", "survival.json/goods");
+    g.name = Text(lot, "name", "survival.json/goods");
+    g.kind = Text(lot, "kind", "survival.json/goods");
+    g.vol = static_cast<int>(Number(lot, "vol", "survival.json/goods"));
+    g.value = Number(lot, "value", "survival.json/goods");
+    g.risk = Flag(lot, "risk");
+    catalog.startingCargo.push_back(g);
+  }
+  for (const Json& record : Field(survival, "survey", "survival.json")) {
+    SurveyRecordDef def;
+    def.id = Text(record, "id", "survival.json/survey");
+    def.name = Text(record, "name", "survival.json/survey");
+    def.src = Text(record, "src", "survival.json/survey");
+    def.value = Number(record, "value", "survival.json/survey");
+    def.state = Text(record, "state", "survival.json/survey");
+    catalog.startingSurvey.push_back(def);
+  }
+  for (const Json& info : Field(survival, "infos", "survival.json")) {
+    catalog.infoLabels.push_back(Text(info, "label", "survival.json/infos"));
+  }
+  for (const Json& resource : Field(survival, "resources", "survival.json")) {
+    catalog.resourceLabels.push_back(Text(resource, "label", "survival.json/resources"));
+  }
+
+  {
+    const Json& engine = Field(survival, "engine", "survival.json");
+    catalog.rules.engine.wearEvery = Number(engine, "wearEvery", "engine", 4);
+    catalog.rules.engine.wearStep = Number(engine, "wearStep", "engine", 1);
+    catalog.rules.engine.warnBelow = Number(engine, "warnBelow", "engine", 50);
+    catalog.rules.engine.perAction = Number(engine, "perAction", "engine", 10);
+
+    const Json& life = Field(survival, "life", "survival.json");
+    catalog.rules.life.lifeMax = Number(life, "lifeMax", "life", 200);
+    catalog.rules.life.decay = Number(life, "decay", "life", 4);
+    catalog.rules.life.capacity = Number(life, "capacity", "life", 10);
+
+    const Json& air = Field(survival, "air", "survival.json");
+    catalog.rules.air.holdMax = Number(air, "holdMax", "air", 20);
+    catalog.rules.air.step = Number(air, "step", "air", 5);
+    for (const Json& stage : Field(survival, "airStages", "survival.json")) {
+      AirStage parsed;
+      parsed.word = Text(stage, "word", "airStages");
+      parsed.tone = Text(stage, "tone", "airStages");
+      parsed.slow = Number(stage, "slow", "airStages", 1);
+      parsed.jobDrop = Number(stage, "jobDrop", "airStages");
+      parsed.harm = Number(stage, "harm", "airStages");
+      catalog.rules.air.stages.push_back(parsed);
+    }
+
+    const Json& mess = Field(survival, "mess", "survival.json");
+    catalog.rules.mess.rackStart = Number(mess, "rack", "mess", 18);
+    catalog.rules.mess.capacity = Number(mess, "capacity", "mess", 24);
+    catalog.rules.mess.every = Number(survival, "messEvery", "survival.json", 25);
+    catalog.rules.mess.starveAt = Number(survival, "messStarve", "survival.json", 90);
+    catalog.rules.mess.starveEvery = Number(survival, "messStarveEvery", "survival.json", 8);
+
+    const Json& pay = Field(crew, "pay", "crew.json");
+    catalog.rules.pay.every = Number(pay, "every", "pay", 100);
+    catalog.rules.pay.hit = Number(pay, "hit", "pay", 12);
+    catalog.rules.docAway = Number(crew, "docAway", "crew.json", 7);
+    catalog.rules.scanCost = Number(survival, "scanCost", "survival.json", 5);
+  }
 
   // ---- totals ------------------------------------------------------------
   catalog.counts.regions = static_cast<int>(catalog.regions.size());

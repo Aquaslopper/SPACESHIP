@@ -145,7 +145,16 @@ function build(g) {
     jobs: g.JOBS,
     orders: g.ORDERS,
     pay: g.PAY,
-    docAway: g.DOC_AWAY
+    docAway: g.DOC_AWAY,
+    /* Two literal tables that live inside functions in the reference
+       (jobBase() and the jobRoom map in applyJob()), not in a data object.
+       Transcribed here so the port never re-types them; export-data --check
+       will fail loudly if the reference text stops matching. */
+    jobBase: { maintenance: 30, filters: 1, navigation: 1, kitchen: 1 },
+    jobRoom: {
+      maintenance: 'engine', filters: 'o2', kitchen: 'mess',
+      navigation: 'bridge', cleaner: 'quarters'
+    }
   };
 
   files['survival.json'] = {

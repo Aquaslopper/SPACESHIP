@@ -1,7 +1,7 @@
 # Spaceship Command — HTA → C++ Port Plan
 
-**Status:** analysis complete, awaiting approval.
-**No C++ source has been written yet.** This document is the only artefact of this pass.
+**Status:** approved; Phases 0 and 1A are complete, Phase 1B is next. Progress is
+recorded at the head of `README.md` and, for each phase, in the phase table below.
 **Reference edition:** `Spaceship.hta` (706,020 bytes, 11,179 lines, single file, no assets).
 **Target:** standard C++17, Raylib + Dear ImGui, CMake with `FetchContent`.
 
@@ -538,6 +538,19 @@ the port work only (analysis and test scaffolding included), assuming I have the
 metrics, `Economy` basics, `SaveSystem` read/write. `spaceship_console` can run a command script and dump a trace.
 **Gate:** ported progression + ships tests green; a 200-action scripted voyage produces byte-identical traces to
 the JS game.
+
+*Delivered in two halves, as agreed.*
+
+**1A — the action clock (done).** `JsNumber` (ES5 rounding and number formatting), `GameState`, `Constants`,
+`Simulation`, `Action` (`performAction`, the 13-step `tickWorld`, `proAction`), `Survival`, `CrewLogic`, `Tasks`,
+`Cooldowns`, `Incidents`, `Simulacron`, `Awards`, `Trace`. `spaceship_console` runs scripts; `ctest` runs 26 tests,
+five of which are differential voyages against the reference. Every voyage in `tests/parity/` reproduces the
+reference's state byte for byte, including a 900-action unattended haul, the filter hand acting on his own
+initiative, air failure, hull loss and a payday that cannot pay everyone.
+
+**1B — the far side of the ship (next).** `Navigation`, `Economy`, `Projects`, `Ships`, `Contracts`, `SaveSystem`
+(bidirectional JSON, UTF-16LE slot 1, `validSave`, migrations), and the travel/scan/arrival task hooks that 1A
+deliberately left registered but inert.
 
 ### Phase 2 — Shell and idle screen (2 days)
 Window, theme layer, taskbar/tabs, side panel + pinned foot, status bar, stat rail, ship diagram from data, feed,

@@ -262,6 +262,19 @@
     }
   ],
   "docAway": 7,
+  "jobBase": {
+    "filters": 1,
+    "kitchen": 1,
+    "maintenance": 30,
+    "navigation": 1
+  },
+  "jobRoom": {
+    "cleaner": "quarters",
+    "filters": "o2",
+    "kitchen": "mess",
+    "maintenance": "engine",
+    "navigation": "bridge"
+  },
   "jobs": [
     {
       "cloth": "#a2947f",

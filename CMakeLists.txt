@@ -112,7 +112,17 @@ target_include_directories(spaceship_json INTERFACE
 # Core simulation (Phase 0: catalogue only, no game logic yet)
 # ---------------------------------------------------------------------------
 add_library(spaceship_core STATIC
-  cpp/data/Catalog.cpp)
+  cpp/data/Catalog.cpp
+  cpp/core/JsNumber.cpp
+  cpp/core/Action.cpp
+  cpp/core/Survival.cpp
+  cpp/core/CrewLogic.cpp
+  cpp/core/Tasks.cpp
+  cpp/core/Cooldowns.cpp
+  cpp/core/Incidents.cpp
+  cpp/core/Simulacron.cpp
+  cpp/core/Awards.cpp
+  cpp/core/Trace.cpp)
 
 target_include_directories(spaceship_core PUBLIC cpp)
 target_link_libraries(spaceship_core PUBLIC spaceship_json)
@@ -124,6 +134,13 @@ if(MSVC)
 else()
   target_compile_options(spaceship_core PRIVATE -Wall -Wextra -Wpedantic)
 endif()
+
+# ---------------------------------------------------------------------------
+# Console harness: replays command scripts against the core, for the
+# differential parity test and for looking at a voyage without a window.
+# ---------------------------------------------------------------------------
+add_executable(spaceship_console cpp/app/console_main.cpp)
+target_link_libraries(spaceship_console PRIVATE spaceship_core)
 
 # ---------------------------------------------------------------------------
 # Client
@@ -165,7 +182,9 @@ if(SPACESHIP_BUILD_TESTS)
   FetchContent_MakeAvailable(Catch2)
 
   add_executable(spaceship_tests
-    cpp/tests/catalog_tests.cpp)
+    cpp/tests/catalog_tests.cpp
+    cpp/tests/simulation_tests.cpp
+    cpp/tests/jsnumber_tests.cpp)
   target_link_libraries(spaceship_tests PRIVATE spaceship_core Catch2::Catch2WithMain)
 
   include(Catch)
@@ -181,6 +200,23 @@ if(SPACESHIP_BUILD_TESTS)
              WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
   elseif(SPACESHIP_DATA_GATE)
     message(WARNING "Spaceship: node not found, the catalogue sync test is not registered")
+  endif()
+
+  # The fidelity gate: every script in tests/parity/ is replayed through the
+  # reference (in a Node VM) and through spaceship_console, and the two trace
+  # streams must match byte for byte. Needs node and the frozen HTA.
+  if(SPACESHIP_DATA_GATE AND SPACESHIP_NODE AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Spaceship.hta")
+    file(GLOB SPACESHIP_PARITY_SCRIPTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/parity/*.script")
+    foreach(script IN LISTS SPACESHIP_PARITY_SCRIPTS)
+      get_filename_component(name "${script}" NAME_WE)
+      add_test(NAME parity.${name}
+               COMMAND "${CMAKE_COMMAND}"
+                       -DNODE=${SPACESHIP_NODE}
+                       -DCONSOLE=$<TARGET_FILE:spaceship_console>
+                       -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                       -DSCRIPT=${script}
+                       -P "${CMAKE_CURRENT_SOURCE_DIR}/tools/run-parity.cmake")
+    endforeach()
   endif()
 endif()
 

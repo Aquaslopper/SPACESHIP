@@ -166,4 +166,57 @@ struct Counts {
   int taskTypes = 0;
 };
 
+
+// ---------------------------------------------------------------------------
+// Authored starting values. These are content: the crew a new voyage begins
+// with, the hull readouts it begins at, and the definitions every subsystem
+// reads. Live state lives in core/GameState.h and is built from these.
+// ---------------------------------------------------------------------------
+struct CrewDefinition {
+  std::string id, name, role, room, activity, colour;
+  std::string sex, hair, hair2, skin, hairStyle;
+  double health = 0, morale = 0, fatigue = 0, hunger = 0, wallet = 0, hungerTick = 0;
+  std::string traits;
+  std::string race;
+  int age = 0;
+  std::string homeworld, hobby, religion;
+  std::string job, skill;
+  double jobAt = 0;
+};
+
+struct StatDefinition {
+  std::string id, label;
+  double value = 0;
+  std::string unit, colour;
+};
+
+struct SurveyRecordDef {
+  std::string id, name, src;
+  double value = 0;
+  std::string state;
+};
+
+struct IncidentType {
+  struct Stage {
+    std::string text;
+    double ticks = 0;
+    std::optional<double> hull, shield, energy, morale;
+  };
+  std::string id, kind, source, title, remedy;
+  double first = 0;   // action of the first report
+  double every = 0;   // actions between reports
+  std::vector<Stage> stages;
+};
+
+struct Commendation {
+  std::string id, title, metric;
+  double goal = 0;
+  std::string detail;
+};
+
+struct ProjectDef {
+  std::string id, label, room, lot;
+  double energy = 0, work = 0;
+};
+
 }  // namespace ship
