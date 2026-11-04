@@ -56,6 +56,7 @@ jobs:
             build/Release/spaceship.exe
             build/Release/WINDOWS-README.txt
             build/Release/NATIVE-PORT.md
+            build/Release/docs/VISUAL-PARITY.md
             build/Release/JSON-LICENSE.txt
             build/Release/music/
             build/Release/sounds/

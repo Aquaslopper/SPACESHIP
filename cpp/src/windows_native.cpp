@@ -970,6 +970,22 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR args, int show) {
     SendMessageW(window, WM_COMMAND, 904, 0);
     ok = ok && !titleVisible && game.actions() == 0;
     ok = ok && IsWindow(canvas) && IsWindow(listBox) && !choices.empty();
+    UpdateWindow(canvas);
+    if (hitRegions.empty())
+      ok = false;
+    else {
+      const auto room = hitRegions.front();
+      const int x = (room.first.left + room.first.right) / 2,
+                y = (room.first.top + room.first.bottom) / 2;
+      const size_t tabs = openTabs.size();
+      SendMessageW(canvas, WM_LBUTTONUP, 0, MAKELPARAM(x, y));
+      ok = ok && page == "home" && selected == room.second && openTabs.size() == tabs &&
+           game.actions() == 0;
+      SendMessageW(canvas, WM_RBUTTONUP, 0, MAKELPARAM(x, y));
+      ok = ok && page == room.second && openTabs.size() == tabs + 1 && game.actions() == 0;
+      pickPage("home");
+    }
+
     SendMessageW(window, WM_COMMAND, idWatch, 0);
     ok = ok && game.actions() == 1 && !IsWindowEnabled(watchButton) &&
          game.controlCooldown("watch") == 15;
