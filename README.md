@@ -1,132 +1,160 @@
-# Spaceship Command
+<p align="center">
+  <img src="spaceship.png" alt="Spaceship — a simulation game of depth, patience, and decisions that matter. Original cream-and-coffee title artwork." width="840">
+</p>
 
-Run `Spaceship.hta` on Windows, or use the browser preview to try it. The title menu uses the supplied artwork and lets you start a voyage, load any of three slots, adjust options or read a quick guide. The game is action-driven: waiting, reading, opening tabs and choosing map targets are free. Starting work costs one action; work in progress advances as you spend actions elsewhere. Navigation also has a **Stand watch** command that spends one action to advance work and survival clocks without a direct item cost, useful when the hold is full; normal life-support and crew consumption still applies. Power-dependent projects, travel, scans and salvage pause if energy runs out.
+<h1 align="center">Spaceship Command</h1>
 
-## Getting started
+<p align="center">
+  A small ship. A wide chart. Time to think.
+</p>
 
-1. Choose **New Voyage** from the title menu. You begin aboard the compact **SC Wren**. Right-click **Navigation**, select its new tab, choose Tolme Anchorage and start a crossing.
-2. Right-click the **O2 Filter Room**. Seat all three canisters, let the work finish, then start the bank. Starting it advances ongoing work by ten without advancing the world.
-3. During a crossing, the **Cargo Hold** can recover salvage. This uses energy and cargo space, but provides useful work while the journey progresses. Right-click the energy or fuel gauge to use a fuel cell.
-4. A completed crossing or scan waits for you to acknowledge it in Navigation. At a station, right-click the **Docked** indicator and select the new station tab to trade, hire, upgrade, accept contracts or undock.
-5. Watch the Events and Contracts sections in the sidebar. Reports can escalate as actions pass; hull failure or the loss of the entire crew ends the voyage.
+<p align="center">
+  <a href="https://github.com/Aquaslopper/SPACESHIP/actions/workflows/native-cpp.yml">Windows builds</a>
+  &nbsp; · &nbsp;
+  <a href="#your-first-voyage">First voyage</a>
+  &nbsp; · &nbsp;
+  <a href="NATIVE-PORT.md">Port status</a>
+  &nbsp; · &nbsp;
+  <a href="CONTRIBUTING.md">Contributing</a>
+</p>
 
-## Exploring the galaxy
+---
 
-The chart has seven regions, 48 navigable systems, 243 local destinations and 30 stations. Every system has a charted star and now includes an additional outer world and natural moon alongside its original local destinations. To leave Kessler, open **Navigation**, switch to **Sector**, select a system and start a jump. To browse farther afield, switch to **Galaxy**, select a region and choose **View sector chart**, then select a system to jump to. After the jump is complete, acknowledge it and switch to **System** to explore its stars, worlds, moons and stations.
+**Spaceship Command** is an offline, action-driven ship-management game about
+keeping a small vessel—and the people aboard it—going. Tend the filters, share a
+meal, take a contract, and decide what lies beyond the next crossing.
 
-Local travel and inter-system jumps both use fuel and progress as you spend actions. You must undock before starting a crossing. Stock spare fuel cells, O2 canisters and repair kits before a long trip: salvage uses energy, and not every system has a station. Deep scans work on local destinations, not entire systems; packaged survey data can be sold at a station. Markets vary by port, and new missions connect the regions. Station refits can expand the hold further or reduce fuel use without shortening travel time.
+It is a game to settle into, at the pace of a morning coffee. There is no clock
+running behind your back: **the world advances when you commit a gameplay action**.
+You can read, consider a route, or step away without losing a moment aboard.
+Unhurried does not mean consequence-free. Air, power, supplies and crew need your
+attention when the voyage moves on.
 
-## Ships and the shipyard
+## Come aboard
 
-A new voyage starts on the three-deck Wren courier, with **40 m3** of cargo space and **six berths**. Its compact deck plan still gives access to all 21 working facilities, including the Simulacron. The four starting crew occupy four berths; hires and passengers share the remaining space. Wren cargo refits raise its hold to 60 m3 and then 90 m3.
+The **native Windows edition** is a real C++ application, with its own interface
+and simulation. No browser, HTA host, Node installation or online service is needed
+to play.
 
-At any station shipyard you can buy the larger **SC Tessellate**, a Kestrel-series ship, for **4,000 shiplets**. Its larger deck plan starts with **60 m3** and **14 berths**; transferred cargo refits raise that to 90 m3 and then 120 m3. The purchase costs one action, requires confirmation, and cannot be reversed. Crew, passengers, cargo, equipment, refits, active work, ship condition, contracts and records transfer; it does not give a free repair or refill. Earnings from cargo, surveys, contracts and commissions can fund the purchase.
+1. Open [Windows builds](https://github.com/Aquaslopper/SPACESHIP/actions/workflows/native-cpp.yml)
+   and choose a **successful run for `main`**.
+2. Under **Artifacts**, download **`spaceship-windows-x64`**. GitHub may ask you to
+   sign in to download it.
+3. Extract the **whole ZIP** to a folder you can write to, then run `spaceship.exe`.
+   Keep the accompanying folders beside it.
 
-Saves made before ship classes existed keep their established Kestrel vessel, layout, capacity and progress rather than being forced onto a smaller ship. Both ship types can be saved and restored in any slot.
-
-## The living ship
-
-Every compartment in the ship diagram now opens a working station. Right-click a room, then select its tab. Use the arrows to scroll through open tabs; the fixed **Home** button returns to the ship. The deck plan uses function-specific color-coded room glyphs, and every facility window has its own illustrated instrument vignette so even utility spaces feel purpose-built. New facilities complement the existing engine, filters, quarters, mess, cargo and science stations:
-
-- **Medical Bay** uses a medkit and power for a quicker, stronger treatment. Medkits are sold at stations; the slower medical order in Crew Quarters remains available without one.
-- **Workshop, Recyclers and Fuel Reserve** turn recovered salvage into repair kits, O2 canisters and fuel cells. **Damage Control** can use salvage to patch the hull; **Hydroponics** can process a produce cargo lot into rations. Inputs are consumed when work begins.
-- **Thermal Control** stabilizes a worn drive. The **Power Bus** and **Shield Array** transfer energy in opposite directions, with a loss on each transfer. The **Bridge** offers a split fuel-cell transfer and a shortcut to Navigation.
-- **Observation** records each visited location once as saleable survey data. **Comms Relay** collects local reports and handles a discovered signal. **Sensor Array** spends insight and energy to shorten one deep scan by two work actions.
-- **Recreation** arranges a shared meal for two available crew. It consumes two rations, takes three work actions and improves their bond and morale. Strong or strained bonds influence morale; crew disputes can worsen or repair a particular bond. A healthy exhausted crew member may also take a short break on their own, temporarily leaving their duties.
-
-A **navigator** reduces fuel use by 4–20% when available at departure; the efficient-drive refit stacks with that saving. A **cleaner** quietly restores one morale to the crew on an action interval shortened by training (40 to 20 actions). Only the best available cleaner applies. Both benefits require the crew member to be available.
-
-Crew cannot be assigned to overlapping work. Ration and canister space is reserved while production is underway. Those processes, the crew's needs and incidents all follow the same action clock, not real time.
-
-## Simulacron
-
-The **Simulacron Core** replaces the old diagnostic room. It is an offline, data-driven game simulation inspired by the project's Simulacron and Sub material; it is **not** a language model and does not contact an external AI. Its named systems are:
-
-- **Name anchors:** a character's authored role, traits and hobby determine an identity such as Wayfinder, Maker, Keeper or Witness. Matching anchors give a small bonus to a shared meal.
-- **Desire Fire:** each person's most pressing need follows their actual health, air, fatigue, hunger, morale and work. Crew conversations and voluntary rest reflect their circumstances.
-- **Memory Mosaic:** arrivals, discoveries, care, conflicts, work and choices are recorded. Personal memories appear on the relevant crew profile; the core keeps the latest 32 records.
-- **Dream Engine / Observer:** choose two unconsolidated memories to turn into insight. Two exploration memories yield an extra insight; two memories involving the same person restore a little morale. A conflict and reconciliation involving the same pair also improve their bond. Insights can be used for sensor calibration or the signal investigation.
-- **World history:** each region has an authored history and continuing pressure, revealed through the Observation and Comms stations.
-
-To begin **Silicon Marrow**, deep-scan Halvan's Reach, build an insight in the core and decode the signal in Comms. Follow the resulting coordinates to the Choir Array in Echo Shoal. The eventual choice to shelter the archive or sell its signal has different, permanent resource and crew consequences. Scans already completed in an older save are recognized.
-
-## Handbook, commendations and commissions
-
-The pinned **Wiki** button opens a searchable, offline handbook covering controls, survival, exploration, the crew, ship systems, and Simulacron. Its Silicon Marrow entry is explicitly marked as a spoiler. Reading and following its room shortcuts are free.
-
-The **Rewards** button opens the captain's log. Fourteen commendations track milestones such as starting the filters, scanning worlds, visiting systems and regions, caring for the crew, resolving incidents, completing contracts and commissions, and concluding the signal story. Earned rewards can be claimed once for shiplets or supplies without spending an action. The captain's rank is cosmetic. The button shows the number of unclaimed rewards.
-
-Station mission boards also offer **repeatable commissions**: visit another port, scan a specified body, or recover two salvage lots during crossings. Only one can be active at a time. Accepting, collecting payment at any station, and abandoning a commission each cost one action; abandonment rotates the offers. Objectives only count after acceptance. The Contracts sidebar shows live commission progress; completed objectives enter the crew's Memory Mosaic, and the active commission survives saving and loading.
-
-## Saving and options
-
-Use the disk icon in the lower-left corner to save or load from three independent slots. Slot 1 remains compatible with the original `Spaceship_save.txt`; the other Windows HTA files are `Spaceship_save_2.txt` and `Spaceship_save_3.txt`. The browser preview uses separate local-storage keys instead. The loss screen can load any slot. Loading replaces the current voyage; the Save / Load menu can also start a new voyage after confirmation without deleting the slots, or return to the title menu and resume the current voyage. Starting a new voyage keeps the current settings, including motion, reading text, crew labels and confirmations.
-
-The Settings gear controls five bridge palettes (classic parchment, Deep Space, Aurora, Nebula and Ember), synthesized ambient music, sound effects, volume, decorative motion, larger reading text, crew diagram labels, and optional confirmations for jettisoning, abandoning a commission, permanent story decisions, saving and loading. The self-contained soundscape works offline; playback starts after a player gesture, and either music or effects can be disabled independently. Changing options costs no actions; preferences are saved with the voyage and older saves receive compatible defaults.
-
-### Action cooldowns are part of the game clock
-
-There is no real-time cooldown or background timer. The ship advances only when a committed action advances the action counter; idle time, opening windows, reading, selecting a map target and blocked clicks are free. When an action commits, every already-active button cooldown loses one action. The button that caused the action starts its own cooldown **after** that tick, so it does not count itself down.
-
-Each repeatable action control has an independent saved cooldown. The current tiers are **5 actions** for routine commands, **10** for ship-system work, **15** for space operations and **20** for critical or consequential decisions. Examples include service and production in the systems tier, travel, scans, docking and **Stand watch - advance ongoing work** in the space tier, and irreversible choices, large-ship purchases, signal decisions, jettisoning or abandoning work in the critical tier. Cooldown progress survives redraws and save/load. A blocked repeat neither commits an action nor advances any countdown; take another action to move it forward.
-
-Existing Kessler-only and expanded-galaxy saves still load, including active legacy room tabs. Scans, completed contracts, the current location, recorded observations, retained dreams and a running filter bank contribute provable past progress. Older saves did not track all historic visits, meals, projects or incidents, so unrecorded progress in those categories begins from migration. Previously earned commendation rewards still require a manual claim.
-
-## Native C++ edition and development
-
-The Windows `spaceship.exe` is now a **native C++ application**, with its own
-Win32 interface, GDI deck/chart views and C++ simulation. It does not launch the
-HTA or embed a browser/JavaScript engine. Its authored catalog is compiled in.
-
-**This is a playable migration build, not yet a feature-identical conversion.**
-Read [NATIVE-PORT.md](NATIVE-PORT.md) for implemented systems and specific parity
-gaps. The original `Spaceship.hta` is preserved as the reference edition. In
-particular, artwork, most settings and full edge-case parity remain unfinished.
-Native music/effects now play from optional bundled WAV files in `music/` and
-`sounds/`, with free toggles and volume controls on Home/Handbook. Native saves go
-in `saves/` next to the EXE, or the per-user `SpaceshipCommand\saves` directory
-when the install folder is read-only. Older per-user native slots remain loadable.
-Each gameplay control, including Stand watch, has an action-count cooldown;
-labelled cooldown readouts distinguish it from ongoing work.
-The native version now has staged crew sheets, autonomous work, selected dreams,
-free travel/scan acknowledgements and reference-tested navigation/commission rules.
-It can **import supported HTA saves**, including Windows UTF-16 files, without
-modifying the source. Unknown tasks or unmapped live cooldowns are explicitly
-refused rather than discarded. Native slots use separate files in
-`saves/` (with the per-user fallback above). See the migration notes for limitations.
-
-Build the shared native simulation, text client and tests:
-
-```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
-ctest --test-dir build --output-on-failure
-./build/spaceship_console
+```text
+Spaceship Command/
+├── spaceship.exe
+├── music/             Ambient shipboard music
+├── sounds/            Action and readout cues
+└── saves/             Three voyage slots and their backups
 ```
 
-On Windows, configure with `cmake -S . -B build -A x64`, build with
-`cmake --build build --config Release`, and run `build/Release/spaceship.exe`.
-The `spaceship-windows-x64` CI artifact contains the native EXE and documentation;
-it no longer bundles or needs `Spaceship.hta`. CTest creates the actual native
-window and dispatches an action in its `--smoke-test` mode. Visual/manual gameplay
-verification on a player's Windows PC is still required.
+The archive also includes a Windows quick-start, migration notes and the dependency
+license notice. Builds are currently distributed as CI artifacts, not a versioned
+release; if an older artifact has expired, use a newer successful run.
 
-The C++ implementation is under `cpp/`. `spaceship_console` uses the same
-`Voyage` simulation as the GUI, rather than a separate stripped-down game. The
-only vendored dependency is nlohmann/json 3.11.3 (MIT). No runtime downloads are
-needed. `node tools/export-native-data.cjs` regenerates the authored catalog at
-development time; its output is committed and checked by CI.
+> **A note on the voyage so far**
+>
+> The native edition is playable, but its conversion is **not yet feature-identical**
+> to the original game. Some artwork, settings and edge-case behavior remain to be
+> ported or verified. See [the migration notes](NATIVE-PORT.md) for the precise status.
+> The original [`Spaceship.hta`](Spaceship.hta) remains preserved as the reference
+> edition, with its own [interface and voyage guide](docs/REFERENCE-GUIDE.md).
 
-The original interface's gameplay JavaScript is inline, and its dependency-free Node tests load it in a VM with small DOM stubs. Run those regression tests from the repository root:
+## Life aboard
 
-```sh
-for test in tests/*.test.cjs; do node "$test"; done
-```
+| A little responsibility | A little possibility |
+| --- | --- |
+| **Keep the ship breathing.** Seat canisters, maintain the filter bank, watch the drive and prepare rations. | **Follow the chart.** Seven regions, 48 systems and 243 destinations form the authored galaxy. |
+| **Look after your crew.** Stage orders, arrange training, make room for rest and listen to the people doing the work. | **Make a living.** Trade between regional markets, recover salvage, package surveys and take station commissions. |
+| **Make room for memory.** Relationships, care, discoveries and disagreements leave traces in the Simulacron. | **Look a little closer.** Turn selected memories into insight, investigate a signal, and choose what to carry forward. |
 
-The key action-flow boundary is `performAction(detail)`: a committed action increments the counter, ticks active button cooldowns once, then advances the world. Keep free navigation and presentation handlers outside that path. Wire repeatable action controls through `commandRow`, `wireAction` or `buildProgressButton`; those UI wrappers start the source control's cooldown only if the callback actually committed an action. Per-control countdowns live in `STATE.actionCooldowns`, so they are included in saves and validated/migrated with other state. `AGENTS.md` records these invariants and the expected workflow for future changes.
+You begin aboard the compact **SC Wren**, with four crew, six berths and a
+40 m³ hold. A larger ship can come later. For now, there is enough to get to know.
 
-## Scope
+The Simulacron is an authored, offline simulation—not a language model or an
+external AI service. Its memories and desires follow the crew's actual voyage.
 
-The current game has working rooms, survival, trade, contracts, relationships, recurring incidents and one branching signal story. It is still a bounded simulation rather than every possibility in the broader manifesto: for example, it does not include a general-purpose AI dialogue/story generator.
+## Your first voyage
 
-For dependency-free checks, run `node tests/galaxy.test.cjs`, `node tests/simulacron.test.cjs`, `node tests/progression.test.cjs`, and `node tests/ships.test.cjs` from this folder.
+There is no need to learn every compartment at once.
+
+1. **Take a look around.** Select a page on the left, choose a target, then read its
+   details. Click a compartment on the deck plan to open it. Browsing is free.
+2. **Make breathing a priority.** Open the **O2 Filter Room** and seat available
+   canisters. Installation takes work; other useful gameplay actions advance it.
+   When all three are seated, start the filter bank if it is not already running.
+3. **Give the crew a plan.** In **Crew quarters**, stage each person's orders, then
+   issue the sheet as one action. Staging is free; crew carry out the work while
+   the rest of the ship continues.
+4. **Choose a nearby crossing.** In **Navigation**, select **Tolme Anchorage** and
+   start travel. Tend other jobs while the crossing progresses. When the readout
+   is ready, **acknowledge arrival**—that acknowledgement is free.
+5. **Find a rhythm.** Trade or take a commission at a station, replenish supplies,
+   and check the incident reports before committing to the next leg.
+
+The [Windows quick-start](WINDOWS-README.txt) covers controls, folders and importing
+an existing voyage. Unavailable commands explain their requirements in the detail
+pane; scroll the command panel if not everything fits on screen.
+
+### One action is one turn of the ship
+
+A successful gameplay command advances the whole simulation once: ongoing work,
+survival, crew needs and existing control cooldowns. Reading, selecting, staging
+orders, changing audio settings and acknowledging completed readouts do not.
+
+| Control category | Cooldown |
+| --- | --- |
+| Routine | 5 other committed actions |
+| Ship systems | 10 other committed actions |
+| Space operations, including **Stand watch** | 15 other committed actions |
+| Critical decisions | 20 other committed actions |
+
+These are **action counts, not seconds**. A control starts its cooldown after its
+own action; other successful gameplay clicks count it down. A blocked repeat
+advances nothing. Alternate useful commands rather than repeatedly pressing one.
+
+The left sidebar separates **ongoing work** from **named control cooldowns**.
+Buttons also show how many action clicks remain before they become available.
+
+## A place for everything
+
+**Saves.** Three slots live in `saves/` beside the EXE, with a `.bak` copy of the
+previous save. If that folder is read-only, the game uses
+`%LOCALAPPDATA%\SpaceshipCommand\saves` instead. **Home / Handbook → Open saves
+folder** shows the active location. Earlier native slots in the old per-user
+folder remain discoverable when a new slot is absent.
+
+**Older voyages.** **Import HTA save** can translate supported UTF-8 and Windows
+UTF-16 saves without changing the original file. Import is not universal: unknown
+work or unmapped active cooldowns are refused explicitly. Keep your originals and
+read the [compatibility notes](NATIVE-PORT.md#saves-and-hta-import) before migrating.
+
+**Sound.** Music, effects and volume have free controls on Home and Handbook.
+Playback begins after interaction. The bundled ambient loop and cues come from the
+reference game's synthesizer; no streaming or downloads are involved. You can
+replace the WAV files using the formats described in
+[`music/README.txt`](runtime/music/README.txt) and
+[`sounds/README.txt`](runtime/sounds/README.txt). Missing or unsupported audio stays
+silent rather than stopping the voyage.
+
+## Around the repository
+
+- **[Native port status](NATIVE-PORT.md)** — implemented systems, known differences
+  and verification boundaries.
+- **[Reference edition guide](docs/REFERENCE-GUIDE.md)** — the original HTA's fuller
+  handbook, including its own controls and settings. Story details are included.
+- **[Development guide](docs/DEVELOPMENT.md)** — build the C++ edition, run checks,
+  and find the shared simulation.
+- **[Contributing](CONTRIBUTING.md)** — report a rough edge or help with the port.
+- **[Spaceship manifesto](Spaceship%20manifesto.pdf)** and
+  **[concept notes](spaceship%20concept.pdf)** — the wider ideas behind the ship.
+
+The original artwork and design documents stay alongside the project. The native
+port is growing toward that vision, without pretending every part is finished.
+
+---
+
+*Put the kettle on. The ship can wait.*

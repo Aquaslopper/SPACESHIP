@@ -3,7 +3,7 @@
 ## Project shape
 
 - `Spaceship.hta` is the self-contained game: markup, CSS, inline JavaScript, game data, UI and save/load logic live in one file. It runs as a Windows HTA and is also used by the browser preview. There is no build step, package manager or external runtime dependency.
-- `README.md` is the player-facing feature and development guide.
+- `README.md` is the calm, player-facing introduction for the native edition. Keep download, clock and save guidance clear, and distinguish incomplete migration from full parity. `docs/REFERENCE-GUIDE.md` preserves the longer HTA guide; `docs/DEVELOPMENT.md` holds build/test instructions; `CONTRIBUTING.md` covers reports and contributions.
 - `tests/*.test.cjs` are dependency-free Node tests. They extract the inline script and exercise it in a VM with lightweight DOM stubs.
 - The supplied PDFs and artwork are design/reference assets; preserve them unless a task specifically requires changing them.
 

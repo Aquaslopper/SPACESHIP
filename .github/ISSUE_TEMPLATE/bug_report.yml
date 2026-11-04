@@ -1,0 +1,50 @@
+name: Report a problem
+description: Something aboard is not behaving as expected.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for checking the ship. A short sequence of clicks helps more than a long explanation.
+        Please review saves and screenshots before sharing them; imported saves may contain the original snapshot.
+  - type: dropdown
+    id: edition
+    attributes:
+      label: Edition
+      options:
+        - Native Windows EXE
+        - Original HTA
+        - Portable console
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: build
+    attributes:
+      label: Build and operating system
+      description: Commit or CI build link if available, plus your Windows or other OS version.
+      placeholder: "Native EXE, build link or commit, Windows version"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What did you do?
+      description: Include the room, selected target and command. Mention active work or cooldowns.
+      placeholder: |
+        1. Open…
+        2. Select…
+        3. Click…
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: What did you expect, and what happened?
+      description: For timing problems, include action counts before/after. Cooldowns count actions, not seconds.
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else that would help?
+      description: Repeatability, a screenshot, or relevant error text. Please omit private information.
