@@ -1,8 +1,10 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
+#include <windows.h>
+
+// Common-dialog declarations require Windows types before this header.
 #include <commdlg.h>
 #include <shlobj.h>
-#include <windows.h>
 
 #include <algorithm>
 #include <filesystem>
