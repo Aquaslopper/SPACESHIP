@@ -13,7 +13,8 @@ const data = {initial:g.saveSnapshot(), bodies:g.BODIES, systems:g.SECTOR_BODIES
  visual:{smallHull:g.SMALL_HULL,largeHull:g.LARGE_HULL,smallCorridor:g.SMALL_CORRIDOR,largeCorridor:g.LARGE_CORRIDOR},
  incidents:g.INCIDENT_TYPES, air:g.AIR_STAGES, engine:g.ENGINE, orders:g.ORDERS,
  surveyWorth:g.SURVEY_WORTH, themes:g.THEMES, pay:g.PAY,
- constants:{starve:g.MESS_STARVE,starveEvery:g.MESS_STARVE_EVERY}};
+ constants:{messEvery:g.MESS_EVERY,airHoldMax:g.AIR.holdMax,starve:g.MESS_STARVE,starveEvery:g.MESS_STARVE_EVERY}};
+data.machines=require('./lib/hta-machines.cjs')(g,fs.readFileSync(path.join(root,'Spaceship.hta'),'utf8'));
 // Separate literal chunks avoid MSVC's individual string-literal size limit.
 const encoded=JSON.stringify(data), chunks=[];
 for(let i=0;i<encoded.length;i+=8000) chunks.push('R"SPACEDATA('+encoded.slice(i,i+8000)+')SPACEDATA"');

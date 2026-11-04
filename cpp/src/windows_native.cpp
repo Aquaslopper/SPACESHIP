@@ -13,6 +13,7 @@
 #include <gdiplus.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -175,6 +176,8 @@ void layout() {
   const bool home = page == "home";
   const int contentW = w - left - 24 - (home ? 0 : right);
   int canvasH = home ? std::max(300, std::min(440, h - 380)) : 200;
+  const auto illustration = game.roomIllustration(page, selected);
+  if (!illustration.is_null()) canvasH = std::min(h - 350, illustration["h"].get<int>() + 16);
   ShowWindow(canvas, SW_SHOW);
   MoveWindow(canvas, left + 12, top, contentW, canvasH, TRUE);
   ShowWindow(listBox, home ? SW_HIDE : SW_SHOW);
@@ -314,12 +317,135 @@ void pickPage(const std::string& value) {
   selected.clear();
   refresh();
 }
+COLORREF cssColor(const std::string& text, COLORREF fallback = RGB(59, 54, 48)) {
+  const auto pos = text.find('#');
+  if (pos == std::string::npos) return fallback;
+  try {
+    auto n = std::stoul(text.substr(pos + 1, 6), nullptr, 16);
+    return RGB((n >> 16) & 255, (n >> 8) & 255, n & 255);
+  } catch (...) {
+    return fallback;
+  }
+}
+void paintAuthoredMachine(HDC dc, RECT area, const Json& drawing) {
+  const double scale = std::min({1.0, (area.right - 24.0) / drawing["w"].get<double>(),
+                                 (area.bottom - 16.0) / drawing["h"].get<double>()});
+  const int ox = static_cast<int>((area.right - drawing["w"].get<double>() * scale) / 2), oy = 8;
+  auto rect = [&](double x, double y, double w, double h) {
+    return RECT{ox + static_cast<LONG>(x * scale), oy + static_cast<LONG>(y * scale),
+                ox + static_cast<LONG>((x + w) * scale), oy + static_cast<LONG>((y + h) * scale)};
+  };
+  const int saved = SaveDC(dc);
+  auto bounds = rect(0, 0, drawing["w"], drawing["h"]);
+  IntersectClipRect(dc, bounds.left, bounds.top, bounds.right, bounds.bottom);
+  fill(dc, bounds, RGB(253, 251, 247));
+  for (const auto& part : drawing["parts"]) {
+    const auto& style = part["style"];
+    if (style.value("display", std::string{}) == "none") continue;
+    const auto id = part.value("id", std::string{});
+    double x = part["x"], y = part["y"], w = part["w"], h = part["h"];
+    if (id.rfind("o2-btnwrap", 0) == 0) {
+      const auto slot = "s" + id.substr(10);
+      Voyage probe = game;
+      bool enabled = probe.act("install", slot);
+      const int wait = game.controlCooldown("install", slot);
+      RECT button = rect(x, y, w, 26);
+      fill(dc, button, panel);
+      auto b = CreateSolidBrush(accent);
+      FrameRect(dc, &button, b);
+      DeleteObject(b);
+      std::string caption = enabled ? "Install canister" : "Slot unavailable";
+      if (wait) caption = "Cooldown: " + std::to_string(wait) + " actions";
+      label(dc, button, wide(caption), enabled ? ink : muted, smallFont,
+            DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+      if (enabled) hitRegions.push_back({button, "@install:" + slot});
+      continue;
+    }
+    if (w <= 0 || h <= 0) continue;
+    auto box = rect(x, y, w, h);
+    const auto backgroundCss = style.value("background", std::string{});
+    const auto border = style.value("border", std::string{});
+    auto pen = CreatePen(
+        border.find("dashed") != std::string::npos ? PS_DASH : PS_SOLID,
+        std::max(1, static_cast<int>((border.empty() ? 1 : std::atof(border.c_str())) * scale)),
+        cssColor(style.value("border-color", border), RGB(203, 184, 156)));
+    auto brush = backgroundCss.find('#') != std::string::npos
+                     ? CreateSolidBrush(cssColor(backgroundCss))
+                     : nullptr;
+    const auto oldPen = SelectObject(dc, border.empty() ? GetStockObject(NULL_PEN) : pen),
+               oldBrush = SelectObject(dc, brush ? brush : GetStockObject(HOLLOW_BRUSH));
+    const auto radius = style.value("border-radius", std::string{});
+    if (radius.find('%') != std::string::npos)
+      Ellipse(dc, box.left, box.top, box.right, box.bottom);
+    else if (!radius.empty()) {
+      int corner = std::max(1, static_cast<int>(std::atof(radius.c_str()) * 2 * scale));
+      RoundRect(dc, box.left, box.top, box.right, box.bottom, corner, corner);
+    } else
+      Rectangle(dc, box.left, box.top, box.right, box.bottom);
+    SelectObject(dc, oldPen);
+    SelectObject(dc, oldBrush);
+    DeleteObject(pen);
+    if (brush) DeleteObject(brush);
+    for (auto edge : {"border-left", "border-bottom", "border-top"})
+      if (style.contains(edge)) {
+        const auto v = style[edge].get<std::string>();
+        auto edgePen = CreatePen(PS_SOLID, 1, cssColor(v));
+        auto old = SelectObject(dc, edgePen);
+        if (std::string(edge) == "border-left") {
+          MoveToEx(dc, box.left, box.top, nullptr);
+          LineTo(dc, box.left, box.bottom);
+        } else {
+          const int yy = std::string(edge) == "border-top" ? box.top : box.bottom - 1;
+          MoveToEx(dc, box.left, yy, nullptr);
+          LineTo(dc, box.right, yy);
+        }
+        SelectObject(dc, old);
+        DeleteObject(edgePen);
+      }
+    const auto text = part.value("text", std::string{});
+    if (!text.empty()) {
+      const int size =
+          style.contains("font-size")
+              ? static_cast<int>(std::atof(style["font-size"].get<std::string>().c_str()))
+              : 12;
+      auto f = CreateFontW(
+          -std::max(7, static_cast<int>(size * scale)), 0, 0, 0,
+          style.value("font-weight", std::string{}) == "bold" ? FW_BOLD : FW_NORMAL, FALSE, FALSE,
+          FALSE, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0,
+          style.value("font-family", std::string{}).find("Consolas") != std::string::npos
+              ? L"Consolas"
+              : L"Segoe UI");
+      const auto align = style.value("text-align", std::string{});
+      UINT format = DT_TOP | DT_SINGLELINE |
+                    (align == "right"    ? DT_RIGHT
+                     : align == "center" ? DT_CENTER
+                                         : DT_LEFT);
+      if (part["runs"].size() > 1) {
+        for (const auto& run : part["runs"])
+          label(dc, box, wide(run["text"]),
+                cssColor(run["style"].value("color", style.value("color", std::string("#3b3630")))),
+                f,
+                DT_TOP | DT_SINGLELINE |
+                    (run["style"].value("float", std::string{}) == "right" ? DT_RIGHT : DT_LEFT));
+      } else
+        label(dc, box, wide(text), cssColor(style.value("color", std::string("#3b3630"))), f,
+              format);
+      DeleteObject(f);
+    }
+  }
+  RestoreDC(dc, saved);
+}
 LRESULT CALLBACK canvasProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
   if (msg == WM_ERASEBKGND) return 1;
   if (msg == WM_LBUTTONUP || msg == WM_RBUTTONUP) {
     POINT p{static_cast<short>(LOWORD(lp)), static_cast<short>(HIWORD(lp))};
     for (const auto& region : hitRegions)
       if (PtInRect(&region.first, p)) {
+        if (region.second.rfind("@install:", 0) == 0) {
+          if (game.act("install", region.second.substr(9))) playCue("install");
+          refresh(false);
+          return 0;
+        }
         if (page == "home") {
           if (msg == WM_RBUTTONUP)
             pickPage(region.second);
@@ -435,6 +561,8 @@ LRESULT CALLBACK canvasProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
       SelectObject(dc, ob);
       SelectObject(dc, op);
       DeleteObject(pen);
+    } else if (!game.roomIllustration(page, selected).is_null()) {
+      paintAuthoredMachine(dc, r, game.roomIllustration(page, selected));
     } else if (Voyage::catalog()["scenes"].contains(page)) {
       const auto& scene = Voyage::catalog()["scenes"][page];
       const std::string hex = scene.value("accent", std::string("#8c6f4e"));

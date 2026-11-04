@@ -22,6 +22,14 @@ This document is an acceptance checklist, not a declaration of completion.
 - Generic room instrument readouts now use the authored scene metadata rather than
   accidentally showing a navigation chart in unrelated rooms.
 
+- Engine, O2, mess and quarters now render extracted original box-of-div geometry
+  and CSS through native GDI, rather than the generic vignette. Crew pixels, job
+  props and medical/study poses come from the original sprite painter. Extraction
+  is development-only; the executable uses embedded data and C++ bindings.
+- Condition, O2 slots/air and meal meters bind to the native save. O2 install hit
+  targets occupy their authored positions and use the existing gameplay handler.
+  Complete page controls/readouts and visual comparison remain outstanding.
+
 **These are reconstruction steps, not pixel or functional UI parity.**
 
 ## Still required before visual acceptance

@@ -834,6 +834,37 @@ int main() {
         require(scene.contains(key) && scene[key].is_string(), "room scene metadata missing");
     }
   });
+  test("HTA machine geometry, pixels and live native bindings remain read-only", [] {
+    Voyage g;
+    const auto before = g.snapshot();
+    for (const auto& room : {"engine", "o2", "mess", "crew"}) {
+      const auto art = g.roomIllustration(room, "rell");
+      require(art.is_object() && art["parts"].size() > 25, "authored room drawing absent");
+    }
+    auto find = [](const Json& scene, const std::string& id) -> Json {
+      for (const auto& p : scene["parts"])
+        if (p.value("id", std::string{}) == id) return p;
+      throw std::runtime_error("missing authored part " + id);
+    };
+    const auto engine = g.roomIllustration("engine");
+    require(engine["w"] == 650 && engine["h"] == 390 && engine["parts"].size() > 200,
+            "engine geometry replaced");
+    require(find(engine, "eng-pct")["text"] ==
+                std::to_string(before["state"]["engineCondition"].get<int>()) + "%",
+            "engine not bound to save");
+    const auto mess = g.roomIllustration("mess");
+    require(find(mess, "mess-psub0")["text"] ==
+                std::to_string(Voyage::catalog()["constants"]["messEvery"].get<int>() -
+                               before["crew"][0].value("hungerTick", 0)) +
+                    " actions to next meal",
+            "meal timing not from HTA");
+    const auto crew = g.roomIllustration("crew", "rell");
+    require(crew["parts"].size() > 250 &&
+                Voyage::catalog()["machines"]["figures"]["rell"].contains("doc"),
+            "original pixel crew missing");
+    require(g.roomIllustration("not-a-room").is_null(), "unknown drawing fabricated");
+    require(g.snapshot() == before, "painting advanced or changed the game");
+  });
   std::filesystem::remove_all(directory);
   std::cout << failures << " failing test groups\n";
   return failures ? 1 : 0;

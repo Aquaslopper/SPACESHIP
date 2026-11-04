@@ -15,6 +15,7 @@ enable_testing()
 add_library(spaceship_core
   cpp/src/voyage.cpp
   cpp/src/voyage_views.cpp
+  cpp/src/voyage_art.cpp
   cpp/src/voyage_crew.cpp
   cpp/src/voyage_import.cpp
   cpp/src/runtime_files.cpp)
