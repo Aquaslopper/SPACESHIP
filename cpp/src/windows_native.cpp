@@ -27,8 +27,8 @@ using spaceship::Choice;
 using spaceship::Control;
 using spaceship::Json;
 using spaceship::Voyage;
-constexpr COLORREF background = RGB(255, 255, 255), panel = RGB(249, 247, 242),
-                   ink = RGB(56, 51, 43), muted = RGB(137, 126, 108), accent = RGB(140, 111, 78);
+constexpr COLORREF background = RGB(255, 255, 255), panel = RGB(250, 247, 242),
+                   ink = RGB(59, 54, 48), muted = RGB(138, 127, 114), accent = RGB(140, 111, 78);
 constexpr int idWatch = 101, idNew = 102, idSave = 103, idLoad = 104, idSlot = 105, idList = 106,
               idCanvas = 107;
 bool titleVisible = true, hasVoyage = false;
@@ -677,8 +677,10 @@ LRESULT CALLBACK windowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         if (titleArtwork) {
           Gdiplus::Graphics graphics(dc);
           graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-          graphics.DrawImage(titleArtwork.get(), titleRect.left, titleRect.top,
-                             titleRect.right - titleRect.left, titleRect.bottom - titleRect.top);
+          graphics.DrawImage(titleArtwork.get(), static_cast<INT>(titleRect.left),
+                             static_cast<INT>(titleRect.top),
+                             static_cast<INT>(titleRect.right - titleRect.left),
+                             static_cast<INT>(titleRect.bottom - titleRect.top));
         } else
           label(dc, {40, 60, r.right - 40, 160}, L"SPACESHIP", accent, titleFont, DT_CENTER);
       } else {
@@ -875,6 +877,7 @@ bool capture(const wchar_t* name) {
   auto old = SelectObject(memory, bitmap);
   RedrawWindow(mainWindow, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
   const BOOL painted = PrintWindow(mainWindow, memory, PW_CLIENTONLY);
+  SelectObject(memory, old);
   auto image = std::make_unique<Gdiplus::Bitmap>(bitmap, nullptr);
   UINT count = 0, size = 0;
   Gdiplus::GetImageEncodersSize(&count, &size);
@@ -888,7 +891,6 @@ bool capture(const wchar_t* name) {
     if (std::wstring(encoders[i].MimeType) == L"image/png")
       saved = painted && image->Save(path.c_str(), &encoders[i].Clsid, nullptr) == Gdiplus::Ok;
   image.reset();
-  SelectObject(memory, old);
   DeleteObject(bitmap);
   DeleteDC(memory);
   ReleaseDC(mainWindow, dc);
