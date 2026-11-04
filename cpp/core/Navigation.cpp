@@ -113,6 +113,26 @@ void Simulation::SetLayer(const std::string& key) {
   // client starts and stops that animation from here.
 }
 
+bool Simulation::ZoomMap(int dir) {
+  // Free. One step on the ladder, clamped, then rounded to a tenth exactly as
+  // the reference rounds it, so the caption and the raster always agree.
+  double zoom = map_.zoom + static_cast<double>(dir) * map_.zstep;
+  if (zoom < map_.zmin) { zoom = map_.zmin; }
+  if (zoom > map_.zmax) { zoom = map_.zmax; }
+  map_.zoom = js::Round(zoom * 10) / 10;
+  return true;
+}
+
+void Simulation::PanMap(double dx, double dy) {
+  // The chart may be pulled half a screen out of place, no further, or it can
+  // be lost off the edge and look broken. Panning is free.
+  LayerView& view = views_[map_.layer];
+  const double limitX = js::Round(map_.vw * 0.5);
+  const double limitY = js::Round(map_.vh * 0.5);
+  view.px = std::max(-limitX, std::min(limitX, view.px + dx));
+  view.py = std::max(-limitY, std::min(limitY, view.py + dy));
+}
+
 bool Simulation::ViewSector(const std::string& regionId) {
   if (FindBodyById(regionId) == nullptr) { return false; }
   const Body* region = nullptr;

@@ -119,6 +119,8 @@ class Simulation {
   bool StandWatch();                        // standWatch()
   bool Acknowledge(const std::string& taskId);  // the finished button
   void SetLayer(const std::string& key);    // free: looking never costs
+  bool ZoomMap(int dir);                    // free: one step on the zoom ladder
+  void PanMap(double dx, double dy);        // free: clamped per layer
   bool ViewSector(const std::string& regionId);
   bool Dock();                              // Dock at <port>
   bool Undock();

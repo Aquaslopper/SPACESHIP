@@ -566,6 +566,21 @@ signal story's two endings (`finishSignal`) and the broadcasts they unlock, clai
 the rank it feeds, and the crew order sheet's remaining payloads (a rest is the only order the clock can create on
 its own). All three are state-complete and save-compatible; they are waiting for their UI.
 
+### Phase 4 — Navigation and the star chart — DONE
+
+`ui/NavScreen` holds the whole chart: the projection pair (`NavProject`, and the
+panned form), the perspective raster (rungs `pow(j/(n+1), 2.1)`, the fan through a
+vanishing point held above the top edge at `-h * 0.35`), the zoom ladder clamped to
+0.6..2.0 in tenths, the pan clamp at half a screen per layer, the route dot trails,
+the seeded star clusters, the body sizes and label flips, and `navMetrics` folded
+into the panels' exact strings. `BuildNavChart` and `BuildNavScreen` build the data
+the renderer walks; `BuildNavFx` places the drifting rock, the orbiting satellite and
+the blinking beacon from a clock alone, so reduced motion freezes it and the action
+counter never moves. `PressNavAction` is the single press path: layer, select, zoom,
+pan, stand watch, dock, travel and scan. `ScreenKind::Nav` routes the tab the taskbar
+opens, and Draw paints the raster, the trails, the ring and the bodies under a
+scissor box with the panels around them.
+
 ### Phase 3 — The task frame and the machine rooms — DONE
 
 `ui/Widgets` holds the house frame every window shares: `TaskHead`, `NavPanel`,

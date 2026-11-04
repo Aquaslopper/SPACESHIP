@@ -16,6 +16,7 @@
 #include "core/JsNumber.h"
 #include "ui/EngineScreen.h"
 #include "ui/MessScreen.h"
+#include "ui/NavScreen.h"
 #include "ui/O2Screen.h"
 
 namespace ship {
@@ -228,6 +229,8 @@ bool PressProgressButton(Simulation& sim, const std::string& taskId) {
                               if (taskId == "o2-run") { return sim.StartFilterBank(); }
                               if (taskId == "maint") { return sim.StartMaintenanceSelf(); }
                               if (taskId == "cook") { return sim.StartCookingSelf(); }
+                              if (taskId == "travel") { return sim.StartTravel(); }
+                              if (taskId == "scan") { return sim.StartScan(); }
                               return false;
                             });
 }
@@ -357,6 +360,9 @@ TaskScreenModel BuildDescribedScreen(const Simulation& sim,
 //  Routing
 // ---------------------------------------------------------------------------
 ScreenKind ScreenKindFor(const Tab& tab) {
+  // The chart is not a room: it is its own window, and it is the first one the
+  // player can open from the taskbar.
+  if (tab.kind == "nav") { return ScreenKind::Nav; }
   if (tab.kind != "room") { return ScreenKind::Described; }
   if (tab.id == "engine") { return ScreenKind::Engine; }
   if (tab.id == "o2") { return ScreenKind::O2; }
@@ -374,6 +380,7 @@ ScreenKind ScreenKindFor(const Tab& tab) {
 
 TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab) {
   switch (ScreenKindFor(tab)) {
+    case ScreenKind::Nav: return BuildNavScreen(sim).screen;
     case ScreenKind::Engine: return BuildEngineScreen(sim).screen;
     case ScreenKind::O2: return BuildO2Screen(sim).screen;
     case ScreenKind::Mess: return BuildMessScreen(sim).screen;

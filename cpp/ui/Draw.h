@@ -22,6 +22,7 @@
 #include "ui/Layout.h"
 #include "ui/Shell.h"
 #include "ui/Widgets.h"
+#include "ui/NavScreen.h"
 #include "ui/Theme.h"
 
 namespace ship {
@@ -74,7 +75,17 @@ class ShellView {
   std::string taskTabKey_;
 
   void PaintChrome(Simulation& sim);
+  struct NavHit {
+    Area box;
+    std::string action;
+    std::string arg;
+  };
+  NavScreenModel navScreen_;
+  bool screenNav_ = false;
+  std::vector<NavHit> navHits_;
+
   void PaintTaskScreen(Simulation& sim);
+  void PaintNavScreen(Simulation& sim);
   void PaintPanel(const NavPanel& panel, const Area& box);
   void PaintStage(const TaskStage& stage, const Area& origin);
   void PaintIdle(Simulation& sim);

@@ -91,9 +91,16 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   } else {
     // Ask the router for the window the active tab owns - the same function the
     // tests drive, so what is painted is what was proven.
+    const Tab* tab = FindTab(sim.State(), sim.State().activeTab);
+    screenNav_ = tab != nullptr && ScreenKindFor(*tab) == ScreenKind::Nav;
     taskTabKey_ = sim.State().activeTab;
     taskScreen_ = BuildTabScreen(sim, *FindTab(sim.State(), taskTabKey_));
-    PaintTaskScreen(sim);
+    if (screenNav_) {
+      navScreen_ = BuildNavScreen(sim);
+      PaintNavScreen(sim);
+    } else {
+      PaintTaskScreen(sim);
+    }
   }
   PaintChrome(sim);
 
@@ -518,6 +525,229 @@ void ShellView::PaintTaskScreen(Simulation& sim) {
   (void)sim;
 }
 
+void ShellView::PaintNavScreen(Simulation& sim) {
+  navHits_.clear();
+  const Palette& p = theme_.palette;
+  const TaskScreenModel& screen = navScreen_.screen;
+  const NavChartView& chart = navScreen_.chart;
+
+  const float left = layout_.content.x + 8.0f;
+  const float right = layout_.content.Right() - 8.0f;
+  const float column = 214.0f;
+  const float middleLeft = left + column + 8.0f;
+  const float middleRight = right - column - 8.0f;
+
+  DrawText(screen.head.kind.c_str(), static_cast<int>(left),
+           static_cast<int>(layout_.content.y), 9, ToRay(p.muted));
+  DrawText(screen.head.title.c_str(), static_cast<int>(left),
+           static_cast<int>(layout_.content.y + 12.0f), 20, ToRay(p.ink));
+  DrawText(screen.head.sub.c_str(), static_cast<int>(left),
+           static_cast<int>(layout_.content.y + 36.0f), 11, ToRay(p.muted));
+
+  // --- the chart box: 638x278 at 1:1, shrunk only when the window is narrower
+  const float spareW = middleRight - middleLeft;
+  float scale = 1.0f;
+  if (chart.zoom >= 0 && spareW < 638.0f) { scale = spareW / 638.0f; }
+  const Area box{middleLeft, layout_.content.y + 58.0f, 638.0f * scale,
+                 278.0f * scale};
+
+  DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel));
+  DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                     static_cast<int>(box.w), static_cast<int>(box.h),
+                     ToRay(p.borderDark));
+
+  BeginScissorMode(static_cast<int>(box.x) + 1, static_cast<int>(box.y) + 1,
+                   static_cast<int>(box.w) - 2, static_cast<int>(box.h) - 2);
+  const ship::NavRaster raster = BuildNavRaster(sim);
+  const float zs = box.w / static_cast<float>(raster.width);
+
+  // The rungs: depth lines across the chart, faint far, solid near.
+  for (const NavRasterRung& rung : raster.rungs) {
+    const int y = static_cast<int>(box.y + static_cast<float>(rung.y) * zs);
+    DrawRectangle(static_cast<int>(box.x), y, static_cast<int>(box.w), 1,
+                  Fade(ToRay(p.ink), static_cast<float>(rung.alpha)));
+  }
+  // The fan: hairlines converging on a point held above the top edge.
+  for (const NavRasterLine& line : raster.lines) {
+    const double pi = 3.14159265358979323846;
+    const double rad = line.angle * pi / 180.0;
+    const double dx = std::cos(rad);
+    const double dy = std::sin(rad);
+    const float x1 = box.x + static_cast<float>(raster.vx - dx * 4000) * zs;
+    const float y1 = box.y + static_cast<float>(raster.vy - dy * 4000) * zs;
+    const float x2 = box.x + static_cast<float>(raster.vx + dx * 4000) * zs;
+    const float y2 = box.y + static_cast<float>(raster.vy + dy * 4000) * zs;
+    DrawLineEx(Vector2{x1, y1}, Vector2{x2, y2}, 1.0f, Fade(ToRay(p.ink), 0.13f));
+  }
+
+  for (const NavDot& dot : chart.clusters) {
+    const float px = box.x + static_cast<float>(dot.x) * zs;
+    const float py = box.y + static_cast<float>(dot.y) * zs;
+    DrawRectangle(static_cast<int>(px), static_cast<int>(py), 1, 1,
+                  ToRay(dot.cls.find("bright") != std::string::npos ? p.coffee
+                                                                  : p.muted));
+  }
+  for (const NavDot& dot : chart.routes) {
+    const float px = box.x + static_cast<float>(dot.x) * zs;
+    const float py = box.y + static_cast<float>(dot.y) * zs;
+    const Color ink = dot.cls.find("sel") != std::string::npos
+                          ? ToRay(p.sage)
+                          : (dot.cls.find("faint") != std::string::npos
+                                 ? Fade(ToRay(p.coffeeLight), 0.55f)
+                                 : Fade(ToRay(p.coffee), 0.8f));
+    DrawRectangle(static_cast<int>(px), static_cast<int>(py), 2, 2, ink);
+  }
+
+  // The ship's ring goes DOWN FIRST: painted last it swallows every click
+  // aimed at the body the ship is parked at.
+  if (chart.hasMarker) {
+    const float px = box.x + static_cast<float>(chart.marker.x) * zs;
+    const float py = box.y + static_cast<float>(chart.marker.y) * zs;
+    DrawCircleLines(static_cast<int>(px), static_cast<int>(py), 13.0f,
+                    ToRay(p.sage));
+  }
+
+  for (const NavBodyView& body : chart.bodies) {
+    const float cx = box.x + static_cast<float>(body.at.x) * zs;
+    const float cy = box.y + static_cast<float>(body.at.y) * zs;
+    const float radius = static_cast<float>(body.size) * 0.42f * zs;
+    Color fill = ToRay(p.coffee);
+    if (body.type == "station") { fill = ToRay(p.coffeeLight); }
+    if (body.type == "star") { fill = ToRay(p.ink); }
+    if (body.type == "region") { fill = ToRay(p.panel3); }
+    if (body.type == "origin") { fill = ToRay(p.sage); }
+    DrawCircleV(Vector2{cx, cy}, radius, fill);
+    if (body.selected) {
+      DrawCircleLines(static_cast<int>(cx), static_cast<int>(cy), radius + 3.0f,
+                      ToRay(p.terracotta));
+    }
+    const int labelX =
+        static_cast<int>(box.x + static_cast<float>(body.labelX) * zs);
+    DrawText(body.name.c_str(), labelX,
+             static_cast<int>(box.y + static_cast<float>(body.labelY) * zs), 9,
+             ToRay(body.scanned ? p.ink : p.muted));
+    navHits_.push_back(NavHit{Area{cx - radius - 4.0f, cy - radius - 4.0f,
+                                   radius * 2.0f + 8.0f, radius * 2.0f + 8.0f},
+                              "select", body.id});
+  }
+  EndScissorMode();
+
+  // --- the zoom pair, the layer stack and the scale caption
+  float bx = box.x + 4.0f;
+  for (const std::string& key : NavLayerOrder()) {
+    const bool on = key == chart.layer;
+    const Area boxArea{bx, box.Bottom() - 20.0f, 54.0f, 16.0f};
+    DrawRectangle(static_cast<int>(boxArea.x), static_cast<int>(boxArea.y),
+                  static_cast<int>(boxArea.w), static_cast<int>(boxArea.h),
+                  ToRay(on ? p.panel3 : p.panel));
+    DrawRectangleLines(static_cast<int>(boxArea.x), static_cast<int>(boxArea.y),
+                       static_cast<int>(boxArea.w), static_cast<int>(boxArea.h),
+                       ToRay(p.borderDark));
+    DrawText(NavLayerLabel(key).c_str(), static_cast<int>(boxArea.x + 6.0f),
+             static_cast<int>(boxArea.y + 4.0f), 9,
+             ToRay(on ? p.ink : p.muted));
+    navHits_.push_back(NavHit{boxArea, "layer", key});
+    bx += 58.0f;
+  }
+  const Area zoomIn{box.Right() - 44.0f, box.y + 4.0f, 18.0f, 18.0f};
+  const Area zoomOut{box.Right() - 22.0f, box.y + 4.0f, 18.0f, 18.0f};
+  for (const Area& z : {zoomIn, zoomOut}) {
+    DrawRectangle(static_cast<int>(z.x), static_cast<int>(z.y),
+                  static_cast<int>(z.w), static_cast<int>(z.h), ToRay(p.panel2));
+    DrawRectangleLines(static_cast<int>(z.x), static_cast<int>(z.y),
+                       static_cast<int>(z.w), static_cast<int>(z.h),
+                       ToRay(p.borderDark));
+  }
+  DrawText("+", static_cast<int>(zoomIn.x + 6.0f), static_cast<int>(zoomIn.y + 3.0f),
+           11, ToRay(p.ink));
+  DrawText("-", static_cast<int>(zoomOut.x + 6.0f),
+           static_cast<int>(zoomOut.y + 3.0f), 11, ToRay(p.ink));
+  navHits_.push_back(NavHit{zoomIn, "zoom-in", ""});
+  navHits_.push_back(NavHit{zoomOut, "zoom-out", ""});
+  DrawText(chart.scaleText.c_str(), static_cast<int>(box.Right() - 260.0f),
+           static_cast<int>(box.Bottom() - 18.0f), 9, ToRay(p.muted));
+
+  // --- panels: identity left, sensors right, the leg underneath the chart
+  float ly = layout_.content.y + 58.0f;
+  for (const NavPanel& panel : screen.left) {
+    PaintPanel(panel, Area{left, ly, column, 96.0f});
+    ly += 100.0f;
+  }
+  PaintPanel(screen.right[0],
+             Area{right - column, layout_.content.y + 58.0f, column, 190.0f});
+
+  const float halfW = (box.w - 6.0f) / 2.0f;
+  float uy = box.Bottom() + 22.0f;
+  for (std::size_t i = 0; i < screen.under.size(); ++i) {
+    PaintPanel(screen.under[i],
+               Area{box.x + static_cast<float>(i) * (halfW + 6.0f), uy, halfW,
+                    112.0f});
+  }
+
+  // --- the commitment band, full width along the bottom
+  const float bandY = layout_.content.Bottom() - 110.0f;
+  DrawRectangle(static_cast<int>(left), static_cast<int>(bandY),
+                static_cast<int>(right - left), 104, ToRay(p.panel));
+  DrawRectangleLines(static_cast<int>(left), static_cast<int>(bandY),
+                     static_cast<int>(right - left), 104, ToRay(p.border));
+  DrawText("Target Actions", static_cast<int>(left + 8.0f),
+           static_cast<int>(bandY + 4.0f), 10, ToRay(p.coffee));
+  float ty = bandY + 18.0f;
+  DrawText(navScreen_.courseNote.c_str(), static_cast<int>(left + 8.0f),
+           static_cast<int>(ty), 10, ToRay(p.muted));
+  ty += 14.0f;
+
+  float px2 = left + 8.0f;
+  for (const ProgressButton& button : screen.progress) {
+    const Area buttonBox{px2, ty, 148.0f, 22.0f};
+    DrawRectangle(static_cast<int>(buttonBox.x), static_cast<int>(buttonBox.y),
+                  static_cast<int>(buttonBox.w), static_cast<int>(buttonBox.h),
+                  ToRay(button.enabled ? p.panel2 : p.panel3));
+    if (button.fillPercent > 0.0) {
+      DrawRectangle(static_cast<int>(buttonBox.x), static_cast<int>(buttonBox.y),
+                    static_cast<int>(buttonBox.w * button.fillPercent / 100.0),
+                    static_cast<int>(buttonBox.h), ToRay(p.white));
+    }
+    DrawRectangleLines(static_cast<int>(buttonBox.x), static_cast<int>(buttonBox.y),
+                       static_cast<int>(buttonBox.w),
+                       static_cast<int>(buttonBox.h), ToRay(p.borderDark));
+    DrawText(button.text.c_str(), static_cast<int>(buttonBox.x + 6.0f),
+             static_cast<int>(buttonBox.y + 6.0f), 9,
+             ToRay(button.state == ButtonState::Cooldown ? p.terracotta : p.ink));
+    navHits_.push_back(NavHit{buttonBox, button.taskId, ""});
+    px2 += 156.0f;
+  }
+
+  ty += 26.0f;
+  for (const CommandRowView& row : screen.commands) {
+    const Area rowBox{left + 8.0f, ty, 300.0f, 18.0f};
+    DrawText(row.label.c_str(), static_cast<int>(rowBox.x + 34.0f),
+             static_cast<int>(rowBox.y + 4.0f), 10,
+             ToRay(row.enabled ? p.ink : p.muted));
+    DrawText((row.displayCost + "  ").c_str(), static_cast<int>(rowBox.x),
+             static_cast<int>(rowBox.y + 4.0f), 9, ToRay(p.coffee));
+    std::string action;
+    if (row.label.find("Stand watch") == 0) { action = "stand-watch"; }
+    if (row.label.find("Dock at ") == 0) { action = "dock"; }
+    if (row.label.find("View ") == 0) { action = "view-sector"; }
+    if (!action.empty()) {
+      const std::string arg =
+          action == "view-sector"
+              ? sim.State().navTarget.value_or(std::string())
+              : std::string();
+      navHits_.push_back(NavHit{rowBox, action, arg});
+    }
+    ty += 19.0f;
+  }
+  for (const std::string& note : navScreen_.notes) {
+    if (ty > bandY + 96.0f) { break; }
+    DrawText(note.c_str(), static_cast<int>(left + 8.0f), static_cast<int>(ty), 9,
+             ToRay(p.muted));
+    ty += 11.0f;
+  }
+}
+
 void ShellView::PaintDiagram(const DiagramModel& diagram) {
   const ::Color frame = ToRay(theme_.palette.coffee);
   const ::Color hull = ToRay(Rgb{253, 251, 247});
@@ -652,6 +882,19 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         break;
     }
     break;
+  }
+
+  // The chart's own controls: bodies, the zoom pair, the layers, the actions.
+  if (screenNav_) {
+    for (const NavHit& hit : navHits_) {
+      if (!hit.box.Contains(x, y)) { continue; }
+      if (PressNavAction(sim, hit.action, hit.arg) &&
+          (hit.action == "travel" || hit.action == "scan")) {
+        SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
+      }
+      return;
+    }
+    return;
   }
 
   // A task window's own controls come first.

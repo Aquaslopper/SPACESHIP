@@ -1,0 +1,47 @@
+# Phase 4 gate: the chart across three scales, a crossing out of Kessler and a
+# deep scan. Every looking verb here is free; only travel, watch and ack move
+# the clock.
+layer galaxy
+sector gal-inner
+layer sector
+layer system
+target tolme
+travel
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+ack travel
+undock
+dock
+target halvan
+scan
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+ack scan
+trace
