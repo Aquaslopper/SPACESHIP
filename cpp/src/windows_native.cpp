@@ -83,7 +83,7 @@ LRESULT CALLBACK canvasProc(HWND h,UINT msg,WPARAM wp,LPARAM lp) {
     PAINTSTRUCT ps;HDC dc=BeginPaint(h,&ps);RECT r;GetClientRect(h,&r);fill(dc,r,panel);hitRegions.clear();
     label(dc,{16,12,r.right-16,44},page=="home"?L"SC WREN / COMPARTMENT PLAN":L"CHART / SELECT A DESTINATION",accent,smallFont);
     if(page=="home") {
-      bool small=game.snapshot()["state"].value("shipClass",std::string{})=="wren";double scale=std::min((r.right-24.0)/(small?600.0:1160.0),(r.bottom-48.0)/(small?365.0:455.0));
+      bool compactShip=game.snapshot()["state"].value("shipClass",std::string{})=="wren";double scale=std::min((r.right-24.0)/(compactShip?600.0:1160.0),(r.bottom-48.0)/(compactShip?365.0:455.0));
       for(const auto& room:game.snapshot()["rooms"]) {
         int x=12+static_cast<int>(room["x"].get<int>()*scale),y=40+static_cast<int>(room["y"].get<int>()*scale);
         RECT box{x,y,x+std::max(20,static_cast<int>(room["w"].get<int>()*scale)),y+std::max(16,static_cast<int>(room["h"].get<int>()*scale))};
