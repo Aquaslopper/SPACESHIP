@@ -55,7 +55,10 @@ parity.legacy=[];
 function legacyCase(name,setup) {
  const c={document:{getElementById:()=>null},window:{location:{protocol:'http:'}}};vm.createContext(c);
  vm.runInContext(fs.readFileSync(path.join(root,'Spaceship.hta'),'utf8').match(/<script type="text\/javascript">([\s\S]*?)<\/script>/)[1],c);
- c.repaintCurrent=()=>{};setup(c);parity.legacy.push({name,save:c.saveSnapshot()});
+ c.repaintCurrent=()=>{};setup(c);const save=c.saveSnapshot();
+ // Log timestamps are presentation-only wall time, not simulation state.
+ for(const line of save.state.feed) if(line && typeof line==='object') line.t='00:00:00';
+ parity.legacy.push({name,save});
 }
 legacyCase('crew-sheet',c=>{c.CREW[0].health=70;c.queueOrders({rell:{doc:true},jax:{rest:true}},7);});
 legacyCase('incident-worker',c=>{for(let i=0;i<45;i++) c.performAction('fixture');c.beginIncidentWork(null,c.EVENTS[0].id);});
