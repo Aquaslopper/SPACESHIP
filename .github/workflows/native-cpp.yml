@@ -54,4 +54,5 @@ jobs:
             build/Release/spaceship.exe
             build/Release/WINDOWS-README.txt
             build/Release/NATIVE-PORT.md
+            build/Release/JSON-LICENSE.txt
           if-no-files-found: error

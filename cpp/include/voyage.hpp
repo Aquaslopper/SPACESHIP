@@ -1,18 +1,24 @@
 #pragma once
-#include "json.hpp"
 #include <filesystem>
 #include <string>
 #include <vector>
 
+#include "json.hpp"
+
 namespace spaceship {
 using Json = nlohmann::json;
-struct Choice { std::string id, label; };
-struct Control { std::string command, argument, label, reason; bool enabled; };
+struct Choice {
+  std::string id, label;
+};
+struct Control {
+  std::string command, argument, label, reason;
+  bool enabled;
+};
 
 // Native simulation. No browser, JavaScript interpreter or operating-system UI
 // calls belong here. Both the Win32 client and regression tests use this API.
 class Voyage {
-public:
+ public:
   Voyage();
   static const Json& catalog();
   const Json& snapshot() const { return save_; }
@@ -29,7 +35,8 @@ public:
   const std::string& message() const { return message_; }
   bool save(const std::filesystem::path& path) const;
   bool load(const std::filesystem::path& path);
-private:
+
+ private:
   Json save_;
   std::string message_;
   bool execute(const std::string& command, const std::string& argument);
@@ -37,7 +44,8 @@ private:
   void tick();
   void advanceWork(int amount);
   void finish(const Json& task);
-  void task(const std::string& id, const std::string& target, int work, const Json& payload = nullptr);
+  void task(const std::string& id, const std::string& target, int work,
+            const Json& payload = nullptr);
   bool busy(const std::string& id) const;
   void change(const std::string& stat, int amount);
   void remember(const std::string& kind, const std::string& text);
@@ -47,4 +55,4 @@ private:
   void arrive(const std::string& target);
   void validate(const Json& value) const;
 };
-}
+}  // namespace spaceship

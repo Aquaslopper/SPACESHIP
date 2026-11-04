@@ -28,7 +28,9 @@ if(WIN32)
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
       "${CMAKE_SOURCE_DIR}/WINDOWS-README.txt" "$<TARGET_FILE_DIR:spaceship>/WINDOWS-README.txt"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${CMAKE_SOURCE_DIR}/NATIVE-PORT.md" "$<TARGET_FILE_DIR:spaceship>/NATIVE-PORT.md")
+      "${CMAKE_SOURCE_DIR}/NATIVE-PORT.md" "$<TARGET_FILE_DIR:spaceship>/NATIVE-PORT.md"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${CMAKE_SOURCE_DIR}/cpp/vendor/LICENSE.json" "$<TARGET_FILE_DIR:spaceship>/JSON-LICENSE.txt")
   add_test(NAME spaceship_native_window COMMAND spaceship --smoke-test)
   set_tests_properties(spaceship_native_window PROPERTIES TIMEOUT 30)
   if(MSVC)
