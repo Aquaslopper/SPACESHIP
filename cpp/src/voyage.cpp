@@ -523,6 +523,7 @@ bool Voyage::execute(const std::string& c, const std::string& a) {
     pending = "project-" + a;
     work = number(p, "work");
   } else if (c == "transfer") {
+    if (a != "shield" && a != "energy") return reject("Choose energy or shield transfer.");
     const bool shield = a == "shield";
     if (stat(shield ? "energy" : "shield") <= 20 || stat(shield ? "shield" : "energy") >= 100)
       return reject("Needs more than 20 reserve points and room at the destination.");

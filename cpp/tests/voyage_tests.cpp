@@ -687,6 +687,14 @@ int main() {
     });
     require(fuel.act("fuel"), fuel.message());
     require(!fuel.act("fuel", "new-key"), "argument bypassed global cooldown");
+    auto transfer = fixture([](Json& d) {
+      stat(d, "energy", 60);
+      stat(d, "shield", 60);
+    });
+    require(transfer.act("transfer", "energy"), transfer.message());
+    const auto beforeTransfer = transfer.snapshot();
+    require(!transfer.act("transfer", "alias"), "unknown transfer target bypass");
+    require(transfer.snapshot() == beforeTransfer, "bad transfer target ticked world");
   });
   test("every enabled gameplay button blocks an immediate repeat", [] {
     auto base = fixture([](Json& d) {

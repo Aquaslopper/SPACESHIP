@@ -4,6 +4,7 @@
 
 // Common-dialog declarations require Windows types before this header.
 #include <commdlg.h>
+#include <shellapi.h>
 #include <shlobj.h>
 
 #include <algorithm>
