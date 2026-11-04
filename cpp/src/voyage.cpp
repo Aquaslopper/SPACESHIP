@@ -73,6 +73,7 @@ bool Voyage::execute(const std::string& c,const std::string& a) {
   if(wait) return reject("Cooldown: "+std::to_string(wait)+" other committed actions.");
   std::string pending,target;int work=0;Json payload;
   const bool docked=s.value("docked",false);
+  int reservedCargo=busy("salvage")?5:0;
   if(c=="watch") { /* Native clock advance; intentionally repeatable. */ }
   else if(c=="travel" || c=="jump") {
     const auto* b=find(catalog()[c=="jump"?"systems":"bodies"],a);
@@ -112,11 +113,11 @@ bool Voyage::execute(const std::string& c,const std::string& a) {
   else if(c=="filters") {
     for(const auto& slot:save_["life"]["slots"]) if(text(slot,"state")!="seated") return reject("Seat all three canisters first.");
     if(stat("energy")<1) return reject("Needs power.");
-    s["filterLife"]=number(save_["life"],"lifeMax");for(auto& slot:save_["life"]["slots"]) slot["state"]="active";
-    add(s["chronicle"],"banks",1);
+    // Switch-on happens after the initiating world tick, like new work.
+    pending="start-filters";
   }
   else if(c=="cook") {
-    if(busy("cook") || number(save_["mess"],"rack")>number(save_["mess"],"capacity")-6 || stat("energy")<3) return reject("Needs room for six rations, 3 energy and an idle galley.");
+    if(busy("cook") || busy("project-food") || number(save_["mess"],"rack")>number(save_["mess"],"capacity")-6 || stat("energy")<3) return reject("Needs room for six rations, 3 energy and an idle galley.");
     change("energy",-3);pending="cook";work=4;
   }
   else if(c=="salvage") {
@@ -130,14 +131,15 @@ bool Voyage::execute(const std::string& c,const std::string& a) {
       const int price=a=="fuel"?45:a=="kit"?60:a=="med"?75:a=="oxygen"?25:20;
       if(number(s,"shiplets")<price) return reject("Insufficient shiplets.");
       if(a=="oxygen" && number(save_["life"],"canisters")>=number(save_["life"],"capacity")) return reject("Canister rack full.");
-      if(a=="rations" && number(save_["mess"],"rack")>number(save_["mess"],"capacity")-6) return reject("Needs room for six rations.");
+      const int reservedRations=(busy("cook")?6:0)+(busy("project-food")?8:0);
+      if(a=="rations" && number(save_["mess"],"rack")+reservedRations>number(save_["mess"],"capacity")-6) return reject("Needs room for six rations.");
       add(s,"shiplets",-price);
       if(a=="fuel") add(s,"fuelCells",1);else if(a=="kit") add(s,"repairKits",1);else if(a=="med") add(s,"medkits",1);
       else if(a=="oxygen") add(save_["life"],"canisters",1);else add(save_["mess"],"rack",6);
     } else if(c=="buy") {
       const auto* good=find(catalog()["market"],a);if(!good) return reject("Unknown cargo.");
       int price=static_cast<int>(number(*good,"value")*port["prices"].value(text(*good,"kind"),1.0));
-      if(number(s,"shiplets")<price || cargoUsed()+number(*good,"vol")>number(save_["cargo"],"capacity")) return reject("Insufficient money or cargo space.");
+      if(number(s,"shiplets")<price || cargoUsed()+reservedCargo+number(*good,"vol")>number(save_["cargo"],"capacity")) return reject("Insufficient money or cargo space.");
       add(s,"shiplets",-price);Json lot=*good;add(s,"lotSerial",1);lot["id"]="lot-"+std::to_string(number(s,"lotSerial"));save_["goods"].push_back(lot);
     } else {
       auto& goods=save_["goods"];auto it=std::find_if(goods.begin(),goods.end(),[&](const Json& g){return text(g,"id")==a;});
@@ -235,7 +237,7 @@ bool Voyage::execute(const std::string& c,const std::string& a) {
     else if(status.empty()) {
       if(contract->contains("origin") && text(*contract,"origin")!=text(save_["map"],"here")) return reject("Accept at the contract's origin port.");
       if(text(*contract,"goal")=="freight") {
-        if(cargoUsed()+number(*contract,"vol")>number(save_["cargo"],"capacity")) return reject("Not enough cargo space.");
+        if(cargoUsed()+reservedCargo+number(*contract,"vol")>number(save_["cargo"],"capacity")) return reject("Not enough cargo space.");
         save_["goods"].push_back({{"id","contract-"+a},{"name",text(*contract,"title")},{"vol",number(*contract,"vol")},{"value",0},{"kind","Contract freight"},{"contractId",a}});
       }
       if(text(*contract,"goal")=="passenger") {
@@ -284,7 +286,11 @@ bool Voyage::execute(const std::string& c,const std::string& a) {
   add(save_,"actions",1);
   auto& cds=s["actionCooldowns"];for(auto it=cds.begin();it!=cds.end();) {add(it.value(),"remaining",-1);if(number(it.value(),"remaining")<=0) it=cds.erase(it);else ++it;}
   tick();
-  if(text(s,"gameOver").empty() && !pending.empty()) task(pending,target,work,payload);
+  if(text(s,"gameOver").empty() && pending=="start-filters") {
+    s["filterLife"]=number(save_["life"],"lifeMax");
+    for(auto& slot:save_["life"]["slots"]) slot["state"]="active";
+    add(s["chronicle"],"banks",1);
+  } else if(text(s,"gameOver").empty() && !pending.empty()) task(pending,target,work,payload);
   if(tier(c)) cds[key]={{"remaining",tier(c)},{"tier",tier(c)}};
   if(c=="filters" && text(s,"gameOver").empty()) advanceWork(10);
   progress();message_="Committed: "+c+(a.empty()?"":" / "+a);return true;
@@ -397,7 +403,7 @@ void Voyage::tick() {
   for(const auto& p:save_["crew"]) if(number(p,"health")>0 && !busy(text(p,"id"))) {
     const auto job=text(p,"job");
     if(job=="maintenance" && number(s,"engineCondition")<=number(p,"jobAt") && !busy("maintain") && number(s,"repairKits")>0) {add(s,"repairKits",-1);task("maintain",text(p,"id"),4);}
-    if(job=="kitchen" && number(save_["mess"],"rack")<=6 && !busy("cook") && stat("energy")>3) {change("energy",-3);task("cook",text(p,"id"),4);}
+    if(job=="kitchen" && number(save_["mess"],"rack")<=6 && !busy("cook") && !busy("project-food") && stat("energy")>3) {change("energy",-3);task("cook",text(p,"id"),4);}
   }
   if(stat("hull")==0) {s["gameOver"]="The hull failed.";s["nativeTasks"]=Json::array();}
 }
@@ -436,6 +442,20 @@ std::string Voyage::summary() const {
 }
 
 void Voyage::validate(const Json& d) const {
+  const auto shape=[](const auto& self,const Json& actual,const Json& model)->void {
+    if(model.is_object()) {
+      if(!actual.is_object()) throw std::runtime_error("Invalid save object.");
+      for(auto it=model.begin();it!=model.end();++it) self(self,actual.at(it.key()),it.value());
+    } else if(model.is_array()) {
+      if(!actual.is_array()) throw std::runtime_error("Invalid save array.");
+    } else if(model.is_number_integer()) {
+      if(!actual.is_number_integer()) throw std::runtime_error("Invalid integer field.");
+    } else if(model.is_number()) {
+      if(!actual.is_number()) throw std::runtime_error("Invalid numeric field.");
+    } else if(model.is_string() && !actual.is_string()) throw std::runtime_error("Invalid text field.");
+    else if(model.is_boolean() && !actual.is_boolean()) throw std::runtime_error("Invalid boolean field.");
+  };
+  shape(shape,d,catalog()["initial"]);
   if(d.value("format",std::string{})!="spaceship-native-1") throw std::runtime_error("Not a native save. HTA saves are kept separate and are not overwritten.");
   if(!d.at("actions").is_number_integer() || d.at("actions").get<int>()<0 || d.at("actions").get<int>()>10000000) throw std::runtime_error("Invalid action counter.");
   for(auto key:{"crew","stats","goods","survey","rooms"}) if(!d.at(key).is_array()) throw std::runtime_error("Invalid save array.");
@@ -447,12 +467,46 @@ void Voyage::validate(const Json& d) const {
   for(const auto& p:d["crew"]) for(auto key:{"health","morale","fatigue","hunger"}) if(!p.at(key).is_number_integer() || number(p,key)<0 || number(p,key)>100) throw std::runtime_error("Invalid crew condition.");
   for(auto id:{"hull","shield","energy","fuel"}) {const auto* st=find(d["stats"],id);if(!st || !st->at("value").is_number_integer() || number(*st,"value")<0 || number(*st,"value")>100) throw std::runtime_error("Invalid ship condition.");}
   if(!s.at("nativeTasks").is_array() || !s.at("nativeIncidents").is_array() || !s.at("nativeVisited").is_object() || !s.at("actionCooldowns").is_object()) throw std::runtime_error("Invalid task state.");
+  if(s["nativeTasks"].size()>128 || s["nativeIncidents"].size()>catalog()["incidents"].size()) throw std::runtime_error("Too many tasks or incidents.");
+  auto unique=[](const Json& list) {
+    std::vector<std::string> seen;
+    for(const auto& item:list) {auto id=item.at("id").get<std::string>();if(id.empty() || std::find(seen.begin(),seen.end(),id)!=seen.end()) throw std::runtime_error("Duplicate or empty ID.");seen.push_back(id);}
+  };
+  for(auto key:{"crew","stats","goods","rooms"}) unique(d.at(key));
+  unique(s["nativeTasks"]);unique(s["nativeIncidents"]);unique(d["life"]["slots"]);
+  for(const auto& ev:s["nativeIncidents"]) {
+    const auto* spec=find(catalog()["incidents"],text(ev,"id"));
+    if(!spec || number(ev,"stage")<0 || number(ev,"stage")>=static_cast<int>((*spec)["stages"].size()) || number(ev,"left")<1 || number(ev,"left")>1000) throw std::runtime_error("Invalid incident stage.");
+  }
+  if(d["rooms"].size()!=21 || d["stats"].size()!=4) throw std::runtime_error("Invalid ship structure.");
+  const auto& rooms=text(s,"shipClass")=="wren"?catalog()["initial"]["rooms"]:catalog()["largeRooms"];
+  for(const auto& r:d["rooms"]) {
+    const auto* authored=find(rooms,text(r,"id"));if(!authored) throw std::runtime_error("Unknown compartment.");
+    for(auto field:{"x","y","w","h"}) if(r.at(field)!=authored->at(field)) throw std::runtime_error("Invalid compartment geometry.");
+  }
+  if(number(s,"engineCondition")>100 || number(s,"airHold")>20 || number(s,"filterLife")>200 || number(s,"wearTick")>3) throw std::runtime_error("Invalid ship clock/condition.");
+  if(number(d["life"],"capacity")!=10 || number(d["life"],"canisters")>10 || number(d["life"],"lifeMax")!=200 || number(d["life"],"decay")!=4) throw std::runtime_error("Invalid life support capacity.");
+  if(number(d["mess"],"capacity")!=24 || number(d["mess"],"rack")<0 || number(d["mess"],"rack")>24) throw std::runtime_error("Invalid ration rack.");
+  const auto& sim=s["sim"];
+  if(number(sim,"insight")<0 || number(sim,"insight")>5 || number(sim,"sensor")<0 || number(sim,"sensor")>2) throw std::runtime_error("Invalid insight or calibration.");
+  for(auto key:{"scanned","nativeVisited"}) for(const auto& value:s[key]) if(!value.is_boolean()) throw std::runtime_error("Invalid progress flag.");
+  for(auto key:{"observed","broadcasts"}) for(const auto& value:sim[key]) if(!value.is_boolean()) throw std::runtime_error("Invalid simulation flag.");
+  for(auto key:{"systems","regions","earned","claimed"}) for(const auto& value:s["chronicle"][key]) if(!value.is_boolean()) throw std::runtime_error("Invalid chronicle flag.");
+  for(auto key:{"banks","projects","dreams","meals","incidents"}) if(number(s["chronicle"],key)<0) throw std::runtime_error("Invalid chronicle count.");
+  for(const auto& item:s["contracts"]) if(!item.is_string() || (item!="active" && item!="ready" && item!="complete")) throw std::runtime_error("Invalid contract state.");
+  for(const auto& m:sim["memories"]) {m.at("id").get<int>();m.at("processed").get<bool>();m.at("text").get<std::string>();m.at("kind").get<std::string>();}
+  if(!s["commissions"]["active"].is_null()) {
+    const auto& c=s["commissions"]["active"];auto kind=text(c,"kind");
+    if((kind!="visit" && kind!="scan" && kind!="salvage") || number(c,"done")<0 || number(c,"done")>number(c,"goal") || number(c,"goal")!=(kind=="salvage"?2:1) || !find(catalog()["bodies"],text(c,"target"))) throw std::runtime_error("Invalid commission.");
+  }
   for(const auto& t:s["nativeTasks"]) {
     const auto id=text(t,"id");bool known=id=="travel" || id=="scan" || id=="repair" || id=="maintain" || id=="cook" || id=="salvage" || id=="social";
     if(id.rfind("project-",0)==0) known=catalog()["projects"].contains(id.substr(8));
     if(id.rfind("install-",0)==0) known=find(d["life"]["slots"],text(t,"target"))!=nullptr;
     if(id.rfind("medical-",0)==0 || id.rfind("rest-",0)==0) known=find(d["crew"],text(t,"target"))!=nullptr;
     if(id.rfind("incident-",0)==0) known=find(catalog()["incidents"],text(t,"target"))!=nullptr;
+    if(id=="social" && (!t.at("payload").is_array() || t["payload"].size()!=2 || t["payload"][0]==t["payload"][1])) throw std::runtime_error("Invalid social assignment.");
+    if(id=="social") for(const auto& member:t["payload"]) if(!member.is_string() || !find(d["crew"],member.get<std::string>())) throw std::runtime_error("Unknown social participant.");
     if(!known || !t.at("left").is_number_integer() || number(t,"left")<1 || number(t,"left")>10000 || number(t,"total")<number(t,"left")) throw std::runtime_error("Invalid ongoing work.");
     if((id=="travel" || id=="scan") && !find(catalog()["bodies"],text(t,"target"))) throw std::runtime_error("Invalid work destination.");
   }

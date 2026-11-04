@@ -35,7 +35,15 @@ jobs:
       - name: Configure 64-bit Windows build
         run: cmake -S . -B build -A x64
       - name: Compile Windows executable
-        run: cmake --build build --config Release --parallel
+        shell: pwsh
+        run: |
+          $output = & cmake --build build --config Release --parallel 2>&1
+          $result = $LASTEXITCODE
+          $output | ForEach-Object { Write-Host $_ }
+          if ($result -ne 0) {
+            $output | Where-Object { $_ -match 'error' } | ForEach-Object { Write-Host "::error::$_" }
+          }
+          exit $result
       - name: Test Windows build
         run: ctest --test-dir build -C Release --output-on-failure
       - name: Publish Windows executable artifact

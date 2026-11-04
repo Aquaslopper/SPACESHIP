@@ -102,8 +102,8 @@ LRESULT CALLBACK canvasProc(HWND h,UINT msg,WPARAM wp,LPARAM lp) {
         if(!local && selected.rfind("sec-",0)==0) {const Json* target=nullptr;for(const auto& s:data["systems"]) if(s.value("id",std::string{})==selected) target=&s;if(target && b.value("region",std::string{})!=target->value("region",std::string{})) continue;}
         int x=20+b["x"].get<int>()*chartW/638,y=48+b["y"].get<int>()*chartH/278;
         RECT dot{x-5,y-5,x+6,y+6};fill(dc,dot,b.value("id",std::string{})==selected?accent:RGB(192,165,102));
-        label(dc,{x+8,y-6,std::min(x+150,r.right-5),y+28},wide(b["name"].get<std::string>()),ink,smallFont);
-        hitRegions.push_back({{x-8,y-9,std::min(x+145,r.right),y+26},b["id"].get<std::string>()});
+        label(dc,{x+8,y-6,std::min<LONG>(x+150,r.right-5),y+28},wide(b["name"].get<std::string>()),ink,smallFont);
+        hitRegions.push_back({{x-8,y-9,std::min<LONG>(x+145,r.right),y+26},b["id"].get<std::string>()});
       }
     }
     EndPaint(h,&ps);return 0;

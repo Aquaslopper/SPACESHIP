@@ -23,6 +23,7 @@ target_link_libraries(spaceship_console PRIVATE spaceship_core)
 if(WIN32)
   add_executable(spaceship WIN32 cpp/src/windows_native.cpp)
   target_link_libraries(spaceship PRIVATE spaceship_core user32 gdi32 shell32)
+  target_compile_definitions(spaceship PRIVATE UNICODE _UNICODE)
   add_custom_command(TARGET spaceship POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
       "${CMAKE_SOURCE_DIR}/WINDOWS-README.txt" "$<TARGET_FILE_DIR:spaceship>/WINDOWS-README.txt"
