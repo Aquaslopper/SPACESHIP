@@ -56,8 +56,13 @@ The game is **not real-time**. Waiting, reading, opening a window, selecting a m
 - Build/test locally with `cmake -S . -B build`, `cmake --build build --parallel`, then `ctest --test-dir build --output-on-failure`. The Windows workflow must compile `build/Release/spaceship.exe` and publish it as an artifact.
 - `.github/workflows/native-cpp.yml` also runs the existing Node regression suites. Keep both the native tests and the legacy-game tests passing during the incremental port.
 
-## Windows packaging correction
+## Native C++ migration (supersedes the HTA launcher)
 
-- The player-facing Windows `spaceship.exe` is an HTA launcher, not the incomplete native port. Ship `Spaceship.hta` and `WINDOWS-README.txt` alongside it. Preserve adjacent save-file compatibility and never bypass Windows security policy.
-- The native console target is now `spaceship_console`; it is excluded from the player artifact. Its **standWatch is deliberately repeatable without cooldown** to prevent permanent stalls caused by its very small command set. This exception applies only to the experimental C++ console, not the HTA cooldown contract above. Each watch still advances the action counter, existing cooldowns and world, in that order.
-- Windows CTest includes the launcher's noninteractive `--check` packaging check. This is not a rendering or end-user policy test.
+- Windows `spaceship.exe` is a real native Win32/GDI application in `cpp/src/windows_native.cpp`. Never replace it with a browser/HTA launcher. No runtime HTA, JavaScript, Node, network access or external data is required.
+- `Voyage` in `voyage.hpp` / `voyage.cpp` / `voyage_views.cpp` is the shared simulation for GUI, portable console and tests. Do not create another independent mini-game with different rules.
+- Preserve `Spaceship.hta` as the reference during migration. See `NATIVE-PORT.md` for explicit parity gaps; do not claim the conversion is complete while those remain.
+- Native watch is intentionally repeatable without cooldown to avoid deadlock. This exception does not alter the reference HTA rules above. Native committed actions increment the counter, tick existing cooldowns, then advance existing work; new work and the source cooldown start afterward. Free view/control probing must never mutate live state.
+- Native save format is `spaceship-native-1`; three UI slots live under `%LOCALAPPDATA%\SpaceshipCommand`, never in the HTA slots. Reject unsupported legacy saves rather than silently losing their state.
+- `tools/export-native-data.cjs` extracts authored data into the committed `native_data.hpp`. Run it after changing reference data, and check with `node tools/export-native-data.cjs --check`. Data is split into literal chunks for MSVC compatibility. This development tool is not part of the native runtime.
+- Native tests are `cpp/tests/voyage_tests.cpp`. Windows CTest also creates the real window and dispatches an action with `spaceship.exe --smoke-test`. This is not full rendering/playthrough verification.
+- Vendored nlohmann/json is MIT licensed in `cpp/vendor/LICENSE.json`. Keep third-party notices and keep builds offline after checkout.

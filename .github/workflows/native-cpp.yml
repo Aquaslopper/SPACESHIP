@@ -17,7 +17,9 @@ jobs:
         with:
           node-version: 22
       - name: Existing game regression tests
-        run: for test in tests/*.test.cjs; do node "$test"; done
+        run: |
+          node tools/export-native-data.cjs --check
+          for test in tests/*.test.cjs; do node "$test"; done
       - name: Configure native C++ game
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
       - name: Build native C++ game
@@ -42,6 +44,6 @@ jobs:
           name: spaceship-windows-x64
           path: |
             build/Release/spaceship.exe
-            build/Release/Spaceship.hta
             build/Release/WINDOWS-README.txt
+            build/Release/NATIVE-PORT.md
           if-no-files-found: error

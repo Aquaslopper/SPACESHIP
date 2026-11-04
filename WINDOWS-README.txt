@@ -1,24 +1,28 @@
-SPACESHIP COMMAND - full visual Windows edition
+SPACESHIP COMMAND - NATIVE C++ MIGRATION BUILD
 
-1. Extract ALL files from spaceship-windows-x64.zip into a writable folder
-   (for example a folder under Documents, not Program Files).
-2. Double-click spaceship.exe. Keep Spaceship.hta beside it.
+Extract the ZIP and run spaceship.exe. It is a native Windows application:
+no HTA host, browser, JavaScript runtime, Node, or Visual C++ redistributable
+installation is required. Game data is compiled into the executable.
 
-This EXE is a launcher for the existing full visual HTA game, NOT a native
-C++ rewrite. It uses Windows' built-in HTML Application host (mshta.exe).
-It needs no Visual C++ runtime download. It works offline.
+This is a playable migration build, NOT yet a feature-identical port.
+Read NATIVE-PORT.md for implemented systems and remaining differences.
 
-The experimental C++ console port is not included in this player package.
+Controls
+- Select a page at left, a target in its list, then an available command.
+- Click a compartment in the ship plan to open it.
+- Navigation lists local destinations first, then all star systems.
+- Reading and selecting are free. A committed command advances one action.
+- Stand watch is repeatable and advances ongoing work and other cooldowns.
+- Disabled command reasons are listed in the detail pane.
+- First watch: O2 Filter Room -> install each slot -> stand watch until seated
+  -> start bank. Navigation -> Tolme Anchorage -> start crossing.
 
-Saves remain Spaceship_save.txt, Spaceship_save_2.txt and
-Spaceship_save_3.txt beside Spaceship.hta. To continue an existing voyage,
-copy those save files from your old game folder into this folder first.
-Keep backups. Replacing the EXE/HTA does not require replacing save files.
+Saves
+Use the slot selector and Save/Load buttons. Files are stored in:
+%LOCALAPPDATA%\SpaceshipCommand\native-slot-1.json (or 2 / 3).
+Previous slot contents are retained as .bak when a replacement is saved.
+These are native-only saves. HTA save import is not implemented; your old
+Spaceship_save*.txt files are not touched. Keep them for the reference edition.
 
-If Windows or your organisation blocks HTML Applications, this launcher
-cannot bypass that policy. Do not disable antivirus or system protections.
-On managed PCs, contact your administrator. Opening Spaceship.hta directly
-uses the same Windows host and can help identify an HTA-specific error.
-
-spaceship.exe --check checks that the HTA and Windows host exist without
-opening a window; it does not verify rendering or override security policy.
+Windows CI checks the native UI with --smoke-test. Actual visual appearance
+and playthrough behavior still require manual Windows testing.
