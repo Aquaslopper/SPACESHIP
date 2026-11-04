@@ -88,6 +88,12 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
 
   if (sim.State().activeTab == "home") {
     PaintIdle(sim);
+  } else {
+    // Ask the router for the window the active tab owns - the same function the
+    // tests drive, so what is painted is what was proven.
+    taskTabKey_ = sim.State().activeTab;
+    taskScreen_ = BuildTabScreen(sim, *FindTab(sim.State(), taskTabKey_));
+    PaintTaskScreen(sim);
   }
   PaintChrome(sim);
 
@@ -335,6 +341,183 @@ void ShellView::PaintIdle(Simulation& sim) {
   (void)sim;
 }
 
+void ShellView::PaintPanel(const NavPanel& panel, const Area& box) {
+  const Palette& p = theme_.palette;
+  DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel));
+  DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                     static_cast<int>(box.w), static_cast<int>(box.h),
+                     ToRay(p.border));
+  DrawText(panel.title.c_str(), static_cast<int>(box.x + 8.0f),
+           static_cast<int>(box.y + 5.0f), 11, ToRay(p.coffee));
+  float y = box.y + 24.0f;
+  for (const PanelLine& line : panel.lines) {
+    switch (line.kind) {
+      case PanelLine::Kind::Name:
+        DrawText(line.value.c_str(), static_cast<int>(box.x + 8.0f),
+                 static_cast<int>(y), 22, ToRay(p.ink));
+        y += 22.0f;
+        break;
+      case PanelLine::Kind::Sub:
+        DrawText(line.value.c_str(), static_cast<int>(box.x + 8.0f),
+                 static_cast<int>(y), 10, ToRay(p.muted));
+        y += 13.0f;
+        break;
+      case PanelLine::Kind::Bar: {
+        const float w = box.w - 16.0f;
+        DrawRectangle(static_cast<int>(box.x + 8.0f), static_cast<int>(y),
+                      static_cast<int>(w), 5, ToRay(p.panel3));
+        DrawRectangle(static_cast<int>(box.x + 8.0f), static_cast<int>(y),
+                      static_cast<int>(w * std::max(0.0, std::min(100.0, line.pct)) / 100.0),
+                      5, ToRay(p.coffee));
+        y += 11.0f;
+        break;
+      }
+      case PanelLine::Kind::Dim:
+      case PanelLine::Kind::Note:
+        DrawText(line.value.c_str(), static_cast<int>(box.x + 8.0f),
+                 static_cast<int>(y), 10, ToRay(p.muted));
+        y += 12.0f * static_cast<float>(1 + line.value.size() / 34);
+        break;
+      case PanelLine::Kind::Field:
+        DrawText(line.key.c_str(), static_cast<int>(box.x + 8.0f),
+                 static_cast<int>(y), 10, ToRay(p.muted));
+        DrawText(line.value.c_str(), static_cast<int>(box.x + box.w - 8.0f -
+                                                          static_cast<float>(MeasureText(line.value.c_str(), 10))),
+                 static_cast<int>(y), 10, ToRay(p.ink));
+        y += 14.0f;
+        break;
+    }
+    if (y > box.Bottom() - 4.0f) { break; }
+  }
+}
+
+void ShellView::PaintStage(const TaskStage& stage, const Area& origin) {
+  const Palette& p = theme_.palette;
+  for (const MachinePart& part : stage.parts) {
+    const int x = static_cast<int>(origin.x + part.box.x);
+    const int y = static_cast<int>(origin.y + part.box.y);
+    const int w = std::max(1, static_cast<int>(part.box.w));
+    const int h = std::max(1, static_cast<int>(part.box.h));
+    if (part.cls.find("pipe") != std::string::npos ||
+        part.cls.find("duct") != std::string::npos ||
+        part.cls.find("counter") != std::string::npos) {
+      DrawRectangle(x, y, w, h, ToRay(p.panel3));
+      DrawRectangleLines(x, y, w, h, ToRay(p.border));
+    } else if (part.cls.find("ring") != std::string::npos ||
+               part.cls.find("wheel") != std::string::npos ||
+               part.cls.find("dial") != std::string::npos) {
+      DrawCircle(x + w / 2, y + h / 2, static_cast<float>(std::max(w, h)) / 2.0f,
+                 ToRay(p.panel2));
+      DrawCircleLines(x + w / 2, y + h / 2,
+                      static_cast<float>(std::max(w, h)) / 2.0f, ToRay(p.coffee));
+    } else if (part.cls.find("fill") != std::string::npos) {
+      DrawRectangle(x, y, w, h, ToRay(p.sage));
+    } else if (part.cls.find("track") != std::string::npos ||
+               part.cls.find("box") != std::string::npos ||
+               part.cls.find("slot") != std::string::npos ||
+               part.cls.find("plate") != std::string::npos ||
+               part.cls.find("rack") != std::string::npos) {
+      DrawRectangle(x, y, w, h, ToRay(p.panel));
+      DrawRectangleLines(x, y, w, h, ToRay(p.borderDark));
+    } else {
+      DrawRectangle(x, y, w, h, ToRay(p.coffeeLight));
+    }
+    if (!part.text.empty() && part.text[0] != 'm') {
+      DrawText(part.text.c_str(), x + 2, y + 1, 8, ToRay(p.muted));
+    }
+  }
+
+  for (const LiveControl& control : stage.controls) {
+    const Area box{origin.x + control.box.x, origin.y + control.box.y,
+                   control.box.w, 26.0f};
+    const bool locked = control.button.state == ButtonState::Cooldown;
+    DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                  static_cast<int>(box.w), static_cast<int>(box.h),
+                  ToRay(control.button.enabled ? p.panel2 : p.panel3));
+    DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                       static_cast<int>(box.w), static_cast<int>(box.h),
+                       ToRay(p.borderDark));
+    DrawText(control.button.text.c_str(), static_cast<int>(box.x + 6.0f),
+             static_cast<int>(box.y + 7.0f), 10,
+             ToRay(locked ? p.terracotta : p.ink));
+    taskButtons_.push_back({box, control.button.taskId});
+  }
+}
+
+void ShellView::PaintTaskScreen(Simulation& sim) {
+  taskButtons_.clear();
+  const Palette& p = theme_.palette;
+  const TaskScreenModel& screen = taskScreen_;
+  const float left = layout_.content.x + 8.0f;
+  const float right = layout_.content.Right() - 8.0f;
+  const float column = 250.0f;
+
+  DrawText(screen.head.kind.c_str(), static_cast<int>(left),
+           static_cast<int>(layout_.content.y), 9, ToRay(p.muted));
+  DrawText(screen.head.title.c_str(), static_cast<int>(left),
+           static_cast<int>(layout_.content.y + 12.0f), 20, ToRay(p.ink));
+  DrawText(screen.head.sub.c_str(), static_cast<int>(left),
+           static_cast<int>(layout_.content.y + 36.0f), 11, ToRay(p.muted));
+
+  float y = layout_.content.y + 58.0f;
+  for (const NavPanel& panel : screen.left) {
+    PaintPanel(panel, Area{left, y, column, 118.0f});
+    y += 124.0f;
+  }
+
+  float ry = layout_.content.y + 58.0f;
+  for (const NavPanel& panel : screen.right) {
+    PaintPanel(panel, Area{right - column, ry, column, 150.0f});
+    ry += 156.0f;
+  }
+
+  if (screen.hasStage) {
+    const Area origin{left + column + 16.0f, layout_.content.y + 58.0f,
+                      screen.stage.width, screen.stage.height};
+    PaintStage(screen.stage, origin);
+    float uy = origin.y + screen.stage.height + 4.0f;
+    const float halfW = (right - column - 16.0f - (left + column + 16.0f) - 4.0f) / 2.0f;
+    for (std::size_t i = 0; i < screen.under.size(); ++i) {
+      PaintPanel(screen.under[i],
+                 Area{origin.x + static_cast<float>(i) * (halfW + 4.0f), uy, halfW,
+                      110.0f});
+    }
+  }
+
+  // The commitments band, along the bottom of the content column.
+  const float bandY = layout_.content.Bottom() - 96.0f;
+  DrawRectangle(static_cast<int>(left), static_cast<int>(bandY),
+                static_cast<int>(right - left), 90, ToRay(p.panel));
+  DrawRectangleLines(static_cast<int>(left), static_cast<int>(bandY),
+                     static_cast<int>(right - left), 90, ToRay(p.border));
+  DrawText("Actions", static_cast<int>(left + 8.0f),
+           static_cast<int>(bandY + 5.0f), 11, ToRay(p.coffee));
+  DrawText(screen.bandNote.c_str(), static_cast<int>(left + 8.0f),
+           static_cast<int>(bandY + 20.0f), 10, ToRay(p.muted));
+
+  float bx = left + 12.0f;
+  for (const ProgressButton& button : screen.progress) {
+    const Area box{bx, bandY + 50.0f, 190.0f, 28.0f};
+    DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                  static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel2));
+    if (button.fillPercent > 0.0) {
+      DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                    static_cast<int>(box.w * button.fillPercent / 100.0),
+                    static_cast<int>(box.h), ToRay(p.white));
+    }
+    DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                       static_cast<int>(box.w), static_cast<int>(box.h),
+                       ToRay(p.borderDark));
+    DrawText(button.text.c_str(), static_cast<int>(box.x + 8.0f),
+             static_cast<int>(box.y + 8.0f), 10,
+             ToRay(button.state == ButtonState::Cooldown ? p.terracotta : p.ink));
+    taskButtons_.push_back({box, button.taskId});
+    bx += 198.0f;
+  }
+  (void)sim;
+}
+
 void ShellView::PaintDiagram(const DiagramModel& diagram) {
   const ::Color frame = ToRay(theme_.palette.coffee);
   const ::Color hull = ToRay(Rgb{253, 251, 247});
@@ -469,6 +652,16 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         break;
     }
     break;
+  }
+
+  // A task window's own controls come first.
+  for (const auto& entry : taskButtons_) {
+    if (!entry.first.Contains(x, y)) { continue; }
+    if (PressProgressButton(sim, entry.second)) {
+      SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
+      hasSelection_ = false;
+    }
+    return;
   }
 
   if (layout_.home.Contains(x, y)) {

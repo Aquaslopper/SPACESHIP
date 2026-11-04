@@ -566,6 +566,17 @@ signal story's two endings (`finishSignal`) and the broadcasts they unlock, clai
 the rank it feeds, and the crew order sheet's remaining payloads (a rest is the only order the clock can create on
 its own). All three are state-complete and save-compatible; they are waiting for their UI.
 
+### Phase 3 — The task frame and the machine rooms — DONE
+
+`ui/Widgets` holds the house frame every window shares: `TaskHead`, `NavPanel`,
+`MachinePart`, `LiveControl`, `TaskStage`, `TaskScreenModel`, the cooldown ladder
+(routine 5 / systems 10 / space 15 / critical 20) with tab-scoped keys, and
+`BuildProgressButton` walking Ready -> Running -> Complete on `ACTION_COOLDOWN_RULES`.
+`ui/EngineScreen`, `ui/O2Screen` and `ui/MessScreen` build their machines from data
+tables (225, 47 and 28 parts) and `ScreenKindFor`/`BuildTabScreen` route every tab.
+Draw paints the frame and the stage and routes clicks through `PressProgressButton`,
+so the headless tests drive exactly the path the window does.
+
 ### Phase 2 — Shell and idle screen — DONE
 Window, theme layer, taskbar/tabs, side panel + pinned foot, status bar, stat rail, ship diagram from data, feed,
 briefing verb, right-click → tab. No task screens yet.

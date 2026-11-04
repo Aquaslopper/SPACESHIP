@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <utility>
 
 namespace ship {
@@ -319,6 +320,57 @@ bool Simulation::StartFilterBank() {
     return true;
   }
   RunBank("Filters activated. Air purified. +10 Pro-Action.");
+  return true;
+}
+
+bool Simulation::StartMaintenanceSelf() {
+  // startMaint(e, "maint", "the commander"): refuses a perfect engine, refuses
+  // a second spanner, charges one action, then registers the work.
+  if (state_.engineCondition >= 100.0) {
+    LogLine("Maintenance refused - the drive is already at full condition.");
+    return false;
+  }
+  if (MaintRunningAny()) { return false; }
+
+  const double cost = MaintCostActions();
+  maintClaim_ = true;
+  PerformAction("Engine maintenance begun by the commander");
+  maintClaim_ = false;
+
+  if (!state_.gameOver.empty()) { return false; }
+
+  Task* task = AddOngoing("maint", "Maintenance - the commander", cost, "maint", "engine");
+  if (task != nullptr) { task->by = "the commander"; }
+  return true;
+}
+
+bool Simulation::StartCookingSelf() {
+  // startCook(e, "cook", "the commander"): refuses a full rack, refuses a
+  // second pot, commits at rate 1 - the commander is not a trained cook.
+  if (mess_.rack >= mess_.capacity) {
+    LogLine("Cooking refused - the rack is already full.");
+    return false;
+  }
+  if (FindOngoing("cook") != nullptr || FindOngoing("project-food") != nullptr) {
+    return false;
+  }
+
+  const CrewMember* cook = Cook();
+  const double rate = 1.0;  // the commander's own rate, never the cook's
+  (void)cook;
+  const double cost = CrewCost(std::ceil((mess_.capacity - mess_.rack) / rate));
+
+  cookClaim_ = true;
+  PerformAction("Cooking begun by the commander");
+  cookClaim_ = false;
+
+  if (!state_.gameOver.empty()) { return false; }
+
+  Task* task = AddOngoing("cook", "Cooking - the commander", cost, "cook", "mess");
+  if (task != nullptr) {
+    task->by = "the commander";
+    task->rate = rate;
+  }
   return true;
 }
 

@@ -79,6 +79,8 @@ const CrewMember* Simulation::Cook() const {
 
 double Simulation::MaintCostActions() const { return MaintCost(); }
 
+bool Simulation::MaintRunningAny() const { return MaintRunning(); }
+
 double Simulation::CleanerIntervalOf(const CrewMember& crew) const {
   return CleanerInterval(crew);
 }

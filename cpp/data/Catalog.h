@@ -57,6 +57,8 @@ class Catalog {
   MapGeometry map;
   DeckPlan wren;
   DeckPlan kestrel;
+  // ROOM_SCENES, by room id. Authored, never computed.
+  std::map<std::string, RoomScene> roomScenes;
 
   std::vector<Body> regions;
   std::vector<Body> systems;

@@ -264,6 +264,39 @@ function runCommand(g, line) {
     g.runBank('Filters activated. Air purified. +10 Pro-Action.');
     return true;
   }
+  if (command === 'maint') {
+    /* startMaint(e, 'maint', 'the commander') without the paint calls. */
+    if (g.STATE.engineCondition >= 100) {
+      g.logLine('Maintenance refused - the drive is already at full condition.');
+      return true;
+    }
+    if (g.maintRunning()) { return true; }
+    const cost = g.maintCost();
+    g.MAINT_CLAIM = true;
+    try { g.performAction('Engine maintenance begun by the commander'); }
+    finally { g.MAINT_CLAIM = false; }
+    if (g.STATE.gameOver) { return true; }
+    const t = g.addOngoing('maint', 'Maintenance - the commander', cost, 'maint', 'engine');
+    if (t) { t.by = 'the commander'; }
+    return true;
+  }
+  if (command === 'cook') {
+    /* startCook(e, 'cook', 'the commander') without the paint calls. */
+    if (g.MESS.rack >= g.MESS.capacity) {
+      g.logLine('Cooking refused - the rack is already full.');
+      return true;
+    }
+    if (g.findOngoing('cook') || g.findOngoing('project-food') || g.PROJECT_CLAIM === 'food') { return true; }
+    const rate = 1;
+    const cost = g.crewCost(Math.ceil((g.MESS.capacity - g.MESS.rack) / rate));
+    g.COOK_CLAIM = true;
+    try { g.performAction('Cooking begun by the commander'); }
+    finally { g.COOK_CLAIM = false; }
+    if (g.STATE.gameOver) { return true; }
+    const t = g.addOngoing('cook', 'Cooking - the commander', cost, 'cook', 'mess');
+    if (t) { t.by = 'the commander'; t.rate = rate; }
+    return true;
+  }
   if (command === 'purse' && parts.length >= 2) {
     g.STATE.shiplets = parseFloat(parts[1]);
     return true;

@@ -76,12 +76,15 @@ Existing Kessler-only and expanded-galaxy saves still load, including active leg
 
 The repository also contains a native C++ port of the game. It is a **work in
 progress**: Phase 0 (build system, extracted catalogue, data gate), Phase 1 (the
-whole headless simulation) and Phase 2 (the cockpit) are complete and verified
-against the reference. Phase 2 delivers the taskbar and its tabs, the sidebar and
-pinned foot, the status bar, and the idle screen with the ship cross-section,
-the feed and the two interaction verbs — left-click reads a briefing, right-click
-opens its tab. The task windows themselves are Phase 3. Until then
-`Spaceship.hta` remains the playable edition.
+whole headless simulation), Phase 2 (the cockpit) and Phase 3 (the task frame and
+the three machine rooms) are complete and verified against the reference. Phase 2
+delivers the taskbar and its tabs, the sidebar and pinned foot, the status bar, and
+the idle screen with the ship cross-section, the feed and the two interaction
+verbs. Phase 3 adds the house task frame — head, panels, machine stage, commitment
+band and the three-state progress button on the shared cooldown ladder — plus the
+Engine Room (a 225-part 650x390 drive), the O2 Filter Room and the Mess Hall, with
+a router that hands every other tab the same frame as a placeholder. The remaining
+room windows are Phase 4. Until then `Spaceship.hta` remains the playable edition.
 
 `spaceship_core` is feature-complete as a simulation: the action clock, drive
 wear, life support, crew, tasks, incidents, the Simulacron, commendations,

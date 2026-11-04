@@ -21,6 +21,7 @@
 #include "ui/IdleScreen.h"
 #include "ui/Layout.h"
 #include "ui/Shell.h"
+#include "ui/Widgets.h"
 #include "ui/Theme.h"
 
 namespace ship {
@@ -68,7 +69,14 @@ class ShellView {
   float others_ = 300.0f;
   int tabScroll_ = 0;
 
+  TaskScreenModel taskScreen_;
+  std::vector<std::pair<Area, std::string>> taskButtons_;
+  std::string taskTabKey_;
+
   void PaintChrome(Simulation& sim);
+  void PaintTaskScreen(Simulation& sim);
+  void PaintPanel(const NavPanel& panel, const Area& box);
+  void PaintStage(const TaskStage& stage, const Area& origin);
   void PaintIdle(Simulation& sim);
   void PaintDiagram(const DiagramModel& diagram);
 };

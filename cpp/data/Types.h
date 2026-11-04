@@ -52,6 +52,16 @@ struct Room {
   bool small = false;
 };
 
+// A room's instrument-window vignette (ROOM_SCENES): which of the nine
+// archetypes it is drawn as, and the three lines of text beneath the scope.
+struct RoomScene {
+  std::string glyph;        // reactor, filter, habitat, medical, cargo, orbit, core, network, garden
+  std::string code;         // "PROPULSION / 01"
+  std::string label;        // "Primary drive manifold"
+  std::string description;  // the caption
+  std::string accent;       // authored hex
+};
+
 struct DeckPlan {
   std::vector<HullPart> hull;
   Rect corridor;

@@ -119,6 +119,10 @@ int main(int argc, char** argv) {
       std::string detail = RestOfLine(line, "action");
       if (detail.empty()) { detail = "Scripted action"; }
       simulation.PerformAction(detail);
+    } else if (command == "maint") {
+      simulation.StartMaintenanceSelf();
+    } else if (command == "cook") {
+      simulation.StartCookingSelf();
     } else if (command == "seat" && parts.size() >= 2) {
       simulation.StartCanisterInstall(std::atoi(parts[1].c_str()));
     } else if (command == "bank") {

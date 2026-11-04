@@ -200,6 +200,17 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
   catalog.kestrel = ReadDeckPlan(Field(ship, "hulls", "ship.json"),
                                  Field(ship, "corridors", "ship.json"),
                                  Field(ship, "rooms", "ship.json"), "kestrel");
+  for (auto it = Field(ship, "roomScenes", "ship.json").begin();
+       it != Field(ship, "roomScenes", "ship.json").end(); ++it) {
+    const std::string where2 = "ship.json/roomScenes/" + it.key();
+    RoomScene scene;
+    scene.glyph = Text(it.value(), "glyph", where2);
+    scene.code = Text(it.value(), "code", where2);
+    scene.label = Text(it.value(), "label", where2);
+    scene.description = Text(it.value(), "description", where2);
+    scene.accent = Text(it.value(), "accent", where2);
+    catalog.roomScenes[it.key()] = scene;
+  }
   catalog.counts.fittedRooms =
       static_cast<int>(Field(ship, "roomFits", "ship.json").size());
   catalog.counts.ships = static_cast<int>(Field(ship, "ships", "ship.json").size());

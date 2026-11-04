@@ -60,6 +60,8 @@ class Simulation {
   // ---- commands that exist in Phase 1A -----------------------------------
   bool StartCanisterInstall(int slot);  // the player carries a canister over
   bool StartFilterBank();               // the player throws the switch
+  bool StartMaintenanceSelf();          // startMaint(e, "maint", "the commander")
+  bool StartCookingSelf();              // startCook(e, "cook", "the commander")
   bool ApplyJob(const std::string& crewId, const std::string& jobId);  // scenario setup
 
   // ---- queries -----------------------------------------------------------
@@ -213,6 +215,7 @@ class Simulation {
   const CrewMember* FilterHand() const;
   const CrewMember* Cook() const;
   double MaintCostActions() const;
+  bool MaintRunningAny() const;   // the commander's spanner or the engineer's
   double CleanerIntervalOf(const CrewMember& crew) const;
 
  private:

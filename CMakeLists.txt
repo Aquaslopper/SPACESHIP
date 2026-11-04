@@ -137,7 +137,11 @@ add_library(spaceship_core STATIC
   cpp/ui/Shell.cpp
   cpp/ui/ShipDiagram.cpp
   cpp/ui/IdleScreen.cpp
-  cpp/ui/Fx.cpp)
+  cpp/ui/Fx.cpp
+  cpp/ui/Widgets.cpp
+  cpp/ui/EngineScreen.cpp
+  cpp/ui/O2Screen.cpp
+  cpp/ui/MessScreen.cpp)
 
 target_include_directories(spaceship_core PUBLIC cpp)
 target_link_libraries(spaceship_core PUBLIC spaceship_json)
@@ -202,7 +206,8 @@ if(SPACESHIP_BUILD_TESTS)
     cpp/tests/simulation_tests.cpp
     cpp/tests/world_tests.cpp
     cpp/tests/jsnumber_tests.cpp
-    cpp/tests/ui_tests.cpp)
+    cpp/tests/ui_tests.cpp
+    cpp/tests/task_tests.cpp)
   target_link_libraries(spaceship_tests PRIVATE spaceship_core Catch2::Catch2WithMain)
 
   include(Catch)
