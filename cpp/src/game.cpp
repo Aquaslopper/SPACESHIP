@@ -50,7 +50,13 @@ ActionResult Game::performAction(const std::string& controlId, CooldownTier tier
 }
 
 ActionResult Game::standWatch() {
-  return performAction("nav:stand-watch", CooldownTier::space);
+  // The small console port has too few independent controls to sustain a
+  // 15-action watch cooldown. Watch is its repeatable clock-advance action.
+  if (state_.gameOver) return ActionResult::gameOver;
+  ++state_.actionCount;
+  tickActionCooldowns();
+  tickWorld();
+  return ActionResult::committed;
 }
 
 ActionResult Game::startTravel(const std::string& destination) {

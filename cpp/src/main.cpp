@@ -12,7 +12,7 @@ using spaceship::Game;
 void printHelp() {
   std::cout << "Commands (reads are free; committed actions advance work):\n"
             << "  status                  show ship state and cooldowns\n"
-            << "  watch                   advance ongoing work (space tier)\n"
+            << "  watch                   advance ongoing work (repeatable)\n"
             << "  travel <destination>    start a three-action crossing (undock first)\n"
             << "  scan <target>           start a three-action deep scan\n"
             << "  service                 restore 25 hull using a repair kit (docked)\n"
