@@ -4,8 +4,11 @@
 
 // Common-dialog declarations require Windows types before this header.
 #include <commdlg.h>
+#include <gdiplus.h>
+#include <objidl.h>
 #include <shellapi.h>
 #include <shlobj.h>
+#include <shlwapi.h>
 
 #include <algorithm>
 #include <filesystem>
@@ -22,10 +25,20 @@ using spaceship::Choice;
 using spaceship::Control;
 using spaceship::Json;
 using spaceship::Voyage;
-constexpr COLORREF background = RGB(12, 21, 31), panel = RGB(20, 34, 47), ink = RGB(220, 232, 235),
-                   muted = RGB(144, 168, 180), accent = RGB(103, 216, 192);
+constexpr COLORREF background = RGB(255, 255, 255), panel = RGB(249, 247, 242),
+                   ink = RGB(56, 51, 43), muted = RGB(137, 126, 108), accent = RGB(140, 111, 78);
 constexpr int idWatch = 101, idNew = 102, idSave = 103, idLoad = 104, idSlot = 105, idList = 106,
               idCanvas = 107;
+bool titleVisible = true, hasVoyage = false;
+ULONG_PTR graphicsToken = 0;
+IStream* titleStream = nullptr;
+std::unique_ptr<Gdiplus::Bitmap> titleArtwork;
+std::vector<HWND> titleButtons, tabButtons;
+std::vector<std::string> openTabs = {"home"};
+int tabStart = 0;
+RECT titleRect{};
+void refresh(bool rebuildList);
+void showTitle(bool visible);
 Voyage game;
 spaceship::RuntimeFiles runtimeFiles;
 spaceship::WavePlayer musicPlayer, effectPlayer;
@@ -111,53 +124,96 @@ void layout() {
   RECT r;
   GetClientRect(mainWindow, &r);
   int w = r.right, h = r.bottom;
-  const int left = 188, right = 350, top = 94, bottom = 30;
-  MoveWindow(GetDlgItem(mainWindow, idNew), w - 570, 20, 112, 34, TRUE);
-  MoveWindow(slotBox, w - 450, 20, 80, 200, TRUE);
-  MoveWindow(GetDlgItem(mainWindow, idSave), w - 360, 20, 85, 34, TRUE);
-  MoveWindow(GetDlgItem(mainWindow, idLoad), w - 267, 20, 85, 34, TRUE);
-  MoveWindow(watchButton, w - 174, 20, 154, 34, TRUE);
-  int y = top;
-  for (auto b : navButtons) {
-    MoveWindow(b, 16, y, left - 32, 36, TRUE);
-    y += 43;
+  for (HWND child = GetWindow(mainWindow, GW_CHILD); child; child = GetWindow(child, GW_HWNDNEXT)) {
+    bool titleControl =
+        std::find(titleButtons.begin(), titleButtons.end(), child) != titleButtons.end();
+    ShowWindow(child, (titleVisible == titleControl) ? SW_SHOW : SW_HIDE);
   }
-  const int sidebarHeight = std::max(160, h - y - bottom - 28), statusHeight = sidebarHeight / 2;
-  MoveWindow(summaryBox, 16, y + 18, left - 32, statusHeight, TRUE);
-  MoveWindow(cooldownBox, 16, y + 26 + statusHeight, left - 32, sidebarHeight - statusHeight - 8,
-             TRUE);
-  const int contentW = w - left - right - 28, canvasH = page == "home" ? 270
-                                                        : page == "navigation" || page == "bridge"
-                                                            ? 210
-                                                            : 0;
-  ShowWindow(canvas, canvasH ? SW_SHOW : SW_HIDE);
-  if (canvasH) MoveWindow(canvas, left + 8, top, contentW, canvasH, TRUE);
-  int contentY = top + (canvasH ? canvasH + 14 : 0), listW = std::min(265, contentW / 2);
-  MoveWindow(listBox, left + 8, contentY, listW, std::max(80, h - contentY - bottom - 164), TRUE);
-  MoveWindow(detailBox, left + listW + 20, contentY, contentW - listW - 12,
-             std::max(80, h - contentY - bottom - 164), TRUE);
-  MoveWindow(feedBox, left + 8, h - bottom - 150, contentW, 140, TRUE);
-  const int paneHeight = h - top - bottom - 8;
-  MoveWindow(commandPane, w - right + 4, top, right - 16, paneHeight, TRUE);
+  if (titleVisible) {
+    const double ratio = 1672.0 / 941.0;
+    int cw = std::min(w - 24, 1672), ch = static_cast<int>(cw / ratio);
+    if (ch > h - 24) {
+      ch = h - 24;
+      cw = static_cast<int>(ch * ratio);
+    }
+    titleRect = {(w - cw) / 2, (h - ch) / 2, (w + cw) / 2, (h + ch) / 2};
+    for (size_t i = 0; i < titleButtons.size(); ++i)
+      MoveWindow(titleButtons[i],
+                 titleRect.left + static_cast<int>(cw * .02) + static_cast<int>(i * cw * .818 / 5),
+                 titleRect.bottom - static_cast<int>(ch * .097), static_cast<int>(cw * .818 / 5),
+                 std::max(26, static_cast<int>(ch * .0565)), TRUE);
+    SetWindowTextW(titleButtons.back(), hasVoyage ? L"RESUME" : L"EXIT");
+    InvalidateRect(mainWindow, nullptr, TRUE);
+    return;
+  }
+  const int left = 164, top = 112, bottom = 24, right = 310;
+  int y = 44;
+  for (auto b : navButtons) {
+    MoveWindow(b, 8, y, left - 16, 29, TRUE);
+    y += 35;
+  }
+  const int sideHeight = std::max(120, h - y - 150);
+  MoveWindow(summaryBox, 8, y + 8, left - 16, sideHeight / 2, TRUE);
+  MoveWindow(cooldownBox, 8, y + 12 + sideHeight / 2, left - 16, sideHeight / 2 - 4, TRUE);
+  MoveWindow(GetDlgItem(mainWindow, idNew), 8, h - 122, 70, 28, TRUE);
+  MoveWindow(GetDlgItem(mainWindow, 993), 84, h - 122, 70, 28, TRUE);
+  MoveWindow(slotBox, 8, h - 88, 65, 160, TRUE);
+  MoveWindow(GetDlgItem(mainWindow, idSave), 77, h - 88, 36, 28, TRUE);
+  MoveWindow(GetDlgItem(mainWindow, idLoad), 116, h - 88, 40, 28, TRUE);
+  MoveWindow(watchButton, 8, h - 52, left - 16, 26, TRUE);
+  for (size_t i = 0; i < tabButtons.size(); ++i) {
+    bool visible = i >= static_cast<size_t>(tabStart) && i < static_cast<size_t>(tabStart + 6);
+    ShowWindow(tabButtons[i], visible ? SW_SHOW : SW_HIDE);
+    if (visible)
+      MoveWindow(tabButtons[i], 8 + static_cast<int>(i - tabStart) * 154, 5, 150, 28, TRUE);
+  }
+  MoveWindow(GetDlgItem(mainWindow, 990), w - 116, 5, 30, 28, TRUE);
+  MoveWindow(GetDlgItem(mainWindow, 991), w - 82, 5, 30, 28, TRUE);
+  MoveWindow(GetDlgItem(mainWindow, 992), w - 48, 5, 42, 28, TRUE);
+  const bool home = page == "home";
+  const int contentW = w - left - 24 - (home ? 0 : right);
+  int canvasH = home ? std::max(300, std::min(440, h - 380)) : 200;
+  ShowWindow(canvas, SW_SHOW);
+  MoveWindow(canvas, left + 12, top, contentW, canvasH, TRUE);
+  ShowWindow(listBox, home ? SW_HIDE : SW_SHOW);
+  ShowWindow(commandPane, home ? SW_HIDE : SW_SHOW);
+  if (home) {
+    MoveWindow(detailBox, left + 12, top + canvasH + 8, contentW, 94, TRUE);
+    MoveWindow(feedBox, left + 12, top + canvasH + 114, contentW,
+               std::max(80, h - top - canvasH - 144), TRUE);
+  } else {
+    const int cy = top + canvasH + 12, lw = std::min(230, contentW / 3);
+    MoveWindow(listBox, left + 12, cy, lw, std::max(100, h - cy - 155), TRUE);
+    MoveWindow(detailBox, left + lw + 24, cy, contentW - lw - 12, std::max(100, h - cy - 155),
+               TRUE);
+    MoveWindow(feedBox, left + 12, h - 140, contentW, 108, TRUE);
+  }
+  const int ph = h - top - bottom;
+  MoveWindow(commandPane, w - right, top, right - 12, ph, TRUE);
   SCROLLINFO info{sizeof(SCROLLINFO),
                   SIF_RANGE | SIF_PAGE | SIF_POS,
                   0,
-                  std::max(0, static_cast<int>(actionButtons.size()) * 37 - 1),
-                  static_cast<UINT>(paneHeight),
+                  std::max(0, static_cast<int>(actionButtons.size()) * 42 - 1),
+                  static_cast<UINT>(ph),
                   commandScroll,
                   0};
   SetScrollInfo(commandPane, SB_VERT, &info, TRUE);
   GetScrollInfo(commandPane, SB_VERT, &info);
   commandScroll = info.nPos;
   y = -commandScroll;
-  for (auto button : actionButtons) {
-    MoveWindow(button, 0, y, right - 38, 32, TRUE);
-    y += 37;
+  for (auto b : actionButtons) {
+    MoveWindow(b, 0, y, right - 36, 38, TRUE);
+    y += 42;
   }
-  MoveWindow(statusLabel, 16, h - 26, w - 32, 24, TRUE);
+  MoveWindow(statusLabel, 8, h - 22, w - 16, 20, TRUE);
   InvalidateRect(mainWindow, nullptr, TRUE);
   InvalidateRect(canvas, nullptr, TRUE);
 }
+void showTitle(bool visible) {
+  titleVisible = visible;
+  layout();
+}
+
 void refresh(bool rebuildList = true) {
   if (rebuildList) {
     choices = game.choices(page);
@@ -169,7 +225,7 @@ void refresh(bool rebuildList = true) {
       if (c.id == selected) found = index;
       ++index;
     }
-    if (found < 0 && !choices.empty()) {
+    if (found < 0 && !choices.empty() && page != "home") {
       found = 0;
       selected = choices[0].id;
     }
@@ -183,7 +239,13 @@ void refresh(bool rebuildList = true) {
   if (!loss.empty()) summary += "\nVOYAGE LOST: " + loss;
   SetWindowTextW(summaryBox, lines(summary).c_str());
   SetWindowTextW(cooldownBox, lines(game.cooldownReport()).c_str());
-  SetWindowTextW(detailBox, lines(game.describe(page, selected)).c_str());
+  auto detail = page == "home" && !selected.empty() ? game.describe(selected, "")
+                                                    : game.describe(page, selected);
+  if (page == "home" && selected.empty())
+    detail = "NAVIGATION\r\nHolding at " + game.location() +
+             ". Left-click a room to read; right-click opens its task window.\r\nReading is free. "
+             "Check life support before your next crossing.";
+  SetWindowTextW(detailBox, lines(detail).c_str());
   std::string feed = "SHIP'S LOG\n";
   const auto& logs = game.snapshot()["state"]["feed"];
   size_t start = logs.size() > 8 ? logs.size() - 8 : 0;
@@ -235,6 +297,16 @@ bool confirm(const wchar_t* question) {
                      MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) == IDYES;
 }
 void pickPage(const std::string& value) {
+  if (std::find(openTabs.begin(), openTabs.end(), value) == openTabs.end()) {
+    openTabs.push_back(value);
+    std::string caption = value;
+    for (const auto& room : game.snapshot()["rooms"])
+      if (room.value("id", std::string{}) == value) caption = room.value("name", value);
+    tabButtons.push_back(widget(L"BUTTON", wide(caption).c_str(), BS_PUSHBUTTON | WS_TABSTOP,
+                                1000 + static_cast<int>(openTabs.size() - 1)));
+    tabStart = std::max(0, static_cast<int>(openTabs.size()) - 6);
+  }
+
   page = value;
   commandScroll = 0;
   selected.clear();
@@ -246,9 +318,14 @@ LRESULT CALLBACK canvasProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     POINT p{static_cast<short>(LOWORD(lp)), static_cast<short>(HIWORD(lp))};
     for (const auto& region : hitRegions)
       if (PtInRect(&region.first, p)) {
-        if (page == "home")
-          pickPage(region.second);
-        else {
+        if (page == "home") {
+          if (msg == WM_RBUTTONUP)
+            pickPage(region.second);
+          else {
+            selected = region.second;
+            refresh(false);
+          }
+        } else {
           selected = region.second;
           refresh();
         }
@@ -256,35 +333,135 @@ LRESULT CALLBACK canvasProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
       }
     return 0;
   }
-  if (msg == WM_PAINT) {
+  if (msg == WM_PAINT || msg == WM_PRINTCLIENT) {
     PAINTSTRUCT ps;
-    HDC dc = BeginPaint(h, &ps);
+    HDC dc = msg == WM_PRINTCLIENT ? reinterpret_cast<HDC>(wp) : BeginPaint(h, &ps);
     RECT r;
     GetClientRect(h, &r);
-    fill(dc, r, panel);
+    fill(dc, r, background);
     hitRegions.clear();
-    label(dc, {16, 12, r.right - 16, 44},
-          page == "home"
-              ? wide(game.snapshot()["ship"]["name"].get<std::string>()) + L" / COMPARTMENT PLAN"
-              : L"CHART / SELECT A DESTINATION",
-          accent, smallFont);
+    if (page != "home")
+      label(dc, {16, 12, r.right - 16, 44},
+            page == "home"
+                ? wide(game.snapshot()["ship"]["name"].get<std::string>()) + L" / COMPARTMENT PLAN"
+                : L"CHART / SELECT A DESTINATION",
+            accent, smallFont);
     if (page == "home") {
-      bool compactShip = game.snapshot()["state"].value("shipClass", std::string{}) == "wren";
-      double scale = std::min((r.right - 24.0) / (compactShip ? 600.0 : 1160.0),
-                              (r.bottom - 48.0) / (compactShip ? 365.0 : 455.0));
-      for (const auto& room : game.snapshot()["rooms"]) {
-        int x = 12 + static_cast<int>(room["x"].get<int>() * scale),
-            y = 40 + static_cast<int>(room["y"].get<int>() * scale);
-        RECT box{x, y, x + std::max(20, static_cast<int>(room["w"].get<int>() * scale)),
-                 y + std::max(16, static_cast<int>(room["h"].get<int>() * scale))};
-        fill(dc, box, RGB(35, 59, 71));
-        FrameRect(dc, &box, panelBrush);
-        RECT textBox = box;
-        InflateRect(&textBox, -3, -2);
-        label(dc, textBox, wide(room["name"].get<std::string>()), ink, smallFont,
-              DT_CENTER | DT_VCENTER | DT_WORDBREAK);
-        hitRegions.push_back({box, room["id"].get<std::string>()});
+      const bool compactShip = game.snapshot()["state"].value("shipClass", std::string{}) == "wren";
+      const double scale = std::min((r.right - 30.0) / (compactShip ? 600.0 : 1160.0),
+                                    (r.bottom - 30.0) / (compactShip ? 365.0 : 455.0));
+      const int ox = static_cast<int>((r.right - (compactShip ? 600 : 1160) * scale) / 2), oy = 10;
+      auto rect = [&](double x, double y, double w, double hh) {
+        return RECT{ox + static_cast<LONG>(x * scale), oy + static_cast<LONG>(y * scale),
+                    ox + static_cast<LONG>((x + w) * scale),
+                    oy + static_cast<LONG>((y + hh) * scale)};
+      };
+      auto color = [](const std::string& text) {
+        unsigned n = 0;
+        try {
+          n = std::stoul(text.substr(1), nullptr, 16);
+        } catch (...) {
+        }
+        return RGB((n >> 16) & 255, (n >> 8) & 255, n & 255);
+      };
+      auto pen = CreatePen(PS_SOLID, 1, accent);
+      auto op = SelectObject(dc, pen);
+      auto ob = SelectObject(dc, panelBrush);
+      const auto& visual = Voyage::catalog()["visual"];
+      for (const auto& hull : visual[compactShip ? "smallHull" : "largeHull"]) {
+        RECT box = rect(hull["x"], hull["y"], hull["w"], hull["h"]);
+        auto cls = hull.value("cls", std::string{});
+        if (cls == "hp-lens")
+          Ellipse(dc, box.left, box.top, box.right, box.bottom);
+        else
+          RoundRect(dc, box.left, box.top, box.right, box.bottom, cls == "hp-nacelle" ? 18 : 8,
+                    cls == "hp-nacelle" ? 18 : 8);
       }
+      const auto& cor = visual[compactShip ? "smallCorridor" : "largeCorridor"];
+      auto corridor = rect(cor["x"], cor["y"], cor["w"], cor["h"]);
+      fill(dc, corridor, RGB(243, 239, 230));
+      label(dc, corridor, L"  CORRIDOR", muted, smallFont);
+      for (const auto& room : game.snapshot()["rooms"]) {
+        const auto id = room.value("id", std::string{});
+        const auto& scene = Voyage::catalog()["scenes"][id];
+        auto tone = color(room.value("tone", std::string("#faf7f2"))),
+             tint = color(scene.value("accent", std::string("#8c6f4e")));
+        RECT box = rect(room["x"], room["y"], room["w"], room["h"]);
+        fill(dc, box, tone);
+        FrameRect(dc, &box, panelBrush);
+        fill(dc, {box.left, box.top, box.left + 3, box.bottom}, tint);
+        label(dc, {box.left + 6, box.top + 4, box.right - 3, box.top + 30},
+              wide(room.value("name", id)), ink, smallFont);
+        if (!room.value("small", false) && box.bottom - box.top > 48) {
+          RECT glyph{box.left + 10, box.bottom - 29, box.right - 10, box.bottom - 8};
+          FrameRect(dc, &glyph, panelBrush);
+          auto brush = CreateSolidBrush(tint);
+          SelectObject(dc, brush);
+          auto type = scene.value("glyph", std::string{});
+          if (type == "filter" || type == "garden") {
+            for (int j = 0; j < 3; ++j)
+              Rectangle(dc, glyph.left + 5 + j * 9, glyph.top + 4, glyph.left + 11 + j * 9,
+                        glyph.bottom - 3);
+          } else if (type == "cargo" || type == "habitat")
+            Rectangle(dc, glyph.left + 6, glyph.top + 5, glyph.left + 23, glyph.bottom - 3);
+          else
+            Ellipse(dc, glyph.left + 5, glyph.top + 3, glyph.left + 24, glyph.bottom - 2);
+          SelectObject(dc, panelBrush);
+          DeleteObject(brush);
+          for (int j = 0; j < 3; ++j) {
+            MoveToEx(dc, glyph.right - 22, glyph.top + 5 + j * 5, nullptr);
+            LineTo(dc, glyph.right - 4, glyph.top + 5 + j * 5);
+          }
+        }
+        hitRegions.push_back({box, id});
+      }
+      for (const auto& person : game.snapshot()["crew"])
+        for (const auto& room : game.snapshot()["rooms"])
+          if (person.value("room", std::string{}) == room.value("id", std::string{})) {
+            auto dot = rect(room["x"].get<int>() + room["w"].get<int>() / 2,
+                            room["y"].get<int>() + room["h"].get<int>() - 6, 8, 8);
+            auto b = CreateSolidBrush(color(person.value("colour", std::string("#829377"))));
+            SelectObject(dc, b);
+            Ellipse(dc, dot.left, dot.top, dot.right, dot.bottom);
+            SelectObject(dc, panelBrush);
+            DeleteObject(b);
+            auto name = person.value("name", std::string{});
+            name = name.substr(0, name.find(' '));
+            label(dc, {dot.left - 12, dot.bottom, dot.left + 48, dot.bottom + 14}, wide(name),
+                  muted, smallFont);
+          }
+      SelectObject(dc, ob);
+      SelectObject(dc, op);
+      DeleteObject(pen);
+    } else if (Voyage::catalog()["scenes"].contains(page)) {
+      const auto& scene = Voyage::catalog()["scenes"][page];
+      const std::string hex = scene.value("accent", std::string("#8c6f4e"));
+      const auto n = std::stoul(hex.substr(1), nullptr, 16);
+      const COLORREF tint = RGB((n >> 16) & 255, (n >> 8) & 255, n & 255);
+      RECT plate{12, 12, r.right - 12, r.bottom - 12};
+      fill(dc, plate, panel);
+      FrameRect(dc, &plate, panelBrush);
+      auto pen = CreatePen(PS_SOLID, 2, tint);
+      auto op = SelectObject(dc, pen);
+      auto ob = SelectObject(dc, GetStockObject(HOLLOW_BRUSH));
+      Ellipse(dc, 36, 38, 160, 162);
+      Ellipse(dc, 50, 52, 146, 148);
+      auto brush = CreateSolidBrush(tint);
+      SelectObject(dc, brush);
+      Ellipse(dc, 76, 78, 120, 122);
+      SelectObject(dc, ob);
+      DeleteObject(brush);
+      SelectObject(dc, op);
+      DeleteObject(pen);
+      label(dc, {190, 32, r.right - 24, 54}, wide(scene.value("code", std::string{})), muted,
+            smallFont);
+      label(dc, {190, 59, r.right - 24, 96}, wide(scene.value("label", std::string{})), ink,
+            titleFont);
+      label(dc, {190, 112, r.right - 24, 160}, wide(scene.value("description", std::string{})), ink,
+            font);
+      for (int i = 0; i < 8; ++i)
+        fill(dc, {190 + i * 20, r.bottom - 36, 202 + i * 20, r.bottom - 27},
+             i < 6 ? tint : RGB(224, 219, 209));
     } else {
       const auto& data = Voyage::catalog();
       const Json* chosen = nullptr;
@@ -324,10 +501,59 @@ LRESULT CALLBACK canvasProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             {{x - 8, y - 9, std::min<LONG>(x + 145, r.right), y + 26}, b["id"].get<std::string>()});
       }
     }
-    EndPaint(h, &ps);
+    if (msg == WM_PAINT) EndPaint(h, &ps);
     return 0;
   }
   return DefWindowProcW(h, msg, wp, lp);
+}
+INT_PTR CALLBACK menuDialog(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
+  if (msg == WM_INITDIALOG) {
+    SetWindowLongPtrW(h, GWLP_USERDATA, lp);
+    if (lp == 202) {
+      for (auto text : {L"Slot 1", L"Slot 2", L"Slot 3"})
+        SendDlgItemMessageW(h, 110, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text));
+      SendDlgItemMessageW(h, 110, CB_SETCURSEL, SendMessageW(slotBox, CB_GETCURSEL, 0, 0), 0);
+    } else {
+      const auto& o = game.snapshot()["state"]["options"];
+      CheckDlgButton(h, 111, o.value("music", true) ? BST_CHECKED : BST_UNCHECKED);
+      CheckDlgButton(h, 112, o.value("soundEffects", true) ? BST_CHECKED : BST_UNCHECKED);
+      for (auto text : {L"0%", L"25%", L"40%", L"50%", L"75%", L"100%"})
+        SendDlgItemMessageW(h, 113, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text));
+      const double level = o.value("audioLevel", .4);
+      int sel = level == 0     ? 0
+                : level == .25 ? 1
+                : level == .4  ? 2
+                : level == .5  ? 3
+                : level == .75 ? 4
+                               : 5;
+      SendDlgItemMessageW(h, 113, CB_SETCURSEL, sel, 0);
+    }
+    return TRUE;
+  }
+  if (msg == WM_COMMAND) {
+    if (LOWORD(wp) == IDCANCEL) {
+      EndDialog(h, IDCANCEL);
+      return TRUE;
+    }
+    if (LOWORD(wp) == IDOK) {
+      if (GetWindowLongPtrW(h, GWLP_USERDATA) == 202)
+        SendMessageW(slotBox, CB_SETCURSEL, SendDlgItemMessageW(h, 110, CB_GETCURSEL, 0, 0), 0);
+      else {
+        const auto options = game.snapshot()["state"]["options"];
+        if ((IsDlgButtonChecked(h, 111) == BST_CHECKED) != options.value("music", true))
+          game.act("toggle-music");
+        if ((IsDlgButtonChecked(h, 112) == BST_CHECKED) != options.value("soundEffects", true))
+          game.act("toggle-sounds");
+        const int levels[] = {0, 25, 40, 50, 75, 100};
+        int sel = static_cast<int>(SendDlgItemMessageW(h, 113, CB_GETCURSEL, 0, 0));
+        if (sel >= 0 && sel < 6) game.act("audio-level", std::to_string(levels[sel]));
+        syncAudio();
+      }
+      EndDialog(h, IDOK);
+      return TRUE;
+    }
+  }
+  return FALSE;
 }
 LRESULT CALLBACK commandsProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
   if (msg == WM_COMMAND || msg == WM_CTLCOLORSTATIC || msg == WM_CTLCOLORBTN)
@@ -366,9 +592,9 @@ LRESULT CALLBACK windowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
   switch (msg) {
     case WM_CREATE: {
       mainWindow = h;
-      font = CreateFontW(-15, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0,
+      font = CreateFontW(-13, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0,
                          CLEARTYPE_QUALITY, 0, L"Segoe UI");
-      smallFont = CreateFontW(-12, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0,
+      smallFont = CreateFontW(-10, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0,
                               CLEARTYPE_QUALITY, 0, L"Segoe UI");
       titleFont = CreateFontW(-26, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0,
                               CLEARTYPE_QUALITY, 0, L"Segoe UI");
@@ -396,8 +622,30 @@ LRESULT CALLBACK windowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
       SetWindowLongPtrW(commandPane, GWL_EXSTYLE,
                         GetWindowLongPtrW(commandPane, GWL_EXSTYLE) | WS_EX_CONTROLPARENT);
       canvas = widget(L"SpaceshipChart", L"", 0, idCanvas);
+      widget(L"BUTTON", L"Menu", BS_PUSHBUTTON | WS_TABSTOP, 993);
+      widget(L"BUTTON", L"<", BS_PUSHBUTTON | WS_TABSTOP, 990);
+      widget(L"BUTTON", L">", BS_PUSHBUTTON | WS_TABSTOP, 991);
+      widget(L"BUTTON", L"Home", BS_PUSHBUTTON | WS_TABSTOP, 992);
+      tabButtons.push_back(widget(L"BUTTON", L"SHIP  SC Wren", BS_PUSHBUTTON | WS_TABSTOP, 1000));
+      for (auto text : {L"NEW VOYAGE", L"LOAD VOYAGE", L"OPTIONS", L"HOW TO PLAY", L"EXIT"})
+        titleButtons.push_back(widget(L"BUTTON", text, BS_OWNERDRAW | WS_TABSTOP,
+                                      900 + static_cast<int>(titleButtons.size())));
       refresh();
       return 0;
+    }
+    case WM_DRAWITEM: {
+      auto item = reinterpret_cast<DRAWITEMSTRUCT*>(lp);
+      if (item->CtlID >= 900 && item->CtlID <= 904) {
+        const bool focus = (item->itemState & (ODS_SELECTED | ODS_FOCUS)) != 0;
+        fill(item->hDC, item->rcItem, focus ? RGB(107, 84, 63) : RGB(56, 47, 35));
+        wchar_t text[64]{};
+        GetWindowTextW(item->hwndItem, text, 64);
+        label(item->hDC, item->rcItem, text, RGB(242, 229, 204), font,
+              DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        if (focus) DrawFocusRect(item->hDC, &item->rcItem);
+        return TRUE;
+      }
+      break;
     }
     case WM_GETMINMAXINFO: {
       auto info = reinterpret_cast<MINMAXINFO*>(lp);
@@ -415,22 +663,105 @@ LRESULT CALLBACK windowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
       SetBkColor(dc, panel);
       return reinterpret_cast<LRESULT>(panelBrush);
     }
+    case WM_PRINTCLIENT:
     case WM_PAINT: {
       PAINTSTRUCT ps;
-      HDC dc = BeginPaint(h, &ps);
+      HDC dc = msg == WM_PRINTCLIENT ? reinterpret_cast<HDC>(wp) : BeginPaint(h, &ps);
       RECT r;
       GetClientRect(h, &r);
-      fill(dc, {0, 0, r.right, 80}, panel);
-      label(dc, {22, 12, 500, 45}, L"SPACESHIP COMMAND", ink, titleFont);
-      label(dc, {24, 48, 560, 75}, L"NATIVE C++  /  OFFLINE VOYAGE  /  MIGRATION BUILD", accent,
-            smallFont);
-      EndPaint(h, &ps);
+      fill(dc, r, background);
+      if (titleVisible) {
+        fill(dc, r, RGB(231, 222, 203));
+        if (titleArtwork) {
+          Gdiplus::Graphics graphics(dc);
+          graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+          graphics.DrawImage(titleArtwork.get(), titleRect.left, titleRect.top,
+                             titleRect.right - titleRect.left, titleRect.bottom - titleRect.top);
+        } else
+          label(dc, {40, 60, r.right - 40, 160}, L"SPACESHIP", accent, titleFont, DT_CENTER);
+      } else {
+        fill(dc, {0, 0, r.right, 38}, RGB(243, 239, 230));
+        fill(dc, {0, 38, 164, r.bottom}, panel);
+        const wchar_t* names[] = {L"HULL INTEGRITY", L"SHIELDS", L"ENERGY", L"FUEL"};
+        const char* keys[] = {"hull", "shield", "energy", "fuel"};
+        const int width = (r.right - 188) / 4;
+        for (int i = 0; i < 4; ++i) {
+          RECT card{176 + i * width, 48, 168 + (i + 1) * width, 102};
+          fill(dc, card, panel);
+          FrameRect(dc, &card, panelBrush);
+          label(dc, {card.left + 10, 54, card.right - 8, 68}, names[i], muted, smallFont);
+          label(dc, {card.left + 10, 69, card.right - 8, 88},
+                std::to_wstring(game.stat(keys[i])) + L"%", ink, font);
+          fill(dc, {card.left + 10, 93, card.right - 10, 97}, RGB(232, 226, 214));
+          fill(dc,
+               {card.left + 10, 93, card.left + 10 + (width - 38) * game.stat(keys[i]) / 100, 97},
+               i == 1 ? RGB(183, 139, 70) : RGB(129, 142, 100));
+        }
+      }
+      if (msg == WM_PAINT) EndPaint(h, &ps);
       return 0;
     }
     case WM_COMMAND: {
       int id = LOWORD(wp);
       // Only activation notifications can commit actions, never focus changes.
       if (id != idList && HIWORD(wp) != BN_CLICKED) return 0;
+      if (id == 993) {
+        showTitle(true);
+        return 0;
+      }
+      if (id == 990 || id == 991) {
+        tabStart = std::clamp(tabStart + (id == 990 ? -1 : 1), 0,
+                              std::max(0, static_cast<int>(openTabs.size()) - 6));
+        layout();
+        return 0;
+      }
+      if (id == 992) {
+        pickPage("home");
+        return 0;
+      }
+      if (id >= 1000 && id < 1000 + static_cast<int>(openTabs.size())) {
+        pickPage(openTabs[id - 1000]);
+        return 0;
+      }
+      if (id >= 900 && id <= 904) {
+        if (id == 900) {
+          if (hasVoyage && !confirm(L"Start a new voyage? Unsaved progress will be lost."))
+            return 0;
+          game = Voyage();
+          hasVoyage = true;
+          titleVisible = false;
+          pickPage("home");
+        } else if (id == 901) {
+          if (DialogBoxParamW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(202), h, menuDialog,
+                              202) != IDOK)
+            return 0;
+          if (hasVoyage && !confirm(L"Load this slot? Unsaved progress will be lost.")) return 0;
+          if (game.load(savePath(true))) {
+            hasVoyage = true;
+            titleVisible = false;
+            pickPage("home");
+          } else
+            MessageBoxW(h, wide(game.message()).c_str(), L"Load voyage", MB_ICONINFORMATION);
+        } else if (id == 902) {
+          DialogBoxParamW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(203), h, menuDialog, 203);
+        } else if (id == 903) {
+          MessageBoxW(
+              h,
+              L"Start aboard SC Wren. Reading, inspecting rooms and choosing targets are "
+              L"free.\n\nLeft-click a compartment to read about it; right-click to open its task "
+              L"tab. Seat three O2 canisters and start the filter bank. Start a crossing to Tolme "
+              L"Anchorage and tend useful jobs while work progresses. Acknowledge completed "
+              L"readouts for free.\n\nEvery committed gameplay action advances the whole ship. "
+              L"Watch and other controls have action-count cooldowns, not timers.",
+              L"Your first watch", MB_OK | MB_ICONINFORMATION);
+        } else if (hasVoyage)
+          showTitle(false);
+        else
+          DestroyWindow(h);
+        audioStarted = true;
+        syncAudio();
+        return 0;
+      }
       audioStarted = true;
       syncAudio();
       const int actionsBefore = game.actions();
@@ -534,9 +865,36 @@ LRESULT CALLBACK windowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
   }
   return DefWindowProcW(h, msg, wp, lp);
 }
+bool capture(const wchar_t* name) {
+  RECT r;
+  GetClientRect(mainWindow, &r);
+  auto dc = GetDC(mainWindow), memory = CreateCompatibleDC(dc);
+  auto bitmap = CreateCompatibleBitmap(dc, r.right, r.bottom);
+  auto old = SelectObject(memory, bitmap);
+  RedrawWindow(mainWindow, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
+  const BOOL painted = PrintWindow(mainWindow, memory, PW_CLIENTONLY);
+  Gdiplus::Bitmap image(bitmap, nullptr);
+  UINT count = 0, size = 0;
+  Gdiplus::GetImageEncodersSize(&count, &size);
+  std::vector<BYTE> storage(size);
+  auto encoders = reinterpret_cast<Gdiplus::ImageCodecInfo*>(storage.data());
+  Gdiplus::GetImageEncoders(count, size, encoders);
+  bool saved = false;
+  std::filesystem::create_directories(L"visual-captures");
+  auto path = std::filesystem::path(L"visual-captures") / (std::wstring(name) + L".png");
+  for (UINT i = 0; i < count; ++i)
+    if (std::wstring(encoders[i].MimeType) == L"image/png")
+      saved = painted && image.Save(path.c_str(), &encoders[i].Clsid, nullptr) == Gdiplus::Ok;
+  SelectObject(memory, old);
+  DeleteObject(bitmap);
+  DeleteDC(memory);
+  ReleaseDC(mainWindow, dc);
+  return saved;
+}
 }  // namespace
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR args, int show) {
-  smokeMode = std::wstring(args) == L"--smoke-test";
+  const bool captureMode = std::wstring(args) == L"--capture-ui";
+  smokeMode = std::wstring(args) == L"--smoke-test" || captureMode;
   try {
     wchar_t exe[32768]{}, user[MAX_PATH]{};
     const DWORD length = GetModuleFileNameW(nullptr, exe, 32768);
@@ -552,6 +910,18 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR args, int show) {
     return 4;
   }
 
+  Gdiplus::GdiplusStartupInput input;
+  if (Gdiplus::GdiplusStartup(&graphicsToken, &input, nullptr) != Gdiplus::Ok) return 5;
+  auto resource = FindResourceW(instance, MAKEINTRESOURCEW(201), RT_RCDATA);
+  if (resource) {
+    auto data = LoadResource(instance, resource);
+    titleStream = SHCreateMemStream(static_cast<const BYTE*>(LockResource(data)),
+                                    SizeofResource(instance, resource));
+    if (titleStream) {
+      titleArtwork.reset(Gdiplus::Bitmap::FromStream(titleStream));
+      if (titleArtwork->GetLastStatus() != Gdiplus::Ok) titleArtwork.reset();
+    }
+  }
   SetProcessDPIAware();
   backgroundBrush = CreateSolidBrush(background);
   panelBrush = CreateSolidBrush(panel);
@@ -576,15 +946,25 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR args, int show) {
   wc.hbrBackground = backgroundBrush;
   wc.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
   if (!RegisterClassW(&wc)) return 1;
-  auto window = CreateWindowExW(0, wc.lpszClassName, L"Spaceship Command - native C++ migration",
-                                WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 1440, 960,
-                                nullptr, nullptr, instance, nullptr);
+  auto window =
+      CreateWindowExW(0, wc.lpszClassName, L"Spaceship Command", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT,
+                      CW_USEDEFAULT, 1440, 960, nullptr, nullptr, instance, nullptr);
   if (!window) return 2;
   ShowWindow(window, show);
   UpdateWindow(window);
-  if (std::wstring(args) == L"--smoke-test") {
+  if (smokeMode) {
     // Real native HWND creation + controller dispatch, no HTA or external host.
-    bool ok = IsWindow(canvas) && IsWindow(listBox) && !choices.empty();
+    bool ok =
+        titleVisible && titleArtwork && IsWindowVisible(titleButtons[0]) && game.actions() == 0;
+    if (captureMode) ok = capture(L"01-title") && ok;
+    SendMessageW(window, WM_COMMAND, 900, 0);
+    if (captureMode) ok = capture(L"02-deck") && ok;
+    ok = ok && !titleVisible && game.actions() == 0;
+    SendMessageW(window, WM_COMMAND, 993, 0);
+    ok = ok && titleVisible && game.actions() == 0;
+    SendMessageW(window, WM_COMMAND, 904, 0);
+    ok = ok && !titleVisible && game.actions() == 0;
+    ok = ok && IsWindow(canvas) && IsWindow(listBox) && !choices.empty();
     SendMessageW(window, WM_COMMAND, idWatch, 0);
     ok = ok && game.actions() == 1 && !IsWindowEnabled(watchButton) &&
          game.controlCooldown("watch") == 15;
@@ -596,12 +976,21 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR args, int show) {
     ok = ok && choices.size() == 4 && !actionButtons.empty() && IsWindow(commandPane);
     SendMessageW(commandPane, WM_MOUSEWHEEL, MAKEWPARAM(0, static_cast<WORD>(-WHEEL_DELTA)), 0);
     ok = ok && game.actions() == 1;
+    for (const auto& room : game.snapshot()["rooms"]) {
+      const auto id = room.value("id", std::string{});
+      pickPage(id);
+      ok = ok && game.actions() == 1 && page == id;
+      if (captureMode) ok = capture(wide(id).c_str()) && ok;
+    }
     DestroyWindow(window);
     DeleteObject(font);
     DeleteObject(smallFont);
     DeleteObject(titleFont);
     DeleteObject(backgroundBrush);
     DeleteObject(panelBrush);
+    titleArtwork.reset();
+    if (titleStream) titleStream->Release();
+    Gdiplus::GdiplusShutdown(graphicsToken);
     return ok ? 0 : 3;
   }
   MSG msg{};
@@ -616,5 +1005,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR args, int show) {
   DeleteObject(titleFont);
   DeleteObject(backgroundBrush);
   DeleteObject(panelBrush);
+  titleArtwork.reset();
+  if (titleStream) titleStream->Release();
+  Gdiplus::GdiplusShutdown(graphicsToken);
   return static_cast<int>(msg.wParam);
 }

@@ -10,6 +10,7 @@ const data = {initial:g.saveSnapshot(), bodies:g.BODIES, systems:g.SECTOR_BODIES
  candidates:g.CANDIDATES, projects:g.SHIP_PROJECTS, scenes:g.ROOM_SCENES,
  history:g.WORLD_HISTORY, awards:g.COMMENDATIONS, wiki:g.WIKI,
  largeShip:g.LARGE_SHIP, largeRooms:g.ROOM_BLUEPRINTS, jobs:g.JOBS,
+ visual:{smallHull:g.SMALL_HULL,largeHull:g.LARGE_HULL,smallCorridor:g.SMALL_CORRIDOR,largeCorridor:g.LARGE_CORRIDOR},
  incidents:g.INCIDENT_TYPES, air:g.AIR_STAGES, engine:g.ENGINE, orders:g.ORDERS,
  surveyWorth:g.SURVEY_WORTH, themes:g.THEMES, pay:g.PAY,
  constants:{starve:g.MESS_STARVE,starveEvery:g.MESS_STARVE_EVERY}};

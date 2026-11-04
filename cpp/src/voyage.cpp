@@ -176,8 +176,8 @@ bool Voyage::execute(const std::string& c, const std::string& a) {
     return true;
   }
   if (c == "audio-level") {
-    if (a != "0" && a != "25" && a != "50" && a != "75" && a != "100")
-      return reject("Choose 0, 25, 50, 75 or 100 percent.");
+    if (a != "0" && a != "25" && a != "40" && a != "50" && a != "75" && a != "100")
+      return reject("Choose 0, 25, 40, 50, 75 or 100 percent.");
     s["options"]["audioLevel"] = std::stoi(a) / 100.0;
     message_ = "Audio level updated (free).";
     return true;

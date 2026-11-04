@@ -58,7 +58,8 @@ release; if an older artifact has expired, use a newer successful run.
 > **A note on the voyage so far**
 >
 > The native edition is playable, but its conversion is **not yet feature-identical**
-> to the original game. Some artwork, settings and edge-case behavior remain to be
+> to the original game. The original interface is being reconstructed, not redesigned;
+> [visual parity is still unfinished](docs/VISUAL-PARITY.md). Some artwork, settings and edge-case behavior remain to be
 > ported or verified. See [the migration notes](NATIVE-PORT.md) for the precise status.
 > The original [`Spaceship.hta`](Spaceship.hta) remains preserved as the reference
 > edition, with its own [interface and voyage guide](docs/REFERENCE-GUIDE.md).

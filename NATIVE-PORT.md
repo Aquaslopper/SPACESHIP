@@ -8,6 +8,15 @@ contains no HTA. The reference edition is preserved unchanged.
 **This remains a playable migration build, not a completed feature-identical
 conversion.** The checks below establish specific behavior, not complete parity.
 
+## Visual fidelity correction
+
+The previous dark dashboard was not a faithful port of the authored interface.
+A native reconstruction is now underway using the HTA's embedded title artwork,
+light palette, hull geometry and room scenes. This is **not yet visually complete**:
+bespoke machinery, sidebar groups and original room layouts still need work.
+See [the explicit acceptance checklist](docs/VISUAL-PARITY.md). Windows CI produces
+native visual captures for inspection; passing CI is not screenshot approval.
+
 ## Implemented in C++
 
 - Native compartment plan/chart, target lists, status/log, contextual commands,
@@ -103,7 +112,7 @@ for test in tests/*.test.cjs; do node "$test"; done
 Visual Studio: configure with `-A x64`, build with `--config Release`, test with
 `-C Release`. The Windows target is `build/Release/spaceship.exe`.
 
-The native suite has 38 test groups, including comparison with independently
+The native suite has 39 test groups, including comparison with independently
 reference-generated expectations for 2,547 routes, 270 commission offers, 21 air
 samples, biography anchors and a 250-action world trace. The trace compares ship
 stats, incident stages/countdowns, atmosphere, stocks and crew survival/pay values.

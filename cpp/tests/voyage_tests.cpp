@@ -821,6 +821,19 @@ int main() {
     require(o["music"] == false && o["soundEffects"] == false && o["audioLevel"] == 0.75,
             "audio options lost");
   });
+  test("native visual data preserves both reference hulls and every room scene", [] {
+    const auto& d = Voyage::catalog();
+    const auto& v = d["visual"];
+    require(v["smallHull"].size() == 6 && v["largeHull"].size() == 10, "hull geometry missing");
+    require(v["smallCorridor"]["x"] == 35 && v["smallCorridor"]["w"] == 411,
+            "small corridor geometry");
+    require(d["scenes"].size() == 21, "room scenes missing");
+    for (const auto& room : d["initial"]["rooms"]) {
+      const auto& scene = d["scenes"].at(room["id"].get<std::string>());
+      for (auto key : {"glyph", "accent", "code", "label", "description"})
+        require(scene.contains(key) && scene[key].is_string(), "room scene metadata missing");
+    }
+  });
   std::filesystem::remove_all(directory);
   std::cout << failures << " failing test groups\n";
   return failures ? 1 : 0;
