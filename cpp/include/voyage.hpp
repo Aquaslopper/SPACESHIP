@@ -24,6 +24,13 @@ class Voyage {
   const Json& snapshot() const { return save_; }
   int stat(const std::string& id) const;
   int actions() const;
+  int airStage() const;
+  int crewWork(int base) const;
+  Json navigationMetrics(const std::string& destination) const;
+  Json commissionOffer(const std::string& kind) const;
+  Json orderQuote() const;
+  static std::string anchor(const Json& crew);
+  std::string desire(const Json& crew) const;
   int cargoUsed() const;
   int cooldown(const std::string& key) const;
   std::string location() const;
@@ -41,14 +48,25 @@ class Voyage {
   std::string message_;
   bool execute(const std::string& command, const std::string& argument);
   bool reject(const std::string& reason);
-  void tick();
+  std::vector<std::string> claims_;
+  void tick(const std::string& initiating);
+  void automate(const std::string& initiating);
+  void tickRelationships();
+  bool checkLoss();
+  void applyOrders(const std::string& person, const Json& orders);
+  void train(Json& person, int steps);
+  int sheetCost(const Json& person, const Json& orders) const;
+  void startBank();
+  void contractProgress(const std::string& kind, const std::string& target);
+  Json importLegacy(const Json& value) const;
   void advanceWork(int amount);
   void finish(const Json& task);
   void task(const std::string& id, const std::string& target, int work,
             const Json& payload = nullptr);
   bool busy(const std::string& id) const;
   void change(const std::string& stat, int amount);
-  void remember(const std::string& kind, const std::string& text);
+  void remember(const std::string& kind, const std::string& text, const std::string& who = "",
+                const std::string& other = "");
   void progress();
   void commissionProgress(const std::string& kind, const std::string& target);
   int metric(const std::string& name) const;

@@ -1,5 +1,6 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
+#include <commdlg.h>
 #include <shlobj.h>
 #include <windows.h>
 
@@ -21,6 +22,8 @@ constexpr COLORREF background = RGB(12, 21, 31), panel = RGB(20, 34, 47), ink = 
 constexpr int idWatch = 101, idNew = 102, idSave = 103, idLoad = 104, idSlot = 105, idList = 106,
               idCanvas = 107;
 Voyage game;
+HWND commandPane;
+int commandScroll = 0;
 HWND mainWindow, summaryBox, detailBox, feedBox, listBox, canvas, slotBox, statusLabel, watchButton;
 HFONT font, smallFont, titleFont;
 HBRUSH backgroundBrush, panelBrush;
@@ -101,9 +104,21 @@ void layout() {
   MoveWindow(detailBox, left + listW + 20, contentY, contentW - listW - 12,
              std::max(80, h - contentY - bottom - 164), TRUE);
   MoveWindow(feedBox, left + 8, h - bottom - 150, contentW, 140, TRUE);
-  y = top;
-  for (auto b : actionButtons) {
-    MoveWindow(b, w - right + 4, y, right - 24, 32, TRUE);
+  const int paneHeight = h - top - bottom - 8;
+  MoveWindow(commandPane, w - right + 4, top, right - 16, paneHeight, TRUE);
+  SCROLLINFO info{sizeof(SCROLLINFO),
+                  SIF_RANGE | SIF_PAGE | SIF_POS,
+                  0,
+                  std::max(0, static_cast<int>(actionButtons.size()) * 37 - 1),
+                  static_cast<UINT>(paneHeight),
+                  commandScroll,
+                  0};
+  SetScrollInfo(commandPane, SB_VERT, &info, TRUE);
+  GetScrollInfo(commandPane, SB_VERT, &info);
+  commandScroll = info.nPos;
+  y = -commandScroll;
+  for (auto button : actionButtons) {
+    MoveWindow(button, 0, y, right - 38, 32, TRUE);
     y += 37;
   }
   MoveWindow(statusLabel, 16, h - 26, w - 32, 24, TRUE);
@@ -155,6 +170,10 @@ void refresh(bool rebuildList = true) {
     EnableWindow(b, controls[i].enabled);
     actionButtons.push_back(b);
   }
+  if (page == "home" || page == "guide")
+    actionButtons.push_back(
+        widget(L"BUTTON", L"Import HTA save (.txt)", BS_PUSHBUTTON | WS_TABSTOP, 489));
+  for (auto button : actionButtons) SetParent(button, commandPane);
   for (size_t i = 0; i < navButtons.size(); ++i)
     SendMessageW(navButtons[i], BM_SETSTATE, page == pages[i].first, 0);
   EnableWindow(watchButton, game.snapshot()["state"].value("gameOver", std::string{}).empty());
@@ -176,6 +195,7 @@ bool confirm(const wchar_t* question) {
 }
 void pickPage(const std::string& value) {
   page = value;
+  commandScroll = 0;
   selected.clear();
   refresh();
 }
@@ -268,6 +288,39 @@ LRESULT CALLBACK canvasProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
   }
   return DefWindowProcW(h, msg, wp, lp);
 }
+LRESULT CALLBACK commandsProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
+  if (msg == WM_COMMAND || msg == WM_CTLCOLORSTATIC || msg == WM_CTLCOLORBTN)
+    return SendMessageW(mainWindow, msg, wp, lp);
+  if (msg == WM_VSCROLL || msg == WM_MOUSEWHEEL) {
+    SCROLLINFO info{sizeof(SCROLLINFO), SIF_ALL};
+    GetScrollInfo(h, SB_VERT, &info);
+    int value = info.nPos;
+    if (msg == WM_MOUSEWHEEL)
+      value -= static_cast<short>(HIWORD(wp)) / WHEEL_DELTA * 74;
+    else
+      switch (LOWORD(wp)) {
+        case SB_LINEUP:
+          value -= 37;
+          break;
+        case SB_LINEDOWN:
+          value += 37;
+          break;
+        case SB_PAGEUP:
+          value -= static_cast<int>(info.nPage);
+          break;
+        case SB_PAGEDOWN:
+          value += static_cast<int>(info.nPage);
+          break;
+        case SB_THUMBTRACK:
+          value = info.nTrackPos;
+          break;
+      }
+    commandScroll = std::clamp(value, 0, std::max(0, info.nMax - static_cast<int>(info.nPage) + 1));
+    layout();
+    return 0;
+  }
+  return DefWindowProcW(h, msg, wp, lp);
+}
 LRESULT CALLBACK windowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
   switch (msg) {
     case WM_CREATE: {
@@ -297,6 +350,9 @@ LRESULT CALLBACK windowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                  LBS_NOTIFY | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_HSCROLL | WS_TABSTOP, idList);
       SendMessageW(listBox, LB_SETHORIZONTALEXTENT, 700, 0);
       statusLabel = widget(L"STATIC", L"", SS_LEFT);
+      commandPane = widget(L"SpaceshipCommands", L"", WS_VSCROLL);
+      SetWindowLongPtrW(commandPane, GWL_EXSTYLE,
+                        GetWindowLongPtrW(commandPane, GWL_EXSTYLE) | WS_EX_CONTROLPARENT);
       canvas = widget(L"SpaceshipChart", L"", 0, idCanvas);
       refresh();
       return 0;
@@ -348,7 +404,27 @@ LRESULT CALLBACK windowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         return 0;
       }
       try {
-        if (id == idWatch)
+        if (id == 489) {
+          if (!confirm(L"Import an HTA voyage? Unsaved native progress will be replaced. The "
+                       L"source file will not be modified."))
+            return 0;
+          wchar_t filename[32768]{};
+          OPENFILENAMEW dialog{};
+          dialog.lStructSize = sizeof(dialog);
+          dialog.hwndOwner = h;
+          dialog.lpstrFile = filename;
+          dialog.nMaxFile = 32768;
+          dialog.lpstrFilter = L"Spaceship saves (*.txt;*.json)\0*.txt;*.json\0All files\0*.*\0";
+          dialog.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+          if (!GetOpenFileNameW(&dialog)) return 0;
+          if (!game.load(std::filesystem::path(filename)))
+            MessageBoxW(h, wide(game.message()).c_str(), L"Import refused; live voyage unchanged",
+                        MB_ICONERROR);
+          else {
+            page = "home";
+            selected.clear();
+          }
+        } else if (id == idWatch)
           game.act("watch");
         else if (id == idNew) {
           if (!confirm(
@@ -409,6 +485,13 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR args, int show) {
   chart.lpszClassName = L"SpaceshipChart";
   chart.hCursor = LoadCursorW(nullptr, IDC_HAND);
   RegisterClassW(&chart);
+  WNDCLASSW commands{};
+  commands.lpfnWndProc = commandsProc;
+  commands.hInstance = instance;
+  commands.lpszClassName = L"SpaceshipCommands";
+  commands.hbrBackground = backgroundBrush;
+  commands.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+  RegisterClassW(&commands);
   WNDCLASSW wc{};
   wc.lpfnWndProc = windowProc;
   wc.hInstance = instance;
@@ -431,7 +514,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR args, int show) {
     pickPage("navigation");
     ok = ok && choices.size() > 48;
     pickPage("crew");
-    ok = ok && choices.size() == 4 && !actionButtons.empty();
+    ok = ok && choices.size() == 4 && !actionButtons.empty() && IsWindow(commandPane);
+    SendMessageW(commandPane, WM_MOUSEWHEEL, MAKEWPARAM(0, static_cast<WORD>(-WHEEL_DELTA)), 0);
+    ok = ok && game.actions() == 1;
     DestroyWindow(window);
     DeleteObject(font);
     DeleteObject(smallFont);

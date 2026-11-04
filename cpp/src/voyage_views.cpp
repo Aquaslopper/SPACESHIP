@@ -50,7 +50,7 @@ std::vector<Choice> Voyage::choices(const std::string& page) const {
   else if (page == "cargo")
     append(save_["goods"]);
   else if (page == "science")
-    append(d["bodies"]);
+    append(save_["survey"]);
   else if (page == "station") {
     append(d["market"], "buy:");
     append(save_["goods"], "sell:");
@@ -87,35 +87,51 @@ std::vector<Control> Voyage::controls(const std::string& page, const std::string
   };
   if (page == "navigation" || page == "bridge") {
     const auto* system = lookup(catalog()["systems"], selection);
+    button("acknowledge", "travel", "Acknowledge arrival (free)");
+    button("acknowledge", "scan", "Read completed scan (free)");
     button(system ? "jump" : "travel", selection, system ? "Jump to system" : "Start crossing");
     button("scan", selection, "Deep scan");
     button(save_["state"].value("docked", false) ? "undock" : "dock", "",
            save_["state"].value("docked", false) ? "Undock" : "Dock at station");
   }
-  if (page == "home" || page == "engine" || page == "bridge" || page == "r10")
-    button("fuel", "", "Use fuel cell (+20 energy/fuel)");
+  if (page == "home" || page == "engine" || page == "bridge" || page == "r10") {
+    button("recharge", "", "Recharge energy (+20, 1 cell)");
+    button("refuel", "", "Transfer fuel (+15, 1 cell)");
+  }
+  if (page == "bridge") button("splitfuel", "", "Split fuel cell (+10 energy / +7 fuel)");
   if (page == "engine") {
-    button("maintain", "", "Service drive (1 kit, 4 work)");
-    button("repair", "", "Repair hull (1 kit, 4 work)");
+    button("maintain", "", "Service drive (work = missing condition / 10)");
+    {
+      button("repair", "", "Patch hull (+25, 1 kit)");
+      button("service-shield", "", "Service shields (+25, 1 kit)");
+    }
   }
   if (page == "o2") {
-    button("install", selection, "Seat selected canister (3 work)");
+    button("install", selection, "Seat selected canister (2 work)");
     button("filters", "", "Start filter bank (+10 work)");
   }
-  if (page == "mess") button("cook", "", "Prepare 6 rations (3 energy)");
+  if (page == "mess") button("cook", "", "Cook to fill rack (1 ration/work)");
   if (page == "cargo") {
-    button("salvage", "", "Recover salvage (4 energy)");
+    for (auto bay : {"0", "1", "2"})
+      button("salvage", bay, std::string("Recover salvage / bay ") + bay + " (3 m3)");
     button("sell", selection, "Sell selected lot");
     button("jettison", selection, "Jettison selected lot");
   }
-  if (page == "science") button("sell-data", "", "Sell survey archive at station");
+  if (page == "science") {
+    button("package", selection, "Package survey (2 work, +15% value)");
+    button("sell-data", "", "Sell survey archive at station");
+  }
   if (page == "crew" || page == "quarters" || page == "r1") {
-    button("rest", selection, "Rest (4 work)");
-    button("medical", selection, "Treat (1 medkit, 4 work)");
+    button("medical", selection, "Treat (1 medkit, 3 work, +25 health)");
     button("talk", selection, "Listen to crew member");
-    button("train", selection, "Station training (50 shiplets)");
+    for (const auto& order : catalog()["orders"])
+      button("stage-" + str(order, "id"), selection,
+             "Stage / unstage: " + str(order, "label") + " (free)");
     for (const auto& job : catalog()["jobs"])
-      button("assign-" + str(job, "id"), selection, "Assign: " + str(job, "label"));
+      button("stage-job=" + str(job, "id"), selection,
+             "Stage job: " + str(job, "label") + " (free)");
+    button("issue-orders", "", "Issue complete order sheet (1 action)");
+    button("clear-orders", "", "Clear staged orders (free)");
   }
   if (page == "station") {
     auto pos = selection.find(':');
@@ -126,22 +142,27 @@ std::vector<Control> Voyage::controls(const std::string& page, const std::string
       button("buy", supply,
              std::string("Buy ") + supply +
                  (std::string(supply) == "fuel"     ? " (45)"
-                  : std::string(supply) == "kit"    ? " (60)"
-                  : std::string(supply) == "med"    ? " (75)"
+                  : std::string(supply) == "kit"    ? " (70)"
+                  : std::string(supply) == "med"    ? " (50)"
                   : std::string(supply) == "oxygen" ? " (25)"
                                                     : " (20 / six)"));
     button("sell-data", "", "Sell survey archive");
     button("ship", "", "Buy SC Tessellate (4000)");
     button("upgrade", "bay", "Cargo refit I (500)");
-    button("upgrade", "bay2", "Cargo refit II (800)");
-    button("upgrade", "drive", "Efficient drive (600)");
+    button("upgrade", "bay2", "Cargo refit II (900)");
+    button("upgrade", "drive", "Efficient drive (900)");
+    button("upgrade", "rack", "O2 rack to 15 (400)");
+    button("upgrade", "scanner", "Faster sensors (600)");
+    button("upgrade", "hull", "Station hull service +50 (120)");
     for (auto kind : {"visit", "scan", "salvage"})
       button("commission", kind, std::string("Commission: ") + kind);
     button("collect", "", "Collect commission");
     button("abandon", "", "Abandon commission");
   }
-  if (page == "r6") button("transfer", "energy", "Shields -> energy (15 -> 10)");
-  if (page == "r7") button("transfer", "shield", "Energy -> shields (15 -> 10)");
+  if (page == "r6") button("transfer", "energy", "Shields -> energy (20 -> 15)");
+  if (page == "r7") button("transfer", "shield", "Energy -> shields (20 -> 15)");
+  if (page == "simulacron")
+    button("select-memory", selection, "Select / deselect dream memory (free)");
   if (page == "r13") button("social", "", "Shared meal (2 rations, 3 work)");
   if (page == "r4") {
     button("broadcast", "", "Collect local report");
@@ -150,7 +171,7 @@ std::vector<Control> Voyage::controls(const std::string& page, const std::string
   }
   for (auto it = catalog()["projects"].begin(); it != catalog()["projects"].end(); ++it)
     if (str(it.value(), "room") == page) button("project", it.key(), str(it.value(), "label"));
-  if (page == "events") button("resolve", selection, "Resolve incident (2 energy, 4 work)");
+  if (page == "events") button("resolve", selection, "Assign crew to report (6 work)");
   if (page == "rewards") button("claim", selection, "Claim earned reward (free)");
   return out;
 }
@@ -183,9 +204,14 @@ std::string Voyage::describe(const std::string& page, const std::string& selecti
       } else
         o << "\nDeep scan not recorded.\n";
     }
+    if (!selection.empty()) {
+      auto metrics = navigationMetrics(selection);
+      o << "\nDistance: " << metrics["dist"] << " work actions / " << metrics["fuel"] << " fuel\n";
+    }
     o << "\nCrossings and scans advance only when you commit actions.\nLocal travel uses "
-         "distance-based fuel; system jumps cost up to 20 fuel.\nNavigation and drive refits "
-         "reduce that cost. Arrival auto-docks at ports.\n";
+         "distance-based fuel; system jumps use region/system distance.\nNavigation and drive "
+         "refits "
+         "reduce that cost. Acknowledge the completed crossing to arrive.\n";
   }
   if (page == "crew" || page == "quarters" || page == "r1") {
     const auto* p = lookup(save_["crew"], selection);
@@ -195,6 +221,9 @@ std::string Voyage::describe(const std::string& page, const std::string& selecti
         o << k << ": " << p->value(k, 0) << "   ";
       o << "\nJob: " << str(*p, "job") << " / " << str(*p, "skill")
         << (busy(selection) ? " [BUSY]" : "") << "\n\n";
+      o << "Anchor: " << anchor(*p) << "\nDesire: " << desire(*p) << "\n";
+      o << "\nSTAGED ORDERS\n"
+        << s["pendingOrders"].dump(2) << "\nWork / fees: " << orderQuote().dump() << "\n";
       for (auto k : {"traits", "homeworld", "hobby", "religion"})
         o << k << ": " << str(*p, k) << "\n";
     }
@@ -234,13 +263,15 @@ std::string Voyage::describe(const std::string& page, const std::string& selecti
   if (page == "simulacron" || page == "r4") {
     o << "Insight " << s["sim"]["insight"] << " / 5\nSilicon Marrow: " << str(s["sim"], "signal")
       << "\n\n";
+    if (page == "simulacron")
+      o << "Selected memory IDs: " << s.value("nativeDreamSelection", Json::array()).dump() << "\n";
     if (page == "simulacron") {
       o << "MEMORY MOSAIC\n";
       for (const auto& m : s["sim"]["memories"])
         if (std::to_string(m["id"].get<int>()) == selection)
           o << str(m, "text")
             << (m.value("processed", false) ? " [consolidated]" : " [unprocessed]") << "\n";
-      o << "\nDreams consolidate the two oldest unprocessed memories.\n";
+      o << "\nSelect two memories; otherwise the oldest two are used.\n";
     }
   }
   if (page == "events") {

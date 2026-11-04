@@ -1,8 +1,10 @@
 #include <chrono>
+#include <codecvt>
 #include <filesystem>
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <locale>
 #include <stdexcept>
 
 #include "voyage.hpp"
@@ -108,9 +110,9 @@ int main() {
   test("filter installation uses three independent controls and powers a running bank", [] {
     Voyage g;
     require(g.act("install", "s0"), g.message());
-    require(task(g, "install-s0")->at("left") == 3, "initiating tick counted");
+    require(task(g, "install-s0")->at("left") == 2, "initiating tick counted");
     require(g.act("install", "s1"), g.message());
-    require(task(g, "install-s0")->at("left") == 2, "old work did not tick");
+    require(task(g, "install-s0")->at("left") == 1, "old work did not tick");
     require(g.act("install", "s2"), g.message());
     watch(g, 3);
     for (const auto& slot : g.snapshot()["life"]["slots"])
@@ -131,6 +133,9 @@ int main() {
     require(g.act("watch"), g.message());
     require(g.act("fuel"), g.message());
     watch(g, 20);
+    require(g.location() == "Kessler Drift", "crossing arrived before acknowledgement");
+    require(g.act("acknowledge", "travel"), g.message());
+    require(g.act("acknowledge", "scan"), g.message());
     require(g.location() == "Halvan's Reach", "crossing failed");
     require(g.snapshot()["state"]["scanned"].value("halvan", false), "scan failed");
     require(g.snapshot()["state"]["sim"]["signal"] == "intercepted", "signal not intercepted");
@@ -168,7 +173,8 @@ int main() {
   test("crossings record visits and ready contracts; collection pays once", [] {
     Voyage g;
     require(g.act("travel", "tolme"), g.message());
-    watch(g, 15);
+    watch(g, 30);
+    require(g.act("acknowledge", "travel"), g.message());
     require(g.snapshot()["state"]["docked"] == true, "not docked on arrival");
     require(g.snapshot()["state"]["contracts"]["arrival"] == "ready", "arrival not ready");
     int cash = g.snapshot()["state"]["shiplets"];
@@ -254,6 +260,7 @@ int main() {
     require(g.load(directory / "fixture.json"), g.message());
     require(g.act("scan", "echo-site"), g.message());
     watch(g, 5);
+    require(g.act("acknowledge", "scan"), g.message());
     require(g.snapshot()["state"]["sim"]["signal"] == "request", "request");
     state = g.snapshot();
     state["map"]["here"] = "palimpsest-site";
@@ -286,7 +293,8 @@ int main() {
     g.describe("events", "fracture");
     require(g.actions() == n, "reading ticked");
     require(g.act("resolve", "fracture"), g.message());
-    watch(g, 4);
+    require(!g.act("rest", "jax"), "assigned engineer not reserved");
+    watch(g, 6);
     require(g.snapshot()["state"]["nativeIncidents"].empty(), "incident not resolved");
     require(g.snapshot()["state"]["chronicle"]["incidents"] == 1, "incident metric");
   });
@@ -371,6 +379,275 @@ int main() {
         int value = state["value"];
         require(value >= 0 && value <= 100, "condition escaped range");
       }
+    }
+  });
+  test("reference parity: all 2547 local and system route metrics", [] {
+    std::ifstream file("cpp/tests/reference_parity.json");
+    Json reference;
+    file >> reference;
+    Voyage g;
+    std::string origin;
+    for (const auto& c : reference["navigation"]) {
+      if (c["origin"] != origin) {
+        origin = c["origin"];
+        g = fixture([&](Json& d) { d["map"]["here"] = origin; });
+      }
+      auto actual = g.navigationMetrics(c["target"]);
+      require(actual["dist"] == c["dist"] && actual["fuel"] == c["fuel"],
+              "route mismatch " + c.dump() + " actual=" + actual.dump());
+    }
+  });
+  test("reference parity: deterministic and rotating commission offers at every port", [] {
+    std::ifstream file("cpp/tests/reference_parity.json");
+    Json reference;
+    file >> reference;
+    for (const auto& c : reference["commissions"]) {
+      auto g = fixture([&](Json& d) {
+        d["map"]["here"] = c["origin"];
+        d["state"]["docked"] = true;
+        d["state"]["commissions"]["serial"] = c["serial"];
+      });
+      auto offer = g.commissionOffer(c["kind"]);
+      for (auto key : {"kind", "origin", "target", "reward"})
+        require(offer[key] == c["offer"][key],
+                "offer mismatch " + c.dump() + " actual=" + offer.dump());
+    }
+  });
+  test(
+      "reference parity: 250 reference world ticks including incidents, hunger, relationships and "
+      "automation",
+      [] {
+        std::ifstream file("cpp/tests/reference_parity.json");
+        Json reference;
+        file >> reference;
+        Voyage g;
+        for (const auto& expected : reference["watch"]) {
+          require(g.act("watch"), g.message());
+          const auto& d = g.snapshot();
+          const auto& s = d["state"];
+          Json actual = {{"actions", g.actions()},
+                         {"engine", s["engineCondition"]},
+                         {"wear", s["wearTick"]},
+                         {"pay", s["payTick"]},
+                         {"air", s["airHold"]},
+                         {"filter", s["filterLife"]},
+                         {"canisters", d["life"]["canisters"]},
+                         {"rations", d["mess"]["rack"]},
+                         {"crew", Json::array()},
+                         {"stats", Json::array()},
+                         {"events", Json::array()}};
+          for (const auto& st : d["stats"])
+            actual["stats"].push_back({{"id", st["id"]}, {"value", st["value"]}});
+          for (const auto& ev : s["nativeIncidents"])
+            actual["events"].push_back(
+                {{"id", ev["id"]}, {"stage", ev["stage"]}, {"left", ev["left"]}});
+          for (const auto& p : d["crew"]) {
+            Json person;
+            for (auto k : {"id", "health", "morale", "fatigue", "hunger", "hungerTick", "wallet"})
+              person[k] = p[k];
+            actual["crew"].push_back(person);
+          }
+          require(actual == expected, "tick mismatch at " + std::to_string(g.actions()) +
+                                          " expected=" + expected.dump() +
+                                          " actual=" + actual.dump());
+        }
+      });
+  test("staging is free, sheet pricing uses the staged job, and each person releases independently",
+       [] {
+         auto g = fixture([](Json& d) {
+           d["state"]["shiplets"] = 1000;
+           d["state"]["docked"] = true;
+           d["map"]["here"] = "tolme";
+         });
+         require(g.act("stage-job=maintenance", "rell"), g.message());
+         require(g.act("stage-learnSt", "rell"), g.message());
+         require(g.act("stage-rest", "suri"), g.message());
+         require(g.actions() == 0, "staging ticked");
+         require(g.orderQuote() == Json({{"work", 8}, {"fee", 50}}),
+                 "wrong staged-job fee or work");
+         require(g.act("issue-orders"), g.message());
+         require(g.actions() == 1, "issuing costs one action");
+         require(task(g, "orders-rell")->at("left") == 7 && task(g, "orders-suri")->at("left") == 1,
+                 "personal task cost");
+         require(!g.act("rest", "rell"), "orders did not reserve crew");
+         watch(g, 1);
+         require(!task(g, "orders-suri"), "short errand not released");
+         require(!g.act("stage-rest", "suri"), "new sheet accepted before old sheet discharged");
+         watch(g, 6);
+         const auto& rell = g.snapshot()["crew"][0];
+         require(rell["job"] == "maintenance" && rell["jobAt"] == 60,
+                 "two station training steps not applied");
+         watch(g, 1);
+         require(!task(g, "crew-sheet"), "sheet did not discharge");
+       });
+  test("orders doctor follow-up is not advanced by its own creation tick or a pro-action burst",
+       [] {
+         Voyage g;
+         require(g.act("stage-doc", "jax"), g.message());
+         require(g.act("issue-orders"), g.message());
+         watch(g, 1);
+         require(task(g, "doctor-jax") && task(g, "doctor-jax")->at("left") == 7,
+                 "follow-up consumed own tick");
+         int health = g.snapshot()["crew"][1]["health"];
+         watch(g, 7);
+         require(g.snapshot()["crew"][1]["health"].get<int>() == std::min(100, health + 12),
+                 "doctor care result");
+       });
+  test("native cooking yields rations while working and unpowered crew work continues", [] {
+    auto g = fixture([](Json& d) {
+      d["mess"]["rack"] = 5;
+      stat(d, "energy", 0);
+      for (auto& p : d["crew"]) p["job"] = "";
+    });
+    require(g.act("cook"), g.message());
+    int start = g.snapshot()["mess"]["rack"];
+    watch(g, 1);
+    require(g.snapshot()["mess"]["rack"].get<int>() == start + 1,
+            "galley did not produce during blackout");
+  });
+  test("selected exploration dreams yield extra insight and shared-person reconciliation rewards",
+       [] {
+         auto g = fixture([](Json& d) {
+           d["state"]["sim"]["memories"] = Json::array({{{"id", 1},
+                                                         {"kind", "Discovery"},
+                                                         {"text", "A discovery"},
+                                                         {"who", "rell"},
+                                                         {"other", ""},
+                                                         {"processed", false}},
+                                                        {{"id", 2},
+                                                         {"kind", "Arrival"},
+                                                         {"text", "An arrival"},
+                                                         {"who", "rell"},
+                                                         {"other", ""},
+                                                         {"processed", false}}});
+           d["state"]["sim"]["serial"] = 2;
+         });
+         require(g.act("select-memory", "2"), g.message());
+         require(g.act("select-memory", "1"), g.message());
+         require(g.actions() == 0, "dream selection ticked");
+         require(g.act("project", "dream"), g.message());
+         watch(g, 4);
+         require(g.snapshot()["state"]["sim"]["insight"] == 2, "exploration combination reward");
+         require(g.snapshot()["crew"][0]["morale"] == 73, "shared-person dream reward");
+       });
+  test("HTA UTF-8 and UTF-16 saves import live tasks without changing the source", [] {
+    Json original = Voyage::catalog()["initial"];
+    original["crew"][0]["name"] = "Rell \xc3\xbc \xf0\x9f\x9a\x80";
+    original["state"]["ongoing"].push_back({{"id", "travel"},
+                                            {"type", "travel"},
+                                            {"target", "tolme"},
+                                            {"state", "done"},
+                                            {"total", 21},
+                                            {"left", 0}});
+    write(original, "legacy.txt");
+    Voyage g;
+    require(g.load(directory / "legacy.txt"), g.message());
+    require(g.actions() == 0 && g.location() == "Kessler Drift", "import ticked or arrived early");
+    require(g.act("acknowledge", "travel"), g.message());
+    require(g.location() == "Tolme Anchorage", "imported readout target");
+    std::ifstream source(directory / "legacy.txt");
+    Json unchanged;
+    source >> unchanged;
+    require(unchanged == original, "import changed source");
+    std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
+    auto bytes = convert.from_bytes(original.dump());
+    std::ofstream utf16(directory / "legacy16.txt", std::ios::binary);
+    utf16.put(static_cast<char>(0xff));
+    utf16.put(static_cast<char>(0xfe));
+    for (char16_t c : bytes) {
+      utf16.put(static_cast<char>(c & 255));
+      utf16.put(static_cast<char>(c >> 8));
+    }
+    utf16.close();
+    require(g.load(directory / "legacy16.txt"), g.message());
+    require(task(g, "travel")->at("left") == 0, "UTF16 live work");
+    require(g.snapshot()["crew"][0]["name"] == original["crew"][0]["name"], "UTF16 Unicode name");
+    original["state"]["ongoing"][0]["type"] = "unimplemented";
+    write(original, "unsupported.txt");
+    auto before = g.snapshot();
+    require(!g.load(directory / "unsupported.txt"), "unknown task silently discarded");
+    require(g.snapshot() == before, "failed migration replaced voyage");
+  });
+  test("reference air penalties and crew anchors match at every pressure level", [] {
+    std::ifstream file("cpp/tests/reference_parity.json");
+    Json ref;
+    file >> ref;
+    for (const auto& sample : ref["air"]) {
+      auto g = fixture([&](Json& d) {
+        d["state"]["filterLife"] = 0;
+        d["state"]["airHold"] = sample["hold"];
+      });
+      require(g.airStage() == sample["stage"] && g.crewWork(7) == sample["work"],
+              "air penalty mismatch");
+    }
+    Voyage g;
+    for (const auto& item : ref["anchors"])
+      for (const auto& person : g.snapshot()["crew"])
+        if (person["id"] == item["id"])
+          require(Voyage::anchor(person) == item["anchor"], "crew anchor mismatch");
+  });
+  test("lost crew cancel shared work, medical reservations and pending orders", [] {
+    auto g = fixture([](Json& d) {
+      d["crew"][1]["health"] = 0;
+      d["state"]["pendingOrders"]["jax"] = {{"rest", true}};
+      d["state"]["nativeTasks"].push_back({{"id", "social"},
+                                           {"target", ""},
+                                           {"left", 3},
+                                           {"total", 3},
+                                           {"payload", Json::array({"rell", "jax"})}});
+    });
+    require(g.act("watch"), g.message());
+    require(g.snapshot()["crew"].size() == 3, "dead crew retained");
+    require(!task(g, "social"), "posthumous shared work retained");
+    require(!g.snapshot()["state"]["pendingOrders"].contains("jax"),
+            "dead person's staged orders retained");
+    require(g.save(directory / "loss-cleanup.json"), "loss save");
+    Voyage restored;
+    require(restored.load(directory / "loss-cleanup.json"), restored.message());
+  });
+  test("malformed crew sheets reject loading transactionally", [] {
+    Voyage g;
+    auto before = g.snapshot();
+    auto d = before;
+    d["state"]["pendingOrders"]["rell"] = {{"job", 42}};
+    write(d, "bad-orders.json");
+    require(!g.load(directory / "bad-orders.json"), "bad job type accepted");
+    require(g.snapshot() == before, "bad load changed live voyage");
+    d = before;
+    d["state"]["pendingOrders"]["rell"] = {{"doc", "yes"}};
+    write(d, "bad-orders.json");
+    require(!g.load(directory / "bad-orders.json"), "bad flag type accepted");
+    require(g.snapshot() == before, "bad load changed live voyage");
+  });
+  test("reference HTA snapshots preserve crew work, incident workers and mapped cooldowns", [] {
+    std::ifstream file("cpp/tests/reference_parity.json");
+    Json ref;
+    file >> ref;
+    for (const auto& item : ref["legacy"]) {
+      write(item["save"], "reference-import.json");
+      Voyage g;
+      require(g.load(directory / "reference-import.json"),
+              item["name"].get<std::string>() + ": " + g.message());
+      require(g.actions() == item["save"]["actions"], "import spent action");
+      if (item["name"] == "crew-sheet") {
+        require(task(g, "orders-rell") && task(g, "orders-jax"), "per-person work lost");
+        watch(g, 3);
+        require(task(g, "doctor-rell"), "imported doctor follow-up lost");
+      }
+      if (item["name"] == "incident-worker") {
+        auto t = task(g, "incident-fracture");
+        require(t && t->at("by") == "jax", "incident worker lost");
+        watch(g, 6);
+        require(g.snapshot()["state"]["chronicle"]["incidents"] == 1,
+                "imported incident did not resolve");
+      }
+      if (item["name"] == "known-cooldown")
+        require(g.cooldown("nav:travel") == 11, "mapped cooldown lost");
+      if (item["name"] == "pre-ship-class")
+        require(g.snapshot()["state"]["shipClass"] == "kestrel",
+                "pre-class migration chose wrong ship");
+      require(g.save(directory / "reference-import-native.json"),
+              "imported voyage not serializable");
     }
   });
   std::filesystem::remove_all(directory);

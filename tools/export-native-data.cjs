@@ -10,7 +10,9 @@ const data = {initial:g.saveSnapshot(), bodies:g.BODIES, systems:g.SECTOR_BODIES
  candidates:g.CANDIDATES, projects:g.SHIP_PROJECTS, scenes:g.ROOM_SCENES,
  history:g.WORLD_HISTORY, awards:g.COMMENDATIONS, wiki:g.WIKI,
  largeShip:g.LARGE_SHIP, largeRooms:g.ROOM_BLUEPRINTS, jobs:g.JOBS,
- incidents:g.INCIDENT_TYPES};
+ incidents:g.INCIDENT_TYPES, air:g.AIR_STAGES, engine:g.ENGINE, orders:g.ORDERS,
+ surveyWorth:g.SURVEY_WORTH, themes:g.THEMES, pay:g.PAY,
+ constants:{starve:g.MESS_STARVE,starveEvery:g.MESS_STARVE_EVERY}};
 // Separate literal chunks avoid MSVC's individual string-literal size limit.
 const encoded=JSON.stringify(data), chunks=[];
 for(let i=0;i<encoded.length;i+=8000) chunks.push('R"SPACEDATA('+encoded.slice(i,i+8000)+')SPACEDATA"');
@@ -21,3 +23,45 @@ if (process.argv.includes('--check')) {
  if (fs.readFileSync(dest,'utf8') !== content) throw Error('Regenerate native_data.hpp');
 } else fs.writeFileSync(dest,content);
 console.log('Native authored catalog: ' + data.systems.length + ' systems, ' + data.bodies.length + ' bodies');
+
+// Differential fixtures: expectations are calculated by the reference game,
+// not copied from the C++ formulas. These are test inputs, never runtime assets.
+const parity={navigation:[], commissions:[], air:[], anchors:[], watch:[]};
+const initial=JSON.parse(JSON.stringify(data.initial));
+for(const origin of g.SECTOR_BODIES) {
+ g.MAP.here=origin.entry;
+ for(const target of g.SECTOR_BODIES) {
+  const m=g.navMetrics(target);parity.navigation.push({origin:origin.entry,target:target.id,dist:m.dist,fuel:m.fuel});
+ }
+ for(const body of g.BODIES.filter(b=>g.bodySystem(b)===origin.id)) {
+  const m=g.navMetrics(body);parity.navigation.push({origin:origin.entry,target:body.id,dist:m.dist,fuel:m.fuel});
+ }
+}
+for(const origin of Object.keys(g.PORTS)) for(const serial of [0,1,2]) {
+ g.MAP.here=origin;g.STATE.docked=true;g.STATE.commissions.serial=serial;
+ for(const kind of ['visit','scan','salvage']) parity.commissions.push({origin,serial,kind,offer:g.commissionOffer(kind)});
+}
+for(const person of g.CREW) parity.anchors.push({id:person.id,anchor:g.simAnchor(person)});
+for(let hold=0;hold<=20;hold++) {g.STATE.filterLife=0;g.STATE.airHold=hold;parity.air.push({hold,stage:g.airStage(),work:g.crewCost(7)});}
+// Fresh VM for a deterministic action trace that includes automatic filter work.
+const trace={document:{getElementById:()=>null},window:{location:{protocol:'http:'}}};
+vm.createContext(trace);vm.runInContext(fs.readFileSync(path.join(root,'Spaceship.hta'),'utf8').match(/<script type="text\/javascript">([\s\S]*?)<\/script>/)[1],trace);
+for(let i=0;i<250;i++) {
+ trace.performAction('Reference parity watch');
+ parity.watch.push({actions:trace.actionCounter,engine:trace.STATE.engineCondition,wear:trace.STATE.wearTick,pay:trace.STATE.payTick,air:trace.STATE.airHold,filter:trace.STATE.filterLife,canisters:trace.LIFE.canisters,rations:trace.MESS.rack,stats:trace.STATS.map(s=>({id:s.id,value:s.value})),events:trace.EVENTS.map(e=>({id:e.type,stage:e.stage,left:e.left})),crew:trace.CREW.map(c=>({id:c.id,health:c.health,morale:c.morale,fatigue:c.fatigue,hunger:c.hunger,hungerTick:c.hungerTick,wallet:c.wallet}))});
+}
+// Preserve representative reference snapshots, including work already in flight.
+parity.legacy=[];
+function legacyCase(name,setup) {
+ const c={document:{getElementById:()=>null},window:{location:{protocol:'http:'}}};vm.createContext(c);
+ vm.runInContext(fs.readFileSync(path.join(root,'Spaceship.hta'),'utf8').match(/<script type="text\/javascript">([\s\S]*?)<\/script>/)[1],c);
+ c.repaintCurrent=()=>{};setup(c);parity.legacy.push({name,save:c.saveSnapshot()});
+}
+legacyCase('crew-sheet',c=>{c.CREW[0].health=70;c.queueOrders({rell:{doc:true},jax:{rest:true}},7);});
+legacyCase('incident-worker',c=>{for(let i=0;i<45;i++) c.performAction('fixture');c.beginIncidentWork(null,c.EVENTS[0].id);});
+legacyCase('known-cooldown',c=>{c.STATE.actionCooldowns['navigation:progress:travel']={category:'space',remaining:11};});
+legacyCase('pre-ship-class',c=>{delete c.STATE.shipClass;});
+const parityPath=path.join(root,'cpp/tests/reference_parity.json'), parityContent=JSON.stringify(parity)+'\n';
+if(process.argv.includes('--check')) {if(fs.readFileSync(parityPath,'utf8')!==parityContent) throw Error('Regenerate reference parity fixtures');}
+else fs.writeFileSync(parityPath,parityContent);
+console.log('Reference parity: '+parity.navigation.length+' routes, '+parity.commissions.length+' offers, '+parity.watch.length+' world ticks');

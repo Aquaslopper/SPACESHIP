@@ -12,7 +12,11 @@ endif()
 
 enable_testing()
 
-add_library(spaceship_core cpp/src/voyage.cpp cpp/src/voyage_views.cpp)
+add_library(spaceship_core
+  cpp/src/voyage.cpp
+  cpp/src/voyage_views.cpp
+  cpp/src/voyage_crew.cpp
+  cpp/src/voyage_import.cpp)
 target_include_directories(spaceship_core PUBLIC cpp/include)
 target_include_directories(spaceship_core SYSTEM PUBLIC cpp/vendor)
 
@@ -22,7 +26,7 @@ target_link_libraries(spaceship_console PRIVATE spaceship_core)
 
 if(WIN32)
   add_executable(spaceship WIN32 cpp/src/windows_native.cpp)
-  target_link_libraries(spaceship PRIVATE spaceship_core user32 gdi32 shell32)
+  target_link_libraries(spaceship PRIVATE spaceship_core user32 gdi32 shell32 comdlg32)
   target_compile_definitions(spaceship PRIVATE UNICODE _UNICODE)
   add_custom_command(TARGET spaceship POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -41,7 +45,7 @@ endif()
 add_executable(voyage_tests cpp/tests/voyage_tests.cpp)
 target_link_libraries(voyage_tests PRIVATE spaceship_core)
 add_test(NAME spaceship_voyage_tests COMMAND voyage_tests)
-
+set_tests_properties(spaceship_voyage_tests PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
 if(MSVC)
   target_compile_options(spaceship_core PRIVATE /W4 /permissive- /utf-8)
