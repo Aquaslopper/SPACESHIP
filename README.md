@@ -74,9 +74,28 @@ Existing Kessler-only and expanded-galaxy saves still load, including active leg
 
 ## Native C++ edition and development
 
-A native C++17 console build now provides a playable port of the action-clock voyage loop: navigation, scans, ship service, station actions, ongoing work, and per-button action cooldowns. `Spaceship.hta` remains the full visual edition while the C++ port is expanded; both use the same documented action economy. The native build has no third-party dependencies.
+The Windows `spaceship.exe` is now a **native C++ application**, with its own
+Win32 interface, GDI deck/chart views and C++ simulation. It does not launch the
+HTA or embed a browser/JavaScript engine. Its authored catalog is compiled in.
 
-Build and run locally with CMake:
+**This is a playable migration build, not yet a feature-identical conversion.**
+Read [NATIVE-PORT.md](NATIVE-PORT.md) for implemented systems and specific parity
+gaps. The original `Spaceship.hta` is preserved as the reference edition. In
+particular, artwork, most settings and full edge-case parity remain unfinished.
+Native music/effects now play from optional bundled WAV files in `music/` and
+`sounds/`, with free toggles and volume controls on Home/Handbook. Native saves go
+in `saves/` next to the EXE, or the per-user `SpaceshipCommand\saves` directory
+when the install folder is read-only. Older per-user native slots remain loadable.
+Each gameplay control, including Stand watch, has an action-count cooldown;
+labelled cooldown readouts distinguish it from ongoing work.
+The native version now has staged crew sheets, autonomous work, selected dreams,
+free travel/scan acknowledgements and reference-tested navigation/commission rules.
+It can **import supported HTA saves**, including Windows UTF-16 files, without
+modifying the source. Unknown tasks or unmapped live cooldowns are explicitly
+refused rather than discarded. Native slots use separate files in
+`saves/` (with the per-user fallback above). See the migration notes for limitations.
+
+Build the shared native simulation, text client and tests:
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -85,11 +104,18 @@ ctest --test-dir build --output-on-failure
 ./build/spaceship_console
 ```
 
-On Windows, configure with `cmake -S . -B build -A x64` and build with `cmake --build build --config Release`. **`build/Release/spaceship.exe` now launches the full visual game**, using Windows' built-in HTA host; it is not a native rewrite. Keep `Spaceship.hta` beside it. The Windows CI artifact `spaceship-windows-x64` includes both files and `WINDOWS-README.txt`: extract the entire ZIP into a writable folder before launching. Existing save files can be copied into that folder unchanged. The launcher uses the static MSVC runtime and reports missing files or host startup failures. Systems that block HTAs may still prevent play; the launcher does not bypass security policy.
+On Windows, configure with `cmake -S . -B build -A x64`, build with
+`cmake --build build --config Release`, and run `build/Release/spaceship.exe`.
+The `spaceship-windows-x64` CI artifact contains the native EXE and documentation;
+it no longer bundles or needs `Spaceship.hta`. CTest creates the actual native
+window and dispatches an action in its `--smoke-test` mode. Visual/manual gameplay
+verification on a player's Windows PC is still required.
 
-The incomplete native port is built separately as `spaceship_console` (`spaceship_console.exe` on Windows) and is not shipped in the player artifact. In this experimental console port only, **watch is repeatable without a cooldown** so there is always a committed action available to advance work and other cooldowns. Other controls retain their existing cooldown tiers. This fixes the small port's permanent action deadlock without changing the full visual game's action economy.
-
-Windows CI checks the packaged launcher's asset/host discovery with `spaceship.exe --check` as well as native unit tests. That is not a graphical end-to-end test: rendering and local Windows security restrictions still need a manual launch check.
+The C++ implementation is under `cpp/`. `spaceship_console` uses the same
+`Voyage` simulation as the GUI, rather than a separate stripped-down game. The
+only vendored dependency is nlohmann/json 3.11.3 (MIT). No runtime downloads are
+needed. `node tools/export-native-data.cjs` regenerates the authored catalog at
+development time; its output is committed and checked by CI.
 
 The original interface's gameplay JavaScript is inline, and its dependency-free Node tests load it in a VM with small DOM stubs. Run those regression tests from the repository root:
 

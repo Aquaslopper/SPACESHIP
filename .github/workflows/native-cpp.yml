@@ -17,7 +17,10 @@ jobs:
         with:
           node-version: 22
       - name: Existing game regression tests
-        run: for test in tests/*.test.cjs; do node "$test"; done
+        run: |
+          node tools/export-native-data.cjs --check
+          node tools/export-native-audio.cjs --check
+          for test in tests/*.test.cjs; do node "$test"; done
       - name: Configure native C++ game
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
       - name: Build native C++ game
@@ -33,7 +36,15 @@ jobs:
       - name: Configure 64-bit Windows build
         run: cmake -S . -B build -A x64
       - name: Compile Windows executable
-        run: cmake --build build --config Release --parallel
+        shell: pwsh
+        run: |
+          $output = & cmake --build build --config Release --parallel 2>&1
+          $result = $LASTEXITCODE
+          $output | ForEach-Object { Write-Host $_ }
+          if ($result -ne 0) {
+            $output | Where-Object { $_ -match 'error' } | ForEach-Object { Write-Host "::error::$_" }
+          }
+          exit $result
       - name: Test Windows build
         run: ctest --test-dir build -C Release --output-on-failure
       - name: Publish Windows executable artifact
@@ -42,6 +53,10 @@ jobs:
           name: spaceship-windows-x64
           path: |
             build/Release/spaceship.exe
-            build/Release/Spaceship.hta
             build/Release/WINDOWS-README.txt
+            build/Release/NATIVE-PORT.md
+            build/Release/JSON-LICENSE.txt
+            build/Release/music/
+            build/Release/sounds/
+            build/Release/saves/README.txt
           if-no-files-found: error
