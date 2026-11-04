@@ -17,6 +17,29 @@ function fresh() {
 }
 const copy = x => JSON.parse(JSON.stringify(x));
 const test = (name, fn) => { fn(); console.log('PASS: ' + name); };
+function mockButtons(g) {
+  g.make = (tag, cls, html) => {
+    const el = {tag, className:cls || '', innerHTML:html || '', style:{}, children:[], events:{}, attrs:{}, title:'',
+      appendChild(child) { this.children.push(child); },
+      setAttribute(name, value) { this.attrs[name] = value; },
+      removeAttribute(name) { delete this.attrs[name]; },
+      getElementsByTagName(name) { return name === 'span' && this.costSpan ? [this.costSpan] : []; }};
+    const match = (html || '').match(/<span[^>]*>([\s\S]*?)<\/span>/i);
+    if (match) el.costSpan = {innerHTML:match[1]};
+    return el;
+  };
+  g.on = (el, type, fn) => { el.events[type] = fn; };
+  g.tickWorld = () => {};
+  g.logLine = () => {};
+  g.checkCommendations = () => {};
+  g.setStatus = () => {};
+  g.repaintCurrent = () => {};
+  g.redrawAfterLoad = () => {};
+  g.findOngoing = () => null;
+  g.fireAction = (e, detail) => g.performAction(detail);
+  return () => ({prevented:0, stopped:0, preventDefault() { this.prevented++; },
+    stopPropagation() { this.stopped++; }, clientX:0, clientY:0});
+}
 
 test('the searchable handbook has unique entries and valid free shortcuts', () => {
   const g = fresh(), ids = new Set();
@@ -146,14 +169,41 @@ test('older saves reconstruct provable progress without granting supplies', () =
   assert(g.STATE.chronicle.earned.breath && g.STATE.chronicle.earned.eyes && g.STATE.chronicle.earned.berth);
   assert.strictEqual(g.STATE.chronicle.dreams, 1); assert(g.STATE.chronicle.systems['sec-kessler']);
   assert.strictEqual(g.STATE.fuelCells, fuel); assert.strictEqual(g.STATE.shiplets, cash);
-  assert.strictEqual(g.STATE.options.largeText, false); assert.strictEqual(g.STATE.commissions.active, null);
+  assert.strictEqual(g.STATE.options.largeText, false); assert.strictEqual(g.STATE.options.theme, 'classic');
+  assert.strictEqual(g.STATE.options.soundEffects, true); assert.strictEqual(g.STATE.options.music, true);
+  assert.strictEqual(g.STATE.options.audioLevel, 0.4); assert.strictEqual(g.STATE.commissions.active, null);
   assert(g.validSave(copy(g.saveSnapshot())));
+});
+
+test('palette and audio preferences persist, validate, and migrate from older option objects', () => {
+  const g = fresh();
+  assert.strictEqual(g.rasterInk(0.5), 'rgba(139,111,78,0.5)');
+  g.STATE.options.theme = 'nebula'; g.STATE.options.soundEffects = false;
+  assert.strictEqual(g.rasterInk(0.5), 'rgba(155,121,208,0.5)');
+  g.STATE.options.music = false; g.STATE.options.audioLevel = 0.65;
+  assert(g.validSave(copy(g.saveSnapshot()))); g.saveGame(2);
+  g.STATE.options.theme = 'classic'; g.STATE.options.soundEffects = true;
+  g.STATE.options.music = true; g.STATE.options.audioLevel = 0.18;
+  assert(/restored/i.test(g.loadGame(2)));
+  assert.strictEqual(g.STATE.options.theme, 'nebula'); assert.strictEqual(g.STATE.options.soundEffects, false);
+  assert.strictEqual(g.STATE.options.music, false); assert.strictEqual(g.STATE.options.audioLevel, 0.65);
+
+  const old = copy(g.saveSnapshot());
+  old.state.options = {largeText:true, confirmRisk:true, hideCrewLabels:false};
+  assert(g.validSave(old)); g.applySnapshot(old);
+  assert.strictEqual(g.STATE.options.theme, 'classic'); assert.strictEqual(g.STATE.options.soundEffects, true);
+  assert.strictEqual(g.STATE.options.music, true); assert.strictEqual(g.STATE.options.audioLevel, 0.4);
+  assert(g.STATE.options.largeText && g.STATE.options.confirmRisk);
 });
 
 test('malformed progression or option state is rejected without replacing a voyage', () => {
   const g = fresh(), original = copy(g.saveSnapshot());
   const cases = [
     d => { d.state.options.confirmRisk = 'yes'; },
+    d => { d.state.options.theme = 'sunshine'; },
+    d => { d.state.options.soundEffects = 1; },
+    d => { d.state.options.music = 'off'; },
+    d => { d.state.options.audioLevel = 1.01; },
     d => { d.state.chronicle.systems.fake = true; },
     d => { d.state.chronicle.claimed.breath = true; },
     d => { d.state.chronicle.projects = -1; },
@@ -162,7 +212,10 @@ test('malformed progression or option state is rejected without replacing a voya
     d => { d.state.commissions.active = {kind:'visit',origin:'tolme',target:'constructor',progress:0,reward:450}; },
     d => { d.state.commissions.active = {kind:'salvage',origin:'constructor',target:'',progress:0,reward:240}; },
     d => { d.state.commissions.active = {kind:'salvage',origin:'tolme',target:'',progress:3,reward:240}; },
-    d => { d.state.commissions.active = {kind:'scan',origin:'tolme',target:'halvan',progress:0,reward:9000}; }
+    d => { d.state.commissions.active = {kind:'scan',origin:'tolme',target:'halvan',progress:0,reward:9000}; },
+    d => { d.state.actionCooldowns = []; },
+    d => { d.state.actionCooldowns = {bad:{category:'unknown',remaining:1}}; },
+    d => { d.state.actionCooldowns = {bad:{category:'critical',remaining:21}}; }
   ];
   for (const mutate of cases) {
     const d = copy(original); mutate(d); assert(!g.validSave(d));
@@ -170,6 +223,136 @@ test('malformed progression or option state is rejected without replacing a voya
     assert.strictEqual(g.STATE.shiplets, original.state.shiplets);
     assert.strictEqual(g.actionCounter, original.actions);
   }
+});
+
+test('each action button has its own cooldown and every other committed action advances it', () => {
+  const g = fresh(), event = mockButtons(g), host = {children:[], appendChild(el) { this.children.push(el); }};
+  let timerCalls = 0;
+  g.STATE.activeTab = 'probe';
+  g.window.setTimeout = () => { timerCalls++; throw new Error('cooldowns must not use wall-clock timers'); };
+  g.commandRow(host, 'Routine control', true, () => g.performAction('routine action'), '1 action', 'routine', 'routine-control');
+  g.commandRow(host, 'Systems control', true, () => g.performAction('systems action'), '1 action', 'systems', 'systems-control');
+  const routine = host.children[0], systems = host.children[1];
+  const routineKey = g.actionCooldownKey('routine-control'), systemsKey = g.actionCooldownKey('systems-control');
+  const before = g.actionCounter;
+  routine.events.click(event());
+  assert.strictEqual(g.actionCounter, before + 1);
+  assert.strictEqual(g.STATE.actionCooldowns[routineKey].remaining, 5);
+  assert.strictEqual(routine.costSpan.innerHTML, 'COOLDOWN 5');
+  assert(routine.className.includes('act-cooldown'));
+
+  const beforeSystems = g.actionCounter;
+  let worldObservation = null;
+  g.tickWorld = () => { worldObservation = {actions:g.actionCounter,
+    routine:g.STATE.actionCooldowns[routineKey] && g.STATE.actionCooldowns[routineKey].remaining,
+    systems:g.STATE.actionCooldowns[systemsKey]}; };
+  systems.events.click(event());
+  assert.deepStrictEqual(worldObservation, {actions:beforeSystems + 1, routine:4, systems:undefined},
+    'the action counter increments, then existing cooldowns tick, before the world tick; the source lock starts afterward');
+  assert.strictEqual(g.STATE.actionCooldowns[routineKey].remaining, 4, 'the other button’s action advances the first cooldown');
+  assert.strictEqual(g.STATE.actionCooldowns[systemsKey].remaining, 10);
+  const lockedActions = g.actionCounter, repeat = event();
+  routine.events.click(repeat);
+  assert.strictEqual(g.actionCounter, lockedActions, 'a blocked repeat is not a committed action');
+  assert.strictEqual(repeat.prevented, 1); assert.strictEqual(repeat.stopped, 1);
+  assert.strictEqual(g.STATE.actionCooldowns[routineKey].remaining, 4, 'a blocked click does not tick cooldowns');
+
+  for (let i = 0; i < 4; i++) g.performAction('another committed action');
+  assert.strictEqual(g.STATE.actionCooldowns[routineKey], undefined, 'five other actions clear the routine lock');
+  assert.strictEqual(g.STATE.actionCooldowns[systemsKey].remaining, 6);
+  routine.events.click(event());
+  assert.strictEqual(g.STATE.actionCooldowns[routineKey].remaining, 5, 'the same control can be used again after its cooldown');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(g.ACTION_COOLDOWN_RULES)), {
+    routine:{actions:5,label:'Routine'}, systems:{actions:10,label:'Ship systems'},
+    space:{actions:15,label:'Space operations'}, critical:{actions:20,label:'Critical'}
+  });
+  const criticalHost = {children:[], appendChild(el) { this.children.push(el); }};
+  g.commandRow(criticalHost, 'Irreversible signal choice', true, () => g.performAction('critical action'),
+    '1 action', 'critical', 'critical-control');
+  criticalHost.children[0].events.click(event());
+  const criticalCooldown = g.STATE.actionCooldowns[g.actionCooldownKey('critical-control')];
+  assert.strictEqual(criticalCooldown.category, 'critical');
+  assert.strictEqual(criticalCooldown.remaining, 20);
+  assert.strictEqual(timerCalls, 0);
+});
+
+test('cooldowns survive redraw and save/load, and older saves migrate cleanly', () => {
+  const g = fresh(), event = mockButtons(g), host = {children:[], appendChild(el) { this.children.push(el); }};
+  g.STATE.activeTab = 'persistent-screen';
+  g.commandRow(host, 'Persistent service', true, () => g.performAction('service'), '1 action', 'systems', 'persistent-service');
+  const button = host.children[0], key = g.actionCooldownKey('persistent-service');
+  button.events.click(event());
+  assert.strictEqual(g.STATE.actionCooldowns[key].remaining, 10);
+  assert(/saved/i.test(g.saveGame(2)));
+
+  /* Rebuilding a screen reattaches DOM refs to the persistent STATE record. */
+  g.ACTION_COOLDOWN_CONTROLS = {};
+  const redrawn = {children:[], appendChild(el) { this.children.push(el); }};
+  g.commandRow(redrawn, 'Persistent service', true, () => g.performAction('service'), '1 action', 'systems', 'persistent-service');
+  assert(redrawn.children[0].className.includes('act-cooldown'));
+  assert.strictEqual(redrawn.children[0].costSpan.innerHTML, 'COOLDOWN 10');
+
+  g.STATE.actionCooldowns = {};
+  assert(/restored/i.test(g.loadGame(2)));
+  assert.strictEqual(g.STATE.actionCooldowns[key].remaining, 10);
+  const afterLoad = {children:[], appendChild(el) { this.children.push(el); }};
+  g.commandRow(afterLoad, 'Persistent service', true, () => g.performAction('service'), '1 action', 'systems', 'persistent-service');
+  const loadedButton = afterLoad.children[0], count = g.actionCounter, blocked = event();
+  loadedButton.events.click(blocked);
+  assert.strictEqual(g.actionCounter, count);
+  assert.strictEqual(blocked.prevented, 1);
+  assert(loadedButton.className.includes('act-cooldown'));
+
+  const legacy = copy(g.saveSnapshot()); delete legacy.state.actionCooldowns;
+  assert(g.validSave(legacy), 'saves predating cooldown state remain loadable');
+  g.applySnapshot(legacy);
+  assert.deepStrictEqual(copy(g.STATE.actionCooldowns), {});
+  const malformed = copy(g.saveSnapshot());
+  malformed.state.actionCooldowns = {bad:{category:'routine',remaining:0}};
+  assert(!g.validSave(malformed), 'invalid cooldown records are rejected');
+});
+
+test('progress actions and Navigation Stand watch obey their own category cooldowns', () => {
+  const g = fresh(), event = mockButtons(g);
+  let starts = 0;
+  g.STATE.activeTab = 'nav:main';
+  const progress = g.buildProgressButton('cooldown-probe', 'Start test work', () => {
+    starts++; g.performAction('start test work');
+  }, true, 'Complete', 'systems');
+  const progressKey = g.actionCooldownKey('progress:cooldown-probe');
+  progress.events.click(event());
+  assert.strictEqual(starts, 1);
+  assert.strictEqual(g.STATE.actionCooldowns[progressKey].remaining, 10);
+  assert(progress.className.includes('pbtn-cooldown'));
+  const count = g.actionCounter, blocked = event();
+  progress.events.click(blocked);
+  assert.strictEqual(starts, 1); assert.strictEqual(g.actionCounter, count);
+  assert.strictEqual(blocked.prevented, 1);
+  g.performAction('another action');
+  assert.strictEqual(g.STATE.actionCooldowns[progressKey].remaining, 9);
+
+  const nav = {children:[], appendChild(el) { this.children.push(el); }};
+  g.commandRow(nav, 'Stand watch - advance ongoing work', true, g.standWatch);
+  const watch = nav.children[0]; watch.events.click(event());
+  const watchKey = Object.keys(g.STATE.actionCooldowns).find(k => k.indexOf('stand-watch') >= 0);
+  assert(watchKey, 'Stand watch has a persistent per-control record');
+  assert.strictEqual(g.STATE.actionCooldowns[watchKey].category, 'space');
+  assert.strictEqual(g.STATE.actionCooldowns[watchKey].remaining, 15);
+  const afterWatch = g.actionCounter;
+  watch.events.click(event());
+  assert.strictEqual(g.actionCounter, afterWatch, 'Stand watch cannot be spammed');
+});
+
+test('offline audio cues generate valid WAV data and distinguish scans, travel and completion', () => {
+  const g = fresh(), uri = g.waveDataUri('fx-ping'), bytes = Buffer.from(uri.split(',')[1], 'base64');
+  assert(uri.startsWith('data:audio/wav;base64,'));
+  assert.strictEqual(bytes.toString('ascii', 0, 4), 'RIFF');
+  assert.strictEqual(bytes.toString('ascii', 8, 12), 'WAVE');
+  assert.strictEqual(bytes.readUInt32LE(24), 8000);
+  assert.strictEqual(g.cueKind('Deep scan started'), 'ping');
+  assert.strictEqual(g.cueKind('Course locked'), 'thrust');
+  assert.strictEqual(g.cueKind('Arrival complete'), 'chime');
+  assert.notStrictEqual(g.waveDataUri('music'), uri);
 });
 
 test('three save slots are independent and a missing slot leaves the current game intact', () => {

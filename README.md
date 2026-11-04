@@ -12,7 +12,7 @@ Run `Spaceship.hta` on Windows, or use the browser preview to try it. The title 
 
 ## Exploring the galaxy
 
-The chart has seven regions, 36 navigable systems, 111 local destinations and 20 stations. To leave Kessler, open **Navigation**, switch to **Sector**, select a system and start a jump. To browse farther afield, switch to **Galaxy**, select a region and choose **View sector chart**, then select a system to jump to. After the jump is complete, acknowledge it and switch to **System** to explore its stars, worlds and stations.
+The chart has seven regions, 48 navigable systems, 243 local destinations and 30 stations. Every system has a charted star and now includes an additional outer world and natural moon alongside its original local destinations. To leave Kessler, open **Navigation**, switch to **Sector**, select a system and start a jump. To browse farther afield, switch to **Galaxy**, select a region and choose **View sector chart**, then select a system to jump to. After the jump is complete, acknowledge it and switch to **System** to explore its stars, worlds, moons and stations.
 
 Local travel and inter-system jumps both use fuel and progress as you spend actions. You must undock before starting a crossing. Stock spare fuel cells, O2 canisters and repair kits before a long trip: salvage uses energy, and not every system has a station. Deep scans work on local destinations, not entire systems; packaged survey data can be sold at a station. Markets vary by port, and new missions connect the regions. Station refits can expand the hold further or reduce fuel use without shortening travel time.
 
@@ -26,7 +26,7 @@ Saves made before ship classes existed keep their established Kestrel vessel, la
 
 ## The living ship
 
-Every compartment in the ship diagram now opens a working station. Right-click a room, then select its tab. Use the arrows to scroll through open tabs; the fixed **Home** button returns to the ship. New facilities complement the existing engine, filters, quarters, mess, cargo and science stations:
+Every compartment in the ship diagram now opens a working station. Right-click a room, then select its tab. Use the arrows to scroll through open tabs; the fixed **Home** button returns to the ship. The deck plan uses function-specific color-coded room glyphs, and every facility window has its own illustrated instrument vignette so even utility spaces feel purpose-built. New facilities complement the existing engine, filters, quarters, mess, cargo and science stations:
 
 - **Medical Bay** uses a medkit and power for a quicker, stronger treatment. Medkits are sold at stations; the slower medical order in Crew Quarters remains available without one.
 - **Workshop, Recyclers and Fuel Reserve** turn recovered salvage into repair kits, O2 canisters and fuel cells. **Damage Control** can use salvage to patch the hull; **Hydroponics** can process a produce cargo lot into rations. Inputs are consumed when work begins.
@@ -62,9 +62,25 @@ Station mission boards also offer **repeatable commissions**: visit another port
 
 Use the disk icon in the lower-left corner to save or load from three independent slots. Slot 1 remains compatible with the original `Spaceship_save.txt`; the other Windows HTA files are `Spaceship_save_2.txt` and `Spaceship_save_3.txt`. The browser preview uses separate local-storage keys instead. The loss screen can load any slot. Loading replaces the current voyage; the Save / Load menu can also start a new voyage after confirmation without deleting the slots, or return to the title menu and resume the current voyage. Starting a new voyage keeps the current settings, including motion, reading text, crew labels and confirmations.
 
-The Settings gear controls decorative motion, larger reading text, crew diagram labels, and optional confirmations for jettisoning, abandoning a commission, permanent story decisions, saving and loading. Changing options costs no actions; preferences are saved with the voyage.
+The Settings gear controls five bridge palettes (classic parchment, Deep Space, Aurora, Nebula and Ember), synthesized ambient music, sound effects, volume, decorative motion, larger reading text, crew diagram labels, and optional confirmations for jettisoning, abandoning a commission, permanent story decisions, saving and loading. The self-contained soundscape works offline; playback starts after a player gesture, and either music or effects can be disabled independently. Changing options costs no actions; preferences are saved with the voyage and older saves receive compatible defaults.
+
+### Action cooldowns are part of the game clock
+
+There is no real-time cooldown or background timer. The ship advances only when a committed action advances the action counter; idle time, opening windows, reading, selecting a map target and blocked clicks are free. When an action commits, every already-active button cooldown loses one action. The button that caused the action starts its own cooldown **after** that tick, so it does not count itself down.
+
+Each repeatable action control has an independent saved cooldown. The current tiers are **5 actions** for routine commands, **10** for ship-system work, **15** for space operations and **20** for critical or consequential decisions. Examples include service and production in the systems tier, travel, scans, docking and **Stand watch - advance ongoing work** in the space tier, and irreversible choices, large-ship purchases, signal decisions, jettisoning or abandoning work in the critical tier. Cooldown progress survives redraws and save/load. A blocked repeat neither commits an action nor advances any countdown; take another action to move it forward.
 
 Existing Kessler-only and expanded-galaxy saves still load, including active legacy room tabs. Scans, completed contracts, the current location, recorded observations, retained dreams and a running filter bank contribute provable past progress. Older saves did not track all historic visits, meals, projects or incidents, so unrecorded progress in those categories begins from migration. Previously earned commendation rewards still require a manual claim.
+
+## Development and tests
+
+`Spaceship.hta` is the self-contained application; there is no build step or package installation. Its gameplay JavaScript is inline, and the dependency-free Node tests load that script in a VM with small DOM stubs. Run the full suite from the repository root:
+
+```sh
+for test in tests/*.test.cjs; do node "$test"; done
+```
+
+The key action-flow boundary is `performAction(detail)`: a committed action increments the counter, ticks active button cooldowns once, then advances the world. Keep free navigation and presentation handlers outside that path. Wire repeatable action controls through `commandRow`, `wireAction` or `buildProgressButton`; those UI wrappers start the source control's cooldown only if the callback actually committed an action. Per-control countdowns live in `STATE.actionCooldowns`, so they are included in saves and validated/migrated with other state. `AGENTS.md` records these invariants and the expected workflow for future changes.
 
 ## Scope
 
