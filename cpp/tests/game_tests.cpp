@@ -53,11 +53,26 @@ int main() {
 
   Game watch;
   check(watch.standWatch() == ActionResult::committed &&
-        watch.cooldownRemaining("nav:stand-watch") == 15,
-        "Stand watch is an action with an independent space cooldown");
+        watch.cooldownRemaining("nav:stand-watch") == 0,
+        "console watch is a repeatable clock advance, not a deadlock");
   const int watchCount = watch.state().actionCount;
-  check(watch.standWatch() == ActionResult::blockedCooldown && watch.state().actionCount == watchCount,
-        "Stand watch cannot be repeated during its cooldown");
+  check(watch.standWatch() == ActionResult::committed && watch.state().actionCount == watchCount + 1,
+        "console watch can advance time again");
+
+  // Reproduce the previously permanent stall using ONLY player-facing commands.
+  Game stalled;
+  stalled.undock();
+  stalled.startTravel("Halvan's Reach");
+  stalled.startScan("Halvan's Reach");
+  stalled.standWatch();
+  stalled.splitFuelCell();
+  check(stalled.state().location == "Halvan's Reach" && stalled.state().scanActions == 1,
+        "reproduced the formerly stalled voyage");
+  for (int i = 0; i < 15; ++i)
+    check(stalled.standWatch() == ActionResult::committed, "watch remains available to advance work");
+  check(stalled.state().lastScan == "Halvan's Reach" &&
+        stalled.startTravel("Echo Shoal") == ActionResult::committed,
+        "player-facing commands finish the scan and permit another crossing");
 
   return failures == 0 ? 0 : 1;
 }

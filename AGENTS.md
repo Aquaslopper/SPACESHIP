@@ -55,3 +55,9 @@ The game is **not real-time**. Waiting, reading, opening a window, selecting a m
 - Keep the action clock discrete: each committed action increments the counter, ticks already-active button cooldowns, then advances ongoing work. The source button's new tier cooldown starts afterward. Invalid actions and blocked repeats do not tick.
 - Build/test locally with `cmake -S . -B build`, `cmake --build build --parallel`, then `ctest --test-dir build --output-on-failure`. The Windows workflow must compile `build/Release/spaceship.exe` and publish it as an artifact.
 - `.github/workflows/native-cpp.yml` also runs the existing Node regression suites. Keep both the native tests and the legacy-game tests passing during the incremental port.
+
+## Windows packaging correction
+
+- The player-facing Windows `spaceship.exe` is an HTA launcher, not the incomplete native port. Ship `Spaceship.hta` and `WINDOWS-README.txt` alongside it. Preserve adjacent save-file compatibility and never bypass Windows security policy.
+- The native console target is now `spaceship_console`; it is excluded from the player artifact. Its **standWatch is deliberately repeatable without cooldown** to prevent permanent stalls caused by its very small command set. This exception applies only to the experimental C++ console, not the HTA cooldown contract above. Each watch still advances the action counter, existing cooldowns and world, in that order.
+- Windows CTest includes the launcher's noninteractive `--check` packaging check. This is not a rendering or end-user policy test.
