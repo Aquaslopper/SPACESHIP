@@ -9,7 +9,10 @@ Read NATIVE-PORT.md for implemented systems and remaining differences.
 
 Controls
 - Select a page at left, a target in its list, then an available command.
-- Click a compartment in the ship plan to open it.
+- Left-click a compartment to inspect it; right-click opens its task tab.
+- The native app starts on the original title artwork. Menu returns there; Resume
+  preserves the current voyage. Visual reconstruction is unfinished: see
+  docs/VISUAL-PARITY.md for the room/sidebar/layout acceptance checklist.
 - Navigation lists local destinations first, then all star systems.
 - Reading/selecting, staging orders and acknowledging completed readouts are free.
 - A committed command advances one action. Idle time never advances gameplay.

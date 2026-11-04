@@ -83,7 +83,8 @@ external AI service. Its memories and desires follow the crew's actual voyage.
 There is no need to learn every compartment at once.
 
 1. **Take a look around.** Select a page on the left, choose a target, then read its
-   details. Click a compartment on the deck plan to open it. Browsing is free.
+   details. Left-click a compartment on the deck plan to inspect it; right-click
+   opens its task tab. Browsing is free.
 2. **Make breathing a priority.** Open the **O2 Filter Room** and seat available
    canisters. Installation takes work; other useful gameplay actions advance it.
    When all three are seated, start the filter bank if it is not already running.
