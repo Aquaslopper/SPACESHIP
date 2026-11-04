@@ -25,7 +25,20 @@ test('a new voyage begins on a compact ship with working facilities and constrai
   assert.strictEqual(g.SHIP.berths, '6'); assert.strictEqual(g.CARGO.capacity, 40);
   assert.strictEqual(g.cargoUsed(), 32); assert.strictEqual(g.ROOMS.length, 21);
   assert.strictEqual(g.HULL.length, 6); assert(g.findById(g.ROOMS, 'simulacron'));
-  for (const r of g.ROOMS) assert(r.x + r.w <= 600 && r.y + r.h <= 365, r.name);
+  assert.strictEqual(Object.keys(g.ROOM_SCENES).length, 21);
+  g.make = (tag, cls, html) => ({tag, className:cls || '', innerHTML:html || ''});
+  const sceneCodes = new Set();
+  for (const r of g.ROOMS) {
+    assert(r.x + r.w <= 600 && r.y + r.h <= 365, r.name);
+    const scene = g.ROOM_SCENES[r.id], illustration = g.buildRoomIllustration(r.id);
+    assert(scene && scene.glyph && scene.accent && scene.code, r.id + ' has no room scene');
+    assert(!sceneCodes.has(scene.code), 'duplicate room scene code: ' + scene.code); sceneCodes.add(scene.code);
+    assert(illustration.className.includes('room-hero-' + scene.glyph));
+    assert(illustration.innerHTML.includes(scene.label));
+  }
+  const settings = g.popupSpec('settings').html;
+  for (const id of ['settings-theme','settings-music','settings-sfx','settings-audio-level']) assert(settings.includes(id), id);
+  assert(settings.includes('Deep Space - cyan') && settings.includes('Aurora - mint') && settings.includes('Nebula - violet') && settings.includes('Ember - copper'));
   assert(g.validSave(copy(g.saveSnapshot())));
 });
 

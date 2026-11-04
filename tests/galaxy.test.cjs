@@ -50,6 +50,29 @@ test('catalogue identifiers, ports, routes and contract destinations', () => {
   }
 });
 
+test('the expanded chart adds outer worlds and a mapped natural moon to every system', () => {
+  const g = fresh();
+  assert.strictEqual(g.GALAXY_BODIES.length, 7);
+  assert.strictEqual(g.SECTOR_BODIES.length, 48);
+  assert.strictEqual(g.BODIES.length, 243);
+  assert.strictEqual(Object.keys(g.PORTS).length, 30);
+  assert.strictEqual(g.BODIES.filter(b => b.type === 'star').length, 50);
+  assert.strictEqual(g.BODIES.filter(b => b.type === 'planet').length, 93);
+  assert.strictEqual(g.BODIES.filter(b => b.type === 'moon').length, 48);
+  for (const sys of g.SECTOR_BODIES) {
+    const prefix = sys.id.substring(4), world = g.findById(g.BODIES, prefix + '-outer');
+    const moon = g.findById(g.BODIES, prefix + '-moon');
+    assert(world && world.type === 'planet' && world.system === sys.id, sys.id + ' outer world');
+    assert(moon && moon.type === 'moon' && moon.system === sys.id, sys.id + ' natural moon');
+    assert.strictEqual(moon.details.find(row => row[0] === 'Satellite of')[1], world.name);
+    assert(world.details.some(row => row[0] === 'Atmosphere'));
+    assert(moon.scan.length === 2 && moon.scan[0].includes('satellite'));
+  }
+  g.revealScan('kessler-moon');
+  assert(g.STATE.scanned['kessler-moon']);
+  assert(g.validSave(JSON.parse(JSON.stringify(g.saveSnapshot()))));
+});
+
 test('all charted systems can be reached within a full fuel tank', () => {
   const g = fresh();
   for (const from of g.SECTOR_BODIES) {

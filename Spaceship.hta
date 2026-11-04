@@ -410,6 +410,101 @@ height:29px; line-height:27px; margin-top:6px; }
    position:absolute; right:6px; bottom:4px;
    font-size:9px; color:#b3a794; letter-spacing:.5px;
 }
+/* Small instrument glyphs replace the empty floors in the deck plan.
+   Every bay shares a tidy device frame, but the silhouettes change
+   by function: reactor, filter, crew habitat, stores, science or signal. */
+.room-glyph { position:absolute; z-index:0; right:8px; bottom:8px; width:52px; height:25px;
+   overflow:hidden; background:#efe8dc; border:1px solid #d8c9b3; border-bottom-width:2px; }
+.room-glyph span { position:absolute; display:block; }
+.room-glyph .rg-main { left:5px; top:5px; width:15px; height:14px; border:1px solid #8c6f4e; }
+.room-glyph .rg-side { right:5px; top:6px; width:20px; height:3px; background:#cbb89c; box-shadow:0 6px 0 #cbb89c, 0 12px 0 #cbb89c; }
+.room-glyph .rg-light { left:8px; top:8px; width:6px; height:6px; border-radius:4px; }
+.room-glyph-reactor .rg-main { border-radius:50%; box-shadow:0 0 0 3px #e4dbcb, 0 0 0 4px #cbb89c; }
+.room-glyph-reactor .rg-side { left:30px; right:auto; width:14px; height:2px; top:5px; }
+.room-glyph-reactor .rg-light { left:10px; top:10px; width:3px; height:3px; }
+.room-glyph-filter .rg-main { left:4px; top:4px; width:6px; height:15px; border-radius:4px; }
+.room-glyph-filter .rg-side { left:15px; right:auto; top:4px; width:6px; height:15px; box-shadow:10px 0 0 #cbb89c, 20px 0 0 #cbb89c; }
+.room-glyph-filter .rg-light { left:6px; top:8px; width:2px; height:2px; }
+.room-glyph-habitat .rg-main { left:4px; top:5px; width:18px; height:12px; background:#faf7f2; }
+.room-glyph-habitat .rg-side { right:4px; top:5px; width:18px; height:12px; background:#faf7f2; box-shadow:none; border:1px solid #cbb89c; }
+.room-glyph-habitat .rg-light { left:11px; top:8px; width:3px; height:3px; }
+.room-glyph-medical .rg-main { left:6px; top:4px; width:16px; height:16px; border-radius:50%; }
+.room-glyph-medical .rg-side { left:29px; right:auto; top:7px; width:13px; height:2px; box-shadow:0 5px 0 #cbb89c, 0 10px 0 #cbb89c; }
+.room-glyph-medical .rg-light { left:12px; top:6px; width:4px; height:12px; border-radius:0; }
+.room-glyph-cargo .rg-main { left:4px; top:6px; width:12px; height:12px; box-shadow:13px 0 0 #cbb89c, 13px 0 0 1px #8c6f4e; }
+.room-glyph-cargo .rg-side { left:5px; right:auto; top:6px; width:11px; height:1px; background:#8c6f4e; box-shadow:13px 0 0 #8c6f4e; }
+.room-glyph-cargo .rg-light { display:none; }
+.room-glyph-orbit .rg-main { left:5px; top:4px; width:17px; height:17px; border-radius:50%; background:none; }
+.room-glyph-orbit .rg-side { left:29px; right:auto; top:6px; width:15px; height:2px; box-shadow:0 6px 0 #cbb89c, 0 12px 0 #cbb89c; }
+.room-glyph-orbit .rg-light { left:11px; top:10px; width:6px; height:6px; border-radius:50%; }
+.room-glyph-network .rg-main { left:7px; top:6px; width:7px; height:7px; border-radius:50%; }
+.room-glyph-network .rg-side { left:28px; right:auto; top:5px; width:15px; height:2px; box-shadow:0 6px 0 #cbb89c, 0 12px 0 #cbb89c; }
+.room-glyph-network .rg-light { left:17px; top:9px; width:5px; height:5px; border-radius:50%; }
+.room-glyph-core .rg-main { left:7px; top:4px; width:16px; height:16px; border-radius:50%; background:none; box-shadow:0 0 0 3px #e4dbcb, 0 0 0 4px #cbb89c; }
+.room-glyph-core .rg-side { left:31px; right:auto; top:5px; width:13px; height:2px; box-shadow:0 6px 0 #cbb89c, 0 12px 0 #cbb89c; }
+.room-glyph-core .rg-light { left:13px; top:10px; width:5px; height:5px; }
+.room-glyph-garden .rg-main { left:7px; top:5px; width:3px; height:15px; border:0; }
+.room-glyph-garden .rg-side { left:14px; right:auto; top:4px; width:3px; height:16px; box-shadow:7px 2px 0 #cbb89c, 14px 0 0 #cbb89c; }
+.room-glyph-garden .rg-light { left:5px; top:6px; width:7px; height:4px; border-radius:7px 0 7px 0; }
+.room-small .room-glyph { right:4px; left:auto; top:3px; bottom:auto; width:8px; height:8px; border:0; background:transparent; }
+.room-small .room-glyph span { display:none; }
+.room-small .room-glyph .rg-light { display:block; left:1px; top:1px; width:6px; height:6px; }
+.room-name, .room-sys, .room-tag { z-index:1; }
+.room-name { right:45px; }
+
+/* Shared instrument-window for the remaining fitted rooms. Bespoke
+   Engine, Filter, Mess and Quarters drawings keep their larger stages. */
+.room-hero { position:relative; height:132px; margin:0 0 12px 0; overflow:hidden;
+   background:#16232d; border:1px solid #344650; border-left:4px solid #8c6f4e; color:#e9eef0; }
+.rh-scope { position:absolute; left:17px; top:14px; width:100px; height:100px; overflow:hidden;
+   border:1px solid #49606b; border-radius:50%; background:#101820; }
+.rh-orbit { position:absolute; left:11px; top:11px; width:76px; height:76px; border:1px solid #455660; border-radius:50%; }
+.rh-orbit-two { left:23px; top:23px; width:52px; height:52px; border-style:dashed; border-color:#536873; }
+.rh-core { position:absolute; left:43px; top:43px; width:14px; height:14px; border-radius:50%; }
+.rh-beacon { position:absolute; width:5px; height:5px; left:21px; top:27px; border-radius:50%; background:#8aa1a8; }
+.rh-beacon-two { left:75px; top:69px; width:4px; height:4px; background:#d4dfe1; }
+.rh-readout { position:absolute; left:143px; top:18px; right:190px; }
+.rh-code { color:#9db4bf; font:9px Consolas,"Lucida Console","Courier New",monospace; letter-spacing:1.3px; }
+.rh-title { padding-top:8px; color:#f4f2eb; font-size:18px; font-weight:bold; }
+.rh-caption { padding-top:4px; color:#aebdc2; font-size:11px; line-height:15px; }
+.rh-meter { height:5px; margin-top:11px; white-space:nowrap; font-size:0; }
+.rh-meter i { display:inline-block; width:8%; height:4px; margin-right:3px; background:#49606b; }
+.rh-meter i:first-child, .rh-meter i:nth-child(2), .rh-meter i:nth-child(3), .rh-meter i:nth-child(4), .rh-meter i:nth-child(5) { background:#8c6f4e; }
+.rh-status { position:absolute; top:16px; right:16px; width:152px; min-height:91px; padding:13px 12px 9px 13px;
+   border-left:1px solid #344650; color:#8fa3aa; font:9px Consolas,"Lucida Console","Courier New",monospace; letter-spacing:1px; }
+.rh-live-dot { display:inline-block; width:6px; height:6px; margin:0 6px 1px 0; border-radius:4px; }
+.rh-status b { display:block; padding-top:8px; color:#d6e6dc; font-size:13px; letter-spacing:2px; }
+.rh-status small { display:block; padding-top:7px; color:#708792; font-size:8px; line-height:11px; letter-spacing:.6px; }
+.room-hero-reactor .rh-scope { border-color:#705642; }
+.room-hero-reactor .rh-core { border-radius:3px; transform:rotate(45deg); }
+.room-hero-filter .rh-orbit { width:56px; height:68px; left:21px; top:15px; border-radius:8px; border-style:solid; }
+.room-hero-filter .rh-orbit-two { width:5px; height:35px; left:31px; top:31px; border-radius:3px; border-style:solid; }
+.room-hero-filter .rh-core { left:48px; top:28px; width:6px; height:6px; box-shadow:0 18px 0 #8aa1a8, 0 36px 0 #8aa1a8; }
+.room-hero-habitat .rh-orbit { width:70px; height:56px; left:14px; top:21px; border-radius:8px; }
+.room-hero-habitat .rh-orbit-two { width:20px; height:48px; left:40px; top:25px; border-radius:2px; border-style:solid; }
+.room-hero-habitat .rh-core { left:28px; top:42px; width:8px; height:8px; border-radius:2px; }
+.room-hero-medical .rh-orbit { width:62px; height:62px; left:18px; top:18px; border-radius:5px; }
+.room-hero-medical .rh-orbit-two { width:26px; height:26px; left:36px; top:36px; border-radius:50%; border-style:solid; }
+.room-hero-medical .rh-core { left:48px; top:40px; width:3px; height:18px; border-radius:0; }
+.room-hero-medical .rh-core:after { content:""; position:absolute; left:-7px; top:7px; width:17px; height:4px; background:inherit; }
+.room-hero-cargo .rh-orbit { width:26px; height:27px; left:18px; top:20px; border-radius:2px; }
+.room-hero-cargo .rh-orbit-two { width:26px; height:27px; left:54px; top:51px; border-radius:2px; border-style:solid; }
+.room-hero-cargo .rh-core { left:56px; top:20px; width:25px; height:25px; border-radius:2px; }
+.room-hero-orbit .rh-orbit { transform:scaleX(1.25); }
+.room-hero-orbit .rh-orbit-two { transform:scaleX(.8); }
+.room-hero-orbit .rh-core { width:11px; height:11px; }
+.room-hero-network .rh-orbit { width:5px; height:5px; left:20px; top:21px; border-radius:50%; border:0; background:#8aa1a8; }
+.room-hero-network .rh-orbit-two { width:6px; height:6px; left:69px; top:65px; border-radius:50%; border:0; background:#8aa1a8; }
+.room-hero-network .rh-core { left:45px; top:25px; width:10px; height:10px; box-shadow:-24px 38px 0 #8aa1a8, 24px 38px 0 #8aa1a8; }
+.room-hero-garden .rh-orbit { width:65px; height:38px; left:17px; top:30px; border-radius:3px; }
+.room-hero-garden .rh-orbit-two { width:2px; height:40px; left:33px; top:28px; border:0; background:#789862; box-shadow:18px -5px 0 #789862, 37px 3px 0 #789862; }
+.room-hero-garden .rh-core { width:8px; height:7px; left:27px; top:32px; border-radius:8px 0 8px 0; }
+.room-hero-core .rh-scope { border-color:#70548a; }
+.room-hero-core .rh-orbit { border-color:#6f5a8a; }
+.room-hero-core .rh-orbit-two { border-color:#876ea3; }
+.room-hero-core .rh-core { width:20px; height:20px; left:40px; top:40px; }
+@media screen and (max-width:800px) { .rh-readout { right:150px; left:128px; } .rh-status { right:8px; width:130px; } }
+
 /* a numbered shell: name only, centred, because there is nothing
   else in there for it to line up with */
 .room-small .room-name { top:50%; margin-top:-8px; left:0; right:0;
@@ -745,6 +840,7 @@ height:29px; line-height:27px; margin-top:6px; }
   click meant for a marker. */
 .cdot { position:absolute; width:2px; height:2px; background:#cabca2; pointer-events:none; }
 .cdot-far { width:1px; height:1px; background:#b4a388; }
+.cdot-bright { width:2px; height:2px; background:#fff0c4; box-shadow:0 0 5px #e6c788; }
 
 .mapdot {
   position:absolute; background:#6b5338;
@@ -752,8 +848,13 @@ height:29px; line-height:27px; margin-top:6px; }
   border:2px solid #ffffff; cursor:pointer;
 }
 .mapdot:hover { background:#b05a42; }
-.mapdot-star { background:#c08a3e; }
-.mapdot-planet { background:#7f9161; }
+.mapdot-star { background:#f1c878; box-shadow:0 0 8px #d39a51; }
+.mapdot-planet { background:#7f9161; box-shadow:inset -3px -2px 0 rgba(37,53,39,.25); }
+.mapdot-gas { background:#d88762; box-shadow:inset -5px -3px 0 rgba(68,39,39,.28),0 0 8px rgba(199,129,92,.5); }
+.mapdot-ice { background:#8dd1df; box-shadow:inset -4px -2px 0 rgba(44,89,112,.28); }
+.mapdot-ocean { background:#4f9cc9; box-shadow:inset -4px -2px 0 rgba(27,50,84,.35); }
+.mapdot-rock { background:#b87961; box-shadow:inset -4px -2px 0 rgba(74,44,35,.3); }
+.mapdot-moon { background:#d4d1c7; border-color:#f5f2e9; box-shadow:inset -3px -2px 0 rgba(74,74,69,.25); }
 .mapdot-belt { background:#a68d6f; }
 .mapdot-site { background:#9a8e83; }
 .mapdot-station { background:#8c6f4e; -moz-border-radius:0; -webkit-border-radius:0; border-radius:0; }
@@ -1146,6 +1247,8 @@ height:29px; line-height:27px; margin-top:6px; }
 .awards-summary .navfield-k { width:180px; }
 .setting-row { padding:9px 0; border-bottom:1px solid #eee5d8; line-height:17px; }
 .setting-row button { margin-top:5px; padding:5px 8px; }
+.setting-row select { width:100%; margin-top:5px; padding:5px 7px; border:1px solid #cbb89c;
+   background:#fff; color:#3b3630; font:12px "Segoe UI",Tahoma,sans-serif; }
 body.large-text .navfield, body.large-text .kv, body.large-text .notice, body.large-text .act,
 body.large-text .navnote, body.large-text .feed-line, body.large-text .pop-body,
 body.large-text .sp-row, body.large-text .task-sub, body.large-text .award-card { font-size:14px; line-height:1.45; }
@@ -1191,6 +1294,174 @@ body.hide-crew-labels .dot-label { display:none; }
 /* Compact functional room names in the spine and the core. */
 .room-small .room-name { font-size:9px; letter-spacing:0; }
 #room-simulacron .room-name { font-size:9px; letter-spacing:0; }
+
+/* Palette overrides. The classic parchment look remains the default;
+   the other four bridge palettes deliberately include dark, high-contrast
+   panels, room plates and charts rather than only recolouring buttons. */
+body.theme-void { background:#0b1320; color:#dce8f2; }
+body.theme-void #taskbar, body.theme-void #taskbar-controls, body.theme-void #sidepanel, body.theme-void #sidefoot, body.theme-void #statusbar { background:#101d2c; border-color:#2e465d; color:#9bb1c1; }
+body.theme-void #content, body.theme-void #stage { background:#0b1320; border-color:#2e465d; color:#dce8f2; }
+body.theme-void .tab { background:#172638; border-color:#2e465d; color:#a9bdca; }
+body.theme-void .tab-active { background:#0b1320; color:#e5f2fb; border-color:#65d7ed; }
+body.theme-void .sp-block, body.theme-void .panel, body.theme-void .navpanel, body.theme-void .stat, body.theme-void .info, body.theme-void #feed, body.theme-void .pop, body.theme-void .award-card, body.theme-void .wiki-article { background:#152437; border-color:#2e465d; color:#dce8f2; }
+body.theme-void .panel-head, body.theme-void .navpanel-head, body.theme-void .pop-head, body.theme-void .stat-label, body.theme-void .info-label, body.theme-void .task-kind, body.theme-void .sp-title, body.theme-void .sp-drop, body.theme-void .wiki-group { background:#1c2e42; border-color:#2e465d; color:#65d7ed; }
+body.theme-void .task-title, body.theme-void .navname, body.theme-void .navfield-v, body.theme-void .stat-value, body.theme-void .info-value, body.theme-void .kv-v, body.theme-void .sp-ship, body.theme-void .cq-nm, body.theme-void .rh-title { color:#e5f2fb; }
+body.theme-void .task-sub, body.theme-void .navsub, body.theme-void .navfield-k, body.theme-void .navnote, body.theme-void .sp-sub, body.theme-void .feed-line, body.theme-void .kv-k, body.theme-void .rh-caption { color:#9bb1c1; }
+body.theme-void .act, body.theme-void .pbtn, body.theme-void .lbtn, body.theme-void .zbtn, body.theme-void .sp-ico, body.theme-void .cq-ord, body.theme-void .cq-talkbtn { background:#1c2e42; border-color:#41627c; color:#dce8f2; }
+body.theme-void .act-live:hover, body.theme-void .pbtn:hover, body.theme-void .lbtn:hover, body.theme-void .zbtn:hover, body.theme-void .cq-ord:hover { background:#263c52; }
+body.theme-void .act-cost, body.theme-void .cq-flag { background:#102033; border-color:#41627c; color:#8dbbd0; }
+body.theme-void .notice, body.theme-void .navpanel-body, body.theme-void .wiki-link, body.theme-void .cq-pay, body.theme-void .cq-row { background:#172638; border-color:#2e465d; color:#dce8f2; }
+body.theme-void .room { background:#142235 !important; border-color:#41627c; color:#e5f2fb; }
+body.theme-void .room-name { color:#e5f2fb; }
+body.theme-void .room-sys, body.theme-void .room-tag { color:#8ca9ba; }
+body.theme-void .room-glyph { background:#0c1624; border-color:#41627c; }
+body.theme-void .room-glyph .rg-side { background:#36526a; box-shadow:0 6px 0 #36526a,0 12px 0 #36526a; }
+body.theme-void .room-hero { background:#101d2c; border-color:#36526a; }
+body.theme-void #map { background-color:#0e1a2b; border-color:#41627c; }
+body.theme-void .maplabel, body.theme-void .mapscale, body.theme-void .maphint { color:#a9c5d5; }
+body.theme-void .mapdot-planet { background:#64c9b1; } body.theme-void .mapdot-star { background:#f1d38c; }
+body.theme-void #o2mach, body.theme-void #messmach, body.theme-void #hallway { background:#101d2c; border-color:#41627c; }
+body.theme-void .setting-row select, body.theme-void .wiki-search, body.theme-void .cq-sel { background:#0f1d2c; border-color:#41627c; color:#dce8f2; }
+body.theme-void #title-dialog { background:#152437; border-color:#65d7ed; color:#dce8f2; }
+body.theme-void #title-dialog h2 { color:#e5f2fb; }
+body.theme-void .title-button { background:#1c2e42; border-color:#65d7ed; color:#e5f2fb; }
+
+body.theme-aurora { background:#0b1717; color:#e2f1e9; }
+body.theme-aurora #taskbar, body.theme-aurora #taskbar-controls, body.theme-aurora #sidepanel, body.theme-aurora #sidefoot, body.theme-aurora #statusbar { background:#102221; border-color:#345b51; color:#9fbdb0; }
+body.theme-aurora #content, body.theme-aurora #stage { background:#0b1717; border-color:#345b51; color:#e2f1e9; }
+body.theme-aurora .tab { background:#18312e; border-color:#345b51; color:#b0c9be; }
+body.theme-aurora .tab-active { background:#0b1717; color:#e8f6ee; border-color:#7cddb4; }
+body.theme-aurora .sp-block, body.theme-aurora .panel, body.theme-aurora .navpanel, body.theme-aurora .stat, body.theme-aurora .info, body.theme-aurora #feed, body.theme-aurora .pop, body.theme-aurora .award-card, body.theme-aurora .wiki-article { background:#162d2a; border-color:#345b51; color:#e2f1e9; }
+body.theme-aurora .panel-head, body.theme-aurora .navpanel-head, body.theme-aurora .pop-head, body.theme-aurora .task-kind, body.theme-aurora .sp-title, body.theme-aurora .sp-drop, body.theme-aurora .wiki-group { background:#1c3934; border-color:#345b51; color:#7cddb4; }
+body.theme-aurora .task-title, body.theme-aurora .navname, body.theme-aurora .navfield-v, body.theme-aurora .stat-value, body.theme-aurora .info-value, body.theme-aurora .kv-v, body.theme-aurora .sp-ship, body.theme-aurora .cq-nm, body.theme-aurora .rh-title { color:#e8f6ee; }
+body.theme-aurora .task-sub, body.theme-aurora .navsub, body.theme-aurora .navfield-k, body.theme-aurora .navnote, body.theme-aurora .sp-sub, body.theme-aurora .feed-line, body.theme-aurora .kv-k, body.theme-aurora .rh-caption { color:#9fbdb0; }
+body.theme-aurora .act, body.theme-aurora .pbtn, body.theme-aurora .lbtn, body.theme-aurora .zbtn, body.theme-aurora .sp-ico, body.theme-aurora .cq-ord, body.theme-aurora .cq-talkbtn { background:#1c3934; border-color:#477466; color:#e2f1e9; }
+body.theme-aurora .act-live:hover, body.theme-aurora .pbtn:hover, body.theme-aurora .lbtn:hover, body.theme-aurora .zbtn:hover, body.theme-aurora .cq-ord:hover { background:#29463f; }
+body.theme-aurora .act-cost, body.theme-aurora .cq-flag { background:#102321; border-color:#477466; color:#8fd9b8; }
+body.theme-aurora .notice, body.theme-aurora .navpanel-body, body.theme-aurora .wiki-link, body.theme-aurora .cq-pay, body.theme-aurora .cq-row { background:#18312e; border-color:#345b51; color:#e2f1e9; }
+body.theme-aurora .room { background:#142b27 !important; border-color:#477466; color:#e8f6ee; }
+body.theme-aurora .room-name { color:#e8f6ee; }
+body.theme-aurora .room-sys, body.theme-aurora .room-tag { color:#9fbdb0; }
+body.theme-aurora .room-glyph { background:#0c1f1d; border-color:#477466; }
+body.theme-aurora .room-glyph .rg-side { background:#365e53; box-shadow:0 6px 0 #365e53,0 12px 0 #365e53; }
+body.theme-aurora .room-hero { background:#102221; border-color:#365e53; }
+body.theme-aurora #map { background-color:#10201e; border-color:#477466; }
+body.theme-aurora .maplabel, body.theme-aurora .mapscale, body.theme-aurora .maphint { color:#b5d8c8; }
+body.theme-aurora .mapdot-planet { background:#70d4a6; } body.theme-aurora .mapdot-star { background:#f2dc98; }
+body.theme-aurora #o2mach, body.theme-aurora #messmach, body.theme-aurora #hallway { background:#102221; border-color:#477466; }
+body.theme-aurora .setting-row select, body.theme-aurora .wiki-search, body.theme-aurora .cq-sel { background:#102321; border-color:#477466; color:#e2f1e9; }
+body.theme-aurora #title-dialog { background:#162d2a; border-color:#7cddb4; color:#e2f1e9; }
+body.theme-aurora #title-dialog h2 { color:#e8f6ee; }
+body.theme-aurora .title-button { background:#1c3934; border-color:#7cddb4; color:#e8f6ee; }
+
+body.theme-nebula { background:#130f20; color:#eee6f7; }
+body.theme-nebula #taskbar, body.theme-nebula #taskbar-controls, body.theme-nebula #sidepanel, body.theme-nebula #sidefoot, body.theme-nebula #statusbar { background:#201831; border-color:#52436d; color:#c0b0cf; }
+body.theme-nebula #content, body.theme-nebula #stage { background:#130f20; border-color:#52436d; color:#eee6f7; }
+body.theme-nebula .tab { background:#2a2040; border-color:#52436d; color:#c3b4d3; }
+body.theme-nebula .tab-active { background:#130f20; color:#f4eafd; border-color:#c8a3ff; }
+body.theme-nebula .sp-block, body.theme-nebula .panel, body.theme-nebula .navpanel, body.theme-nebula .stat, body.theme-nebula .info, body.theme-nebula #feed, body.theme-nebula .pop, body.theme-nebula .award-card, body.theme-nebula .wiki-article { background:#281f3b; border-color:#52436d; color:#eee6f7; }
+body.theme-nebula .panel-head, body.theme-nebula .navpanel-head, body.theme-nebula .pop-head, body.theme-nebula .task-kind, body.theme-nebula .sp-title, body.theme-nebula .sp-drop, body.theme-nebula .wiki-group { background:#332748; border-color:#52436d; color:#c8a3ff; }
+body.theme-nebula .task-title, body.theme-nebula .navname, body.theme-nebula .navfield-v, body.theme-nebula .stat-value, body.theme-nebula .info-value, body.theme-nebula .kv-v, body.theme-nebula .sp-ship, body.theme-nebula .cq-nm, body.theme-nebula .rh-title { color:#f4eafd; }
+body.theme-nebula .task-sub, body.theme-nebula .navsub, body.theme-nebula .navfield-k, body.theme-nebula .navnote, body.theme-nebula .sp-sub, body.theme-nebula .feed-line, body.theme-nebula .kv-k, body.theme-nebula .rh-caption { color:#c0b0cf; }
+body.theme-nebula .act, body.theme-nebula .pbtn, body.theme-nebula .lbtn, body.theme-nebula .zbtn, body.theme-nebula .sp-ico, body.theme-nebula .cq-ord, body.theme-nebula .cq-talkbtn { background:#332748; border-color:#665385; color:#eee6f7; }
+body.theme-nebula .act-live:hover, body.theme-nebula .pbtn:hover, body.theme-nebula .lbtn:hover, body.theme-nebula .zbtn:hover, body.theme-nebula .cq-ord:hover { background:#413256; }
+body.theme-nebula .act-cost, body.theme-nebula .cq-flag { background:#21182f; border-color:#665385; color:#c8a3ff; }
+body.theme-nebula .notice, body.theme-nebula .navpanel-body, body.theme-nebula .wiki-link, body.theme-nebula .cq-pay, body.theme-nebula .cq-row { background:#2a2040; border-color:#52436d; color:#eee6f7; }
+body.theme-nebula .room { background:#241b36 !important; border-color:#665385; color:#f4eafd; }
+body.theme-nebula .room-name { color:#f4eafd; }
+body.theme-nebula .room-sys, body.theme-nebula .room-tag { color:#b7a5c9; }
+body.theme-nebula .room-glyph { background:#181327; border-color:#665385; }
+body.theme-nebula .room-glyph .rg-side { background:#4a3a63; box-shadow:0 6px 0 #4a3a63,0 12px 0 #4a3a63; }
+body.theme-nebula .room-hero { background:#201831; border-color:#4a3a63; }
+body.theme-nebula #map { background-color:#1a1429; border-color:#665385; }
+body.theme-nebula .maplabel, body.theme-nebula .mapscale, body.theme-nebula .maphint { color:#d2bce6; }
+body.theme-nebula .mapdot-planet { background:#aa8bdb; } body.theme-nebula .mapdot-star { background:#ffe09a; }
+body.theme-nebula #o2mach, body.theme-nebula #messmach, body.theme-nebula #hallway { background:#201831; border-color:#665385; }
+body.theme-nebula .setting-row select, body.theme-nebula .wiki-search, body.theme-nebula .cq-sel { background:#21182f; border-color:#665385; color:#eee6f7; }
+body.theme-nebula #title-dialog { background:#281f3b; border-color:#c8a3ff; color:#eee6f7; }
+body.theme-nebula #title-dialog h2 { color:#f4eafd; }
+body.theme-nebula .title-button { background:#332748; border-color:#c8a3ff; color:#f4eafd; }
+
+body.theme-ember { background:#1a1210; color:#f5e7d9; }
+body.theme-ember #taskbar, body.theme-ember #taskbar-controls, body.theme-ember #sidepanel, body.theme-ember #sidefoot, body.theme-ember #statusbar { background:#251b17; border-color:#654a36; color:#c3a78f; }
+body.theme-ember #content, body.theme-ember #stage { background:#1a1210; border-color:#654a36; color:#f5e7d9; }
+body.theme-ember .tab { background:#34261f; border-color:#654a36; color:#d2b59a; }
+body.theme-ember .tab-active { background:#1a1210; color:#fff0df; border-color:#ffba76; }
+body.theme-ember .sp-block, body.theme-ember .panel, body.theme-ember .navpanel, body.theme-ember .stat, body.theme-ember .info, body.theme-ember #feed, body.theme-ember .pop, body.theme-ember .award-card, body.theme-ember .wiki-article { background:#30231d; border-color:#654a36; color:#f5e7d9; }
+body.theme-ember .panel-head, body.theme-ember .navpanel-head, body.theme-ember .pop-head, body.theme-ember .task-kind, body.theme-ember .sp-title, body.theme-ember .sp-drop, body.theme-ember .wiki-group { background:#3b2c23; border-color:#654a36; color:#ffba76; }
+body.theme-ember .task-title, body.theme-ember .navname, body.theme-ember .navfield-v, body.theme-ember .stat-value, body.theme-ember .info-value, body.theme-ember .kv-v, body.theme-ember .sp-ship, body.theme-ember .cq-nm, body.theme-ember .rh-title { color:#fff0df; }
+body.theme-ember .task-sub, body.theme-ember .navsub, body.theme-ember .navfield-k, body.theme-ember .navnote, body.theme-ember .sp-sub, body.theme-ember .feed-line, body.theme-ember .kv-k, body.theme-ember .rh-caption { color:#c3a78f; }
+body.theme-ember .act, body.theme-ember .pbtn, body.theme-ember .lbtn, body.theme-ember .zbtn, body.theme-ember .sp-ico, body.theme-ember .cq-ord, body.theme-ember .cq-talkbtn { background:#3b2c23; border-color:#835d42; color:#f5e7d9; }
+body.theme-ember .act-live:hover, body.theme-ember .pbtn:hover, body.theme-ember .lbtn:hover, body.theme-ember .zbtn:hover, body.theme-ember .cq-ord:hover { background:#493326; }
+body.theme-ember .act-cost, body.theme-ember .cq-flag { background:#291d18; border-color:#835d42; color:#ffba76; }
+body.theme-ember .notice, body.theme-ember .navpanel-body, body.theme-ember .wiki-link, body.theme-ember .cq-pay, body.theme-ember .cq-row { background:#34261f; border-color:#654a36; color:#f5e7d9; }
+body.theme-ember .room { background:#2d211b !important; border-color:#835d42; color:#fff0df; }
+body.theme-ember .room-name { color:#fff0df; }
+body.theme-ember .room-sys, body.theme-ember .room-tag { color:#c3a78f; }
+body.theme-ember .room-glyph { background:#1d1512; border-color:#835d42; }
+body.theme-ember .room-glyph .rg-side { background:#5b4030; box-shadow:0 6px 0 #5b4030,0 12px 0 #5b4030; }
+body.theme-ember .room-hero { background:#251b17; border-color:#5b4030; }
+body.theme-ember #map { background-color:#241915; border-color:#835d42; }
+body.theme-ember .maplabel, body.theme-ember .mapscale, body.theme-ember .maphint { color:#e2c3a5; }
+body.theme-ember .mapdot-planet { background:#d8a16a; } body.theme-ember .mapdot-star { background:#ffe0a1; }
+body.theme-ember #o2mach, body.theme-ember #messmach, body.theme-ember #hallway { background:#251b17; border-color:#835d42; }
+body.theme-ember .setting-row select, body.theme-ember .wiki-search, body.theme-ember .cq-sel { background:#291d18; border-color:#835d42; color:#f5e7d9; }
+body.theme-ember #title-dialog { background:#30231d; border-color:#ffba76; color:#f5e7d9; }
+body.theme-ember #title-dialog h2 { color:#fff0df; }
+body.theme-ember .title-button { background:#3b2c23; border-color:#ffba76; color:#fff0df; }
+body.theme-void #title-screen { background:#0b1320; color:#dce8f2; }
+body.theme-void #title-actions { background:#101d2c; border-color:#41627c; }
+body.theme-void #title-actions button { background:#101d2c; border-right-color:#41627c; color:#dce8f2; }
+body.theme-void #title-actions button:hover, body.theme-void #title-actions button:focus { background:#263c52; outline-color:#65d7ed; }
+body.theme-aurora #title-screen { background:#0b1717; color:#e2f1e9; }
+body.theme-aurora #title-actions { background:#102221; border-color:#477466; }
+body.theme-aurora #title-actions button { background:#102221; border-right-color:#477466; color:#e2f1e9; }
+body.theme-aurora #title-actions button:hover, body.theme-aurora #title-actions button:focus { background:#29463f; outline-color:#7cddb4; }
+body.theme-nebula #title-screen { background:#130f20; color:#eee6f7; }
+body.theme-nebula #title-actions { background:#201831; border-color:#665385; }
+body.theme-nebula #title-actions button { background:#201831; border-right-color:#665385; color:#eee6f7; }
+body.theme-nebula #title-actions button:hover, body.theme-nebula #title-actions button:focus { background:#413256; outline-color:#c8a3ff; }
+body.theme-ember #title-screen { background:#1a1210; color:#f5e7d9; }
+body.theme-ember #title-actions { background:#251b17; border-color:#835d42; }
+body.theme-ember #title-actions button { background:#251b17; border-right-color:#835d42; color:#f5e7d9; }
+body.theme-ember #title-actions button:hover, body.theme-ember #title-actions button:focus { background:#493326; outline-color:#ffba76; }
+
+/* Keep small labels, crew controls and select widgets legible in dark palettes. */
+body.theme-void .sp-key, body.theme-void .sp-val, body.theme-void .cq-payv, body.theme-void .cq-talkbtn, body.theme-void .cq-says, body.theme-void .cq-ordl, body.theme-void .pbtn-text { color:#dce8f2; }
+body.theme-void .sp-val-dim, body.theme-void .sp-longv, body.theme-void .sp-evt-kind, body.theme-void .sp-dim, body.theme-void .cq-rl, body.theme-void .cq-cost, body.theme-void .cq-ordn, body.theme-void .cq-ordc, body.theme-void .cq-talkbtn-off, body.theme-void .cq-payk, body.theme-void .cq-sub2, body.theme-void .pbtn-off .pbtn-text { color:#9bb1c1; }
+body.theme-void .sp-longk, body.theme-void .cq-sub, body.theme-void .cq-lab, body.theme-void .cq-payh { color:#65d7ed; }
+body.theme-void .sp-hr, body.theme-void .sp-evt, body.theme-void .kv, body.theme-void .cq-pay, body.theme-void .cq-row, body.theme-void .cq-ord { border-color:#2e465d; }
+body.theme-void .sp-evt-btn, body.theme-void .sp-quick button { background:#102033; border-color:#41627c; color:#dce8f2; }
+body.theme-void .sp-evt-btn:hover, body.theme-void .sp-quick button:hover, body.theme-void .cq-talkbtn:hover { background:#263c52; }
+body.theme-void #title-dialog select, body.theme-void #title-dialog .setting-row button { background:#0f1d2c; border-color:#41627c; color:#dce8f2; }
+body.theme-aurora .sp-key, body.theme-aurora .sp-val, body.theme-aurora .cq-payv, body.theme-aurora .cq-talkbtn, body.theme-aurora .cq-says, body.theme-aurora .cq-ordl, body.theme-aurora .pbtn-text { color:#e2f1e9; }
+body.theme-aurora .sp-val-dim, body.theme-aurora .sp-longv, body.theme-aurora .sp-evt-kind, body.theme-aurora .sp-dim, body.theme-aurora .cq-rl, body.theme-aurora .cq-cost, body.theme-aurora .cq-ordn, body.theme-aurora .cq-ordc, body.theme-aurora .cq-talkbtn-off, body.theme-aurora .cq-payk, body.theme-aurora .cq-sub2, body.theme-aurora .pbtn-off .pbtn-text { color:#9fbdb0; }
+body.theme-aurora .sp-longk, body.theme-aurora .cq-sub, body.theme-aurora .cq-lab, body.theme-aurora .cq-payh { color:#7cddb4; }
+body.theme-aurora .sp-hr, body.theme-aurora .sp-evt, body.theme-aurora .kv, body.theme-aurora .cq-pay, body.theme-aurora .cq-row, body.theme-aurora .cq-ord { border-color:#345b51; }
+body.theme-aurora .sp-evt-btn, body.theme-aurora .sp-quick button { background:#102321; border-color:#477466; color:#e2f1e9; }
+body.theme-aurora .sp-evt-btn:hover, body.theme-aurora .sp-quick button:hover, body.theme-aurora .cq-talkbtn:hover { background:#29463f; }
+body.theme-aurora #title-dialog select, body.theme-aurora #title-dialog .setting-row button { background:#102321; border-color:#477466; color:#e2f1e9; }
+body.theme-nebula .sp-key, body.theme-nebula .sp-val, body.theme-nebula .cq-payv, body.theme-nebula .cq-talkbtn, body.theme-nebula .cq-says, body.theme-nebula .cq-ordl, body.theme-nebula .pbtn-text { color:#eee6f7; }
+body.theme-nebula .sp-val-dim, body.theme-nebula .sp-longv, body.theme-nebula .sp-evt-kind, body.theme-nebula .sp-dim, body.theme-nebula .cq-rl, body.theme-nebula .cq-cost, body.theme-nebula .cq-ordn, body.theme-nebula .cq-ordc, body.theme-nebula .cq-talkbtn-off, body.theme-nebula .cq-payk, body.theme-nebula .cq-sub2, body.theme-nebula .pbtn-off .pbtn-text { color:#c0b0cf; }
+body.theme-nebula .sp-longk, body.theme-nebula .cq-sub, body.theme-nebula .cq-lab, body.theme-nebula .cq-payh { color:#c8a3ff; }
+body.theme-nebula .sp-hr, body.theme-nebula .sp-evt, body.theme-nebula .kv, body.theme-nebula .cq-pay, body.theme-nebula .cq-row, body.theme-nebula .cq-ord { border-color:#52436d; }
+body.theme-nebula .sp-evt-btn, body.theme-nebula .sp-quick button { background:#21182f; border-color:#665385; color:#eee6f7; }
+body.theme-nebula .sp-evt-btn:hover, body.theme-nebula .sp-quick button:hover, body.theme-nebula .cq-talkbtn:hover { background:#413256; }
+body.theme-nebula #title-dialog select, body.theme-nebula #title-dialog .setting-row button { background:#21182f; border-color:#665385; color:#eee6f7; }
+body.theme-ember .sp-key, body.theme-ember .sp-val, body.theme-ember .cq-payv, body.theme-ember .cq-talkbtn, body.theme-ember .cq-says, body.theme-ember .cq-ordl, body.theme-ember .pbtn-text { color:#f5e7d9; }
+body.theme-ember .sp-val-dim, body.theme-ember .sp-longv, body.theme-ember .sp-evt-kind, body.theme-ember .sp-dim, body.theme-ember .cq-rl, body.theme-ember .cq-cost, body.theme-ember .cq-ordn, body.theme-ember .cq-ordc, body.theme-ember .cq-talkbtn-off, body.theme-ember .cq-payk, body.theme-ember .cq-sub2, body.theme-ember .pbtn-off .pbtn-text { color:#c3a78f; }
+body.theme-ember .sp-longk, body.theme-ember .cq-sub, body.theme-ember .cq-lab, body.theme-ember .cq-payh { color:#ffba76; }
+body.theme-ember .sp-hr, body.theme-ember .sp-evt, body.theme-ember .kv, body.theme-ember .cq-pay, body.theme-ember .cq-row, body.theme-ember .cq-ord { border-color:#654a36; }
+body.theme-ember .sp-evt-btn, body.theme-ember .sp-quick button { background:#291d18; border-color:#835d42; color:#f5e7d9; }
+body.theme-ember .sp-evt-btn:hover, body.theme-ember .sp-quick button:hover, body.theme-ember .cq-talkbtn:hover { background:#493326; }
+body.theme-ember #title-dialog select, body.theme-ember #title-dialog .setting-row button { background:#291d18; border-color:#835d42; color:#f5e7d9; }
+
+/* Per-button action cooldowns persist across redraws. The handler guard also
+   rejects synthetic/keyboard clicks; these styles make the remaining wait clear. */
+.act-action { cursor:pointer; }
+.act-cooldown, .pbtn-cooldown { pointer-events:none; cursor:wait; opacity:.58; }
+.act-cooldown .act-cost { color:#a2402f; font-weight:bold; }
+.pbtn-cooldown .pbtn-text { color:#a2402f; font-weight:bold; }
 
 </style>
 </head>
@@ -1343,6 +1614,33 @@ var ROOMS = [
    systems:"Crew relationships", tag:"LENS", tone:"#fdfbf7" }
 ];
 var CORRIDOR = { x:100, y:210, w:740, h:26 };
+
+/* Each bay gets its own visual language as well as a working system.
+   The small glyphs fit into the deck plan; the richer room card is
+   used by facilities that do not already have a dedicated machine view. */
+var ROOM_SCENES = {
+  engine:{glyph:"reactor", code:"PROPULSION / 01", label:"Primary drive manifold", description:"Twin coolant loops feed the compact core.", accent:"#d18a4c"},
+  o2:{glyph:"filter", code:"LIFE SUPPORT / 02", label:"Atmosphere recovery", description:"Three canisters scrub and recirculate cabin air.", accent:"#42aaa3"},
+  quarters:{glyph:"habitat", code:"HABITAT / 03", label:"Crew quarters", description:"Six berths, lockers and a shared watch board.", accent:"#b59670"},
+  mess:{glyph:"habitat", code:"GALLEY / 04", label:"Rations and meal prep", description:"The rack, stove and water line share one counter.", accent:"#d3a257"},
+  r1:{glyph:"medical", code:"MEDICAL / 05", label:"Triage and treatment", description:"A compact care station with monitored recovery beds.", accent:"#d66d71"},
+  cargo:{glyph:"cargo", code:"STORES / 06", label:"Cargo and salvage", description:"Three restrained bays keep recovered material secure.", accent:"#83a8c7"},
+  science:{glyph:"orbit", code:"SCIENCE / 07", label:"Survey archive", description:"Scans, observations and packaged data are filed here.", accent:"#6ebed4"},
+  simulacron:{glyph:"core", code:"SIMULACRON / 08", label:"Memory mosaic", description:"A quiet core turns lived experience into insight.", accent:"#a981d0"},
+  r2:{glyph:"cargo", code:"WORKSHOP / 09", label:"Fabrication bench", description:"Recovered alloys become tools and repair kits.", accent:"#ce9564"},
+  r3:{glyph:"orbit", code:"SENSORS / 10", label:"Long-range aperture", description:"The array calibrates one scan at a time.", accent:"#55c3d6"},
+  r4:{glyph:"network", code:"COMMS / 11", label:"Relay and signal desk", description:"Local traffic and old transmissions share a receiver.", accent:"#78a9e8"},
+  r5:{glyph:"reactor", code:"THERMAL / 12", label:"Radiator control", description:"Heat exchangers protect the worn drive.", accent:"#e37e57"},
+  r6:{glyph:"reactor", code:"POWER / 13", label:"Emergency distribution", description:"A protected bus routes power between systems.", accent:"#e0b85e"},
+  r7:{glyph:"network", code:"DEFENCE / 14", label:"Shield harmonics", description:"The array trades reserve power for protection.", accent:"#6d9fc6"},
+  r8:{glyph:"garden", code:"HYDROPONICS / 15", label:"Grow beds", description:"Produce can be turned into fresh shipboard rations.", accent:"#7daf69"},
+  r9:{glyph:"filter", code:"RECYCLING / 16", label:"Material recovery", description:"Salvage is separated into useful life-support stock.", accent:"#69b88a"},
+  r10:{glyph:"cargo", code:"FUEL RESERVE / 17", label:"Cell refinery", description:"A small press recovers one fuel cell from salvage.", accent:"#d39a51"},
+  r11:{glyph:"cargo", code:"DAMAGE CONTROL / 18", label:"Hull patch station", description:"Brace plates are cut to fit the damaged section.", accent:"#d56d5d"},
+  r12:{glyph:"orbit", code:"OBSERVATION / 19", label:"External survey port", description:"A clear forward window records each place once.", accent:"#80c8d5"},
+  bridge:{glyph:"network", code:"COMMAND / 20", label:"Flight and watch control", description:"Navigation, crew status and the ship's working board.", accent:"#dfb85e"},
+  r13:{glyph:"habitat", code:"RECREATION / 21", label:"Common room", description:"Two crew can share a meal and repair a strained bond.", accent:"#c68eb4"}
+};
 
 /* Four starting crew, scrappy and not yet experts. Their needs,
   assignments, pay and training are live state.
@@ -1964,6 +2262,7 @@ var STATE = {
   chronicle : newChronicle(),
   commissions : newCommissions(),
   spOpen : { vessel:false, resources:false, crew:false },
+  actionCooldowns : {}, /* per-button action-count cooldowns; never wall-clock time */
   ongoing : [],        /* ongoing tasks - see Section D-4 */
   navTarget : null,      /* selected map body id, free to change */
   scanned : {},         /* bodyId -> true once a readout was read */
@@ -2220,7 +2519,10 @@ function measureMap() {
     widening the fan pitch on wide charts.
     ---------------------------------------------------------------- */
 
-function rasterInk(a) { return "rgba(139,111,78," + a + ")"; }
+function rasterInk(a) {
+  var palette = STATE.options && THEMES[STATE.options.theme] ? THEMES[STATE.options.theme] : THEMES.classic;
+  return "rgba(" + palette.ink + "," + a + ")";
+}
 
 /* one hairline, as a gradient layer. t is measured along the
   gradient axis from where that axis enters the box. */
@@ -2336,6 +2638,10 @@ function renderFeed() {
 function performAction(detail) {
   if (STATE.gameOver) { return; }
   actionCounter++;
+
+    /* Cooldowns share the same discrete heartbeat as every other
+       countdown. A committed action ticks existing cooldowns once. */
+    tickActionCooldowns();
 
     /* every countdown, chain and pending outcome advances here,
       exactly once, before anything is reported to the player */
@@ -3105,6 +3411,7 @@ function advanceTasks(n) {
        }
     }
     sweepAutoTasks();           /* retire anything with nothing to collect */
+    if (done > 0) { playActionSound("complete"); }
 
     /* Deliberately vague. The main screen never says what
       finished - the player goes and looks. */
@@ -3164,20 +3471,121 @@ function ongoingPercent(t) {
   ================================================================ */
 
 var PROGRESS_UI = {}; /* taskId -> live DOM refs for the current screen */
+var ACTION_COOLDOWN_RULES = {
+  routine:{actions:5, label:"Routine"},
+  systems:{actions:10, label:"Ship systems"},
+  space:{actions:15, label:"Space operations"},
+  critical:{actions:20, label:"Critical"}
+};
+var ACTION_COOLDOWN_CONTROLS = {}; /* currently rendered UI refs; counts live in STATE */
+var COMMAND_ROW_COUNTS = {}; /* disambiguates repeated labels within one rendered task */
 
-function buildProgressButton(taskId, idleLabel, startFn, enabled, doneLabel) {
+/* Action cooldowns use the game's action clock, never wall-clock time.
+   A key identifies one control across redraws; the selected task tab is
+   part of the key so separate windows do not accidentally share a lock. */
+function actionCooldownKey(id) {
+  return "cd|" + (STATE && STATE.activeTab ? STATE.activeTab : "home") + "|" + String(id || "action");
+}
+function actionCooldownCategory(subject, preferred) {
+  var s, category = preferred || "";
+  if (ACTION_COOLDOWN_RULES.hasOwnProperty(category)) { return category; }
+  s = String(subject || "").toLowerCase();
+  if (/signal|archive|buy larger ship|commissioned sc|permanent|irreversible|jettison|abandon/.test(s)) { return "critical"; }
+  if (/navigation|travel|jump|course|dock|undock|watch|crossing|salvage|scan|route|space|traffic report/.test(s)) { return "space"; }
+  if (/^(buy|sell|accept|collect|hire)\b/.test(s)) { return "routine"; }
+  if (/o2|oxygen|filter|engine|maintenance|cook|project|medical|treat|incident|resolve|assign|sensor|shield|power|recycl|workshop|hydropon|fuel reserve|damage control|thermal|package|hull|repair|service|recharge|transfer|split|upgrade|expand|cargo hold|efficient drive|rack/.test(s)) { return "systems"; }
+  return "routine";
+}
+function actionCooldownFor(key) {
+  return STATE && STATE.actionCooldowns && STATE.actionCooldowns[key] ? STATE.actionCooldowns[key] : null;
+}
+function suppressActionClick(e) {
+  if (e && e.preventDefault) { e.preventDefault(); }
+  if (e && e.stopPropagation) { e.stopPropagation(); }
+  if (e) { e.cancelBubble = true; }
+}
+function paintActionCooldownControl(control) {
+  var cooldown, remaining, el, spans, tier;
+  if (!control) { return; }
+  cooldown = actionCooldownFor(control.key);
+  remaining = cooldown ? cooldown.remaining : 0;
+  tier = cooldown && ACTION_COOLDOWN_RULES[cooldown.category] ? ACTION_COOLDOWN_RULES[cooldown.category].label : "Action";
+  if (control.kind === "command") {
+    el = control.element; if (!el) { return; }
+    el.className = control.baseClass + (remaining > 0 ? " act-cooldown" : "");
+    if (remaining > 0) {
+      if (el.setAttribute) { el.setAttribute("aria-disabled", "true"); }
+      el.title = tier + " cooldown: " + remaining + " more actions. Other committed actions advance it; waiting does not.";
+    } else {
+      if (el.removeAttribute) { el.removeAttribute("aria-disabled"); }
+      el.title = control.idleTitle || "";
+    }
+    spans = el.getElementsByTagName ? el.getElementsByTagName("span") : null;
+    if (spans && spans.length) { spans[0].innerHTML = remaining > 0 ? "COOLDOWN " + remaining : control.idleCost; }
+  } else if (control.kind === "progress" && PROGRESS_UI[control.taskId]) {
+    paintProgress(control.taskId);
+  }
+}
+function registerActionCooldownControl(control) {
+  ACTION_COOLDOWN_CONTROLS[control.key] = control;
+  paintActionCooldownControl(control);
+}
+function paintActionCooldowns() {
+  var key;
+  for (key in ACTION_COOLDOWN_CONTROLS) {
+    if (ACTION_COOLDOWN_CONTROLS.hasOwnProperty(key)) { paintActionCooldownControl(ACTION_COOLDOWN_CONTROLS[key]); }
+  }
+}
+function tickActionCooldowns() {
+  var key, cooldown;
+  if (!STATE.actionCooldowns) { STATE.actionCooldowns = {}; }
+  for (key in STATE.actionCooldowns) {
+    if (!STATE.actionCooldowns.hasOwnProperty(key)) { continue; }
+    cooldown = STATE.actionCooldowns[key];
+    cooldown.remaining--;
+    if (cooldown.remaining <= 0) { delete STATE.actionCooldowns[key]; }
+  }
+  paintActionCooldowns();
+}
+function commitActionButton(e, key, category, callback) {
+  var cooldown = actionCooldownFor(key), before = actionCounter, result;
+  if (cooldown && cooldown.remaining > 0) {
+    suppressActionClick(e); paintActionCooldowns(); return false;
+  }
+  try { result = callback(e); }
+  finally {
+    /* Some visible controls can become invalid between paint and click.
+       Only start their lock if the callback really committed an action. */
+    if (actionCounter > before) {
+      if (!STATE.actionCooldowns) { STATE.actionCooldowns = {}; }
+      category = actionCooldownCategory(key, category);
+      STATE.actionCooldowns[key] = {category:category, remaining:ACTION_COOLDOWN_RULES[category].actions};
+    }
+    paintActionCooldowns();
+  }
+  return result;
+}
+
+function isActionCost(cost) {
+  return cost === undefined || cost === null || /\baction(?:s)?\b/i.test(String(cost));
+}
+
+function buildProgressButton(taskId, idleLabel, startFn, enabled, doneLabel, cooldownCategory) {
   var wrap = make("div", "pbtn");
   var fill = make("div", "pbtn-fill");
   var text = make("div", "pbtn-text", idleLabel);
+  var cooldownKey = actionCooldownKey("progress:" + taskId);
+  var category = actionCooldownCategory(taskId + " " + idleLabel, cooldownCategory);
   wrap.appendChild(fill);
   wrap.appendChild(text);
 
     PROGRESS_UI[taskId] = {
        wrap:wrap, fill:fill, text:text,
        idleLabel:idleLabel, doneLabel:(doneLabel || "Complete"),
-       enabled:(enabled !== false)
+       enabled:(enabled !== false), cooldownKey:cooldownKey, cooldownCategory:category
     };
 
+    registerActionCooldownControl({key:cooldownKey, kind:"progress", taskId:taskId});
     on(wrap, "click", function (e) { onProgressClick(e, taskId, startFn); });
     paintProgress(taskId);
     return wrap;
@@ -3207,20 +3615,28 @@ function onProgressClick(e, taskId, startFn) {
        return;
     }
     if (ui && !ui.enabled) { return; }               /* nothing selected */
-    startFn(e);
+    return commitActionButton(e, ui ? ui.cooldownKey : actionCooldownKey("progress:" + taskId),
+      ui ? ui.cooldownCategory : actionCooldownCategory(taskId), function () { return startFn(e); });
 }
 
 function paintProgress(taskId) {
   var ui = PROGRESS_UI[taskId];
   if (!ui) { return; }
-  var t = findOngoing(taskId);
+  var t = findOngoing(taskId), cooldown = actionCooldownFor(ui.cooldownKey);
 
     if (!t) {
-       ui.wrap.className = "pbtn" + (ui.enabled ? "" : " pbtn-off");
        ui.fill.style.width = "0";
-
-      ui.text.innerHTML = ui.idleLabel;
-      return;
+       if (cooldown && cooldown.remaining > 0) {
+         var tier = ACTION_COOLDOWN_RULES[cooldown.category];
+         ui.wrap.className = "pbtn pbtn-cooldown";
+         ui.text.innerHTML = "Cooldown: " + cooldown.remaining + " actions";
+         ui.wrap.title = (tier ? tier.label : "Action") + " cooldown. Other committed actions advance it; waiting does not.";
+       } else {
+         ui.wrap.className = "pbtn" + (ui.enabled ? "" : " pbtn-off");
+         ui.text.innerHTML = ui.idleLabel;
+         ui.wrap.title = "";
+       }
+       return;
     }
     if (t.state === "done") {
        ui.wrap.className = "pbtn pbtn-done";
@@ -3254,11 +3670,11 @@ function setProgressEnabled(taskId, on) {
   future action can accidentally skip one. */
 /* the cosmetics of an action, split out so a BATCH can leave one
   mark without pretending to be one action */
-function actionMark(e) {
+function actionMark(e, detail) {
    try {
       var m = mousePoint(e);
       spawnActionMark(m.x, m.y);
-      playActionSound();
+      playActionSound(detail);
     } catch (err) { /* a lost sparkle is not a lost action */ }
 }
 
@@ -3268,7 +3684,7 @@ function fireAction(e, detail) {
     them used to abort the whole handler and the player lost
     the click they paid for. The action is the only part that
     matters and it is now unconditional. */
-  actionMark(e);
+  actionMark(e, detail);
   performAction(detail);
 }
 
@@ -3361,26 +3777,177 @@ function spawnActionMark(x, y) {
     }, FX.frame);
 }
 
-/* --- audio stub ------------------------------------------------
-  No audio file exists yet. When one is dropped beside the .hta,
-  set SOUND.enabled to true and this will fire. A swapped bgsound
-  element is used rather than <audio> because it works in every
-  document mode an HTA can land in. */
+/* --- self-contained sound and music ---------------------------
+  The game stays offline and single-file: modern browser previews
+  use a tiny synthesized Web Audio soundscape; HTA builds fall back
+  to short, generated PCM WAV data URIs. Nothing external is fetched. */
 var SOUND = {
-   enabled : false,
-   file : "click.wav",
-   node : null
+  context:null, master:null, effects:null, music:null,
+  musicNodes:[], musicTimer:null, musicIndex:0, musicStarted:false,
+  fallbackMusic:null, fallbackEffects:{}, wavCache:{}
 };
-
-function playActionSound() {
-  if (!SOUND.enabled) { return; }
+function audioLevel() {
+  var n = STATE && STATE.options ? parseFloat(STATE.options.audioLevel) : 0.4;
+  if (!isFinite(n)) { n = 0.4; }
+  return Math.max(0, Math.min(1, n));
+}
+function makeGain(ctx, value, destination) {
+  var g = ctx.createGain ? ctx.createGain() : ctx.createGainNode();
+  g.gain.value = value; g.connect(destination); return g;
+}
+function ensureAudioContext() {
+  if (SOUND.context) { return SOUND.context; }
+  var C = window.AudioContext || window.webkitAudioContext;
+  if (!C) { return null; }
   try {
-     if (!SOUND.node) {
-        SOUND.node = document.createElement("bgsound");
-        document.body.appendChild(SOUND.node);
-     }
-     SOUND.node.src = SOUND.file;
-  } catch (err) { /* never let audio break an action */ }
+    SOUND.context = new C();
+    SOUND.master = makeGain(SOUND.context, audioLevel() * 0.62, SOUND.context.destination);
+    SOUND.effects = makeGain(SOUND.context, 0.8, SOUND.master);
+    SOUND.music = makeGain(SOUND.context, 0.18, SOUND.master);
+  } catch (err) { SOUND.context = null; SOUND.master = null; SOUND.effects = null; SOUND.music = null; }
+  return SOUND.context;
+}
+function audioPlay(node, rewind) {
+  if (!node) { return; }
+  try {
+    if (rewind) { node.currentTime = 0; }
+    var result = node.play();
+    if (result && result.catch) { result.catch(function () {}); }
+  } catch (err) { /* audio is optional; never interrupt a ship action */ }
+}
+function fallbackAudio(kind) {
+  var node, key = kind;
+  if (kind === "music") {
+    if (SOUND.fallbackMusic) { return SOUND.fallbackMusic; }
+    node = document.createElement("audio"); node.loop = true; node.preload = "auto";
+    node.src = waveDataUri("music"); SOUND.fallbackMusic = node;
+  } else {
+    if (SOUND.fallbackEffects[key]) { return SOUND.fallbackEffects[key]; }
+    node = document.createElement("audio"); node.preload = "auto";
+    node.src = waveDataUri(kind); SOUND.fallbackEffects[key] = node;
+  }
+  if (document.body) { document.body.appendChild(node); }
+  return node;
+}
+function startDrone() {
+  if (!SOUND.context || SOUND.musicStarted) { return; }
+  var ctx = SOUND.context, freqs = [55, 82.41, 110], levels = [0.10, 0.055, 0.022], i, osc, amp;
+  SOUND.musicStarted = true;
+  for (i = 0; i < freqs.length; i++) {
+    osc = ctx.createOscillator(); amp = ctx.createGain();
+    osc.type = "sine"; osc.frequency.value = freqs[i]; amp.gain.value = levels[i];
+    osc.connect(amp); amp.connect(SOUND.music); osc.start(); SOUND.musicNodes.push(osc);
+  }
+  playMusicNote();
+  SOUND.musicTimer = window.setInterval(playMusicNote, 2450);
+}
+function playMusicNote() {
+  if (!SOUND.context || !STATE.options || !STATE.options.music) { return; }
+  try {
+    var ctx = SOUND.context, notes = [220, 261.63, 196, 164.81, 246.94, 196],
+        now = ctx.currentTime, osc = ctx.createOscillator(), env = ctx.createGain();
+    osc.type = "sine"; osc.frequency.value = notes[SOUND.musicIndex % notes.length]; SOUND.musicIndex++;
+    env.gain.setValueAtTime(0.0001, now);
+    env.gain.linearRampToValueAtTime(0.09, now + 0.22);
+    env.gain.exponentialRampToValueAtTime(0.0001, now + 2.25);
+    osc.connect(env); env.connect(SOUND.music); osc.start(now); osc.stop(now + 2.3);
+  } catch (err) { /* an unsupported audio node should not break gameplay */ }
+}
+function cueKind(detail) {
+  var s = (detail || "").toLowerCase();
+  if (s.indexOf("scan") >= 0 || s.indexOf("sensor") >= 0 || s.indexOf("signal") >= 0 || s.indexOf("comms") >= 0) { return "ping"; }
+  if (s.indexOf("course") >= 0 || s.indexOf("travel") >= 0 || s.indexOf("jump") >= 0 || s.indexOf("crossing") >= 0) { return "thrust"; }
+  if (s.indexOf("complete") >= 0 || s.indexOf("arriv") >= 0 || s.indexOf("paid") >= 0) { return "chime"; }
+  return "click";
+}
+function playWebCue(kind) {
+  if (!SOUND.context || !SOUND.effects) { return; }
+  try {
+    var ctx = SOUND.context, now = ctx.currentTime, osc = ctx.createOscillator(), env = ctx.createGain();
+    var duration = kind === "ping" ? 0.62 : (kind === "chime" ? 0.8 : 0.24);
+    var start = kind === "thrust" ? 142 : (kind === "ping" ? 570 : (kind === "chime" ? 760 : 650));
+    osc.type = kind === "thrust" ? "sawtooth" : (kind === "click" ? "triangle" : "sine");
+    osc.frequency.setValueAtTime(start, now);
+    if (kind === "ping") { osc.frequency.linearRampToValueAtTime(1120, now + duration); }
+    else if (kind === "thrust") { osc.frequency.exponentialRampToValueAtTime(58, now + duration); }
+    else { osc.frequency.exponentialRampToValueAtTime(start * 0.72, now + duration); }
+    env.gain.setValueAtTime(0.0001, now);
+    env.gain.linearRampToValueAtTime(kind === "click" ? 0.12 : 0.16, now + 0.025);
+    env.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    osc.connect(env); env.connect(SOUND.effects); osc.start(now); osc.stop(now + duration + 0.02);
+  } catch (err) { /* audio is a cosmetic layer */ }
+}
+function syncAudioOptions(forceStart) {
+  var opts = STATE && STATE.options ? STATE.options : {}, wantsMusic = opts.music !== false;
+  var wantsEffects = opts.soundEffects !== false, ctx, level = audioLevel();
+  if (!forceStart && !SOUND.context && !SOUND.fallbackMusic) { return; }
+  if (forceStart) { ctx = ensureAudioContext(); } else { ctx = SOUND.context; }
+  if (ctx) {
+    SOUND.master.gain.value = level * 0.62;
+    SOUND.effects.gain.value = wantsEffects ? 0.8 : 0;
+    SOUND.music.gain.value = wantsMusic ? 0.18 : 0;
+    if (wantsMusic) { startDrone(); }
+    if (ctx.state === "suspended" && ctx.resume) { try { ctx.resume(); } catch (ignored) {} }
+  } else if (typeof document !== "undefined" && document.createElement) {
+    if (wantsMusic && forceStart) {
+      var music = fallbackAudio("music"); music.volume = level * 0.28; audioPlay(music, false);
+    } else if (SOUND.fallbackMusic) {
+      SOUND.fallbackMusic.volume = level * 0.28;
+      if (!wantsMusic) { try { SOUND.fallbackMusic.pause(); } catch (ignored2) {} }
+      else if (forceStart) { audioPlay(SOUND.fallbackMusic, false); }
+    }
+    if (SOUND.fallbackEffects) {
+      var k; for (k in SOUND.fallbackEffects) { if (SOUND.fallbackEffects.hasOwnProperty(k)) { SOUND.fallbackEffects[k].volume = level * 0.5; } }
+    }
+  }
+}
+function startAudioFromGesture() { syncAudioOptions(true); }
+function playActionSound(detail) {
+  if (!STATE.options || STATE.options.soundEffects === false) { return; }
+  syncAudioOptions(true);
+  var kind = cueKind(detail);
+  if (SOUND.context) { playWebCue(kind); }
+  else {
+    try { var node = fallbackAudio("fx-" + kind); node.volume = audioLevel() * 0.5; audioPlay(node, true); }
+    catch (err) { /* fallback audio is optional */ }
+  }
+}
+function waveDataUri(kind) {
+  if (SOUND.wavCache[kind]) { return SOUND.wavCache[kind]; }
+  var rate = 8000, music = kind === "music", seconds = music ? 8 : 0.42;
+  var count = Math.round(rate * seconds), dataSize = count * 2, pieces = [], part = "", i, t, v, env, f, a, b;
+  function le32(n) { return String.fromCharCode(n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >> 24) & 255); }
+  var head = "RIFF" + le32(36 + dataSize) + "WAVEfmt " + le32(16) + String.fromCharCode(1,0,1,0) +
+    le32(rate) + le32(rate * 2) + String.fromCharCode(2,0,16,0) + "data" + le32(dataSize);
+  for (i = 0; i < count; i++) {
+    t = i / rate;
+    if (music) {
+      var chord = Math.floor(t / 2) % 4, roots = [55, 49, 65.41, 58.27], tones = [220, 246.94, 196, 174.61];
+      var phase = t % 2, edge = Math.min(1, t / 0.12, (seconds - t) / 0.12);
+      env = Math.min(1, phase / 0.18) * Math.min(1, (2 - phase) / 0.35) * Math.max(0, edge);
+      v = Math.sin(6.28318 * roots[chord] * t) * 0.18 + Math.sin(6.28318 * roots[chord] * 1.5 * t) * 0.07 +
+          Math.sin(6.28318 * tones[chord] * t) * 0.10 * env;
+    } else {
+      var cue = kind.substring(3); env = Math.exp(-t * (cue === "ping" ? 4.5 : 12));
+      f = cue === "ping" ? 540 + 800 * (t / seconds) : (cue === "thrust" ? 145 - 85 * (t / seconds) :
+          (cue === "chime" ? 760 - 230 * (t / seconds) : 640 - 300 * (t / seconds)));
+      v = Math.sin(6.28318 * f * t) * env * (cue === "thrust" ? 0.18 : 0.12);
+    }
+    v = Math.max(-0.85, Math.min(0.85, v)); a = Math.round(v * 32767); b = a < 0 ? a + 65536 : a;
+    part += String.fromCharCode(b & 255, (b >> 8) & 255);
+    if (part.length >= 4096) { pieces.push(part); part = ""; }
+  }
+  if (part) { pieces.push(part); }
+  var binary = head + pieces.join(""), alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/", encoded = "", n, c1, c2, c3;
+  for (n = 0; n < binary.length; n += 3) {
+    c1 = binary.charCodeAt(n) & 255; c2 = n + 1 < binary.length ? binary.charCodeAt(n + 1) & 255 : 0;
+    c3 = n + 2 < binary.length ? binary.charCodeAt(n + 2) & 255 : 0;
+    encoded += alphabet.charAt(c1 >> 2) + alphabet.charAt(((c1 & 3) << 4) | (c2 >> 4)) +
+      (n + 1 < binary.length ? alphabet.charAt(((c2 & 15) << 2) | (c3 >> 6)) : "=") +
+      (n + 2 < binary.length ? alphabet.charAt(c3 & 63) : "=");
+  }
+  SOUND.wavCache[kind] = "data:audio/wav;base64," + encoded;
+  return SOUND.wavCache[kind];
 }
 
 
@@ -3530,9 +4097,9 @@ cd.style.left = CORRIDOR.x + "px";
     stage.appendChild(cd);
 
     /* --- rooms, drawn from data --------------------------- */
-    var r;
+    var r, scene;
     for (i = 0; i < ROOMS.length; i++) {
-       r = ROOMS[i];
+       r = ROOMS[i]; scene = ROOM_SCENES[r.id] || {glyph:"network", code:"SHIP SYSTEM", accent:"#8c6f4e"};
        el = make("div", "room" + (r.small ? " room-small" : ""));
        el.id = "room-" + r.id;
        el.title = r.name + " - " + r.systems;
@@ -3541,7 +4108,12 @@ cd.style.left = CORRIDOR.x + "px";
        el.style.width     = r.w + "px";
        el.style.height = r.h + "px";
        el.style.background = r.tone;
+       el.style.borderLeft = "3px solid " + scene.accent;
        el.innerHTML =
+          '<div class="room-glyph room-glyph-' + scene.glyph + '" style="border-color:' + scene.accent + ';">' +
+            '<span class="rg-main" style="background:' + scene.accent + ';" ></span>' +
+            '<span class="rg-side"></span><span class="rg-light" style="background:' + scene.accent + ';" ></span>' +
+          '</div>' +
           '<div class="room-name">' + r.name + '</div>' +
           (r.systems && !r.small ? '<div class="room-sys">' + r.systems + '</div>' : "") +
           '<div class="room-tag">' + r.tag + '</div>';
@@ -3573,6 +4145,32 @@ cd.style.left = CORRIDOR.x + "px";
     }
 
     return stage;
+}
+
+/* Facilities without a large bespoke machine drawing still open as
+   real rooms, not empty forms: each gets its own instrument-window
+   vignette, accent, callout and room-specific signal motif. */
+function buildRoomIllustration(id) {
+   var scene = ROOM_SCENES[id] || {glyph:"network", code:"SHIP SYSTEM", label:"Systems console", description:"Local status and controls.", accent:"#8c6f4e"};
+   var panel = make("div", "room-hero room-hero-" + scene.glyph, "");
+   panel.innerHTML =
+      '<div class="rh-scope">' +
+        '<span class="rh-orbit rh-orbit-one"></span>' +
+        '<span class="rh-orbit rh-orbit-two"></span>' +
+        '<span class="rh-core" style="background:' + scene.accent + ';box-shadow:0 0 16px ' + scene.accent + ';" ></span>' +
+        '<span class="rh-beacon rh-beacon-one" style="background:' + scene.accent + ';" ></span>' +
+        '<span class="rh-beacon rh-beacon-two"></span>' +
+      '</div>' +
+      '<div class="rh-readout">' +
+        '<div class="rh-code">' + scene.code + '</div>' +
+        '<div class="rh-title">' + scene.label + '</div>' +
+        '<div class="rh-caption">' + scene.description + '</div>' +
+        '<div class="rh-meter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>' +
+      '</div>' +
+      '<div class="rh-status"><span class="rh-live-dot" style="background:' + scene.accent + ';" ></span>' +
+        '<span>SHIP SYSTEM</span><b>ONLINE</b><small>' + scene.code + '</small>' +
+      '</div>';
+   return panel;
 }
 
 function buildStageNote() {
@@ -4254,8 +4852,23 @@ function live(label, costLabel, detail) {
 /* Separate function so the loop variable is not captured by
   reference - the same IE-era closure trap guarded against in
   the right-click binding. */
-function wireAction(el, detail) {
-   on(el, "click", function (e) { fireAction(e, detail); });
+function wireAction(el, detail, controlId, subject, cooldownCategory) {
+   var label = String(subject || detail || "action");
+   var slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+   var countKey = "task:" + slug, occurrence = COMMAND_ROW_COUNTS[countKey] || 0;
+   var identity = controlId || (slug + ":" + occurrence);
+   var key = actionCooldownKey("task-action:" + String(identity));
+   var category = actionCooldownCategory(label, cooldownCategory);
+   var baseClass;
+   COMMAND_ROW_COUNTS[countKey] = occurrence + 1;
+   if (!el) { return; }
+   if (el.className && !/(^|\s)act-action(\s|$)/.test(el.className)) { el.className += " act-action"; }
+   baseClass = el.className || "act act-live act-action";
+   registerActionCooldownControl({key:key, kind:"command", element:el, baseClass:baseClass,
+     idleCost:(el.getElementsByTagName && el.getElementsByTagName("span").length ? el.getElementsByTagName("span")[0].innerHTML : "1 action"), idleTitle:el.title || ""});
+   on(el, "click", function (e) {
+      return commitActionButton(e, key, category, function () { return fireAction(e, detail); });
+   });
 }
 
 function occupantsOf(roomId) {
@@ -4273,6 +4886,8 @@ function buildTaskScreen(t) {
   clear(host);
   stopNavFX();        /* the map timer must not outlive the map */
   PROGRESS_UI = {}; /* drop stale DOM refs from the last screen */
+   ACTION_COOLDOWN_CONTROLS = {}; /* cooldown values persist in STATE, not in DOM refs */
+   COMMAND_ROW_COUNTS = {};
   if (!t) { return; }
 
     if (t.kind === "wiki") { buildWikiScreen(host); return; }
@@ -4348,7 +4963,7 @@ for (i = 0; i < t.acts.length; i++) {
    a = t.acts[i];
    row = make("div", "act" + (a.live ? " act-live" : ""),
             '<span class="act-cost">' + a.cost + '</span>' + a.label);
-   if (a.live) { wireAction(row, a.detail); }
+   if (a.live) { wireAction(row, a.detail, null, a.label, a.cooldownCategory); }
    else { dead++; }
    body2.appendChild(row);
 }
@@ -4867,13 +5482,13 @@ function drawMapRoutes() {
 function drawClusters(L, lay) {
    var i, j, b, rnd, a, r, d;
    if (lay.id === "galaxy" || lay.id === "sector") {
-      var seed = 8721, count = lay.id === "galaxy" ? 150 : 70;
+      var seed = 8721, count = lay.id === "galaxy" ? 260 : 108;
       if (lay.id === "sector") {
          for (i = 0; i < GALAXY_BODIES.length; i++) { if (GALAXY_BODIES[i].id === MAP.sector) { seed += i + 1; } }
       }
       rnd = seeded(seed);
       for (i = 0; i < count; i++) {
-         d = make("div", "cdot cdot-far");
+         d = make("div", "cdot cdot-far" + (i % 17 === 0 ? " cdot-bright" : ""));
          d.style.left = Math.round(mapX(rnd() * MAP.w)) + "px";
          d.style.top = Math.round(mapY(rnd() * MAP.h)) + "px";
          L.appendChild(d);
@@ -4989,13 +5604,17 @@ for (j = 0; j < bodies.length; j++) {
       the dot lands exactly on its coordinate */
    size = (b.type === "station") ? 18 : 16;
    if (b.type === "origin") { size = 14; }
+   if (b.type === "moon") { size = 12; }
+   if (b.subtype === "gas") { size = 20; }
    if (b.type === "system") { size = 18; }
    if (b.type === "region") { size = 22; }
 
   dot = make("div", "mapdot" +
     (b.type === "station" ? " mapdot-station" : "") +
-    (b.type === "star" && b.system ? " mapdot-star" : "") +
+    (b.type === "star" ? " mapdot-star" : "") +
     (b.type === "planet" ? " mapdot-planet" : "") +
+    (b.type === "moon" ? " mapdot-moon" : "") +
+    (b.subtype ? " mapdot-" + b.subtype : "") +
     (b.type === "belt" ? " mapdot-belt" : "") +
     (b.type === "site" ? " mapdot-site" : "") +
     (b.type === "system" ? " mapdot-sys" : "") +
@@ -5309,7 +5928,8 @@ actions.appendChild(make("div", "actionbar",
     row.appendChild(actionCell(buildProgressButton(
        "travel", b && b.type === "system" ? "Start Jump" : "Start Travel", startTravel,
        !!(reach && !atTarget(b) && !STATE.docked && STATE.engineCondition > 0 &&
-          statValue("energy").value > 0 && statValue("fuel").value >= navMetrics(b).fuel)
+          statValue("energy").value > 0 && statValue("fuel").value >= navMetrics(b).fuel),
+       undefined, "space"
     )));
 
     /* A scan running on a DIFFERENT body must not look like it
@@ -5318,17 +5938,17 @@ actions.appendChild(make("div", "actionbar",
        set of sensors, one scan at a time. */
     if (scan && scan.state === "running" && b && scan.target !== b.id) {
         row.appendChild(actionCell(buildProgressButton(
-           "scan-busy", "Sensors busy", startScan, false, "Scan Complete"
+           "scan-busy", "Sensors busy", startScan, false, "Scan Complete", "space"
         )));
     } else {
         row.appendChild(actionCell(buildProgressButton(
            "scan", "Run Deep Scan", startScan,
-           reach && b.type !== "system" && statValue("energy").value > 0, "Scan Complete"
+           reach && b.type !== "system" && statValue("energy").value > 0, "Scan Complete", "space"
         )));
     }
 
     actions.appendChild(row);
-    commandRow(actions, "Stand watch - advance ongoing work", !STATE.gameOver, standWatch);
+    commandRow(actions, "Stand watch - advance ongoing work", !STATE.gameOver, standWatch, undefined, "space");
     actions.appendChild(make("div", "actionnote", "Standing watch spends one action and needs no item; work and survival clocks advance, with normal resource use."));
     if (PORTS[MAP.here] && !STATE.docked && !running) {
        commandRow(actions, "Dock at " + PORTS[MAP.here].name, true, function (e) {
@@ -5336,7 +5956,7 @@ actions.appendChild(make("div", "actionbar",
              STATE.docked = true; contractProgress("visit", MAP.here);
              findById(INFOS, "location").value = PORTS[MAP.here].name + " - docked";
           });
-       });
+       }, undefined, "space");
     }
 
     actions.appendChild(make("div", "actionnote",
@@ -8101,14 +8721,30 @@ function wireSettings() {
   bindSetting("settings-text", "largeText");
   bindSetting("settings-confirm", "confirmRisk");
   bindSetting("settings-labels", "hideCrewLabels");
+  bindSetting("settings-sfx", "soundEffects");
+  bindSetting("settings-music", "music");
+  on($("settings-theme"), "change", function () {
+    STATE.options.theme = $("settings-theme").value; applyPreferences(); paintSettings();
+  });
+  on($("settings-audio-level"), "change", function () {
+    STATE.options.audioLevel = parseFloat($("settings-audio-level").value); applyPreferences(); paintSettings();
+  });
   paintSettings();
 }
 function bindSetting(id, key) {
-  on($(id), "click", function () { STATE.options[key] = !STATE.options[key]; applyPreferences(); paintSettings(); });
+  on($(id), "click", function () {
+    STATE.options[key] = !STATE.options[key]; applyPreferences(); paintSettings();
+    if (key === "music" && STATE.options.music) { startAudioFromGesture(); }
+  });
 }
 function applyPreferences() {
-  if (document.body) { document.body.className = (STATE.options.largeText ? "large-text " : "") +
-    (STATE.options.hideCrewLabels ? "hide-crew-labels" : ""); }
+  var o = STATE.options || newGameOptions(), theme = THEMES[o.theme] ? o.theme : "classic", cls = "";
+  if (o.largeText) { cls += "large-text "; }
+  if (o.hideCrewLabels) { cls += "hide-crew-labels "; }
+  if (theme !== "classic") { cls += "theme-" + theme; }
+  if (document.body) { document.body.className = cls; }
+  syncAudioOptions(false);
+  if ($("map")) { applyRaster(); }
 }
 function confirmRisk(message) {
   return !STATE.options.confirmRisk || (typeof window.confirm === "function" && window.confirm(message));
@@ -8119,6 +8755,10 @@ function paintSettings() {
   b = $("settings-text"); if (b) { b.innerHTML = STATE.options.largeText ? "Use standard reading text" : "Use larger reading text"; }
   b = $("settings-confirm"); if (b) { b.innerHTML = STATE.options.confirmRisk ? "Disable confirmations" : "Enable confirmations"; }
   b = $("settings-labels"); if (b) { b.innerHTML = STATE.options.hideCrewLabels ? "Show crew labels" : "Hide crew labels"; }
+  b = $("settings-sfx"); if (b) { b.innerHTML = STATE.options.soundEffects ? "Sound effects: On" : "Sound effects: Off"; }
+  b = $("settings-music"); if (b) { b.innerHTML = STATE.options.music ? "Ambient soundtrack: On" : "Ambient soundtrack: Off"; }
+  b = $("settings-theme"); if (b) { b.value = THEMES[STATE.options.theme] ? STATE.options.theme : "classic"; }
+  b = $("settings-audio-level"); if (b) { b.value = String(audioLevel()); }
 }
 
 /* Anything written to the log reaches an open log popup at once.
@@ -8201,6 +8841,13 @@ function popupSpec(key) {
     return {
        title:"Settings",
       html :'<div class="notice">Preferences are free to change and are saved with the voyage.</div>' +
+         '<div class="setting-row"><b>Colour palette</b><br>Change the bridge and instrument colours.<br><select id="settings-theme">' +
+           '<option value="classic">Flight Deck - parchment</option><option value="void">Deep Space - cyan</option>' +
+           '<option value="aurora">Aurora - mint</option><option value="nebula">Nebula - violet</option><option value="ember">Ember - copper</option></select></div>' +
+         '<div class="setting-row"><b>Ambient soundtrack</b><br>A quiet, synthesized shipboard theme. Audio begins after a click.<br><button id="settings-music"></button></div>' +
+         '<div class="setting-row"><b>Sound effects</b><br>Soft console clicks, scan pings, drive cues and completion chimes.<br><button id="settings-sfx"></button></div>' +
+         '<div class="setting-row"><b>Audio level</b><br>Overall music and effects volume.<br><select id="settings-audio-level">' +
+           '<option value="0.18">Quiet</option><option value="0.4">Standard</option><option value="0.65">Loud</option><option value="0.9">Very loud</option></select></div>' +
          '<div class="setting-row"><b>Decorative motion</b><br>Pause map and crew drift, tab glows and action marks.<br><button id="settings-motion"></button></div>' +
          '<div class="setting-row"><b>Reading text</b><br>Enlarge the main reading and action text.<br><button id="settings-text"></button></div>' +
          '<div class="setting-row"><b>Confirmations</b><br>Ask before jettisoning, abandoning, story decisions, saving or loading.<br><button id="settings-confirm"></button></div>' +
@@ -8468,7 +9115,19 @@ var STAR_CATALOG = [
  ["sec-spindle","gal-rift","Spindle Way",140,205,"Spindle Star","Thread","Spindle Station","transit","Supply ships shelter in the lee of a narrow dust lane."],
  ["sec-drawbridge","gal-rift","Drawbridge",440,205,"Drawbridge Star","Causeway","Broken Span","","A collapsed gate has become a landmark for navigators."],
  ["sec-kite","gal-halo","Kiteward",140,205,"Kite Star","White Sail","Kiteward Haven","frontier","A small harbour welcomes ships returning from the halo."],
- ["sec-winter","gal-halo","Winter Sound",440,205,"Winter Star","Snowmelt","Distant Choir","","A quiet transmitter sings beneath the ice."]
+ ["sec-winter","gal-halo","Winter Sound",440,205,"Winter Star","Snowmelt","Distant Choir","","A quiet transmitter sings beneath the ice."],
+ ["sec-ravelin","gal-inner","Ravelin Reach",72,145,"Ravelin Primary","Aster Quay","Ravelin Platform","transit","Convoy lights curve between the inner moons."],
+ ["sec-kharon","gal-inner","Kharon Fields",570,72,"Kharon B","Sable Verge","Sable Exchange","frontier","Pilots barter for water beneath a dark red sun."],
+ ["sec-orison","gal-core","Orison Crown",65,145,"Orison Prime","Mosaic","Orison Exchange","core","A ring of habitats glitters around a blue-white star."],
+ ["sec-ardent","gal-core","Ardent Spiral",535,145,"Ardent Pair","Cinderwake","The Long Archive","","Two close stars light a drifting library hull."],
+ ["sec-morrow","gal-outer","Morrow Reach",285,60,"Morrow Beacon","Glass Delta","Morrow Station","agri","A green ocean world feeds the outer convoy routes."],
+ ["sec-talbot","gal-outer","Talbot Yard",535,145,"Talbot Red","Iron Choir","Talbot Salvage Yard","salvage","A field of old drives turns slowly above the yard."],
+ ["sec-glassfall","gal-verge","Glassfall",285,145,"Glassfall White","Blue Shard","Glassfall Beacon","frontier","A lone beacon refracts starlight through a crystal belt."],
+ ["sec-lacuna","gal-shoal","Lacuna Drift",285,145,"Lacuna Star","Quiet Mare","Null Choir","","A silent sea of ice hides a warm fissure below."],
+ ["sec-novafold","gal-shoal","Novafold",535,145,"Novafold A","Paper Moon","Novafold Exchange","core","A folded orbital city trades in old survey records."],
+ ["sec-nacre","gal-rift","Nacre Crossing",285,145,"Nacre Pair","Pearlwind","Nacre Dock","transit","A pale dust lane marks the safest passage through the Rift."],
+ ["sec-palem","gal-halo","Pale Meridian",285,145,"Pale Meridian","Rimeward","Pale Meridian Station","frontier","Ice haulers meet beneath a star that barely warms them."],
+ ["sec-tern","gal-halo","Tern Anchorage",535,145,"Tern Star","Gannet","Tern Haven","agri","A chain of greenhouse barges follows the blue dusk." ]
 ];
 var PORT_PRICES = {
   industry:{"Bulk metal":0.65, "Components":0.90, "Perishable":1.40, "Unregistered":0.70, "Water":1.25, "Medicine":1.25, "Relics":0.85},
@@ -8490,12 +9149,16 @@ function addSystemBody(id, type, name, x, y, sys, text) {
   var reading = type === "star" ? "Stellar output has been charted." :
     (type === "station" ? "A working dock answers on the approach channel." :
     (type === "planet" ? "Surface contours have been recorded." :
-    (type === "belt" ? "Loose material is spread across the plotted belt." : "The landmark has been plotted for later investigation.")));
-  BODIES.push({id:id, type:type, name:name, x:x, y:y, system:sys.id,
+    (type === "moon" ? "A natural satellite follows a stable orbit." :
+    (type === "belt" ? "Loose material is spread across the plotted belt." : "The landmark has been plotted for later investigation."))));
+  var body = {id:id, type:type, name:name, x:x, y:y, system:sys.id,
     klass:type === "star" ? "Charted star" : (type === "station" ? "Working station" :
-      (type === "planet" ? "Charted world" : (type === "belt" ? "Debris belt" : "Unoccupied landmark"))),
+      (type === "planet" ? "Charted world" : (type === "moon" ? "Natural satellite" :
+      (type === "belt" ? "Debris belt" : "Unoccupied landmark")))),
     details:[["System", sys.name], ["Region", findById(GALAXY_BODIES, sys.region).name]],
-    scan:[text, reading], scanLocked:[type === "station" ? "Station manifest" : "Detailed spectral survey"]});
+    scan:[text, reading], scanLocked:[type === "station" ? "Station manifest" : "Detailed spectral survey"]};
+  BODIES.push(body);
+  return body;
 }
 function buildGalaxyContent() {
   var i, row, sys, slug, entry, landmark, hub = {}, region;
@@ -8527,7 +9190,52 @@ function buildGalaxyContent() {
   }
 }
 buildGalaxyContent();
-SURVEY_WORTH.planet = 110; SURVEY_WORTH.belt = 120; SURVEY_WORTH.site = 160;
+
+/* The local chart now has depth, not just an entry star and one
+   world: every system receives a second world and a natural satellite.
+   Fixed naming, positions and types keep the catalogue stable in saves. */
+var ORBITAL_WORLDS = [
+  {id:"gas", label:"Outer gas giant", atmo:"Hydrogen / helium", scan:"Cloud bands reveal a slow, powerful upper jet.", locked:"Deep atmospheric descent"},
+  {id:"ice", label:"Outer ice world", atmo:"Nitrogen frost", scan:"A broad ice mantle covers a fractured silicate core.", locked:"Subsurface ocean mapping"},
+  {id:"ocean", label:"Temperate ocean world", atmo:"Nitrogen / oxygen", scan:"A shallow ocean reflects the star across most of the surface.", locked:"Biosphere survey"},
+  {id:"rock", label:"Rugged terrestrial world", atmo:"Trace argon", scan:"Impact scars and old lava plains cross the dark hemisphere.", locked:"Subsurface mineral assay"}
+];
+var ORBITAL_PLANET_NAMES = ["Aster", "Bastion", "Cinder", "Dawn", "Eidolon", "Fallow", "Gossamer", "Hallow", "Indigo", "Juniper", "Kestrel", "Lattice"];
+var ORBITAL_MOON_NAMES = ["Moth", "Nacre", "Orrery", "Peregrine", "Quietus", "Rill", "Sable", "Tern", "Umbra", "Vesper", "Wisp", "Yarrow"];
+function expandLocalCharts() {
+  var i, sys, word, profile, world, moon, key, value, x, y;
+  for (i = 0; i < SECTOR_BODIES.length; i++) {
+    sys = SECTOR_BODIES[i]; word = sys.name.replace(/[^A-Za-z0-9]+/g, " ").replace(/^\s+|\s+$/g, "").split(" ")[0];
+    profile = ORBITAL_WORLDS[i % ORBITAL_WORLDS.length];
+    x = 470 + (i % 5) * 28; y = 88 + (i % 5) * 22;
+    world = addSystemBody(sys.id.substring(4) + "-outer", "planet",
+      ORBITAL_PLANET_NAMES[i % ORBITAL_PLANET_NAMES.length] + " " + word,
+      x, y, sys, profile.scan);
+    world.subtype = profile.id; world.klass = profile.label;
+    world.details.push(["Atmosphere", profile.atmo], ["Orbital band", "Outer system"]);
+    world.scan = [profile.scan, "This world is charted beyond the system's primary traffic lane."];
+    world.scanLocked = [profile.locked, "High-resolution orbital survey"];
+
+    x = 36 + (i % 5) * 24; y = 194 + (i % 4) * 16;
+    moon = addSystemBody(sys.id.substring(4) + "-moon", "moon",
+      ORBITAL_MOON_NAMES[(i * 5) % ORBITAL_MOON_NAMES.length] + " " + word,
+      x, y, sys, "A small satellite traces a quiet path beyond the mapped world.");
+    moon.klass = "Natural satellite - stable orbit";
+    moon.details.push(["Satellite of", world.name], ["Surface", i % 2 ? "Heavily cratered" : "Icy regolith"]);
+    moon.scan = ["A natural satellite follows a stable orbit.", "The surface is " + (i % 2 ? "heavily cratered" : "covered in icy regolith") + "."];
+    moon.scanLocked = ["Subsurface structure", "Full orbital mechanics"];
+
+    for (var j = 0; j < sys.details.length; j++) {
+      key = sys.details[j][0]; value = sys.details[j][1];
+      if (key === "Charted bodies") { sys.details[j][1] = sys.id === "sec-kessler" ? "8" : "5"; }
+      else if (key === "Navigable") { sys.details[j][1] = "5 local destinations"; }
+    }
+    if (sys.id === "sec-kessler") { sys.klass = "Eight charted destinations"; }
+    else if (sys.klass === "Charted star system") { sys.klass = "Five charted destinations"; }
+  }
+}
+expandLocalCharts();
+SURVEY_WORTH.planet = 110; SURVEY_WORTH.moon = 90; SURVEY_WORTH.belt = 120; SURVEY_WORTH.site = 160;
 MARKET.push(
   {id:"water", name:"Water ice", vol:6, value:160, kind:"Water", risk:false},
   {id:"medicine", name:"Medical supplies", vol:4, value:240, kind:"Medicine", risk:false},
@@ -8647,10 +9355,25 @@ function contentPanel(parent, title) {
   p.appendChild(make("div", "panel-head", title));
   p.appendChild(body); parent.appendChild(p); return body;
 }
-function commandRow(parent, label, enabled, fn, cost) {
-  var el = make("div", "act" + (enabled ? " act-live" : ""),
-    '<span class="act-cost">' + (cost || "1 action") + '</span>' + label);
-  if (enabled) { on(el, "click", fn); }
+function commandRow(parent, label, enabled, fn, cost, cooldownCategory, cooldownId) {
+  var action = isActionCost(cost), displayCost = cost || "1 action";
+  var el = make("div", "act" + (enabled ? " act-live" : "") + (enabled && action ? " act-action" : ""),
+    '<span class="act-cost">' + displayCost + '</span>' + label);
+  var slug = String(label || "action").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  var occurrence = COMMAND_ROW_COUNTS[slug] || 0, id, key, category;
+  COMMAND_ROW_COUNTS[slug] = occurrence + 1;
+  id = cooldownId || ("command:" + slug + ":" + occurrence);
+  key = actionCooldownKey(id);
+  category = actionCooldownCategory(label, cooldownCategory);
+  if (enabled) {
+    if (action) {
+      registerActionCooldownControl({key:key, kind:"command", element:el, baseClass:el.className,
+        idleCost:displayCost, idleTitle:el.title || ""});
+      on(el, "click", function (e) {
+        return commitActionButton(e, key, category, function () { return fn(e); });
+      });
+    } else { on(el, "click", fn); }
+  }
   parent.appendChild(el);
 }
 function repaintCurrent() {
@@ -8741,7 +9464,7 @@ function buildStoresScreen(host, t) {
           commitChange(e, "Jettisoned " + item.name, function () {
             GOODS.splice(index, 1); if (item.contractId) { STATE.contracts[item.contractId] = "failed"; }
           });
-        });
+        }, undefined, "critical", "jettison:" + item.id);
       } else if (item.state === "packaged") {
         commandRow(body, "Packaged: " + item.name + " (" + item.value + " sh)", false, null, "done");
       } else {
@@ -8815,7 +9538,7 @@ function buildStationScreen(host, t) {
       if (g.contractId) { sales.appendChild(make("div", "navnote", g.name + " - contract cargo, not for sale.")); return; }
       commandRow(sales, "Sell " + g.name + " - " + price + " sh", true, function (e) {
         commitChange(e, "Sold " + g.name, function () { GOODS.splice(index, 1); STATE.shiplets += price; });
-      });
+      }, undefined, "routine", "sell-cargo:" + g.id);
     }(i));
   }
   for (i = 0; i < SURVEY.length; i++) {
@@ -8824,7 +9547,7 @@ function buildStationScreen(host, t) {
       commandRow(sales, "Sell survey: " + s.name + " - " + s.value + " sh",
         !findOngoing("pkg-" + s.id), function (e) {
         commitChange(e, "Sold survey - " + s.name, function () { SURVEY.splice(index, 1); STATE.shiplets += s.value; });
-      });
+      }, undefined, "routine", "sell-survey:" + s.id);
     }(i));
   }
   var board = contentPanel(middle, "Mission board");
@@ -8864,7 +9587,7 @@ function buildStationScreen(host, t) {
       "Trade up to the Kestrel-series SC Tessellate: " + shipCargoCapacity("kestrel", cargoRefitLevel()) +
       " m3 with your current refits, 14 berths, and a larger deck plan. The crew, cargo, active work, " +
       "equipment and all voyage records transfer; hull and systems keep their condition."));
-    commandRow(yard, "Buy larger ship SC Tessellate - 4,000 sh", STATE.shiplets >= LARGE_SHIP_PRICE, buyLargerShip);
+    commandRow(yard, "Buy larger ship SC Tessellate - 4,000 sh", STATE.shiplets >= LARGE_SHIP_PRICE, buyLargerShip, undefined, "critical");
   } else {
     yard.appendChild(make("div", "navnote", "Your Kestrel-series ship: " + CARGO.capacity + " m3 cargo, " + SHIP.berths + " berths."));
   }
@@ -9006,7 +9729,7 @@ function buildIncidentScreen(host, t, ev) {
   var needsKit = typeof spec.requiresKit === "boolean" ? spec.requiresKit : spec.kind !== "Crew";
   commandRow(body, spec.remedy + (needsKit ? " - use one repair kit" : ""), !needsKit || STATE.repairKits > 0, function (e) {
     commitChange(e, spec.remedy, function () { if (needsKit) { STATE.repairKits--; } removeIncident(ev.id); });
-  });
+  }, undefined, "systems");
   var hand = incidentHand(ev);
   commandRow(body, "Assign crew to resolve - 6 actions of work" + (hand ? " (" + simEscape(hand.name) + ")" : " (none available)"),
     !findOngoing("incident-" + ev.id) && !!hand, function (e) { beginIncidentWork(e, ev.id); });
@@ -9109,6 +9832,18 @@ function saveGame(slot) {
 function saveArray(a) { return Object.prototype.toString.call(a) === "[object Array]"; }
 function saveNumber(n) { return typeof n === "number" && isFinite(n) && n >= 0; }
 function saveObject(o) { return Object.prototype.toString.call(o) === "[object Object]" && typeof o.hasOwnProperty === "function"; }
+function validActionCooldowns(cooldowns) {
+  var key, c, rule;
+  if (typeof cooldowns === "undefined") { return true; } /* migrate older saves */
+  if (!saveObject(cooldowns)) { return false; }
+  for (key in cooldowns) {
+    if (!cooldowns.hasOwnProperty(key)) { continue; }
+    c = cooldowns[key]; rule = c && ACTION_COOLDOWN_RULES[c.category];
+    if (!c || !ACTION_COOLDOWN_RULES.hasOwnProperty(c.category) || !rule || !saveNumber(c.remaining) || c.remaining % 1 ||
+        c.remaining < 1 || c.remaining > rule.actions) { return false; }
+  }
+  return true;
+}
 function validSave(d) {
   var i, x, spec, held = 0, seenTasks = {}, a = d && d.state;
   if (!d || d.format !== "spaceship-command-1" || !a || !d.map || !d.ship || !d.life ||
@@ -9128,7 +9863,8 @@ function validSave(d) {
   if (a.shipClass !== undefined && a.shipClass !== "wren" && a.shipClass !== "kestrel") { return false; }
   if ((a.options !== undefined && !validGameOptions(a.options)) ||
       (a.chronicle !== undefined && !validChronicle(a.chronicle)) ||
-      (a.commissions !== undefined && !validCommissions(a.commissions))) { return false; }
+      (a.commissions !== undefined && !validCommissions(a.commissions)) ||
+      !validActionCooldowns(a.actionCooldowns)) { return false; }
   if ((typeof a.medkits !== "undefined" && (!saveNumber(a.medkits) || a.medkits % 1)) ||
       (typeof a.sim !== "undefined" && !validSimSave(a.sim, d.actions))) { return false; }
   if (!saveArray(a.tabs) || !saveArray(a.ongoing) || !saveArray(a.feed) || !saveArray(a.passengers) || !saveArray(d.rooms) ||
@@ -9227,6 +9963,7 @@ function validSave(d) {
 }
 function applySnapshot(d) {
   var i, v;
+  ACTION_COOLDOWN_CONTROLS = {}; COMMAND_ROW_COUNTS = {}; PROGRESS_UI = {};
   STATE = d.state; actionCounter = d.actions; SHIP = d.ship; ROOMS = d.rooms;
   if (STATE.reducedMotion === undefined) { STATE.reducedMotion = false; }
   if (STATE.shipClass === undefined) { STATE.shipClass = "kestrel"; }
@@ -9793,7 +10530,7 @@ function buildComms(body) {
   var sys = currentSystem(), h = WORLD_HISTORY[sys.region], s = STATE.sim.signal;
   body.innerHTML = field("Local system", sys.name) + field("History", h[0]) +
     (STATE.sim.broadcasts[sys.id] ? field("Traffic report", h[1]) : "");
-  commandRow(body, "Request local traffic report (2% energy)", !STATE.sim.broadcasts[sys.id] && statValue("energy").value > 2, broadcastLocal);
+  commandRow(body, "Request local traffic report (2% energy)", !STATE.sim.broadcasts[sys.id] && statValue("energy").value > 2, broadcastLocal, undefined, "space");
   body.appendChild(make("div", "cq-sub", "The Silicon Marrow signal"));
   if (s === "dormant") { body.appendChild(make("div", "navnote", "No unusual signal logged. A deep scan of Halvan's Reach may reveal one.")); }
   if (s === "intercepted" || s === "decoding") {
@@ -9806,15 +10543,17 @@ function buildComms(body) {
       "The Archive Hull in Palimpsest can shelter it; a buyer at any station offers 900 shiplets instead."));
     commandRow(body, "Shelter the archive at the Archive Hull (1 repair kit, 5% energy)",
       MAP.here === "palimpsest-site" && STATE.repairKits > 0 && statValue("energy").value > 5,
-      function (e) { finishSignal(e, "preserved"); });
+      function (e) { finishSignal(e, "preserved"); }, undefined, "critical");
     commandRow(body, "Sell the signal at this station (+900 sh, crew morale -8)", STATE.docked,
-      function (e) { finishSignal(e, "sold"); });
+      function (e) { finishSignal(e, "sold"); }, undefined, "critical");
   }
   if (s === "preserved") { body.appendChild(make("div", "notice", "The archive rests in the Palimpsest hull. The crew kept its request.")); }
   if (s === "sold") { body.appendChild(make("div", "notice", "The archive was sold. The crew remembers the decision.")); }
 }
 function buildShipRoom(host, t) {
-  var scr = contentScreen(host, "ROOM", t.title, t.sub), body = contentPanel(scr, "Ship systems"), id = t.id, p;
+  var scr = contentScreen(host, "ROOM", t.title, t.sub), id = t.id, p;
+  scr.appendChild(buildRoomIllustration(id));
+  var body = contentPanel(scr, "Ship systems");
   if (id === "simulacron") { buildSimCore(body); return; }
   if (id === "r1") { buildMedical(body); return; }
   if (id === "r4") { buildComms(body); return; }
@@ -9988,7 +10727,17 @@ function init() {
   Read-only navigation is free. Rewards are earned from real work,
   claimed once, and all records travel with the voyage save.
   ================================================================ */
-function newGameOptions() { return {largeText:false, confirmRisk:false, hideCrewLabels:false}; }
+var THEMES = {
+  classic:{label:"Flight Deck - parchment", ink:"139,111,78"},
+  void:{label:"Deep Space - cyan", ink:"91,184,213"},
+  aurora:{label:"Aurora - mint", ink:"91,190,157"},
+  nebula:{label:"Nebula - violet", ink:"155,121,208"},
+  ember:{label:"Ember - copper", ink:"215,144,91"}
+};
+function newGameOptions() {
+  return {largeText:false, confirmRisk:false, hideCrewLabels:false,
+    theme:"classic", soundEffects:true, music:true, audioLevel:0.4};
+}
 function newChronicle() {
   return {version:1, systems:{}, regions:{}, banks:0, projects:0, dreams:0, meals:0,
     incidents:0, earned:{}, claimed:{}};
@@ -9997,7 +10746,7 @@ function newCommissions() { return {version:1, serial:0, completed:0, active:nul
 
 var WIKI = [
   {id:"first-watch", group:"Getting started", title:"Your first watch", text:"Start at Kessler Drift. Right-click Navigation, choose Tolme Anchorage and start a crossing. Seat all three canisters in the O2 Filter Room and start the bank. While crossing, recover salvage in the Cargo Hold. Acknowledge arrival in Navigation; open the Docked indicator to trade and use the mission board.", link:"o2", linkLabel:"Open O2 Filter Room"},
-  {id:"controls", group:"Getting started", title:"Controls, tabs and saves", text:"Left-click a ship element for a briefing; right-click it to open a task tab. Use the arrows to scroll tabs and Home to return to the ship. The disk icon has three independent save slots, a new-voyage command and a return to the main menu; slot one reads the original save. The gear holds motion, reading and confirmation preferences. Reading, changing options and claiming commendations are free."},
+  {id:"controls", group:"Getting started", title:"Controls, tabs and saves", text:"Left-click a ship element for a briefing; right-click it to open a task tab. Use the arrows to scroll tabs and Home to return to the ship. The disk icon has three independent save slots, a new-voyage command and a return to the main menu; slot one reads the original save. The gear holds five bridge palettes, ambient music, sound effects, volume, motion, reading, crew labels and confirmations. Rapid repeat action clicks are briefly ignored while each command settles. Reading and changing options are free."},
   {id:"ships", group:"Getting started", title:"Your ships and the shipyard", text:"A new voyage begins on the compact Wren courier: 40 m3 of cargo and six berths, with all ship systems fitted. At any station shipyard, buy the larger Kestrel-series SC Tessellate for 4,000 shiplets. It has 60 m3 of cargo and 14 berths before refits. Cargo, crew, active work, equipment, refits, condition and records transfer; the purchase is permanent and takes one action. Cargo refits increase the Wren to 60 then 90 m3; the same refits carry over to 90 then 120 m3 on the Kestrel."},
   {id:"actions", group:"Getting started", title:"Actions and ongoing work", text:"One committed action advances the ship clock once. Starting a process costs one action, then its remaining work progresses on later actions. Completed crossings and scans must be acknowledged. Use Stand watch in Navigation to spend one action advancing work and survival clocks, even with a full hold. The filter bank grants ten units of work progress without advancing the world clock. Opening tabs, reading and selecting map targets never cost an action."},
   {id:"air", group:"Survival", title:"Air and the filter bank", text:"The O2 Filter Room needs three canisters seated before the bank can start. A full bank contains 200 charge and uses four per action. After it stops, cabin air gradually worsens: bad air slows crew and eventually harms health. The Recyclers can make a canister from salvage, or stations sell supplies.", link:"o2", linkLabel:"Open O2 Filter Room"},
@@ -10006,7 +10755,7 @@ var WIKI = [
   {id:"hazards", group:"Survival", title:"Incidents and loss", text:"Reports appear in Events as actions pass and can escalate if ignored. Open a report to resolve it with supplies or assign an available crew member for six actions of work. Hull failure or the loss of all crew ends the voyage. Load a saved slot or start a new voyage after a loss."},
   {id:"charts", group:"Exploration", title:"Charts and travel", text:"The chart has System, Sector and Galaxy layers. Galaxy selects a region for browsing; Sector selects a system for a jump; System selects a local destination. Travel requires fuel, power and a working drive. Start a crossing, spend actions elsewhere, then acknowledge the finished crossing. Undock before plotting another course.", link:"nav", linkLabel:"Open Navigation"},
   {id:"scans", group:"Exploration", title:"Scans, observation and surveys", text:"Deep-scan a local destination, let the work finish, then acknowledge the readout. Unique scanned bodies count toward exploration commendations. Observation records each visited location once. Surveys go to the Science Room, where packaging adds value before sale. The Sensor Array can spend insight to shorten one scan.", link:"science", linkLabel:"Open Science Room"},
-  {id:"markets", group:"Exploration", title:"Regions, ports and trade", text:"Seven regions contain 36 navigable systems, 111 destinations and 20 ports. Prices vary by port and commodity. Buy where goods are plentiful, carry them within the hold limit, then sell where they are scarce. Stock fuel, canisters and repair kits for long routes; not every system has a station."},
+  {id:"markets", group:"Exploration", title:"Regions, ports and trade", text:"Seven regions contain 48 navigable systems, 243 local destinations and 30 ports. Charts include stars, worlds and their natural moons. Prices vary by port and commodity. Buy where goods are plentiful, carry them within the hold limit, then sell where they are scarce. Stock fuel, canisters and repair kits for long routes; not every system has a station."},
   {id:"jobs", group:"Crew", title:"Jobs, training and wages", text:"In Crew Quarters, stage jobs and orders, then issue the sheet. Work takes the listed actions and training has a fee. A navigator reduces departure fuel use, a cleaner supports morale, and an engineer, filter hand and cook can work autonomously. Wages are paid from the ship's purse on the action clock.", link:"quarters", linkLabel:"Open Crew Quarters"},
   {id:"needs", group:"Crew", title:"Needs, bonds and rest", text:"Health, air, fatigue, hunger, morale and work shape a crew member's outlook. Recreation lets two available hands share a meal, raising their bond and morale. Disputes can hurt a bond; mediation can repair it. A healthy exhausted person may rest on their own. A person already assigned to work cannot be double-booked.", link:"r13", linkLabel:"Open Recreation"},
   {id:"anchors", group:"Simulacron", title:"Name anchors and Desire Fire", text:"The Simulacron is an offline, bounded simulation, not a language model. Authored biographies give crew stable name anchors such as Wayfinder, Maker, Keeper and Witness. Desire Fire reflects present needs and drives dialogue and voluntary rest. Shared anchors give a small extra bond bonus to a meal.", link:"simulacron", linkLabel:"Open Simulacron Core"},
@@ -10254,7 +11003,12 @@ function buildCommissionBoard(body) {
 }
 
 function validGameOptions(o) {
-  return saveObject(o) && typeof o.largeText === "boolean" && typeof o.confirmRisk === "boolean" && typeof o.hideCrewLabels === "boolean";
+  if (!saveObject(o) || typeof o.largeText !== "boolean" || typeof o.confirmRisk !== "boolean" || typeof o.hideCrewLabels !== "boolean") { return false; }
+  if (o.theme !== undefined && (typeof o.theme !== "string" || !THEMES.hasOwnProperty(o.theme))) { return false; }
+  if (o.soundEffects !== undefined && typeof o.soundEffects !== "boolean") { return false; }
+  if (o.music !== undefined && typeof o.music !== "boolean") { return false; }
+  if (o.audioLevel !== undefined && (typeof o.audioLevel !== "number" || !isFinite(o.audioLevel) || o.audioLevel < 0 || o.audioLevel > 1)) { return false; }
+  return true;
 }
 function validChronicle(j) {
   var i, k, fields = ["banks", "projects", "dreams", "meals", "incidents"];
@@ -10280,8 +11034,15 @@ function validCommissions(c) {
   return a.target === "";
 }
 function migrateProgression() {
-  var old = !STATE.chronicle, k, b, sys;
-  if (!STATE.options) { STATE.options = newGameOptions(); }
+  var old = !STATE.chronicle, k, b, sys, defaults = newGameOptions();
+  if (!STATE.actionCooldowns || !saveObject(STATE.actionCooldowns)) { STATE.actionCooldowns = {}; }
+  if (!STATE.options) { STATE.options = defaults; }
+  /* Preserve preferences in pre-expansion save files while filling in
+     the new presentation and audio controls. */
+  if (STATE.options.theme === undefined) { STATE.options.theme = defaults.theme; }
+  if (STATE.options.soundEffects === undefined) { STATE.options.soundEffects = defaults.soundEffects; }
+  if (STATE.options.music === undefined) { STATE.options.music = defaults.music; }
+  if (STATE.options.audioLevel === undefined) { STATE.options.audioLevel = defaults.audioLevel; }
   if (!STATE.commissions) { STATE.commissions = newCommissions(); }
   if (old) {
     STATE.chronicle = newChronicle();
@@ -10339,6 +11100,7 @@ function hideTitleMenu() {
   var title = $("title-screen");
   if (title) { title.parentNode.removeChild(title); }
   $("game-shell").style.display = "block";
+  startAudioFromGesture(); /* browser autoplay is only attempted from the player's menu click */
   switchTab(STATE.activeTab); /* layout was measured while the dashboard was hidden */
 }
 function titleBack() {
