@@ -197,7 +197,17 @@ function build(g) {
 
   files['progression.json'] = {
     comment: 'Contracts, incidents, ship projects, commendations, commissions and world history.',
-    contracts: g.CONTRACTS,
+    /* CONTRACTS gains its later entries at boot (9244), so this is the
+       full 18. Optional fields are exported only when authored. */
+    contracts: g.CONTRACTS.map(function (q) {
+      const out = { id: q.id, title: q.title, goal: q.goal, target: q.target,
+                    reward: q.reward, note: q.note };
+      if (q.origin !== undefined) { out.origin = q.origin; }
+      if (q.vol !== undefined) { out.vol = q.vol; }
+      if (q.cargo !== undefined) { out.cargo = q.cargo; }
+      if (q.recognizePrior !== undefined) { out.recognizePrior = q.recognizePrior; }
+      return out;
+    }),
     incidents: g.INCIDENT_TYPES,
     projects: g.SHIP_PROJECTS,
     commendations: g.COMMENDATIONS,

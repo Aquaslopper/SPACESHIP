@@ -1,0 +1,82 @@
+# Voyage 09: the shipyard. A Wren becomes a Kestrel, and the deck changes.
+purse 6000
+trace
+target tolme
+travel
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+trace
+ack travel
+trace
+shipyard
+trace
+upgrade bay2
+trace
+medical rell
+trace
+watch
+watch
+watch
+watch
+trace
+buy rations
+trace
+target kessler
+travel
+trace
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+trace
+ack travel
+trace

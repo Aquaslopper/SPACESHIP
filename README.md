@@ -75,12 +75,16 @@ Existing Kessler-only and expanded-galaxy saves still load, including active leg
 ## Native C++ edition and development
 
 The repository also contains a native C++ port of the game. It is a **work in
-progress**: Phase 0 (build system, extracted catalogue, data gate) is complete,
-Phase 1A (the action clock: drive wear, life support, crew, tasks, incidents,
-the Simulacron and commendations) is complete and verified against the
-reference, and Phase 1B (navigation, ports, contracts, projects, saves) is next.
-Until Phase 3 the client is a window, not a game, so `Spaceship.hta` remains the
-playable edition.
+progress**: Phase 0 (build system, extracted catalogue, data gate) and Phase 1
+(the whole headless simulation) are complete and verified against the reference.
+What remains is the interface: Phase 2 onwards replaces the DOM with Raylib and
+Dear ImGui. Until then `Spaceship.hta` remains the playable edition.
+
+`spaceship_core` is feature-complete as a simulation: the action clock, drive
+wear, life support, crew, tasks, incidents, the Simulacron, commendations,
+navigation (three chart scales, crossings, sensors), ports and trade, contracts,
+commissions, the twelve task hooks, the ten ship projects, both hulls, and
+bidirectional saves in the original file format.
 
 ### Build
 
@@ -148,8 +152,40 @@ is ported; the five committed voyages cover the opening loop, a 900-action
 unattended haul, the filter hand's own initiative, running out of air, and a
 payday that cannot pay everyone.
 
-Script commands: `action [text]`, `seat <slot>`, `bank`, `job <crew> <job>`,
-`purse <n>`, `trace`, and `#` comments.
+Script commands:
+
+| Group | Commands |
+|---|---|
+| the clock | `action [text]`, `watch`, `purse <n>`, `trace` |
+| life support | `seat <slot>`, `bank`, `job <crew> <job>` |
+| navigation | `target <body>`, `travel`, `scan`, `ack <task>`, `dock`, `undock`, `layer <key>`, `sector <region>` |
+| ports | `buy <item>`, `sellgood <lot>`, `sellsurvey <record>`, `jettison <lot>`, `package <record>`, `hire <crew>`, `upgrade <id>`, `shipyard`, `contract accept\|collect <id>`, `commission accept <kind>\|collect\|abandon` |
+| the ship | `project <id>`, `medical <crew>`, `social <a> <b>`, `salvage <bay>` |
+| persistence | `save <file> [utf16]`, `load <file>`, `saveslot <1\|2\|3>`, `loadslot <1\|2\|3>` |
+
+`#` starts a comment.
+
+### Save compatibility
+
+`SaveSystem.cpp` writes and reads the original format one key at a time: the same
+seventeen top-level keys, the same `state` fields, the same `format` string. It is
+proven in both directions by `tools/run-save-parity.cmake`, which `ctest` runs as
+`parity.save-roundtrip`:
+
+1. the port flies a voyage and writes a save;
+2. the reference loads that file and spends twenty actions; the port loads the
+   same file and spends twenty actions — the two traces must match;
+3. the reference re-saves what it advanced;
+4. both editions load *that* file and advance — the traces must match again;
+5. slot 1 is written as UTF-16LE with a BOM, as the HTA writes it, and must read
+   back identically.
+
+`ValidSave` is the reference's validation, including the cross-checks: the hold
+cannot be fuller than the hold (salvage in flight counts against it), a task
+cannot point at a body that does not exist, an incident cannot wait on a stage
+with no ticks left, a decoding signal must have the work to decode it, and
+cooldowns must be whole numbers inside their rule. A failed load leaves the live
+voyage untouched.
 
 ### Fidelity
 

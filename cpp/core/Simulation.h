@@ -41,6 +41,10 @@ struct JobDef {
   std::string room;   // where the job is worked
 };
 
+// Builds a live crew member from an authored definition. Shared by the new
+// voyage and by a hiring at a port.
+CrewMember MakeCrew(const CrewDefinition& def);
+
 class Simulation {
  public:
   // A voyage in the state the reference reaches the moment its script has
@@ -60,18 +64,106 @@ class Simulation {
 
   // ---- queries -----------------------------------------------------------
   double ActionCount() const { return actionCounter_; }
+  double MessRack() const { return mess_.rack; }
+  double MessCapacity() const { return mess_.capacity; }
   const GameState& State() const { return state_; }
   GameState& MutableState() { return state_; }
   const std::vector<CrewMember>& Crew() const { return crew_; }
   const std::vector<Stat>& Stats() const { return stats_; }
   const LifeStore& Life() const { return life_; }
-  double MessRack() const { return messRack_; }
-  double MessCapacity() const { return messCapacity_; }
+  LifeStore& MutableLife() { return life_; }
+  Cargo& MutableCargo() { return cargo_; }
+  Mess& MutableMess() { return mess_; }
+  std::vector<GoodsLot>& MutableGoods() { return goods_; }
   const std::vector<Incident>& Events() const { return events_; }
   const std::vector<GoodsLot>& Goods() const { return goods_; }
   const Catalog& World() const { return catalog_; }
+  const MapView& Map() const { return map_; }
+  MapView& MutableMap() { return map_; }
+  const std::map<std::string, LayerView>& Views() const { return views_; }
+  const std::vector<Room>& Rooms() const { return rooms_; }
+  const ShipDef& Ship() const { return ship_; }
+  const std::vector<InfoRow>& Infos() const { return infos_; }
+  const Cargo& CargoStore() const { return cargo_; }
+  const std::vector<Passenger>& Passengers() const { return state_.passengers; }
+  const std::vector<Good>& Market() const { return catalog_.goods; }
+  const std::vector<SurveyRecord>& Survey() const { return survey_; }
+  double ScanCost() const { return scanCost_; }
+  bool InRange(const Body& body) const;
+  bool AtTarget(const Body& body) const;
+  std::string CurrentSystemId() const;
+  const Body* CurrentSystem() const;
+  const Body* FindBodyById(const std::string& id) const;
+  const Body* HomeBody() const;
+  // navMetrics() — distance, fuel, and the strings the panel prints.
+  struct NavMetrics {
+    double dist = 0;
+    double fuel = 0;
+    double total = 0;
+    std::string ly;
+    std::string km;
+    std::string transit;
+  };
+  NavMetrics MetricsFor(const Body& body) const;
+  CrewMember* AssignedNavigator();
   const Rules& GameRules() const { return rules_; }
   std::vector<std::string> FeedText() const;
+
+  // ---- Phase 1B commands ------------------------------------------------
+  // Navigation (Navigation.cpp). Selection is free; only travel and scans cost.
+  bool SelectTarget(const std::string& bodyId);
+  bool StartTravel();                       // startTravel()
+  bool StartScan();                         // startScan()
+  bool StandWatch();                        // standWatch()
+  bool Acknowledge(const std::string& taskId);  // the finished button
+  void SetLayer(const std::string& key);    // free: looking never costs
+  bool ViewSector(const std::string& regionId);
+  bool Dock();                              // Dock at <port>
+  bool Undock();
+
+  // Economy (Economy.cpp)
+  double LotPrice(const GoodsLot& lot) const;
+  double CargoUsed() const;
+  double CargoReserved() const;
+  bool BuySupply(const std::string& id);     // fuel cell, kit, medkit, canister, rations
+  bool BuyGood(const std::string& goodId);
+  bool SellGood(const std::string& lotId);
+  bool SellSurvey(const std::string& recordId);
+  bool Jettison(const std::string& lotId);
+  bool StartSalvage(int bay);
+  bool PackageSurvey(const std::string& recordId);
+  bool AcceptContract(const std::string& contractId);
+  bool CollectContract(const std::string& contractId);
+  bool HireCrew(const std::string& candidateId);
+  bool BuyUpgrade(const std::string& upgradeId);   // bay, bay2, drive, rack, scanner, hull
+  void ContractProgress(const std::string& goal, const std::string& target);
+  void CommissionProgress(const std::string& kind, const std::string& target);
+  bool AcceptCommission(const std::string& kind);
+  bool CollectCommission();
+  bool AbandonCommission();
+
+  // Projects and the shipyard (Projects.cpp, Ships.cpp)
+  bool StartProject(const std::string& id);
+  bool StartMedical(const std::string& crewId);
+  bool StartSocial(const std::string& a, const std::string& b);
+  std::string ProjectBlock(const std::string& id) const;
+  void ApplyShipLayout();
+  bool BuyLargerShip();
+  double ShipCargoCapacity(const std::string& kind, int level) const;
+  int CargoRefitLevel() const;
+
+  // Persistence (SaveSystem.cpp)
+  std::string SaveJson() const;                       // saveSnapshot(), pretty
+  bool LoadJson(const std::string& text, std::string* error);   // validSave + apply
+  // Slot 1 is written as UTF-16LE with a BOM, because that is the file the HTA
+  // writes beside itself; slots 2 and 3 are UTF-8. The names match the original.
+  static std::string SlotFilename(int slot);
+  static bool SlotIsUtf16(int slot);
+  bool SaveSlot(int slot, const std::string& directory, std::string* error) const;
+  bool LoadSlot(int slot, const std::string& directory, std::string* error);
+  bool SaveToFile(const std::string& path, bool utf16le, std::string* error) const;
+  bool LoadFromFile(const std::string& path, std::string* error);
+  static bool ValidSave(const std::string& text, const Catalog& catalog, std::string* why);
 
   // Canonical snapshot, sorted keys, JS number formatting. Used by the
   // console harness and by the parity tests.
@@ -160,6 +252,26 @@ class Simulation {
   // Awards.cpp
   double ChronicleValue(const std::string& metric) const;
 
+  // Navigation.cpp
+  void ArriveAt(const std::string& bodyId);
+  void RefreshLocationInfo();
+  void RevealScan(const std::string& bodyId);
+  void FileSurvey(const Body& body);
+  void ChronicleVisit(const Body* system);
+  std::vector<const Body*> CurBodies() const;
+
+  // Economy.cpp
+  const Port* HerePort() const;
+  double SurveyWorth(const std::string& type) const;
+  int ProjectLot(const std::string& kind) const;
+
+  // Projects.cpp
+  void ProjectDone(Task& task);
+  std::vector<Memory> SimUnprocessed() const;
+
+  // SaveSystem.cpp
+  void ApplySnapshotDefaults();
+
   // Automation that follows the clock
   void AutoMaint();
   void AutoFilters();
@@ -176,9 +288,16 @@ class Simulation {
   std::vector<SurveyRecord> survey_;
   std::vector<JobDef> jobs_;
 
+  ShipDef ship_;
+  std::vector<Room> rooms_;
+  std::vector<InfoRow> infos_;
+  Cargo cargo_;
+  Mess mess_;
+  MapView map_;
+  std::map<std::string, LayerView> views_;
+  double scanCost_ = 5;
+
   double actionCounter_ = 0;
-  double messRack_ = 0;
-  double messCapacity_ = 0;
 
   // Re-entry guards. A command spends its action BEFORE it registers the work
   // it starts, and the tick inside that action must not let a crew member grab

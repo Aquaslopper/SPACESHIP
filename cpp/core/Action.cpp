@@ -25,6 +25,37 @@ std::string Lower(std::string text) {
 }
 }  // namespace
 
+CrewMember MakeCrew(const CrewDefinition& def) {
+  CrewMember crew;
+  crew.id = def.id;
+  crew.name = def.name;
+  crew.role = def.role;
+  crew.room = def.room;
+  crew.activity = def.activity;
+  crew.colour = def.colour;
+  crew.sex = def.sex;
+  crew.hair = def.hair;
+  crew.hair2 = def.hair2;
+  crew.skin = def.skin;
+  crew.hairStyle = def.hairStyle;
+  crew.health = def.health;
+  crew.morale = def.morale;
+  crew.fatigue = def.fatigue;
+  crew.hunger = def.hunger;
+  crew.wallet = def.wallet;
+  crew.hungerTick = def.hungerTick;
+  crew.traits = def.traits;
+  crew.race = def.race;
+  crew.age = def.age;
+  crew.homeworld = def.homeworld;
+  crew.hobby = def.hobby;
+  crew.religion = def.religion;
+  crew.job = def.job;
+  crew.skill = def.skill;
+  crew.jobAt = def.jobAt;
+  return crew;
+}
+
 Simulation Simulation::NewVoyage(const Catalog& catalog) {
   Simulation sim;
   sim.catalog_ = catalog;
@@ -32,34 +63,7 @@ Simulation Simulation::NewVoyage(const Catalog& catalog) {
 
   // ---- crew --------------------------------------------------------------
   for (const CrewDefinition& def : catalog.startingCrew) {
-    CrewMember crew;
-    crew.id = def.id;
-    crew.name = def.name;
-    crew.role = def.role;
-    crew.room = def.room;
-    crew.activity = def.activity;
-    crew.colour = def.colour;
-    crew.sex = def.sex;
-    crew.hair = def.hair;
-    crew.hair2 = def.hair2;
-    crew.skin = def.skin;
-    crew.hairStyle = def.hairStyle;
-    crew.health = def.health;
-    crew.morale = def.morale;
-    crew.fatigue = def.fatigue;
-    crew.hunger = def.hunger;
-    crew.wallet = def.wallet;
-    crew.hungerTick = def.hungerTick;
-    crew.traits = def.traits;
-    crew.race = def.race;
-    crew.age = def.age;
-    crew.homeworld = def.homeworld;
-    crew.hobby = def.hobby;
-    crew.religion = def.religion;
-    crew.job = def.job;
-    crew.skill = def.skill;
-    crew.jobAt = def.jobAt;
-    sim.crew_.push_back(crew);
+    sim.crew_.push_back(MakeCrew(def));
   }
 
   // ---- hull readouts -----------------------------------------------------
@@ -79,9 +83,43 @@ Simulation Simulation::NewVoyage(const Catalog& catalog) {
   sim.life_.slots = {{"s0", "Slot 1", "empty"}, {"s1", "Slot 2", "empty"},
                      {"s2", "Slot 3", "empty"}};
 
-  // ---- the ration counter ------------------------------------------------
-  sim.messRack_ = catalog.rules.mess.rackStart;
-  sim.messCapacity_ = catalog.rules.mess.capacity;
+  // ---- the ration counter and the hold ----------------------------------
+  sim.mess_.rack = catalog.rules.mess.rackStart;
+  sim.mess_.capacity = catalog.rules.mess.capacity;
+  sim.cargo_.capacity = sim.ShipCargoCapacity("wren", 0);
+
+  // ---- the hull the crew are standing in ---------------------------------
+  {
+    const DeckPlan& plan = catalog.wren;
+    for (const Room& room : plan.rooms) { sim.rooms_.push_back(room); }
+    ShipDef ship;
+    ship.fields = {{"name", "SC Wren"}, {"berths", "6"}};
+    sim.ship_ = ship;
+    for (const InfoDefinition& info : catalog.infoDefs) {
+      sim.infos_.push_back(InfoRow{info.id, info.label, info.value});
+    }
+  }
+
+  // ---- the chart ---------------------------------------------------------
+  sim.map_ = MapView();
+  const MapGeometry& geometry = catalog.map;
+  sim.map_.w = geometry.w;
+  sim.map_.h = geometry.h;
+  sim.map_.cx = geometry.cx;
+  sim.map_.cy = geometry.cy;
+  sim.map_.vw = geometry.w;
+  sim.map_.vh = geometry.h;
+  sim.map_.zoom = geometry.zoom;
+  sim.map_.zmin = geometry.zmin;
+  sim.map_.zmax = geometry.zmax;
+  sim.map_.zstep = geometry.zstep;
+  sim.map_.grid = geometry.grid;
+  sim.map_.vpy = geometry.vpy;
+  sim.map_.rungs = geometry.rungs;
+  sim.map_.rungPow = geometry.rungPow;
+  sim.map_.pxPerAction = geometry.pxPerAction;
+  sim.map_.lyPerAction = geometry.lyPerAction;
+  for (const std::string& layer : catalog.layerOrder) { sim.views_[layer] = LayerView(); }
 
   // ---- the hold ----------------------------------------------------------
   for (const Good& good : catalog.startingCargo) {

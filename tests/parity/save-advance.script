@@ -1,0 +1,24 @@
+# Save parity, stage 2: load the voyage and spend twenty actions in it.
+load runtime/saves/rt-a.json
+trace
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+trace

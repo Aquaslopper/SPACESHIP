@@ -1,7 +1,8 @@
 # Spaceship Command — HTA → C++ Port Plan
 
-**Status:** approved; Phases 0 and 1A are complete, Phase 1B is next. Progress is
-recorded at the head of `README.md` and, for each phase, in the phase table below.
+**Status:** approved; Phases 0 and 1 are complete (the headless simulation is
+feature-complete). Phase 2, the interface, is next. Progress is recorded at the
+head of `README.md` and, for each phase, in the phase table below.
 **Reference edition:** `Spaceship.hta` (706,020 bytes, 11,179 lines, single file, no assets).
 **Target:** standard C++17, Raylib + Dear ImGui, CMake with `FetchContent`.
 
@@ -548,9 +549,21 @@ five of which are differential voyages against the reference. Every voyage in `t
 reference's state byte for byte, including a 900-action unattended haul, the filter hand acting on his own
 initiative, air failure, hull loss and a payday that cannot pay everyone.
 
-**1B — the far side of the ship (next).** `Navigation`, `Economy`, `Projects`, `Ships`, `Contracts`, `SaveSystem`
-(bidirectional JSON, UTF-16LE slot 1, `validSave`, migrations), and the travel/scan/arrival task hooks that 1A
-deliberately left registered but inert.
+**1B — the far side of the ship (done).** `Navigation` (three scales, `navMetrics` with the navigator discount and
+the efficient drive, crossings, sensors, arrival and revelation), `Economy` (port prices, trade, salvage, survey
+packaging, contracts, commissions, hiring, refits), `Projects` (ten ship projects plus medical care and shared
+meals), `Ships` (`applyShipLayout`, the Kestrel purchase, staged cargo refits), and `SaveSystem` (the reference's
+seventeen-key JSON, `validSave` with every cross-check, migrations, and slot 1 as UTF-16LE). All twelve task hooks
+are live.
+
+*Verification:* `ctest` is 53 tests — 37 Catch2 cases (7,100 assertions) ported from the four Node suites, nine
+differential voyages, the catalogue gate, and the save round-trip that sends a voyage from the port to the
+reference and back.
+
+**Still outstanding inside Phase 1's subject matter** (deliberately deferred to the screens that own them): the
+signal story's two endings (`finishSignal`) and the broadcasts they unlock, claiming a commendation's reward and
+the rank it feeds, and the crew order sheet's remaining payloads (a rest is the only order the clock can create on
+its own). All three are state-complete and save-compatible; they are waiting for their UI.
 
 ### Phase 2 — Shell and idle screen (2 days)
 Window, theme layer, taskbar/tabs, side panel + pinned foot, status bar, stat rail, ship diagram from data, feed,

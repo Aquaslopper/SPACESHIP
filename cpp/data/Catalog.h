@@ -69,6 +69,11 @@ class Catalog {
   std::vector<Contract> contracts;
 
   std::vector<std::string> taskTypes;
+  std::vector<std::string> layerOrder;               // system, sector, galaxy
+  std::map<std::string, double> surveyWorth;         // body type -> shiplets
+  std::vector<CandidateDefinition> candidates;       // the hire pool
+  std::map<std::string, std::map<std::string, std::string>> shipFields;  // by class
+  std::map<std::string, std::vector<double>> cargoByClass;  // refit levels 0..2
 
   // Authored starting values and definitions (Phase 1).
   std::vector<CrewDefinition> startingCrew;
@@ -87,7 +92,7 @@ class Catalog {
   std::vector<Good> startingCargo;          // the hold a new voyage opens with
   std::vector<SurveyRecordDef> startingSurvey;
 
-  std::vector<std::string> infoLabels;      // INFOS: location/contacts/life
+  std::vector<InfoDefinition> infoDefs;     // INFOS: location/contacts/life
   std::vector<std::string> resourceLabels;  // RESOURCES, in sidebar order
 
   // Tunables, straight out of survival.json and content.json.

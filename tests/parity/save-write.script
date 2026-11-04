@@ -1,0 +1,24 @@
+# Save parity, stage 3: load, advance, write the voyage out again.
+load runtime/saves/rt-a.json
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+trace
+save runtime/saves/rt-b.json

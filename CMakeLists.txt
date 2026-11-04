@@ -122,7 +122,12 @@ add_library(spaceship_core STATIC
   cpp/core/Incidents.cpp
   cpp/core/Simulacron.cpp
   cpp/core/Awards.cpp
-  cpp/core/Trace.cpp)
+  cpp/core/Trace.cpp
+  cpp/core/Navigation.cpp
+  cpp/core/Economy.cpp
+  cpp/core/Projects.cpp
+  cpp/core/Ships.cpp
+  cpp/core/SaveSystem.cpp)
 
 target_include_directories(spaceship_core PUBLIC cpp)
 target_link_libraries(spaceship_core PUBLIC spaceship_json)
@@ -184,6 +189,7 @@ if(SPACESHIP_BUILD_TESTS)
   add_executable(spaceship_tests
     cpp/tests/catalog_tests.cpp
     cpp/tests/simulation_tests.cpp
+    cpp/tests/world_tests.cpp
     cpp/tests/jsnumber_tests.cpp)
   target_link_libraries(spaceship_tests PRIVATE spaceship_core Catch2::Catch2WithMain)
 
@@ -217,6 +223,17 @@ if(SPACESHIP_BUILD_TESTS)
                        -DSCRIPT=${script}
                        -P "${CMAKE_CURRENT_SOURCE_DIR}/tools/run-parity.cmake")
     endforeach()
+  endif()
+
+  # Save parity: the two editions must write and read each other's files, in
+  # both encodings. This is the gate that Decision 5 lives or dies by.
+  if(SPACESHIP_DATA_GATE AND SPACESHIP_NODE AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Spaceship.hta")
+    add_test(NAME parity.save-roundtrip
+             COMMAND "${CMAKE_COMMAND}"
+                     -DNODE=${SPACESHIP_NODE}
+                     -DCONSOLE=$<TARGET_FILE:spaceship_console>
+                     -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                     -P "${CMAKE_CURRENT_SOURCE_DIR}/tools/run-save-parity.cmake")
   endif()
 endif()
 

@@ -91,7 +91,7 @@ std::string Simulation::TraceJson() const {
     out["counters"] = counters;
   }
 
-  out["mess"] = Json{{"rack", Num(messRack_)}};
+  out["mess"] = Json{{"rack", Num(mess_.rack)}};
 
   {
     Json crew = Json::array();
@@ -129,6 +129,8 @@ std::string Simulation::TraceJson() const {
       entry["who"] = task.who;
       entry["slot"] = Num(task.slot);
       entry["rate"] = Num(task.rate);
+      entry["vol"] = Num(task.vol);
+      entry["payload"] = task.payload;
       tasks.push_back(entry);
     }
     out["tasks"] = tasks;
@@ -195,6 +197,92 @@ std::string Simulation::TraceJson() const {
       cooldowns[entry.first] = Num(entry.second.remaining);
     }
     out["cooldowns"] = cooldowns;
+  }
+
+  {
+    Json map = Json::object();
+    map["layer"] = map_.layer;
+    map["here"] = map_.here;
+    map["sector"] = map_.sector;
+    map["zoom"] = Num(map_.zoom);
+    out["map"] = map;
+  }
+  out["navTarget"] = state_.navTarget.has_value() ? Json(*state_.navTarget) : Json(nullptr);
+  out["docked"] = state_.docked;
+  out["shipClass"] = state_.shipClass;
+  out["scanCost"] = Num(scanCost_);
+  out["cargo"] = Json{{"capacity", Num(cargo_.capacity)},
+                      {"used", Num(CargoUsed())},
+                      {"reserved", Num(CargoReserved())}};
+
+  {
+    Json contracts = Json::object();
+    for (const auto& entry : state_.contracts) { contracts[entry.first] = entry.second; }
+    out["contracts"] = contracts;
+  }
+  {
+    Json scanned = Json::array();
+    for (const auto& entry : state_.scanned) {
+      if (entry.second) { scanned.push_back(entry.first); }
+    }
+    std::sort(scanned.begin(), scanned.end());
+    out["scanned"] = scanned;
+  }
+  {
+    Json goods = Json::array();
+    for (const GoodsLot& lot : goods_) {
+      goods.push_back(Json{{"id", lot.id}, {"name", lot.name}, {"kind", lot.kind},
+                           {"vol", Num(lot.vol)}, {"value", Num(lot.value)},
+                           {"contractId", lot.contractId}});
+    }
+    out["goods"] = goods;
+  }
+  {
+    Json survey = Json::array();
+    for (const SurveyRecord& record : survey_) {
+      survey.push_back(Json{{"id", record.id}, {"name", record.name},
+                            {"value", Num(record.value)}, {"state", record.state}});
+    }
+    out["survey"] = survey;
+  }
+  {
+    Json passengers = Json::array();
+    for (const Passenger& passenger : state_.passengers) { passengers.push_back(passenger.id); }
+    out["passengers"] = passengers;
+  }
+  {
+    Json upgrades = Json::array();
+    for (const auto& entry : state_.upgrades) {
+      if (entry.second) { upgrades.push_back(entry.first); }
+    }
+    std::sort(upgrades.begin(), upgrades.end());
+    out["upgrades"] = upgrades;
+  }
+  {
+    Json commissions = Json::object();
+    commissions["serial"] = Num(state_.commissions.serial);
+    commissions["completed"] = Num(state_.commissions.completed);
+    if (state_.commissions.active.has_value()) {
+      const Commission& c = *state_.commissions.active;
+      commissions["active"] = Json{{"kind", c.kind}, {"origin", c.origin}, {"target", c.target},
+                                   {"progress", Num(c.progress)}, {"reward", Num(c.reward)}};
+    } else {
+      commissions["active"] = nullptr;
+    }
+    out["commissions"] = commissions;
+  }
+  {
+    Json infos = Json::object();
+    for (const InfoRow& row : infos_) { infos[row.id] = row.value; }
+    out["infos"] = infos;
+  }
+  {
+    Json rooms = Json::array();
+    for (const Room& room : rooms_) {
+      rooms.push_back(Json{{"id", room.id}, {"x", Num(room.box.x)}, {"y", Num(room.box.y)},
+                           {"w", Num(room.box.w)}, {"h", Num(room.box.h)}, {"tag", room.tag}});
+    }
+    out["rooms"] = rooms;
   }
 
   {

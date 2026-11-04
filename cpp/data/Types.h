@@ -125,6 +125,7 @@ struct Contract {
   std::string note;
   double reward = 0;
   int vol = 0;
+  std::string cargo;   // freight: what the consignment is called
   bool recognizePrior = false;
 };
 
@@ -182,6 +183,16 @@ struct CrewDefinition {
   std::string homeworld, hobby, religion;
   std::string job, skill;
   double jobAt = 0;
+};
+
+struct CandidateDefinition {
+  CrewDefinition crew;
+  std::string port;
+  double fee = 0;
+};
+
+struct InfoDefinition {
+  std::string id, label, value;
 };
 
 struct StatDefinition {

@@ -203,6 +203,17 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
   catalog.counts.fittedRooms =
       static_cast<int>(Field(ship, "roomFits", "ship.json").size());
   catalog.counts.ships = static_cast<int>(Field(ship, "ships", "ship.json").size());
+  for (auto it = Field(ship, "cargoByClass", "ship.json").begin();
+       it != Field(ship, "cargoByClass", "ship.json").end(); ++it) {
+    for (const Json& level : it.value()) { catalog.cargoByClass[it.key()].push_back(level.get<double>()); }
+  }
+  for (auto it = Field(ship, "ships", "ship.json").begin(); it != Field(ship, "ships", "ship.json").end(); ++it) {
+    std::map<std::string, std::string> fields;
+    for (auto field = it.value().begin(); field != it.value().end(); ++field) {
+      if (field.value().is_string()) { fields[field.key()] = field.value().get<std::string>(); }
+    }
+    catalog.shipFields[it.key()] = fields;
+  }
   catalog.counts.roomsWren = static_cast<int>(catalog.wren.rooms.size());
   catalog.counts.roomsKestrel = static_cast<int>(catalog.kestrel.rooms.size());
 
@@ -217,6 +228,9 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
   catalog.map.zmax = Number(map, "zmax", "chart.json/map", 2.0);
   catalog.map.zstep = Number(map, "zstep", "chart.json/map", 0.2);
   catalog.map.grid = Number(map, "grid", "chart.json/map", 45);
+  for (const Json& layer : Field(chart, "layerOrder", "chart.json")) {
+    catalog.layerOrder.push_back(layer.get<std::string>());
+  }
   catalog.map.vpy = Number(map, "vpy", "chart.json/map", 0.35);
   catalog.map.rungs = Number(map, "rungs", "chart.json/map", 9);
   catalog.map.rungPow = Number(map, "rungPow", "chart.json/map", 2.1);
@@ -276,6 +290,7 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     c.note = Text(contract, "note", "progression.json/contracts");
     c.reward = Number(contract, "reward", "progression.json/contracts");
     c.vol = static_cast<int>(Number(contract, "vol", "progression.json/contracts"));
+    c.cargo = Text(contract, "cargo", "progression.json/contracts");
     c.recognizePrior = Flag(contract, "recognizePrior");
     catalog.contracts.push_back(c);
   }
@@ -355,6 +370,13 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     catalog.startingCrew.push_back(ReadCrew(member));
   }
   catalog.counts.crew = static_cast<int>(Field(crew, "crew", "crew.json").size());
+  for (const Json& candidate : Field(crew, "candidates", "crew.json")) {
+    CandidateDefinition def;
+    def.crew = ReadCrew(candidate);
+    def.port = Text(candidate, "port", "crew.json/candidates");
+    def.fee = Number(candidate, "fee", "crew.json/candidates");
+    catalog.candidates.push_back(def);
+  }
   catalog.counts.hires = static_cast<int>(Field(crew, "candidates", "crew.json").size());
   catalog.counts.jobs = static_cast<int>(Field(crew, "jobs", "crew.json").size());
   catalog.counts.orders = static_cast<int>(Field(crew, "orders", "crew.json").size());
@@ -400,6 +422,10 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     g.risk = Flag(lot, "risk");
     catalog.startingCargo.push_back(g);
   }
+  for (auto it = Field(survival, "surveyWorth", "survival.json").begin();
+       it != Field(survival, "surveyWorth", "survival.json").end(); ++it) {
+    catalog.surveyWorth[it.key()] = it.value().get<double>();
+  }
   for (const Json& record : Field(survival, "survey", "survival.json")) {
     SurveyRecordDef def;
     def.id = Text(record, "id", "survival.json/survey");
@@ -410,7 +436,11 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     catalog.startingSurvey.push_back(def);
   }
   for (const Json& info : Field(survival, "infos", "survival.json")) {
-    catalog.infoLabels.push_back(Text(info, "label", "survival.json/infos"));
+    InfoDefinition def;
+    def.id = Text(info, "id", "survival.json/infos");
+    def.label = Text(info, "label", "survival.json/infos");
+    def.value = Text(info, "value", "survival.json/infos");
+    catalog.infoDefs.push_back(def);
   }
   for (const Json& resource : Field(survival, "resources", "survival.json")) {
     catalog.resourceLabels.push_back(Text(resource, "label", "survival.json/resources"));

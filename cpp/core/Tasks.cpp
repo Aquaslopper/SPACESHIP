@@ -32,11 +32,13 @@ bool IsQuiet(const std::string& type) {
   // "A ship process has completed." line.
   return type == "crewOrder" || type == "crewJob" || type == "crewDoc" ||
          type == "o2slot" || type == "maint" || type == "cook" ||
-         type == "incident" || type == "salvage" || type == "surveyPackage";
+         type == "incident" || type == "salvage" || type == "surveyPackage" ||
+         type == "shipProject";
 }
 
 bool IsAutoClear(const std::string& type) {
-  return type != "travel" && type != "scan" && type != "shipProject";
+  // Only a crossing and a scan have a readout to hand over.
+  return type != "travel" && type != "scan";
 }
 
 }  // namespace
@@ -92,7 +94,7 @@ void Simulation::TickTask(const Task& task, double used) {
   // two actions of a bake cannot credit it for ten.
   if (task.type != "cook") { return; }
   const double rate = task.rate > 0 ? task.rate : 1.0;
-  messRack_ = std::min(messCapacity_, messRack_ + used * rate);
+  mess_.rack = std::min(mess_.capacity, mess_.rack + used * rate);
 }
 
 void Simulation::OnTaskDone(Task& task) {
@@ -168,7 +170,12 @@ void Simulation::OnTaskDone(Task& task) {
     }
     return;
   }
-  // travel, scan and shipProject land in Phase 1B with Navigation.
+  if (task.type == "shipProject") {
+    ProjectDone(task);
+    return;
+  }
+  // travel and scan do nothing when the counter lands: the player must come back
+  // and press the finished button, which is acknowledged in Navigation.
 }
 
 void Simulation::TickOngoing() { AdvanceTasks(1); }

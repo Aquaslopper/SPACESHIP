@@ -1,0 +1,76 @@
+# Voyage 08: sensors, survey records, salvage and the projects that use them.
+purse 3000
+trace
+target sirrus
+scan
+trace
+watch
+watch
+watch
+watch
+watch
+watch
+trace
+ack scan
+trace
+package sv-sirrus
+trace
+watch
+watch
+watch
+trace
+target tolme
+travel
+trace
+salvage 0
+trace
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+trace
+salvage 1
+trace
+watch
+watch
+watch
+watch
+watch
+watch
+trace
+ack travel
+trace
+project observe
+trace
+watch
+watch
+watch
+watch
+watch
+trace
+project food
+trace
+watch
+watch
+watch
+watch
+watch
+trace
+social rell jax
+trace
+watch
+watch
+watch
+watch
+trace
+project dream
+trace
+watch
+watch
+watch
+watch
+watch
+trace

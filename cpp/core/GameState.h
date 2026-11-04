@@ -16,6 +16,8 @@
 #include <string>
 #include <vector>
 
+#include "data/Types.h"
+
 namespace ship {
 
 // ---------------------------------------------------------------------------
@@ -89,6 +91,15 @@ struct Task {
   double slot = -1;   // o2slot: which of the three slots
   double rate = 0;    // cook: rations per action
   double vol = 0;     // salvage: cubic metres held
+  std::string payload;  // observe: the body recorded; dream: unused
+
+  // A dream carries both halves of what the crew consolidated: their ids, kinds,
+  // texts and the two people each half was about.
+  std::vector<std::string> dreamIds;
+  std::vector<std::string> dreamKinds;
+  std::vector<std::string> dreamTexts;
+  std::vector<std::string> dreamWho;
+  std::vector<std::string> dreamOther;
   bool rest = false;  // crewJob payload: the only one Phase 1A can create
   bool hasOrders = false;
 };
@@ -120,6 +131,11 @@ struct Memory {
   bool processed = false;
 };
 
+struct Dream {
+  double at = 0;
+  std::string text;
+};
+
 struct SimState {
   int version = 1;
   double serial = 1;
@@ -129,7 +145,7 @@ struct SimState {
   std::map<std::string, double> bonds;   // "a~b" -> -100..100
   std::map<std::string, bool> observed;
   std::map<std::string, bool> broadcasts;
-  std::vector<std::string> dreams;
+  std::vector<Dream> dreams;
   std::vector<Memory> memories;
 };
 
@@ -148,9 +164,10 @@ struct Chronicle {
 
 struct Commission {
   std::string kind;
+  std::string origin;
   std::string target;
   double progress = 0;
-  double serial = 0;
+  double reward = 0;
 };
 
 struct Commissions {
@@ -216,6 +233,87 @@ struct SurveyRecord {
 };
 
 // ---------------------------------------------------------------------------
+// The chart's live view. The authored geometry lives in the catalogue; this is
+// where the ship is, which layer is on screen, and how each layer was left.
+// ---------------------------------------------------------------------------
+struct MapView {
+  std::string layer = "system";
+  std::string here = "kessler";
+  std::string sector = "gal-inner";
+  double zoom = 1;
+  double cx = 319;
+  double cy = 139;
+  double w = 638;
+  double h = 278;
+  double vw = 638;
+  double vh = 278;
+  double pxPerAction = 16;
+  double lyPerAction = 0.42;
+  double grid = 45;
+  double zmin = 0.6;
+  double zmax = 2.0;
+  double zstep = 0.2;
+  double vpy = 0.35;
+  double rungs = 9;
+  double rungPow = 2.1;
+};
+
+// One scale's remembered pan, zoom and selection.
+struct LayerView {
+  double zoom = 1;
+  double px = 0;
+  double py = 0;
+  std::string sel;
+};
+
+// The hull the crew are standing in. Authored display fields are kept verbatim
+// so a save round-trips what the reference wrote.
+struct ShipDef {
+  std::map<std::string, std::string> fields;
+
+  std::string Get(const std::string& key) const {
+    auto it = fields.find(key);
+    return it == fields.end() ? std::string() : it->second;
+  }
+  double Berths() const {
+    const std::string value = Get("berths");
+    return value.empty() ? 0.0 : std::stod(value);
+  }
+};
+
+// A right-clickable readout in the side panel.
+struct InfoRow {
+  std::string id;
+  std::string label;
+  std::string value;
+};
+
+struct Cargo {
+  double capacity = 40;
+};
+
+struct Mess {
+  double rack = 18;
+  double capacity = 24;
+};
+
+// An open task tab. The reference keeps these as objects so a restored voyage
+// reopens exactly what the player had on screen.
+struct Tab {
+  std::string key;
+  std::string id;
+  std::string kind;
+  std::string title;
+  std::string kindLabel;
+  std::string sub;
+};
+
+struct Passenger {
+  std::string id;
+  std::string name;
+};
+
+// ---------------------------------------------------------------------------
 // STATE itself.
 // ---------------------------------------------------------------------------
 struct GameState {
@@ -255,7 +353,7 @@ struct GameState {
   double repairKits = 3;
   double lotSerial = 0;
   std::map<std::string, std::string> contracts;  // contract id -> active/ready/complete/failed
-  std::vector<std::string> passengers;
+  std::vector<Passenger> passengers;
   std::map<std::string, bool> upgrades;
   std::map<std::string, bool> hired;
   std::string gameOver;
@@ -264,7 +362,8 @@ struct GameState {
 
   // UI-only in the reference, kept here because they are saved with the voyage.
   std::string activeTab = "home";
-  std::vector<std::string> tabs;
+  std::vector<Tab> tabs;
+  std::map<std::string, bool> freshTabs;
   double popups = 0;
   std::map<std::string, Cooldown> actionCooldowns;
 };

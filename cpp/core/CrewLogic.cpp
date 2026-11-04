@@ -42,8 +42,8 @@ void Simulation::TickCrew() {
     crew.hungerTick += 1;
     if (crew.hungerTick < rules_.mess.every) { continue; }
     crew.hungerTick = 0;
-    if (messRack_ > 0) {
-      messRack_ -= 1;
+    if (mess_.rack > 0) {
+      mess_.rack -= 1;
       crew.hunger = std::max(0.0, crew.hunger - 40);
       state_.rackWarnedMess = false;
     } else {
@@ -278,11 +278,11 @@ void Simulation::AutoMess() {
   if (cookClaim_ || projectClaim_ == "food" || FindOngoing("project-food") != nullptr) { return; }
   if (worker == nullptr || FindOngoing("cook") != nullptr) { return; }
   if (CrewBusy(*worker) != nullptr) { return; }
-  if (messRack_ > js::Floor(messCapacity_ / 2.0)) { return; }
-  if (messRack_ >= messCapacity_) { return; }
+  if (mess_.rack > js::Floor(mess_.capacity / 2.0)) { return; }
+  if (mess_.rack >= mess_.capacity) { return; }
 
   const double rate = worker->jobAt;
-  const double cost = CrewCost(js::Ceil((messCapacity_ - messRack_) / rate));
+  const double cost = CrewCost(js::Ceil((mess_.capacity - mess_.rack) / rate));
   Task* task = AddOngoing("cook", "Cooking - " + worker->name, cost, "cook", "mess");
   if (task != nullptr) {
     task->by = worker->name;

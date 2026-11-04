@@ -13,10 +13,29 @@
 //    bank                 turnOnFilter()           — throw the filter switch
 //    job <crewId> <jobId> applyJob()             — scenario setup
 //    purse <n>            set STATE.shiplets     — scenario setup
+//    target <body>        select a chart body (free)
+//    travel               startTravel()          — plot a crossing
+//    scan                 startScan()            — run the sensors
+//    watch                standWatch()           — one action, nothing else
+//    ack <taskId>         press a finished task's button (arrival, scan readout)
+//    dock | undock        the station berth
+//    layer <key>          switch chart scale (free)
+//    sector <region>      browse a region (free)
+//    buy <item>           supply id, or a market good id
+//    sellgood <lotId> | sellsurvey <recordId> | jettison <lotId>
+//    package <recordId>   file a survey record for sale
+//    salvage <bay>        recover route salvage while under way
+//    contract accept|collect <id>
+//    commission accept <kind> | commission collect | commission abandon
+//    hire <candidateId> | upgrade <id> | shipyard
+//    project <id> | medical <crewId> | social <a> <b>
+//    save <file> [utf16]  |  load <file>
+//    saveslot <1|2|3> | loadslot <1|2|3>   the HTA's own three slots
 //    trace                print the canonical snapshot
 // ============================================================================
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -108,6 +127,80 @@ int main(int argc, char** argv) {
       simulation.ApplyJob(parts[1], parts[2]);
     } else if (command == "purse" && parts.size() >= 2) {
       simulation.MutableState().shiplets = std::atof(parts[1].c_str());
+    } else if (command == "target" && parts.size() >= 2) {
+      simulation.SelectTarget(parts[1]);
+    } else if (command == "travel") {
+      simulation.StartTravel();
+    } else if (command == "scan") {
+      simulation.StartScan();
+    } else if (command == "watch") {
+      simulation.StandWatch();
+    } else if (command == "ack" && parts.size() >= 2) {
+      simulation.Acknowledge(parts[1]);
+    } else if (command == "dock") {
+      simulation.Dock();
+    } else if (command == "undock") {
+      simulation.Undock();
+    } else if (command == "layer" && parts.size() >= 2) {
+      simulation.SetLayer(parts[1]);
+    } else if (command == "sector" && parts.size() >= 2) {
+      simulation.ViewSector(parts[1]);
+    } else if (command == "buy" && parts.size() >= 2) {
+      if (!simulation.BuySupply(parts[1])) { simulation.BuyGood(parts[1]); }
+    } else if (command == "sellgood" && parts.size() >= 2) {
+      simulation.SellGood(parts[1]);
+    } else if (command == "sellsurvey" && parts.size() >= 2) {
+      simulation.SellSurvey(parts[1]);
+    } else if (command == "jettison" && parts.size() >= 2) {
+      simulation.Jettison(parts[1]);
+    } else if (command == "package" && parts.size() >= 2) {
+      simulation.PackageSurvey(parts[1]);
+    } else if (command == "salvage" && parts.size() >= 2) {
+      simulation.StartSalvage(std::atoi(parts[1].c_str()));
+    } else if (command == "contract" && parts.size() >= 3) {
+      if (parts[1] == "accept") { simulation.AcceptContract(parts[2]); }
+      else if (parts[1] == "collect") { simulation.CollectContract(parts[2]); }
+    } else if (command == "commission" && parts.size() >= 2) {
+      if (parts[1] == "accept" && parts.size() >= 3) { simulation.AcceptCommission(parts[2]); }
+      else if (parts[1] == "collect") { simulation.CollectCommission(); }
+      else if (parts[1] == "abandon") { simulation.AbandonCommission(); }
+    } else if (command == "hire" && parts.size() >= 2) {
+      simulation.HireCrew(parts[1]);
+    } else if (command == "upgrade" && parts.size() >= 2) {
+      simulation.BuyUpgrade(parts[1]);
+    } else if (command == "shipyard") {
+      simulation.BuyLargerShip();
+    } else if (command == "project" && parts.size() >= 2) {
+      simulation.StartProject(parts[1]);
+    } else if (command == "medical" && parts.size() >= 2) {
+      simulation.StartMedical(parts[1]);
+    } else if (command == "social" && parts.size() >= 3) {
+      simulation.StartSocial(parts[1], parts[2]);
+    } else if (command == "save" && parts.size() >= 2) {
+      const bool utf16 = parts.size() >= 3 && parts[2] == "utf16";
+      std::string error;
+      if (!simulation.SaveToFile(parts[1], utf16, &error)) {
+        std::fprintf(stderr, "spaceship_console: %s\n", error.c_str());
+        return 1;
+      }
+    } else if (command == "saveslot" && parts.size() >= 2) {
+      std::string error;
+      if (!simulation.SaveSlot(std::atoi(parts[1].c_str()), "runtime/saves", &error)) {
+        std::fprintf(stderr, "spaceship_console: %s\n", error.c_str());
+        return 1;
+      }
+    } else if (command == "loadslot" && parts.size() >= 2) {
+      std::string error;
+      if (!simulation.LoadSlot(std::atoi(parts[1].c_str()), "runtime/saves", &error)) {
+        std::fprintf(stderr, "spaceship_console: %s\n", error.c_str());
+        return 1;
+      }
+    } else if (command == "load" && parts.size() >= 2) {
+      std::string error;
+      if (!simulation.LoadFromFile(parts[1], &error)) {
+        std::fprintf(stderr, "spaceship_console: %s\n", error.c_str());
+        return 1;
+      }
     } else if (command == "trace") {
       std::printf("TRACE %s\n", simulation.TraceJson().c_str());
     } else {
