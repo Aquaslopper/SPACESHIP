@@ -48,3 +48,10 @@ The game is **not real-time**. Waiting, reading, opening a window, selecting a m
    NODE
    git diff --check
    ```
+
+## Native C++ target and PR checks
+
+- The C++17 native target is built with the root `CMakeLists.txt`; portable gameplay code belongs under `cpp/`.
+- Keep the action clock discrete: each committed action increments the counter, ticks already-active button cooldowns, then advances ongoing work. The source button's new tier cooldown starts afterward. Invalid actions and blocked repeats do not tick.
+- Build/test locally with `cmake -S . -B build`, `cmake --build build --parallel`, then `ctest --test-dir build --output-on-failure`. The Windows workflow must compile `build/Release/spaceship.exe` and publish it as an artifact.
+- `.github/workflows/native-cpp.yml` also runs the existing Node regression suites. Keep both the native tests and the legacy-game tests passing during the incremental port.

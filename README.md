@@ -72,9 +72,22 @@ Each repeatable action control has an independent saved cooldown. The current ti
 
 Existing Kessler-only and expanded-galaxy saves still load, including active legacy room tabs. Scans, completed contracts, the current location, recorded observations, retained dreams and a running filter bank contribute provable past progress. Older saves did not track all historic visits, meals, projects or incidents, so unrecorded progress in those categories begins from migration. Previously earned commendation rewards still require a manual claim.
 
-## Development and tests
+## Native C++ edition and development
 
-`Spaceship.hta` is the self-contained application; there is no build step or package installation. Its gameplay JavaScript is inline, and the dependency-free Node tests load that script in a VM with small DOM stubs. Run the full suite from the repository root:
+A native C++17 console build now provides a playable port of the action-clock voyage loop: navigation, scans, ship service, station actions, ongoing work, and per-button action cooldowns. `Spaceship.hta` remains the full visual edition while the C++ port is expanded; both use the same documented action economy. The native build has no third-party dependencies.
+
+Build and run locally with CMake:
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+./build/spaceship
+```
+
+On Windows, configure with `cmake -S . -B build -A x64` and build with `cmake --build build --config Release`; this produces `build/Release/spaceship.exe`. The `Windows EXE build` pull-request check compiles and tests that executable and uploads it as the `spaceship-windows-x64` artifact.
+
+The original interface's gameplay JavaScript is inline, and its dependency-free Node tests load it in a VM with small DOM stubs. Run those regression tests from the repository root:
 
 ```sh
 for test in tests/*.test.cjs; do node "$test"; done
