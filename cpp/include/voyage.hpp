@@ -33,6 +33,8 @@ class Voyage {
   std::string desire(const Json& crew) const;
   int cargoUsed() const;
   int cooldown(const std::string& key) const;
+  int controlCooldown(const std::string& command, const std::string& argument = "") const;
+  std::string cooldownReport() const;
   std::string location() const;
   std::string summary() const;
   std::string describe(const std::string& page, const std::string& selection) const;

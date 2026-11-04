@@ -36,10 +36,14 @@ conversion.** The checks below establish specific behavior, not complete parity.
 
 ## Saves and HTA import
 
-Native slots use `spaceship-native-1` and separate filenames:
-`%LOCALAPPDATA%\SpaceshipCommand\native-slot-{1,2,3}.json`. Saves are written via a
-temporary file and retain the previous slot as `.bak`. Loading validates before
-replacing the live voyage.
+Native slots use `spaceship-native-1`. The distribution has `music/`, `sounds/`
+and `saves/` next to `spaceship.exe`. Slots are `saves/native-slot-{1,2,3}.json`;
+if the EXE directory is not writable, they go to
+`%LOCALAPPDATA%\SpaceshipCommand\saves`. **Open saves folder** on Home/Handbook
+opens the active directory. If a new slot is absent, Load also checks the earlier
+`%LOCALAPPDATA%\SpaceshipCommand\native-slot-{1,2,3}.json` location. Earlier files
+are not moved, overwritten or deleted. Saves use temporary writes and `.bak`
+backups; loading validates before replacing the live voyage.
 
 On Home or Guide, **Import HTA save** opens a `.txt`/`.json` file picker. The loader
 recognizes `spaceship-command-1`, including BOM-marked UTF-16LE Windows saves and
@@ -57,12 +61,23 @@ of every historical save or reference-only UI preference.
 ## Remaining work / differences
 
 - Native visuals are a redesign. Original title/menu artwork, animated crew,
-  detailed machine artwork, audio, palettes and settings controls are not ported.
-  This also means original reference-only accessibility preferences are not yet
-  implemented in the native UI.
-- Watch remains deliberately repeatable without a cooldown to avoid native control
-  deadlocks. The original reference watch rule is unchanged. Some control identities,
-  availability checks and tiers still differ from the reference's per-button labels.
+  detailed machine artwork, palettes and most settings controls are not ported.
+  Original reference-only accessibility preferences are not yet implemented.
+  Native audio now plays bundled reference-synthesized WAVs, with separate music/
+  effects toggles and volume controls on Home/Handbook (free and saved per voyage).
+  Music starts after interaction and loops independently of the action clock;
+  effects play on successful actions/readout acknowledgement, never blocked spam.
+  Replace `music/ambient.wav` or `sounds/{click,scan,travel,complete}.wav` with
+  standard 16-bit PCM mono/stereo WAVs (8–192 kHz, at most 32 MiB per file).
+  Missing/unsupported files or audio devices are silent and do not block gameplay.
+- Watch now has its own 15-action space-operation cooldown, with no rapid-repeat
+  bypass. Each successful gameplay click increments the action counter, ticks all
+  previously active cooldowns once, advances the whole world once, then starts the
+  source cooldown. Blocked/invalid repeats and free controls advance nothing.
+  Global controls use canonical keys even if a caller supplies unused arguments.
+  Left-side work and control cooldowns are separate labelled readouts; buttons show
+  their remaining cooldown in action clicks. Some other control identities,
+  availability checks and tiers still differ from reference per-button labels.
 - Older direct console convenience commands (assignment/training/rest and combined
   `fuel`) remain available; these are not substitutes for staged reference orders.
   The GUI uses sheets and separate recharge/refuel controls.
@@ -81,13 +96,14 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 node tools/export-native-data.cjs --check
+node tools/export-native-audio.cjs --check
 for test in tests/*.test.cjs; do node "$test"; done
 ```
 
 Visual Studio: configure with `-A x64`, build with `--config Release`, test with
 `-C Release`. The Windows target is `build/Release/spaceship.exe`.
 
-The native suite has 32 test groups, including comparison with independently
+The native suite has 38 test groups, including comparison with independently
 reference-generated expectations for 2,547 routes, 270 commission offers, 21 air
 samples, biography anchors and a 250-action world trace. The trace compares ship
 stats, incident stages/countdowns, atmosphere, stocks and crew survival/pay values.
@@ -95,6 +111,11 @@ Reference snapshots also exercise imported crew sheets, incident workers, mapped
 cooldowns and pre-class saves. Other tests cover rollback, reservations, birth-tick
 ordering, selected dreams, save slots and UTF-8/UTF-16 import. Sanitizer testing uses
 AddressSanitizer, UndefinedBehaviorSanitizer and leak detection on Linux.
+Click tests cover immediate-repeat rejection across enabled gameplay controls,
+watch argument-key spam, persistence/read-only behavior, and watch re-enabling after
+15 real other gameplay clicks. Long simulation traces explicitly use a test-only
+fixture driver to advance world ticks, not a production watch-cooldown bypass.
+Folder fallback/legacy precedence and optional WAV validation also have tests.
 
 `tools/export-native-data.cjs` runs JavaScript **only at development time** to export
 `native_data.hpp` and `cpp/tests/reference_parity.json`. Neither Node, the HTA nor
@@ -102,5 +123,11 @@ test fixtures are needed by the executable. CI verifies generated files, runs th
 reference regression suites, builds/tests C++ on Linux and Windows, and creates
 the real Windows HWND/control smoke test (`spaceship.exe --smoke-test`).
 
+`tools/export-native-audio.cjs` is also development-only: it exports the original
+reference synthesizer's WAV loop/cues into `runtime/` for distribution. Runtime
+playback is C++/Windows waveOut, with independent music/effects buffers and no game
+timers. Audible output and mixing still require manual Windows verification.
+
 Only nlohmann/json 3.11.3 is vendored (MIT; `cpp/vendor/LICENSE.json`). Windows uses
-the static MSVC runtime. No runtime downloads or external game-data files are needed.
+the static MSVC runtime. No runtime downloads or external simulation/catalog files are needed; WAV assets
+are optional and included in the distribution folders.

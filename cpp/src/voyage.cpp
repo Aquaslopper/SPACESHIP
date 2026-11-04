@@ -1,6 +1,7 @@
 #include "voyage.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <codecvt>
 #include <fstream>
@@ -25,10 +26,25 @@ std::string keyFor(const std::string& c, const std::string& a) {
   if (c == "jump") return "nav:travel";
   if (c == "salvage") return "salvage:" + (a.empty() ? std::string("0") : a);
   if (c == "travel" || c == "scan") return "nav:" + c;
+  for (auto global :
+       {"watch",        "fuel",     "recharge",   "refuel",  "splitfuel", "service-shield",
+        "repair",       "maintain", "filters",    "cook",    "dock",      "undock",
+        "issue-orders", "social",   "collect",    "abandon", "ship",      "sell-data",
+        "broadcast",    "preserve", "sell-signal"})
+    if (c == global) return c + ":";
   return c + ":" + a;
 }
+std::string controlName(const std::string& c, const std::string& a) {
+  std::string name = c == "watch" ? "Stand watch" : c == "issue-orders" ? "Issue crew orders" : c;
+  std::replace(name.begin(), name.end(), '-', ' ');
+  if (!name.empty()) name[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(name[0])));
+  if (!a.empty() && keyFor(c, a) != c + ":") name += " / " + a;
+  return name;
+}
+
 int tier(const std::string& c) {
-  if (c == "watch" || c == "claim") return 0;
+  if (c == "claim") return 0;
+  if (c == "watch" || c == "broadcast") return 15;
   if (c == "travel" || c == "jump" || c == "scan" || c == "salvage" || c == "dock" || c == "undock")
     return 15;
   if (c == "ship" || c == "jettison" || c == "preserve" || c == "sell-signal" || c == "abandon")
@@ -76,6 +92,25 @@ int Voyage::cooldown(const std::string& key) const {
   const auto& c = save_["state"]["actionCooldowns"];
   return c.contains(key) ? number(c[key], "remaining") : 0;
 }
+int Voyage::controlCooldown(const std::string& c, const std::string& a) const {
+  return cooldown(keyFor(c, a));
+}
+std::string Voyage::cooldownReport() const {
+  std::ostringstream out;
+  out << "CONTROL COOLDOWNS (other action clicks)\n";
+  const auto& cds = save_["state"]["actionCooldowns"];
+  if (cds.empty()) out << "All controls ready.\n";
+  for (auto it = cds.begin(); it != cds.end(); ++it) {
+    const auto split = it.key().find(':');
+    auto name = it.value().value(
+        "label", controlName(it.key().substr(0, split),
+                             split == std::string::npos ? "" : it.key().substr(split + 1)));
+    out << name << ": " << number(it.value(), "remaining") << " / " << number(it.value(), "tier")
+        << " left\n";
+  }
+  return out.str();
+}
+
 std::string Voyage::location() const {
   auto* b = find(catalog()["bodies"], text(save_["map"], "here"));
   return b ? text(*b, "name") : "Unknown";
@@ -134,6 +169,19 @@ bool Voyage::act(const std::string& c, const std::string& a) {
 bool Voyage::execute(const std::string& c, const std::string& a) {
   auto& s = save_["state"];
   auto& sim = s["sim"];
+  if (c == "toggle-music" || c == "toggle-sounds") {
+    auto k = c == "toggle-music" ? "music" : "soundEffects";
+    s["options"][k] = !s["options"].value(k, true);
+    message_ = "Audio preference updated (free).";
+    return true;
+  }
+  if (c == "audio-level") {
+    if (a != "0" && a != "25" && a != "50" && a != "75" && a != "100")
+      return reject("Choose 0, 25, 50, 75 or 100 percent.");
+    s["options"]["audioLevel"] = std::stoi(a) / 100.0;
+    message_ = "Audio level updated (free).";
+    return true;
+  }
   if (!text(s, "gameOver").empty())
     return reject(text(s, "gameOver") + " Load a save or start a new voyage.");
   if (c == "acknowledge") {
@@ -232,7 +280,7 @@ bool Voyage::execute(const std::string& c, const std::string& a) {
     work = number(quote, "work");
     payload = s["pendingOrders"];
     s["pendingOrders"] = Json::object();
-  } else if (c == "watch") { /* Native clock advance; intentionally repeatable. */
+  } else if (c == "watch") { /* A space-operation click, subject to its own cooldown. */
   } else if (c == "travel" || c == "jump") {
     const auto* b = find(catalog()[c == "jump" ? "systems" : "bodies"], a);
     const auto* here = find(catalog()["bodies"], text(save_["map"], "here"));
@@ -738,7 +786,7 @@ bool Voyage::execute(const std::string& c, const std::string& a) {
       if (person) task("orders-" + it.key(), it.key(), sheetCost(*person, it.value()), it.value());
     }
   }
-  if (tier(c)) cds[key] = {{"remaining", tier(c)}, {"tier", tier(c)}};
+  if (tier(c)) cds[key] = {{"remaining", tier(c)}, {"tier", tier(c)}, {"label", controlName(c, a)}};
 
   progress();
   message_ = "Committed: " + c + (a.empty() ? "" : " / " + a);
@@ -1145,12 +1193,15 @@ std::string Voyage::summary() const {
     << "   Medkits " << number(s, "medkits") << "\nRations " << number(save_["mess"], "rack")
     << "   O2 canisters " << number(save_["life"], "canisters") << "   Cargo " << cargoUsed() << "/"
     << number(save_["cargo"], "capacity") << " m3\n";
+  o << "\nONGOING WORK (actions to completion)";
+  if (s["nativeTasks"].empty()) o << "\nNo work in progress.";
   for (const auto& t : s["nativeTasks"])
     o << "\n"
       << text(t, "id") << " / " << text(t, "target") << ": " << number(t, "left")
       << (t.value("state", std::string("running")) == "done"
               ? " / readout waiting (acknowledge free)"
               : " actions left");
+  o << "\n\n" << cooldownReport();
   if (!text(s, "gameOver").empty()) o << "\nVOYAGE LOST: " << text(s, "gameOver");
   return o.str();
 }
@@ -1184,6 +1235,10 @@ void Voyage::validate(const Json& d) const {
   if (!find(catalog()["bodies"], text(d.at("map"), "here")))
     throw std::runtime_error("Unknown location.");
   const auto& s = d.at("state");
+  if (s["options"].at("audioLevel").get<double>() < 0 ||
+      s["options"]["audioLevel"].get<double>() > 1)
+    throw std::runtime_error("Invalid audio level.");
+
   if (text(s, "shipClass") != "wren" && text(s, "shipClass") != "kestrel")
     throw std::runtime_error("Unknown ship class.");
   for (auto key : {"shiplets", "fuelCells", "repairKits", "medkits", "engineCondition",

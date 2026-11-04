@@ -81,13 +81,19 @@ HTA or embed a browser/JavaScript engine. Its authored catalog is compiled in.
 **This is a playable migration build, not yet a feature-identical conversion.**
 Read [NATIVE-PORT.md](NATIVE-PORT.md) for implemented systems and specific parity
 gaps. The original `Spaceship.hta` is preserved as the reference edition. In
-particular, artwork/audio/settings and full edge-case parity remain unfinished.
+particular, artwork, most settings and full edge-case parity remain unfinished.
+Native music/effects now play from optional bundled WAV files in `music/` and
+`sounds/`, with free toggles and volume controls on Home/Handbook. Native saves go
+in `saves/` next to the EXE, or the per-user `SpaceshipCommand\saves` directory
+when the install folder is read-only. Older per-user native slots remain loadable.
+Each gameplay control, including Stand watch, has an action-count cooldown;
+labelled cooldown readouts distinguish it from ongoing work.
 The native version now has staged crew sheets, autonomous work, selected dreams,
 free travel/scan acknowledgements and reference-tested navigation/commission rules.
 It can **import supported HTA saves**, including Windows UTF-16 files, without
 modifying the source. Unknown tasks or unmapped live cooldowns are explicitly
 refused rather than discarded. Native slots use separate files in
-`%LOCALAPPDATA%\SpaceshipCommand`. See the migration notes for limitations.
+`saves/` (with the per-user fallback above). See the migration notes for limitations.
 
 Build the shared native simulation, text client and tests:
 

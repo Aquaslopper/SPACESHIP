@@ -16,7 +16,8 @@ add_library(spaceship_core
   cpp/src/voyage.cpp
   cpp/src/voyage_views.cpp
   cpp/src/voyage_crew.cpp
-  cpp/src/voyage_import.cpp)
+  cpp/src/voyage_import.cpp
+  cpp/src/runtime_files.cpp)
 target_include_directories(spaceship_core PUBLIC cpp/include)
 target_include_directories(spaceship_core SYSTEM PUBLIC cpp/vendor)
 
@@ -26,7 +27,7 @@ target_link_libraries(spaceship_console PRIVATE spaceship_core)
 
 if(WIN32)
   add_executable(spaceship WIN32 cpp/src/windows_native.cpp)
-  target_link_libraries(spaceship PRIVATE spaceship_core user32 gdi32 shell32 comdlg32)
+  target_link_libraries(spaceship PRIVATE spaceship_core user32 gdi32 shell32 comdlg32 winmm)
   target_compile_definitions(spaceship PRIVATE UNICODE _UNICODE)
   add_custom_command(TARGET spaceship POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -35,6 +36,11 @@ if(WIN32)
       "${CMAKE_SOURCE_DIR}/NATIVE-PORT.md" "$<TARGET_FILE_DIR:spaceship>/NATIVE-PORT.md"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
       "${CMAKE_SOURCE_DIR}/cpp/vendor/LICENSE.json" "$<TARGET_FILE_DIR:spaceship>/JSON-LICENSE.txt")
+  foreach(folder music sounds saves)
+    add_custom_command(TARGET spaceship POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/runtime/${folder}" "$<TARGET_FILE_DIR:spaceship>/${folder}")
+  endforeach()
   add_test(NAME spaceship_native_window COMMAND spaceship --smoke-test)
   set_tests_properties(spaceship_native_window PROPERTIES TIMEOUT 30)
   if(MSVC)

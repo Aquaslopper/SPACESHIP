@@ -12,7 +12,9 @@
 #include <string>
 #include <vector>
 
+#include "runtime_files.hpp"
 #include "voyage.hpp"
+#include "windows_audio.hpp"
 
 namespace {
 using spaceship::Choice;
@@ -24,6 +26,10 @@ constexpr COLORREF background = RGB(12, 21, 31), panel = RGB(20, 34, 47), ink = 
 constexpr int idWatch = 101, idNew = 102, idSave = 103, idLoad = 104, idSlot = 105, idList = 106,
               idCanvas = 107;
 Voyage game;
+spaceship::RuntimeFiles runtimeFiles;
+spaceship::WavePlayer musicPlayer, effectPlayer;
+bool audioStarted = false, smokeMode = false;
+HWND cooldownBox;
 HWND commandPane;
 int commandScroll = 0;
 HWND mainWindow, summaryBox, detailBox, feedBox, listBox, canvas, slotBox, statusLabel, watchButton;
@@ -57,6 +63,27 @@ std::wstring lines(const std::string& s) {
     out += c;
   }
   return out;
+}
+void syncAudio() {
+  if (smokeMode) return;
+  const auto& options = game.snapshot()["state"]["options"];
+  const double level = options.value("audioLevel", 0.4);
+  if (audioStarted && options.value("music", true) && level > 0) {
+    if (!musicPlayer.playing()) musicPlayer.play(runtimeFiles.music / L"ambient.wav", true, level);
+    musicPlayer.volume(level);
+  } else
+    musicPlayer.stop();
+  if (!options.value("soundEffects", true) || level == 0) effectPlayer.stop();
+}
+void playCue(const std::string& command) {
+  if (smokeMode) return;
+  const auto& options = game.snapshot()["state"]["options"];
+  if (!options.value("soundEffects", true) || options.value("audioLevel", 0.4) <= 0) return;
+  auto name = command == "travel" || command == "jump" ? L"travel.wav"
+              : command == "scan"                      ? L"scan.wav"
+              : command == "acknowledge"               ? L"complete.wav"
+                                                       : L"click.wav";
+  effectPlayer.play(runtimeFiles.sounds / name, false, options.value("audioLevel", 0.4));
 }
 HWND widget(const wchar_t* cls, const wchar_t* text, DWORD style, int id = 0) {
   HWND h = CreateWindowExW(cls == std::wstring(L"EDIT") ? WS_EX_CLIENTEDGE : 0, cls, text,
@@ -94,7 +121,10 @@ void layout() {
     MoveWindow(b, 16, y, left - 32, 36, TRUE);
     y += 43;
   }
-  MoveWindow(summaryBox, 16, y + 18, left - 32, std::max(80, h - y - bottom - 28), TRUE);
+  const int sidebarHeight = std::max(160, h - y - bottom - 28), statusHeight = sidebarHeight / 2;
+  MoveWindow(summaryBox, 16, y + 18, left - 32, statusHeight, TRUE);
+  MoveWindow(cooldownBox, 16, y + 26 + statusHeight, left - 32, sidebarHeight - statusHeight - 8,
+             TRUE);
   const int contentW = w - left - right - 28, canvasH = page == "home" ? 270
                                                         : page == "navigation" || page == "bridge"
                                                             ? 210
@@ -145,7 +175,13 @@ void refresh(bool rebuildList = true) {
     if (choices.empty()) selected.clear();
     if (found >= 0) SendMessageW(listBox, LB_SETCURSEL, found, 0);
   }
-  SetWindowTextW(summaryBox, lines(game.summary()).c_str());
+  auto summary = game.summary();
+  const auto cooldownStart = summary.find("CONTROL COOLDOWNS");
+  if (cooldownStart != std::string::npos) summary.erase(cooldownStart);
+  const auto loss = game.snapshot()["state"].value("gameOver", std::string{});
+  if (!loss.empty()) summary += "\nVOYAGE LOST: " + loss;
+  SetWindowTextW(summaryBox, lines(summary).c_str());
+  SetWindowTextW(cooldownBox, lines(game.cooldownReport()).c_str());
   SetWindowTextW(detailBox, lines(game.describe(page, selected)).c_str());
   std::string feed = "SHIP'S LOG\n";
   const auto& logs = game.snapshot()["state"]["feed"];
@@ -172,25 +208,27 @@ void refresh(bool rebuildList = true) {
     EnableWindow(b, controls[i].enabled);
     actionButtons.push_back(b);
   }
-  if (page == "home" || page == "guide")
+  if (page == "home" || page == "guide") {
     actionButtons.push_back(
         widget(L"BUTTON", L"Import HTA save (.txt)", BS_PUSHBUTTON | WS_TABSTOP, 489));
+    actionButtons.push_back(
+        widget(L"BUTTON", L"Open saves folder", BS_PUSHBUTTON | WS_TABSTOP, 488));
+  }
   for (auto button : actionButtons) SetParent(button, commandPane);
   for (size_t i = 0; i < navButtons.size(); ++i)
     SendMessageW(navButtons[i], BM_SETSTATE, page == pages[i].first, 0);
-  EnableWindow(watchButton, game.snapshot()["state"].value("gameOver", std::string{}).empty());
+  Voyage probe = game;
+  EnableWindow(watchButton, probe.act("watch"));
+  const int wait = game.controlCooldown("watch");
+  SetWindowTextW(watchButton, wait ? (L"Watch [CD: " + std::to_wstring(wait) + L" clicks]").c_str()
+                                   : L"Stand watch (+1)");
   layout();
 }
-std::filesystem::path savePath() {
-  wchar_t folder[MAX_PATH];
-  if (FAILED(SHGetFolderPathW(nullptr, CSIDL_LOCAL_APPDATA | CSIDL_FLAG_CREATE, nullptr,
-                              SHGFP_TYPE_CURRENT, folder)))
-    throw std::runtime_error("Cannot locate the per-user save directory.");
-  auto dir = std::filesystem::path(folder) / L"SpaceshipCommand";
-  std::filesystem::create_directories(dir);
-  int slot = static_cast<int>(SendMessageW(slotBox, CB_GETCURSEL, 0, 0)) + 1;
-  return dir / (L"native-slot-" + std::to_wstring(slot) + L".json");
+std::filesystem::path savePath(bool loading = false) {
+  const int slot = static_cast<int>(SendMessageW(slotBox, CB_GETCURSEL, 0, 0)) + 1;
+  return runtimeFiles.slot(slot, loading);
 }
+
 bool confirm(const wchar_t* question) {
   return MessageBoxW(mainWindow, question, L"Spaceship Command",
                      MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) == IDYES;
@@ -344,7 +382,8 @@ LRESULT CALLBACK windowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
       for (size_t i = 0; i < pages.size(); ++i)
         navButtons.push_back(widget(L"BUTTON", pages[i].second.c_str(), BS_PUSHBUTTON | WS_TABSTOP,
                                     200 + static_cast<int>(i)));
-      summaryBox = widget(L"EDIT", L"", ES_MULTILINE | ES_READONLY | WS_VSCROLL);
+      summaryBox = widget(L"EDIT", L"", ES_MULTILINE | ES_READONLY | WS_VSCROLL | WS_TABSTOP);
+      cooldownBox = widget(L"EDIT", L"", ES_MULTILINE | ES_READONLY | WS_VSCROLL | WS_TABSTOP);
       detailBox = widget(L"EDIT", L"", ES_MULTILINE | ES_READONLY | WS_VSCROLL | WS_TABSTOP);
       feedBox = widget(L"EDIT", L"", ES_MULTILINE | ES_READONLY | WS_VSCROLL);
       listBox =
@@ -389,6 +428,12 @@ LRESULT CALLBACK windowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     }
     case WM_COMMAND: {
       int id = LOWORD(wp);
+      // Only activation notifications can commit actions, never focus changes.
+      if (id != idList && HIWORD(wp) != BN_CLICKED) return 0;
+      audioStarted = true;
+      syncAudio();
+      const int actionsBefore = game.actions();
+      std::string cue = "click";
       if (id >= 200 && id < 200 + static_cast<int>(pages.size())) {
         pickPage(pages[id - 200].first);
         return 0;
@@ -406,6 +451,12 @@ LRESULT CALLBACK windowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         return 0;
       }
       try {
+        if (id == 488) {
+          if (reinterpret_cast<INT_PTR>(ShellExecuteW(h, L"open", runtimeFiles.saves.c_str(),
+                                                      nullptr, nullptr, SW_SHOWNORMAL)) <= 32)
+            MessageBoxW(h, runtimeFiles.saves.c_str(), L"Save folder", MB_OK);
+          return 0;
+        }
         if (id == 489) {
           if (!confirm(L"Import an HTA voyage? Unsaved native progress will be replaced. The "
                        L"source file will not be modified."))
@@ -447,7 +498,7 @@ LRESULT CALLBACK windowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             MessageBoxW(h, path.c_str(), L"Voyage saved", MB_OK);
         } else if (id == idLoad) {
           if (!confirm(L"Load this slot? Unsaved progress will be replaced.")) return 0;
-          if (!game.load(savePath()))
+          if (!game.load(savePath(true)))
             MessageBoxW(h, wide(game.message()).c_str(), L"Load failed", MB_ICONERROR);
         } else if (id >= 500 && id < 500 + static_cast<int>(controls.size())) {
           auto command = controls[id - 500];
@@ -458,9 +509,13 @@ LRESULT CALLBACK windowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
               !confirm(
                   L"Commit this consequential action? It cannot be undone without loading a save."))
             return 0;
-          game.act(command.command, command.argument);
+          cue = command.command;
+          if (game.act(command.command, command.argument) && command.command == "acknowledge")
+            playCue(command.command);
         } else
           return 0;
+        syncAudio();
+        if (game.actions() > actionsBefore) playCue(cue);
         refresh();
       } catch (const std::exception& e) {
         MessageBoxW(h, wide(e.what()).c_str(), L"Spaceship error", MB_ICONERROR);
@@ -471,6 +526,8 @@ LRESULT CALLBACK windowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
       if (confirm(L"Exit? Unsaved progress will be lost.")) DestroyWindow(h);
       return 0;
     case WM_DESTROY:
+      musicPlayer.stop();
+      effectPlayer.stop();
       PostQuitMessage(0);
       return 0;
   }
@@ -478,6 +535,22 @@ LRESULT CALLBACK windowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
 }
 }  // namespace
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR args, int show) {
+  smokeMode = std::wstring(args) == L"--smoke-test";
+  try {
+    wchar_t exe[32768]{}, user[MAX_PATH]{};
+    const DWORD length = GetModuleFileNameW(nullptr, exe, 32768);
+    if (!length || length >= 32768 ||
+        FAILED(SHGetFolderPathW(nullptr, CSIDL_LOCAL_APPDATA | CSIDL_FLAG_CREATE, nullptr,
+                                SHGFP_TYPE_CURRENT, user)))
+      throw std::runtime_error("Cannot locate game/save folders.");
+    runtimeFiles =
+        spaceship::RuntimeFiles::prepare(std::filesystem::path(exe).parent_path(),
+                                         std::filesystem::path(user) / L"SpaceshipCommand");
+  } catch (const std::exception& e) {
+    MessageBoxW(nullptr, wide(e.what()).c_str(), L"Startup failed", MB_ICONERROR);
+    return 4;
+  }
+
   SetProcessDPIAware();
   backgroundBrush = CreateSolidBrush(background);
   panelBrush = CreateSolidBrush(panel);
@@ -512,7 +585,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR args, int show) {
     // Real native HWND creation + controller dispatch, no HTA or external host.
     bool ok = IsWindow(canvas) && IsWindow(listBox) && !choices.empty();
     SendMessageW(window, WM_COMMAND, idWatch, 0);
-    ok = ok && game.actions() == 1;
+    ok = ok && game.actions() == 1 && !IsWindowEnabled(watchButton) &&
+         game.controlCooldown("watch") == 15;
+    for (int i = 0; i < 20; ++i) SendMessageW(window, WM_COMMAND, idWatch, 0);
+    ok = ok && game.actions() == 1 && GetWindowTextLengthW(cooldownBox) > 0;
     pickPage("navigation");
     ok = ok && choices.size() > 48;
     pickPage("crew");

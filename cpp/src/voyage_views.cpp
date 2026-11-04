@@ -83,8 +83,21 @@ std::vector<Control> Voyage::controls(const std::string& page, const std::string
   auto button = [&](const std::string& cmd, const std::string& arg, const std::string& label) {
     Voyage trial = *this;
     bool allowed = trial.act(cmd, arg);
-    out.push_back({cmd, arg, label, allowed ? "" : trial.message(), allowed});
+    auto shown = label;
+    const int remaining = controlCooldown(cmd, arg);
+    if (remaining) shown += " [CD: " + std::to_string(remaining) + " clicks]";
+    out.push_back({cmd, arg, shown, allowed ? "" : trial.message(), allowed});
   };
+  if (page == "home" || page == "guide") {
+    const auto& options = save_["state"]["options"];
+    button("toggle-music", "",
+           std::string("Music: ") + (options.value("music", true) ? "On" : "Off") + " (free)");
+    button("toggle-sounds", "",
+           std::string("Sound effects: ") + (options.value("soundEffects", true) ? "On" : "Off") +
+               " (free)");
+    for (auto level : {"0", "25", "50", "75", "100"})
+      button("audio-level", level, std::string("Audio level ") + level + "% (free)");
+  }
   if (page == "navigation" || page == "bridge") {
     const auto* system = lookup(catalog()["systems"], selection);
     button("acknowledge", "travel", "Acknowledge arrival (free)");
@@ -293,7 +306,8 @@ std::string Voyage::describe(const std::string& page, const std::string& selecti
   }
   if (page == "guide") {
     o << "NATIVE CONTROLS\nSelect a page, select a target, then choose a command.\nStand watch is "
-         "repeatable in this port to prevent action deadlock.\nSave slots are native-only; HTA "
+         "limited by its own 15-action cooldown. Other successful gameplay clicks advance it; "
+         "reading and blocked repeats do not.\nSave slots are native-only; HTA "
          "saves are not overwritten.\n\nREFERENCE HANDBOOK (some original UI instructions "
          "differ)\n\n";
     const auto* entry = lookup(d["wiki"], selection);

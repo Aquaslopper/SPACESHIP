@@ -19,6 +19,7 @@ jobs:
       - name: Existing game regression tests
         run: |
           node tools/export-native-data.cjs --check
+          node tools/export-native-audio.cjs --check
           for test in tests/*.test.cjs; do node "$test"; done
       - name: Configure native C++ game
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -55,4 +56,7 @@ jobs:
             build/Release/WINDOWS-README.txt
             build/Release/NATIVE-PORT.md
             build/Release/JSON-LICENSE.txt
+            build/Release/music/
+            build/Release/sounds/
+            build/Release/saves/README.txt
           if-no-files-found: error

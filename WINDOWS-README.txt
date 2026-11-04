@@ -15,15 +15,33 @@ Controls
 - A committed command advances one action. Idle time never advances gameplay.
 - Crew: stage each person's orders, then issue the whole sheet as one action.
 - Scroll the command panel when more actions are available than fit on screen.
-- Stand watch is repeatable and advances ongoing work and other cooldowns.
+- Stand watch costs one action and has a 15-action cooldown. Perform other gameplay
+  actions to advance its countdown; waiting or blocked repeats cannot advance it.
+- The left sidebar separates ONGOING WORK from labelled CONTROL COOLDOWNS.
+  Buttons show their remaining cooldown in other committed action clicks.
 - Disabled command reasons are listed in the detail pane.
-- First watch: O2 Filter Room -> install each slot -> stand watch until seated
-  -> start bank. Navigation -> Tolme Anchorage -> start crossing -> stand watch
-  until complete -> acknowledge arrival (free) -> dock.
+- First actions: O2 Filter Room -> seat available slots, issue crew work or cook,
+  navigate to start a crossing, and alternate useful commands as their work advances.
+  A completed crossing/scan must be acknowledged (free). No idle-time progress.
+
+Folders and audio
+Keep this structure after extracting the ZIP:
+  spaceship.exe
+  music/ambient.wav
+  sounds/click.wav, scan.wav, travel.wav, complete.wav
+  saves/README.txt (native slot files appear here when you save)
+Music/effects toggles and volume controls are on Home and Handbook; changing them
+is free. Music starts after interaction. The supplied WAVs are synthesized from
+the reference game. You may replace them using the same filenames with 16-bit PCM
+WAVs (mono/stereo, 8-192 kHz, max 32 MiB). No download or browser is involved.
+Missing/unsupported files or audio hardware are silent and do not block the game.
 
 Saves
-Use the slot selector and Save/Load buttons. Files are stored in:
-%LOCALAPPDATA%\SpaceshipCommand\native-slot-1.json (or 2 / 3).
+Save/Load use three slots in the saves folder next to the EXE. If it is not
+writable, the active folder is %LOCALAPPDATA%\SpaceshipCommand\saves instead.
+Home/Handbook -> Open saves folder opens the actual active directory.
+Older native slots directly in %LOCALAPPDATA%\SpaceshipCommand are still checked
+when the new selected slot is absent. Old files are never moved/deleted.
 Previous slot contents are retained as .bak when a replacement is saved.
 Home/Guide -> Import HTA save opens a .txt/.json file picker. Supported HTA UTF-8
 and UTF-16LE voyages are translated without writing the source file. Save the

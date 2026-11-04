@@ -7,6 +7,7 @@
 #include <locale>
 #include <stdexcept>
 
+#include "runtime_files.hpp"
 #include "voyage.hpp"
 
 using spaceship::Json;
@@ -38,8 +39,18 @@ Voyage fixture(const std::function<void(Json&)>& change) {
   require(g.load(directory / "fixture.json"), g.message());
   return g;
 }
+// Simulation-unit-test driver, NOT a player command: reference traces call
+// performAction directly, without clicking a cooldown-wrapped UI control.
+// Clear only the watch gate through validated fixture loading between ticks.
+// Production has no bypass; separate tests exercise actual repeated clicks.
 void watch(Voyage& g, int count) {
-  for (int i = 0; i < count; ++i) require(g.act("watch"), g.message());
+  for (int i = 0; i < count; ++i) {
+    Json d = g.snapshot();
+    d["state"]["actionCooldowns"].erase("watch:");
+    write(d, "clock-fixture.json");
+    require(g.load(directory / "clock-fixture.json"), g.message());
+    require(g.act("watch"), g.message());
+  }
 }
 const Json* task(const Voyage& g, const std::string& id) {
   for (const auto& t : g.snapshot()["state"]["nativeTasks"])
@@ -126,7 +137,7 @@ int main() {
     require(!g.act("claim", "breath"), "claimed twice");
     require(g.actions() == n, "claim spent action");
   });
-  test("player-facing watch prevents the original console deadlock and advances real work", [] {
+  test("world ticks advance real work while completion acknowledgement stays free", [] {
     Voyage g;
     require(g.act("travel", "halvan"), g.message());
     require(g.act("scan", "halvan"), g.message());
@@ -363,14 +374,14 @@ int main() {
     require(g.save(unicodePath), "Unicode save path");
     require(loaded.load(unicodePath), loaded.message());
   });
-  test("a longer player-command voyage remains serializable without hidden test actions", [] {
+  test("a longer controlled world trace remains serializable", [] {
     Voyage g;
     for (int n = 0; n < 120; ++n) {
       if (n % 18 == 0) g.act("fuel");
       if (n % 13 == 0) g.act("talk", "rell");
       if (n % 17 == 0) g.act("rest", "suri");
       if (n % 19 == 0) g.act("cook");
-      require(g.act("watch"), g.message());
+      watch(g, 1);
       require(g.save(directory / "long-voyage.json"), "long voyage save validation");
       Voyage loaded;
       require(loaded.load(directory / "long-voyage.json"), loaded.message());
@@ -422,7 +433,7 @@ int main() {
         file >> reference;
         Voyage g;
         for (const auto& expected : reference["watch"]) {
-          require(g.act("watch"), g.message());
+          watch(g, 1);
           const auto& d = g.snapshot();
           const auto& s = d["state"];
           Json actual = {{"actions", g.actions()},
@@ -649,6 +660,158 @@ int main() {
       require(g.save(directory / "reference-import-native.json"),
               "imported voyage not serializable");
     }
+  });
+  test("watch spam, alternate arguments and read-only clicks cannot advance cooldowns", [] {
+    Voyage g;
+    require(g.act("watch"), g.message());
+    auto before = g.snapshot();
+    require(g.controlCooldown("watch") == 15, "watch tier");
+    for (int i = 0; i < 50; ++i) {
+      require(!g.act("watch", std::to_string(i)), "watch argument bypass");
+      g.choices("home");
+      g.describe("crew", "rell");
+      g.controls("navigation", "tolme");
+    }
+    require(g.snapshot() == before, "blocked or read-only click advanced world");
+    require(g.act("talk", "rell"), g.message());
+    require(g.controlCooldown("watch") == 14, "other click did not tick watch");
+    require(g.cooldownReport().find("Stand watch: 14 / 15") != std::string::npos,
+            "unlabelled watch countdown");
+    require(g.save(directory / "watch-cd.json"), "save watch cooldown");
+    Voyage loaded;
+    require(loaded.load(directory / "watch-cd.json"), loaded.message());
+    require(!loaded.act("watch"), "load reset watch cooldown");
+    auto fuel = fixture([](Json& d) {
+      stat(d, "energy", 50);
+      stat(d, "fuel", 50);
+    });
+    require(fuel.act("fuel"), fuel.message());
+    require(!fuel.act("fuel", "new-key"), "argument bypassed global cooldown");
+  });
+  test("every enabled gameplay button blocks an immediate repeat", [] {
+    auto base = fixture([](Json& d) {
+      d["map"]["here"] = "tolme";
+      d["state"]["docked"] = true;
+      d["state"]["shiplets"] = 20000;
+      d["state"]["engineCondition"] = 65;
+      for (auto id : {"hull", "shield", "energy", "fuel"}) stat(d, id, 60);
+      for (auto& p : d["crew"]) {
+        p["health"] = 60;
+        p["fatigue"] = 70;
+      }
+      d["state"]["nativeIncidents"].push_back({{"id", "fracture"}, {"stage", 0}, {"left", 10}});
+    });
+    int checked = 0;
+    for (auto page : {"home", "engine", "o2", "mess", "bridge", "navigation", "crew", "cargo",
+                      "station", "simulacron", "events", "science", "r6", "r7"}) {
+      auto entries = base.choices(page);
+      if (entries.empty()) entries.push_back({"", ""});
+      for (size_t i = 0; i < std::min<size_t>(3, entries.size()); ++i)
+        for (const auto& button : base.controls(page, entries[i].id)) {
+          Voyage g = base;
+          if (!button.enabled || !g.act(button.command, button.argument) ||
+              g.actions() == base.actions())
+            continue;
+          ++checked;
+          auto before = g.snapshot();
+          require(g.controlCooldown(button.command, button.argument) > 0,
+                  "no cooldown: " + button.command);
+          require(!g.act(button.command, button.argument), "repeat accepted: " + button.command);
+          require(g.snapshot() == before, "repeat ticked: " + button.command);
+        }
+    }
+    require(checked >= 25, "insufficient gameplay-button coverage");
+  });
+  test("watch cooldown expires through fifteen real other gameplay clicks", [] {
+    Voyage g;
+    require(g.act("watch"), g.message());
+    for (int step = 0; step < 15; ++step) {
+      bool committed = false;
+      for (auto page :
+           {"navigation", "crew", "engine", "o2", "mess", "cargo", "simulacron", "r6", "r7"}) {
+        if (committed) break;
+        auto entries = g.choices(page);
+        if (entries.empty()) entries.push_back({"", ""});
+        for (size_t i = 0; i < std::min<size_t>(4, entries.size()) && !committed; ++i)
+          for (const auto& button : g.controls(page, entries[i].id)) {
+            if (!button.enabled || button.command == "watch") continue;
+            Voyage probe = g;
+            if (!probe.act(button.command, button.argument) || probe.actions() != g.actions() + 1)
+              continue;
+            require(g.act(button.command, button.argument), g.message());
+            committed = true;
+            break;
+          }
+      }
+      require(committed, "no other gameplay click available at step " + std::to_string(step));
+      require(g.controlCooldown("watch") == 14 - step, "watch countdown order");
+    }
+    require(g.act("watch"), g.message());
+    require(g.controlCooldown("watch") == 15, "watch did not restart tier");
+  });
+  test("portable save folders fall back safely and preserve earlier slots", [] {
+    auto root = directory / "portable", user = directory / "userdata";
+    auto files = spaceship::RuntimeFiles::prepare(root, user);
+    require(files.saves == root / "saves" && std::filesystem::is_directory(files.music) &&
+                std::filesystem::is_directory(files.sounds),
+            "portable layout");
+    std::filesystem::create_directories(user);
+    Voyage g;
+    require(g.save(user / "native-slot-1.json"), "legacy fixture");
+    require(files.slot(1, true) == user / "native-slot-1.json", "old slot not found");
+    require(files.slot(1, false) == root / "saves" / "native-slot-1.json",
+            "save targets old directory");
+    require(g.save(files.slot(1, false)), "portable save");
+    require(files.slot(1, true) == files.slot(1, false), "portable slot precedence");
+    auto blocked = directory / "blocked";
+    std::filesystem::create_directories(blocked);
+    std::ofstream(blocked / "saves") << "not a folder";
+    auto fallback = spaceship::RuntimeFiles::prepare(blocked, user);
+    require(fallback.saves == user / "saves", "unwritable install did not fall back");
+    require(std::filesystem::exists(user / "native-slot-1.json"), "old slot removed");
+  });
+  test("shipped optional WAV assets validate and malformed assets are silent", [] {
+    for (auto name : {"music/ambient.wav", "sounds/click.wav", "sounds/scan.wav",
+                      "sounds/travel.wav", "sounds/complete.wav"}) {
+      auto clip = spaceship::readWave(std::filesystem::path("runtime") / name);
+      require(clip.rate == 8000 && clip.channels == 1 && !clip.samples.empty(),
+              std::string("invalid shipped WAV: ") + name);
+    }
+    require(spaceship::readWave(directory / "missing.wav").samples.empty(),
+            "missing WAV not silent");
+    std::ofstream(directory / "bad.wav", std::ios::binary) << "RIFFgarbage";
+    require(spaceship::readWave(directory / "bad.wav").samples.empty(), "bad WAV accepted");
+    auto source = std::filesystem::path("runtime/sounds/click.wav");
+    std::ifstream in(source, std::ios::binary);
+    std::string data((std::istreambuf_iterator<char>(in)), {});
+    data[20] = 3;
+    std::ofstream bad(directory / "bad-format.wav", std::ios::binary);
+    bad.write(data.data(), data.size());
+    bad.close();
+    require(spaceship::readWave(directory / "bad-format.wav").samples.empty(),
+            "non-PCM WAV accepted");
+    data[20] = 1;
+    data[40] = static_cast<char>(0xff);
+    data[41] = static_cast<char>(0xff);
+    std::ofstream truncated(directory / "truncated.wav", std::ios::binary);
+    truncated.write(data.data(), data.size());
+    truncated.close();
+    require(spaceship::readWave(directory / "truncated.wav").samples.empty(),
+            "oversize WAV chunk accepted");
+  });
+  test("audio preferences are free, persisted and cannot advance a cooldown", [] {
+    Voyage g;
+    require(g.act("watch"), g.message());
+    const int actions = g.actions();
+    require(g.act("toggle-music") && g.act("toggle-sounds") && g.act("audio-level", "75"),
+            "audio controls");
+    require(g.actions() == actions && g.controlCooldown("watch") == 15, "settings ticked gameplay");
+    require(g.save(directory / "audio-options.json"), "audio save");
+    Voyage restored;
+    require(restored.load(directory / "audio-options.json"), restored.message());
+    const auto& o = restored.snapshot()["state"]["options"];
+    require(o["music"] == false && o["soundEffects"] == false && o["audioLevel"] == 0.75,
+            "audio options lost");
   });
   std::filesystem::remove_all(directory);
   std::cout << failures << " failing test groups\n";
