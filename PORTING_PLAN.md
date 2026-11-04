@@ -588,7 +588,7 @@ What was built, and where it lives:
 **Tested headless** — 29 new Catch2 cases in `cpp/tests/ui_tests.cpp` cover the palette values, every anchor and the
 feed clamp, the indicator maths, the tab system's four functions, the status sentence, the sidebar blocks, every
 briefing branch, the diagram geometry and dot containment, and the effect timings (including a thousand drift ticks
-leaving `TraceJson()` byte-identical). `ctest` is 83/83: 66 Catch2 cases / 7,436 assertions, nine parity voyages, the
+leaving `TraceJson()` byte-identical). `ctest` is 84/84: 67 Catch2 cases / 7,478 assertions, nine parity voyages, the
 catalogue gate, the save round-trip and `ui.gui-syntax`.
 
 **GUI gate:** `tools/check-gui-syntax.sh` compiles `Draw.cpp` and `main.cpp` with

@@ -349,6 +349,84 @@ std::vector<IndicatorLine> IndicatorLines(const Simulation& sim) {
   return out;
 }
 
+std::vector<SideHit> SideHits(const Simulation& sim, const Area& sidepanel,
+                              const Area& foot, float lineHeight) {
+  std::vector<SideHit> hits;
+  float y = sidepanel.y + 8.0f;
+  for (const SideBlock& block : SideBlocks(sim)) {
+    SideHit head;
+    head.action = SideAction::Toggle;
+    head.key = block.key;
+    head.text = block.title;
+    head.box = Area{sidepanel.x + 6.0f, y, sidepanel.w - 12.0f, lineHeight + 3.0f};
+    head.header = true;
+    hits.push_back(head);
+    y += lineHeight + 3.0f;
+
+    if (block.indicators) {
+      y += Metrics::kIndH + 6.0f;   // the strip is drawn, never clicked
+      continue;
+    }
+    if (!block.open) { continue; }
+    if (block.rows.empty() && !block.empty.empty()) {
+      SideHit dim;
+      dim.text = block.empty;
+      dim.dim = true;
+      dim.box = Area{sidepanel.x + 12.0f, y, sidepanel.w - 18.0f, lineHeight};
+      hits.push_back(dim);
+      y += lineHeight;
+      continue;
+    }
+    for (const SideRow& row : block.rows) {
+      float height = lineHeight;
+      // A long value gets its own line beneath its label.
+      if (row.kind == "long" || row.kind == "event") { height += 12.0f; }
+      SideHit hit;
+      hit.text = row.key;
+      hit.detail = row.kind == "long" ? row.value : std::string();
+      hit.dim = row.dim;
+      hit.box = Area{sidepanel.x + 12.0f, y, sidepanel.w - 18.0f, height};
+      if (row.kind == "event") {
+        hit.action = SideAction::OpenEvent;
+        hit.key = row.id;
+      }
+      hits.push_back(hit);
+      y += height;
+      if (y > sidepanel.Bottom() - 4.0f) { return hits; }
+    }
+  }
+
+  // The pinned foot: four ship functions, then the two reference windows.
+  float fx = foot.x + 8.0f;
+  const std::vector<FootButton> buttons = FootButtons();
+  const SideAction actions[4] = {SideAction::Manifest, SideAction::Log,
+                                 SideAction::Files, SideAction::Settings};
+  for (std::size_t i = 0; i < buttons.size() && i < 4; ++i) {
+    SideHit hit;
+    hit.action = actions[i];
+    hit.key = buttons[i].key;
+    hit.text = buttons[i].title;
+    hit.box = Area{fx, foot.y + 8.0f, 26.0f, 26.0f};
+    hits.push_back(hit);
+    fx += 34.0f;
+  }
+
+  SideHit wiki;
+  wiki.action = SideAction::Wiki;
+  wiki.key = "wiki";
+  wiki.text = "Wiki";
+  wiki.box = Area{foot.x + 8.0f, foot.y + 42.0f, 34.0f, 18.0f};
+  hits.push_back(wiki);
+
+  SideHit rewards;
+  rewards.action = SideAction::Rewards;
+  rewards.key = "awards";
+  rewards.text = RewardsLabel(sim);
+  rewards.box = Area{foot.x + 48.0f, foot.y + 42.0f, 100.0f, 18.0f};
+  hits.push_back(rewards);
+  return hits;
+}
+
 // ---------------------------------------------------------------------------
 //  The pinned foot.
 // ---------------------------------------------------------------------------

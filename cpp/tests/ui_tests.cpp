@@ -475,6 +475,59 @@ TEST_CASE("indicator lines: the engine, the air, then the work", "[ui][shell]") 
   CHECK(lines[0].pct == 100);
 }
 
+TEST_CASE("the sidebar's controls are where they are painted", "[ui][shell]") {
+  ship::Simulation sim = Fresh();
+  const ship::ShellLayout layout =
+      ship::ComputeLayout(1280.0f, 800.0f, 742.0f, 420.0f, true);
+  const std::vector<ship::SideHit> hits =
+      ship::SideHits(sim, layout.sidepanel, layout.sidefoot, 17.0f);
+  REQUIRE_FALSE(hits.empty());
+
+  // Six headers, then the foot's six controls.
+  int headers = 0;
+  int toggles = 0;
+  int wiki = 0;
+  int rewards = 0;
+  for (const ship::SideHit& hit : hits) {
+    if (hit.header) { ++headers; }
+    if (hit.header && hit.action == ship::SideAction::Toggle) { ++toggles; }
+    if (hit.action == ship::SideAction::Wiki) { ++wiki; }
+    if (hit.action == ship::SideAction::Rewards) { ++rewards; }
+  }
+  CHECK(headers == 6);
+  CHECK(toggles == 6);   // Indicators is a header too, and refuses to fold
+  CHECK(wiki == 1);
+  CHECK(rewards == 1);
+
+  // Nothing is painted outside the panel or the foot.
+  for (const ship::SideHit& hit : hits) {
+    const bool inPanel = hit.box.y >= layout.sidepanel.y &&
+                         hit.box.y < layout.sidepanel.Bottom();
+    const bool inFoot = hit.box.y >= layout.sidefoot.y &&
+                        hit.box.y < layout.sidefoot.Bottom();
+    CHECK((inPanel || inFoot));
+    CHECK(hit.box.x >= 0.0f);
+    CHECK(hit.box.Right() <= layout.sidepanel.Right());
+  }
+
+  // A folded block's rows are not clickable; an open one's are.
+  const auto rowsFor = [&sim, &layout](const std::string& key) {
+    int rows = 0;
+    for (const ship::SideHit& hit :
+         ship::SideHits(sim, layout.sidepanel, layout.sidefoot, 17.0f)) {
+      if (!hit.header && hit.action == ship::SideAction::None &&
+          hit.text != "Wiki" && !hit.text.empty()) {
+        ++rows;
+      }
+    }
+    (void)key;
+    return rows;
+  };
+  const int folded = rowsFor("vessel");
+  sim.MutableState().spOpen["vessel"] = true;
+  CHECK(rowsFor("vessel") > folded);
+}
+
 TEST_CASE("the foot and the rewards count", "[ui][shell]") {
   ship::Simulation sim = Fresh();
   const std::vector<ship::FootButton> foot = ship::FootButtons();

@@ -119,7 +119,7 @@ its tests still build and run. On Windows, configure with
 | `spaceship_core` | the simulation: catalogue, state, action clock, tasks, saves. No window, no graphics |
 | `spaceship` | the Raylib + Dear ImGui client (only when the graphics packages are present) |
 | `spaceship_console` | scriptable harness that replays command scripts against the core |
-| `spaceship_tests` | CTest suite: 66 Catch2 cases / 7,436 assertions, plus the parity, catalogue and save gates |
+| `spaceship_tests` | CTest suite: 67 Catch2 cases / 7,478 assertions, plus the parity, catalogue and save gates |
 
 ### Content pipeline
 

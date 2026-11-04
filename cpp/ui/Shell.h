@@ -82,6 +82,35 @@ std::vector<SideBlock> SideBlocks(const Simulation& sim);
 // report. Leftmost is always the thing most likely to hurt.
 std::vector<IndicatorLine> IndicatorLines(const Simulation& sim);
 
+// The sidebar, hit-tested. One entry per clickable thing the panel draws: a
+// block header (which folds), an event's Open button, and the six pinned-foot
+// controls. Drawing and clicking both walk this list, so a control cannot be
+// painted somewhere it cannot be pressed.
+enum class SideAction {
+  None,
+  Toggle,       // a block header, or the Wiki/Rewards buttons
+  OpenEvent,    // an event row's Open
+  Manifest,
+  Log,
+  Files,
+  Settings,
+  Wiki,
+  Rewards,
+};
+
+struct SideHit {
+  SideAction action = SideAction::None;
+  std::string key;   // block key, event id, or foot button key
+  std::string text;
+  std::string detail;   // a long row's value, drawn beneath its label
+  Area box;
+  bool header = false;
+  bool dim = false;
+};
+
+std::vector<SideHit> SideHits(const Simulation& sim, const Area& sidepanel,
+                              const Area& foot, float lineHeight);
+
 // The pinned foot.
 struct FootButton {
   std::string key;      // manifest / log / files / settings

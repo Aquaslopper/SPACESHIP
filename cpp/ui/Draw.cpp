@@ -160,57 +160,70 @@ void ShellView::PaintChrome(Simulation& sim) {
   draw->AddRectFilled(ImVec2(layout_.sidepanel.x, layout_.sidepanel.y),
                       ImVec2(layout_.sidepanel.Right(), layout_.sidepanel.Bottom()),
                       ToIm(p.panel));
-  float y = layout_.sidepanel.y + 8.0f;
-  for (const SideBlock& block : SideBlocks(sim)) {
-    draw->AddText(ImVec2(10.0f, y), ToIm(p.coffee), block.title.c_str());
-    y += theme_.LineHeight() + 3.0f;
-    if (block.indicators) {
-      const std::vector<IndicatorRect> lines = PlaceIndicators(IndicatorLines(sim));
-      for (const IndicatorRect& line : lines) {
-        if (line.grow) {
-          draw->AddRectFilled(ImVec2(10.0f + line.ghost.x, y + line.ghost.y),
-                              ImVec2(12.0f + line.ghost.x, y + line.ghost.Bottom()),
+
+  const std::vector<SideHit> hits =
+      SideHits(sim, layout_.sidepanel, layout_.sidefoot, theme_.LineHeight());
+  const std::vector<SideBlock> blocks = SideBlocks(sim);
+  for (const SideHit& hit : hits) {
+    if (hit.action == SideAction::Toggle && hit.header) {
+      // The caret: open blocks point down, folded ones point right.
+      bool open = true;
+      for (const SideBlock& block : blocks) {
+        if (block.key == hit.key) { open = block.open; }
+      }
+      draw->AddText(ImVec2(hit.box.x, hit.box.y), ToIm(p.coffee), hit.text.c_str());
+      draw->AddText(ImVec2(hit.box.Right() - 10.0f, hit.box.y), ToIm(p.muted),
+                    open ? "v" : ">");
+      if (hit.key == "indicators") {
+        const std::vector<IndicatorRect> lines = PlaceIndicators(IndicatorLines(sim));
+        const float base = hit.box.Bottom() + 4.0f;
+        for (const IndicatorRect& line : lines) {
+          draw->AddRectFilled(ImVec2(hit.box.x + line.ghost.x, base + line.ghost.y),
+                              ImVec2(hit.box.x + line.ghost.x + 2.0f,
+                                     base + line.ghost.Bottom()),
                               ToIm(p.panel3));
-          draw->AddRectFilled(ImVec2(10.0f + line.line.x, y + line.line.y),
-                              ImVec2(12.0f + line.line.x, y + line.line.Bottom()),
-                              ToIm(p.terracotta));
-        } else {
-          draw->AddRectFilled(ImVec2(10.0f + line.line.x, y + line.line.y),
-                              ImVec2(12.0f + line.line.x, y + line.line.Bottom()),
-                              ToIm(p.sage));
+          draw->AddRectFilled(
+              ImVec2(hit.box.x + line.line.x, base + line.line.y),
+              ImVec2(hit.box.x + line.line.x + 2.0f, base + line.line.Bottom()),
+              line.grow ? ToIm(p.terracotta) : ToIm(p.sage));
         }
       }
-      y += Metrics::kIndH + 6.0f;
       continue;
     }
-    if (!block.open) { continue; }
-    for (const SideRow& row : block.rows) {
-      draw->AddText(ImVec2(12.0f, y), ToIm(p.ink), row.key.c_str());
-      if (!row.value.empty()) {
-        draw->AddText(ImVec2(12.0f, y + 12.0f), ToIm(p.muted), row.value.c_str());
-        y += 12.0f;
-      }
-      y += theme_.LineHeight();
-      if (y > layout_.sidepanel.Bottom() - 4.0f) { break; }
+    if (hit.action == SideAction::OpenEvent) {
+      draw->AddText(ImVec2(hit.box.x, hit.box.y), ToIm(p.ink), hit.text.c_str());
+      draw->AddRect(ImVec2(hit.box.Right() - 34.0f, hit.box.y + 12.0f),
+                    ImVec2(hit.box.Right(), hit.box.y + 26.0f), ToIm(p.borderDark), 3.0f);
+      draw->AddText(ImVec2(hit.box.Right() - 28.0f, hit.box.y + 14.0f), ToIm(p.muted),
+                    "Open");
+      continue;
+    }
+    if (hit.box.y < layout_.sidepanel.y) { continue; }   // the foot is drawn below
+    draw->AddText(ImVec2(hit.box.x, hit.box.y),
+                  ToIm(hit.dim ? p.muted : p.ink), hit.text.c_str());
+    if (!hit.detail.empty()) {
+      draw->AddText(ImVec2(hit.box.x, hit.box.y + 12.0f), ToIm(p.muted),
+                    hit.detail.c_str());
     }
   }
 
   // ---- pinned foot -------------------------------------------------------
-  draw->AddLine(ImVec2(0.0f, layout_.sidefoot.y), ImVec2(layout_.sidefoot.Right(), layout_.sidefoot.y),
-                ToIm(p.border));
-  float fx = 8.0f;
-  for (const FootButton& button : FootButtons()) {
-    draw->AddRect(ImVec2(fx, layout_.sidefoot.y + 8.0f),
-                  ImVec2(fx + 26.0f, layout_.sidefoot.y + 34.0f), ToIm(p.borderDark), 3.0f);
-    if (ImGui::IsMouseHoveringRect(ImVec2(fx, layout_.sidefoot.y + 8.0f),
-                                   ImVec2(fx + 26.0f, layout_.sidefoot.y + 34.0f))) {
-      ImGui::SetTooltip("%s", button.title.c_str());
+  draw->AddLine(ImVec2(0.0f, layout_.sidefoot.y),
+                ImVec2(layout_.sidefoot.Right(), layout_.sidefoot.y), ToIm(p.border));
+  for (const SideHit& hit : hits) {
+    if (hit.box.y < layout_.sidefoot.y) { continue; }
+    if (hit.action == SideAction::Manifest || hit.action == SideAction::Log ||
+        hit.action == SideAction::Files || hit.action == SideAction::Settings) {
+      draw->AddRect(ImVec2(hit.box.x, hit.box.y),
+                    ImVec2(hit.box.Right(), hit.box.Bottom()), ToIm(p.borderDark), 3.0f);
+      if (ImGui::IsMouseHoveringRect(ImVec2(hit.box.x, hit.box.y),
+                                     ImVec2(hit.box.Right(), hit.box.Bottom()))) {
+        ImGui::SetTooltip("%s", hit.text.c_str());
+      }
+      continue;
     }
-    fx += 34.0f;
+    draw->AddText(ImVec2(hit.box.x, hit.box.y), ToIm(p.ink), hit.text.c_str());
   }
-  draw->AddText(ImVec2(8.0f, layout_.sidefoot.y + 44.0f), ToIm(p.ink), "Wiki");
-  draw->AddText(ImVec2(48.0f, layout_.sidefoot.y + 44.0f), ToIm(p.ink),
-                RewardsLabel(sim).c_str());
   draw->AddText(ImVec2(8.0f, layout_.sidefoot.y + 68.0f), ToIm(p.muted),
                 "Spaceship Command");
 
@@ -427,7 +440,37 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
                       double nowMs) {
   if (button == HitButton::None) { return; }
 
-  // Chrome first: the sidebar's foot, Home, then the ship.
+  // Chrome first: the sidebar (blocks, events, foot), Home, then the ship.
+  for (const SideHit& hit : SideHits(sim, layout_.sidepanel, layout_.sidefoot,
+                                     theme_.LineHeight())) {
+    if (!hit.box.Contains(x, y)) { continue; }
+    switch (hit.action) {
+      case SideAction::Toggle:
+        if (hit.key == "indicators") { return; }  // the glance never folds
+        sim.MutableState().spOpen[hit.key] = !sim.MutableState().spOpen[hit.key];
+        return;
+      case SideAction::OpenEvent:
+        OpenTask(sim, "event", hit.key, false);   // tab only - no jump
+        return;
+      case SideAction::Wiki:
+        OpenTask(sim, "wiki", "main", true);
+        return;
+      case SideAction::Rewards:
+        OpenTask(sim, "awards", "main", true);
+        return;
+      case SideAction::Manifest:
+      case SideAction::Log:
+      case SideAction::Files:
+      case SideAction::Settings:
+        // These four open the ship's own windows in Phase 6; until then they
+        // answer their tooltip and nothing else.
+        return;
+      case SideAction::None:
+        break;
+    }
+    break;
+  }
+
   if (layout_.home.Contains(x, y)) {
     SwitchTab(sim, "home");
     return;
