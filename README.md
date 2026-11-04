@@ -1,2 +1,73 @@
-# SPACESHIP
-a simple click simulation with boring panels and text.
+# Spaceship Command
+
+Run `Spaceship.hta` on Windows, or use the browser preview to try it. The title menu uses the supplied artwork and lets you start a voyage, load any of three slots, adjust options or read a quick guide. The game is action-driven: waiting, reading, opening tabs and choosing map targets are free. Starting work costs one action; work in progress advances as you spend actions elsewhere. Navigation also has a **Stand watch** command that spends one action to advance work and survival clocks without a direct item cost, useful when the hold is full; normal life-support and crew consumption still applies. Power-dependent projects, travel, scans and salvage pause if energy runs out.
+
+## Getting started
+
+1. Choose **New Voyage** from the title menu. You begin aboard the compact **SC Wren**. Right-click **Navigation**, select its new tab, choose Tolme Anchorage and start a crossing.
+2. Right-click the **O2 Filter Room**. Seat all three canisters, let the work finish, then start the bank. Starting it advances ongoing work by ten without advancing the world.
+3. During a crossing, the **Cargo Hold** can recover salvage. This uses energy and cargo space, but provides useful work while the journey progresses. Right-click the energy or fuel gauge to use a fuel cell.
+4. A completed crossing or scan waits for you to acknowledge it in Navigation. At a station, right-click the **Docked** indicator and select the new station tab to trade, hire, upgrade, accept contracts or undock.
+5. Watch the Events and Contracts sections in the sidebar. Reports can escalate as actions pass; hull failure or the loss of the entire crew ends the voyage.
+
+## Exploring the galaxy
+
+The chart has seven regions, 36 navigable systems, 111 local destinations and 20 stations. To leave Kessler, open **Navigation**, switch to **Sector**, select a system and start a jump. To browse farther afield, switch to **Galaxy**, select a region and choose **View sector chart**, then select a system to jump to. After the jump is complete, acknowledge it and switch to **System** to explore its stars, worlds and stations.
+
+Local travel and inter-system jumps both use fuel and progress as you spend actions. You must undock before starting a crossing. Stock spare fuel cells, O2 canisters and repair kits before a long trip: salvage uses energy, and not every system has a station. Deep scans work on local destinations, not entire systems; packaged survey data can be sold at a station. Markets vary by port, and new missions connect the regions. Station refits can expand the hold further or reduce fuel use without shortening travel time.
+
+## Ships and the shipyard
+
+A new voyage starts on the three-deck Wren courier, with **40 m3** of cargo space and **six berths**. Its compact deck plan still gives access to all 21 working facilities, including the Simulacron. The four starting crew occupy four berths; hires and passengers share the remaining space. Wren cargo refits raise its hold to 60 m3 and then 90 m3.
+
+At any station shipyard you can buy the larger **SC Tessellate**, a Kestrel-series ship, for **4,000 shiplets**. Its larger deck plan starts with **60 m3** and **14 berths**; transferred cargo refits raise that to 90 m3 and then 120 m3. The purchase costs one action, requires confirmation, and cannot be reversed. Crew, passengers, cargo, equipment, refits, active work, ship condition, contracts and records transfer; it does not give a free repair or refill. Earnings from cargo, surveys, contracts and commissions can fund the purchase.
+
+Saves made before ship classes existed keep their established Kestrel vessel, layout, capacity and progress rather than being forced onto a smaller ship. Both ship types can be saved and restored in any slot.
+
+## The living ship
+
+Every compartment in the ship diagram now opens a working station. Right-click a room, then select its tab. Use the arrows to scroll through open tabs; the fixed **Home** button returns to the ship. New facilities complement the existing engine, filters, quarters, mess, cargo and science stations:
+
+- **Medical Bay** uses a medkit and power for a quicker, stronger treatment. Medkits are sold at stations; the slower medical order in Crew Quarters remains available without one.
+- **Workshop, Recyclers and Fuel Reserve** turn recovered salvage into repair kits, O2 canisters and fuel cells. **Damage Control** can use salvage to patch the hull; **Hydroponics** can process a produce cargo lot into rations. Inputs are consumed when work begins.
+- **Thermal Control** stabilizes a worn drive. The **Power Bus** and **Shield Array** transfer energy in opposite directions, with a loss on each transfer. The **Bridge** offers a split fuel-cell transfer and a shortcut to Navigation.
+- **Observation** records each visited location once as saleable survey data. **Comms Relay** collects local reports and handles a discovered signal. **Sensor Array** spends insight and energy to shorten one deep scan by two work actions.
+- **Recreation** arranges a shared meal for two available crew. It consumes two rations, takes three work actions and improves their bond and morale. Strong or strained bonds influence morale; crew disputes can worsen or repair a particular bond. A healthy exhausted crew member may also take a short break on their own, temporarily leaving their duties.
+
+A **navigator** reduces fuel use by 4–20% when available at departure; the efficient-drive refit stacks with that saving. A **cleaner** quietly restores one morale to the crew on an action interval shortened by training (40 to 20 actions). Only the best available cleaner applies. Both benefits require the crew member to be available.
+
+Crew cannot be assigned to overlapping work. Ration and canister space is reserved while production is underway. Those processes, the crew's needs and incidents all follow the same action clock, not real time.
+
+## Simulacron
+
+The **Simulacron Core** replaces the old diagnostic room. It is an offline, data-driven game simulation inspired by the project's Simulacron and Sub material; it is **not** a language model and does not contact an external AI. Its named systems are:
+
+- **Name anchors:** a character's authored role, traits and hobby determine an identity such as Wayfinder, Maker, Keeper or Witness. Matching anchors give a small bonus to a shared meal.
+- **Desire Fire:** each person's most pressing need follows their actual health, air, fatigue, hunger, morale and work. Crew conversations and voluntary rest reflect their circumstances.
+- **Memory Mosaic:** arrivals, discoveries, care, conflicts, work and choices are recorded. Personal memories appear on the relevant crew profile; the core keeps the latest 32 records.
+- **Dream Engine / Observer:** choose two unconsolidated memories to turn into insight. Two exploration memories yield an extra insight; two memories involving the same person restore a little morale. A conflict and reconciliation involving the same pair also improve their bond. Insights can be used for sensor calibration or the signal investigation.
+- **World history:** each region has an authored history and continuing pressure, revealed through the Observation and Comms stations.
+
+To begin **Silicon Marrow**, deep-scan Halvan's Reach, build an insight in the core and decode the signal in Comms. Follow the resulting coordinates to the Choir Array in Echo Shoal. The eventual choice to shelter the archive or sell its signal has different, permanent resource and crew consequences. Scans already completed in an older save are recognized.
+
+## Handbook, commendations and commissions
+
+The pinned **Wiki** button opens a searchable, offline handbook covering controls, survival, exploration, the crew, ship systems, and Simulacron. Its Silicon Marrow entry is explicitly marked as a spoiler. Reading and following its room shortcuts are free.
+
+The **Rewards** button opens the captain's log. Fourteen commendations track milestones such as starting the filters, scanning worlds, visiting systems and regions, caring for the crew, resolving incidents, completing contracts and commissions, and concluding the signal story. Earned rewards can be claimed once for shiplets or supplies without spending an action. The captain's rank is cosmetic. The button shows the number of unclaimed rewards.
+
+Station mission boards also offer **repeatable commissions**: visit another port, scan a specified body, or recover two salvage lots during crossings. Only one can be active at a time. Accepting, collecting payment at any station, and abandoning a commission each cost one action; abandonment rotates the offers. Objectives only count after acceptance. The Contracts sidebar shows live commission progress; completed objectives enter the crew's Memory Mosaic, and the active commission survives saving and loading.
+
+## Saving and options
+
+Use the disk icon in the lower-left corner to save or load from three independent slots. Slot 1 remains compatible with the original `Spaceship_save.txt`; the other Windows HTA files are `Spaceship_save_2.txt` and `Spaceship_save_3.txt`. The browser preview uses separate local-storage keys instead. The loss screen can load any slot. Loading replaces the current voyage; the Save / Load menu can also start a new voyage after confirmation without deleting the slots, or return to the title menu and resume the current voyage. Starting a new voyage keeps the current settings, including motion, reading text, crew labels and confirmations.
+
+The Settings gear controls decorative motion, larger reading text, crew diagram labels, and optional confirmations for jettisoning, abandoning a commission, permanent story decisions, saving and loading. Changing options costs no actions; preferences are saved with the voyage.
+
+Existing Kessler-only and expanded-galaxy saves still load, including active legacy room tabs. Scans, completed contracts, the current location, recorded observations, retained dreams and a running filter bank contribute provable past progress. Older saves did not track all historic visits, meals, projects or incidents, so unrecorded progress in those categories begins from migration. Previously earned commendation rewards still require a manual claim.
+
+## Scope
+
+The current game has working rooms, survival, trade, contracts, relationships, recurring incidents and one branching signal story. It is still a bounded simulation rather than every possibility in the broader manifesto: for example, it does not include a general-purpose AI dialogue/story generator.
+
+For dependency-free checks, run `node tests/galaxy.test.cjs`, `node tests/simulacron.test.cjs`, `node tests/progression.test.cjs`, and `node tests/ships.test.cjs` from this folder.
