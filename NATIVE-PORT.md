@@ -69,8 +69,9 @@ of every historical save or reference-only UI preference.
 
 ## Remaining work / differences
 
-- Native visuals are a redesign. Original title/menu artwork, animated crew,
-  detailed machine artwork, palettes and most settings controls are not ported.
+- Native visuals are undergoing reference-led reconstruction, not accepted as a
+  redesign. Original embedded title artwork and a native menu are now present;
+  animated crew, bespoke machine artwork, palettes and most settings still need work.
   Original reference-only accessibility preferences are not yet implemented.
   Native audio now plays bundled reference-synthesized WAVs, with separate music/
   effects toggles and volume controls on Home/Handbook (free and saved per voyage).

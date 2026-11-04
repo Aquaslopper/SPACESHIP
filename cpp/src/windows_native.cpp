@@ -4,11 +4,13 @@
 
 // Common-dialog declarations require Windows types before this header.
 #include <commdlg.h>
-#include <gdiplus.h>
 #include <objidl.h>
 #include <shellapi.h>
 #include <shlobj.h>
 #include <shlwapi.h>
+
+// GDI+ depends on the COM types declared above; keep this include after objidl.h.
+#include <gdiplus.h>
 
 #include <algorithm>
 #include <filesystem>
@@ -873,7 +875,7 @@ bool capture(const wchar_t* name) {
   auto old = SelectObject(memory, bitmap);
   RedrawWindow(mainWindow, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
   const BOOL painted = PrintWindow(mainWindow, memory, PW_CLIENTONLY);
-  Gdiplus::Bitmap image(bitmap, nullptr);
+  auto image = std::make_unique<Gdiplus::Bitmap>(bitmap, nullptr);
   UINT count = 0, size = 0;
   Gdiplus::GetImageEncodersSize(&count, &size);
   std::vector<BYTE> storage(size);
@@ -884,7 +886,8 @@ bool capture(const wchar_t* name) {
   auto path = std::filesystem::path(L"visual-captures") / (std::wstring(name) + L".png");
   for (UINT i = 0; i < count; ++i)
     if (std::wstring(encoders[i].MimeType) == L"image/png")
-      saved = painted && image.Save(path.c_str(), &encoders[i].Clsid, nullptr) == Gdiplus::Ok;
+      saved = painted && image->Save(path.c_str(), &encoders[i].Clsid, nullptr) == Gdiplus::Ok;
+  image.reset();
   SelectObject(memory, old);
   DeleteObject(bitmap);
   DeleteDC(memory);
