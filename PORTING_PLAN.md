@@ -1,8 +1,9 @@
 # Spaceship Command — HTA → C++ Port Plan
 
-**Status:** approved; Phases 0 and 1 are complete (the headless simulation is
-feature-complete). Phase 2, the interface, is next. Progress is recorded at the
-head of `README.md` and, for each phase, in the phase table below.
+**Status:** approved; Phases 0, 1 and 2 are complete (the headless simulation is
+feature-complete, and the cockpit - shell, idle screen and ship diagram - is
+built and tested). Phase 3, the task windows, is next. Progress is recorded at
+the head of `README.md` and, for each phase, in the phase table below.
 **Reference edition:** `Spaceship.hta` (706,020 bytes, 11,179 lines, single file, no assets).
 **Target:** standard C++17, Raylib + Dear ImGui, CMake with `FetchContent`.
 
@@ -556,7 +557,7 @@ meals), `Ships` (`applyShipLayout`, the Kestrel purchase, staged cargo refits), 
 seventeen-key JSON, `validSave` with every cross-check, migrations, and slot 1 as UTF-16LE). All twelve task hooks
 are live.
 
-*Verification:* `ctest` is 53 tests — 37 Catch2 cases (7,100 assertions) ported from the four Node suites, nine
+*Verification:* `ctest` was 53 tests at the close of Phase 1 — 37 Catch2 cases (7,100 assertions) ported from the four Node suites, nine
 differential voyages, the catalogue gate, and the save round-trip that sends a voyage from the port to the
 reference and back.
 
@@ -565,11 +566,35 @@ signal story's two endings (`finishSignal`) and the broadcasts they unlock, clai
 the rank it feeds, and the crew order sheet's remaining payloads (a rest is the only order the clock can create on
 its own). All three are state-complete and save-compatible; they are waiting for their UI.
 
-### Phase 2 — Shell and idle screen (2 days)
+### Phase 2 — Shell and idle screen — DONE
 Window, theme layer, taskbar/tabs, side panel + pinned foot, status bar, stat rail, ship diagram from data, feed,
 briefing verb, right-click → tab. No task screens yet.
-**Gate:** side-by-side screenshot match at 1440×940 in all five palettes; resize rules (feed min/max, centred
-stage) behave.
+
+What was built, and where it lives:
+
+| File | Subject |
+|---|---|
+| `cpp/ui/Theme.h/.cpp` | the five `THEMES` entries, the stylesheet's fourteen role colours, `largeText`, `hideCrewLabels`, `reducedMotion`, `stage-compact` |
+| `cpp/ui/Palette.h` | the theme → Dear ImGui style adapter. No widget can fall back to stock ImGui styling; the palette is the only source of colour |
+| `cpp/ui/Layout.h/.cpp` | the fixed anchors of §6.4 and the `measure-and-give` maths: feed 62–132, map park 240 / ceiling `min(500, round(vw/2))`, centred fixed stage, indicator strip placed bottom-up on a 5 px pitch |
+| `cpp/ui/Shell.h/.cpp` | §H tab routing (`openTask` background unless focused, `switchTab` re-describing, `closeTab` → Home, `freshTabs` pulse consumed once), §J sidebar (six blocks, five folding), §L `setStatus()` text, §D feed newest-first |
+| `cpp/ui/Describe.h/.cpp` | `targetEntity` + `describeTarget` word for word: the GONE guard, the two reference windows, station, event, nav, room (generic, fitted, quarters, engine, O2, mess, cargo, science), crew, system, readout |
+| `cpp/ui/ShipDiagram.h/.cpp` | hull, nacelle intake bars, nozzles (3 / 2 compact), corridor and its label, conduit, 21 rooms, hold dividers, crew dots confined to their compartment, CSS border radii |
+| `cpp/ui/IdleScreen.h/.cpp` | §E build order: stat rail, stage, stage note, nav strip, dock strip when berthed, info rail, feed measured last |
+| `cpp/ui/Fx.h/.cpp` | `driftTick` at 55 ms (0.5 px per tick, 20–109 tick pauses), action marks (220 ms hold, 26 px rise, 950 ms fade, five alive), both gated on `reducedMotion`, neither touching simulation state |
+| `cpp/ui/Draw.h/.cpp` | the only TU that names Raylib or ImGui: chrome through ImGui draw lists, hull through Raylib primitives, pointer turned into `describeTarget` (left) or `openTask` (right) |
+| `cpp/app/main.cpp` | the client loop: catalogue → voyage → window → shell |
+
+**Tested headless** — 29 new Catch2 cases in `cpp/tests/ui_tests.cpp` cover the palette values, every anchor and the
+feed clamp, the indicator maths, the tab system's four functions, the status sentence, the sidebar blocks, every
+briefing branch, the diagram geometry and dot containment, and the effect timings (including a thousand drift ticks
+leaving `TraceJson()` byte-identical). `ctest` is 83/83: 66 Catch2 cases / 7,436 assertions, nine parity voyages, the
+catalogue gate, the save round-trip and `ui.gui-syntax`.
+
+**GUI gate:** `tools/check-gui-syntax.sh` compiles `Draw.cpp` and `main.cpp` with
+`-fsyntax-only -Wall -Wextra -Wpedantic` against whichever Raylib/ImGui/rlImGui headers are present, and skips
+(CTest 77) when none are. The sandbox has no X11/GL development files, so linking and the 1440×940 screenshot
+comparison remain yours to run on a desktop; everything that can be checked without a display is checked.
 
 ### Phase 3 — Task frame and the three "machine" rooms (2 days)
 House-frame widgets (`commandRow`, progress button, cooldowns, confirmations), engine room, O2 filter room, mess

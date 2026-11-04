@@ -65,6 +65,24 @@ void Simulation::TickCrew() {
   }
 }
 
+const CrewMember* Simulation::Engineer() const {
+  return const_cast<Simulation*>(this)->AssignedEngineer();
+}
+
+const CrewMember* Simulation::FilterHand() const {
+  return const_cast<Simulation*>(this)->AssignedFilterHand();
+}
+
+const CrewMember* Simulation::Cook() const {
+  return const_cast<Simulation*>(this)->AssignedCook();
+}
+
+double Simulation::MaintCostActions() const { return MaintCost(); }
+
+double Simulation::CleanerIntervalOf(const CrewMember& crew) const {
+  return CleanerInterval(crew);
+}
+
 double Simulation::CleanerInterval(const CrewMember& crew) const {
   return std::max(20.0, 40.0 - 4.0 * std::min(5.0, crew.jobAt));
 }

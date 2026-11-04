@@ -127,7 +127,17 @@ add_library(spaceship_core STATIC
   cpp/core/Economy.cpp
   cpp/core/Projects.cpp
   cpp/core/Ships.cpp
-  cpp/core/SaveSystem.cpp)
+  cpp/core/SaveSystem.cpp
+  # The cockpit's arithmetic: theme, layout, tab routing, briefing text and the
+  # cross-section. Pure data - no window, no graphics library - so CTest can hold
+  # every rectangle and every sentence to the reference.
+  cpp/ui/Theme.cpp
+  cpp/ui/Layout.cpp
+  cpp/ui/Describe.cpp
+  cpp/ui/Shell.cpp
+  cpp/ui/ShipDiagram.cpp
+  cpp/ui/IdleScreen.cpp
+  cpp/ui/Fx.cpp)
 
 target_include_directories(spaceship_core PUBLIC cpp)
 target_link_libraries(spaceship_core PUBLIC spaceship_json)
@@ -166,7 +176,8 @@ if(SPACESHIP_GUI)
   set_target_properties(spaceship_imgui PROPERTIES CXX_STANDARD 17)
 
   add_executable(spaceship
-    cpp/app/main.cpp)
+    cpp/app/main.cpp
+    cpp/ui/Draw.cpp)
 
   target_link_libraries(spaceship PRIVATE spaceship_core spaceship_imgui raylib)
   set_target_properties(spaceship PROPERTIES WIN32_EXECUTABLE OFF)
@@ -190,12 +201,20 @@ if(SPACESHIP_BUILD_TESTS)
     cpp/tests/catalog_tests.cpp
     cpp/tests/simulation_tests.cpp
     cpp/tests/world_tests.cpp
-    cpp/tests/jsnumber_tests.cpp)
+    cpp/tests/jsnumber_tests.cpp
+    cpp/tests/ui_tests.cpp)
   target_link_libraries(spaceship_tests PRIVATE spaceship_core Catch2::Catch2WithMain)
 
   include(Catch)
   catch_discover_tests(spaceship_tests
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
+  # The drawing code cannot be linked here without X11/OpenGL, but it can be
+  # parsed. Skips (77) on a machine with no headers fetched yet.
+  add_test(NAME ui.gui-syntax
+           COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/check-gui-syntax.sh"
+           WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+  set_tests_properties(ui.gui-syntax PROPERTIES SKIP_RETURN_CODE 77)
 
   # The data gate: the committed catalogue must still match the HTA. This is
   # the test that stops a content edit shipping without its JSON.

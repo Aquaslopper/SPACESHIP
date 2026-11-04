@@ -1,17 +1,13 @@
 // ============================================================================
-//  main.cpp — Phase 0 client.
+//  main.cpp — the client.
 //  ---------------------------------------------------------------------------
-//  This is a skeleton on purpose. It opens the reference edition's window,
-//  loads the extracted catalogue, applies the flight-deck palette to Dear ImGui
-//  and reports what it found. The shell, the ship diagram and the task windows
-//  arrive in Phases 2 and 3; nothing here pretends to be a game yet.
+//  Phase 2 turns the Phase 0 skeleton into the cockpit: the window opens at the
+//  reference's size, the catalogue loads, a voyage begins, and ShellView paints
+//  the taskbar, the sidebar, the pinned foot, the status bar and the idle
+//  screen's ship cross-section. Task windows arrive in Phase 3.
 //
-//  What it does prove, on a machine with the graphics development packages:
-//    * the assets are found beside the executable,
-//    * the catalogue parses and validates in a real process,
-//    * Raylib and ImGui are wired together by rlImGui,
-//    * the bundled fonts load,
-//    * no widget falls back to the stock dark-blue ImGui theme.
+//  Everything the shell decides is in cpp/ui's headless view-models; this file
+//  is only the loop that turns a mouse into a verb and a frame into a paint.
 // ============================================================================
 
 #include <cstdio>
@@ -22,8 +18,11 @@
 #include "raylib.h"
 #include "rlImGui.h"
 
+#include "core/Simulation.h"
 #include "data/Catalog.h"
+#include "ui/Draw.h"
 #include "ui/Palette.h"
+#include "ui/Theme.h"
 
 namespace {
 
@@ -78,59 +77,10 @@ void LoadFonts(const std::filesystem::path& assets) {
               mono ? (std::string(" + ") + mono).c_str() : "");
 }
 
-void DrawCatalogueReport(const ship::Catalog& catalog, const ship::ui::Palette& palette) {
-  ImGui::SetNextWindowPos(ImVec2(24, 24), ImGuiCond_FirstUseEver);
-  ImGui::SetNextWindowSize(ImVec2(720, 520), ImGuiCond_FirstUseEver);
-  ImGui::Begin("Spaceship Command");
-
-  ImGui::TextColored(ImVec4(palette.muted.r / 255.0f, palette.muted.g / 255.0f,
-                            palette.muted.b / 255.0f, 1.0f),
-                     "Phase 0 - build system, catalogue and data gate.");
-  ImGui::Separator();
-
-  const ship::Counts& n = catalog.counts;
-  ImGui::Text("%d regions   %d systems   %d chart bodies   %d ports",
-              n.regions, n.systems, n.bodies, n.ports);
-  ImGui::Text("%d rooms on the Kestrel deck plan, %d of them fitted",
-              n.roomsKestrel, n.fittedRooms);
-  ImGui::Text("%d contracts   %d incidents   %d commendations   %d handbook entries",
-              n.contracts, n.incidents, n.commendations, n.wiki);
-  ImGui::Text("%d crew   %d candidates   %d jobs   %d task types",
-              n.crew, n.hires, n.jobs, n.taskTypes);
-
-  ImGui::Separator();
-  const std::vector<std::string> problems = catalog.Validate();
-  if (problems.empty()) {
-    ImGui::TextColored(ImVec4(palette.sage.r / 255.0f, palette.sage.g / 255.0f,
-                              palette.sage.b / 255.0f, 1.0f),
-                       "Catalogue integrity: sound.");
-  } else {
-    ImGui::TextColored(ImVec4(palette.terracotta.r / 255.0f, palette.terracotta.g / 255.0f,
-                              palette.terracotta.b / 255.0f, 1.0f),
-                       "Catalogue integrity: %d problem(s).", static_cast<int>(problems.size()));
-    for (const std::string& problem : problems) { ImGui::BulletText("%s", problem.c_str()); }
-  }
-
-  ImGui::Separator();
-  ImGui::TextWrapped(
-      "The idle screen, the deck plan and the task windows are built in Phase 2 and 3. "
-      "Everything this window reports is read from assets/data, which tools/export-data.cjs "
-      "generates from Spaceship.hta.");
-
-  ImGui::Separator();
-  ImGui::TextColored(ImVec4(palette.muted.r / 255.0f, palette.muted.g / 255.0f,
-                            palette.muted.b / 255.0f, 1.0f),
-                     "Palette: %s   Source: Spaceship.hta, %lld bytes",
-                     palette.label, catalog.sourceBytes);
-
-  ImGui::End();
-}
-
 }  // namespace
 
 int main(int argc, char** argv) {
   (void)argc;
-  (void)argv;
 
   // ---- catalogue ---------------------------------------------------------
   std::filesystem::path assets = AssetDirBesideExecutable(argv[0]);
@@ -154,6 +104,9 @@ int main(int argc, char** argv) {
     std::fprintf(stderr, "catalogue problem: %s\n", problem.c_str());
   }
 
+  // ---- the voyage --------------------------------------------------------
+  ship::Simulation sim = ship::Simulation::NewVoyage(catalog);
+
   // ---- window ------------------------------------------------------------
   SetTraceLogLevel(LOG_WARNING);
   SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT);
@@ -161,23 +114,47 @@ int main(int argc, char** argv) {
   SetWindowMinSize(1180, 720);
   SetTargetFPS(60);
 
-  const ship::ui::Palette palette = ship::ui::ClassicPalette();
+  ship::Theme theme = ship::Theme::ById(sim.State().options.theme);
+  theme.largeText = sim.State().options.largeText;
+  theme.hideCrewLabels = sim.State().options.hideCrewLabels;
+  theme.reducedMotion = sim.State().reducedMotion;
+  theme.stageCompact = sim.State().shipClass == "wren";
 
   // rlImGui owns the ImGui context, so fonts go in between its two init halves.
   rlImGuiBeginInitImGui();
   LoadFonts(assets);
   rlImGuiEndInitImGui();
-  ship::ui::ApplyPalette(palette);
+  ship::ui::ApplyPalette(theme);
+
+  ship::ShellView shell;
+  shell.Configure(static_cast<float>(GetScreenWidth()),
+                  static_cast<float>(GetScreenHeight()), theme);
 
   while (!WindowShouldClose()) {
-    BeginDrawing();
-    ClearBackground(palette.paper);
+    // Resizing re-measures, exactly as the reference's coalesced handler does.
+    if (IsWindowResized()) {
+      theme.stageCompact = sim.State().shipClass == "wren";
+      shell.Configure(static_cast<float>(GetScreenWidth()),
+                      static_cast<float>(GetScreenHeight()), theme);
+      ship::ui::ApplyPalette(theme);
+    }
+
+    // The two verbs. ImGui owns the pointer while a window is up, so the shell
+    // is handed a click only when ImGui did not want it.
+    const bool overUi = ImGui::GetIO().WantCaptureMouse;
+    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && !overUi) {
+      const Vector2 mouse = GetMousePosition();
+      shell.Click(sim, mouse.x, mouse.y, ship::HitButton::Left,
+                  static_cast<double>(GetTime()) * 1000.0);
+    } else if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT) && !overUi) {
+      const Vector2 mouse = GetMousePosition();
+      shell.Click(sim, mouse.x, mouse.y, ship::HitButton::Right,
+                  static_cast<double>(GetTime()) * 1000.0);
+    }
 
     rlImGuiBegin();
-    DrawCatalogueReport(catalog, palette);
+    shell.Draw(sim, static_cast<double>(GetTime()) * 1000.0);
     rlImGuiEnd();
-
-    EndDrawing();
   }
 
   rlImGuiShutdown();

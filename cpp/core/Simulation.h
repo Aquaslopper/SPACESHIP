@@ -206,6 +206,15 @@ class Simulation {
   void RemoveIncident(const std::string& id);
   void CheckCommendations(bool silent = false);
 
+  // ---- read-only job lookups for the interface --------------------------
+  // The briefing and the sidebar ask "who is holding this job" and "what does
+  // that job act at" without starting anything, so these are const and free.
+  const CrewMember* Engineer() const;
+  const CrewMember* FilterHand() const;
+  const CrewMember* Cook() const;
+  double MaintCostActions() const;
+  double CleanerIntervalOf(const CrewMember& crew) const;
+
  private:
   void TickWorld();
 

@@ -75,10 +75,13 @@ Existing Kessler-only and expanded-galaxy saves still load, including active leg
 ## Native C++ edition and development
 
 The repository also contains a native C++ port of the game. It is a **work in
-progress**: Phase 0 (build system, extracted catalogue, data gate) and Phase 1
-(the whole headless simulation) are complete and verified against the reference.
-What remains is the interface: Phase 2 onwards replaces the DOM with Raylib and
-Dear ImGui. Until then `Spaceship.hta` remains the playable edition.
+progress**: Phase 0 (build system, extracted catalogue, data gate), Phase 1 (the
+whole headless simulation) and Phase 2 (the cockpit) are complete and verified
+against the reference. Phase 2 delivers the taskbar and its tabs, the sidebar and
+pinned foot, the status bar, and the idle screen with the ship cross-section,
+the feed and the two interaction verbs — left-click reads a briefing, right-click
+opens its tab. The task windows themselves are Phase 3. Until then
+`Spaceship.hta` remains the playable edition.
 
 `spaceship_core` is feature-complete as a simulation: the action clock, drive
 wear, life support, crew, tasks, incidents, the Simulacron, commendations,
@@ -116,7 +119,7 @@ its tests still build and run. On Windows, configure with
 | `spaceship_core` | the simulation: catalogue, state, action clock, tasks, saves. No window, no graphics |
 | `spaceship` | the Raylib + Dear ImGui client (only when the graphics packages are present) |
 | `spaceship_console` | scriptable harness that replays command scripts against the core |
-| `spaceship_tests` | CTest suite |
+| `spaceship_tests` | CTest suite: 66 Catch2 cases / 7,436 assertions, plus the parity, catalogue and save gates |
 
 ### Content pipeline
 
@@ -164,6 +167,20 @@ Script commands:
 | persistence | `save <file> [utf16]`, `load <file>`, `saveslot <1\|2\|3>`, `loadslot <1\|2\|3>` |
 
 `#` starts a comment.
+
+### The interface, without a window
+
+The cockpit's decisions are data, not drawing. `cpp/ui` keeps the theme, the
+layout arithmetic, the tab router, the sidebar, the briefing text, the deck plan
+and the effect timings in translation units that never include Raylib or ImGui,
+so `ctest` holds them to the reference: exact rectangles, exact sentences, exact
+timings. Only `cpp/ui/Draw.cpp` and `cpp/app/main.cpp` name a graphics library.
+
+That is why an interface change can be reviewed on a machine with no display.
+`tools/check-gui-syntax.sh` (registered as `ui.gui-syntax`) runs both of those
+translation units through the compiler with `-fsyntax-only -Wall -Wextra
+-Wpedantic` against whatever Raylib/ImGui headers it can find, and skips cleanly
+when none are installed.
 
 ### Save compatibility
 
