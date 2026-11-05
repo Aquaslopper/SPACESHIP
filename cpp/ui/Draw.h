@@ -139,8 +139,12 @@ class ShellView {
   void PaintQuartersScreen(Simulation& sim);
   void PaintCrewRecord(const Simulation& sim);
   void PaintPanel(const NavPanel& panel, const Area& box);
+  bool PaintScenePart(const MachinePart& part, const Area& origin);
   void PaintStage(const TaskStage& stage, const Area& origin);
   void PaintIdle(Simulation& sim);
+  void PaintActionBand(const std::string& title, const std::string& note,
+                       const std::vector<ProgressButton>& buttons,
+                       const std::string& warning = "");
   void PaintDiagram(const DiagramModel& diagram, const Area& stageBox, float scale);
   bool PressPanelRow(Simulation& sim, ScreenKind kind, const std::string& id);
 
@@ -187,6 +191,15 @@ class ShellView {
   float sideContentH_ = 0.0f;
   std::vector<SideHit> sideHits_;
 
+  float actionBandTop_ = 0.0f;
+  std::vector<NavHit> actionBandHits_;
+  float feedScroll_ = 0.0f;
+  float feedMaxScroll_ = 0.0f;
+  Area feedBox_{};
+  Area feedThumb_{};
+  bool feedActive_ = false;
+  bool draggingFeed_ = false;
+  float feedDragOffset_ = 0.0f;
   float contentScroll_ = 0.0f;
   float contentMaxScroll_ = 0.0f;
   float wikiIndexScroll_ = 0.0f;

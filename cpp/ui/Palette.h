@@ -67,12 +67,12 @@ inline void ApplyPalette(const Theme& theme) {
   c[ImGuiCol_TextDisabled] = col(p.muted);
 
   c[ImGuiCol_WindowBg] = col(p.panel);
-  c[ImGuiCol_ChildBg] = col(p.white);
+  c[ImGuiCol_ChildBg] = col(p.content);
   c[ImGuiCol_PopupBg] = col(p.panel);
   c[ImGuiCol_Border] = col(p.border);
   c[ImGuiCol_BorderShadow] = ImVec4(0, 0, 0, 0);
 
-  c[ImGuiCol_FrameBg] = col(p.panel2);
+  c[ImGuiCol_FrameBg] = col(p.input);
   c[ImGuiCol_FrameBgHovered] = col(p.panel3);
   c[ImGuiCol_FrameBgActive] = col(p.panel3);
 
@@ -90,8 +90,8 @@ inline void ApplyPalette(const Theme& theme) {
   c[ImGuiCol_SliderGrab] = col(p.coffee);
   c[ImGuiCol_SliderGrabActive] = col(p.coffeeDark);
 
-  c[ImGuiCol_Button] = col(p.panel2);
-  c[ImGuiCol_ButtonHovered] = col(p.panel3);
+  c[ImGuiCol_Button] = col(p.control);
+  c[ImGuiCol_ButtonHovered] = col(p.hover);
   c[ImGuiCol_ButtonActive] = col(p.panel3);
 
   c[ImGuiCol_Header] = col(p.panel3);
@@ -108,7 +108,7 @@ inline void ApplyPalette(const Theme& theme) {
 
   c[ImGuiCol_Tab] = col(p.panel2);
   c[ImGuiCol_TabHovered] = col(p.panel3);
-  c[ImGuiCol_TabSelected] = col(p.white);
+  c[ImGuiCol_TabSelected] = col(p.content);
   c[ImGuiCol_TabSelectedOverline] = col(p.coffee);
   c[ImGuiCol_TabDimmed] = col(p.panel2);
   c[ImGuiCol_TabDimmedSelected] = col(p.panel);
