@@ -8,9 +8,8 @@
 //  unchanged so old saves keep their choice; only the colours and the labels
 //  move.
 //
-//  Each palette is authored as six colours and derived once: panels darken by a
-//  hair per level, borders are the panel colour with a little ink, and the
-//  muted ink is the text colour blended towards the paper.
+//  Every role is a literal from HTA lines 1–2000. Distinct CSS surfaces
+//  stay distinct; semantic red/green/amber are not replaced by the accent.
 // ============================================================================
 #include "ui/Theme.h"
 
@@ -36,47 +35,6 @@ Rgb Hex(const char* hex) {
   return rgb;
 }
 
-Rgb Mix(const Rgb& a, const Rgb& b, double towardsB) {
-  const auto blend = [towardsB](int x, int y) {
-    return static_cast<int>(std::lround(static_cast<double>(x) * (1.0 - towardsB) +
-                                        static_cast<double>(y) * towardsB));
-  };
-  return Rgb{blend(a.r, b.r), blend(a.g, b.g), blend(a.b, b.b)};
-}
-
-Rgb Darken(const Rgb& colour, int amount) {
-  return Rgb{colour.r > amount ? colour.r - amount : 0,
-             colour.g > amount ? colour.g - amount : 0,
-             colour.b > amount ? colour.b - amount : 0};
-}
-
-// One authored palette: paper, panel, ink, accent. Everything else is derived.
-Palette FromFour(const char* paper, const char* panel, const char* ink,
-                 const char* accent) {
-  Palette p;
-  const Rgb paperRgb = Hex(paper);
-  const Rgb panelRgb = Hex(panel);
-  const Rgb inkRgb = Hex(ink);
-  const Rgb accentRgb = Hex(accent);
-  p.white = Hex("#ffffff");
-  p.panel = paperRgb;
-  p.panel2 = panelRgb;
-  p.panel3 = Darken(panelRgb, 6);
-  p.border = Darken(panelRgb, 14);
-  p.borderDark = Mix(Darken(panelRgb, 30), inkRgb, 0.25);
-  p.coffee = accentRgb;
-  p.coffeeDark = Mix(accentRgb, inkRgb, 0.35);
-  p.coffeeLight = Mix(accentRgb, paperRgb, 0.45);
-  p.ink = inkRgb;
-  p.muted = Mix(inkRgb, paperRgb, 0.45);
-  p.terracotta = Mix(accentRgb, inkRgb, 0.15);
-  p.sage = accentRgb;
-  p.amber = Mix(accentRgb, paperRgb, 0.25);
-  p.titleBackground = panelRgb; p.titleDialog = paperRgb;
-  p.titleBorder = accentRgb; p.titleInk = inkRgb;
-  return p;
-}
-
 Palette ClassicPalette() {
   // Literal Section 1 CSS roles; do not derive one role from another.
   Palette p;
@@ -89,35 +47,131 @@ Palette ClassicPalette() {
   p.sage = Hex("#7f9161"); p.amber = Hex("#c08a3e");
   p.titleBackground = Hex("#d8c4a6"); p.titleDialog = Hex("#f5ead8");
   p.titleBorder = Hex("#8e7757"); p.titleInk = Hex("#443528");
+  p.content = Hex("#ffffff"); p.chrome = Hex("#faf7f2");
+  p.hover = Hex("#f6efe3"); p.control = Hex("#ffffff"); p.input = Hex("#ffffff");
+  p.tabInk = Hex("#6b6157"); p.activeInk = Hex("#3b3630");
+  p.chart = Hex("#ece2d1"); p.chartInk = Hex("#6b5338");
+  p.titleMenu = Hex("#3f342b"); p.titleMenuInk = Hex("#f2e5cc");
+  p.titleMenuBorder = Hex("#a48e72"); p.titleMenuHover = Hex("#6b543f");
   return p;
 }
 
 Palette PaletteForId(const std::string& id) {
-  // FromFour(paper, panel, ink, accent): paper→panel bg, panel→body bg,
-  // ink→text/chart ink, accent→highlight. Mapping mirrors the HTA's
-  // theme-<id> CSS blocks.
-  // classic: Flight Deck - parchment (the HTA's default, light theme)
-  if (id == "classic") {
-    return ClassicPalette();
-  }
-  // void: Deep Space - cyan (dark theme)
+  // HTA 1301–1457: literal CSS roles. Never blend or darken authored colours.
+  Palette p = ClassicPalette();
   if (id == "void") {
-    return FromFour("#152437", "#0b1320", "#dce8f2", "#65d7ed");
+    p.panel = Hex("#152437");
+    p.panel2 = Hex("#1c2e42");
+    p.panel3 = Hex("#172638");
+    p.border = Hex("#2e465d");
+    p.borderDark = Hex("#41627c");
+    p.coffee = Hex("#65d7ed");
+    p.ink = Hex("#dce8f2");
+    p.muted = Hex("#9bb1c1");
+    p.content = Hex("#0b1320");
+    p.chrome = Hex("#101d2c");
+    p.hover = Hex("#263c52");
+    p.control = Hex("#1c2e42");
+    p.input = Hex("#0f1d2c");
+    p.tabInk = Hex("#a9bdca");
+    p.activeInk = Hex("#e5f2fb");
+    p.chart = Hex("#0e1a2b");
+    p.chartInk = Hex("#a9c5d5");
+    p.titleBackground = Hex("#0b1320");
+    p.titleDialog = Hex("#152437");
+    p.titleBorder = Hex("#65d7ed");
+    p.titleInk = Hex("#e5f2fb");
+    p.titleMenu = Hex("#101d2c");
+    p.titleMenuInk = Hex("#dce8f2");
+    p.titleMenuBorder = Hex("#41627c");
+    p.titleMenuHover = Hex("#263c52");
+    return p;
   }
-  // aurora: Aurora - mint (dark theme)
   if (id == "aurora") {
-    return FromFour("#162d2a", "#0b1717", "#e2f1e9", "#7cddb4");
+    p.panel = Hex("#162d2a");
+    p.panel2 = Hex("#1c3934");
+    p.panel3 = Hex("#18312e");
+    p.border = Hex("#345b51");
+    p.borderDark = Hex("#477466");
+    p.coffee = Hex("#7cddb4");
+    p.ink = Hex("#e2f1e9");
+    p.muted = Hex("#9fbdb0");
+    p.content = Hex("#0b1717");
+    p.chrome = Hex("#102221");
+    p.hover = Hex("#29463f");
+    p.control = Hex("#1c3934");
+    p.input = Hex("#102321");
+    p.tabInk = Hex("#b0c9be");
+    p.activeInk = Hex("#e8f6ee");
+    p.chart = Hex("#10201e");
+    p.chartInk = Hex("#b5d8c8");
+    p.titleBackground = Hex("#0b1717");
+    p.titleDialog = Hex("#162d2a");
+    p.titleBorder = Hex("#7cddb4");
+    p.titleInk = Hex("#e8f6ee");
+    p.titleMenu = Hex("#102221");
+    p.titleMenuInk = Hex("#e2f1e9");
+    p.titleMenuBorder = Hex("#477466");
+    p.titleMenuHover = Hex("#29463f");
+    return p;
   }
-  // nebula: Nebula - violet (dark theme)
   if (id == "nebula") {
-    return FromFour("#281f3b", "#130f20", "#eee6f7", "#c8a3ff");
+    p.panel = Hex("#281f3b");
+    p.panel2 = Hex("#332748");
+    p.panel3 = Hex("#2a2040");
+    p.border = Hex("#52436d");
+    p.borderDark = Hex("#665385");
+    p.coffee = Hex("#c8a3ff");
+    p.ink = Hex("#eee6f7");
+    p.muted = Hex("#c0b0cf");
+    p.content = Hex("#130f20");
+    p.chrome = Hex("#201831");
+    p.hover = Hex("#413256");
+    p.control = Hex("#332748");
+    p.input = Hex("#21182f");
+    p.tabInk = Hex("#c3b4d3");
+    p.activeInk = Hex("#f4eafd");
+    p.chart = Hex("#1a1429");
+    p.chartInk = Hex("#d2bce6");
+    p.titleBackground = Hex("#130f20");
+    p.titleDialog = Hex("#281f3b");
+    p.titleBorder = Hex("#c8a3ff");
+    p.titleInk = Hex("#f4eafd");
+    p.titleMenu = Hex("#201831");
+    p.titleMenuInk = Hex("#eee6f7");
+    p.titleMenuBorder = Hex("#665385");
+    p.titleMenuHover = Hex("#413256");
+    return p;
   }
-  // ember: Ember - copper (dark theme)
   if (id == "ember") {
-    return FromFour("#30231d", "#1a1210", "#f5e7d9", "#ffba76");
+    p.panel = Hex("#30231d");
+    p.panel2 = Hex("#3b2c23");
+    p.panel3 = Hex("#34261f");
+    p.border = Hex("#654a36");
+    p.borderDark = Hex("#835d42");
+    p.coffee = Hex("#ffba76");
+    p.ink = Hex("#f5e7d9");
+    p.muted = Hex("#c3a78f");
+    p.content = Hex("#1a1210");
+    p.chrome = Hex("#251b17");
+    p.hover = Hex("#493326");
+    p.control = Hex("#3b2c23");
+    p.input = Hex("#291d18");
+    p.tabInk = Hex("#d2b59a");
+    p.activeInk = Hex("#fff0df");
+    p.chart = Hex("#241915");
+    p.chartInk = Hex("#e2c3a5");
+    p.titleBackground = Hex("#1a1210");
+    p.titleDialog = Hex("#30231d");
+    p.titleBorder = Hex("#ffba76");
+    p.titleInk = Hex("#fff0df");
+    p.titleMenu = Hex("#251b17");
+    p.titleMenuInk = Hex("#f5e7d9");
+    p.titleMenuBorder = Hex("#835d42");
+    p.titleMenuHover = Hex("#493326");
+    return p;
   }
-  // Unknown ids fall back to classic.
-  return ClassicPalette();
+  return p;  // classic, including unknown ids
 }
 
 }  // namespace

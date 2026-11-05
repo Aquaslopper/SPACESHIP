@@ -26,7 +26,6 @@ MachinePart Part(const std::string& cls, float x, float y, float w, float h,
 }  // namespace
 
 TaskStage BuildFilterMachine(const Simulation& sim) {
-  (void)sim;  // the scenery is authored, not derived; slots are live elsewhere
   TaskStage stage;
   stage.id = "o2mach";
   stage.width = 600.0f;  // STAGE.o2
@@ -41,7 +40,32 @@ TaskStage BuildFilterMachine(const Simulation& sim) {
   }
 
   // --- the cabin air, rebuilt by the renderer ---------------------------
-  parts.push_back(Part("o2-air", 20, 52, 560, 66, "air"));
+  // paintAir(): the chamber is stateful scenery, not the literal word "air".
+  const auto add = [&](const std::string& cls, float x, float y, float w, float h,
+                       const std::string& text, const std::string& tone) {
+    auto part = Part(cls, x, y, w, h, text); part.tone = tone;
+    parts.push_back(part);
+  };
+  const bool running = sim.BankRunning();
+  const auto& air = sim.AirSpec();
+  add("o2-air", 20, 52, 560, 66, "", sim.AirStageIndex() == 4 ? "#f1f6ea" : "#efe7d8");
+  // Reflow the source's 8/11px labels inside the same chamber for >=18px.
+  add("o2-airlab", 28, 60, 200, 18, "CABIN AIR", "#a2947f");
+  add("o2-airword", 330, 58, 240, 18, air.word, air.tone);
+  add("o2-airsub", 330, 78, 240, 18,
+      running ? Num(sim.State().filterLife) + " filtered"
+              : Num(sim.State().airHold) + " of " + Num(sim.GameRules().air.holdMax) + " left", "#a2947f");
+  add("o2-airtrack", 28, 98, 544, 14, "", "#e6ddcd");
+  add("o2-airfill", 29, 99, std::round(544 * sim.AirPercent() / 100), 12, "", air.tone);
+  for (int i = 1; i < 4; ++i) {
+    add("o2-airnotch", 28 + std::round(544 * i / 4.0), 98, 1, 14, "", "#fdfbf7");
+  }
+  const int marks = running ? 4 : (4 - sim.AirStageIndex()) * 4;
+  for (int i = 0; i < marks; ++i) {
+    add(running ? "o2-streak" : "o2-dust", 20 + (running ? 60 + i * 130 : 14 + i * 33),
+        running ? 114 : 100 + (i % 3) * 5, running ? 72 : 3, running ? 2 : 3,
+        "", running ? "#cfdcc0" : "#b9a893");
+  }
 
   // --- three slot housings ----------------------------------------------
   for (int k = 0; k < 3; ++k) {
@@ -50,11 +74,18 @@ TaskStage BuildFilterMachine(const Simulation& sim) {
     parts.push_back(Part("o2-mini", sx + 9.0f, 132, 80, 10,
                          "SLOT " + std::to_string(k + 1)));
     parts.push_back(Part("o2-well", sx + 30.0f, 152, 120, 84));
-    parts.push_back(Part("o2-can", sx + 46.0f, 162, 88, 64));
-    parts.push_back(Part("o2-neck", sx + 78.0f, 154, 24, 8));
-    parts.push_back(Part("o2-state", sx + 8.0f, 242, 164, 14, "EMPTY"));
-    parts.push_back(Part("o2-track", sx + 30.0f, 260, 120, 8));
-    parts.push_back(Part("o2-fill", sx + 30.0f, 260, 0, 8));
+    const auto& slot = sim.Life().slots[k];
+    if (slot.state != "empty") {
+      add("o2-can", sx + 46, 162, 88, 64, "", slot.state == "active" ? "#dfeccd" : "#e4dbcb");
+      add("o2-neck", sx + 78, 154, 24, 8, "", "#cbb89c");
+    }
+    const auto state = slot.state == "empty" ? "EMPTY" : slot.state == "installed" ? "INSTALLED"
+                         : running ? "ACTIVE" : "NO POWER";
+    add("o2-state", sx + 8, 242, 164, 18, state,
+        slot.state == "active" ? "#7f9161" : slot.state == "installed" ? "#8c6f4e" : "#b05a42");
+    parts.push_back(Part("o2-track", sx + 30, 264, 120, 8));
+    const double pct = std::round(sim.State().filterLife / sim.GameRules().life.lifeMax * 100);
+    add("o2-fill", sx + 30, 264, slot.state == "active" ? std::round(120 * pct / 100) : 0, 8, "", "#7f9161");
 
     // The live control - deliberately not scenery.
     LiveControl control;
@@ -96,7 +127,7 @@ O2ScreenModel BuildO2Screen(const Simulation& sim) {
     air.dust = (4 - sim.AirStageIndex()) * 4;
   }
 
-  const double pct = std::floor((state.filterLife / sim.GameRules().life.lifeMax) * 100.0);
+  const double pct = std::round((state.filterLife / sim.GameRules().life.lifeMax) * 100.0);
 
   TaskScreenModel& screen = model.screen;
   screen.head = TaskHead{"ROOM", "O2 Filter Room",

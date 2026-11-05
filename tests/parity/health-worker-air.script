@@ -1,0 +1,20 @@
+# All ticks/costs/automation remain actual source behavior, no new mechanics.
+survival-set airHold 0
+survival-set rack 0
+survival-set crewTick 0
+survival-set canisters 3
+survival-set engineCondition 19
+trace
+# Foul air doubles newly scheduled worker durations. Engineer/filter hand/cook
+# are chosen by real jobs and thresholds; cooker produces food on task ticks.
+action Work under foul air
+trace
+action Food produced while jobs run
+trace
+# A busy worker cannot start medical care; a refused action spends nothing.
+medical jax
+trace
+# Restoring clean air does not retroactively rescale an already scheduled job.
+survival-set airHold 20
+action Work after air recovery
+trace

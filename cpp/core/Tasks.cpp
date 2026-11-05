@@ -43,8 +43,12 @@ bool IsQuiet(const std::string& type) {
 }
 
 bool IsAutoClear(const std::string& type) {
-  // Only a crossing and a scan have a readout to hand over.
-  return type != "travel" && type != "scan";
+  // HTA TASK_TYPES: automatic completion is explicitly opted into by type.
+  // Unknown types must not silently lose a finished readout.
+  return type == "crewOrder" || type == "crewJob" || type == "crewDoc" ||
+         type == "o2slot" || type == "maint" || type == "cook" ||
+         type == "incident" || type == "salvage" || type == "surveyPackage" ||
+         type == "shipProject";
 }
 
 }  // namespace

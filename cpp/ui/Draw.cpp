@@ -12,6 +12,7 @@
 //  cockpit would be the loudest possible lie about what this port is.
 // ============================================================================
 #include "ui/Draw.h"
+#include "ui/First2000Styles.h"
 
 #include <algorithm>
 #include <cmath>
@@ -198,6 +199,7 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   if (scrollTabKey_ != sim.State().activeTab) {
     scrollTabKey_ = sim.State().activeTab;
     ResetContentScroll();
+    if (sim.State().activeTab == "home") { feedScroll_ = 0; draggingFeed_ = false; }
     draggingChart_ = false;
   }
 
@@ -206,7 +208,7 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   // random dots every frame caused teleporting and a blank reduced-motion view.
   if (sim.State().activeTab == "home") {
     FxRng seeded = rng_;
-    idle_ = BuildIdleScreen(sim, layout_, theme_, theme_.hideCrewLabels, others_, seeded);
+    idle_ = BuildIdleScreen(sim, layout_, theme_, theme_.hideCrewLabels, seeded);
     rng_ = seeded;
     SyncIdleDots(sim, nowMs);
     // The whole home column scrolls when it is taller than the content area
@@ -216,13 +218,17 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
         std::max(0.0f, idle_.feedBox.Bottom() - layout_.content.Bottom());
   }
 
+  actionBandTop_ = layout_.content.Bottom();
+  actionBandHits_.clear();
+  feedActive_ = sim.State().activeTab == "home" && !titleActive_;
+  if (!feedActive_) draggingFeed_ = false;
   UpdateMarks(marks_, nowMs);
 
   // A lost voyage that has been dealt with (loaded or restarted) puts the
   // overlay away for good; a fresh loss brings it back.
   if (sim.State().gameOver.empty()) { lossDismissed_ = false; }
 
-  ClearBackground(ToRay(theme_.palette.panel));
+  ClearBackground(ToRay(theme_.palette.content));
 
   if (titleActive_) {
     PaintTitle(sim);
@@ -286,7 +292,7 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   }
   EndMode2D();
   paintingContent_ = false;
-  const float readingBottom = screenQuarters_ ? quartersBandTop_ : layout_.content.Bottom();
+  const float readingBottom = screenQuarters_ ? quartersBandTop_ : actionBandTop_;
   contentMaxScroll_ = std::max(0.0f, contentPaintBottom_ - readingBottom);
   contentScroll_ = std::min(contentScroll_, contentMaxScroll_);
 
@@ -299,13 +305,18 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
     const MarkStyle style = MarkAt(mark, nowMs);
     if (!style.alive) { continue; }
     const int alpha = static_cast<int>(style.opacity * 255.0f);
-    const float x = mark.x + layout_.content.x;
-    DrawLine(static_cast<int>(x), static_cast<int>(style.top),
-             static_cast<int>(x + 11.0f), static_cast<int>(style.top),
-             ToRay(theme_.palette.coffee, alpha));
-    DrawLine(static_cast<int>(x + 5.0f), static_cast<int>(style.top - 5.0f),
-             static_cast<int>(x + 5.0f), static_cast<int>(style.top + 6.0f),
-             ToRay(theme_.palette.coffee, alpha));
+    const float x = mark.x;
+    // Five-pixel soft green halo, behind the two crisp foreground bars.
+    for (int radius = 5; radius > 0; --radius) {
+      const Color glow{0xb6, 0xf0, 0x7d, static_cast<unsigned char>(alpha * (6 - radius) / 60)};
+      DrawRectangle(static_cast<int>(x) - radius, static_cast<int>(style.top + 4) - radius,
+                    11 + radius * 2, 2 + radius * 2, glow);
+      DrawRectangle(static_cast<int>(x + 4) - radius, static_cast<int>(style.top) - radius,
+                    2 + radius * 2, 11 + radius * 2, glow);
+    }
+    const Color markInk{0x7e, 0xc6, 0x3f, static_cast<unsigned char>(alpha)};
+    DrawRectangle(static_cast<int>(x), static_cast<int>(style.top + 4), 11, 2, markInk);
+    DrawRectangle(static_cast<int>(x + 4), static_cast<int>(style.top), 2, 11, markInk);
   }
 
 }
@@ -369,7 +380,7 @@ void ShellView::PaintChrome(Simulation& sim) {
   // ---- taskbar -----------------------------------------------------------
   const ship::Palette& p = theme_.palette;
   draw->AddRectFilled(ImVec2(0.0f, 0.0f), ImVec2(width_, Metrics::kTaskbarH),
-                      ToIm(p.panel2));
+                      ToIm(theme_.id == "classic" ? p.panel2 : p.chrome));
   draw->AddLine(ImVec2(0.0f, Metrics::kTaskbarH - 1.0f),
                 ImVec2(width_, Metrics::kTaskbarH - 1.0f), ToIm(p.borderDark));
 
@@ -402,12 +413,12 @@ void ShellView::PaintChrome(Simulation& sim) {
     const Area tabBox{x, 3.0f, w, Metrics::kTaskbarH - 5.0f};
     const Area closeBox{tabBox.Right() - 19.0f, tabBox.y, 18.0f, tabBox.h};
     tabHits_.push_back(TabHit{tab.key, tabBox, closeBox, tab.closable});
-    const ImU32 fill = tab.active ? ToIm(p.white)
+    const ImU32 fill = tab.active ? ToIm(p.content)
                        : tab.fresh ? ToIm(p.coffeeLight)
                                    : ToIm(p.panel3);
     draw->AddRectFilled(ImVec2(x, 3.0f), ImVec2(x + w, Metrics::kTaskbarH - 2.0f), fill, 3.0f);
     draw->AddRect(ImVec2(x, 3.0f), ImVec2(x + w, Metrics::kTaskbarH - 2.0f), ToIm(p.border), 3.0f);
-    draw->AddText(ImVec2(x + 7.0f, 9.0f), ToIm(p.muted), tab.title.c_str());
+    draw->AddText(ImVec2(x + 7.0f, 9.0f), ToIm(tab.active ? p.activeInk : p.tabInk), tab.title.c_str());
     if (tab.closable) { draw->AddText(ImVec2(x + w - 13.0f, 9.0f), ToIm(p.muted), "x"); }
     x += w + 4.0f;
   }
@@ -424,7 +435,7 @@ void ShellView::PaintChrome(Simulation& sim) {
   // ---- sidebar -----------------------------------------------------------
   draw->AddRectFilled(ImVec2(layout_.sidepanel.x, layout_.sidepanel.y),
                       ImVec2(layout_.sidepanel.Right(), layout_.sidepanel.Bottom()),
-                      ToIm(p.panel));
+                      ToIm(p.chrome));
 
   const auto measureSide = [&](const std::string& text, float width) {
     const float h = ImGui::CalcTextSize(text.c_str(), nullptr, false, width).y;
@@ -458,14 +469,21 @@ void ShellView::PaintChrome(Simulation& sim) {
       bool open = true;
       for (const auto& block : blocks) { if (block.key == hit.key) { open = block.open; } }
       if (hit.key != "indicators") {
-        draw->AddText(ImVec2(box.Right() - 10, box.y), ToIm(p.muted), open ? "v" : ">");
+        const float x = box.Right() - 9, y = box.y + 5;
+        if (open) {
+          draw->AddTriangleFilled(ImVec2(x, y), ImVec2(x + 8, y),
+                                  ImVec2(x + 4, y + 5), IM_COL32(140,111,78,255));
+        } else {
+          draw->AddTriangleFilled(ImVec2(x, y - 1), ImVec2(x, y + 7),
+                                  ImVec2(x + 5, y + 3), IM_COL32(162,148,127,255));
+        }
       } else {
         for (const auto& line : PlaceIndicators(IndicatorLines(sim))) {
           const float base = box.Bottom() + 4;
           draw->AddRectFilled(ImVec2(box.x + line.ghost.x, base + line.ghost.y),
-                              ImVec2(box.x + line.ghost.x + 2, base + line.ghost.Bottom()), ToIm(p.panel3));
+                              ImVec2(box.x + line.ghost.x + 3, base + line.ghost.Bottom()), IM_COL32(236,229,216,255));
           draw->AddRectFilled(ImVec2(box.x + line.line.x, base + line.line.y),
-                              ImVec2(box.x + line.line.x + 2, base + line.line.Bottom()),
+                              ImVec2(box.x + line.line.x + 3, base + line.line.Bottom()),
                               ToIm(line.grow ? p.terracotta : p.sage));
         }
       }
@@ -493,7 +511,7 @@ void ShellView::PaintChrome(Simulation& sim) {
 
   // ---- pinned foot -------------------------------------------------------
   draw->AddRectFilled(ImVec2(layout_.sidefoot.x, layout_.sidefoot.y),
-                      ImVec2(layout_.sidefoot.Right(), layout_.sidefoot.Bottom()), ToIm(p.panel));
+                      ImVec2(layout_.sidefoot.Right(), layout_.sidefoot.Bottom()), ToIm(p.chrome));
   draw->AddLine(ImVec2(0.0f, layout_.sidefoot.y),
                 ImVec2(layout_.sidefoot.Right(), layout_.sidefoot.y), ToIm(p.border));
   for (const SideHit& hit : hits) {
@@ -558,7 +576,7 @@ void ShellView::PaintChrome(Simulation& sim) {
 
   // ---- status bar --------------------------------------------------------
   draw->AddRectFilled(ImVec2(0.0f, layout_.statusbar.y),
-                      ImVec2(width_, layout_.statusbar.Bottom()), ToIm(p.panel2));
+                      ImVec2(width_, layout_.statusbar.Bottom()), ToIm(theme_.id == "classic" ? p.panel2 : p.chrome));
   draw->AddLine(ImVec2(0.0f, layout_.statusbar.y), ImVec2(width_, layout_.statusbar.y),
                 ToIm(p.border));
   draw->AddText(ImVec2(8.0f, layout_.statusbar.y + 4.0f), ToIm(p.ink),
@@ -607,7 +625,7 @@ void ShellView::PaintIdle(Simulation& sim) {
     DrawRectangle(static_cast<int>(cell.box.x + 6.0f),
                   static_cast<int>(cell.box.Bottom() - 12.0f),
                   static_cast<int>(bar * std::max(0.0, std::min(100.0, cell.reading)) / 100.0),
-                  4, ToRay(theme.palette.coffee));
+                  4, HexColor(cell.colour, ToRay(theme.palette.coffee)));
   }
 
   PaintDiagram(idle_.diagram, idle_.stageArea, idleDiagramScale_);
@@ -649,13 +667,50 @@ void ShellView::PaintIdle(Simulation& sim) {
                      static_cast<int>(idle_.feedBox.y),
                      static_cast<int>(idle_.feedBox.w),
                      static_cast<int>(idle_.feedBox.h), ToRay(theme.palette.border));
-  float y = idle_.feedBox.y + 4.0f;
-  for (const std::string& line : idle_.feed) {
-    if (y > idle_.feedBox.Bottom() - 12.0f) { break; }
-    Text(line.c_str(), static_cast<int>(idle_.feedBox.x + 6.0f),
-             static_cast<int>(y), TypePx(12) , ToRay(theme.palette.ink));
-    y += theme.LineHeight();
+  const bool trackFeed = paintingContent_;
+  paintingContent_ = false;
+  feedBox_ = idle_.feedBox;
+  std::vector<std::string> log;
+  for (auto it = sim.State().feed.rbegin(); it != sim.State().feed.rend(); ++it)
+    log.push_back(it->stamp.empty() ? it->text : it->stamp + "  " + it->text);
+  if (feedRevision_ != sim.FeedRevision() || feedSeen_ != log) {
+    feedScroll_ = 0;
+    draggingFeed_ = false;
+    feedRevision_ = sim.FeedRevision();
+    feedSeen_ = log;
   }
+  const int size = TypePx(12);
+  const float lineH = std::max(theme.LineHeight(), static_cast<float>(size) + 4);
+  std::vector<std::string> rows;
+  for (const auto& entry : log) {
+    const auto wrapped = WrapText(entry, std::max(1.0f, feedBox_.w - 28), size, SelectFont(size, false));
+    rows.insert(rows.end(), wrapped.begin(), wrapped.end());
+  }
+  const float visibleH = std::max(1.0f, feedBox_.h - 8);
+  feedMaxScroll_ = std::max(0.0f, rows.size() * lineH - visibleH);
+  feedScroll_ = std::clamp(feedScroll_, 0.0f, feedMaxScroll_);
+  BeginScissorMode(static_cast<int>(feedBox_.x + 1), static_cast<int>(feedBox_.y - contentScroll_ + 1),
+                   std::max(0, static_cast<int>(feedBox_.w - 2)), std::max(0, static_cast<int>(feedBox_.h - 2)));
+  float y = feedBox_.y + 4 - feedScroll_;
+  for (const auto& row : rows) {
+    if (y + lineH > feedBox_.y && y < feedBox_.Bottom()) {
+      Text(row.c_str(), static_cast<int>(feedBox_.x + 6), static_cast<int>(y), size, ToRay(theme.palette.ink));
+    }
+    y += lineH;
+  }
+  feedThumb_ = {};
+  if (feedMaxScroll_ > 0) {
+    const float trackH = feedBox_.h - 4;
+    const float thumbH = std::min(trackH, std::max(18.0f, trackH * visibleH / (visibleH + feedMaxScroll_)));
+    feedThumb_ = {feedBox_.Right() - 10, feedBox_.y + 2 + (trackH - thumbH) * feedScroll_ / feedMaxScroll_, 8, thumbH};
+    DrawRectangle(static_cast<int>(feedThumb_.x), static_cast<int>(feedBox_.y + 2), 8,
+                  static_cast<int>(trackH), ToRay(theme.palette.panel3));
+    DrawRectangle(static_cast<int>(feedThumb_.x), static_cast<int>(feedThumb_.y), 8,
+                  static_cast<int>(thumbH), ToRay(theme.palette.borderDark));
+  }
+  EndScissorMode();
+  paintingContent_ = trackFeed;
+  contentPaintBottom_ = std::max(contentPaintBottom_, feedBox_.Bottom());
   (void)sim;
 }
 
@@ -703,7 +758,7 @@ void ShellView::PaintPanel(const NavPanel& panel, const Area& box) {
                       static_cast<int>(w), 5, ToRay(p.panel3));
         DrawRectangle(static_cast<int>(box.x + 8.0f), static_cast<int>(y),
           static_cast<int>(w * std::max(0.0, std::min(100.0, item.pct)) / 100.0),
-          5, ToRay(p.coffee));
+          5, HexColor(item.tone, ToRay(p.coffee)));
         y += TypeStep(11.0f);
         break;
       }
@@ -771,13 +826,91 @@ float ShellView::MeasurePanelHeight(const NavPanel& panel, float width) const {
   return y + lineHeight + 4.0f;
 }
 
+// Native painting of the literal scene styles in HTA lines 918–1199.
+// Geometry stays in the existing part models; CSS borders are inside the box.
+bool ShellView::PaintScenePart(const MachinePart& part, const Area& origin) {
+  const SceneStyle style = SceneStyleFor(part.cls);
+  if (!*style.cls) return false;
+  const float x = origin.x + part.box.x, y = origin.y + part.box.y;
+  const float w = std::max(0.0f, part.box.w), h = std::max(0.0f, part.box.h);
+  const Rectangle box{x, y, w, h};
+  const bool tonedFill = part.text.empty() && !part.tone.empty();
+  const std::string background = tonedFill ? part.tone : style.background;
+  const float rounding = std::min(1.0f, 2.0f * std::max(0, style.radius) / std::max(1.0f, std::min(w, h)));
+  if (!background.empty() && w > 0 && h > 0) {
+    const Color ink = HexColor(background, ToRay(theme_.palette.panel));
+    if (style.radius == -1) DrawEllipse(static_cast<int>(x + w / 2), static_cast<int>(y + h / 2), w / 2, h / 2, ink);
+    else if (style.radius > 0) DrawRectangleRounded(box, rounding, 12, ink);
+    else DrawRectangle(static_cast<int>(x), static_cast<int>(y), static_cast<int>(w), static_cast<int>(h), ink);
+  }
+  if (style.width > 0 && *style.border && w > 0 && h > 0) {
+    const Color ink = HexColor(style.border, ToRay(theme_.palette.border));
+    const float thick = static_cast<float>(style.width);
+    if (style.radius == -1 && w == h) {
+      const Vector2 center{x + w / 2, y + h / 2};
+      if (style.dashed) {
+        for (float angle = 0; angle < 360; angle += 12) DrawRing(center, std::max(0.0f, w / 2 - thick), w / 2, angle, angle + 6, 3, ink);
+      } else DrawRing(center, std::max(0.0f, w / 2 - thick), w / 2, 0, 360, 64, ink);
+    } else if (style.radius > 0 && !style.dashed && style.sides == 15) {
+      DrawRectangleRoundedLinesEx(box, rounding, 12, thick, ink);
+    } else {
+      auto edge = [&](float ax, float ay, float bx, float by) {
+        const float dx = bx - ax, dy = by - ay, length = std::sqrt(dx * dx + dy * dy);
+        if (length <= 0) return;
+        if (!style.dashed) { DrawLineEx({ax, ay}, {bx, by}, thick, ink); return; }
+        for (float pos = 0; pos < length; pos += 6) {
+          const float end = std::min(pos + 3, length);
+          DrawLineEx({ax + dx * pos / length, ay + dy * pos / length},
+                     {ax + dx * end / length, ay + dy * end / length}, thick, ink);
+        }
+      };
+      const float d = thick / 2;
+      if (style.sides & 1) edge(x + d, y + d, x + w - d, y + d);
+      if (style.sides & 2) edge(x + w - d, y + d, x + w - d, y + h - d);
+      if (style.sides & 4) edge(x + d, y + h - d, x + w - d, y + h - d);
+      if (style.sides & 8) edge(x + d, y + d, x + d, y + h - d);
+    }
+  }
+  if (!part.text.empty()) {
+    const int size = TypePx(style.fontPx);
+    float tx = x;
+    if (style.align) {
+      const float space = w - TextWidth(part.text.c_str(), size, style.mono);
+      tx += style.align == 1 ? space / 2 : space;
+    }
+    const std::string ink = part.tone.empty() ? style.ink : part.tone;
+    Text(part.text.c_str(), static_cast<int>(tx), static_cast<int>(y), size,
+         HexColor(ink, ToRay(theme_.palette.ink)), style.mono);
+  }
+  return true;
+}
+
 void ShellView::PaintStage(const TaskStage& stage, const Area& origin) {
   const Palette& p = theme_.palette;
+  // HTA #machine is not overridden by the dark palette; the filter and
+  // galley housings are. Keep the frame behind (not over) the scenery.
+  const bool darkHousing = theme_.id != "classic" && stage.id != "machine";
+  const Color housing = darkHousing ? ToRay(p.chrome) : HexColor("#fdfbf7", ToRay(p.panel));
+  const Color edge = darkHousing ? ToRay(p.borderDark) : HexColor("#8c6f4e", ToRay(p.borderDark));
+  DrawRectangle(static_cast<int>(origin.x), static_cast<int>(origin.y),
+                static_cast<int>(stage.width), static_cast<int>(stage.height), housing);
+  DrawRectangleLines(static_cast<int>(origin.x), static_cast<int>(origin.y),
+                     static_cast<int>(stage.width), static_cast<int>(stage.height), edge);
   for (const MachinePart& part : stage.parts) {
+    if (PaintScenePart(part, origin)) continue;
     const int x = static_cast<int>(origin.x + part.box.x);
     const int y = static_cast<int>(origin.y + part.box.y);
     const int w = std::max(1, static_cast<int>(part.box.w));
     const int h = std::max(1, static_cast<int>(part.box.h));
+    if (!part.tone.empty()) {
+      const Color tone = HexColor(part.tone, ToRay(p.muted));
+      if (!part.text.empty()) {
+        Text(part.text.c_str(), x, y, TypePx(8), tone);
+      } else if (part.box.w > 0 && part.box.h > 0) {
+        DrawRectangle(x, y, w, h, tone);
+      }
+      continue;
+    }
     if (part.cls.find("pipe") != std::string::npos ||
         part.cls.find("duct") != std::string::npos ||
         part.cls.find("counter") != std::string::npos) {
@@ -825,6 +958,75 @@ void ShellView::PaintStage(const TaskStage& stage, const Area& origin) {
   }
 }
 
+float ShellView::PaintActionBand(const std::string& title, const std::string& note,
+                                const std::vector<ProgressButton>& buttons, const std::string& warning, bool measureOnly) {
+  const auto& p = theme_.palette;
+  const float left = layout_.content.x + 8, width = layout_.content.w - 16;
+  const float inner = std::max(1.0f, width - 24), gap = 10;
+  const int size = TypePx(10);
+  const float line = std::max(theme_.LineHeight(), static_cast<float>(size) + 4);
+  struct ButtonBox { std::size_t index; float width, height; std::vector<std::string> text; };
+  std::vector<std::vector<ButtonBox>> rows(1);
+  float used = 0;
+  for (std::size_t i = 0; i < buttons.size(); ++i) {
+    const float w = std::min(inner, std::max(200.0f, TextWidth(buttons[i].text.c_str(), size) + 24));
+    auto text = WrapText(buttons[i].text, std::max(1.0f, w - 20), size, SelectFont(size, false));
+    if (!rows.back().empty() && used + gap + w > inner) { rows.emplace_back(); used = 0; }
+    if (!rows.back().empty()) used += gap;
+    used += w;
+    rows.back().push_back({i, w, text.size() * line + 12, std::move(text)});
+  }
+  const auto notes = note.empty() ? std::vector<std::string>{} : WrapText(note, inner, size, SelectFont(size, false));
+  const auto warnings = warning.empty() ? std::vector<std::string>{} : WrapText(warning, inner, size, SelectFont(size, false));
+  float buttonsH = 0;
+  for (const auto& row : rows) {
+    float h = 0; for (const auto& button : row) h = std::max(h, button.height);
+    if (h) buttonsH += h + gap;
+  }
+  const float h = 12 + line + 10 + buttonsH + (notes.size() + warnings.size()) * line + 12;
+  if (measureOnly) return h;
+  actionBandTop_ = layout_.content.Bottom() - 8 - h;
+  const float top = actionBandTop_ + contentScroll_;
+  // A pinned overlay must not inflate the scroll extent of the body beneath it.
+  const bool tracked = paintingContent_; paintingContent_ = false;
+  DrawRectangle(static_cast<int>(left), static_cast<int>(top), static_cast<int>(width), static_cast<int>(h), ToRay(p.panel));
+  DrawRectangleLines(static_cast<int>(left), static_cast<int>(top), static_cast<int>(width), static_cast<int>(h), ToRay(p.border));
+  Text(title.c_str(), static_cast<int>(left + (width - TextWidth(title.c_str(), size)) / 2), static_cast<int>(top + 8), size, ToRay(p.coffee));
+  float y = top + 12 + line + 10;
+  for (const auto& row : rows) {
+    float rowW = 0, rowH = 0;
+    for (const auto& button : row) { rowW += button.width; rowH = std::max(rowH, button.height); }
+    if (!row.empty()) rowW += gap * (row.size() - 1);
+    float x = left + (width - rowW) / 2;
+    for (const auto& cell : row) {
+      const auto& button = buttons[cell.index];
+      const Area box{x, y, cell.width, rowH};
+      DrawRectangle(static_cast<int>(x), static_cast<int>(y), static_cast<int>(box.w), static_cast<int>(box.h), ToRay(button.enabled ? p.control : p.panel3));
+      PaintProgressFill(box, button.fillPercent);
+      DrawRectangleLines(static_cast<int>(x), static_cast<int>(y), static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.borderDark));
+      float textY = y + (rowH - cell.text.size() * line) / 2;
+      for (const auto& text : cell.text) {
+        Text(text.c_str(), static_cast<int>(x + (box.w - TextWidth(text.c_str(), size)) / 2), static_cast<int>(textY), size,
+             ToRay(button.state == ButtonState::Cooldown ? p.terracotta : p.ink));
+        textY += line;
+      }
+      actionBandHits_.push_back({box, button.taskId, ""});
+      x += box.w + gap;
+    }
+    y += rowH + gap;
+  }
+  for (const auto& text : notes) {
+    Text(text.c_str(), static_cast<int>(left + (width - TextWidth(text.c_str(), size)) / 2), static_cast<int>(y), size, ToRay(p.muted));
+    y += line;
+  }
+  for (const auto& text : warnings) {
+    Text(text.c_str(), static_cast<int>(left + (width - TextWidth(text.c_str(), size)) / 2), static_cast<int>(y), size, ToRay(p.terracotta));
+    y += line;
+  }
+  paintingContent_ = tracked;
+  return h;
+}
+
 void ShellView::PaintTaskScreen(Simulation& sim) {
   taskButtons_.clear();
   const Palette& p = theme_.palette;
@@ -835,71 +1037,42 @@ void ShellView::PaintTaskScreen(Simulation& sim) {
 
   const float headerH = PaintTaskHeader(screen.head, left, layout_.content.y);
 
-  float y = layout_.content.y + headerH + 8.0f;
+  const float bodyTop = layout_.content.y + headerH + 8;
+  const float stageX = left + (right - left - screen.stage.width) / 2;
+  const bool beside = !screen.hasStage ||
+      (stageX >= left + column + 16 && stageX + screen.stage.width <= right - column - 16);
+  const float panelTop = screen.hasStage && !beside ? bodyTop + screen.stage.height + 12 : bodyTop;
+  float y = panelTop;
   for (const NavPanel& panel : screen.left) {
     const float panelH = std::max(118.0f, MeasurePanelHeight(panel, column));
     PaintPanel(panel, Area{left, y, column, panelH});
-    y += panelH + 6.0f;
+    y += panelH + 6;
   }
-
-  float ry = layout_.content.y + headerH + 8.0f;
+  float ry = panelTop;
   for (const NavPanel& panel : screen.right) {
     const float panelH = std::max(150.0f, MeasurePanelHeight(panel, column));
     PaintPanel(panel, Area{right - column, ry, column, panelH});
-    ry += panelH + 6.0f;
+    ry += panelH + 6;
   }
-
-  float stageBottom = layout_.content.y + headerH;
+  float stageBottom = bodyTop;
   if (screen.hasStage) {
-    const Area origin{left + column + 16.0f, layout_.content.y + headerH + 8.0f,
-                      screen.stage.width, screen.stage.height};
+    // Fixed-size instrument, centered independently of viewport width. When
+    // the side panels cannot fit beside it, they flow beneath, never over it.
+    const Area origin{stageX, bodyTop, screen.stage.width, screen.stage.height};
     PaintStage(screen.stage, origin);
-    const float uy = origin.y + screen.stage.height + 4.0f;
-    const float halfW = (right - column - 16.0f - (left + column + 16.0f) - 4.0f) / 2.0f;
-    float underH = 110.0f;
-    for (const NavPanel& panel : screen.under) {
-      underH = std::max(underH, MeasurePanelHeight(panel, halfW));
-    }
+    const float uy = beside ? origin.Bottom() + 4 : std::max({origin.Bottom(), y, ry}) + 12;
+    const float gap = 6;
+    const float panelW = (origin.w - gap * std::max(0, static_cast<int>(screen.under.size()) - 1)) /
+                         std::max(1, static_cast<int>(screen.under.size()));
+    float underH = 0;
+    for (const auto& panel : screen.under) underH = std::max(underH, MeasurePanelHeight(panel, panelW));
     stageBottom = uy + underH;
-    for (std::size_t i = 0; i < screen.under.size(); ++i) {
-      PaintPanel(screen.under[i],
-                 Area{origin.x + static_cast<float>(i) * (halfW + 4.0f), uy, halfW,
-                      underH});
-    }
+    for (std::size_t i = 0; i < screen.under.size(); ++i)
+      PaintPanel(screen.under[i], {origin.x + i * (panelW + gap), uy, panelW, underH});
   }
 
-  // The commitments band, along the bottom of the content column.
-  const float bandY = std::max({layout_.content.Bottom() - 108.0f, y + 8.0f, ry + 8.0f, stageBottom + 8.0f});
-  DrawRectangle(static_cast<int>(left), static_cast<int>(bandY),
-                static_cast<int>(right - left), 102, ToRay(p.panel));
-  DrawRectangleLines(static_cast<int>(left), static_cast<int>(bandY),
-                     static_cast<int>(right - left), 102, ToRay(p.border));
-  Text("Actions", static_cast<int>(left + 8.0f),
-           static_cast<int>(bandY + 5.0f), TypePx(11), ToRay(p.coffee));
-  float noteY = bandY + TypeStep(32.0f);
-  for (const auto& line : WrapText(screen.bandNote, right - left - 16.0f, TypePx(10), SelectFont(TypePx(10), false))) {
-    Text(line.c_str(), static_cast<int>(left + 8.0f), static_cast<int>(noteY), TypePx(10), ToRay(p.muted));
-    noteY += theme_.LineHeight();
-  }
-
-  float bx = left + 12.0f;
-  const float progressH = theme_.LineHeight() + 6.0f;
-  const float progressY = noteY + 8.0f;
-  for (const ProgressButton& button : screen.progress) {
-    const float buttonW = std::max(190.0f, TextWidth(button.text.c_str(), TypePx(10)) + 16.0f);
-    const Area box{bx, progressY, buttonW, progressH};
-    DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
-                  static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel2));
-    PaintProgressFill(box, button.fillPercent);
-    DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
-                       static_cast<int>(box.w), static_cast<int>(box.h),
-                       ToRay(p.borderDark));
-    Text(button.text.c_str(), static_cast<int>(box.x + 8.0f),
-             static_cast<int>(box.y + (box.h - TypePx(10)) * 0.5f), TypePx(10) ,
-             ToRay(button.state == ButtonState::Cooldown ? p.terracotta : p.ink));
-    taskButtons_.push_back({box, button.taskId});
-    bx += buttonW + 8.0f;
-  }
+  contentPaintBottom_ = std::max({contentPaintBottom_, y, ry, stageBottom});
+  PaintActionBand("Actions", screen.bandNote, screen.progress);
   (void)sim;
 }
 
@@ -923,10 +1096,23 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   const float spareW = std::max(1.0f, middleRight - middleLeft);
   const float chartW = std::min(1100.0f, spareW);
   const float chartTop = layout_.content.y + headerH + 8.0f;
-  const float availableH = layout_.content.Bottom() - chartTop - 300.0f;
-  const float chartH = std::min({500.0f, chartW * 0.5f,
-                                 std::max(240.0f, availableH)});
-  const Area box{middleLeft, chartTop, chartW, chartH};
+  // Park at 240 and measure every other drawn item, as HTA layoutNav does.
+  const float halfW = (chartW - 6) / 2;
+  float underH = 112;
+  for (const auto& panel : screen.under) underH = std::max(underH, MeasurePanelHeight(panel, halfW));
+  float leftH = 0;
+  for (const auto& panel : screen.left) leftH += std::max(96.0f, MeasurePanelHeight(panel, leftColumn)) + 4;
+  const float rightH = screen.right.empty() ? 0 : std::max(190.0f, MeasurePanelHeight(screen.right[0], rightColumn));
+  float tailH = screen.commands.size() * (theme_.LineHeight() + 12);
+  for (const auto& note : navScreen_.notes)
+    tailH += WrapText(note, right - left - 16, TypePx(9), SelectFont(TypePx(9), false)).size() * theme_.LineHeight() + 4;
+  const float footerH = PaintActionBand("Target Actions", navScreen_.courseNote, screen.progress, "", true);
+  const float parkedBody = std::max({240 + 22 + underH, leftH, rightH}) + 12 + tailH;
+  const float otherH = headerH + 8 + parkedBody - 240 + footerH + 8;
+  const float availableH = layout_.content.h - otherH - 4;
+  // Preserve the existing logical viewport and cap/floor ordering by request.
+  const float chartH = std::min({500.0f, chartW * 0.5f, std::max(240.0f, availableH)});
+  const Area box{middleLeft + (spareW - chartW) / 2, chartTop, chartW, chartH};
   navChartBox_ = box;
   const ship::NavRaster raster = BuildNavRaster(sim);
   const float sx = box.w / static_cast<float>(raster.width);
@@ -936,7 +1122,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   const float bodyScale = std::min(sx, sy);
 
   DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
-                static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel));
+                static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.chart));
   DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
                      static_cast<int>(box.w), static_cast<int>(box.h),
                      ToRay(p.borderDark));
@@ -1059,7 +1245,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     layerY += layerH + 4.0f;
   }
   Text(chart.scaleText.c_str(), static_cast<int>(box.x + 8.0f),
-       static_cast<int>(box.y + 7.0f), TypePx(9), ToRay(p.muted));
+       static_cast<int>(box.y + 7.0f), TypePx(9), ToRay(p.chartInk));
 
   // --- panels: identity left, sensors right, the leg underneath the chart
   float ly = layout_.content.y + headerH + 8.0f;
@@ -1078,11 +1264,6 @@ void ShellView::PaintNavScreen(Simulation& sim) {
                     rightColumn, panelH});
   }
 
-  const float halfW = (box.w - 6.0f) / 2.0f;
-  float underH = 112.0f;
-  for (const NavPanel& panel : screen.under) {
-    underH = std::max(underH, MeasurePanelHeight(panel, halfW));
-  }
   const float uy = box.Bottom() + 22.0f;
   for (std::size_t i = 0; i < screen.under.size(); ++i) {
     PaintPanel(screen.under[i],
@@ -1090,40 +1271,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
                     underH});
   }
 
-  // --- the commitment band, full width along the bottom
-  const float bandY = std::max({layout_.content.Bottom() - 110.0f, ly + 8.0f, rightBottom + 8.0f, uy + underH + 8.0f});
-  DrawRectangle(static_cast<int>(left), static_cast<int>(bandY),
-                static_cast<int>(right - left), 104, ToRay(p.panel));
-  DrawRectangleLines(static_cast<int>(left), static_cast<int>(bandY),
-                     static_cast<int>(right - left), 104, ToRay(p.border));
-  Text("Target Actions", static_cast<int>(left + 8.0f),
-           static_cast<int>(bandY + 4.0f), TypePx(10) , ToRay(p.coffee));
-  float ty = bandY + theme_.LineHeight() + 12.0f;
-  for (const auto& line : WrapText(navScreen_.courseNote, right - left - 16.0f, TypePx(10), SelectFont(TypePx(10), false))) {
-    Text(line.c_str(), static_cast<int>(left + 8.0f), static_cast<int>(ty), TypePx(10), ToRay(p.muted));
-    ty += theme_.LineHeight();
-  }
-  ty += 8.0f;
-
-  float px2 = left + 8.0f;
-  for (const ProgressButton& button : screen.progress) {
-    const float buttonW = std::max(148.0f, TextWidth(button.text.c_str(), TypePx(9)) + 16.0f);
-    const Area buttonBox{px2, ty, buttonW, theme_.LineHeight() + 12.0f};
-    DrawRectangle(static_cast<int>(buttonBox.x), static_cast<int>(buttonBox.y),
-                  static_cast<int>(buttonBox.w), static_cast<int>(buttonBox.h),
-                  ToRay(button.enabled ? p.panel2 : p.panel3));
-    PaintProgressFill(buttonBox, button.fillPercent);
-    DrawRectangleLines(static_cast<int>(buttonBox.x), static_cast<int>(buttonBox.y),
-                       static_cast<int>(buttonBox.w),
-                       static_cast<int>(buttonBox.h), ToRay(p.borderDark));
-    Text(button.text.c_str(), static_cast<int>(buttonBox.x + 6.0f),
-             static_cast<int>(buttonBox.y + 6.0f), TypePx(9) ,
-             ToRay(button.state == ButtonState::Cooldown ? p.terracotta : p.ink));
-    navHits_.push_back(NavHit{buttonBox, button.taskId, ""});
-    px2 += buttonW + 8.0f;
-  }
-
-  ty += theme_.LineHeight() + 20.0f;
+  float ty = std::max({ly, rightBottom, uy + underH}) + 12;
   for (const CommandRowView& row : screen.commands) {
     const float costW = TextWidth(row.displayCost.c_str(), TypePx(9)) + 12.0f;
     const Area rowBox{left + 8.0f, ty, right - left - 16.0f, theme_.LineHeight() + 8.0f};
@@ -1152,6 +1300,9 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     }
     ty += 4.0f;
   }
+  contentPaintBottom_ = std::max(contentPaintBottom_, ty);
+  PaintActionBand("Target Actions", navScreen_.courseNote, screen.progress);
+
 }
 
 void ShellView::PaintCrewRecord(const Simulation& sim) {
@@ -1215,7 +1366,9 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
   quartersBandTop_ = layout_.content.Bottom() - bandHeight;
   // Payroll and roster are separate in paintRoster(). Do not paint the full
   // roster as a table and then overlay clickable copies over its payroll rows.
-  float rowY = panelTop;
+  const Area hall{(left + right - 560) / 2, panelTop, 560, 300};
+  const bool stacked = hall.x < left + column + 10 || hall.Right() > right - column - 10;
+  float rowY = stacked ? hall.Bottom() + 10 : panelTop;
   if (!screen.left.empty()) {
     auto payroll = screen.left.front();
     if (payroll.lines.size() > 4) { payroll.lines.resize(4); }
@@ -1242,15 +1395,16 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
     navHits_.push_back({box, "select", row.id});
     rowY += h + 3;
   }
-  const Area hall{left + column + 10, panelTop, 560, 300};
   DrawRectangle(static_cast<int>(hall.x), static_cast<int>(hall.y),
-                static_cast<int>(hall.w), static_cast<int>(hall.h), ToRay(p.panel2));
+                static_cast<int>(hall.w), static_cast<int>(hall.h),
+                theme_.id == "classic" ? HexColor("#fdfbf7", ToRay(p.panel)) : ToRay(p.chrome));
   DrawRectangleLines(static_cast<int>(hall.x), static_cast<int>(hall.y),
                      static_cast<int>(hall.w), static_cast<int>(hall.h),
                      ToRay(p.borderDark));
   BeginScissorMode(static_cast<int>(hall.x) + 1, static_cast<int>(hall.y - contentScroll_) + 1,
                    static_cast<int>(hall.w) - 2, static_cast<int>(hall.h) - 2);
   for (const MachinePart& part : quarters_.hall) {
+    if (PaintScenePart(part, hall)) continue;
     const int x = static_cast<int>(hall.x + part.box.x);
     const int y = static_cast<int>(hall.y + part.box.y);
     const int w = std::max(1, static_cast<int>(part.box.w));
@@ -1281,8 +1435,7 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
 
   // Orders retain the HTA dropdown and every note/cost. At narrow widths the
   // whole column moves below the hall instead of painting through its figure.
-  const bool stacked = right - column < hall.Right() + 10;
-  const float orderX = stacked ? hall.x : right - column;
+  const float orderX = right - column;
   float oy = stacked ? hall.Bottom() + 10 : panelTop;
   for (const auto& panel : screen.right) {
     const float h = MeasurePanelHeight(panel, column);
@@ -1334,7 +1487,7 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
       oy += h + 4;
     }
   }
-  float uy = stacked ? oy + 10 : hall.Bottom() + 10;
+  float uy = stacked ? std::max(rowY, oy) + 10 : hall.Bottom() + 10;
   for (const auto& panel : screen.under) {
     const float h = MeasurePanelHeight(panel, hall.w);
     PaintPanel(panel, {hall.x, uy, hall.w, h}); uy += h + 6;
@@ -1365,12 +1518,16 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
   for (const auto& button : screen.progress) {
     const float width = buttonWidth(button);
     const float buttonH = countRows(button.text, width - 16) * line + 12;
-    const Area box{left + 8, y + 6, width, buttonH};
+    const Area box{(left + right - width) / 2, y + 6, width, buttonH};
     DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.w), static_cast<int>(box.h), ToRay(button.enabled ? p.panel2 : p.panel3));
     PaintProgressFill(box, button.fillPercent);
     DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.borderDark));
     float textY = box.y + 6;
-    wrapped(button.text, box.x + 8, textY, width - 16, ToRay(p.ink));
+    for (const auto& text : WrapText(button.text, width - 16, TypePx(10), SelectFont(TypePx(10), false))) {
+      Text(text.c_str(), static_cast<int>(box.x + (width - TextWidth(text.c_str(), TypePx(10))) / 2),
+           static_cast<int>(textY), TypePx(10), ToRay(p.ink));
+      textY += line;
+    }
     navHits_.push_back({box, "commit", ""});
     y = box.Bottom() + 8;
   }
@@ -1635,14 +1792,14 @@ void ShellView::PaintTitle(Simulation& sim) {
   // controls. HTA #title-actions paints its own five commands over that strip.
   const Area menu{card.x + card.w * 0.02f, card.Bottom() - card.h * (0.0405f + 0.0565f),
                   card.w * 0.818f, std::max(card.h * 0.0565f, theme_.LineHeight() + 12)};
-  const Color menuBg{0x3f,0x34,0x2b,255}, menuText{0xf2,0xe5,0xcc,255};
+  const Color menuBg = ToRay(p.titleMenu), menuText = ToRay(p.titleMenuInk);
   const float cell = menu.w / static_cast<float>(title_.actions.size());
   for (std::size_t i = 0; i < title_.actions.size(); ++i) {
     const Area box{menu.x + cell * i, menu.y, cell, menu.h};
     const bool hover = box.Contains(mouseX_, mouseY_);
     DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.w + 1), static_cast<int>(box.h),
-                  hover ? Color{0x6b,0x54,0x3f,255} : menuBg);
-    DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.w), static_cast<int>(box.h), Color{0xa4,0x8e,0x72,255});
+                  hover ? ToRay(p.titleMenuHover) : menuBg);
+    DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.titleMenuBorder));
     const auto& action = title_.actions[i];
     const float tw = TextWidth(action.label.c_str(), TypePx(12), true);
     Text(action.label.c_str(), static_cast<int>(box.x + (box.w - tw) / 2),
@@ -1840,61 +1997,15 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
     panelsBottom = std::max(panelsBottom, y);
   }
 
-  // Only screens with commitments, progress, or a confirmation get a bottom band.
-  if (!screen.progress.empty() || !pendingConfirm_.empty() || !screen.bandNote.empty()) {
-  const float bandY = std::max(layout_.content.Bottom() - 96.0f, panelsBottom + 12.0f);
-  DrawRectangle(static_cast<int>(left), static_cast<int>(bandY),
-                static_cast<int>(right - left), 90, ToRay(p.panel));
-  DrawRectangleLines(static_cast<int>(left), static_cast<int>(bandY),
-                     static_cast<int>(right - left), 90, ToRay(p.border));
-  Text("Work in progress", static_cast<int>(left + 8.0f),
-       static_cast<int>(bandY + 5.0f), TypePx(11), ToRay(p.coffee));
-  float bandCursor = bandY + theme_.LineHeight() + 12.0f;
-  for (const auto& line : WrapText(screen.bandNote, right - left - 16.0f, TypePx(10), SelectFont(TypePx(10), false))) {
-    Text(line.c_str(), static_cast<int>(left + 8.0f), static_cast<int>(bandCursor), TypePx(10), ToRay(p.muted));
-    bandCursor += theme_.LineHeight();
-  }
+  contentPaintBottom_ = std::max(contentPaintBottom_, panelsBottom);
+  auto buttons = screen.progress;
+  std::string note = screen.bandNote;
   if (!pendingConfirm_.empty()) {
-    for (const auto& line : WrapText(pendingConfirm_, right - left - 16.0f, TypePx(10), SelectFont(TypePx(10), false))) {
-      Text(line.c_str(), static_cast<int>(left + 8.0f), static_cast<int>(bandCursor), TypePx(10), ToRay(p.terracotta));
-      bandCursor += theme_.LineHeight();
-    }
-    const struct {
-      const char* action;
-      const char* label;
-    } answers[] = {{"confirm-yes", "Yes, do it"}, {"confirm-no", "Keep as it is"}};
-    float ax = left + 12.0f;
-    for (const auto& entry : answers) {
-      const float aw = static_cast<float>(TextWidth(entry.label, TypePx(10) )) + 20.0f;
-      const Area box{ax, bandCursor + 6.0f, aw, theme_.LineHeight() + 12.0f};
-      DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
-                         static_cast<int>(box.w), static_cast<int>(box.h),
-                         ToRay(p.borderDark));
-      Text(entry.label, static_cast<int>(box.x + 8.0f),
-               static_cast<int>(box.y + 7.0f), TypePx(10) , ToRay(p.ink));
-      navHits_.push_back(NavHit{box, entry.action, ""});
-      ax += aw + 8.0f;
-    }
+    ProgressButton yes; yes.taskId = "confirm-yes"; yes.text = "Yes, do it";
+    ProgressButton no; no.taskId = "confirm-no"; no.text = "Keep as it is";
+    buttons.push_back(yes); buttons.push_back(no);
   }
-
-  if (!pendingConfirm_.empty()) { bandCursor += theme_.LineHeight() + 24.0f; }
-  const float progressTop = bandCursor + 8.0f;
-  float bx = left + 12.0f;
-  for (const ProgressButton& button : screen.progress) {
-    const Area box{bx, progressTop, 190.0f, 28.0f};
-    DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
-                  static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel2));
-    PaintProgressFill(box, button.fillPercent);
-    DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
-                       static_cast<int>(box.w), static_cast<int>(box.h),
-                       ToRay(p.borderDark));
-    Text(button.text.c_str(), static_cast<int>(box.x + 8.0f),
-             static_cast<int>(box.y + 8.0f), TypePx(10) ,
-             ToRay(button.state == ButtonState::Cooldown ? p.terracotta : p.ink));
-    taskButtons_.push_back({box, button.taskId});
-    bx += 198.0f;
-  }
-  }
+  if (!buttons.empty() || !note.empty()) PaintActionBand("Work in progress", note, buttons, pendingConfirm_);
   (void)sim;
 }
 
@@ -2150,9 +2261,16 @@ void ShellView::Move(float x, float y) {
 
 void ShellView::Drag(Simulation& sim, float x, float y, float dx, float dy, bool down, bool pressed) {
   Move(x, y);
-  if (!down) { draggingChart_ = false; return; }
+  if (!down) { draggingChart_ = false; draggingFeed_ = false; return; }
   if (floating_.HasConfirmation()) { return; }
   if (titleActive_ || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow)) { return; }
+  if (feedActive_ && down && (draggingFeed_ ||
+      (pressed && layout_.content.Contains(x, y) && feedThumb_.Contains(x, y + contentScroll_)))) {
+    if (!draggingFeed_) { draggingFeed_ = true; feedDragOffset_ = y + contentScroll_ - feedThumb_.y; }
+    const float travel = feedBox_.h - 4 - feedThumb_.h;
+    if (travel > 0) feedScroll_ = std::clamp((y + contentScroll_ - feedBox_.y - 2 - feedDragOffset_) / travel, 0.0f, 1.0f) * feedMaxScroll_;
+    return;
+  }
   const float localY = y + contentScroll_;
   if (!draggingChart_) {
     if (!pressed) { return; }
@@ -2182,6 +2300,9 @@ void ShellView::Scroll(float x, float y, float wheelDelta) {
   if (floating_.HasConfirmation()) { return; }
   const float step = wheelDelta * TypeStep(40.0f);
   if (titleActive_) { titleScroll_ = std::max(0.0f, std::min(titleMaxScroll_, titleScroll_ - step)); }
+  else if (feedActive_ && layout_.content.Contains(x, y) && feedBox_.Contains(x, y + contentScroll_)) {
+    feedScroll_ = std::clamp(feedScroll_ - step, 0.0f, feedMaxScroll_);
+  }
   else if (wikiIndexBox_.Contains(x, y + contentScroll_)) { wikiIndexScroll_ = std::max(0.0f, std::min(wikiIndexMaxScroll_, wikiIndexScroll_ - step)); }
   else if (wikiBodyBox_.Contains(x, y + contentScroll_)) { wikiBodyScroll_ = std::max(0.0f, std::min(wikiBodyMaxScroll_, wikiBodyScroll_ - step)); }
   else if (layout_.sidepanel.Contains(x, y)) { sideScroll_ = std::max(0.0f, std::min(std::max(0.0f, sideContentH_ - layout_.sidepanel.h), sideScroll_ - step)); }
@@ -2326,6 +2447,24 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
   if (!layout_.content.Contains(x, y)) { return; }
   const float scrollY = contentScroll_;
 
+  if (y >= actionBandTop_) {
+    for (const auto& hit : actionBandHits_) {
+      if (!hit.box.Contains(x, y + scrollY)) continue;
+      if (hit.action == "confirm-no") { pendingConfirm_.clear(); pendingAction_.clear(); return; }
+      if (hit.action == "confirm-yes") {
+        const std::string action = pendingAction_;
+        pendingConfirm_.clear(); pendingAction_.clear();
+        if (PressPanelRow(sim, panelsKind_, action)) SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
+        return;
+      }
+      const bool positive = screenNav_ ? PressNavAction(sim, hit.action, hit.arg)
+                                       : PressProgressButton(sim, hit.action);
+      if (positive) SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
+      return;
+    }
+    return; // Never activate a body control hidden behind the band.
+  }
+
   // The quarters: a roster row, a job, an order, the sheet, a word.
   if (screenQuarters_) {
     for (const NavHit& hit : navHits_) {
@@ -2334,7 +2473,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
       if (y >= quartersBandTop_ && hit.action != "commit") { continue; }
       if (!hit.box.Contains(x, y + scrollY)) { continue; }
       if (PressQuartersAction(sim, hit.action, hit.arg) && hit.action == "commit") {
-        SpawnMark(marks_, x, y + scrollY, nowMs, sim.State().reducedMotion);
+        SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
       }
       return;
     }
@@ -2346,15 +2485,6 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
   if (screenPanels_) {
     for (const NavHit& hit : navHits_) {
       if (!hit.box.Contains(x, y + scrollY)) { continue; }
-      if (hit.action == "confirm-no") { pendingConfirm_.clear(); pendingAction_.clear(); return; }
-      if (hit.action == "confirm-yes") {
-        const std::string action = pendingAction_;
-        pendingConfirm_.clear();
-        pendingAction_.clear();
-        const bool acted = PressPanelRow(sim, panelsKind_, action);
-        if (acted) { SpawnMark(marks_, x, y + scrollY, nowMs, sim.State().reducedMotion); }
-        return;
-      }
       // Read the row's own question before acting: a purchase that cannot be
       // undone asks first when the reader keeps confirmations on.
       std::string question;
@@ -2373,7 +2503,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         return;
       }
       const bool acted = PressPanelRow(sim, panelsKind_, hit.arg);
-      if (acted) { SpawnMark(marks_, x, y + scrollY, nowMs, sim.State().reducedMotion); }
+      if (acted) { SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion); }
       return;
     }
   }
@@ -2384,7 +2514,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
       if (!hit.box.Contains(x, y + scrollY)) { continue; }
       if (PressNavAction(sim, hit.action, hit.arg) &&
           (hit.action == "travel" || hit.action == "scan")) {
-        SpawnMark(marks_, x, y + scrollY, nowMs, sim.State().reducedMotion);
+        SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
       }
       return;
     }
@@ -2395,7 +2525,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
   for (const auto& entry : taskButtons_) {
     if (!entry.first.Contains(x, y + scrollY)) { continue; }
     if (PressProgressButton(sim, entry.second)) {
-      SpawnMark(marks_, x, y + scrollY, nowMs, sim.State().reducedMotion);
+      SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
     }
     return;
   }
@@ -2436,7 +2566,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
           OpenTask(sim, "room", room.id, false);
         } else {
           OpenBriefing(sim, "room", room.id);
-          SpawnMark(marks_, x - layout_.content.x, y, nowMs,
+          SpawnMark(marks_, x, y, nowMs,
                     sim.State().reducedMotion);
         }
         return;

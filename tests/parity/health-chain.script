@@ -1,0 +1,52 @@
+# Boundary states set equally in both engines; ticks execute real HTA logic.
+# Eating happens BEFORE starvation: 90 hunger falls by 40 and avoids damage.
+survival-set canisters 0
+survival-set airHold 20
+survival-set crewTick 7
+survival-set rack 1
+crew-set rell health 5
+crew-set rell hunger 90
+crew-set rell hungerTick 24
+trace
+action Meal before starvation
+trace
+# Empty rack: +15 hunger; the same eighth tick now harms a starving person.
+survival-set crewTick 7
+crew-set rell hunger 90
+crew-set rell hungerTick 24
+action Empty rack
+trace
+# BAD air at hold=5; ten-tick harm follows filter decay on this same action.
+survival-set airHold 6
+survival-set crewTick 9
+action Bad air boundary
+trace
+# FOUL air and starvation stack on tick 40; health clamps at zero, then loss.
+survival-set airHold 0
+survival-set crewTick 39
+crew-set rell health 1
+crew-set rell hunger 100
+action Combined harm and death
+trace
+# Actual source startMedical callback and original task-completion hook.
+survival-set airHold 20
+crew-set jax health 50
+medical jax
+trace
+action Treatment 1
+action Treatment 2
+action Treatment 3
+trace
+# Worker starts automatic canister seating while air is healthy.
+survival-set airHold 20
+survival-set crewTick 0
+survival-set canisters 2
+crew-set bo jobAt 4
+action Automatic filter work
+trace
+# Death interrupts that worker's task and refunds its consumed canister.
+survival-set airHold 0
+survival-set crewTick 4
+crew-set bo health 1
+action Worker lost during seating
+trace

@@ -41,6 +41,10 @@ struct Palette {
   Rgb sage;
   Rgb amber;
   Rgb titleBackground, titleDialog, titleBorder, titleInk;
+  // Separate source roles: chrome is not a panel; content is not an active tab
+  // texture tint; menu colours are overridden independently in dark themes.
+  Rgb content, chrome, hover, control, input, tabInk, activeInk, chart, chartInk;
+  Rgb titleMenu, titleMenuInk, titleMenuBorder, titleMenuHover;
 };
 
 // One of THEMES: a name, a label for the settings screen, and the ink that the

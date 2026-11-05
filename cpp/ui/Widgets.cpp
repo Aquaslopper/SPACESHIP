@@ -318,17 +318,24 @@ CommandRowView BuildCommandRow(const Simulation& sim, const std::string& label,
   row.cooldownKey =
       ActionCooldownKey(sim, "command:" + CommandSlug(label) + ":" + Num(occurrence));
 
-  row.remaining = CooldownRemaining(sim, row.cooldownKey);
-  if (row.remaining > 0.0) {
-    row.coolingDown = true;
-    row.displayCost = "COOLDOWN " + Num(row.remaining);
-    const std::string tier =
-        RuleLabel(sim, sim.State().actionCooldowns.at(row.cooldownKey).category);
-    row.title = tier + " cooldown: " + Num(row.remaining) +
-                " more actions. Other committed actions advance it; waiting does "
-                "not.";
-  }
+  BindCommandCooldown(sim, row, row.cooldownKey, row.category);
   return row;
+}
+
+void BindCommandCooldown(const Simulation& sim, CommandRowView& row,
+                         const std::string& key, const std::string& category) {
+  row.cooldownKey = key;
+  row.category = category;
+  row.remaining = CooldownRemaining(sim, key);
+  row.coolingDown = row.remaining > 0.0;
+  if (row.coolingDown) {
+    row.displayCost = "COOLDOWN " + Num(row.remaining);
+    row.title = RuleLabel(sim, sim.State().actionCooldowns.at(key).category) +
+        " cooldown: " + Num(row.remaining) +
+        " more actions. Other committed actions advance it; waiting does not.";
+    row.enabled = false;
+    row.live = false;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -568,6 +575,8 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
           view.enabled = row.enabled;
           view.live = row.enabled;
           view.confirm = row.confirm;
+          BindCommandCooldown(sim, view, ActionCooldownKey(sim, "press:station:" + row.id + ":"),
+                              "routine");
           rows.push_back(view);
           ids.push_back(row.id);
         }
@@ -598,6 +607,8 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         view.enabled = row.enabled;
         view.live = row.enabled;
         view.confirm = row.confirm;
+        BindCommandCooldown(sim, view, ActionCooldownKey(sim, "press:stores:" + row.id + ":"),
+                            ActionCooldownCategory(row.id + " "));
         rows.push_back(view);
         ids.push_back(row.id);
       }
@@ -622,6 +633,8 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         view.enabled = row.enabled;
         view.live = row.enabled;
         view.confirm = row.confirm;
+        BindCommandCooldown(sim, view, ActionCooldownKey(sim, "press:room:" + row.id + ":"),
+                            ActionCooldownCategory(row.id + " "));
         rows.push_back(view);
         ids.push_back(row.id);
       }
@@ -652,6 +665,8 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         view.enabled = row.enabled;
         view.live = row.enabled;
         view.confirm = row.confirm;
+        BindCommandCooldown(sim, view, ActionCooldownKey(sim, "press:simcore:" + row.id + ":"),
+                            ActionCooldownCategory(row.id + " "));
         rows.push_back(view);
         ids.push_back(row.id);
       }
@@ -726,6 +741,8 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         view.enabled = row.enabled;
         view.live = row.enabled;
         view.confirm = row.confirm;
+        BindCommandCooldown(sim, view, ActionCooldownKey(sim, "press:awards:" + row.id + ":"),
+                            ActionCooldownCategory(row.id + " "));
         rows.push_back(view);
         ids.push_back(row.id);
       }
@@ -748,6 +765,8 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         view.enabled = row.enabled;
         view.live = row.enabled;
         view.confirm = row.confirm;
+        BindCommandCooldown(sim, view, ActionCooldownKey(sim, "press:event:" + row.id + ":"),
+                            ActionCooldownCategory(row.id + " "));
         rows.push_back(view);
         ids.push_back(row.id);
       }

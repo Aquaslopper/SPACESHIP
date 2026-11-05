@@ -441,3 +441,31 @@ TEST_CASE("quarters commits only the displayed progress cooldown", "[crew][ui][c
   CHECK(ship::CooldownRemaining(sim, button.cooldownKey) == ship::RuleActions(sim, button.category));
   CHECK(sim.State().actionCooldowns.size() == 1);
 }
+
+TEST_CASE("quarters condition preserves actual vital widths and source good-bad colours", "[crew][health][source-audit]") {
+  auto sim = Fresh();
+  sim.MutableState().crewSel = "jax";
+  auto* crew = sim.FindCrew("jax");
+  REQUIRE(crew != nullptr);
+  crew->health = 25; crew->morale = 55; crew->fatigue = 80; crew->hunger = 90;
+  const auto screen = ship::BuildQuartersScreen(sim);
+  const auto* condition = Panel(screen.screen.under, "cq-cond");
+  REQUIRE(condition != nullptr);
+  REQUIRE(condition->lines.size() == 8);
+  const char* labels[] = {"Health", "Morale", "Fatigue", "Hunger"};
+  const double values[] = {25, 55, 80, 90};
+  const char* tones[] = {"#b05a42", "#c08a3e", "#b05a42", "#b05a42"};
+  for (int i = 0; i < 4; ++i) {
+    CHECK(condition->lines[2 * i].key == labels[i]);
+    const auto& bar = condition->lines[2 * i + 1];
+    CHECK(bar.kind == ship::PanelLine::Kind::Bar);
+    CHECK(bar.pct == values[i]);  // bad-stat colours invert; the value does NOT
+    CHECK(bar.tone == tones[i]);
+  }
+  // Reading health/needs cannot advance the quote cycle or action clock.
+  const auto actions = sim.ActionCount();
+  const auto said = crew->saidN;
+  ship::BuildQuartersScreen(sim); ship::BuildCrewRecord(sim, "jax");
+  CHECK(sim.ActionCount() == actions);
+  CHECK(crew->saidN == said);
+}

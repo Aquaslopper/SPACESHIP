@@ -32,6 +32,8 @@
 //    project <id> | medical <crewId> | social <a> <b>
 //    save <file> [utf16]  |  load <file>
 //    saveslot <1|2|3> | loadslot <1|2|3>   the HTA's own three slots
+//    crew-set <id> <numeric field> <value>   survival boundary test setup
+//    survival-set <field> <value>            survival boundary test setup
 //    active <tab>         select cooldown scope (UI test setup)
 //    progress[-click] <id> <0|1 enabled> <idle label>
 //                         inspect/click the real progress-button model
@@ -142,7 +144,30 @@ int main(int argc, char** argv) {
     if (parts.empty()) { continue; }
     const std::string& command = parts[0];
 
-    if (command == "active" && parts.size() >= 2) {
+    if (command == "crew-set" && parts.size() == 4) {
+      auto* crew = simulation.FindCrew(parts[1]);
+      double* field = nullptr;
+      if (crew != nullptr) {
+        if (parts[2] == "health") field = &crew->health;
+        if (parts[2] == "hunger") field = &crew->hunger;
+        if (parts[2] == "hungerTick") field = &crew->hungerTick;
+        if (parts[2] == "morale") field = &crew->morale;
+        if (parts[2] == "fatigue") field = &crew->fatigue;
+        if (parts[2] == "jobAt") field = &crew->jobAt;
+      }
+      if (field == nullptr) { std::fprintf(stderr, "Invalid crew fixture\n"); return 2; }
+      *field = std::stod(parts[3]);
+    } else if (command == "survival-set" && parts.size() == 3) {
+      double* field = nullptr;
+      if (parts[1] == "airHold") field = &simulation.MutableState().airHold;
+      if (parts[1] == "crewTick") field = &simulation.MutableState().crewTick;
+      if (parts[1] == "filterLife") field = &simulation.MutableState().filterLife;
+      if (parts[1] == "engineCondition") field = &simulation.MutableState().engineCondition;
+      if (parts[1] == "rack") field = &simulation.MutableMess().rack;
+      if (parts[1] == "canisters") field = &simulation.MutableLife().canisters;
+      if (field == nullptr) { std::fprintf(stderr, "Invalid survival fixture\n"); return 2; }
+      *field = std::stod(parts[2]);
+    } else if (command == "active" && parts.size() >= 2) {
       simulation.MutableState().activeTab = parts[1];
     } else if ((command == "progress" || command == "progress-click") && parts.size() >= 4) {
       const auto label = RestOfLine(RestOfLine(RestOfLine(line, command), parts[1]), parts[2]);

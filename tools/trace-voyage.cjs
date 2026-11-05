@@ -244,6 +244,23 @@ function runCommand(g, line) {
   const parts = line.trim().split(/\s+/);
   const command = parts[0];
 
+  // Scenario setup only: put BOTH engines at named boundary states. No tick,
+  // health mutation or treatment implementation is replaced by this fixture.
+  if (command === 'crew-set' && parts.length === 4) {
+    const allowed = ['health', 'hunger', 'hungerTick', 'morale', 'fatigue', 'jobAt'];
+    const c = g.findById(g.CREW, parts[1]);
+    if (!c || !allowed.includes(parts[2])) { throw new Error('Invalid crew fixture'); }
+    c[parts[2]] = Number(parts[3]);
+    return true;
+  }
+  if (command === 'survival-set' && parts.length === 3) {
+    const value = Number(parts[2]);
+    if (['airHold', 'crewTick', 'filterLife', 'engineCondition'].includes(parts[1])) { g.STATE[parts[1]] = value; }
+    else if (parts[1] === 'rack') { g.MESS.rack = value; }
+    else if (parts[1] === 'canisters') { g.LIFE.canisters = value; }
+    else { throw new Error('Invalid survival fixture'); }
+    return true;
+  }
   if (command === 'active' && parts.length >= 2) {
     g.STATE.activeTab = parts[1];
     return true;
@@ -783,15 +800,7 @@ function runCommand(g, line) {
     return true;
   }
   if (command === 'medical' && parts.length >= 2) {
-    const c = g.findById(g.CREW, parts[1]);
-    if (!c || c.health >= 100 || g.crewBusy(c) || !g.STATE.medkits || g.statValue('energy').value <= 2 || g.STATE.gameOver) { return true; }
-    g.STATE.medkits--;
-    g.clampStat('energy', -2);
-    g.CREW_CLAIMS[c.id] = true;
-    try { g.performAction('Treatment started for ' + c.name); } finally { delete g.CREW_CLAIMS[c.id]; }
-    if (g.STATE.gameOver || !g.findById(g.CREW, c.id)) { return true; }
-    const task = g.addOngoing('doc-' + c.id, 'Treating ' + c.name, 3, 'shipProject', 'medical');
-    if (task) { task.who = c.id; c.activity = 'In the medical bay'; }
+    g.startMedical(null, parts[1]);
     return true;
   }
   if (command === 'social' && parts.length >= 3) {

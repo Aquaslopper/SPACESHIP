@@ -346,7 +346,7 @@ bool PressStationActionRaw(Simulation& sim, const std::string& action,
 bool PressStationAction(Simulation& sim, const std::string& action, const std::string& arg) {
   return CommitActionButton(
       sim, ActionCooldownKey(sim, "press:station:" + action + ":" + arg),
-      ActionCooldownCategory(action + " " + arg),
+      "routine",  // user correction: a one-action station command locks for five actions
       [&]() { return PressStationActionRaw(sim, action, arg); });
 }
 

@@ -179,4 +179,13 @@ IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout
   return out;
 }
 
+IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout,
+                                const Theme& theme, bool hideCrewLabels, FxRng& rng) {
+  auto out = BuildIdleScreen(sim, layout, theme, hideCrewLabels, 0, rng);
+  const float other = out.feedBox.y - layout.content.y;
+  out.feedHeight = GiveFeedHeight(layout.content.h, other);
+  out.feedBox.h = out.feedHeight;
+  return out;
+}
+
 }  // namespace ship
