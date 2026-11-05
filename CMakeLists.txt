@@ -321,8 +321,15 @@ if(SPACESHIP_BUILD_TESTS)
   target_link_libraries(spaceship_tests PRIVATE spaceship_core Catch2::Catch2WithMain)
 
   include(Catch)
-  catch_discover_tests(spaceship_tests
-    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+  if(NOT CMAKE_CROSSCOMPILING)
+    catch_discover_tests(spaceship_tests
+      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+  else()
+    # A cross-build's test binary is a Windows PE: the build machine cannot run
+    # it, so discovery (which executes it) is skipped. The executable is still
+    # built, and the Windows job runs it under Wine.
+    message(STATUS "Spaceship: cross-compiling, so Catch2 discovery is skipped")
+  endif()
 
   # The drawing code cannot be linked here without X11/OpenGL, but it can be
   # parsed. Skips (77) on a machine with no headers fetched yet.
