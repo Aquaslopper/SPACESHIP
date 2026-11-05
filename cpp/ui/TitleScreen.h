@@ -61,6 +61,7 @@ struct TitleModel {
 
 std::string TitleButtonLabel(bool fromVoyage);
 bool AnySlotWritten(const Simulation& sim, const std::string& saveDir);
+bool TitleNeedsConfirmation(const Simulation& sim, bool fromVoyage);
 
 TitleModel BuildTitleScreen(const Simulation& sim, bool fromVoyage, TitlePanel panel,
                             const std::string& saveDir, int slot = 1,
@@ -71,7 +72,8 @@ TitleModel BuildTitleScreen(const Simulation& sim, bool fromVoyage, TitlePanel p
 // returns true when something changed and the caller should repaint.
 bool PressTitleAction(Simulation& sim, const std::string& action, const std::string& arg,
                       bool* fromVoyage, TitlePanel* panel, int* slot,
-                      const std::string& saveDir, std::string* message);
+                      const std::string& saveDir, std::string* message,
+                      bool* titleActive = nullptr);
 
 // ---------------------------------------------------------------------------
 //  Loss
