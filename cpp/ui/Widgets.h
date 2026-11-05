@@ -103,6 +103,19 @@ struct CommandRowView {
   double remaining = 0.0;
 };
 
+// A row the player can press, with the id the press path answers to. The
+// station, the stores, the fitted rooms, the Simulacron, the logbook and the
+// incident reports all speak this shape.
+struct ActionRowView {
+  std::string id;
+  std::string label;
+  std::string cost;      // "1 action", "free", "done", or empty
+  std::string note;
+  std::string confirm;   // asked first when confirmations are on
+  bool enabled = false;
+  bool reading = false;  // plain reading: nothing to press
+};
+
 // commandRow(): the same slug-and-occurrence identity the reference builds, so
 // two rows with the same label in one window do not share a lock.
 std::string CommandSlug(const std::string& label);
@@ -164,35 +177,6 @@ struct TaskStage {
   std::vector<LiveControl> controls;
 };
 
-struct TaskScreenModel {
-  TaskHead head;
-  std::vector<NavPanel> left;
-  std::vector<NavPanel> under;
-  std::vector<NavPanel> right;
-  std::vector<NavPanel> band;     // the full-width commitments panel
-  TaskStage stage;
-  std::vector<ProgressButton> progress;  // buttons in the band (and stage)
-  std::vector<CommandRowView> commands;  // the generic frame's action rows
-  std::string bandNote;
-  bool hasStage = false;
-
-  // Free-standing columns: the station and the stores are lists of command
-  // rows under a heading, not a stage with panels around it. The ids travel
-  // beside the rows so a click can be dispatched without parsing a label.
-  std::vector<NavPanel> panels;
-  std::vector<std::vector<CommandRowView>> panelRows;
-  std::vector<std::vector<std::string>> panelRowIds;
-};
-
-// The generic path: a described target that owns no bespoke screen.
-TaskScreenModel BuildDescribedScreen(const Simulation& sim, const Description& described);
-
-// Which builder a tab would use. Phase 3 owns the three machine rooms; every
-// other window still opens on the described frame until its own phase.
-enum class ScreenKind { Described, Nav, Engine, O2, Mess, Quarters, CrewRecord, Station, Cargo, Science, Deferred };
-ScreenKind ScreenKindFor(const Tab& tab);
-TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab);
-
 // ---------------------------------------------------------------------------
 //  ROOM SCENES — the nine vignettes.
 // ---------------------------------------------------------------------------
@@ -219,6 +203,40 @@ struct Vignette {
   std::string statusValue = "ONLINE";
   bool squareCore = false;  // the reactor's core is a rotated square
 };
+
+struct TaskScreenModel {
+  TaskHead head;
+  std::vector<NavPanel> left;
+  std::vector<NavPanel> under;
+  std::vector<NavPanel> right;
+  std::vector<NavPanel> band;     // the full-width commitments panel
+  TaskStage stage;
+  std::vector<ProgressButton> progress;  // buttons in the band (and stage)
+  std::vector<CommandRowView> commands;  // the generic frame's action rows
+  std::string bandNote;
+  bool hasStage = false;
+
+  // The authored hero vignette a fitted room paints above its lists: the
+  // geometry, the readout and the eight-meter gauge come from ROOM_SCENES.
+  Vignette hero;
+  bool hasHero = false;
+
+  // Free-standing columns: the station and the stores are lists of command
+  // rows under a heading, not a stage with panels around it. The ids travel
+  // beside the rows so a click can be dispatched without parsing a label.
+  std::vector<NavPanel> panels;
+  std::vector<std::vector<CommandRowView>> panelRows;
+  std::vector<std::vector<std::string>> panelRowIds;
+};
+
+// The generic path: a described target that owns no bespoke screen.
+TaskScreenModel BuildDescribedScreen(const Simulation& sim, const Description& described);
+
+// Which builder a tab would use. Phase 3 owns the three machine rooms; every
+// other window still opens on the described frame until its own phase.
+enum class ScreenKind { Described, Nav, Engine, O2, Mess, Quarters, CrewRecord, Station, Cargo, Science, Room, SimCore, Awards, Event, Deferred };
+ScreenKind ScreenKindFor(const Tab& tab);
+TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab);
 
 Vignette BuildVignette(const Simulation& sim, const std::string& roomId);
 

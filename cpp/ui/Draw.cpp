@@ -32,6 +32,26 @@ namespace {
                  static_cast<unsigned char>(alpha)};
 }
 
+// "#rrggbb" -> a colour; anything else falls back rather than inventing one.
+Rgb RgbFromHex(const std::string& hex, const Rgb& fallback) {
+  if (hex.size() != 7 || hex[0] != '#') { return fallback; }
+  const auto nibble = [&hex](std::size_t i) {
+    const char c = hex[i];
+    if (c >= '0' && c <= '9') { return c - '0'; }
+    if (c >= 'a' && c <= 'f') { return c - 'a' + 10; }
+    if (c >= 'A' && c <= 'F') { return c - 'A' + 10; }
+    return -1;
+  };
+  int channels[3] = {0, 0, 0};
+  for (int i = 0; i < 3; ++i) {
+    const int hi = nibble(static_cast<std::size_t>(1 + i * 2));
+    const int lo = nibble(static_cast<std::size_t>(2 + i * 2));
+    if (hi < 0 || lo < 0) { return fallback; }
+    channels[i] = hi * 16 + lo;
+  }
+  return Rgb{channels[0], channels[1], channels[2]};
+}
+
 ImU32 ToIm(const Rgb& rgb, int alpha = 255) {
   return IM_COL32(rgb.r, rgb.g, rgb.b, alpha);
 }
@@ -97,7 +117,9 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
     screenQuarters_ = kind == ScreenKind::Quarters;
     screenRecord_ = kind == ScreenKind::CrewRecord;
     screenPanels_ = kind == ScreenKind::Station || kind == ScreenKind::Cargo ||
-                    kind == ScreenKind::Science;
+                    kind == ScreenKind::Science || kind == ScreenKind::Room ||
+                    kind == ScreenKind::SimCore || kind == ScreenKind::Awards ||
+                    kind == ScreenKind::Event;
     panelsKind_ = kind;
     if (taskTabKey_ != sim.State().activeTab) {
       pendingConfirm_.clear();
@@ -943,6 +965,83 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
 //  plain even split - the reference does the same - and every row is a hit box
 //  whose id comes from the view-model, never from the label.
 // ============================================================================
+bool ShellView::PressPanelRow(Simulation& sim, ScreenKind kind, const std::string& id) {
+  switch (kind) {
+    case ScreenKind::Station: return PressStationAction(sim, id, "");
+    case ScreenKind::Cargo:
+    case ScreenKind::Science: return PressStoresAction(sim, id, "");
+    case ScreenKind::Room: return PressRoomAction(sim, id, "");
+    case ScreenKind::SimCore: return PressSimCoreAction(sim, id, "");
+    case ScreenKind::Awards: return PressAwardsAction(sim, id, "");
+    case ScreenKind::Event: return PressEventAction(sim, id, "");
+    default: return false;
+  }
+}
+
+// ============================================================================
+//  The room hero: the authored vignette from ROOM_SCENES — a scope, two orbits,
+//  a core, two beacons, the code and label, and an eight-bar gauge. Every
+//  rectangle is read from the model; none of it is measured here.
+// ============================================================================
+void ShellView::PaintHero(const Vignette& vignette, const Area& box) {
+  const Palette& p = theme_.palette;
+  const Rgb accent = RgbFromHex(vignette.accent, p.coffee);
+  DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel));
+  DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                     static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.border));
+
+  const auto cx = [&box](const Area& a) {
+    return box.x + a.x + a.w / 2.0f;
+  };
+  const auto cy = [&box](const Area& a) {
+    return box.y + a.y + a.h / 2.0f;
+  };
+  DrawCircleLines(static_cast<int>(cx(vignette.scope)), static_cast<int>(cy(vignette.scope)),
+                  vignette.scope.w / 2.0f, ToRay(p.border));
+  DrawCircleLines(static_cast<int>(cx(vignette.orbitOne)),
+                  static_cast<int>(cy(vignette.orbitOne)), vignette.orbitOne.w / 2.0f,
+                  ToRay(p.borderDark));
+  DrawCircleLines(static_cast<int>(cx(vignette.orbitTwo)),
+                  static_cast<int>(cy(vignette.orbitTwo)), vignette.orbitTwo.w / 2.0f,
+                  ToRay(p.borderDark));
+  DrawRectangle(static_cast<int>(box.x + vignette.core.x),
+                static_cast<int>(box.y + vignette.core.y),
+                static_cast<int>(vignette.core.w), static_cast<int>(vignette.core.h),
+                ToRay(accent));
+  DrawRectangle(static_cast<int>(box.x + vignette.beaconOne.x),
+                static_cast<int>(box.y + vignette.beaconOne.y),
+                static_cast<int>(vignette.beaconOne.w),
+                static_cast<int>(vignette.beaconOne.h), ToRay(accent));
+  DrawRectangle(static_cast<int>(box.x + vignette.beaconTwo.x),
+                static_cast<int>(box.y + vignette.beaconTwo.y),
+                static_cast<int>(vignette.beaconTwo.w),
+                static_cast<int>(vignette.beaconTwo.h), ToRay(p.muted));
+
+  DrawText(vignette.code.c_str(),
+           static_cast<int>(box.x + vignette.readout.x),
+           static_cast<int>(box.y + vignette.readout.y), 9, ToRay(p.coffee));
+  DrawText(vignette.label.c_str(),
+           static_cast<int>(box.x + vignette.readout.x),
+           static_cast<int>(box.y + vignette.readout.y + 14.0f), 13, ToRay(p.ink));
+  DrawText(vignette.description.c_str(),
+           static_cast<int>(box.x + vignette.readout.x),
+           static_cast<int>(box.y + vignette.readout.y + 32.0f), 9, ToRay(p.muted));
+  DrawText(vignette.statusTop.c_str(),
+           static_cast<int>(box.x + vignette.readout.x),
+           static_cast<int>(box.y + box.h - 34.0f), 8, ToRay(p.muted));
+  DrawText(vignette.statusValue.c_str(),
+           static_cast<int>(box.x + vignette.readout.x),
+           static_cast<int>(box.y + box.h - 22.0f), 9, ToRay(p.coffee));
+
+  for (std::size_t i = 0; i < vignette.meter.size(); ++i) {
+    const Area& bar = vignette.meter[i];
+    DrawRectangle(static_cast<int>(box.x + bar.x), static_cast<int>(box.y + bar.y),
+                  static_cast<int>(bar.w), static_cast<int>(bar.h),
+                  ToRay(i < 5 ? p.coffee : p.panel3));
+  }
+}
+
 void ShellView::PaintPanelsScreen(Simulation& sim) {
   navHits_.clear();
   taskButtons_.clear();
@@ -958,7 +1057,11 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
   DrawText(screen.head.sub.c_str(), static_cast<int>(left),
            static_cast<int>(layout_.content.y + 36.0f), 11, ToRay(p.muted));
 
-  const float top = layout_.content.y + 56.0f;
+  float top = layout_.content.y + 56.0f;
+  if (screen.hasHero) {
+    PaintHero(screen.hero, Area{left, top, right - left, screen.hero.hero.h});
+    top += screen.hero.hero.h + 8.0f;
+  }
   const float bottom = layout_.content.Bottom() - 104.0f;
   const std::size_t count = screen.panels.empty() ? 1 : screen.panels.size();
   const float gap = 8.0f;
@@ -1467,9 +1570,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         pendingAction_ = hit.arg;
         return;
       }
-      const bool acted = panelsKind_ == ScreenKind::Station
-                             ? PressStationAction(sim, hit.arg, "")
-                             : PressStoresAction(sim, hit.arg, "");
+      const bool acted = PressPanelRow(sim, panelsKind_, hit.arg);
       if (acted) { SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion); }
       return;
     }

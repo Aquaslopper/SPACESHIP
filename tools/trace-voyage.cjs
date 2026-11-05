@@ -658,6 +658,95 @@ function runCommand(g, line) {
     if (task && payload !== null) { task.payload = payload; }
     return true;
   }
+  if (command === 'dream' && parts.length >= 3) {
+    /* startProject(e, "dream", [a, b]) without the DOM work. */
+    const S = g.STATE, one = parseInt(parts[1], 10), two = parseInt(parts[2], 10);
+    const pending = g.simUnprocessed();
+    const first = pending.find(m => m.id === one), second = pending.find(m => m.id === two);
+    if (!first || !second || first === second || g.projectBlock('dream')) { return true; }
+    const p = g.SHIP_PROJECTS.dream;
+    first.processed = true; second.processed = true;
+    g.clampStat('energy', -p.energy);
+    g.PROJECT_CLAIM = 'dream';
+    try { g.performAction(p.label + ' started'); } finally { g.PROJECT_CLAIM = ''; }
+    if (S.gameOver) { return true; }
+    const task = g.addOngoing('project-' + 'dream', p.label, p.work, 'shipProject', 'dream');
+    if (task) { task.payload = [g.dreamPart(first), g.dreamPart(second)]; }
+    return true;
+  }
+  if (command === 'signalstate' && parts.length >= 2) {
+    g.STATE.sim.signal = parts[1];
+    return true;
+  }
+  if (command === 'broadcast') {
+    /* broadcastLocal() without the repaint. */
+    const sys = g.currentSystem(), history = g.WORLD_HISTORY[sys.region];
+    if (g.STATE.gameOver || g.STATE.sim.broadcasts[sys.id] || g.statValue('energy').value <= 2) { return true; }
+    g.clampStat('energy', -2);
+    g.STATE.sim.broadcasts[sys.id] = true;
+    g.performAction('Local traffic report received');
+    if (!g.STATE.gameOver) { g.simRemember('World', sys.name + ': ' + history[1]); }
+    return true;
+  }
+  if (command === 'signal' && parts.length >= 2) {
+    /* finishSignal(e, choice) without the confirmation dialog. */
+    const choice = parts[1], S = g.STATE;
+    if (S.gameOver || S.sim.signal !== 'request' || (choice !== 'preserved' && choice !== 'sold')) { return true; }
+    if (choice === 'preserved' && (g.MAP.here !== 'palimpsest-site' || S.repairKits < 1 || g.statValue('energy').value <= 5)) { return true; }
+    if (choice === 'sold' && !S.docked) { return true; }
+    S.sim.signal = choice;
+    if (choice === 'preserved') {
+      S.repairKits--; g.clampStat('energy', -5);
+      if (!g.findById(g.SURVEY, 'silicon-marrow')) {
+        g.SURVEY.push({ id: 'silicon-marrow', name: 'The sheltered archive', src: 'Signal', value: 360, state: 'filed' });
+      }
+      for (let i = 0; i < g.CREW.length; i++) {
+        g.CREW[i].morale = Math.min(100, g.CREW[i].morale + 5);
+        for (let j = i + 1; j < g.CREW.length; j++) { g.simChangeBond(g.CREW[i].id, g.CREW[j].id, 5); }
+      }
+      g.simRemember('Choice', 'The crew sheltered the signal at the Archive Hull.');
+    } else {
+      S.shiplets += 900;
+      for (const c of g.CREW) { c.morale = Math.max(0, c.morale - 8); }
+      g.simRemember('Choice', 'The signal was sold despite its request not to be copied.');
+    }
+    g.performAction(choice === 'preserved' ? "Silicon Marrow's archive was sheltered" : "Silicon Marrow's signal was sold");
+    if (!S.gameOver) { g.checkCommendations(); }
+    return true;
+  }
+  if (command === 'claim' && parts.length >= 2) {
+    const a = g.findById(g.COMMENDATIONS, parts[1]), j = g.STATE.chronicle;
+    if (!a || !j.earned[parts[1]] || j.claimed[parts[1]] || g.STATE.gameOver) { return true; }
+    j.claimed[parts[1]] = true;
+    const r = a.reward;
+    g.STATE.shiplets += r.cash || 0; g.STATE.fuelCells += r.fuel || 0;
+    g.STATE.repairKits += r.kits || 0; g.STATE.medkits += r.med || 0;
+    g.logLine('Reward claimed: ' + a.title + ' - ' + g.rewardText(r) + '.');
+    return true;
+  }
+  if (command === 'remedy' && parts.length >= 2) {
+    const ev = g.findById(g.EVENTS, parts[1]);
+    if (!ev) { return true; }
+    const spec = g.incidentSpec(ev);
+    const needsKit = typeof spec.requiresKit === 'boolean' ? spec.requiresKit : spec.kind !== 'Crew';
+    if (!spec || g.STATE.gameOver || (needsKit && g.STATE.repairKits < 1)) { return true; }
+    if (needsKit) { g.STATE.repairKits--; }
+    g.performAction(spec.remedy);
+    if (!g.STATE.gameOver && g.findById(g.EVENTS, parts[1])) { g.removeIncident(parts[1]); }
+    return true;
+  }
+  if (command === 'assign' && parts.length >= 2) {
+    const ev = g.findById(g.EVENTS, parts[1]), worker = ev && g.incidentHand(ev);
+    if (!worker || g.STATE.gameOver || g.findOngoing('incident-' + parts[1])) { return true; }
+    g.CREW_CLAIMS[worker.id] = true;
+    try { g.performAction(worker.name + ' assigned to ' + g.incidentSpec(ev).title); }
+    finally { delete g.CREW_CLAIMS[worker.id]; }
+    if (!g.STATE.gameOver && g.findById(g.EVENTS, parts[1]) && g.findById(g.CREW, worker.id)) {
+      const task = g.addOngoing('incident-' + parts[1], 'Resolving ' + g.incidentSpec(ev).title, 6, 'incident', parts[1]);
+      if (task) { task.by = worker.name; task.who = worker.id; }
+    }
+    return true;
+  }
   if (command === 'medical' && parts.length >= 2) {
     const c = g.findById(g.CREW, parts[1]);
     if (!c || c.health >= 100 || g.crewBusy(c) || !g.STATE.medkits || g.statValue('energy').value <= 2 || g.STATE.gameOver) { return true; }

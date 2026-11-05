@@ -275,6 +275,31 @@ class Simulation {
   void RemoveIncident(const std::string& id);
   void CheckCommendations(bool silent = false);
 
+  // ---- Phase 7: the logbook ----------------------------------------------
+  const Commendation* FindCommendation(const std::string& id) const;
+  // The public face of the chronicle metric, for the logbook's own lines.
+  double ChronicleValueFor(const std::string& metric) const { return ChronicleValue(metric); }
+  double ReadyCommendations() const;      // earned and not yet claimed
+  double EarnedCommendations() const;
+  std::string CaptainRank() const;        // cosmetic, fed by the log itself
+  std::string RewardText(const std::string& commendationId) const;
+  std::string RewardTextOf(const Commendation& commendation) const;
+  bool ClaimCommendation(const std::string& id);   // free, once only
+
+  // ---- Phase 7: the signal story ------------------------------------------
+  const std::vector<std::string>& WorldHistory(const std::string& regionId) const;
+  bool BroadcastLocal();                       // the comms relay's traffic report
+  bool FinishSignal(const std::string& choice);  // "preserved" or "sold"
+
+  // ---- Phase 7: incidents -------------------------------------------------
+  bool RemedyIncident(const std::string& incidentId);       // quick fix, maybe a kit
+  bool AssignIncidentCrew(const std::string& incidentId);   // six actions of work
+  const CrewMember* IncidentHand(const Incident& incident) const;
+  const IncidentType::Stage* IncidentStage(const Incident& incident) const;
+
+  // ---- Phase 7: the dream engine with a chosen pair ------------------------
+  bool StartDream(const std::string& firstId, const std::string& secondId);
+
   // ---- read-only job lookups for the interface --------------------------
   // The briefing and the sidebar ask "who is holding this job" and "what does
   // that job act at" without starting anything, so these are const and free.

@@ -237,13 +237,25 @@ struct IncidentType {
   std::string id, kind, source, title, remedy;
   double first = 0;   // action of the first report
   double every = 0;   // actions between reports
+  // Whether the quick remedy costs a repair kit. Absent means "every report
+  // except a crew dispute".
+  std::optional<bool> requiresKit;
   std::vector<Stage> stages;
+};
+
+// What claiming a commendation pays. Free to claim, and once only.
+struct Reward {
+  double cash = 0;
+  double fuel = 0;   // fuel cells
+  double kits = 0;   // repair kits
+  double med = 0;    // medkits
 };
 
 struct Commendation {
   std::string id, title, metric;
   double goal = 0;
   std::string detail;
+  Reward reward;
 };
 
 struct ProjectDef {

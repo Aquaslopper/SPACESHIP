@@ -60,6 +60,92 @@ void Simulation::RemoveIncident(const std::string& id) {
   }
 }
 
+const IncidentType::Stage* Simulation::IncidentStage(const Incident& incident) const {
+  const IncidentType* spec = IncidentSpec(incident);
+  if (spec == nullptr || spec->stages.empty()) { return nullptr; }
+  const std::size_t index = static_cast<std::size_t>(
+      std::max(0, std::min(incident.stage, static_cast<int>(spec->stages.size()) - 1)));
+  return &spec->stages[index];
+}
+
+// incidentHand(): the best available hand for the report. Trade, then morale.
+const CrewMember* Simulation::IncidentHand(const Incident& incident) const {
+  const IncidentType* spec = IncidentSpec(incident);
+  if (spec == nullptr) { return nullptr; }
+  const CrewMember* best = nullptr;
+  double bestScore = -1e18;
+  for (const CrewMember& crew : crew_) {
+    if (CrewBusy(crew) != nullptr) { continue; }
+    if (state_.pendingOrders.count(crew.id) != 0) { continue; }
+    double score = crew.morale;
+    if ((spec->kind == "Mechanical" || spec->kind == "Electrical") &&
+        crew.job == "maintenance") {
+      score += 100;
+    }
+    if (spec->kind == "Environmental" && crew.job == "filters") { score += 100; }
+    if (spec->kind == "Crew" && crew.id != incident.a && crew.id != incident.b) { score += 100; }
+    if (score > bestScore) { best = &crew; bestScore = score; }
+  }
+  return best;
+}
+
+bool Simulation::RemedyIncident(const std::string& incidentId) {
+  const Incident* found = nullptr;
+  for (const Incident& incident : events_) {
+    if (incident.id == incidentId) { found = &incident; }
+  }
+  if (found == nullptr) { return false; }
+  const IncidentType* spec = IncidentSpec(*found);
+  if (spec == nullptr || !state_.gameOver.empty()) { return false; }
+  const bool needsKit = spec->requiresKit.value_or(spec->kind != "Crew");
+  if (needsKit && state_.repairKits < 1) { return false; }
+
+  const std::string remedy = spec->remedy;
+  const std::string id = incidentId;
+  if (needsKit) { state_.repairKits -= 1; }
+  PerformAction(remedy);
+  if (!state_.gameOver.empty()) { return true; }
+  // The report may have been cleared by the tick the action caused.
+  for (const Incident& incident : events_) {
+    if (incident.id == id) { RemoveIncident(id); break; }
+  }
+  return true;
+}
+
+bool Simulation::AssignIncidentCrew(const std::string& incidentId) {
+  const Incident* found = nullptr;
+  for (const Incident& incident : events_) {
+    if (incident.id == incidentId) { found = &incident; }
+  }
+  if (found == nullptr || !state_.gameOver.empty()) { return false; }
+  if (FindOngoing("incident-" + incidentId) != nullptr) { return false; }
+  const IncidentType* spec = IncidentSpec(*found);
+  const CrewMember* worker = IncidentHand(*found);
+  if (spec == nullptr || worker == nullptr) { return false; }
+
+  const std::string workerId = worker->id;
+  const std::string workerName = worker->name;
+  const std::string title = spec->title;
+  crewClaims_[workerId] = true;
+  PerformAction(workerName + " assigned to " + title);
+  crewClaims_.erase(workerId);
+  if (!state_.gameOver.empty()) { return true; }
+
+  bool stillHere = false;
+  for (const Incident& incident : events_) {
+    if (incident.id == incidentId) { stillHere = true; }
+  }
+  if (!stillHere || FindCrew(workerId) == nullptr) { return true; }
+
+  Task* task = AddOngoing("incident-" + incidentId, "Resolving " + title, 6, "incident",
+                          incidentId);
+  if (task != nullptr) {
+    task->by = workerName;
+    task->who = workerId;
+  }
+  return true;
+}
+
 std::pair<std::string, std::string> Simulation::SimDisputePair() const {
   std::pair<std::string, std::string> pair;
   double worst = 101;

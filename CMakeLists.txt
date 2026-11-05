@@ -147,6 +147,11 @@ add_library(spaceship_core STATIC
   cpp/ui/CrewRecord.cpp
   cpp/ui/QuartersScreen.cpp
   cpp/ui/Popups.cpp
+  cpp/core/Signal.cpp
+  cpp/ui/RoomsScreen.cpp
+  cpp/ui/SimCoreScreen.cpp
+  cpp/ui/AwardsScreen.cpp
+  cpp/ui/EventScreen.cpp
   cpp/ui/StationScreen.cpp
   cpp/ui/StoresScreen.cpp
   cpp/ui/NavScreen.cpp)
@@ -214,6 +219,7 @@ if(SPACESHIP_BUILD_TESTS)
     cpp/tests/simulation_tests.cpp
     cpp/tests/world_tests.cpp
     cpp/tests/jsnumber_tests.cpp
+    cpp/tests/phase7_tests.cpp
     cpp/tests/ui_tests.cpp
     cpp/tests/task_tests.cpp
     cpp/tests/nav_tests.cpp

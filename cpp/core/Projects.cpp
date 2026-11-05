@@ -141,6 +141,46 @@ bool Simulation::StartProject(const std::string& id) {
   return true;
 }
 
+bool Simulation::StartDream(const std::string& firstId, const std::string& secondId) {
+  // The reference's two selects, as a command: the pair must be two distinct
+  // unconsolidated memories. Everything else is StartProject("dream").
+  if (firstId == secondId) { return false; }
+  const std::vector<Memory> pending = SimUnprocessed();
+  const Memory* first = nullptr;
+  const Memory* second = nullptr;
+  for (const Memory& memory : pending) {
+    if (js::NumToString(memory.id) == firstId) { first = &memory; }
+    if (js::NumToString(memory.id) == secondId) { second = &memory; }
+  }
+  if (first == nullptr || second == nullptr) { return false; }
+  if (!ProjectBlock("dream").empty()) { return false; }
+
+  const ProjectDef* project = nullptr;
+  for (const ProjectDef& candidate : catalog_.projects) {
+    if (candidate.id == "dream") { project = &candidate; }
+  }
+  if (project == nullptr || !state_.gameOver.empty()) { return false; }
+
+  for (Memory& memory : state_.sim.memories) {
+    if (memory.id == first->id || memory.id == second->id) { memory.processed = true; }
+  }
+  ClampStat("energy", -project->energy);
+  projectClaim_ = "dream";
+  PerformAction(project->label + " started");
+  projectClaim_.clear();
+  if (!state_.gameOver.empty()) { return true; }
+
+  Task* task = AddOngoing("project-dream", project->label, project->work, "shipProject", "dream");
+  if (task != nullptr) {
+    task->dreamIds = {firstId, secondId};
+    task->dreamKinds = {first->kind, second->kind};
+    task->dreamTexts = {first->text, second->text};
+    task->dreamWho = {first->who, first->other};
+    task->dreamOther = {second->who, second->other};
+  }
+  return true;
+}
+
 bool Simulation::StartMedical(const std::string& crewId) {
   CrewMember* crew = FindCrew(crewId);
   if (crew == nullptr || crew->health >= 100 || CrewBusy(*crew) != nullptr) { return false; }

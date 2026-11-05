@@ -561,10 +561,9 @@ are live.
 differential voyages, the catalogue gate, and the save round-trip that sends a voyage from the port to the
 reference and back.
 
-**Still outstanding inside Phase 1's subject matter** (deliberately deferred to the screens that own them): the
-signal story's two endings (`finishSignal`) and the broadcasts they unlock, claiming a commendation's reward and
-the rank it feeds, and the crew order sheet's remaining payloads (a rest is the only order the clock can create on
-its own). All three are state-complete and save-compatible; they are waiting for their UI.
+**Still outstanding inside Phase 1's subject matter:** the signal story's two endings and the broadcasts they
+unlock, claiming a commendation's reward and the rank it feeds — all four landed with their screens in Phase 7 —
+and the crew order sheet's remaining payloads (a rest is the only order the clock can create on its own).
 
 ### Phase 6 — Stations, stores and the floating popups — DONE
 
@@ -687,6 +686,42 @@ sweep reproduces; all four `simulacron.test.cjs` crew behaviours pass.
 Station screen (trade, mission board, hire, refit, shipyard, undock), cargo/science stores, contracts and
 repeatable commissions, three save slots + settings popup + load-transaction rollback.
 **Gate:** save round-trip through both implementations; market margin and commission tests pass.
+
+### Phase 7 — The fourteen fitted rooms, the Simulacron, the signal and the logbook — DONE
+
+`core/Signal.cpp` carries the two permanent answers to the Silicon Marrow archive: the
+shelter at the Archive Hull (one repair kit, 5% energy, a filed survey record, five
+morale and five bond on every pair) and the sale at any dock (900 shiplets, eight
+morale from each hand), each closing the signal and remembering the choice; the local
+traffic report costs 2% energy once per system and becomes a World memory.
+`core/Awards.cpp` pays a commendation's reward exactly once into the purse and the two
+stores, words the reward the way the reference does, and names the rank the log adds up
+to. `core/Incidents.cpp` gained the stage readout, the hand the mess hall can spare and
+the two remedies — the quick one with its kit rule, and six actions of assigned crew
+work. `core/Projects.cpp` grew the dream engine's validated pair.
+
+`ui/RoomsScreen` opens all fourteen fitted bays plus the bridge: every bay paints its
+own authored vignette (scope, two orbits, core, two beacons, code, label, eight-bar
+gauge) from `ROOM_SCENES`, its own fields and note, and each of the ten projects sits
+in the room the catalogue gives it with its three-state button and the core's own
+blocking sentence. The bridge offers the chart and the fuel split, the power bus and
+shield array convert 20 into 15, the medical bay treats the unwell with a kit and 2%
+energy, recreation lists every shared meal with its bond and anchors, and the relay
+holds the history, the traffic report and the signal's four states. `ui/SimCoreScreen`
+is the mosaic (newest first), the anchors and desire fire per hand, the three cheapest
+memory pairs, the dream engine's button and the door to Comms. `ui/AwardsScreen` is the
+logbook: rank, the two counts, the systems and regions, deep scans and commissions, and
+fourteen cards that read `n / goal`, `Ready to claim` or `Claimed`. `ui/EventScreen`
+is the incident report with its stage, its clock, the kit rule and the assignee.
+`Shell.cpp` routes `room:r1..r13`, `room:bridge`, `room:simulacron`, `awards` and
+`event:<id>`, and `Draw.cpp` paints the hero and dispatches every row's id.
+
+*Verification:* `phase7_tests` adds 17 cases and 335 assertions; the suite is now 137
+cases and 9,630 assertions, `ctest` is 159/159 with `ui.gui-syntax` clean under
+`-Wall -Wextra -Wpedantic`, and `parity.voyage-14` replays nineteen commands —
+broadcast, bank, two claims, a crossing, a salvage, a dock, a project, a remedy, an
+assignment, a dream, the signal's request and its sale — against the reference with
+all seventeen traces identical.
 
 ### Phase 7 — Simulacron, projects, story, awards (2–3 days)
 The 10 ship projects and their interlocks, memories/dreams/insight/bonds/name anchors/desire fire, the Silicon

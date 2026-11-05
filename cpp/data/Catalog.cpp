@@ -314,6 +314,9 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     type.remedy = Text(incident, "remedy", "incidents");
     type.first = Number(incident, "first", "incidents");
     type.every = Number(incident, "every", "incidents");
+    if (incident.contains("requiresKit") && incident["requiresKit"].is_boolean()) {
+      type.requiresKit = incident["requiresKit"].get<bool>();
+    }
     for (const Json& stage : Field(incident, "stages", "incidents")) {
       IncidentType::Stage parsed;
       parsed.text = Text(stage, "text", "incidents/stages");
@@ -339,6 +342,13 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     c.metric = Text(award, "metric", "commendations");
     c.goal = Number(award, "goal", "commendations");
     c.detail = Text(award, "detail", "commendations");
+    if (award.contains("reward") && award["reward"].is_object()) {
+      const Json& reward = award["reward"];
+      if (reward.contains("cash")) { c.reward.cash = reward["cash"].get<double>(); }
+      if (reward.contains("fuel")) { c.reward.fuel = reward["fuel"].get<double>(); }
+      if (reward.contains("kits")) { c.reward.kits = reward["kits"].get<double>(); }
+      if (reward.contains("med")) { c.reward.med = reward["med"].get<double>(); }
+    }
     catalog.commendations.push_back(c);
   }
   for (auto it = Field(progression, "projects", "progression.json").begin();
@@ -351,6 +361,12 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     p.energy = Number(it.value(), "energy", "projects");
     p.work = Number(it.value(), "work", "projects");
     catalog.projects.push_back(p);
+  }
+  for (auto it = Field(progression, "worldHistory", "progression.json").begin();
+       it != Field(progression, "worldHistory", "progression.json").end(); ++it) {
+    std::vector<std::string> lines;
+    for (const Json& line : it.value()) { lines.push_back(line.get<std::string>()); }
+    catalog.worldHistory[it.key()] = lines;
   }
   catalog.counts.incidents =
       static_cast<int>(Field(progression, "incidents", "progression.json").size());

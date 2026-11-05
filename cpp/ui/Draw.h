@@ -27,6 +27,10 @@
 #include "ui/NavScreen.h"
 #include "ui/Popups.h"
 #include "ui/QuartersScreen.h"
+#include "ui/AwardsScreen.h"
+#include "ui/EventScreen.h"
+#include "ui/RoomsScreen.h"
+#include "ui/SimCoreScreen.h"
 #include "ui/StationScreen.h"
 #include "ui/StoresScreen.h"
 #include "ui/Theme.h"
@@ -125,7 +129,9 @@ class ShellView {
 
   void PaintTaskScreen(Simulation& sim);
   void PaintPanelsScreen(Simulation& sim);
+  static bool PressPanelRow(Simulation& sim, ScreenKind kind, const std::string& id);
   void PaintPopup(Simulation& sim);
+  void PaintHero(const Vignette& vignette, const Area& box);
   void PaintNavScreen(Simulation& sim);
   void PaintQuartersScreen(Simulation& sim);
   void PaintCrewRecord(const Simulation& sim);

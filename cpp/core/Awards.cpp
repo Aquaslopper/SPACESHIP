@@ -8,6 +8,9 @@
 #include "core/Simulation.h"
 
 #include <string>
+#include <vector>
+
+#include "core/JsNumber.h"
 
 namespace ship {
 
@@ -55,6 +58,84 @@ double Simulation::ChronicleValue(const std::string& metric) const {
   if (metric == "meals") { return chronicle.meals; }
   if (metric == "incidents") { return chronicle.incidents; }
   return 0.0;
+}
+
+const Commendation* Simulation::FindCommendation(const std::string& id) const {
+  for (const Commendation& award : catalog_.commendations) {
+    if (award.id == id) { return &award; }
+  }
+  return nullptr;
+}
+
+double Simulation::ReadyCommendations() const {
+  double ready = 0;
+  for (const Commendation& award : catalog_.commendations) {
+    auto earned = state_.chronicle.earned.find(award.id);
+    auto claimed = state_.chronicle.claimed.find(award.id);
+    const bool has = earned != state_.chronicle.earned.end() && earned->second;
+    const bool took = claimed != state_.chronicle.claimed.end() && claimed->second;
+    if (has && !took) { ready += 1; }
+  }
+  return ready;
+}
+
+double Simulation::EarnedCommendations() const {
+  double earned = 0;
+  for (const auto& entry : state_.chronicle.earned) {
+    if (entry.second) { earned += 1; }
+  }
+  return earned;
+}
+
+std::string Simulation::CaptainRank() const {
+  // Cosmetic, as the reference says: a name for how much of the log is filled.
+  const double earned = EarnedCommendations();
+  const double total = static_cast<double>(catalog_.commendations.size());
+  if (earned >= total && total > 0) { return "Constellation"; }
+  if (earned >= 10) { return "Voyager"; }
+  if (earned >= 6) { return "Wayfinder"; }
+  if (earned >= 3) { return "Keeper"; }
+  return "New Watch";
+}
+
+std::string Simulation::RewardText(const std::string& id) const {
+  return RewardTextOf(*FindCommendation(id));
+}
+
+std::string Simulation::RewardTextOf(const Commendation& award) const {
+  const Reward& reward = award.reward;
+  std::vector<std::string> parts;
+  // The reference says "shiplets" even for one; the stores' words are plural
+  // only when the count is.
+  if (reward.cash > 0) { parts.push_back(js::NumToString(reward.cash) + " shiplets"); }
+  const auto push = [&parts](double amount, const std::string& word) {
+    if (amount <= 0) { return; }
+    parts.push_back(js::NumToString(amount) + " " + word + (amount == 1.0 ? "" : "s"));
+  };
+  push(reward.fuel, std::string("fuel cell"));
+  push(reward.kits, std::string("repair kit"));
+  push(reward.med, std::string("medkit"));
+  std::string out;
+  for (const std::string& part : parts) { out += (out.empty() ? "" : " + ") + part; }
+  return out;
+}
+
+bool Simulation::ClaimCommendation(const std::string& id) {
+  const Commendation* award = FindCommendation(id);
+  if (award == nullptr || !state_.gameOver.empty()) { return false; }
+  auto earned = state_.chronicle.earned.find(id);
+  if (earned == state_.chronicle.earned.end() || !earned->second) { return false; }
+  auto claimed = state_.chronicle.claimed.find(id);
+  if (claimed != state_.chronicle.claimed.end() && claimed->second) { return false; }
+
+  state_.chronicle.claimed[id] = true;
+  state_.shiplets += award->reward.cash;
+  state_.fuelCells += award->reward.fuel;
+  state_.repairKits += award->reward.kits;
+  state_.medkits += award->reward.med;
+  // Free: a reward for work already done is not another turn of work.
+  LogLine("Reward claimed: " + award->title + " - " + RewardTextOf(*award) + ".");
+  return true;
 }
 
 void Simulation::CheckCommendations(bool silent) {

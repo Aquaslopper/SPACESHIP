@@ -18,7 +18,11 @@
 #include "ui/MessScreen.h"
 #include "ui/CrewRecord.h"
 #include "ui/NavScreen.h"
+#include "ui/AwardsScreen.h"
+#include "ui/EventScreen.h"
 #include "ui/Popups.h"
+#include "ui/RoomsScreen.h"
+#include "ui/SimCoreScreen.h"
 #include "ui/QuartersScreen.h"
 #include "ui/StationScreen.h"
 #include "ui/StoresScreen.h"
@@ -237,6 +241,20 @@ bool PressProgressButton(Simulation& sim, const std::string& taskId) {
                               if (taskId == "travel") { return sim.StartTravel(); }
                               if (taskId == "scan") { return sim.StartScan(); }
                               if (taskId == "crew-assign") { return sim.CommitOrders(); }
+                              // Phase 7: projects, the medical bay, the shared meal
+                              // and the incident work all live behind this one
+                              // button, exactly as they do in the reference.
+                              if (taskId.compare(0, 8, "project-") == 0) {
+                                const std::string id = taskId.substr(8);
+                                if (id == "social") { return false; }  // needs a pair
+                                return sim.StartProject(id);
+                              }
+                              if (taskId.compare(0, 4, "doc-") == 0) {
+                                return sim.StartMedical(taskId.substr(4));
+                              }
+                              if (taskId.compare(0, 9, "incident-") == 0) {
+                                return sim.AssignIncidentCrew(taskId.substr(9));
+                              }
                               return false;
                             });
 }
@@ -376,6 +394,10 @@ ScreenKind ScreenKindFor(const Tab& tab) {
   if (tab.kind == "room" && tab.id == "cargo") { return ScreenKind::Cargo; }
   if (tab.kind == "room" && tab.id == "science") { return ScreenKind::Science; }
   if (tab.kind == "room" && tab.id == "quarters") { return ScreenKind::Quarters; }
+  // Phase 7: the Simulacron, the fitted bays and the logbook.
+  if (tab.kind == "awards") { return ScreenKind::Awards; }
+  if (tab.kind == "event") { return ScreenKind::Event; }
+  if (tab.kind == "room" && tab.id == "simulacron") { return ScreenKind::SimCore; }
   if (tab.kind != "room") { return ScreenKind::Described; }
   if (tab.id == "engine") { return ScreenKind::Engine; }
   if (tab.id == "o2") { return ScreenKind::O2; }
@@ -384,8 +406,19 @@ ScreenKind ScreenKindFor(const Tab& tab) {
   // window of their own in a later phase; until then they open on the house
   // frame rather than on nothing.
 
-  for (const std::string& glyph : SceneGlyphs()) { (void)glyph; }
-  if (tab.id == "bridge") { return ScreenKind::Deferred; }
+  // The fourteen fitted bays and the bridge: r1..r13 and "bridge", which is
+  // exactly the set ROOM_FITS names (the Simulacron left above).
+  if (tab.id == "bridge") { return ScreenKind::Room; }
+  if (tab.id.size() > 1 && tab.id[0] == 'r') {
+    bool digits = true;
+    for (std::size_t i = 1; i < tab.id.size(); ++i) {
+      if (tab.id[i] < '0' || tab.id[i] > '9') { digits = false; }
+    }
+    if (digits) {
+      const int number = std::stoi(tab.id.substr(1));
+      if (number >= 1 && number <= 13) { return ScreenKind::Room; }
+    }
+  }
   return ScreenKind::Described;
 }
 
@@ -450,6 +483,106 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab) {
       screen.panelRowIds.push_back(ids);
       screen.progress = stores.buttons;
       screen.hasStage = false;
+      return screen;
+    }
+    case ScreenKind::Room: {
+      const RoomScreenModel room = BuildRoomScreen(sim, tab.id);
+      TaskScreenModel screen;
+      screen.head = room.head;
+      screen.panels.push_back(room.body);
+      std::vector<CommandRowView> rows;
+      std::vector<std::string> ids;
+      for (const ActionRowView& row : room.rows) {
+        CommandRowView view;
+        view.label = row.label;
+        view.cost = row.cost;
+        view.displayCost = row.cost.empty() ? "1 action" : row.cost;
+        view.enabled = row.enabled;
+        view.live = row.enabled;
+        view.confirm = row.confirm;
+        rows.push_back(view);
+        ids.push_back(row.id);
+      }
+      screen.panelRows.push_back(rows);
+      screen.panelRowIds.push_back(ids);
+      screen.progress = room.buttons;
+      screen.hero = BuildVignette(sim, tab.id);
+      screen.hasHero = true;
+      return screen;
+    }
+    case ScreenKind::SimCore: {
+      const SimScreenModel core = BuildSimCoreScreen(sim);
+      TaskScreenModel screen;
+      screen.head = core.head;
+      NavPanel panel = core.body;
+      for (const std::string& line : core.anchors) { panel.Note(line); }
+      if (!core.latestDream.empty()) { panel.Note(core.latestDream); }
+      panel.Sub("Memory mosaic - newest first");
+      for (const std::string& line : core.memories) { panel.Note(line); }
+      screen.panels.push_back(panel);
+      std::vector<CommandRowView> rows;
+      std::vector<std::string> ids;
+      for (const ActionRowView& row : core.rows) {
+        CommandRowView view;
+        view.label = row.label;
+        view.cost = row.cost;
+        view.displayCost = row.cost.empty() ? "1 action" : row.cost;
+        view.enabled = row.enabled;
+        view.live = row.enabled;
+        view.confirm = row.confirm;
+        rows.push_back(view);
+        ids.push_back(row.id);
+      }
+      screen.panelRows.push_back(rows);
+      screen.panelRowIds.push_back(ids);
+      screen.progress = core.buttons;
+      screen.hero = BuildVignette(sim, "simulacron");
+      screen.hasHero = true;
+      return screen;
+    }
+    case ScreenKind::Awards: {
+      const AwardsScreenModel awards = BuildAwardsScreen(sim);
+      TaskScreenModel screen;
+      screen.head = awards.head;
+      screen.panels.push_back(awards.summary);
+      std::vector<CommandRowView> rows;
+      std::vector<std::string> ids;
+      for (const ActionRowView& row : awards.rows) {
+        CommandRowView view;
+        view.label = row.label;
+        view.cost = row.cost;
+        view.displayCost = row.cost.empty() ? "free" : row.cost;
+        view.enabled = row.enabled;
+        view.live = row.enabled;
+        view.confirm = row.confirm;
+        rows.push_back(view);
+        ids.push_back(row.id);
+      }
+      screen.panelRows.push_back(rows);
+      screen.panelRowIds.push_back(ids);
+      return screen;
+    }
+    case ScreenKind::Event: {
+      const EventScreenModel event = BuildEventScreen(sim, tab.id);
+      TaskScreenModel screen;
+      screen.head = event.head;
+      screen.panels.push_back(event.report);
+      std::vector<CommandRowView> rows;
+      std::vector<std::string> ids;
+      for (const ActionRowView& row : event.rows) {
+        CommandRowView view;
+        view.label = row.label;
+        view.cost = row.cost;
+        view.displayCost = row.cost.empty() ? "1 action" : row.cost;
+        view.enabled = row.enabled;
+        view.live = row.enabled;
+        view.confirm = row.confirm;
+        rows.push_back(view);
+        ids.push_back(row.id);
+      }
+      screen.panelRows.push_back(rows);
+      screen.panelRowIds.push_back(ids);
+      screen.progress = event.buttons;
       return screen;
     }
     case ScreenKind::CrewRecord: {
