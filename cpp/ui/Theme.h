@@ -75,9 +75,9 @@ struct Theme {
   // "rgba(139,111,78,0.13)" as the stylesheet writes it, for the raster hairlines.
   std::string Ink(float alpha) const;
 
-  // The HTA base body face is 12px. Keep native text at that authored size;
-  // optional reading-size steps remain a port preference, not a larger default.
-  static constexpr float kFontFloorPx = 12.0f;
+  // Native readability floor requested for the port. No rendered label should
+  // fall below 18 px; the four settings steps may increase it further.
+  static constexpr float kFontFloorPx = 18.0f;
   static float FontPxForStep(int step);
   static float LineHeightForPx(float px);
   float FontPx() const {

@@ -138,7 +138,7 @@ PopupModel BuildPopup(const Simulation& sim, const std::string& key,
   model.theme = options.theme.empty() ? "classic" : options.theme;
 
   // ---- typography floor and the window ----------------------------------
-  // Four optional reading-size steps above the HTA's 12px default.
+  // Four readable native sizes, starting at the required 18px floor.
   model.fontStep = options.fontStep < 0 ? 0 : (options.fontStep > 3 ? 3 : options.fontStep);
   const char* stepNames[] = {"Base", "+5%", "+10%", "+15%"};
   for (int step = 0; step < 4; ++step) {

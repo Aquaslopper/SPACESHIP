@@ -96,7 +96,7 @@ Palette PaletteForId(const std::string& id) {
 
 float Theme::FontPxForStep(int step) {
   const int clamped = step < 0 ? 0 : (step > 3 ? 3 : step);
-  // 12 px HTA baseline, then +5% per optional reading-size step: 12..14 px.
+  // 18 px minimum, then +5% per optional reading-size step: 18..21 px.
   return kFontFloorPx + static_cast<float>(std::lround(0.05 * kFontFloorPx * clamped));
 }
 

@@ -86,7 +86,8 @@ std::string TimeStamp(double actionCount) {
 int ShellView::TypePx(int reference) const {
   return reference <= 0
              ? reference
-             : static_cast<int>(std::lround(reference * (theme_.FontPx() / 13.0)));
+             : std::max(18, static_cast<int>(
+                                std::lround(reference * (theme_.FontPx() / 13.0))));
 }
 
 void ShellView::Text(const char* text, int x, int y, int size, ::Color tint,
