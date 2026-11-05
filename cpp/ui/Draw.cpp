@@ -90,15 +90,24 @@ int ShellView::TypePx(int reference) const {
                                 std::lround(reference * (theme_.FontPx() / 13.0))));
 }
 
+// The font used to paint text at `size`: bold once the 18 px floor is reached.
+// TextWidth/WrapText must measure with the same font Text paints with, or
+// layout arithmetic (panel heights, FitText truncation) silently under- or
+// over-estimates and panels overlap or text is clipped.
+const Font& ShellView::SelectFont(int size, bool mono) const {
+  return mono ? monoFont_
+              : (size >= TypePx(16) ? boldFont_ : bodyFont_);
+}
+
 void ShellView::Text(const char* text, int x, int y, int size, ::Color tint,
                      bool mono) const {
-  const Font& font = mono ? monoFont_ : (size >= TypePx(16) ? boldFont_ : bodyFont_);
+  const Font& font = SelectFont(size, mono);
   DrawTextEx(font, text, Vector2{static_cast<float>(x), static_cast<float>(y)},
              static_cast<float>(size), 1.0f, tint);
 }
 
 float ShellView::TextWidth(const char* text, int size, bool mono) const {
-  const Font& font = mono ? monoFont_ : bodyFont_;
+  const Font& font = SelectFont(size, mono);
   return MeasureTextEx(font, text, static_cast<float>(size), 1.0f).x;
 }
 
@@ -148,7 +157,12 @@ void ShellView::Configure(float width, float height, const Theme& theme) {
   layout_ = ComputeLayout(width_, height_, height_ - Metrics::kContentTop -
                                               Metrics::kStatusH,
                           others_, theme_.stageCompact);
+  // A resize or font change can remove the overflow that required scrolling:
+  // reset so the column isn't scrolled when nothing extends past the viewport.
+  ResetContentScroll();
 }
+
+void ShellView::ResetContentScroll() { contentScroll_ = 0.0f; }
 
 void ShellView::Draw(Simulation& sim, double nowMs) {
   const float contentH = height_ - Metrics::kContentTop - Metrics::kStatusH;
@@ -507,8 +521,11 @@ void ShellView::PaintChrome(Simulation& sim) {
 
   // ---- the briefing popup a left-click opens -----------------------------
   if (hasSelection_) {
+    // Initial position only: ImGui's native window dragging lets the reader
+    // move the briefing around (ImGuiCond_Always would fight the drag and
+    // pin it in place). Width is fixed every frame; height sizes to content.
     ImGui::SetNextWindowPos(ImVec2(layout_.content.x + 40.0f, layout_.content.y + 60.0f),
-                            ImGuiCond_Always);
+                            ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(420.0f, 0.0f), ImGuiCond_Always);
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ToIm(p.panel));
     ImGui::PushStyleColor(ImGuiCol_Text, ToIm(p.ink));
@@ -562,12 +579,24 @@ void ShellView::PaintIdle(Simulation& sim) {
                        ToRay(theme.palette.border));
     // The label sits at the top of the cell; the value starts one label height
     // plus a gap below it, so the two never overlap at any typography step.
+    // The unit (e.g. "%", " air", " ration/action") is painted to the right of
+    // the value when it fits, matching the reference's inline stat-unit.
+    const float labelY = cell.box.y + 6.0f;
     const float valueY =
         cell.box.y + 6.0f + TypePx(11) + 6.0f;
     Text(cell.label.c_str(), static_cast<int>(cell.box.x + 6.0f),
-             static_cast<int>(cell.box.y + 6.0f), TypePx(11) , ToRay(theme.palette.muted));
+             static_cast<int>(labelY), TypePx(11) , ToRay(theme.palette.muted));
     Text(cell.value.c_str(), static_cast<int>(cell.box.x + 6.0f),
          static_cast<int>(valueY), TypePx(20), ToRay(theme.palette.ink), true);
+    if (!cell.unit.empty()) {
+      const float valueW = TextWidth(cell.value.c_str(), TypePx(20), true);
+      const float unitW = TextWidth(cell.unit.c_str(), TypePx(10), false);
+      const float unitX = cell.box.x + 6.0f + valueW + 4.0f;
+      if (unitX + unitW <= cell.box.Right() - 6.0f) {
+        Text(cell.unit.c_str(), static_cast<int>(unitX), static_cast<int>(valueY),
+             TypePx(10), ToRay(theme.palette.muted));
+      }
+    }
     const float bar = cell.box.w - 12.0f;
     DrawRectangle(static_cast<int>(cell.box.x + 6.0f),
                   static_cast<int>(cell.box.Bottom() - 12.0f), static_cast<int>(bar), 4,
@@ -643,10 +672,11 @@ void ShellView::PaintPanel(const NavPanel& panel, const Area& box) {
        static_cast<int>(box.y + 5.0f), TypePx(11), ToRay(p.coffee));
   float y = box.y + TypeStep(24.0f);
   const float textW = std::max(1.0f, box.w - 16.0f);
-  auto paintWrapped = [&](const std::string& value, float x, float width,
-                          ::Color color) {
-    const std::vector<std::string> rows = WrapText(value, std::max(1.0f, width), small, bodyFont_);
-    for (const std::string& row : rows) {
+    auto paintWrapped = [&](const std::string& value, float x, float width,
+                            ::Color color) {
+      const std::vector<std::string> rows =
+          WrapText(value, std::max(1.0f, width), small, SelectFont(small, false));
+      for (const std::string& row : rows) {
       if (y + line > box.Bottom() - 3.0f) { break; }
       Text(row.c_str(), static_cast<int>(x), static_cast<int>(y), small, color);
       y += line;
@@ -706,7 +736,7 @@ float ShellView::MeasurePanelHeight(const NavPanel& panel, float width) const {
   const float lineHeight = TypeStep(14.0f);
   const auto wrappedRows = [this, textPx](const std::string& text, float available) {
     return static_cast<float>(WrapText(text, std::max(1.0f, available), textPx,
-                                       bodyFont_).size());
+                                       SelectFont(textPx, false)).size());
   };
   float y = TypeStep(24.0f);
   for (const PanelLine& item : panel.lines) {
@@ -2094,12 +2124,13 @@ void ShellView::PaintDiagram(const DiagramModel& diagram, const Area& stageBox, 
     DrawRectangle(x, y, w, h, ToRay(theme_.palette.panel2));
     DrawRectangleLines(x, y, w, h, ToRay(theme_.palette.borderDark));
     DrawRectangle(x, y, 3, h, ToRay(theme_.palette.coffee));
-    if (!diagram.compact) {
-      Text(room.name.c_str(), x + 6, y + 4, TypePx(10) , ToRay(theme_.palette.ink));
-      if (!room.small) {
-        Text(room.tag.c_str(), x + w - 30, y + h - 14, TypePx(8) ,
-                 ToRay(theme_.palette.muted));
-      }
+    // Room names are always shown: in the reference the compact deck keeps
+    // names at 10 px and hides only tags/sys codes. The 18 px floor applies,
+    // so names may be large in compact rooms but are never hidden.
+    Text(room.name.c_str(), x + 6, y + 4, TypePx(10), ToRay(theme_.palette.ink));
+    if (!diagram.compact && !room.small) {
+      Text(room.tag.c_str(), x + w - 30, y + h - 14, TypePx(8),
+           ToRay(theme_.palette.muted));
     }
   }
 

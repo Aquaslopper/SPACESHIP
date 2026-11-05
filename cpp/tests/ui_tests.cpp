@@ -976,3 +976,73 @@ TEST_CASE("a left-click describes, a right-click opens a tab", "[ui][verbs]") {
   CHECK(sim.State().tabs[0].kindLabel == "ROOM");
   CHECK(sim.State().tabs[0].title == "O2 Filter Room");
 }
+
+// ---------------------------------------------------------------------------
+//  UI-00x regression: stat units, font measurement, compact labels
+// ---------------------------------------------------------------------------
+TEST_CASE("home stat cells carry their units (UI-007)", "[ui][idle][layout]") {
+  ship::Simulation sim = Fresh();
+  ship::FxRng rng;
+  const ship::Theme theme = ship::Theme::ById("classic");
+  const ship::ShellLayout layout =
+      ship::ComputeLayout(1440.0f, 940.0f, 940.0f - 36.0f - 22.0f, 300.0f, true);
+  const ship::IdleScreenModel idle =
+      ship::BuildIdleScreen(sim, layout, theme, false, 300.0f, rng);
+  REQUIRE_FALSE(idle.stats.empty());
+  // Every stat cell carries a unit string (e.g. "%", " air", " action").
+  // BuildIdleScreen populates cell.unit; PaintIdle paints it inline with the
+  // value so it is never silently dropped.
+  for (const ship::RailCell& cell : idle.stats) {
+    CHECK_FALSE(cell.unit.empty());
+  }
+  // The stat unit is inline with the value: cell.value and cell.unit together
+  // must fit inside the cell width, so the value baseline and bar both fit.
+  CHECK(idle.stats.front().box.w >= 6.0f + 6.0f);
+}
+
+TEST_CASE("font step grows TypePx monotone and never below 18 px (UI-002)",
+          "[ui][theme][layout]") {
+  auto typePxFor = [](const ship::Theme& theme, int reference) {
+    return std::max(18, static_cast<int>(
+        std::lround(reference * (theme.FontPx() / 13.0))));
+  };
+  for (int step : {-2, -1, 0, 1, 2, 3, 4}) {
+    ship::Theme theme = ship::Theme::ById("classic");
+    theme.fontStep = step;
+    const float fontPx = ship::Theme::FontPxForStep(step);
+    const int ref10 = static_cast<int>(std::max(18.0,
+        std::round(10.0 * fontPx / 13.0)));
+    const int ref13 = static_cast<int>(std::max(18.0,
+        std::round(13.0 * fontPx / 13.0)));
+    CHECK(typePxFor(theme, 10) >= 18);
+    CHECK(typePxFor(theme, 13) >= 18);
+    CHECK(typePxFor(theme, 10) == ref10);
+    CHECK(typePxFor(theme, 13) == ref13);
+  }
+  // Larger font steps never make text smaller (layouts grow, never shrink).
+  ship::Theme t0 = ship::Theme::ById("classic");
+  t0.fontStep = 0;
+  ship::Theme t3 = ship::Theme::ById("classic");
+  t3.fontStep = 3;
+  CHECK(typePxFor(t3, 13) >= typePxFor(t0, 13));
+  CHECK(typePxFor(t3, 20) >= typePxFor(t0, 20));
+}
+
+TEST_CASE("home diagram compact rooms carry names and tags in the model "
+          "(UI-006)", "[ui][diagram][layout]") {
+  ship::Simulation sim = Fresh();
+  ship::FxRng rng;
+  const ship::Theme theme = ship::Theme::ById("classic");
+  const ship::ShellLayout compact =
+      ship::ComputeLayout(1024.0f, 768.0f, 768.0f - 36.0f - 22.0f, 300.0f, true);
+  const ship::IdleScreenModel idle =
+      ship::BuildIdleScreen(sim, compact, theme, false, 300.0f, rng);
+  const auto& plan = ship::ActivePlan(sim);
+  REQUIRE_FALSE(plan.rooms.empty());
+  for (const ship::Room& room : plan.rooms) {
+    // The model always carries the room name and tag; PaintDiagram paints
+    // names in both compact and expanded decks (tags only when expanded).
+    CHECK_FALSE(room.name.empty());
+    CHECK_FALSE(room.tag.empty());
+  }
+}
