@@ -13,26 +13,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Add Pre-installed MinGW-w64 to PATH
-        shell: bash
-        run: |
-          echo "C:/msys64/mingw64/bin" >> $GITHUB_PATH
-
-      - name: Prepare CMake and GCC 13/14 Compatibility
+      - name: Prepare CMake and Windows GCC Compatibility
         shell: bash
         run: |
           python3 - << 'EOF'
           import pathlib, re
 
-          # 1. Prevent CMake from running test discovery during EXE packaging
+          # 1. CMakeLists.txt: skip test discovery on EXE build, remove -Werror, ensure GUI builds on WIN32
           cmake_path = pathlib.Path("CMakeLists.txt")
           if cmake_path.exists():
               txt = cmake_path.read_text(encoding="utf-8")
               txt = re.sub(r'catch_discover_tests\s*\([^)]*\)', '# skipped for EXE packaging', txt)
               txt = txt.replace('-Werror', '')
+              txt = txt.replace('find_package(X11 QUIET)', 'set(X11_FOUND TRUE)')
               cmake_path.write_text(txt, encoding="utf-8")
 
-          # 2. Prevent GCC 13/14 false-positive -Wdangling-reference in Catalog.cpp
+          # 2. Catalog.cpp: avoid GCC 13/14 false-positive -Wdangling-reference
           cat_path = pathlib.Path("cpp/data/Catalog.cpp")
           if cat_path.exists():
               txt = cat_path.read_text(encoding="utf-8")
@@ -46,8 +42,8 @@ jobs:
         run: |
           cmake -B build-win -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_COMPILER=C:/msys64/mingw64/bin/gcc.exe \
-            -DCMAKE_CXX_COMPILER=C:/msys64/mingw64/bin/g++.exe \
+            -DCMAKE_C_COMPILER=gcc \
+            -DCMAKE_CXX_COMPILER=g++ \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
             -DOPENGL_gl_LIBRARY=opengl32 \
             -DCMAKE_CXX_FLAGS="-Wno-dangling-reference -Wno-error" \
