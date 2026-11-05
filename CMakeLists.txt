@@ -124,6 +124,7 @@ add_library(spaceship_core STATIC
   cpp/core/Awards.cpp
   cpp/core/Trace.cpp
   cpp/core/Navigation.cpp
+  cpp/core/Orders.cpp
   cpp/core/Economy.cpp
   cpp/core/Projects.cpp
   cpp/core/Ships.cpp
@@ -142,6 +143,9 @@ add_library(spaceship_core STATIC
   cpp/ui/EngineScreen.cpp
   cpp/ui/O2Screen.cpp
   cpp/ui/MessScreen.cpp
+  cpp/ui/CrewSprites.cpp
+  cpp/ui/CrewRecord.cpp
+  cpp/ui/QuartersScreen.cpp
   cpp/ui/NavScreen.cpp)
 
 target_include_directories(spaceship_core PUBLIC cpp)
@@ -209,7 +213,8 @@ if(SPACESHIP_BUILD_TESTS)
     cpp/tests/jsnumber_tests.cpp
     cpp/tests/ui_tests.cpp
     cpp/tests/task_tests.cpp
-    cpp/tests/nav_tests.cpp)
+    cpp/tests/nav_tests.cpp
+    cpp/tests/crew_tests.cpp)
   target_link_libraries(spaceship_tests PRIVATE spaceship_core Catch2::Catch2WithMain)
 
   include(Catch)

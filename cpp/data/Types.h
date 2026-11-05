@@ -105,6 +105,17 @@ struct Body {
   std::string subtype;
 };
 
+// One animation of the quarters figure: rows of characters, five-pixel cells.
+struct SpriteFrame {
+  std::vector<std::string> rows;
+};
+
+// A haircut is a sparse set of row overrides on SPRITE.
+struct HairStyle {
+  std::string id;
+  std::map<int, std::string> rows;
+};
+
 struct Lane {
   std::string from;
   std::string to;

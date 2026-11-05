@@ -363,6 +363,47 @@ function runCommand(g, line) {
     g.performAction('Undocked from ' + port.name);
     return true;
   }
+  if (command === 'jobassign' && parts.length >= 3) {
+    g.stageJob(parts[1], parts[2]);
+    return true;
+  }
+  if (command === 'stage' && parts.length >= 3) {
+    g.toggleOrder(parts[1], parts[2]);
+    return true;
+  }
+  if (command === 'orders') {
+    /* commitOrders() without the DOM work: the fee, the one action, the queue. */
+    const n = g.ordersCost();
+    if (n <= 0 || g.findOngoing('crew-assign')) { return true; }
+    let busy = false;
+    for (const id of Object.keys(g.STATE.pendingOrders)) {
+      const c = g.findById(g.CREW, id);
+      if (c && g.crewBusy(c)) { busy = true; }
+    }
+    if (busy) { return true; }
+    const fee = g.ordersFee();
+    if (fee > g.STATE.shiplets) { return true; }
+    const sheet = g.STATE.pendingOrders;
+    g.STATE.pendingOrders = {};
+    g.STATE.shiplets -= fee;
+    for (const id of Object.keys(sheet)) { g.CREW_CLAIMS[id] = true; }
+    try { g.performAction('Crew assignments issued'); } finally {
+      for (const id of Object.keys(sheet)) { delete g.CREW_CLAIMS[id]; }
+    }
+    if (g.STATE.gameOver) { return true; }
+    if (fee > 0) { g.logLine('Training fees paid - ' + fee + ' sh. Purse ' + g.STATE.shiplets + ' sh.'); }
+    g.queueOrders(sheet, n);
+    g.logLine('Crew assignments updated. ' + n + ' actions of work.');
+    return true;
+  }
+  if (command === 'talk' && parts.length >= 2) {
+    const c = g.findById(g.CREW, parts[1]);
+    if (c && !g.atDoc(c)) {
+      c.said = g.crewNeed(c);
+      g.logLine(c.name + ': "' + c.said + '"');
+    }
+    return true;
+  }
   if (command === 'layer' && parts.length >= 2) {
     g.setLayer(parts[1]);
     return true;

@@ -16,7 +16,9 @@
 #include "core/JsNumber.h"
 #include "ui/EngineScreen.h"
 #include "ui/MessScreen.h"
+#include "ui/CrewRecord.h"
 #include "ui/NavScreen.h"
+#include "ui/QuartersScreen.h"
 #include "ui/O2Screen.h"
 
 namespace ship {
@@ -231,6 +233,7 @@ bool PressProgressButton(Simulation& sim, const std::string& taskId) {
                               if (taskId == "cook") { return sim.StartCookingSelf(); }
                               if (taskId == "travel") { return sim.StartTravel(); }
                               if (taskId == "scan") { return sim.StartScan(); }
+                              if (taskId == "crew-assign") { return sim.CommitOrders(); }
                               return false;
                             });
 }
@@ -363,6 +366,10 @@ ScreenKind ScreenKindFor(const Tab& tab) {
   // The chart is not a room: it is its own window, and it is the first one the
   // player can open from the taskbar.
   if (tab.kind == "nav") { return ScreenKind::Nav; }
+  // A crew tab is a read-only record, and a room tab for the quarters is the
+  // order sheet. Neither is a room screen in the machine sense.
+  if (tab.kind == "crew") { return ScreenKind::CrewRecord; }
+  if (tab.kind == "room" && tab.id == "quarters") { return ScreenKind::Quarters; }
   if (tab.kind != "room") { return ScreenKind::Described; }
   if (tab.id == "engine") { return ScreenKind::Engine; }
   if (tab.id == "o2") { return ScreenKind::O2; }
@@ -370,7 +377,7 @@ ScreenKind ScreenKindFor(const Tab& tab) {
   // Cargo, science, the fitted systems, the bridge and the quarters each have a
   // window of their own in a later phase; until then they open on the house
   // frame rather than on nothing.
-  if (tab.id == "cargo" || tab.id == "science" || tab.id == "quarters") {
+  if (tab.id == "cargo" || tab.id == "science") {
     return ScreenKind::Deferred;
   }
   for (const std::string& glyph : SceneGlyphs()) { (void)glyph; }
@@ -381,6 +388,15 @@ ScreenKind ScreenKindFor(const Tab& tab) {
 TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab) {
   switch (ScreenKindFor(tab)) {
     case ScreenKind::Nav: return BuildNavScreen(sim).screen;
+    case ScreenKind::Quarters: return BuildQuartersScreen(sim).screen;
+    case ScreenKind::CrewRecord: {
+      // The record's four shelves are the whole window.
+      const CrewRecordModel record = BuildCrewRecord(sim, tab.id);
+      TaskScreenModel screen;
+      screen.head = record.head;
+      screen.left = record.shelves;
+      return screen;
+    }
     case ScreenKind::Engine: return BuildEngineScreen(sim).screen;
     case ScreenKind::O2: return BuildO2Screen(sim).screen;
     case ScreenKind::Mess: return BuildMessScreen(sim).screen;

@@ -58,6 +58,11 @@ struct CrewMember {
   std::string job;
   std::string skill;
   double jobAt = 0;
+
+  // What the quarters last heard them say, and where in the cycle they are.
+  std::string said;
+  std::string saidKey;
+  int saidN = 0;
 };
 
 // ---------------------------------------------------------------------------
@@ -75,6 +80,24 @@ struct Stat {
 // Ongoing work. The payload fields are optional by type, exactly as the
 // reference hangs them on the object.
 // ---------------------------------------------------------------------------
+// What the commander has staged for ONE hand. Staging is free; handing the
+// sheet over is the single action. The job is staged separately from the
+// orders because a job is a trade, not a chore.
+struct OrderSheet {
+  bool hasJob = false;
+  std::string job;
+  std::map<std::string, bool> flags;
+
+  bool Empty() const { return !hasJob && flags.empty(); }
+  bool Has(const std::string& id) const {
+    auto it = flags.find(id);
+    return it != flags.end() && it->second;
+  }
+  void Set(const std::string& id, bool on) {
+    if (on) { flags[id] = true; } else { flags.erase(id); }
+  }
+};
+
 struct Task {
   std::string id;
   std::string label;
@@ -100,8 +123,15 @@ struct Task {
   std::vector<std::string> dreamTexts;
   std::vector<std::string> dreamWho;
   std::vector<std::string> dreamOther;
-  bool rest = false;  // crewJob payload: the only one Phase 1A can create
+  bool rest = false;  // crewJob payload: the rest that autoDesires queues
   bool hasOrders = false;
+
+  // The order sheet a crewJob carries, applied when the work finishes.
+  bool sheetHasJob = false;
+  std::string sheetJob;
+  std::map<std::string, bool> sheetFlags;
+  // The whole sheet, on the crewOrder bar: one task per person, one bar for all.
+  std::string sheetOwner;
 };
 
 // ---------------------------------------------------------------------------

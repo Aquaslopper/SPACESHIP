@@ -27,6 +27,12 @@ namespace ship {
 
 namespace {
 
+// "Rell Voss" -> "Rell": the sheet names a hand by the name the roster uses.
+std::string FirstName(const std::string& name) {
+  const std::size_t space = name.find(' ');
+  return space == std::string::npos ? name : name.substr(0, space);
+}
+
 bool IsQuiet(const std::string& type) {
   // Types that announce themselves by name; they do not also emit the vague
   // "A ship process has completed." line.
@@ -206,9 +212,13 @@ double Simulation::AdvanceTasks(double n) {
     if (task->left <= 0) {
       task->left = 0;
       task->state = "done";
-      OnTaskDone(*task);
+      // A hook may queue new work, which can reallocate the vector this pointer
+      // walks into. Copy what the hook and the quiet count need first - reading
+      // task->type afterwards was reading freed storage.
+      const Task finished = *task;
+      OnTaskDone(*FindOngoing(original.id));
       done += 1;
-      if (!IsQuiet(task->type)) { quiet += 1; }
+      if (!IsQuiet(finished.type)) { quiet += 1; }
     }
   }
 
@@ -222,15 +232,48 @@ double Simulation::AdvanceTasks(double n) {
 
 void Simulation::ApplyOrderPayload(CrewMember& crew, const Task& task) {
   if (!task.hasOrders) { return; }
+  const auto flag = [&task](const std::string& id) {
+    auto it = task.sheetFlags.find(id);
+    return it != task.sheetFlags.end() && it->second;
+  };
+  // Read every flag BEFORE creating anything: AddOngoing pushes onto the same
+  // vector `task` lives in, and a reallocation would leave that reference
+  // pointing at dead storage - which silently turned a patient's sheet into a
+  // discharged one.
+  const bool rest = task.rest || flag("rest");
+  const bool fireOrder = flag("fire");
+  const bool docOrder = flag("doc");
+  const bool learnOn = flag("learnOn");
+  const bool learnSt = flag("learnSt");
+  const bool hasJob = task.sheetHasJob;
+  const std::string jobId = task.sheetJob;
 
-  // Phase 1A: the only payload anything can create is the voluntary rest that
-  // autoDesires queues. The order sheet itself arrives with Phase 1B.
-  if (task.rest) {
+  // FIRST, because nothing else on the sheet means anything to somebody who is
+  // being put off the ship.
+  if (fireOrder) {
+    FireCrew(crew);
+    return;
+  }
+  if (rest) {
     crew.fatigue = std::max(0.0, crew.fatigue - 25);
     crew.morale = std::min(100.0, crew.morale + 5);
     LogLine(crew.name + " took a restorative break.");
     SimRemember("Rest", crew.name + " took a restorative break.", crew.id);
   }
+  if (hasJob) { ApplyJobTo(crew, jobId); }
+  if (docOrder) {
+    // The sheet is done; the doctor is not. This is the one order whose
+    // consequence outlives the order itself.
+    Task* doc = AddOngoing("doc-" + crew.id, "Medical - " + FirstName(crew.name),
+                           rules_.docAway, "crewDoc", crew.id);
+    if (doc != nullptr) { doc->who = crew.id; }
+    crew.activity = "In the medical bay";
+    LogLine(crew.name + " went into the medical bay - about " +
+            js::NumToString(rules_.docAway) + " actions.");
+  }
+  if (learnOn) { TrainCrew(crew, 1, "aboard"); }
+  if (learnSt && state_.docked) { TrainCrew(crew, 2, "at the station"); }
+  if (!docOrder) { crew.activity = "Back on station"; }
 }
 
 }  // namespace ship

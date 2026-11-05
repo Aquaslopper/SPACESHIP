@@ -22,7 +22,9 @@
 #include "ui/Layout.h"
 #include "ui/Shell.h"
 #include "ui/Widgets.h"
+#include "ui/CrewRecord.h"
 #include "ui/NavScreen.h"
+#include "ui/QuartersScreen.h"
 #include "ui/Theme.h"
 
 namespace ship {
@@ -82,10 +84,16 @@ class ShellView {
   };
   NavScreenModel navScreen_;
   bool screenNav_ = false;
+  bool screenQuarters_ = false;
+  bool screenRecord_ = false;
+  QuartersScreenModel quarters_;
+  CrewRecordModel record_;
   std::vector<NavHit> navHits_;
 
   void PaintTaskScreen(Simulation& sim);
   void PaintNavScreen(Simulation& sim);
+  void PaintQuartersScreen(Simulation& sim);
+  void PaintCrewRecord(const Simulation& sim);
   void PaintPanel(const NavPanel& panel, const Area& box);
   void PaintStage(const TaskStage& stage, const Area& origin);
   void PaintIdle(Simulation& sim);

@@ -145,6 +145,18 @@ int main(int argc, char** argv) {
       simulation.Dock();
     } else if (command == "undock") {
       simulation.Undock();
+    } else if (command == "jobassign" && parts.size() >= 3) {
+      simulation.StageJob(parts[1], parts[2]);
+    } else if (command == "stage" && parts.size() >= 3) {
+      simulation.ToggleOrder(parts[1], parts[2]);
+    } else if (command == "orders") {
+      simulation.CommitOrders();
+    } else if (command == "talk" && parts.size() >= 2) {
+      for (ship::CrewMember& crew : simulation.MutableCrew()) {
+        if (crew.id != parts[1]) { continue; }
+        const std::string said = simulation.AskCrew(crew);
+        simulation.LogLine(crew.name + ": \"" + said + "\"");
+      }
     } else if (command == "layer" && parts.size() >= 2) {
       simulation.SetLayer(parts[1]);
     } else if (command == "sector" && parts.size() >= 2) {

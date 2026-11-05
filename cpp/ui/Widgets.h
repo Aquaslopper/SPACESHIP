@@ -181,7 +181,7 @@ TaskScreenModel BuildDescribedScreen(const Simulation& sim, const Description& d
 
 // Which builder a tab would use. Phase 3 owns the three machine rooms; every
 // other window still opens on the described frame until its own phase.
-enum class ScreenKind { Described, Nav, Engine, O2, Mess, Deferred };
+enum class ScreenKind { Described, Nav, Engine, O2, Mess, Quarters, CrewRecord, Deferred };
 ScreenKind ScreenKindFor(const Tab& tab);
 TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab);
 

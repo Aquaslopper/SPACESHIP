@@ -89,8 +89,31 @@ class Catalog {
     double wage = 0;
     double baseAt = 0;      // jobBase()
     std::string room;       // jobRoom map in applyJob()
+    // The price table. An order's price is also how long the sheet takes.
+    double cost = 1;
+    double learnOn = 0, learnSt = 0;
+    double feeOn = 0, feeSt = 0;
+    double trainStep = 0, trainCap = 0;
+    std::string unit;
+    std::string cloth, dark;  // what the sprite in the quarters wears
   };
   std::vector<JobDefinition> jobDefs;
+
+  struct OrderDefinition {
+    std::string id, label, note;
+  };
+  std::vector<OrderDefinition> orderDefs;
+
+  // The quarters art. Authored, never computed.
+  int spritePx = 4;
+  double floorY = 230;
+  SpriteFrame sprite, lie, sit;
+  std::string spriteBlank;
+  std::map<std::string, SpriteFrame> props;
+  std::map<std::string, SpriteFrame> hats;
+  std::map<std::string, std::pair<std::string, std::string>> jobHat;
+  std::map<std::string, std::string> jobTool;
+  std::map<std::string, HairStyle> hairStyles;
   std::vector<Good> startingCargo;          // the hold a new voyage opens with
   std::vector<SurveyRecordDef> startingSurvey;
 

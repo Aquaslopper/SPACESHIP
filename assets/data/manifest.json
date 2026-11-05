@@ -18,6 +18,7 @@
     "roomsKestrel": 21,
     "roomsWren": 21,
     "ships": 2,
+    "spriteRows": 21,
     "systems": 48,
     "taskTypes": 12,
     "themes": 5,

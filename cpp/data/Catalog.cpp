@@ -397,8 +397,68 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     def.label = Text(job, "label", "crew.json/jobs");
     def.unique = Flag(job, "unique");
     def.wage = Number(job, "wage", "crew.json/jobs");
+    def.cost = Number(job, "cost", "crew.json/jobs", 1);
+    def.learnOn = Number(job, "learnOn", "crew.json/jobs");
+    def.learnSt = Number(job, "learnSt", "crew.json/jobs");
+    def.feeOn = Number(job, "feeOn", "crew.json/jobs");
+    def.feeSt = Number(job, "feeSt", "crew.json/jobs");
+    def.trainStep = Number(job, "trainStep", "crew.json/jobs");
+    def.trainCap = Number(job, "trainCap", "crew.json/jobs");
+    def.unit = Text(job, "unit", "crew.json/jobs");
+    def.cloth = Text(job, "cloth", "crew.json/jobs");
+    def.dark = Text(job, "dark", "crew.json/jobs");
     catalog.jobDefs.push_back(def);
   }
+  for (const Json& order : Field(crew, "orders", "crew.json")) {
+    Catalog::OrderDefinition def;
+    def.id = Text(order, "id", "crew.json/orders");
+    def.label = Text(order, "label", "crew.json/orders");
+    def.note = Text(order, "note", "crew.json/orders");
+    catalog.orderDefs.push_back(def);
+  }
+
+  // --- the quarters art ---------------------------------------------------
+  {
+    const Json art = LoadFile(data / "crew-art.json");
+    const auto frame = [](const Json& rows) {
+      SpriteFrame out;
+      for (const Json& row : rows) { out.rows.push_back(row.get<std::string>()); }
+      return out;
+    };
+    catalog.spritePx = static_cast<int>(Number(art, "px", "crew-art.json", 4));
+    catalog.floorY = Number(art, "floory", "crew-art.json", 230);
+    catalog.sprite = frame(Field(art, "sprite", "crew-art.json"));
+    catalog.lie = frame(Field(art, "lie", "crew-art.json"));
+    catalog.sit = frame(Field(art, "sit", "crew-art.json"));
+    catalog.spriteBlank = Text(art, "spBlank", "crew-art.json");
+    const Json& props = Field(art, "props", "crew-art.json");
+    for (auto it = props.begin(); it != props.end(); ++it) {
+      catalog.props[it.key()] = frame(it.value());
+    }
+    const Json& hats = Field(art, "hats", "crew-art.json");
+    for (auto it = hats.begin(); it != hats.end(); ++it) {
+      catalog.hats[it.key()] = frame(it.value());
+    }
+    const Json& jobHat = Field(art, "jobHat", "crew-art.json");
+    for (auto it = jobHat.begin(); it != jobHat.end(); ++it) {
+      catalog.jobHat[it.key()] = {it.value().at(0).get<std::string>(),
+                                  it.value().at(1).get<std::string>()};
+    }
+    const Json& tools = Field(art, "jobTool", "crew-art.json");
+    for (auto it = tools.begin(); it != tools.end(); ++it) {
+      catalog.jobTool[it.key()] = it.value().get<std::string>();
+    }
+    for (const Json& style : Field(art, "hairStyles", "crew-art.json")) {
+      HairStyle hair;
+      hair.id = Text(style, "id", "crew-art.json/hairStyles");
+      for (const Json& row : Field(style, "rows", "crew-art.json/hairStyles")) {
+        hair.rows[static_cast<int>(Number(row, "row", "crew-art.json"))] =
+            Text(row, "text", "crew-art.json");
+      }
+      catalog.hairStyles[hair.id] = hair;
+    }
+  }
+
   {
     const Json& base = Field(crew, "jobBase", "crew.json");
     const Json& rooms = Field(crew, "jobRoom", "crew.json");

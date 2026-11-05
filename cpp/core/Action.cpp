@@ -151,6 +151,16 @@ Simulation Simulation::NewVoyage(const Catalog& catalog) {
     job.wage = def.wage;
     job.baseAt = def.baseAt;
     job.room = def.room;
+    job.cost = def.cost;
+    job.learnOn = def.learnOn;
+    job.learnSt = def.learnSt;
+    job.feeOn = def.feeOn;
+    job.feeSt = def.feeSt;
+    job.trainStep = def.trainStep;
+    job.trainCap = def.trainCap;
+    job.unit = def.unit;
+    job.cloth = def.cloth;
+    job.dark = def.dark;
     sim.jobs_.push_back(job);
   }
 

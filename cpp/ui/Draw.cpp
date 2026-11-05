@@ -92,12 +92,21 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
     // Ask the router for the window the active tab owns - the same function the
     // tests drive, so what is painted is what was proven.
     const Tab* tab = FindTab(sim.State(), sim.State().activeTab);
-    screenNav_ = tab != nullptr && ScreenKindFor(*tab) == ScreenKind::Nav;
+    const ScreenKind kind = tab == nullptr ? ScreenKind::Described : ScreenKindFor(*tab);
+    screenNav_ = kind == ScreenKind::Nav;
+    screenQuarters_ = kind == ScreenKind::Quarters;
+    screenRecord_ = kind == ScreenKind::CrewRecord;
     taskTabKey_ = sim.State().activeTab;
     taskScreen_ = BuildTabScreen(sim, *FindTab(sim.State(), taskTabKey_));
     if (screenNav_) {
       navScreen_ = BuildNavScreen(sim);
       PaintNavScreen(sim);
+    } else if (screenQuarters_) {
+      quarters_ = BuildQuartersScreen(sim);
+      PaintQuartersScreen(sim);
+    } else if (screenRecord_) {
+      record_ = BuildCrewRecord(sim, tab->id);
+      PaintCrewRecord(sim);
     } else {
       PaintTaskScreen(sim);
     }
@@ -748,6 +757,176 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   }
 }
 
+void ShellView::PaintCrewRecord(const Simulation& sim) {
+  navHits_.clear();
+  const Palette& p = theme_.palette;
+  const float left = layout_.content.x + 8.0f;
+  const float right = layout_.content.Right() - 8.0f;
+
+  DrawText(record_.head.kind.c_str(), static_cast<int>(left),
+           static_cast<int>(layout_.content.y), 9, ToRay(p.muted));
+  DrawText(record_.head.title.c_str(), static_cast<int>(left),
+           static_cast<int>(layout_.content.y + 12.0f), 20, ToRay(p.ink));
+  DrawText(record_.head.sub.c_str(), static_cast<int>(left),
+           static_cast<int>(layout_.content.y + 36.0f), 11, ToRay(p.muted));
+
+  // Status across the top, then the three short shelves left to right.
+  float y = layout_.content.y + 58.0f;
+  if (!record_.shelves.empty()) {
+    PaintPanel(record_.shelves[0], Area{left, y, right - left, 96.0f});
+    y += 102.0f;
+  }
+  const float column = (right - left - 12.0f) / 3.0f;
+  for (std::size_t i = 1; i < record_.shelves.size() && i <= 3; ++i) {
+    PaintPanel(record_.shelves[i],
+               Area{left + static_cast<float>(i - 1) * (column + 6.0f), y, column,
+                    180.0f});
+  }
+  (void)sim;
+}
+
+void ShellView::PaintQuartersScreen(Simulation& sim) {
+  navHits_.clear();
+  const Palette& p = theme_.palette;
+  const TaskScreenModel& screen = quarters_.screen;
+  const float left = layout_.content.x + 8.0f;
+  const float right = layout_.content.Right() - 8.0f;
+  const float column = 210.0f;
+
+  DrawText(screen.head.kind.c_str(), static_cast<int>(left),
+           static_cast<int>(layout_.content.y), 9, ToRay(p.muted));
+  DrawText(screen.head.title.c_str(), static_cast<int>(left),
+           static_cast<int>(layout_.content.y + 12.0f), 20, ToRay(p.ink));
+  DrawText(screen.head.sub.c_str(), static_cast<int>(left),
+           static_cast<int>(layout_.content.y + 36.0f), 10, ToRay(p.muted));
+
+  // --- the roster, and the payroll above it
+  const float panelTop = layout_.content.y + 58.0f;
+  float ry = panelTop;
+  if (!screen.left.empty()) {
+    PaintPanel(screen.left[0], Area{left, ry, column, 170.0f});
+    ry += 176.0f;
+  }
+
+  // --- the hallway: 560x300 of scenery, then the figure on top of it
+  const Area hall{left + column + 10.0f, panelTop, 560.0f, 300.0f};
+  DrawRectangle(static_cast<int>(hall.x), static_cast<int>(hall.y),
+                static_cast<int>(hall.w), static_cast<int>(hall.h), ToRay(p.panel2));
+  DrawRectangleLines(static_cast<int>(hall.x), static_cast<int>(hall.y),
+                     static_cast<int>(hall.w), static_cast<int>(hall.h),
+                     ToRay(p.borderDark));
+  BeginScissorMode(static_cast<int>(hall.x) + 1, static_cast<int>(hall.y) + 1,
+                   static_cast<int>(hall.w) - 2, static_cast<int>(hall.h) - 2);
+  for (const MachinePart& part : quarters_.hall) {
+    const int x = static_cast<int>(hall.x + part.box.x);
+    const int y = static_cast<int>(hall.y + part.box.y);
+    const int w = std::max(1, static_cast<int>(part.box.w));
+    const int h = std::max(1, static_cast<int>(part.box.h));
+    Color ink = ToRay(p.panel3);
+    if (part.cls.find("cq-wall") != std::string::npos) { ink = ToRay(p.panel); }
+    if (part.cls.find("cq-floor") != std::string::npos) { ink = ToRay(p.coffeeLight); }
+    if (part.cls.find("cq-light") != std::string::npos) { ink = ToRay(p.white); }
+    if (part.cls.find("cq-door") != std::string::npos) { ink = ToRay(p.coffeeDark); }
+    if (part.cls.find("cq-lock") != std::string::npos) { ink = ToRay(p.coffee); }
+    DrawRectangle(x, y, w, h, ink);
+    if (!part.text.empty()) {
+      DrawText(part.text.c_str(), x + 2, y + 1, 8, ToRay(p.muted));
+    }
+  }
+  for (const SpritePixel& pixel : quarters_.scene.pixels) {
+    DrawRectangle(static_cast<int>(hall.x + pixel.box.x),
+                  static_cast<int>(hall.y + pixel.box.y),
+                  std::max(1, static_cast<int>(pixel.box.w)),
+                  std::max(1, static_cast<int>(pixel.box.h)),
+                  Color{static_cast<unsigned char>(std::stoi(pixel.colour.substr(1, 2), nullptr, 16)),
+                        static_cast<unsigned char>(std::stoi(pixel.colour.substr(3, 2), nullptr, 16)),
+                        static_cast<unsigned char>(std::stoi(pixel.colour.substr(5, 2), nullptr, 16)),
+                        255});
+  }
+  EndScissorMode();
+
+  // --- the roster is clickable: looking at a hand is free
+  float rowY = panelTop + 34.0f;
+  for (const CrewRowView& row : quarters_.roster) {
+    const Area box{left + 6.0f, rowY, column - 12.0f, 24.0f};
+    if (row.selected) {
+      DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                    static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel3));
+    }
+    DrawText(row.name.c_str(), static_cast<int>(box.x + 8.0f),
+             static_cast<int>(box.y + 3.0f), 10, ToRay(p.ink));
+    DrawText(row.role.c_str(), static_cast<int>(box.x + 8.0f),
+             static_cast<int>(box.y + 13.0f), 8, ToRay(p.muted));
+    if (!row.flag.empty()) {
+      DrawText(row.flag.c_str(), static_cast<int>(box.Right() - 30.0f),
+               static_cast<int>(box.y + 6.0f), 8, ToRay(p.terracotta));
+    }
+    navHits_.push_back(NavHit{box, "select", row.id});
+    rowY += 26.0f;
+  }
+
+  // --- condition and standing, under the hallway
+  float uy = hall.Bottom() + 8.0f;
+  for (const NavPanel& panel : screen.under) {
+    PaintPanel(panel, Area{hall.x + (uy > hall.Bottom() + 8.0f ? 0.0f : 0.0f), uy,
+                           270.0f, 120.0f});
+    uy += 124.0f;
+  }
+
+  // --- orders and the sheet, down the right
+  float oy = panelTop;
+  for (const NavPanel& panel : screen.right) {
+    const float height = panel.id == "cq-orders" ? 220.0f : 120.0f;
+    PaintPanel(panel, Area{right - column, oy, column, height});
+    if (panel.id == "cq-orders" && !quarters_.closed) {
+      float lineY = oy + 96.0f;
+      for (const OrderLineView& line : quarters_.orders) {
+        const Area box{right - column + 6.0f, lineY, column - 12.0f, 18.0f};
+        const std::string label = (line.on ? "[x] " : "[ ] ") + line.label;
+        DrawText(label.c_str(), static_cast<int>(box.x),
+                 static_cast<int>(box.y), 9,
+                 ToRay(line.on ? p.ink : (line.locked ? p.muted : p.ink)));
+        DrawText(line.cost.c_str(), static_cast<int>(box.Right() - 46.0f),
+                 static_cast<int>(box.y), 8, ToRay(p.coffee));
+        navHits_.push_back(NavHit{box, "order", line.id});
+        lineY += 19.0f;
+    }
+    }
+    oy += height + 6.0f;
+  }
+
+  // --- the band: one button, one bar, one charge
+  const float bandY = layout_.content.Bottom() - 78.0f;
+  DrawRectangle(static_cast<int>(left), static_cast<int>(bandY),
+                static_cast<int>(right - left), 72, ToRay(p.panel));
+  DrawRectangleLines(static_cast<int>(left), static_cast<int>(bandY),
+                     static_cast<int>(right - left), 72, ToRay(p.border));
+  DrawText("Assignments", static_cast<int>(left + 8.0f),
+           static_cast<int>(bandY + 4.0f), 9, ToRay(p.coffee));
+  DrawText(quarters_.bandNote.c_str(), static_cast<int>(left + 8.0f),
+           static_cast<int>(bandY + 18.0f), 10, ToRay(p.muted));
+  float bx = left + 8.0f;
+  for (const ProgressButton& button : screen.progress) {
+    const Area box{bx, bandY + 36.0f, 220.0f, 26.0f};
+    DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                  static_cast<int>(box.w), static_cast<int>(box.h),
+                  ToRay(button.enabled ? p.panel2 : p.panel3));
+    if (button.fillPercent > 0.0) {
+      DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                    static_cast<int>(box.w * button.fillPercent / 100.0),
+                    static_cast<int>(box.h), ToRay(p.white));
+    }
+    DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                       static_cast<int>(box.w), static_cast<int>(box.h),
+                       ToRay(p.borderDark));
+    DrawText(button.text.c_str(), static_cast<int>(box.x + 8.0f),
+             static_cast<int>(box.y + 7.0f), 10, ToRay(p.ink));
+    navHits_.push_back(NavHit{box, "commit", ""});
+    bx += 228.0f;
+  }
+  (void)sim;
+}
+
 void ShellView::PaintDiagram(const DiagramModel& diagram) {
   const ::Color frame = ToRay(theme_.palette.coffee);
   const ::Color hull = ToRay(Rgb{253, 251, 247});
@@ -883,6 +1062,19 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
     }
     break;
   }
+
+  // The quarters: a roster row, a job, an order, the sheet, a word.
+  if (screenQuarters_) {
+    for (const NavHit& hit : navHits_) {
+      if (!hit.box.Contains(x, y)) { continue; }
+      if (PressQuartersAction(sim, hit.action, hit.arg) && hit.action == "commit") {
+        SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
+      }
+      return;
+    }
+    return;
+  }
+  if (screenRecord_) { return; }
 
   // The chart's own controls: bodies, the zoom pair, the layers, the actions.
   if (screenNav_) {

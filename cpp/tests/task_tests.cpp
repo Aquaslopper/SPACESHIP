@@ -438,7 +438,8 @@ TEST_CASE("the router sends the three machine rooms to their own windows",
   CHECK(ship::ScreenKindFor(TabOf("room", "mess")) == ScreenKind::Mess);
   CHECK(ship::ScreenKindFor(TabOf("room", "cargo")) == ScreenKind::Deferred);
   CHECK(ship::ScreenKindFor(TabOf("room", "cabin")) == ScreenKind::Described);
-  CHECK(ship::ScreenKindFor(TabOf("crew", "jax")) == ScreenKind::Described);
+  // Phase 5 gave a crew tab its own read-only record.
+  CHECK(ship::ScreenKindFor(TabOf("crew", "jax")) == ScreenKind::CrewRecord);
 
   ship::Simulation sim = Fresh();
   const ship::TaskScreenModel screen =

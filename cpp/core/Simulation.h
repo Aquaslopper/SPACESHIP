@@ -39,6 +39,12 @@ struct JobDef {
   double wage = 0;
   double baseAt = 0;  // jobBase(): the rate a hand starts at
   std::string room;   // where the job is worked
+  double cost = 1;    // what handing the trade over costs, in actions
+  double learnOn = 0, learnSt = 0;    // the price of a lesson, in actions
+  double feeOn = 0, feeSt = 0;        // ...and in shiplets
+  double trainStep = 0, trainCap = 0;
+  std::string unit;                   // "%" / " air" / " ration/action"
+  std::string cloth, dark;            // what the sprite in the quarters wears
 };
 
 // Builds a live crew member from an authored definition. Shared by the new
@@ -71,6 +77,8 @@ class Simulation {
   const GameState& State() const { return state_; }
   GameState& MutableState() { return state_; }
   const std::vector<CrewMember>& Crew() const { return crew_; }
+  // The quarters needs to write down what a hand just said; nothing else does.
+  std::vector<CrewMember>& MutableCrew() { return crew_; }
   const std::vector<Stat>& Stats() const { return stats_; }
   const LifeStore& Life() const { return life_; }
   LifeStore& MutableLife() { return life_; }
@@ -110,6 +118,54 @@ class Simulation {
   CrewMember* AssignedNavigator();
   const Rules& GameRules() const { return rules_; }
   std::vector<std::string> FeedText() const;
+
+  // ---- Phase 5: the order sheet (Quarters) -------------------------------
+  // Staging is free: selecting a hand, a trade and a set of orders moves no
+  // clock. Handing the sheet over is one action, and the work it names is the
+  // price - the crew spend it carrying orders out while the ship runs on.
+  const std::vector<JobDef>& Jobs() const { return jobs_; }
+  const JobDef* FindJobDef(const std::string& jobId) const;
+  const OrderSheet* SheetOf(const CrewMember& crew) const;
+  std::string StagedJob(const CrewMember& crew) const;
+  bool StageJob(const std::string& crewId, const std::string& jobId);  // free
+  bool ToggleOrder(const std::string& crewId, const std::string& orderId);  // free
+  void ClearOrders();
+  int OrderedCount() const;
+  bool OrdersRunning() const;
+  bool CrewAvailable(const CrewMember& crew) const;  // ordersAvailable()
+  double JobCost(const std::string& jobId) const;
+  double OrderCostFor(const std::string& jobId, const std::string& orderId) const;
+  double OrderCost(const CrewMember& crew, const std::string& orderId) const;
+  double CrewCostOf(const CrewMember& crew) const;   // crewCostOf()
+  double OrderFeeFor(const std::string& jobId, const std::string& orderId) const;
+  double CrewFeeOf(const CrewMember& crew) const;
+  double OrdersCost() const;   // the work, in actions
+  double OrdersFee() const;    // the schooling, in shiplets
+  double SheetCost(const CrewMember& crew, const OrderSheet& sheet) const;
+  bool CommitOrders();         // fireAction + queueOrders()
+  void ApplyJobTo(CrewMember& crew, const std::string& jobId);
+  void TrainCrew(CrewMember& crew, int steps, const std::string& where);
+  void FireCrew(CrewMember& crew);
+
+  // ---- Phase 5: the read-only views the crew windows share --------------
+  // Everything a crew window prints is derived at paint time, never cached,
+  // so a tab left open can never go stale.
+  double CrewWage(const CrewMember& crew) const;
+  double PayrollBill() const;
+  double PayrollDue() const;
+  std::string JobThreshold(const CrewMember& crew) const;
+  std::string CrewWhere(const CrewMember& crew) const;
+  std::string SimActivityOf(const CrewMember& crew) const;
+  std::string NeedKeyFor(const CrewMember& crew) const;
+  std::string SimDriveOf(const CrewMember& crew) const;
+  std::string SimAnchorOf(const CrewMember& crew) const;
+  double NavigatorFuelDiscount(const CrewMember& crew) const;
+  // The scene the quarters draws for one hand: pose and props.
+  std::string AirStageWord() const;
+  // NEED_LINES, and the quote cycle behind "Talk to <name>". Asking is free and
+  // spells out a different line each time.
+  std::string NeedLine(const std::string& needKey, int n, const std::string& jobLabel) const;
+  std::string AskCrew(CrewMember& crew);
 
   // ---- Phase 1B commands ------------------------------------------------
   // Navigation (Navigation.cpp). Selection is free; only travel and scans cost.
@@ -240,6 +296,7 @@ class Simulation {
   double MaintCost() const;
   bool MaintRunning() const;
   void ApplyOrderPayload(CrewMember& crew, const Task& task);
+  void QueueOrders(const std::map<std::string, OrderSheet>& sheet, double total);
 
   // Tasks.cpp
   double AdvanceTasks(double n);
@@ -301,6 +358,9 @@ class Simulation {
   std::vector<GoodsLot> goods_;
   std::vector<SurveyRecord> survey_;
   std::vector<JobDef> jobs_;
+  // The staged sheets, by crew id. STATE.pendingOrders mirrors which ids have
+  // one, so a save written here still reads as the reference expects.
+  std::map<std::string, OrderSheet> orderSheets_;
 
   ShipDef ship_;
   std::vector<Room> rooms_;

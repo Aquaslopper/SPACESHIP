@@ -209,6 +209,149 @@ CrewMember* Simulation::AssignedCook() {
   return nullptr;
 }
 
+// ---------------------------------------------------------------------------
+// The read-only views the crew windows share. None of these moves a clock:
+// they are what a panel reads, not what a button does.
+// ---------------------------------------------------------------------------
+double Simulation::CrewWage(const CrewMember& crew) const { return WageOf(crew); }
+
+double Simulation::PayrollBill() const {
+  double total = 0;
+  for (const CrewMember& crew : crew_) { total += WageOf(crew); }
+  return total;
+}
+
+double Simulation::PayrollDue() const {
+  const double left = rules_.pay.every - state_.payTick;
+  return left < 0 ? 0 : left;
+}
+
+std::string Simulation::AirStageWord() const { return AirSpec().word; }
+
+double Simulation::NavigatorFuelDiscount(const CrewMember& crew) const {
+  const double at = crew.jobAt == 0 ? 1.0 : crew.jobAt;
+  return 4.0 * std::max(1.0, std::min(5.0, at));
+}
+
+std::string Simulation::JobThreshold(const CrewMember& crew) const {
+  if (crew.job == "maintenance") {
+    return js::NumToString(EffectiveJobAt(crew)) + "% condition";
+  }
+  if (crew.job == "filters") {
+    const std::vector<AirStage>& stages = rules_.air.stages;
+    const std::size_t index = static_cast<std::size_t>(crew.jobAt);
+    return (index < stages.size() ? stages[index].word : AirSpec().word) + " air";
+  }
+  if (crew.job == "navigation") {
+    return "Fuel use -" + js::NumToString(NavigatorFuelDiscount(crew)) + "% when plotting";
+  }
+  if (crew.job == "cleaner") {
+    return "Crew morale +1 every " + js::NumToString(CleanerInterval(crew)) + " actions";
+  }
+  if (crew.job == "kitchen") {
+    return js::NumToString(crew.jobAt) + (crew.jobAt == 1 ? " ration" : " rations") +
+           " per action, cooking";
+  }
+  return "-";
+}
+
+std::string Simulation::CrewWhere(const CrewMember& crew) const {
+  const Task* work = CrewBusy(crew);
+  if (work != nullptr && work->target == "social") { return "Recreation"; }
+  if (FindOngoing("doc-" + crew.id) != nullptr) { return "Medical Bay"; }
+  if (crew.job.empty()) { return "Corridor - no job"; }
+  for (const Room& room : rooms_) {
+    if (room.id == crew.room) { return room.name; }
+  }
+  return "Corridor";
+}
+
+std::string Simulation::SimActivityOf(const CrewMember& crew) const {
+  const Task* work = CrewBusy(crew);
+  if (work != nullptr && work->target == "social") { return "Sharing a meal"; }
+  if (FindOngoing("doc-" + crew.id) != nullptr) { return "In medical care"; }
+  if (work != nullptr && work->by == crew.name) { return work->label; }
+  return crew.activity;
+}
+
+// needKey(): the order of the tests is the order of what hurts.
+std::string Simulation::NeedKeyFor(const CrewMember& crew) const {
+  if (crew.health < 75) { return "ill"; }
+  if (AirStageIndex() <= 1) { return "air"; }
+  if (crew.fatigue > 70) { return "tired"; }
+  if (crew.hunger > 70) { return "hungry"; }
+  if (crew.morale < 60) { return "morale"; }
+  if (!crew.job.empty() && (crew.skill.empty() || crew.skill == "Untrained")) {
+    return "untrained";
+  }
+  if (crew.job.empty()) { return "idle"; }
+  return "fine";
+}
+
+std::string Simulation::NeedLine(const std::string& needKey, int n,
+                                 const std::string& jobLabel) const {
+  static const std::map<std::string, std::vector<std::string>> kLines = {
+      {"ill", {"I am not right. I should see the doc.",
+               "Been feeling rough for a while now. Do not make me say it twice.",
+               "I can work. I would rather not, but I can work.",
+               "Whatever I picked up, it has not let go of me yet."}},
+      {"air", {"The air in here is filthy. Sort the filters and I will sort everything else.",
+               "Every breath tastes of the last one. How long has the bank been dead?",
+               "My head is splitting and it is not the work.",
+               "You can smell the ship going stale. That is not supposed to happen."}},
+      {"untrained", {"I am doing the {job} work on guesswork. Teach me properly and I will catch things sooner.",
+                     "Nobody ever showed me the {job} job. I copy what I saw the last one do.",
+                     "I will keep guessing at {job} if you like. It has held so far.",
+                     "Send me to learn the {job} work. I would rather know than hope."}},
+      {"morale", {"Put me on something else. This job is wearing on me.",
+                  "I am not asking for much. Just something different for a while.",
+                  "Same station, same hours, same walls. You see the problem.",
+                  "I have stopped looking forward to my shifts."}},
+      {"tired", {"I need a shift off my feet.",
+                 "I have been awake longer than the drive has.",
+                 "Give me an hour in the bunk and I will be twice the use."}},
+      {"hungry", {"When did we last eat properly?",
+                  "Rations again. I am starting to dream about the mess hall.",
+                  "Feed the crew, commander. It is cheaper than replacing us."}},
+      {"idle", {"Give me something to be responsible for.",
+                "I will take any job going. Standing about is worse than work.",
+                "You have a spare pair of hands here doing nothing."}},
+      {"fine", {"Nothing to report. The {job} work is in hand.",
+                "All quiet. I will tell you the moment it is not.",
+                "Ship is behaving. Long may it last.",
+                "No complaints today, and that is rare enough to mention."}}};
+
+  auto it = kLines.find(needKey);
+  if (it == kLines.end() || it->second.empty()) { return std::string(); }
+  std::string text = it->second[static_cast<std::size_t>(n) % it->second.size()];
+  std::string job = jobLabel.empty() ? std::string("ship") : jobLabel;
+  std::transform(job.begin(), job.end(), job.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  const std::string token = "{job}";
+  for (std::size_t at = text.find(token); at != std::string::npos;
+       at = text.find(token, at + job.size())) {
+    text.replace(at, token.size(), job);
+  }
+  return text;
+}
+
+std::string Simulation::AskCrew(CrewMember& crew) {
+  if (FindOngoing("doc-" + crew.id) != nullptr) { return crew.said; }
+  const std::string key = NeedKeyFor(crew);
+  if (crew.saidKey != key) {
+    crew.saidKey = key;
+    crew.saidN = 0;
+  } else {
+    crew.saidN += 1;
+  }
+  const JobDef* job = FindJobDef(crew.job);
+  crew.said = NeedLine(key, crew.saidN, job == nullptr ? std::string() : job->label);
+  return crew.said;
+}
+
+std::string Simulation::SimDriveOf(const CrewMember& crew) const { return SimDrive(crew); }
+std::string Simulation::SimAnchorOf(const CrewMember& crew) const { return SimAnchor(crew); }
+
 const Task* Simulation::CrewBusy(const CrewMember& crew) const {
   if (crewClaims_.count(crew.id) != 0) {
     // A claimed hand is mid-command; report "busy" without inventing a task.

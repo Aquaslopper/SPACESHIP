@@ -566,6 +566,22 @@ signal story's two endings (`finishSignal`) and the broadcasts they unlock, clai
 the rank it feeds, and the crew order sheet's remaining payloads (a rest is the only order the clock can create on
 its own). All three are state-complete and save-compatible; they are waiting for their UI.
 
+### Phase 5 — Crew quarters and the crew records — DONE
+
+`data/crew-art.json` now carries the sprite tables out of the reference verbatim
+(SPRITE 21x18, LIE 9x26, SIT 16x18, PROPS, HATS, JOB_HAT, JOB_TOOL, HAIR_STYLES),
+exported by `tools/export-data.cjs` and loaded into the catalogue. `ui/CrewSprites`
+resolves a hand's look (staged job, gown, hat, haircut, the female eye row) into
+coloured 4px cells and builds the scene the sheet implies: lying on the cot, at the
+bench, beside a crate, or sat on the deck. `ui/QuartersScreen` is the order sheet —
+staging a trade or an order is free, handing the sheet over is one action, and the
+price of the order is the work the crew then spend — with `core/Orders.cpp` holding
+the prices (`orderCostFor`, `jobCost`, `ordersFee`, `sheetCost`), the unique-trade
+rule, `trainCrew` and the lay-off. `ui/CrewRecord` is the read-only four-shelf
+record a crew tab opens on. Both are routed and painted; `crew_tests` covers the
+grid, the postures, the free/paid line, the doc's own countdown, the trade and the
+training gate, and `voyage-12` pins a full order-sheet voyage against the reference.
+
 ### Phase 4 — Navigation and the star chart — DONE
 
 `ui/NavScreen` holds the whole chart: the projection pair (`NavProject`, and the

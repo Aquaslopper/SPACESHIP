@@ -77,8 +77,8 @@ Existing Kessler-only and expanded-galaxy saves still load, including active leg
 The repository also contains a native C++ port of the game. It is a **work in
 progress**: Phase 0 (build system, extracted catalogue, data gate), Phase 1 (the
 whole headless simulation), Phase 2 (the cockpit), Phase 3 (the task frame and the
-three machine rooms) and Phase 4 (Navigation and the star chart) are complete and
-verified against the reference. Phase 2
+three machine rooms), Phase 4 (Navigation and the star chart) and Phase 5 (Crew
+Quarters and the crew records) are complete and verified against the reference. Phase 2
 delivers the taskbar and its tabs, the sidebar and pinned foot, the status bar, and
 the idle screen with the ship cross-section, the feed and the two interaction
 verbs. Phase 3 adds the house task frame — head, panels, machine stage, commitment
@@ -87,8 +87,11 @@ Engine Room (a 225-part 650x390 drive), the O2 Filter Room and the Mess Hall. Ph
 adds the Navigation window: three chart scales, the perspective raster, the zoom and
 pan ladder, the ship's ring and the two controls that cost anything (Start Travel and
 Run Deep Scan), with the panels' distance, transit and fuel readouts derived exactly.
-The router hands every tab that has no window yet the same frame as a placeholder;
-those remaining windows are Phase 5. Until then `Spaceship.hta` remains the playable
+Phase 5 adds the quarters: the pixel sprites built from the reference's character
+maps, the order sheet (staging free, one action to hand it over, the price paid as
+work), job and trade changes, station training, the medical bay and the roster. The
+router hands every tab that has no window yet the same frame as a placeholder;
+those remaining windows are Phase 6. Until then `Spaceship.hta` remains the playable
 edition.
 
 `spaceship_core` is feature-complete as a simulation: the action clock, drive
