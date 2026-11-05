@@ -431,6 +431,141 @@ int main() {
       shell.ClosePopup();
     }
 
+    // Exercise the real pointer paths and animation, not only their models.
+    {
+      auto audit = ship::Simulation::NewVoyage(ship::Catalog::LoadFromAssets("assets"));
+      ship::ShellView cockpit;
+      io.DisplaySize = ImVec2(1280, 1600);
+      cockpit.Configure(1280, 1600, ship::Theme::ById("classic"));
+      Frame(cockpit, audit, 1000);
+      const auto life = std::find_if(audit.Infos().begin(), audit.Infos().end(),
+                                    [](const auto& i) { return i.id == "life"; });
+      Require(life != audit.Infos().end(), "No source life info card");
+      const auto card = FindText(life->label);
+      cockpit.Click(audit, card.x + 2, card.y + 2, ship::HitButton::Right, 1000);
+      Require(ship::FindTab(audit.State(), "info:life") != nullptr &&
+              ship::FindTab(audit.State(), "room:o2") == nullptr && audit.State().activeTab == "home",
+              "Life right-click bypassed the source information task");
+      Require(audit.ActionCount() == 0, "Reading life info ticked the clock");
+
+      // Same roster, different employment: actual painted dot must eventually
+      // drift into the new compartment, then into the unemployment corridor.
+      auto* hand = audit.FindCrew("jax");
+      Require(hand != nullptr, "No engineer in dot fixture");
+      hand->colour = "#010203";
+      hand->job = "cook"; hand->room = "mess";
+      for (int i = 1; i <= 450; ++i) Frame(cockpit, audit, 1000 + i * 1000);
+      ship::FxRng rng;
+      auto idle = ship::BuildIdleScreen(audit, cockpit.LayoutNow(), cockpit.CurrentTheme(), false, rng);
+      const auto* room = ship::ActivePlan(audit).FindRoom("mess");
+      Require(room != nullptr, "No source mess room");
+      auto paintedHand = [&]() {
+        const auto it = std::find_if(rects.begin(), rects.end(), [](const RectCall& r) {
+          return r.w == 15 && r.h == 15 && r.color.r == 1 && r.color.g == 2 && r.color.b == 3;
+        });
+        Require(it != rects.end(), "Crew indicator was not painted"); return *it;
+      };
+      auto dot = paintedHand();
+      Require(dot.x >= idle.stageArea.x + room->box.x && dot.x < idle.stageArea.x + room->box.x + room->box.w &&
+              dot.y >= idle.stageArea.y + room->box.y && dot.y < idle.stageArea.y + room->box.y + room->box.h,
+              "Same-size roster kept the crew indicator in its previous workplace");
+      hand->job.clear();
+      for (int i = 451; i <= 900; ++i) Frame(cockpit, audit, 1000 + i * 1000);
+      dot = paintedHand();
+      const auto corridor = ship::ActivePlan(audit).corridor;
+      Require(dot.y >= idle.stageArea.y + corridor.y && dot.y < idle.stageArea.y + corridor.y + corridor.h,
+              "Laid-off indicator did not migrate into the corridor");
+      const auto before = dot;
+      for (int i = 901; i <= 960; ++i) Frame(cockpit, audit, 1000 + i * 1000);
+      dot = paintedHand();
+      Require(dot.x != before.x, "Corridor crew indicator never drifts");
+      Require(audit.ActionCount() == 0 && audit.State().wearTick == 0,
+              "Cosmetic crew movement advanced the action clock");
+
+      ship::OpenTask(audit, "crew", "missing", true);
+      Frame(cockpit, audit, 970000);
+      FindText("No longer aboard"); FindText("crew missing");
+      ship::OpenTask(audit, "event", "missing", true);
+      Frame(cockpit, audit, 971000);
+      FindText("No longer aboard"); FindText("event missing");
+
+      ship::OpenTask(audit, "nav", "main", true);
+      Frame(cockpit, audit, 972000);
+      const auto initialChart = ship::BuildNavChart(audit);
+      const auto labelBody = std::find_if(initialChart.bodies.begin(), initialChart.bodies.end(),
+                                         [](const auto& b) { return b.id == "halvan"; });
+      Require(labelBody != initialChart.bodies.end(), "No Halvan chart label");
+      const auto mapBox = std::find_if(rects.begin(), rects.end(), [&](const RectCall& r) {
+        const auto c = cockpit.CurrentTheme().palette.chart;
+        return r.w > 200 && r.h > 100 && r.color.r == c.r && r.color.g == c.g && r.color.b == c.b;
+      });
+      Require(mapBox != rects.end(), "No painted map for label fixture");
+      cockpit.Click(audit, mapBox->x + labelBody->labelX * mapBox->w / audit.Map().vw + 20,
+                     mapBox->y + labelBody->labelY * mapBox->h / audit.Map().vh + 3,
+                     ship::HitButton::Left, 972000);
+      Require(audit.State().navTarget == "halvan", "Visible map label did not select its body");
+      Require(audit.ActionCount() == 0, "Selecting a label spent an action");
+      Require(audit.StartTravel(), "Could not start ring-interpolation fixture");
+      auto* trip = audit.FindOngoing("travel");
+      Require(trip != nullptr, "No travel fixture"); trip->left = trip->total * .5;
+      Frame(cockpit, audit, 973000);
+      const auto chart = ship::BuildNavChart(audit);
+      const auto chartRect = std::find_if(rects.begin(), rects.end(), [&](const RectCall& r) {
+        const auto c = cockpit.CurrentTheme().palette.chart;
+        return r.w > 200 && r.h > 100 && r.color.r == c.r && r.color.g == c.g && r.color.b == c.b;
+      });
+      Require(chartRect != rects.end(), "No painted navigation chart");
+      const float ringX = chartRect->x + chart.marker.x * chartRect->w / audit.Map().vw;
+      const float ringY = chartRect->y + chart.marker.y * chartRect->h / audit.Map().vh;
+      const auto actions = audit.ActionCount();
+      cockpit.Click(audit, ringX, ringY, ship::HitButton::Left, 973000);
+      Require(audit.State().navTarget == audit.HomeBody()->id,
+              "Interpolated ship-position ring did not select home");
+      Require(audit.ActionCount() == actions, "Selecting the ship ring advanced travel");
+    }
+    {
+      auto tabs = ship::Simulation::NewVoyage(ship::Catalog::LoadFromAssets("assets"));
+      ship::ShellView cockpit;
+      io.DisplaySize = ImVec2(1280, 720);
+      cockpit.Configure(1280, 720, ship::Theme::ById("classic"));
+      auto hasColour = [](ImU32 colour) {
+        const auto* data = ImGui::GetDrawData();
+        for (int i = 0; i < data->CmdListsCount; ++i)
+          for (const auto& vertex : data->CmdLists[i]->VtxBuffer)
+            if (vertex.col == colour) return true;
+        return false;
+      };
+      ship::OpenTask(tabs, "crew", "rell", true);
+      Frame(cockpit, tabs, 1000);
+      Require(hasColour(IM_COL32(233,214,184,255)), "Active new tab did not receive HTA warm glow");
+      Frame(cockpit, tabs, 1150);
+      Require(hasColour(IM_COL32(233,214,184,255)), "Tab glow did not hold 160 ms");
+      Frame(cockpit, tabs, 2000);
+      Require(!hasColour(IM_COL32(233,214,184,255)), "Tab glow never faded");
+      Frame(cockpit, tabs, 2700);
+      tabs.MutableState().reducedMotion = true;
+      ship::OpenTask(tabs, "crew", "jax", true);
+      Frame(cockpit, tabs, 3000);
+      Require(!hasColour(IM_COL32(233,214,184,255)), "Reduced motion did not suppress tab glow");
+      ship::SwitchTab(tabs, "home"); Frame(cockpit, tabs, 4000);
+      for (int i = 0; i < 18; ++i) ship::OpenTask(tabs, "crew", "missing" + std::to_string(i), false);
+      Frame(cockpit, tabs, 5000);
+      Require(tabs.State().activeTab == "home", "Background tab reveal stole focus");
+      cockpit.Click(tabs, cockpit.LayoutNow().tabStrip.w - 12, 12, ship::HitButton::Left, 5000);
+      Require(ship::FindTab(tabs.State(), "crew:missing17") == nullptr,
+              "New background tab was not revealed with its close target");
+      ship::OpenTask(tabs, "crew", "missing0", false);
+      Frame(cockpit, tabs, 6000);
+      const auto* tab = ship::FindTab(tabs.State(), "crew:missing0");
+      Require(tab != nullptr, "Existing background tab vanished");
+      const float closeX = ImGui::CalcTextSize((tab->kindLabel + "  " + tab->title).c_str()).x + 20;
+      cockpit.Click(tabs, closeX, 12, ship::HitButton::Left, 6000);
+      Require(ship::FindTab(tabs.State(), "crew:missing0") == nullptr,
+              "Repeated background open did not reveal its existing tab");
+      Require(tabs.ActionCount() == 0, "Tab pulse/reveal/close advanced the clock");
+    }
+    io.DisplaySize = ImVec2(1280, 720);
+
     Texture2D title{}; title.id = 1; title.width = 1672; title.height = 941;
     view.SetTitleTexture(&title);
     view.ShowTitle(false);
@@ -455,7 +590,7 @@ int main() {
     Require(view.Panel() == ship::TitlePanel::Settings && textureCalls == 1,
             "Options replaced the title image instead of opening a sheet over it");
     ImGui::DestroyContext();
-    std::cout << "PASS: real Draw.cpp scroll direction, windowed Assignments, Vessel input/clamp, green action/air fills, visible station cooldown, source health colours/live values, literal engine pipe, screen-space green click mark/glow after scrolling, pinned/centered measured action bands at 1180/1280, independent feed wheel/drag/wrap/clamp plus timestamp/reset, centered fixed machine/crew scenes with panel reflow, measured chart height and wide centering, preserved purchase confirmation, free-click feedback/rise/fade, four dark title menus, title art retained behind Options; all text >=18px\n";
+    std::cout << "PASS: real Draw.cpp scroll direction, windowed Assignments, Vessel input/clamp, green action/air fills, visible station cooldown, source health colours/live values, literal engine pipe, screen-space green click mark/glow after scrolling, pinned/centered measured action bands at 1180/1280, independent feed wheel/drag/wrap/clamp plus timestamp/reset, centered fixed machine/crew scenes with panel reflow, measured chart height and wide centering, preserved purchase confirmation, free-click feedback/rise/fade, four dark title menus, title art retained behind Options; source crew relocation/corridor drift, life-info routing, crew/event GONE rendering, map-label and moving-ring selection, active-tab glow/reduced-motion, new/existing background-tab reveal; all text >=18px\n";
     return 0;
   } catch (const std::exception& error) {
     std::cerr << "draw probe: " << error.what() << '\n'; return 1;

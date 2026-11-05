@@ -125,7 +125,7 @@ class ShellView {
   void ResetContentScroll();
 
   void SyncIdleDots(const Simulation& sim, double nowMs);
-  void PaintChrome(Simulation& sim);
+  void PaintChrome(Simulation& sim, double nowMs);
   void OpenBriefing(const Simulation& sim, const std::string& kind, const std::string& id);
   void PaintTaskScreen(Simulation& sim);
   void PaintPanelsScreen(Simulation& sim);
@@ -184,6 +184,7 @@ class ShellView {
   float tabScroll_ = 0.0f;
   float maxTabScroll_ = 0.0f;
   std::string lastRevealedTab_;
+  std::map<std::string, double> tabPulseStarts_;
   std::size_t lastTabCount_ = 0;
   std::vector<TabHit> tabHits_;
 

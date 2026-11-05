@@ -86,6 +86,7 @@ bool OpenTask(Simulation& sim, const std::string& kind, const std::string& id,
     state.tabs.push_back(tab);
     state.freshTabs[key] = true;
   }
+  state.tabRevealKey = key;
   if (focus) { return SwitchTab(sim, key); }
   return true;  // opened in the background: the screen does not change
 }
@@ -94,6 +95,7 @@ bool SwitchTab(Simulation& sim, const std::string& key) {
   GameState& state = sim.MutableState();
   if (key != "home" && FindTab(state, key) == nullptr) { return false; }
   state.activeTab = key;
+  state.tabRevealKey = key;
   if (key != "home") { RefreshTab(sim, key); }
   return true;
 }
