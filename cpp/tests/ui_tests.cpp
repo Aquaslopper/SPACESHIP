@@ -530,16 +530,26 @@ TEST_CASE("the sidebar's controls are where they are painted", "[ui][shell]") {
   int toggles = 0;
   int wiki = 0;
   int rewards = 0;
+  std::vector<float> footIconX;
   for (const ship::SideHit& hit : hits) {
     if (hit.header) { ++headers; }
     if (hit.header && hit.action == ship::SideAction::Toggle) { ++toggles; }
     if (hit.action == ship::SideAction::Wiki) { ++wiki; }
     if (hit.action == ship::SideAction::Rewards) { ++rewards; }
+    if (hit.action == ship::SideAction::Manifest || hit.action == ship::SideAction::Log ||
+        hit.action == ship::SideAction::Files || hit.action == ship::SideAction::Settings) {
+      footIconX.push_back(hit.box.x);
+    }
   }
   CHECK(headers == 6);
   CHECK(toggles == 6);   // Indicators is a header too, and refuses to fold
   CHECK(wiki == 1);
   CHECK(rewards == 1);
+  REQUIRE(footIconX.size() == 4);
+  CHECK(footIconX[0] == 18.5f);
+  CHECK(footIconX[1] == 50.5f);
+  CHECK(footIconX[2] == 82.5f);
+  CHECK(footIconX[3] == 114.5f);
 
   // Nothing is painted outside the panel or the foot.
   for (const ship::SideHit& hit : hits) {

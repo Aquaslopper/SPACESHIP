@@ -133,6 +133,7 @@ class ShellView {
   void PaintQuartersScreen(Simulation& sim);
   void PaintCrewRecord(const Simulation& sim);
   void PaintPanel(const NavPanel& panel, const Area& box);
+  float MeasurePanelHeight(const NavPanel& panel, float width) const;
   void PaintStage(const TaskStage& stage, const Area& origin);
   void PaintIdle(Simulation& sim);
   void PaintDiagram(const DiagramModel& diagram, const Area& stageBox, float scale);
@@ -188,6 +189,8 @@ class ShellView {
   Area wikiIndexBox_{};
   Area wikiBodyBox_{};
   Area navChartBox_{};
+  float navChartScaleX_ = 1.0f;
+  float navChartScaleY_ = 1.0f;
 
   TaskScreenModel taskScreen_;
   std::vector<std::pair<Area, std::string>> taskButtons_;

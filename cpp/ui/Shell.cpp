@@ -390,8 +390,8 @@ std::vector<SideHit> SideHits(const Simulation& sim, const Area& sidepanel,
 
   // The pinned foot: four ship functions, then the two reference windows.
   // Always emitted regardless of how many sidebar blocks are unfolded above.
-  float fx = foot.x + 8.0f;
   const std::vector<FootButton> buttons = FootButtons();
+  float fx = foot.x + std::max(0.0f, (foot.w - 128.0f) * 0.5f);
   const SideAction actions[4] = {SideAction::Manifest, SideAction::Log,
                                  SideAction::Files, SideAction::Settings};
   for (std::size_t i = 0; i < buttons.size() && i < 4; ++i) {
@@ -401,7 +401,7 @@ std::vector<SideHit> SideHits(const Simulation& sim, const Area& sidepanel,
     hit.text = buttons[i].title;
     hit.box = Area{fx, foot.y + 8.0f, 32.0f, 28.0f};
     hits.push_back(hit);
-    fx += 38.0f;
+    fx += 32.0f;
   }
 
   SideHit wiki;

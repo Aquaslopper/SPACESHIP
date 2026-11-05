@@ -383,8 +383,51 @@ void ShellView::PaintChrome(Simulation& sim) {
     if (hit.box.y < layout_.sidefoot.y) { continue; }
     if (hit.action == SideAction::Manifest || hit.action == SideAction::Log ||
         hit.action == SideAction::Files || hit.action == SideAction::Settings) {
-      draw->AddRect(ImVec2(hit.box.x, hit.box.y),
-                    ImVec2(hit.box.Right(), hit.box.Bottom()), ToIm(p.borderDark), 3.0f);
+      const ImVec2 iconMin(hit.box.x + 3.0f, hit.box.y + 1.0f);
+      const ImVec2 iconMax(hit.box.Right() - 3.0f, hit.box.y + 27.0f);
+      draw->AddRect(iconMin, iconMax, ToIm(p.borderDark));
+      const ImVec2 iconCenter(hit.box.x + hit.box.w * 0.5f,
+                             hit.box.y + 14.0f);
+      const ImU32 iconInk = ToIm(p.coffee);
+      if (hit.action == SideAction::Manifest) {
+        draw->AddLine(ImVec2(iconCenter.x, iconCenter.y - 8.0f),
+                      ImVec2(iconCenter.x, iconCenter.y + 4.0f), iconInk, 2.0f);
+        draw->AddTriangleFilled(ImVec2(iconCenter.x + 1.0f, iconCenter.y - 6.0f),
+                                ImVec2(iconCenter.x + 8.0f, iconCenter.y - 2.0f),
+                                ImVec2(iconCenter.x + 1.0f, iconCenter.y + 1.0f),
+                                ToIm(p.muted));
+        draw->AddTriangleFilled(ImVec2(iconCenter.x - 8.0f, iconCenter.y + 4.0f),
+                                ImVec2(iconCenter.x + 8.0f, iconCenter.y + 4.0f),
+                                ImVec2(iconCenter.x, iconCenter.y + 9.0f), iconInk);
+      } else if (hit.action == SideAction::Log) {
+        for (int line = 0; line < 3; ++line) {
+          const float yy = iconCenter.y - 5.0f + static_cast<float>(line) * 5.0f;
+          draw->AddLine(ImVec2(iconCenter.x - 8.0f, yy),
+                        ImVec2(iconCenter.x + (line == 2 ? 3.0f : 8.0f), yy),
+                        iconInk, 2.0f);
+        }
+      } else if (hit.action == SideAction::Files) {
+        draw->AddRectFilled(ImVec2(iconCenter.x - 7.0f, iconCenter.y - 8.0f),
+                            ImVec2(iconCenter.x + 7.0f, iconCenter.y + 8.0f),
+                            iconInk, 1.0f);
+        draw->AddRectFilled(ImVec2(iconCenter.x - 2.0f, iconCenter.y - 7.0f),
+                            ImVec2(iconCenter.x + 4.0f, iconCenter.y - 3.0f),
+                            ToIm(p.panel));
+        draw->AddRectFilled(ImVec2(iconCenter.x - 4.0f, iconCenter.y + 2.0f),
+                            ImVec2(iconCenter.x + 5.0f, iconCenter.y + 6.0f),
+                            ToIm(p.coffeeLight));
+      } else {
+        draw->AddCircle(iconCenter, 6.0f, iconInk, 0, 2.0f);
+        draw->AddCircleFilled(iconCenter, 2.0f, iconInk);
+        draw->AddLine(ImVec2(iconCenter.x, iconCenter.y - 10.0f),
+                      ImVec2(iconCenter.x, iconCenter.y - 6.0f), iconInk, 2.0f);
+        draw->AddLine(ImVec2(iconCenter.x, iconCenter.y + 6.0f),
+                      ImVec2(iconCenter.x, iconCenter.y + 10.0f), iconInk, 2.0f);
+        draw->AddLine(ImVec2(iconCenter.x - 10.0f, iconCenter.y),
+                      ImVec2(iconCenter.x - 6.0f, iconCenter.y), iconInk, 2.0f);
+        draw->AddLine(ImVec2(iconCenter.x + 6.0f, iconCenter.y),
+                      ImVec2(iconCenter.x + 10.0f, iconCenter.y), iconInk, 2.0f);
+      }
       if (ImGui::IsMouseHoveringRect(ImVec2(hit.box.x, hit.box.y),
                                      ImVec2(hit.box.Right(), hit.box.Bottom()))) {
         ImGui::SetTooltip("%s", hit.text.c_str());
@@ -580,6 +623,43 @@ void ShellView::PaintPanel(const NavPanel& panel, const Area& box) {
   EndScissorMode();
 }
 
+float ShellView::MeasurePanelHeight(const NavPanel& panel, float width) const {
+  const float textWidth = std::max(1.0f, width - 16.0f);
+  const int textPx = TypePx(10);
+  const float lineHeight = TypeStep(14.0f);
+  const auto wrappedRows = [this, textPx](const std::string& text, float available) {
+    return static_cast<float>(WrapText(text, std::max(1.0f, available), textPx,
+                                       bodyFont_).size());
+  };
+  float y = TypeStep(24.0f);
+  for (const PanelLine& item : panel.lines) {
+    switch (item.kind) {
+      case PanelLine::Kind::Name:
+        y += TypeStep(23.0f);
+        break;
+      case PanelLine::Kind::Sub:
+      case PanelLine::Kind::Dim:
+      case PanelLine::Kind::Note:
+        y += wrappedRows(item.value, textWidth) * lineHeight + TypeStep(2.0f);
+        break;
+      case PanelLine::Kind::Bar:
+        y += TypeStep(11.0f);
+        break;
+      case PanelLine::Kind::Field: {
+        const float keyWidth = TextWidth(item.key.c_str(), textPx);
+        const float valueWidth = TextWidth(item.value.c_str(), textPx);
+        const float valueRoom = textWidth - keyWidth - TypeStep(8.0f);
+        y += lineHeight;
+        if (valueWidth > valueRoom) {
+          y += wrappedRows(item.value, textWidth - TypeStep(6.0f)) * lineHeight;
+        }
+        break;
+      }
+    }
+  }
+  return y + lineHeight + 4.0f;
+}
+
 void ShellView::PaintStage(const TaskStage& stage, const Area& origin) {
   const Palette& p = theme_.palette;
   for (const MachinePart& part : stage.parts) {
@@ -650,26 +730,32 @@ void ShellView::PaintTaskScreen(Simulation& sim) {
 
   float y = layout_.content.y + 58.0f;
   for (const NavPanel& panel : screen.left) {
-    PaintPanel(panel, Area{left, y, column, 118.0f});
-    y += 124.0f;
+    const float panelH = std::max(118.0f, MeasurePanelHeight(panel, column));
+    PaintPanel(panel, Area{left, y, column, panelH});
+    y += panelH + 6.0f;
   }
 
   float ry = layout_.content.y + 58.0f;
   for (const NavPanel& panel : screen.right) {
-    PaintPanel(panel, Area{right - column, ry, column, 150.0f});
-    ry += 156.0f;
+    const float panelH = std::max(150.0f, MeasurePanelHeight(panel, column));
+    PaintPanel(panel, Area{right - column, ry, column, panelH});
+    ry += panelH + 6.0f;
   }
 
   if (screen.hasStage) {
     const Area origin{left + column + 16.0f, layout_.content.y + 58.0f,
                       screen.stage.width, screen.stage.height};
     PaintStage(screen.stage, origin);
-    float uy = origin.y + screen.stage.height + 4.0f;
+    const float uy = origin.y + screen.stage.height + 4.0f;
     const float halfW = (right - column - 16.0f - (left + column + 16.0f) - 4.0f) / 2.0f;
+    float underH = 110.0f;
+    for (const NavPanel& panel : screen.under) {
+      underH = std::max(underH, MeasurePanelHeight(panel, halfW));
+    }
     for (std::size_t i = 0; i < screen.under.size(); ++i) {
       PaintPanel(screen.under[i],
                  Area{origin.x + static_cast<float>(i) * (halfW + 4.0f), uy, halfW,
-                      110.0f});
+                      underH});
     }
   }
 
@@ -714,9 +800,10 @@ void ShellView::PaintNavScreen(Simulation& sim) {
 
   const float left = layout_.content.x + 8.0f;
   const float right = layout_.content.Right() - 8.0f;
-  const float column = 214.0f;
-  const float middleLeft = left + column + 8.0f;
-  const float middleRight = right - column - 8.0f;
+  const float leftColumn = 214.0f;
+  const float rightColumn = 252.0f;
+  const float middleLeft = left + leftColumn + 12.0f;
+  const float middleRight = right - rightColumn - 12.0f;
 
   Text(screen.head.kind.c_str(), static_cast<int>(left),
            static_cast<int>(layout_.content.y), TypePx(9) , ToRay(p.muted));
@@ -725,13 +812,22 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   Text(screen.head.sub.c_str(), static_cast<int>(left),
            static_cast<int>(layout_.content.y + 36.0f), TypePx(11) , ToRay(p.muted));
 
-  // --- the chart box: 638x278 at 1:1, shrunk only when the window is narrower
-  const float spareW = middleRight - middleLeft;
-  float scale = 1.0f;
-  if (chart.zoom >= 0 && spareW < 638.0f) { scale = spareW / 638.0f; }
-  const Area box{middleLeft, layout_.content.y + 58.0f, 638.0f * scale,
-                 278.0f * scale};
+  // HTA #map fills the middle column up to 1100px. Its height is limited by
+  // the remaining content height, 500px and half its width, with a 240px floor.
+  const float spareW = std::max(1.0f, middleRight - middleLeft);
+  const float chartW = std::min(1100.0f, spareW);
+  const float chartTop = layout_.content.y + 58.0f;
+  const float availableH = layout_.content.Bottom() - chartTop - 300.0f;
+  const float chartH = std::min({500.0f, chartW * 0.5f,
+                                 std::max(240.0f, availableH)});
+  const Area box{middleLeft, chartTop, chartW, chartH};
   navChartBox_ = box;
+  const ship::NavRaster raster = BuildNavRaster(sim);
+  const float sx = box.w / static_cast<float>(raster.width);
+  const float sy = box.h / static_cast<float>(raster.height);
+  navChartScaleX_ = sx;
+  navChartScaleY_ = sy;
+  const float bodyScale = std::min(sx, sy);
 
   DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
                 static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel));
@@ -741,12 +837,10 @@ void ShellView::PaintNavScreen(Simulation& sim) {
 
   BeginScissorMode(static_cast<int>(box.x) + 1, static_cast<int>(box.y) + 1,
                    static_cast<int>(box.w) - 2, static_cast<int>(box.h) - 2);
-  const ship::NavRaster raster = BuildNavRaster(sim);
-  const float zs = box.w / static_cast<float>(raster.width);
 
   // The rungs: depth lines across the chart, faint far, solid near.
   for (const NavRasterRung& rung : raster.rungs) {
-    const int y = static_cast<int>(box.y + static_cast<float>(rung.y) * zs);
+    const int y = static_cast<int>(box.y + static_cast<float>(rung.y) * sy);
     DrawRectangle(static_cast<int>(box.x), y, static_cast<int>(box.w), 1,
                   Fade(ToRay(p.ink), static_cast<float>(rung.alpha)));
   }
@@ -756,23 +850,23 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     const double rad = line.angle * pi / 180.0;
     const double dx = std::cos(rad);
     const double dy = std::sin(rad);
-    const float x1 = box.x + static_cast<float>(raster.vx - dx * 4000) * zs;
-    const float y1 = box.y + static_cast<float>(raster.vy - dy * 4000) * zs;
-    const float x2 = box.x + static_cast<float>(raster.vx + dx * 4000) * zs;
-    const float y2 = box.y + static_cast<float>(raster.vy + dy * 4000) * zs;
+    const float x1 = box.x + static_cast<float>(raster.vx - dx * 4000) * sx;
+    const float y1 = box.y + static_cast<float>(raster.vy - dy * 4000) * sy;
+    const float x2 = box.x + static_cast<float>(raster.vx + dx * 4000) * sx;
+    const float y2 = box.y + static_cast<float>(raster.vy + dy * 4000) * sy;
     DrawLineEx(Vector2{x1, y1}, Vector2{x2, y2}, 1.0f, Fade(ToRay(p.ink), 0.13f));
   }
 
   for (const NavDot& dot : chart.clusters) {
-    const float px = box.x + static_cast<float>(dot.x) * zs;
-    const float py = box.y + static_cast<float>(dot.y) * zs;
+    const float px = box.x + static_cast<float>(dot.x) * sx;
+    const float py = box.y + static_cast<float>(dot.y) * sy;
     DrawRectangle(static_cast<int>(px), static_cast<int>(py), 1, 1,
                   ToRay(dot.cls.find("bright") != std::string::npos ? p.coffee
                                                                   : p.muted));
   }
   for (const NavDot& dot : chart.routes) {
-    const float px = box.x + static_cast<float>(dot.x) * zs;
-    const float py = box.y + static_cast<float>(dot.y) * zs;
+    const float px = box.x + static_cast<float>(dot.x) * sx;
+    const float py = box.y + static_cast<float>(dot.y) * sy;
     const Color ink = dot.cls.find("sel") != std::string::npos
                           ? ToRay(p.sage)
                           : (dot.cls.find("faint") != std::string::npos
@@ -784,16 +878,16 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   // The ship's ring goes DOWN FIRST: painted last it swallows every click
   // aimed at the body the ship is parked at.
   if (chart.hasMarker) {
-    const float px = box.x + static_cast<float>(chart.marker.x) * zs;
-    const float py = box.y + static_cast<float>(chart.marker.y) * zs;
-    DrawCircleLines(static_cast<int>(px), static_cast<int>(py), 13.0f,
+    const float px = box.x + static_cast<float>(chart.marker.x) * sx;
+    const float py = box.y + static_cast<float>(chart.marker.y) * sy;
+    DrawCircleLines(static_cast<int>(px), static_cast<int>(py), 13.0f * bodyScale,
                     ToRay(p.sage));
   }
 
   for (const NavBodyView& body : chart.bodies) {
-    const float cx = box.x + static_cast<float>(body.at.x) * zs;
-    const float cy = box.y + static_cast<float>(body.at.y) * zs;
-    const float radius = static_cast<float>(body.size) * 0.42f * zs;
+    const float cx = box.x + static_cast<float>(body.at.x) * sx;
+    const float cy = box.y + static_cast<float>(body.at.y) * sy;
+    const float radius = static_cast<float>(body.size) * 0.42f * bodyScale;
     Color fill = ToRay(p.coffee);
     if (body.type == "station") { fill = ToRay(p.coffeeLight); }
     if (body.type == "star") { fill = ToRay(p.ink); }
@@ -805,9 +899,9 @@ void ShellView::PaintNavScreen(Simulation& sim) {
                       ToRay(p.terracotta));
     }
     const int labelX =
-        static_cast<int>(box.x + static_cast<float>(body.labelX) * zs);
+        static_cast<int>(box.x + static_cast<float>(body.labelX) * sx);
     Text(body.name.c_str(), labelX,
-             static_cast<int>(box.y + static_cast<float>(body.labelY) * zs), TypePx(9) ,
+             static_cast<int>(box.y + static_cast<float>(body.labelY) * sy), TypePx(9) ,
              ToRay(body.scanned ? p.ink : p.muted));
     navHits_.push_back(NavHit{Area{cx - radius - 4.0f, cy - radius - 4.0f,
                                    radius * 2.0f + 8.0f, radius * 2.0f + 8.0f},
@@ -852,18 +946,28 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   // --- panels: identity left, sensors right, the leg underneath the chart
   float ly = layout_.content.y + 58.0f;
   for (const NavPanel& panel : screen.left) {
-    PaintPanel(panel, Area{left, ly, column, 96.0f});
-    ly += 100.0f;
+    const float panelH = std::max(96.0f, MeasurePanelHeight(panel, column));
+    PaintPanel(panel, Area{left, ly, column, panelH});
+    ly += panelH + 4.0f;
   }
-  PaintPanel(screen.right[0],
-             Area{right - column, layout_.content.y + 58.0f, column, 190.0f});
+  if (!screen.right.empty()) {
+    const float panelH = std::max(190.0f,
+                                  MeasurePanelHeight(screen.right[0], rightColumn));
+    PaintPanel(screen.right[0],
+               Area{right - rightColumn, layout_.content.y + 58.0f,
+                    rightColumn, panelH});
+  }
 
   const float halfW = (box.w - 6.0f) / 2.0f;
-  float uy = box.Bottom() + 22.0f;
+  float underH = 112.0f;
+  for (const NavPanel& panel : screen.under) {
+    underH = std::max(underH, MeasurePanelHeight(panel, halfW));
+  }
+  const float uy = box.Bottom() + 22.0f;
   for (std::size_t i = 0; i < screen.under.size(); ++i) {
     PaintPanel(screen.under[i],
                Area{box.x + static_cast<float>(i) * (halfW + 6.0f), uy, halfW,
-                    112.0f});
+                    underH});
   }
 
   // --- the commitment band, full width along the bottom
@@ -945,14 +1049,18 @@ void ShellView::PaintCrewRecord(const Simulation& sim) {
   // Status across the top, then the three short shelves left to right.
   float y = layout_.content.y + 58.0f;
   if (!record_.shelves.empty()) {
-    PaintPanel(record_.shelves[0], Area{left, y, right - left, 96.0f});
-    y += 102.0f;
+    const float panelH = std::max(96.0f,
+                                  MeasurePanelHeight(record_.shelves[0], right - left));
+    PaintPanel(record_.shelves[0], Area{left, y, right - left, panelH});
+    y += panelH + 6.0f;
   }
   const float column = (right - left - 12.0f) / 3.0f;
   for (std::size_t i = 1; i < record_.shelves.size() && i <= 3; ++i) {
+    const float panelH = std::max(180.0f,
+                                  MeasurePanelHeight(record_.shelves[i], column));
     PaintPanel(record_.shelves[i],
                Area{left + static_cast<float>(i - 1) * (column + 6.0f), y, column,
-                    180.0f});
+                    panelH});
   }
   (void)sim;
 }
@@ -974,10 +1082,10 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
 
   // --- the roster, and the payroll above it
   const float panelTop = layout_.content.y + 58.0f;
-  float ry = panelTop;
   if (!screen.left.empty()) {
-    PaintPanel(screen.left[0], Area{left, ry, column, 170.0f});
-    ry += 176.0f;
+    const float panelH = std::max(170.0f,
+                                  MeasurePanelHeight(screen.left[0], column));
+    PaintPanel(screen.left[0], Area{left, panelTop, column, panelH});
   }
 
   // --- the hallway: 560x300 of scenery, then the figure on top of it
@@ -1040,15 +1148,16 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
   // --- condition and standing, under the hallway
   float uy = hall.Bottom() + 8.0f;
   for (const NavPanel& panel : screen.under) {
-    PaintPanel(panel, Area{hall.x + (uy > hall.Bottom() + 8.0f ? 0.0f : 0.0f), uy,
-                           270.0f, 120.0f});
-    uy += 124.0f;
+    const float panelH = std::max(120.0f, MeasurePanelHeight(panel, 270.0f));
+    PaintPanel(panel, Area{hall.x, uy, 270.0f, panelH});
+    uy += panelH + 4.0f;
   }
 
   // --- orders and the sheet, down the right
   float oy = panelTop;
   for (const NavPanel& panel : screen.right) {
-    const float height = panel.id == "cq-orders" ? 220.0f : 120.0f;
+    const float baseHeight = panel.id == "cq-orders" ? 220.0f : 120.0f;
+    const float height = std::max(baseHeight, MeasurePanelHeight(panel, column));
     PaintPanel(panel, Area{right - column, oy, column, height});
     if (panel.id == "cq-orders" && !quarters_.closed) {
       float lineY = oy + 96.0f;
@@ -1531,14 +1640,10 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
   const float gap = 8.0f;
   const float columnW = (right - left - gap * static_cast<float>(count - 1)) /
                         static_cast<float>(count);
-
   for (std::size_t i = 0; i < screen.panels.size(); ++i) {
     const float x = left + static_cast<float>(i) * (columnW + gap);
     const NavPanel& panel = screen.panels[i];
-    float noteH = 34.0f;
-    for (const PanelLine& line : panel.lines) {
-      noteH += 12.0f * static_cast<float>(1 + line.value.size() / 30);
-    }
+    const float noteH = MeasurePanelHeight(panel, columnW);
     PaintPanel(panel, Area{x, top, columnW, noteH});
 
     float y = top + noteH + 6.0f;
@@ -1968,8 +2073,8 @@ void ShellView::Drag(Simulation& sim, float x, float y, float dx, float dy, bool
     chartDragAccumX_ = navScreen_.chart.panX;
     chartDragAccumY_ = navScreen_.chart.panY;
   } else {
-    chartDragAccumX_ += dx;
-    chartDragAccumY_ += dy;
+    chartDragAccumX_ += dx / std::max(0.01f, navChartScaleX_);
+    chartDragAccumY_ += dy / std::max(0.01f, navChartScaleY_);
     char pan[64];
     std::snprintf(pan, sizeof(pan), "%.2f,%.2f", chartDragAccumX_, chartDragAccumY_);
     PressNavAction(sim, "pan", pan);
