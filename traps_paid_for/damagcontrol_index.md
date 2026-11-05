@@ -46,3 +46,5 @@ Latest: [user-observed regression repairs](damagecontrol_report.md#bughunt-2026-
 
 
 Latest follow-up: [JPEG decoder, reversed scroll camera, reachable Assignments, sidebar scroll clamp and real progress painter](damagecontrol_report.md#bughunt-2026-11-05-decoder-scroll-progress). **214/214 tests pass**, including real-Draw.cpp CPU recording and HTA button lifecycle comparisons. Engine caption layout remains open. Windows packaged JPEG probe and graphical retest are separate evidence; no merge or parity sign-off.
+
+Windows follow-up for code `a8617c3`: [push build 42100284609](https://github.com/Aquaslopper/SPACESHIP/actions/runs/42100284609) and PR build 42100292804 succeeded, **including actual packaged-executable JPEG decoding**. Retest artifact: `Spaceship-Windows-x64` in that push run. Graphical parity remains unverified; PR15 remains open, not merged.
