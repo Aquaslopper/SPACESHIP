@@ -16,6 +16,8 @@
 #include <utility>
 #include <vector>
 
+#include "raylib.h"
+
 #include "core/Simulation.h"
 #include "ui/Describe.h"
 #include "ui/Fx.h"
@@ -48,6 +50,13 @@ class ShellView {
 
   // Window size and options, before anything is drawn.
   void Configure(float width, float height, const Theme& theme);
+  void SetFonts(Font body, Font bold, Font mono) {
+    bodyFont_ = body;
+    boldFont_ = bold;
+    monoFont_ = mono;
+  }
+  // The app owns the texture and keeps it alive until the shell is destroyed.
+  void SetTitleTexture(void* texture) { titleArt_ = texture; }
 
   // The idle screen's non-feed height, measured once per paint. Reported to
   // Layout::GiveFeedHeight, exactly as `other` is reported in the reference.
@@ -84,7 +93,11 @@ class ShellView {
   // ---- the main menu (Section N) -----------------------------------------
   // The menu covers the window; while. it is up nothing reaches the ship.
   void ShowTitle(bool fromVoyage);
-  void HideTitle() { titleActive_ = false; titlePanel_ = TitlePanel::None; }
+  void HideTitle() {
+    titleActive_ = false;
+    titlePanel_ = TitlePanel::None;
+    titleConfirm_ = false;
+  }
   bool TitleActive() const { return titleActive_; }
   bool TitleFromVoyage() const { return fromVoyage_; }
   TitlePanel Panel() const { return titlePanel_; }
@@ -108,6 +121,9 @@ class ShellView {
   // reference's 13 px and steps with the reader's choice, so the whole
   // interface grows together instead of one label at a time.
   int TypePx(int reference) const;
+  void Text(const char* text, int x, int y, int size, ::Color tint,
+            bool mono = false) const;
+  float TextWidth(const char* text, int size) const;
   // The same factor for text-driven row cadences: a line box grows with the
   // face so a list of toggles or slots never overlaps itself.
   float TypeStep(float reference) const {
@@ -116,6 +132,9 @@ class ShellView {
   float TypeFace() const { return theme_.FontPx() / 13.0f; }
 
   Theme theme_;
+  Font bodyFont_{};
+  Font boldFont_{};
+  Font monoFont_{};
   ShellLayout layout_;
   FxRng rng_;
   std::vector<ActionMark> marks_;
@@ -177,9 +196,7 @@ class ShellView {
   std::string titleMessage_;
   TitleModel title_;
   std::vector<NavHit> titleHits_;
-  std::string artPath_;
-  void* titleArt_ = nullptr;      // Texture2D, owned once the art is loaded
-  bool titleArtLoaded_ = false;
+  void* titleArt_ = nullptr;      // Texture2D owned by the application
 
   WikiView wiki_;
   char wikiQuery_[96] = {};

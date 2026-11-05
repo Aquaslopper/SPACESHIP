@@ -214,11 +214,16 @@ if(SPACESHIP_GUI)
     cpp/ui/Draw.cpp)
 
   target_link_libraries(spaceship PRIVATE spaceship_core spaceship_imgui raylib)
-  set_target_properties(spaceship PROPERTIES WIN32_EXECUTABLE OFF)
+  set_target_properties(spaceship PROPERTIES WIN32_EXECUTABLE TRUE)
+  if(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_link_options(spaceship PRIVATE -mwindows)
+  endif()
 
   add_custom_command(TARGET spaceship POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${SPACESHIP_ASSETS}" "$<TARGET_FILE_DIR:spaceship>/assets"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_SOURCE_DIR}/spaceship.png" "$<TARGET_FILE_DIR:spaceship>/spaceship.png"
     COMMENT "Copying assets beside the executable")
 endif()
 

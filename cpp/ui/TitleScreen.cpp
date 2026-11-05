@@ -79,6 +79,10 @@ bool AnySlotWritten(const Simulation& sim, const std::string& saveDir) {
   return false;
 }
 
+bool TitleNeedsConfirmation(const Simulation& sim, bool fromVoyage) {
+  return fromVoyage && sim.ActionCount() > 0.0;
+}
+
 TitleModel BuildTitleScreen(const Simulation& sim, bool fromVoyage, TitlePanel panel,
                             const std::string& saveDir, int slot,
                             const std::string& message, int tutorialCard) {
@@ -162,6 +166,14 @@ TitleModel BuildTitleScreen(const Simulation& sim, bool fromVoyage, TitlePanel p
       row.enabled = true;
       model.panelRows.push_back(row);
     }
+    for (std::size_t i = 0; i < model.settings.fontStepLabels.size(); ++i) {
+      ActionRowView row;
+      row.id = "font:" + Num(static_cast<double>(i));
+      row.label = "Reading size: " + model.settings.fontStepLabels[i];
+      row.cost = "free";
+      row.enabled = true;
+      model.panelRows.push_back(row);
+    }
   } else if (panel == TitlePanel::Guide) {
     model.panelTitle = "Your first watch";
     model.panelNote = std::string(kGuide) + "\n\n" + kGuideMore + "\n\n" + kGuideShip;
@@ -190,6 +202,12 @@ TitleModel BuildTitleScreen(const Simulation& sim, bool fromVoyage, TitlePanel p
     next.enabled = card + 1 < count;
     next.reading = card + 1 >= count;
     model.panelRows.push_back(next);
+    ActionRowView start;
+    start.id = "start-voyage";
+    start.label = "START A NEW VOYAGE";
+    start.cost = "free";
+    start.enabled = true;
+    model.panelRows.push_back(start);
   } else if (panel == TitlePanel::Quit) {
     model.panelTitle = "Leaving the game";
     model.panelNote = "Close this window to exit the preview.";
@@ -208,15 +226,17 @@ TitleModel BuildTitleScreen(const Simulation& sim, bool fromVoyage, TitlePanel p
 
 bool PressTitleAction(Simulation& sim, const std::string& action, const std::string& arg,
                       bool* fromVoyage, TitlePanel* panel, int* slot,
-                      const std::string& saveDir, std::string* message) {
+                      const std::string& saveDir, std::string* message,
+                      bool* titleActive) {
   (void)arg;
   if (message != nullptr) { message->clear(); }
   if (fromVoyage == nullptr || panel == nullptr || slot == nullptr) { return false; }
 
-  if (action == "new-voyage") {
+  if (action == "new-voyage" || action == "start-voyage") {
     sim.RestartVoyage();
     *fromVoyage = false;
     *panel = TitlePanel::None;
+    if (titleActive != nullptr) { *titleActive = false; }
     if (message != nullptr) { *message = "A new voyage has begun."; }
     return true;
   }
@@ -231,7 +251,8 @@ bool PressTitleAction(Simulation& sim, const std::string& action, const std::str
   }
   if (action == "resume") {
     if (!*fromVoyage) { *panel = TitlePanel::Quit; return true; }
-    return true;  // the caller hides the menu
+    if (titleActive != nullptr) { *titleActive = false; }
+    return true;
   }
   if (action == "back") { *panel = TitlePanel::None; return true; }
   if (action.compare(0, 5, "slot:") == 0) {
@@ -249,6 +270,7 @@ bool PressTitleAction(Simulation& sim, const std::string& action, const std::str
     }
     *fromVoyage = true;
     *panel = TitlePanel::None;
+    if (titleActive != nullptr) { *titleActive = false; }
     if (message != nullptr) { *message = "Saved voyage restored."; }
     return true;
   }
@@ -257,6 +279,9 @@ bool PressTitleAction(Simulation& sim, const std::string& action, const std::str
   }
   if (action.compare(0, 6, "theme:") == 0) {
     return PressPopupAction(sim, "settings", "theme", action.substr(6), saveDir, message);
+  }
+  if (action.compare(0, 5, "font:") == 0) {
+    return PressPopupAction(sim, "settings", "font", action.substr(5), saveDir, message);
   }
   return false;
 }

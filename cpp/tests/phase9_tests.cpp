@@ -213,12 +213,17 @@ TEST_CASE("the main menu opens a five-card tutorial", "[phase9][tutorial]") {
   CHECK(first.panelNote.find(cards[0].body) != std::string::npos);
   const ship::ActionRowView* prev = nullptr;
   const ship::ActionRowView* next = nullptr;
+  const ship::ActionRowView* start = nullptr;
   for (const ship::ActionRowView& row : first.panelRows) {
     if (row.id == "card:prev") { prev = &row; }
     if (row.id == "card:next") { next = &row; }
+    if (row.id == "start-voyage") { start = &row; }
   }
   REQUIRE(prev != nullptr);
   REQUIRE(next != nullptr);
+  REQUIRE(start != nullptr);
+  CHECK(start->enabled);
+  CHECK(start->label == "START A NEW VOYAGE");
   CHECK_FALSE(prev->enabled);
   CHECK(prev->reading);
   CHECK(next->enabled);

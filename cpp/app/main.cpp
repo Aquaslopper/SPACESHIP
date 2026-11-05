@@ -10,9 +10,11 @@
 //  is only the loop that turns a mouse into a verb and a frame into a paint.
 // ============================================================================
 
+#include <array>
 #include <cstdio>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 #include "imgui.h"
 #include "raylib.h"
@@ -65,44 +67,100 @@ std::filesystem::path FindAssetDir() {
   return selected.empty() ? ship::Catalog::DefaultAssetDir() : selected;
 }
 
-// Prefer the real Windows faces when they are installed, so metrics match the
-// HTA on the platform it was written for; otherwise use the bundled DejaVu.
-// Both are asked for at the same pixel size, 12 px, which is what the CSS
-// declares for body text.
-void LoadFonts(const std::filesystem::path& assets) {
+struct FontResources {
+  Font body{};
+  Font bold{};
+  Font mono{};
+  std::array<ImFont*, 4> imguiBody{};
+};
+
+std::string FirstFont(const std::vector<std::filesystem::path>& candidates) {
+  for (const std::filesystem::path& candidate : candidates) {
+    if (std::filesystem::exists(candidate)) { return candidate.string(); }
+  }
+  return {};
+}
+
+Font LoadRayFont(const std::vector<std::filesystem::path>& candidates) {
+  std::vector<int> codepoints;
+  for (int cp = 32; cp <= 126; ++cp) { codepoints.push_back(cp); }
+  for (int cp = 160; cp <= 255; ++cp) { codepoints.push_back(cp); }
+  for (int cp : {0x2013, 0x2014, 0x2018, 0x2019, 0x201C, 0x201D, 0x2026,
+                 0x2190, 0x2191, 0x2192, 0x2193}) {
+    codepoints.push_back(cp);
+  }
+  for (const std::filesystem::path& candidate : candidates) {
+    if (!std::filesystem::exists(candidate)) { continue; }
+    Font font = LoadFontEx(candidate.string().c_str(), 48, codepoints.data(),
+                           static_cast<int>(codepoints.size()));
+    if (font.texture.id != 0) {
+      SetTextureFilter(font.texture, TEXTURE_FILTER_BILINEAR);
+      return font;
+    }
+  }
+  return Font{};
+}
+
+FontResources LoadFonts(const std::filesystem::path& assets) {
+  const std::filesystem::path fonts = assets / "fonts";
+  const std::vector<std::filesystem::path> sans = {
+      "C:/Windows/Fonts/segoeui.ttf", fonts / "DejaVuSans.ttf"};
+  const std::vector<std::filesystem::path> bold = {
+      "C:/Windows/Fonts/segoeuib.ttf", fonts / "DejaVuSans-Bold.ttf"};
+  const std::vector<std::filesystem::path> mono = {
+      "C:/Windows/Fonts/consola.ttf", fonts / "DejaVuSansMono.ttf"};
+  const std::string sansPath = FirstFont(sans);
+  const std::string boldPath = FirstFont(bold);
+  const std::string monoPath = FirstFont(mono);
+
+  FontResources loaded;
+  loaded.body = LoadRayFont(sans);
+  loaded.bold = LoadRayFont(bold);
+  loaded.mono = LoadRayFont(mono);
+  if (loaded.body.texture.id == 0) { loaded.body = loaded.bold; }
+  if (loaded.bold.texture.id == 0) { loaded.bold = loaded.body; }
+  if (loaded.mono.texture.id == 0) { loaded.mono = loaded.body; }
+
   ImGuiIO& io = ImGui::GetIO();
-
-  const std::filesystem::path bundledSans = assets / "fonts" / "DejaVuSans.ttf";
-  const std::filesystem::path bundledMono = assets / "fonts" / "DejaVuSansMono.ttf";
-
-  const char* sans = nullptr;
-  const char* mono = nullptr;
-  std::string sansPath;
-  std::string monoPath;
-
-  for (const char* candidate : {"C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/arial.ttf"}) {
-    if (std::filesystem::exists(candidate)) { sans = candidate; break; }
+  const int sizes[4] = {18, 19, 20, 21};
+  for (int i = 0; i < 4; ++i) {
+    loaded.imguiBody[static_cast<std::size_t>(i)] =
+        sansPath.empty() ? nullptr : io.Fonts->AddFontFromFileTTF(
+                                        sansPath.c_str(), static_cast<float>(sizes[i]));
   }
-  for (const char* candidate : {"C:/Windows/Fonts/consola.ttf", "C:/Windows/Fonts/cour.ttf"}) {
-    if (std::filesystem::exists(candidate)) { mono = candidate; break; }
-  }
-  if (sans == nullptr && std::filesystem::exists(bundledSans)) {
-    sansPath = bundledSans.string();
-    sans = sansPath.c_str();
-  }
-  if (mono == nullptr && std::filesystem::exists(bundledMono)) {
-    monoPath = bundledMono.string();
-    mono = monoPath.c_str();
-  }
+  if (!monoPath.empty()) { io.Fonts->AddFontFromFileTTF(monoPath.c_str(), 18.0f); }
+  std::printf("fonts: %s | %s | %s\n", sansPath.c_str(), boldPath.c_str(), monoPath.c_str());
+  return loaded;
+}
 
-  // The first font added becomes the default, so the UI face goes first and the
-  // monospace face second for numbers and readouts (the reference's .num class).
-  if (sans != nullptr) { io.Fonts->AddFontFromFileTTF(sans, 13.0f); }
-  if (mono != nullptr) { io.Fonts->AddFontFromFileTTF(mono, 13.0f); }
+void ReloadImGuiFonts() {
+  // rlImGui 6.0 has no rlImGuiReloadFonts() entry point. Building the atlas here
+  // is the supported equivalent; its raylib backend uploads the texture on the
+  // first frame, including every TTF size added above.
+  ImGui::GetIO().Fonts->Build();
+}
 
-  std::printf("fonts: %s%s\n",
-              sans ? sans : "ImGui default",
-              mono ? (std::string(" + ") + mono).c_str() : "");
+void SelectImGuiFont(const FontResources& fonts, int fontStep) {
+  const int clamped = fontStep < 0 ? 0 : (fontStep > 3 ? 3 : fontStep);
+  ImFont* selected = fonts.imguiBody[static_cast<std::size_t>(clamped)];
+  if (selected != nullptr) { ImGui::GetIO().FontDefault = selected; }
+}
+
+Texture2D LoadTitleTexture(const std::filesystem::path& assets) {
+  const std::vector<std::filesystem::path> candidates = {
+      assets / "art" / "title.jpg", std::filesystem::current_path() / "spaceship.png",
+      assets / "art" / "spaceship.png"};
+  for (const std::filesystem::path& candidate : candidates) {
+    if (!std::filesystem::exists(candidate)) { continue; }
+    Texture2D texture = LoadTexture(candidate.string().c_str());
+    if (texture.id != 0) {
+      SetTextureFilter(texture, TEXTURE_FILTER_BILINEAR);
+      std::printf("title artwork: %s\n", candidate.string().c_str());
+      return texture;
+    }
+  }
+  std::fprintf(stderr, "spaceship: title artwork not found\n");
+  return Texture2D{};
 }
 
 // ============================================================================
@@ -289,13 +347,19 @@ int main(int argc, char** argv) {
   theme.reducedMotion = sim.State().reducedMotion;
   theme.stageCompact = sim.State().shipClass == "wren";
 
-  // rlImGui owns the ImGui context, so fonts go in between its two init halves.
+  // rlImGui owns the ImGui context, so add the four reading sizes between its
+  // two init halves. The renderer builds/uploads the complete atlas afterward.
   rlImGuiBeginInitImGui();
-  LoadFonts(assets);
+  const FontResources fonts = LoadFonts(assets);
   rlImGuiEndInitImGui();
+  ReloadImGuiFonts();
+  SelectImGuiFont(fonts, sim.State().options.fontStep);
   ship::ui::ApplyPalette(theme);
 
+  Texture2D titleTexture = LoadTitleTexture(assets);
   ship::ShellView shell;
+  shell.SetFonts(fonts.body, fonts.bold, fonts.mono);
+  shell.SetTitleTexture(&titleTexture);
   shell.Configure(static_cast<float>(GetScreenWidth()),
                   static_cast<float>(GetScreenHeight()), theme);
 
@@ -316,48 +380,74 @@ int main(int argc, char** argv) {
   }
 
   while (!WindowShouldClose()) {
-    // Resizing re-measures, exactly as the reference's coalesced handler does.
-    // The reading size travels with the theme, so a step change re-measures
-    // every row the shell lays out rather than only repainting the faces.
-    if (theme.fontStep != sim.State().options.fontStep) {
-      theme.fontStep = sim.State().options.fontStep;
-      shell.Configure(static_cast<float>(GetScreenWidth()),
-                      static_cast<float>(GetScreenHeight()), theme);
-    }
-    if (sim.State().options.fullscreen != fullscreen) {
-      fullscreen = sim.State().options.fullscreen;
-      ToggleBorderlessWindowed();
-    }
-    if (IsWindowResized()) {
-      theme.stageCompact = sim.State().shipClass == "wren";
-      shell.Configure(static_cast<float>(GetScreenWidth()),
-                      static_cast<float>(GetScreenHeight()), theme);
-      ship::ui::ApplyPalette(theme);
-    }
+    // Process the current raylib events and begin ImGui before deciding whether
+    // its actual text-entry windows own this frame's pointer.
+    rlImGuiBegin();
 
-    // The two verbs. ImGui owns the pointer while a window is up, so the shell
-    // is handed a click only when ImGui did not want it.
+    // The shell owns hit-testing for its raylib-painted controls. Its ImGui root
+    // window is intentionally input-transparent; only real ImGui fields such
+    // as the handbook search can claim the pointer. The title has no ImGui
+    // widgets at all, so never let stale capture state swallow a menu click.
     const bool overUi = ImGui::GetIO().WantCaptureMouse;
-    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && !overUi) {
+    const bool acceptShellClick = shell.TitleActive() || !overUi;
+    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && acceptShellClick) {
       const Vector2 mouse = GetMousePosition();
       shell.Click(sim, mouse.x, mouse.y, ship::HitButton::Left,
                   static_cast<double>(GetTime()) * 1000.0);
-    } else if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT) && !overUi) {
+    } else if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT) && acceptShellClick) {
       const Vector2 mouse = GetMousePosition();
       shell.Click(sim, mouse.x, mouse.y, ship::HitButton::Right,
                   static_cast<double>(GetTime()) * 1000.0);
     }
 
+    // Apply settings from either the title sheet or the in-game Options panel
+    // before rendering this frame, so palettes and type sizes change at once.
+    ship::Theme nextTheme = ship::Theme::ById(sim.State().options.theme);
+    nextTheme.fontStep = sim.State().options.fontStep;
+    nextTheme.largeText = sim.State().options.largeText;
+    nextTheme.hideCrewLabels = sim.State().options.hideCrewLabels;
+    nextTheme.reducedMotion = sim.State().reducedMotion;
+    nextTheme.stageCompact = sim.State().shipClass == "wren";
+    const bool themeChanged = nextTheme.id != theme.id ||
+                              nextTheme.fontStep != theme.fontStep ||
+                              nextTheme.largeText != theme.largeText ||
+                              nextTheme.hideCrewLabels != theme.hideCrewLabels ||
+                              nextTheme.reducedMotion != theme.reducedMotion ||
+                              nextTheme.stageCompact != theme.stageCompact;
+    const bool resized = IsWindowResized();
+    if (themeChanged || resized) {
+      theme = nextTheme;
+      shell.Configure(static_cast<float>(GetScreenWidth()),
+                      static_cast<float>(GetScreenHeight()), theme);
+      ship::ui::ApplyPalette(theme);
+    }
+    SelectImGuiFont(fonts, sim.State().options.fontStep);
+
+    if (sim.State().options.fullscreen != fullscreen) {
+      fullscreen = sim.State().options.fullscreen;
+      ToggleBorderlessWindowed();
+    }
+
     audio.Configure(sim.State().options);
     audio.Tick(sim);
 
-    rlImGuiBegin();
+    BeginDrawing();
     shell.Draw(sim, static_cast<double>(GetTime()) * 1000.0);
     rlImGuiEnd();
+    EndDrawing();
   }
 
   audio.Shutdown();
   rlImGuiShutdown();
+  if (titleTexture.id != 0) { UnloadTexture(titleTexture); }
+  if (fonts.body.texture.id != 0) { UnloadFont(fonts.body); }
+  if (fonts.bold.texture.id != 0 && fonts.bold.texture.id != fonts.body.texture.id) {
+    UnloadFont(fonts.bold);
+  }
+  if (fonts.mono.texture.id != 0 && fonts.mono.texture.id != fonts.body.texture.id &&
+      fonts.mono.texture.id != fonts.bold.texture.id) {
+    UnloadFont(fonts.mono);
+  }
   CloseWindow();
   (void)audioReady;
   return 0;

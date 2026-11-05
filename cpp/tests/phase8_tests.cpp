@@ -318,7 +318,10 @@ TEST_CASE("settings and the guide are the same sheets the ship shows",
       sim, true, ship::TitlePanel::Settings, dir);
   CHECK(options.panelTitle == "Options");
   REQUIRE(options.settings.toggles.size() == 6);
-  CHECK(options.panelRows.size() == 6 + 5 + 1);   // toggles, five palettes, back
+  CHECK(options.panelRows.size() == 6 + 5 + 4 + 1);  // toggles, palettes, font steps, back
+  CHECK(Row(options.panelRows, "theme:classic") != nullptr);
+  CHECK(Row(options.panelRows, "font:0") != nullptr);
+  CHECK(Row(options.panelRows, "font:3") != nullptr);
 
   // Toggling from the menu is the footer's own action, so the labels agree.
   bool fromVoyage = true;
@@ -332,6 +335,9 @@ TEST_CASE("settings and the guide are the same sheets the ship shows",
   CHECK(ship::PressTitleAction(sim, "theme:void", "", &fromVoyage, &panel, &slot, dir,
                                &message));
   CHECK(sim.State().options.theme == "void");
+  CHECK(ship::PressTitleAction(sim, "font:3", "", &fromVoyage, &panel, &slot, dir,
+                               &message));
+  CHECK(sim.State().options.fontStep == 3);
 
   const ship::TitleModel guide = ship::BuildTitleScreen(sim, true, ship::TitlePanel::Guide,
                                                         dir);
@@ -343,6 +349,26 @@ TEST_CASE("settings and the guide are the same sheets the ship shows",
   CHECK(panel == ship::TitlePanel::None);
 }
 
+TEST_CASE("the first NEW VOYAGE click starts the boot voyage and dismisses the title",
+          "[phase8][title]") {
+  ship::Simulation sim = Fresh();
+  REQUIRE(sim.ActionCount() == 0.0);
+  bool fromVoyage = false;
+  bool titleActive = true;
+  ship::TitlePanel panel = ship::TitlePanel::None;
+  int slot = 1;
+  std::string message;
+
+  CHECK_FALSE(ship::TitleNeedsConfirmation(sim, fromVoyage));
+  REQUIRE(ship::PressTitleAction(sim, "new-voyage", "", &fromVoyage, &panel, &slot,
+                                 ScratchDir("title-first-click"), &message,
+                                 &titleActive));
+  CHECK_FALSE(titleActive);
+  CHECK_FALSE(fromVoyage);
+  CHECK(sim.ActionCount() == 0.0);
+  CHECK(message == "A new voyage has begun.");
+}
+
 TEST_CASE("a new voyage from the menu starts the same voyage a loss recovers from",
           "[phase8][title]") {
   ship::Simulation sim = Fresh();
@@ -350,6 +376,7 @@ TEST_CASE("a new voyage from the menu starts the same voyage a loss recovers fro
   REQUIRE(sim.ActionCount() > 0);
 
   bool fromVoyage = true;
+  CHECK(ship::TitleNeedsConfirmation(sim, fromVoyage));
   ship::TitlePanel panel = ship::TitlePanel::Load;
   int slot = 1;
   std::string message;
