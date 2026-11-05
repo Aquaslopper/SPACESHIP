@@ -722,3 +722,76 @@ TEST_CASE("HTA cooldown tiers remain distinct and missing rules fall back to fiv
   CHECK(ship::RuleActions(sim, "critical") == 20);
   CHECK(ship::RuleActions(sim, "unregistered") == 5);
 }
+
+TEST_CASE("the action click jointly clocks meals filters wear and existing work without an eating pause", "[simulation][crew][audit]") {
+  for (const bool stocked : {false, true}) {
+    auto sim = Fresh();
+    sim.MutableState().engineCondition = 50;
+    sim.MutableState().filterLife = 200;
+    for (auto& slot : sim.MutableLife().slots) slot.state = "installed";
+    for (auto& crew : sim.MutableCrew()) { crew.hungerTick = 0; crew.hunger = 60; }
+    auto* rell = sim.FindCrew("rell");
+    REQUIRE(rell != nullptr);
+    rell->hungerTick = sim.GameRules().mess.every - 1;
+    sim.MutableMess().rack = stocked ? 10 : 0;
+    const auto life = sim.State().filterLife;
+    for (int i = 0; i < 20; ++i) {
+      REQUIRE(ship::OpenTask(sim, "crew", "rell", false));
+      ship::TabBar(sim);
+    }
+    CHECK(sim.ActionCount() == 0);
+    CHECK(sim.State().filterLife == life);
+    CHECK(rell->hungerTick == sim.GameRules().mess.every - 1);
+    CHECK(sim.State().wearTick == 0);
+    REQUIRE(sim.StartMaintenanceSelf());
+    REQUIRE(sim.FindOngoing("maint") != nullptr);
+    const double work = sim.FindOngoing("maint")->left;
+    CHECK(sim.ActionCount() == 1);
+    CHECK(sim.State().wearTick == 1);
+    CHECK(sim.State().filterLife == life - sim.GameRules().life.decay);
+    CHECK(rell->hungerTick == 0);
+    CHECK(rell->hunger == (stocked ? 20 : 75));
+    CHECK(sim.MutableMess().rack == (stocked ? 9 : 0));
+    // A meal due while work already exists must NOT steal a work tick.
+    rell->hungerTick = sim.GameRules().mess.every - 1;
+    sim.PerformAction();
+    REQUIRE(sim.FindOngoing("maint") != nullptr);
+    CHECK(sim.FindOngoing("maint")->left == work - 1);
+    CHECK(sim.ActionCount() == 2);
+    CHECK(sim.State().crewTick == 2);
+    CHECK(sim.State().wearTick == 2);
+    CHECK(sim.State().filterLife == life - 2 * sim.GameRules().life.decay);
+    CHECK(rell->hungerTick == 0);
+    CHECK(rell->hunger == (stocked ? 0 : 90));
+  }
+}
+
+TEST_CASE("source filter charge expiry keeps the separate air hold step", "[simulation][audit]") {
+  auto sim = Fresh();
+  sim.MutableState().filterLife = sim.GameRules().life.lifeMax;
+  for (auto& slot : sim.MutableLife().slots) slot.state = "installed";
+  const int ticks = static_cast<int>(std::ceil(sim.GameRules().life.lifeMax / sim.GameRules().life.decay));
+  for (int i = 1; i < ticks; ++i) sim.PerformAction();
+  CHECK(sim.State().filterLife == sim.GameRules().life.decay);
+  sim.PerformAction();
+  CHECK(sim.ActionCount() == ticks);
+  CHECK(sim.State().filterLife == 0);
+  for (const auto& slot : sim.Life().slots) CHECK(slot.state == "empty");
+  CHECK(sim.State().airHold == sim.GameRules().air.holdMax);
+  sim.PerformAction();
+  CHECK(sim.State().airHold == sim.GameRules().air.holdMax - 1);
+}
+
+TEST_CASE("starvation damage follows the source eight-action crew clock not a render timer", "[simulation][crew][audit]") {
+  auto sim = Fresh();
+  auto* hand = sim.FindCrew("rell");
+  REQUIRE(hand != nullptr);
+  hand->hunger = sim.GameRules().mess.starveAt;
+  hand->hungerTick = 0;
+  hand->health = 80;
+  sim.MutableState().crewTick = sim.GameRules().mess.starveEvery - 2;
+  sim.PerformAction();
+  CHECK(hand->health == 80);
+  sim.PerformAction();
+  CHECK(hand->health == 79);
+}

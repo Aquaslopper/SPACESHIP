@@ -97,6 +97,15 @@ CrewRecordModel BuildCrewRecord(const Simulation& sim, const std::string& crewId
   personality.Field("Outlook", OutlookWord(sim.NeedKeyFor(*crew)));
   personality.Field("Name anchor", sim.SimAnchorOf(*crew));
   personality.Field("Driving need", sim.SimDriveOf(*crew));
+  // HTA simPersonal: newest three involving this hand, including other-party memories.
+  int personal = 0;
+  for (auto it = sim.State().sim.memories.rbegin();
+       it != sim.State().sim.memories.rend() && personal < 3; ++it) {
+    if (it->who != crewId && it->other != crewId) { continue; }
+    personality.Note("Action " + js::NumToString(it->at) + ": " + it->text);
+    ++personal;
+  }
+  if (personal == 0) { personality.Note("No personal memories recorded yet."); }
 
   NavPanel employment;
   employment.id = "crew-employment";

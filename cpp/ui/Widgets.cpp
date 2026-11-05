@@ -387,6 +387,7 @@ TaskScreenModel BuildDescribedScreen(const Simulation& sim,
   status.id = "status";
   status.title = "Status";
   for (const DescribeRow& row : described.rows) { status.Field(row.key, row.value); }
+  status.placement = described.acts.empty() ? "np-full" : "";
   screen.left.push_back(status);
 
   if (described.acts.empty()) { return screen; }
@@ -460,7 +461,7 @@ ScreenKind ScreenKindFor(const Tab& tab) {
 
 TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
                                const WikiView& wiki) {
-  if (tab.kind != "event" && !DescribeTargetExists(sim, tab.kind, tab.id)) {
+  if (!DescribeTargetExists(sim, tab.kind, tab.id)) {
     return BuildDescribedScreen(sim, DescribeTarget(sim, tab.kind, tab.id));
   }
   switch (ScreenKindFor(tab)) {

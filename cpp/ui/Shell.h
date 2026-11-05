@@ -31,7 +31,7 @@ struct TabView {
   std::string kindLabel;
   bool home = false;
   bool active = false;
-  bool fresh = false;     // the cream pulse, cleared the moment it is drawn
+  bool fresh = false;     // one-shot start event; renderer retains the timed glow
   bool closable = false;
 };
 
@@ -45,8 +45,8 @@ bool SwitchTab(Simulation& sim, const std::string& key);
 bool CloseTab(Simulation& sim, const std::string& key);
 bool RefreshTab(Simulation& sim, const std::string& key);
 
-// The whole bar, Home first. Drawing a fresh tab consumes its pulse, exactly
-// as makeTab does - so the caller should keep this call once per paint.
+// The whole bar, Home first. Transfer each fresh-tab start event once, as
+// makeTab does; the renderer owns the 160 ms hold / 1500 ms fade thereafter.
 std::vector<TabView> TabBar(Simulation& sim);
 std::string HomeTabTitle(const Simulation& sim);
 

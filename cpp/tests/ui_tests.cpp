@@ -18,6 +18,7 @@
 #include "core/Simulation.h"
 #include "data/Catalog.h"
 #include "ui/Describe.h"
+#include "ui/CrewRecord.h"
 #include "ui/Fx.h"
 #include "ui/FloatingPanels.h"
 #include "ui/PointerOwnership.h"
@@ -1181,4 +1182,59 @@ TEST_CASE("the rendered Home feed measures rails hull and conditional dock strip
       CHECK(idle.docked == docked);
     }
   }
+}
+
+TEST_CASE("source personal memories show newest three for either participant without ticking", "[ui][audit]") {
+  auto sim = Fresh();
+  const auto id = sim.Crew().front().id;
+  sim.MutableState().sim.memories.clear();
+  auto record = ship::BuildCrewRecord(sim, id);
+  CHECK(record.shelves[2].lines.back().value == "No personal memories recorded yet.");
+  for (int i = 1; i <= 5; ++i) {
+    ship::Memory m; m.at = i; m.text = "memory " + std::to_string(i);
+    if (i % 2) m.who = id; else m.other = id;
+    sim.MutableState().sim.memories.push_back(m);
+  }
+  ship::Memory unrelated; unrelated.at = 6; unrelated.text = "unrelated";
+  sim.MutableState().sim.memories.push_back(unrelated);
+  record = ship::BuildCrewRecord(sim, id);
+  const auto& lines = record.shelves[2].lines;
+  REQUIRE(lines.size() == 9);
+  CHECK(lines[6].value == "Action 5: memory 5");
+  CHECK(lines[7].value == "Action 4: memory 4");
+  CHECK(lines[8].value == "Action 3: memory 3");
+  CHECK(sim.ActionCount() == 0);
+}
+
+TEST_CASE("all expired task kinds share the source GONE status and no actions", "[ui][audit]") {
+  auto sim = Fresh();
+  for (const auto& kind : {"crew", "event", "station", "room", "system", "info"}) {
+    ship::Tab tab; tab.kind = kind; tab.id = "missing"; tab.key = std::string(kind) + ":missing";
+    const auto screen = ship::BuildTabScreen(sim, tab, {});
+    CHECK(screen.head.kind == "GONE");
+    CHECK(screen.head.title == "No longer aboard");
+    REQUIRE(screen.left.size() == 1);
+    CHECK(screen.left[0].placement == "np-full");
+    REQUIRE(screen.left[0].lines.size() == 2);
+    CHECK(screen.left[0].lines[0].value == std::string(kind) + " missing");
+    CHECK(screen.commands.empty());
+    CHECK(screen.progress.empty());
+  }
+  CHECK(sim.ActionCount() == 0);
+}
+
+TEST_CASE("background opens and repeated same-tab switches explicitly request reveal for free", "[ui][audit]") {
+  auto sim = Fresh();
+  REQUIRE(ship::OpenTask(sim, "crew", "rell", false));
+  CHECK(sim.State().activeTab == "home");
+  CHECK(sim.State().tabRevealKey == "crew:rell");
+  sim.MutableState().tabRevealKey.clear();
+  REQUIRE(ship::OpenTask(sim, "crew", "rell", false));
+  CHECK(sim.State().tabs.size() == 1);
+  CHECK(sim.State().tabRevealKey == "crew:rell");
+  REQUIRE(ship::SwitchTab(sim, "crew:rell"));
+  sim.MutableState().tabRevealKey.clear();
+  REQUIRE(ship::SwitchTab(sim, "crew:rell"));
+  CHECK(sim.State().tabRevealKey == "crew:rell");
+  CHECK(sim.ActionCount() == 0);
 }

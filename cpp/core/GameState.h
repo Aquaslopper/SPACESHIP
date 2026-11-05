@@ -398,6 +398,8 @@ struct GameState {
   std::string activeTab = "home";
   std::vector<Tab> tabs;
   std::map<std::string, bool> freshTabs;
+  // Transient presentation request: never serialized, never a world action.
+  std::string tabRevealKey;
   double popups = 0;
   std::map<std::string, Cooldown> actionCooldowns;
 };
