@@ -2165,9 +2165,12 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
       const float localY = y - idle_.stageArea.y;
       for (const DiagramCrew& crew : idle_.diagram.crew) {
         const Area hit{crew.dot.x - 6.0f, crew.dot.y - 6.0f, 27.0f, 27.0f};
-        if (!hit.Contains(localX, localY)) { continue; }
+        const Area labelHit{crew.label.x, crew.label.y,
+                            crew.labelled ? TextWidth(crew.firstName.c_str(), TypePx(9)) : 0.0f,
+                            crew.labelled ? TypeStep(12.0f) : 0.0f};
+        if (!hit.Contains(localX, localY) && !labelHit.Contains(localX, localY)) { continue; }
         if (button == HitButton::Right) {
-          OpenTask(sim, "crew", crew.id, true);
+          OpenTask(sim, "crew", crew.id, false);
         } else {
           selection_ = DescribeTarget(sim, "crew", crew.id);
           briefingKind_ = "crew";
@@ -2182,7 +2185,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
           continue;
         }
         if (button == HitButton::Right) {
-          OpenTask(sim, "room", room.id, true);
+          OpenTask(sim, "room", room.id, false);
         } else {
           selection_ = DescribeTarget(sim, "room", room.id);
           briefingKind_ = "room";
@@ -2197,7 +2200,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
     for (const RailCell& cell : idle_.stats) {
       if (!cell.box.Contains(x, y)) { continue; }
       if (button == HitButton::Right) {
-        OpenTask(sim, "system", cell.id, true);
+        OpenTask(sim, "system", cell.id, false);
       } else {
         selection_ = DescribeTarget(sim, "system", cell.id);
         briefingKind_ = "system";
@@ -2210,9 +2213,9 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
       if (!cell.box.Contains(x, y)) { continue; }
       if (button == HitButton::Right) {
         if (cell.id == "life") {
-          OpenTask(sim, "room", "o2", true);
+          OpenTask(sim, "room", "o2", false);
         } else {
-          OpenTask(sim, "info", cell.id, true);
+          OpenTask(sim, "info", cell.id, false);
         }
       } else {
         selection_ = DescribeTarget(sim, "info", cell.id);
@@ -2224,7 +2227,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
     }
     if (idle_.nav.box.Contains(x, y)) {
       if (button == HitButton::Right) {
-        OpenTask(sim, "nav", "main", true);
+        OpenTask(sim, "nav", "main", false);
       } else {
         selection_ = DescribeTarget(sim, "nav", "main");
         briefingKind_ = "nav";
@@ -2235,7 +2238,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
     }
     if (idle_.docked && idle_.dock.box.Contains(x, y)) {
       if (button == HitButton::Right) {
-        OpenTask(sim, "station", sim.Map().here, true);
+        OpenTask(sim, "station", sim.Map().here, false);
       } else {
         selection_ = DescribeTarget(sim, "station", sim.Map().here);
         briefingKind_ = "station";
