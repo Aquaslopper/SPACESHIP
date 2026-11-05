@@ -1,6 +1,6 @@
 # Traps paid for: port parity evidence
 
-This folder preserves the screenshots supplied in the report and records concrete port mismatches visible in them. The four panels in `00_current_port_composite.png` are also split into individual, clearly named captures (`01`–`04`) so they can be compared screen by screen. For the strict 1:1 mission and a warning that inherited agent work may contain hallucinations or unsupported claims, see [`REPAIR_AND_RESCUE.md`](../REPAIR_AND_RESCUE.md); current open issues are indexed in [`damagcontrol_index.md`](damagcontrol_index.md).
+This folder preserves the screenshots supplied in the report and records concrete port mismatches visible in them. For the strict 1:1 mission and a warning that inherited agent work may contain hallucinations or unsupported claims, see [`REPAIR_AND_RESCUE.md`](../REPAIR_AND_RESCUE.md); current open issues are indexed in [`damagcontrol_index.md`](damagcontrol_index.md).
 
 ## Image index
 
@@ -16,12 +16,14 @@ This folder preserves the screenshots supplied in the report and records concret
 | `images/07_port_navigation_older_capture.png` | Uploaded `s1.png`, classified by visible content as a native-port Navigation capture. |
 | `images/08_reference_navigation_capture.png` | Uploaded `s2.png`, classified by visible content as the original-game/reference Navigation capture. |
 | `images/09_empty_startup_window.png` | Uploaded dated screenshot showing the empty `Spaceship Command` window. |
+AND GROWING
 
-The `b1`/`b2` and `s1`/`s2` labels are visual classifications, not claims about metadata or capture order. Original uploaded images are retained byte-for-byte under their new descriptive names; the four crops were made from the supplied composite.
+`b1`/`b2` labels = BROKEN VERSION
+`s1`/`s2` labels = ORIGINAL HTA VERSION
 
 ## Main findings
 
-1. **Text size and geometry are not coordinated.** `cpp/ui/Draw.cpp:86-97` enforces a minimum 18 px for the Raylib text path, but many callers still position text using short, legacy offsets. For example, `PaintIdle` at `cpp/ui/Draw.cpp:545-552` starts an 18 px label at `y+4` and a larger value at `y+20`; the start-to-start gap is smaller than the label height. `cpp/ui/Draw.cpp:574-587` has the same issue in the navigation strip and info rail. These are direct code-level causes of overlap like the top-rail and strip collisions visible in the port captures; changing the font size alone cannot repair them.
+1. **Text size and geometry are not coordinated.** `cpp/ui/Draw.cpp:86-97` enforces a minimum 18 px for the Raylib text path, but many callers still position text using short, legacy offsets. For example, `PaintIdle` at `cpp/ui/Draw.cpp:545-552` starts an 18 px label at `y+4` and a larger value at `y+20`; the start-to-start gap is smaller than the label height. `cpp/ui/Draw.cpp:574-587` has the same issue in the navigation strip and info rail. These are direct code-level causes of overlap like the top-rail and strip collisions visible in the port captures.
 
 2. **The UI uses two text systems with different effective sizes.** Most content uses `TypePx()` and Raylib `DrawTextEx`, while the chrome/sidebar path uses ImGui `AddText`/`CalcTextSize` with its default font (`cpp/ui/Draw.cpp:288 onward`). Thus an 18 px rule is not consistently applied across tabs, sidebar, footer and screen content. The mixed measurement/rendering paths also make width estimates unreliable when one path's measurements are used to lay out the other.
 
