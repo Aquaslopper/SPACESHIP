@@ -208,6 +208,20 @@ each is held by a test; nothing here moves a number the reference owns.
 None of this reaches the simulation's arithmetic: the differential voyages still
 agree with the reference byte for byte, and the catalogue gate is untouched.
 
+The one piece of test plumbing Phase 9 changed is the save gate. Its five stage
+scripts share file names (`runtime/saves/rt-a.json`, `rt-b.json`, `rt-c.json`),
+and under `ctest -j` the differentially-registered copies of those scripts could
+read a file another test was midway through writing — which is how
+`parity.save-utf16` failed once on a fresh build and passed when re-run. Every
+parity case now gets its own scratch root (`build/parity/<name>`) with the script
+rewritten to point at it, each save stage builds its own prerequisites in that
+root, and `parity.save-roundtrip` does the same for the full bidirectional flow.
+The shared `runtime/saves/` is no longer touched by the suite at all — verified by
+deleting it and running `ctest -j 16` repeatedly with a green 192/192 — and
+`RESOURCE_LOCK` guards the save tests against a future stage that forgets to
+isolate itself. `SPACESHIP_SAVE_DIR` overrides the harness's save root for the
+same reason.
+
 ### 3.4 Not negotiable, and checked
 
 All numbers and their rounding (JavaScript's, via `js::`), all strings, action

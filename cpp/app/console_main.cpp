@@ -50,6 +50,26 @@
 
 namespace {
 
+// The save root every script uses. Defaults to the game's own runtime/saves,
+// but a test can point it anywhere with SPACESHIP_SAVE_DIR - which is what
+// keeps parallel CTest runs from fighting over one Spaceship_save.txt.
+std::string SaveRootPath() {
+  const char* override = std::getenv("SPACESHIP_SAVE_DIR");
+  if (override != nullptr && override[0] != '\0') { return std::string(override); }
+  return std::string("runtime/saves");
+}
+
+}  // namespace
+
+namespace ship {
+// Exposed to the command loop below; the definition lives with the harness's
+// other helpers so the default stays in one place.
+std::string SaveRoot() { return SaveRootPath(); }
+}  // namespace ship
+
+namespace {
+
+
 std::vector<std::string> Split(const std::string& line) {
   std::vector<std::string> parts;
   std::istringstream stream(line);
@@ -169,6 +189,8 @@ int main(int argc, char** argv) {
         simulation.LogLine(crew.name + ": \"" + said + "\"");
       }
     } else if (command == "option" && parts.size() >= 2) {
+      // (the settings rows never touch the save root; the directory is passed
+      // through because the press path wants one)
       // The settings popup's own free paths, so a script drives the same rows
       // a reader would press.
       if (parts[1] == "theme" || parts[1] == "audio") {
@@ -176,11 +198,11 @@ int main(int argc, char** argv) {
         std::string message;
         ship::PressPopupAction(simulation, "settings",
                                parts[1] == "theme" ? "theme" : "audio", parts[2],
-                               "runtime/saves", &message);
+                               ship::SaveRoot(), &message);
       } else {
         std::string message;
         ship::PressPopupAction(simulation, "settings", "toggle", parts[1],
-                               "runtime/saves", &message);
+                               ship::SaveRoot(), &message);
       }
     } else if (command == "layer" && parts.size() >= 2) {
       simulation.SetLayer(parts[1]);
@@ -241,13 +263,13 @@ int main(int argc, char** argv) {
       }
     } else if (command == "saveslot" && parts.size() >= 2) {
       std::string error;
-      if (!simulation.SaveSlot(std::atoi(parts[1].c_str()), "runtime/saves", &error)) {
+      if (!simulation.SaveSlot(std::atoi(parts[1].c_str()), ship::SaveRoot(), &error)) {
         std::fprintf(stderr, "spaceship_console: %s\n", error.c_str());
         return 1;
       }
     } else if (command == "loadslot" && parts.size() >= 2) {
       std::string error;
-      if (!simulation.LoadSlot(std::atoi(parts[1].c_str()), "runtime/saves", &error)) {
+      if (!simulation.LoadSlot(std::atoi(parts[1].c_str()), ship::SaveRoot(), &error)) {
         std::fprintf(stderr, "spaceship_console: %s\n", error.c_str());
         return 1;
       }

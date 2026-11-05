@@ -268,15 +268,40 @@ if(SPACESHIP_BUILD_TESTS)
   # streams must match byte for byte. Needs node and the frozen HTA.
   if(SPACESHIP_DATA_GATE AND SPACESHIP_NODE AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Spaceship.hta")
     file(GLOB SPACESHIP_PARITY_SCRIPTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/parity/*.script")
+    # The five save stages are a chain, not standalone cases: each needs the file
+    # the previous one wrote. They are registered below, each in its own scratch
+    # root, so `ctest -j` can run them at the same time without sharing a path.
+    set(SPACESHIP_SAVE_STAGES setup advance write reload utf16)
     foreach(script IN LISTS SPACESHIP_PARITY_SCRIPTS)
       get_filename_component(name "${script}" NAME_WE)
+      if(name MATCHES "^save-(setup|advance|write|reload|utf16)$")
+        continue()
+      endif()
       add_test(NAME parity.${name}
                COMMAND "${CMAKE_COMMAND}"
                        -DNODE=${SPACESHIP_NODE}
                        -DCONSOLE=$<TARGET_FILE:spaceship_console>
                        -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
                        -DSCRIPT=${script}
+                       -DWORK=${CMAKE_CURRENT_BINARY_DIR}/parity/${name}
                        -P "${CMAKE_CURRENT_SOURCE_DIR}/tools/run-parity.cmake")
+      set_tests_properties(parity.${name} PROPERTIES
+                           RESOURCE_LOCK spaceship-parity-${name})
+    endforeach()
+
+    foreach(stage IN LISTS SPACESHIP_SAVE_STAGES)
+      add_test(NAME parity.save-${stage}
+               COMMAND "${CMAKE_COMMAND}"
+                       -DNODE=${SPACESHIP_NODE}
+                       -DCONSOLE=$<TARGET_FILE:spaceship_console>
+                       -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                       -DSTAGE=${stage}
+                       -DWORK=${CMAKE_CURRENT_BINARY_DIR}/parity/save-${stage}
+                       -P "${CMAKE_CURRENT_SOURCE_DIR}/tools/run-save-stage.cmake")
+      # Each stage owns its scratch root, so they may run together; the lock is
+      # belt-and-braces for a future stage that forgets to isolate itself.
+      set_tests_properties(parity.save-${stage} PROPERTIES
+                           RESOURCE_LOCK spaceship-saves)
     endforeach()
   endif()
 
@@ -288,7 +313,10 @@ if(SPACESHIP_BUILD_TESTS)
                      -DNODE=${SPACESHIP_NODE}
                      -DCONSOLE=$<TARGET_FILE:spaceship_console>
                      -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                     -DWORK=${CMAKE_CURRENT_BINARY_DIR}/parity/save-roundtrip
                      -P "${CMAKE_CURRENT_SOURCE_DIR}/tools/run-save-parity.cmake")
+    set_tests_properties(parity.save-roundtrip PROPERTIES
+                         RESOURCE_LOCK spaceship-saves)
   endif()
 endif()
 
