@@ -1,9 +1,10 @@
 // ============================================================================
-//  Trace.cpp — the canonical snapshot used to prove parity.
+//  Trace.cpp — the canonical projection for selected differential tests.
 //  ---------------------------------------------------------------------------
-//  The differential harness runs one command script twice: once through this
-//  simulation, once through the reference in a Node VM. Both sides print this
-//  projection after every checkpoint, and the two streams must be identical.
+//  The differential harness runs selected command scripts twice: once through
+//  this simulation, once through the reference in a Node VM. Both sides print
+//  this projection after each checkpoint; streams should match for those
+//  exercised scripts. This does not cover the GUI or prove complete parity.
 //
 //  Two rules make that comparison honest:
 //    * keys are sorted, so object order can never mask a difference;

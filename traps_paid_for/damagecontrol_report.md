@@ -11,6 +11,7 @@
 3. **Separate evidence from inference.** Label findings **Observed**, **Hypothesis**, or **Unknown**. A screenshot proves appearance at that state, not underlying simulation behavior.
 4. **Record exact verification.** Include commands, build/runtime, operating system, window/display conditions, and results. “Built” is not “visually verified”; tests passing is not proof of overall parity.
 5. **Keep remaining work visible.** Mark defects `OPEN`, `IN PROGRESS`, `VERIFIED FIX`, or `BLOCKED`; list risks and the next concrete check. Do not mark fixed solely because code was changed.
+6. **Treat inherited agent claims as unverified until checked.** Comments, commit summaries, prior logs, hard-coded constants, and test names may contain hallucinations or overstate coverage. Trace behavior to the HTA and inspect the actual test path before relying on a claim; record corrections as follow-up entries.
 
 ## Entry template — copy for each new investigation
 
@@ -92,3 +93,32 @@
 - **OPEN:** audit each screen's displayed fields, order, panel bounds, actions, and state transitions against the HTA, especially Engine Room, Mess Hall, crew, and Navigation.
 - **OPEN:** independently test gameplay/service effects and save/reload parity. No broad gameplay-parity claim is supported by the current checks.
 - **Next action:** run `tools/compare-hta-port.ps1` on Windows at the target window size, append a new dated entry with exact capture names and action steps, then fix one evidenced defect at a time and rerun the same checkpoint.
+
+<a id="agent-claim-audit-2026-11-05"></a>
+
+## 2026-11-05 — Audit of inherited agent claims
+
+- Agent / commit: Arena Agent; audit follow-up to the 1:1 Repair & Rescue mission.
+- Status: **IN PROGRESS** — explicit safeguards added; this is not a complete forensic review of every historical agent-authored line.
+- Scope: detect unsupported claims that the native port or its tests are complete/parity-proven, and instruct future agents to treat inherited conclusions as hypotheses.
+
+### Findings
+- **Observed:** no blanket statement that the native port is done was found in the targeted repository search. `README.md` describes the native C++ edition as still in progress and explicitly says visual parity, widget reachability, text clipping, and complete screen-by-screen interaction parity remain open.
+- **Observed:** several native comments used broader language than their actual evidence scope: `cpp/core/Trace.cpp` called the trace a parity proof; `cpp/tests/simulation_tests.cpp` called the selected differential harness the “heavy proof”; `cpp/tests/world_tests.cpp` called it proof of exact equality; and `cpp/ui/Shell.cpp` called the native chrome “Faithful” to HTA sections. These were unsupported/overbroad descriptions, not proof that the underlying implementation is fabricated.
+- **Observed:** the save-parity README text could be read as a blanket proof of bidirectional compatibility. It now says the automated test covers the scripted round trip, not every save/version/state combination.
+- **Unknown:** whether other historical claims or behavior mismatches remain outside the targeted searches; no exhaustive commit-by-commit audit has been completed.
+
+### Changes
+- Added an explicit inherited-agent-hallucination warning and sanity-check procedure to `REPAIR_AND_RESCUE.md`.
+- Added a logbook rule that inherited comments, PR summaries, constants and test names must be verified against source and actual test coverage.
+- Narrowed comments in `Trace.cpp`, `simulation_tests.cpp`, `world_tests.cpp`, and `Shell.cpp` to describe what is actually covered; narrowed the README save-parity claim to its scripted scope.
+- No gameplay code or simulation behavior changed in this audit.
+
+### Verification
+- Targeted repository searches for `faithful`, `proof of parity`, `exact equality`, and complete-parity wording were run. Their remaining uses are explicitly scoped to selected comparisons or state that UI parity remains open.
+- `git diff --check` passed.
+- No runtime, build, or gameplay test was run for these documentation/comment-only edits.
+
+### Remaining risk and next step
+- **OPEN:** continue checking inherited descriptions when a feature is touched; comments and test names should be corrected if they overstate evidence.
+- **Next action:** keep the new sanity-check section visible from the root README through the Repair & Rescue document and require future entries to label source-backed, test-covered (with scope), runtime-observed, inferred, and unverified claims separately.

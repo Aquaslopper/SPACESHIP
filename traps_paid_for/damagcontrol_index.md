@@ -8,6 +8,7 @@ Short entry point for current issues. Detailed evidence, history, and handoff no
 | UI-002 | OPEN | Shared chrome and content | ImGui chrome and Raylib content use different effective font metrics; layout and hitboxes may not match rendered text. | [2026-11-05 baseline](damagecontrol_report.md#baseline-2026-11-05) |
 | UI-003 | OPEN | Main content / all overflowing screens | Wheel input updates `contentScroll_`, but painting and hit testing do not consume it; long screens cannot be relied on to scroll. | [2026-11-05 baseline](damagecontrol_report.md#baseline-2026-11-05) |
 | UI-004 | OPEN | Task headers and panels | Text fitting can truncate content and panel scissoring can hide it; verify information is preserved when fixing geometry. | [2026-11-05 baseline](damagecontrol_report.md#baseline-2026-11-05) |
+| PROC-001 | OPEN | Repository claims / tests | Continue auditing inherited comments and test names for claims that overstate implementation or parity coverage. | [2026-11-05 claim audit](damagecontrol_report.md#agent-claim-audit-2026-11-05) |
 | PAR-001 | OPEN | Ship/home, Engine Room, Mess Hall, Navigation | Visual/content parity is not verified against fresh, matched runtime captures from the current port build. | [2026-11-05 baseline](damagecontrol_report.md#baseline-2026-11-05) |
 | PAR-002 | OPEN | Gameplay systems and save/reload | Overall behavior parity is unverified. The earlier service comparison covered only a narrow implementation segment. | [2026-11-05 baseline](damagecontrol_report.md#baseline-2026-11-05) |
 

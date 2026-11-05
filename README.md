@@ -172,9 +172,10 @@ a syntax check is not a UI test. Full graphical comparison remains open work.
 ### Save compatibility
 
 `SaveSystem.cpp` writes and reads the original format one key at a time: the same
-seventeen top-level keys, the same `state` fields, the same `format` string. It is
-proven in both directions by `tools/run-save-parity.cmake`, which `ctest` runs as
-`parity.save-roundtrip`:
+seventeen top-level keys, the same `state` fields, the same `format` string. The
+`tools/run-save-parity.cmake` test, run by `ctest` as `parity.save-roundtrip`,
+checks bidirectional compatibility for the scripted voyage and save round-trip
+below. This is scoped save-flow coverage, not a proof of every save/version/state combination:
 
 1. the port flies a voyage and writes a save;
 2. the reference loads that file and spends twenty actions; the port loads the

@@ -15,6 +15,19 @@ The path is hard because the reference is a large, stateful game, not just a col
 5. **Typography is constrained to 18 px.** Do not “fix” overflow by shrinking text to the HTA’s CSS baseline. Repair panel dimensions, wrapping, clipping, scrolling, and hitbox/layout geometry while preserving 18 px text.
 6. **Make the smallest evidence-backed change.** Avoid broad refactors or unrelated gameplay edits during a repair. Preserve existing behavior unless source comparison demonstrates a mismatch.
 7. **Verification must match the claim.** A successful build proves compilation; a unit test proves only the behavior it exercises. Neither proves visual or overall gameplay parity. Do not claim a repair is verified until the same workflow has been compared in the HTA and port.
+8. **Assume inherited agent work may contain hallucinations.** Comments, PR summaries, test names, hard-coded values, and earlier agents’ conclusions are leads—not specifications. Verify each important claim against the HTA implementation and the native behavior. Check that a test actually covers what its name or comment claims; do not assume a plausible implementation is real source behavior.
+
+## Inherited-work sanity check
+
+A native port can carry forward mistakes from earlier agents: invented behavior, guessed dimensions or costs, copied assumptions that do not match the HTA, stale comments, and claims that a feature or test is complete when only a narrow path was exercised. **Do not trust code because it is already in the repository.** This is a warning to investigate, not a reason to delete or rewrite code blindly.
+
+Before building on inherited work:
+
+- Trace the claimed behavior in `Spaceship.hta` and the actual port call path. Treat comments, commit messages, issue summaries, and this document’s older notes as secondary evidence.
+- Read the test itself and its fixtures/scripts. Record precisely which actions, states, and outputs it covers; a passing selected trace does not prove full gameplay or UI parity.
+- Separate `source-confirmed`, `runtime-observed`, `test-covered (scope named)`, `inferred`, and `unverified` claims in the damage-control log.
+- Verify numeric constants, default values, string labels, geometry, costs, and state mutations against the source before changing or relying on them.
+- If a previous claim turns out to be unsupported or wrong, add a dated correction/follow-up to [`traps_paid_for/damagecontrol_report.md`](traps_paid_for/damagecontrol_report.md) and update [`traps_paid_for/damagcontrol_index.md`](traps_paid_for/damagcontrol_index.md) when it affects an open defect. Preserve the old log entry; correct it with evidence rather than silently erasing it.
 
 ## Required repair loop
 

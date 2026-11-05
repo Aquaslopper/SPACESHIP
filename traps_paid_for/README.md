@@ -1,6 +1,6 @@
 # Traps paid for: port parity evidence
 
-This folder preserves the screenshots supplied in the report and records concrete port mismatches visible in them. The four panels in `00_current_port_composite.png` are also split into individual, clearly named captures (`01`–`04`) so they can be compared screen by screen.
+This folder preserves the screenshots supplied in the report and records concrete port mismatches visible in them. The four panels in `00_current_port_composite.png` are also split into individual, clearly named captures (`01`–`04`) so they can be compared screen by screen. For the strict 1:1 mission and a warning that inherited agent work may contain hallucinations or unsupported claims, see [`REPAIR_AND_RESCUE.md`](../REPAIR_AND_RESCUE.md); current open issues are indexed in [`damagcontrol_index.md`](damagcontrol_index.md).
 
 ## Image index
 
@@ -37,7 +37,7 @@ The `b1`/`b2` and `s1`/`s2` labels are visual classifications, not claims about 
 
 ## Where the agent's code-level hallucination / unsupported assumption occurred
 
-There is no literal function in the inspected paths that fabricates gameplay state. The concrete “hallucination” here is the agent treating plausible-looking layout translations and a successful build as proof of parity:
+No literal gameplay-state fabrication was identified in the specific PR #11/PR #12 source paths inspected for this audit. That is a limited finding, not a guarantee that the repository contains no inherited hallucinations. The concrete agent failure evidenced here is treating plausible-looking layout translations and a successful build as proof of parity. Future agents must assume inherited code, comments, and test claims can be wrong until traced against the HTA; see `REPAIR_AND_RESCUE.md`.
 
 - **`63cec81` — “Match responsive navigation geometry and panel content bounds.”** The commit introduces measured panel heights and fixed navigation columns/chart sizing. “Responsive” and “match” were stronger than the evidence: no HTA runtime comparison was performed, and the supplied native/reference captures visibly differ. The relevant code is the `PaintNavScreen` sizing block in `cpp/ui/Draw.cpp` and `MeasurePanelHeight` immediately before `PaintStage`.
 - **`db1b423` — shared task header and text/panel geometry edits.** `PaintTaskHeader` and `FitText` (`cpp/ui/Draw.cpp:105-139`) were an unverified layout strategy. `FitText` truncates instead of preserving a title, and the helper is not used by the separate home renderer. The screenshot evidence was not captured by running that build, so the change could not be called visually verified.

@@ -1,11 +1,10 @@
 // ============================================================================
 //  world_tests.cpp — the parts of the world the Node suites prove.
 //  ---------------------------------------------------------------------------
-//  tests/*.test.cjs asserts these behaviours against the reference in a VM. The
-//  port keeps the same promises, restated against the C++ API, so a change that
-//  breaks the model fails here without needing Node at all. The differential
-//  harness (tests/parity) remains the proof of exact equality; these are the
-//  invariants that must hold for either edition to be a working game.
+//  tests/*.test.cjs asserts selected behaviours against the reference in a VM.
+//  These C++ tests pin focused invariants against the native API. Differential
+//  scripts compare only the states and outputs exercised by those scripts;
+//  neither suite proves exact equality across every world path or the UI.
 // ============================================================================
 #include <catch2/catch_test_macros.hpp>
 
