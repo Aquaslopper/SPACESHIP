@@ -193,9 +193,9 @@ ProgressButton BuildProgressButton(const Simulation& sim, const std::string& tas
     button.fillPercent = 0.0;
     if (remaining > 0.0) {
       button.state = ButtonState::Cooldown;
-      button.text = "Cooldown: " + Num(remaining) + " actions";
+      button.text = "COOLDOWN " + Num(remaining);
       button.title = RuleLabel(sim, sim.State().actionCooldowns.at(button.cooldownKey).category) +
-                     " cooldown. Other committed actions advance it; waiting does not.";
+                     " cooldown: " + Num(remaining) + " more actions. Other committed actions advance it; waiting does not.";
     } else {
       button.state = enabled ? ButtonState::Idle : ButtonState::Off;
       button.text = idleLabel;

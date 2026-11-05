@@ -113,13 +113,10 @@ float ShellView::TextWidth(const char* text, int size, bool mono) const {
 
 std::string ShellView::FitText(const std::string& text, float maxWidth, int size,
                                bool mono) const {
-  if (TextWidth(text.c_str(), size, mono) <= maxWidth) { return text; }
-  std::string fitted = text;
-  while (!fitted.empty() &&
-         TextWidth((fitted + "…").c_str(), size, mono) > maxWidth) {
-    fitted.pop_back();
-  }
-  return fitted.empty() ? std::string() : fitted + "…";
+  // Never discard content: return the full text even if it exceeds maxWidth.
+  // Layouts grow, wrap, or scroll — they do not silently truncate.
+  (void)maxWidth;
+  return text;
 }
 
 float ShellView::PaintTaskHeader(const TaskHead& head, float left, float top) const {
@@ -196,6 +193,13 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
     return;
   }
 
+  // Main-content scroll: the whole content column moves with contentScroll_,
+  // matching the HTA's #content { overflow:auto }. Every screen paints inside
+  // this transform, and Click() offsets the cursor by the same amount so
+  // obscured content can never be clicked.
+  Camera2D scrollCam{{0.0f, 0.0f}, {0.0f, -contentScroll_}, 0.0f, 1.0f};
+  BeginMode2D(scrollCam);
+
   if (sim.State().activeTab == "home") {
     // Screen hit lists belong to the window that was painted last frame. Clear
     // them when Home becomes active, otherwise a stale quarters/stores early
@@ -242,6 +246,8 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
       PaintTaskScreen(sim);
     }
   }
+  EndMode2D();
+
   PaintChrome(sim);
   if (!popupKey_.empty()) { PaintPopup(sim); }
   if (LossVisible(sim)) { PaintLoss(sim); }
@@ -563,15 +569,6 @@ void ShellView::PaintChrome(Simulation& sim) {
 void ShellView::PaintIdle(Simulation& sim) {
   const Theme& theme = theme_;
 
-  // Main-content scroll: the whole home column moves with contentScroll_,
-  // matching the HTA's #content { overflow:auto }. The feed is part of this
-  // scrolling column; it is deliberately not given a separate internal scroll
-  // here (that is a distinct HTA mechanism, #feed { overflow-y:auto }, left
-  // out of this slice). Hit testing in Click() offsets the cursor by the same
-  // scroll so content painted above the viewport can never be clicked.
-  Camera2D scrollCam{{0.0f, 0.0f}, {0.0f, -contentScroll_}, 0.0f, 1.0f};
-  BeginMode2D(scrollCam);
-
   // ---- stat and info rails ----------------------------------------------
   for (const RailCell& cell : idle_.stats) {
     DrawRectangleLines(static_cast<int>(cell.box.x), static_cast<int>(cell.box.y),
@@ -653,7 +650,6 @@ void ShellView::PaintIdle(Simulation& sim) {
              static_cast<int>(y), TypePx(12) , ToRay(theme.palette.ink));
     y += theme.LineHeight();
   }
-  EndMode2D();
   (void)sim;
 }
 
@@ -1814,9 +1810,12 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
            static_cast<int>(bandY + 5.0f), TypePx(11) , ToRay(p.coffee));
   Text(screen.bandNote.c_str(), static_cast<int>(left + 8.0f),
            static_cast<int>(bandY + 20.0f), TypePx(10) , ToRay(p.muted));
+  // Progress buttons start below any confirmation answers so the two control
+  // rows never overlap: confirmation answers end at bandY + 70.
+  const float progressTop = !pendingConfirm_.empty() ? bandY + 74.0f : bandY + 50.0f;
   float bx = left + 12.0f;
   for (const ProgressButton& button : screen.progress) {
-    const Area box{bx, bandY + 50.0f, 190.0f, 28.0f};
+    const Area box{bx, progressTop, 190.0f, 28.0f};
     DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
                   static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel2));
     if (button.fillPercent > 0.0) {
@@ -2354,12 +2353,17 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
     }
   }
 
+  // Screen content is painted shifted up by contentScroll_; shift the cursor
+  // down by the same amount so hit testing matches what is painted, and
+  // content scrolled out of view can never be clicked.
+  const float scrollY = contentScroll_;
+
   // The quarters: a roster row, a job, an order, the sheet, a word.
   if (screenQuarters_) {
     for (const NavHit& hit : navHits_) {
-      if (!hit.box.Contains(x, y)) { continue; }
+      if (!hit.box.Contains(x, y + scrollY)) { continue; }
       if (PressQuartersAction(sim, hit.action, hit.arg) && hit.action == "commit") {
-        SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
+        SpawnMark(marks_, x, y + scrollY, nowMs, sim.State().reducedMotion);
       }
       return;
     }
@@ -2370,14 +2374,14 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
   // Station and stores: each command row carries its own action id.
   if (screenPanels_) {
     for (const NavHit& hit : navHits_) {
-      if (!hit.box.Contains(x, y)) { continue; }
+      if (!hit.box.Contains(x, y + scrollY)) { continue; }
       if (hit.action == "confirm-no") { pendingConfirm_.clear(); pendingAction_.clear(); return; }
       if (hit.action == "confirm-yes") {
         const std::string action = pendingAction_;
         pendingConfirm_.clear();
         pendingAction_.clear();
         const bool acted = PressPanelRow(sim, panelsKind_, action);
-        if (acted) { SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion); }
+        if (acted) { SpawnMark(marks_, x, y + scrollY, nowMs, sim.State().reducedMotion); }
         return;
       }
       // Read the row's own question before acting: a purchase that cannot be
@@ -2398,7 +2402,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         return;
       }
       const bool acted = PressPanelRow(sim, panelsKind_, hit.arg);
-      if (acted) { SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion); }
+      if (acted) { SpawnMark(marks_, x, y + scrollY, nowMs, sim.State().reducedMotion); }
       return;
     }
   }
@@ -2406,10 +2410,10 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
   // The chart's own controls: bodies, the zoom pair, the layers, the actions.
   if (screenNav_) {
     for (const NavHit& hit : navHits_) {
-      if (!hit.box.Contains(x, y)) { continue; }
+      if (!hit.box.Contains(x, y + scrollY)) { continue; }
       if (PressNavAction(sim, hit.action, hit.arg) &&
           (hit.action == "travel" || hit.action == "scan")) {
-        SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
+        SpawnMark(marks_, x, y + scrollY, nowMs, sim.State().reducedMotion);
       }
       return;
     }
@@ -2418,9 +2422,9 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
 
   // A task window's own controls come first.
   for (const auto& entry : taskButtons_) {
-    if (!entry.first.Contains(x, y)) { continue; }
+    if (!entry.first.Contains(x, y + scrollY)) { continue; }
     if (PressProgressButton(sim, entry.second)) {
-      SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
+      SpawnMark(marks_, x, y + scrollY, nowMs, sim.State().reducedMotion);
       hasSelection_ = false;
     }
     return;

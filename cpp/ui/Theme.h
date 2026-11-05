@@ -1,11 +1,10 @@
 // ============================================================================
 //  Theme.h — the CSS roles, as data.
 //  ---------------------------------------------------------------------------
-//  The reference styles itself from one stylesheet: `classic` is the only theme
-//  with a full palette, and the other four only change the "ink" hue that the
-//  raster, the glows and the accents are mixed from. That is not an oversight to
-//  be corrected - it is what the game looks like - so the port keeps exactly
-//  that split: one authored palette, five ink triples.
+//  The reference has one light parchment theme (classic) and four dark themes
+//  (void, aurora, nebula, ember) that re-tint every surface, not just the ink.
+//  The port mirrors that split: one authored light palette, four authored dark
+//  palettes, each with its own surface colours and ink.
 //
 //  Everything here is presentation. No function in this file can advance the
 //  voyage, and nothing here is saved (the voyage saves the theme's NAME).

@@ -195,10 +195,9 @@ TEST_CASE("a lock reads back as a cooldown, in actions", "[ui][button]") {
   const ship::ProgressButton button =
       ship::BuildProgressButton(sim, "maint", "Run Maintenance", true);
   CHECK(button.state == ship::ButtonState::Cooldown);
-  CHECK(button.text == "Cooldown: 7 actions");
+  CHECK(button.text == "COOLDOWN 7");
   CHECK(button.title ==
-        "Ship systems cooldown. Other committed actions advance it; waiting "
-        "does not.");
+        "Ship systems cooldown: 7 more actions. Other committed actions advance it; waiting does not.");
   CHECK(button.fillPercent == 0.0);
 
   // A command row shows the same lock in its cost badge.
@@ -393,7 +392,7 @@ TEST_CASE("the filter room reads the rack, the bank and the air", "[ui][o2]") {
   CHECK(running.slots[0].barPercent == 100.0);
   // The switch has just been thrown, so its lock is running down.
   CHECK(running.screen.progress[0].state == ship::ButtonState::Cooldown);
-  CHECK(running.screen.progress[0].text == "Cooldown: 10 actions");
+  CHECK(running.screen.progress[0].text == "COOLDOWN 10");
 }
 
 TEST_CASE("the galley reads the rack and the four clocks", "[ui][mess]") {
