@@ -219,12 +219,21 @@ if(SPACESHIP_GUI)
     target_link_options(spaceship PRIVATE -mwindows)
   endif()
 
+  # spaceship.png is not in the repository: it is the last fallback candidate in
+  # LoadTitleTexture (cpp/app/main.cpp), behind assets/art/title.jpg, which is
+  # committed. Copy it when it exists so a local icon still lands beside the
+  # executable, but never require it -- an unconditional copy_if_different on a
+  # missing file fails the whole build after a successful link.
   add_custom_command(TARGET spaceship POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${SPACESHIP_ASSETS}" "$<TARGET_FILE_DIR:spaceship>/assets"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_CURRENT_SOURCE_DIR}/spaceship.png" "$<TARGET_FILE_DIR:spaceship>/spaceship.png"
     COMMENT "Copying assets beside the executable")
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/spaceship.png")
+    add_custom_command(TARGET spaceship POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+              "${CMAKE_CURRENT_SOURCE_DIR}/spaceship.png" "$<TARGET_FILE_DIR:spaceship>/spaceship.png"
+      COMMENT "Copying the fallback title artwork beside the executable")
+  endif()
 endif()
 
 # ---------------------------------------------------------------------------
