@@ -49,7 +49,12 @@ jobs:
           # itself with: keep it, and surface its tail as an annotation.
           if ! cmake -S . -B build -DCMAKE_BUILD_TYPE=Release 2>&1 | tee configure.log; then
             cmake --version | head -1 | sed 's/^/::error::/'
-            tail -25 configure.log | sed 's/^/::error::/'
+            echo "::error::--- error lines ---"
+            grep -n -i -m 6 -E "cmake error|error:|could not|failed" configure.log | sed 's/^/::error::/' || true
+            echo "::error::--- context ---"
+            sed -n '/CMake Error/,+6p' configure.log | sed 's/^/::error::/' || true
+            echo "::error::--- last lines ---"
+            tail -6 configure.log | sed 's/^/::error::/'
             exit 1
           fi
 
@@ -136,7 +141,12 @@ jobs:
           set -o pipefail
           if ! cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release 2>&1 | tee configure.log; then
             cmake --version | head -1 | sed 's/^/::error::/'
-            tail -25 configure.log | sed 's/^/::error::/'
+            echo "::error::--- error lines ---"
+            grep -n -i -m 6 -E "cmake error|error:|could not|failed" configure.log | sed 's/^/::error::/' || true
+            echo "::error::--- context ---"
+            sed -n '/CMake Error/,+6p' configure.log | sed 's/^/::error::/' || true
+            echo "::error::--- last lines ---"
+            tail -6 configure.log | sed 's/^/::error::/'
             exit 1
           fi
 
