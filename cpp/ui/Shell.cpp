@@ -13,6 +13,7 @@
 #include "ui/Describe.h"
 
 #include <algorithm>
+#include <cmath>
 
 #include "core/JsNumber.h"
 
@@ -369,15 +370,27 @@ std::vector<SideHit> SideHits(const Simulation& sim, const Area& sidepanel,
       continue;
     }
     for (const SideRow& row : block.rows) {
+      const float rowWidth = std::max(1.0f, sidepanel.w - 18.0f);
+      const float averageCharWidth = std::max(6.0f, lineHeight * 0.5f);
+      const float maxChars = std::max(1.0f, rowWidth / averageCharWidth);
       float height = lineHeight;
-      // A long value gets its own line beneath its label.
-      if (row.kind == "long" || row.kind == "event") { height += 14.0f; }
       SideHit hit;
       hit.text = row.key;
       hit.detail = row.kind == "long" ? row.value : std::string();
       hit.rightValue = row.kind == "pair" ? row.value : std::string();
       hit.dim = row.dim;
-      hit.box = Area{sidepanel.x + 12.0f, 0.0f, sidepanel.w - 18.0f, height};
+      if (row.kind == "long") {
+        const float detailLines = std::max(
+            1.0f, std::ceil(static_cast<float>(row.value.size()) / maxChars));
+        height += detailLines * lineHeight + 4.0f;
+      } else if (row.kind == "event") {
+        height = std::max(lineHeight + 6.0f, 30.0f);
+      } else if (row.kind == "pair" &&
+                 static_cast<float>(row.key.size() + row.value.size()) > maxChars) {
+        hit.stackValue = true;
+        height += lineHeight;
+      }
+      hit.box = Area{sidepanel.x + 12.0f, 0.0f, rowWidth, height};
       if (row.kind == "event") {
         hit.action = SideAction::OpenEvent;
         hit.key = row.id;

@@ -102,6 +102,43 @@ float ShellView::TextWidth(const char* text, int size, bool mono) const {
   return MeasureTextEx(font, text, static_cast<float>(size), 1.0f).x;
 }
 
+std::string ShellView::FitText(const std::string& text, float maxWidth, int size,
+                               bool mono) const {
+  if (TextWidth(text.c_str(), size, mono) <= maxWidth) { return text; }
+  std::string fitted = text;
+  while (!fitted.empty() &&
+         TextWidth((fitted + "…").c_str(), size, mono) > maxWidth) {
+    fitted.pop_back();
+  }
+  return fitted.empty() ? std::string() : fitted + "…";
+}
+
+float ShellView::PaintTaskHeader(const TaskHead& head, float left, float top) const {
+  const Palette& p = theme_.palette;
+  const float width = std::max(1.0f, layout_.content.Right() - left - 8.0f);
+  const int kindSize = TypePx(9);
+  const int titleSize = TypePx(20);
+  const int subSize = TypePx(11);
+  const float smallLine = theme_.LineHeight();
+  const float titleLine = std::max(smallLine, TypeStep(28.0f));
+  float y = top;
+  Text(head.kind.c_str(), static_cast<int>(left), static_cast<int>(y), kindSize,
+       ToRay(p.muted));
+  y += smallLine + TypeStep(3.0f);
+  const std::string title = FitText(head.title, width, titleSize);
+  Text(title.c_str(), static_cast<int>(left), static_cast<int>(y), titleSize,
+       ToRay(p.ink));
+  y += titleLine + TypeStep(3.0f);
+  const std::vector<std::string> subtitle =
+      WrapText(head.sub, width, subSize, bodyFont_);
+  for (const std::string& line : subtitle) {
+    Text(line.c_str(), static_cast<int>(left), static_cast<int>(y), subSize,
+         ToRay(p.muted));
+    y += smallLine;
+  }
+  return y - top + TypeStep(4.0f);
+}
+
 ShellView::ShellView() { theme_ = Theme::ById("classic"); }
 
 void ShellView::Configure(float width, float height, const Theme& theme) {
@@ -353,26 +390,42 @@ void ShellView::PaintChrome(Simulation& sim) {
       continue;
     }
     if (hit.action == SideAction::OpenEvent) {
-      draw->AddText(ImVec2(hit.box.x, hit.box.y), ToIm(p.ink), hit.text.c_str());
-      draw->AddRect(ImVec2(hit.box.Right() - 34.0f, hit.box.y + 12.0f),
-                    ImVec2(hit.box.Right(), hit.box.y + 26.0f), ToIm(p.borderDark), 3.0f);
-      draw->AddText(ImVec2(hit.box.Right() - 28.0f, hit.box.y + 14.0f), ToIm(p.muted),
-                    "Open");
+      const float buttonW = 52.0f;
+      const float buttonH = std::min(hit.box.h, 30.0f);
+      const float buttonX = hit.box.Right() - buttonW;
+      const float buttonY = hit.box.y + (hit.box.h - buttonH) * 0.5f;
+      const std::string eventLabel =
+          FitText(hit.text, std::max(1.0f, hit.box.w - buttonW - 8.0f),
+                  static_cast<int>(ImGui::GetFontSize()));
+      draw->AddText(ImVec2(hit.box.x, hit.box.y), ToIm(p.ink), eventLabel.c_str());
+      draw->AddRect(ImVec2(buttonX, buttonY),
+                    ImVec2(buttonX + buttonW, buttonY + buttonH), ToIm(p.borderDark), 3.0f);
+      const ImVec2 openSize = ImGui::CalcTextSize("Open");
+      draw->AddText(ImVec2(buttonX + (buttonW - openSize.x) * 0.5f,
+                           buttonY + (buttonH - openSize.y) * 0.5f),
+                    ToIm(p.muted), "Open");
       continue;
     }
     if (hit.box.y < layout_.sidepanel.y) { continue; }   // the foot is drawn below
     draw->AddText(ImVec2(hit.box.x, hit.box.y),
                   ToIm(hit.dim ? p.muted : p.ink), hit.text.c_str());
     if (!hit.rightValue.empty()) {
+      const ImVec2 labelSize = ImGui::CalcTextSize(hit.text.c_str());
       const ImVec2 valueSize = ImGui::CalcTextSize(hit.rightValue.c_str());
-      const float valueX = std::max(hit.box.x,
-                                    hit.box.Right() - valueSize.x - 1.0f);
-      draw->AddText(ImVec2(valueX, hit.box.y),
+      const bool stack = hit.stackValue ||
+                         labelSize.x + valueSize.x + 8.0f > hit.box.w;
+      const float valueX = stack
+                               ? hit.box.x
+                               : std::max(hit.box.x, hit.box.Right() - valueSize.x - 1.0f);
+      const float valueY = stack ? hit.box.y + theme_.LineHeight() : hit.box.y;
+      draw->AddText(ImVec2(valueX, valueY),
                     ToIm(hit.dim ? p.muted : p.ink), hit.rightValue.c_str());
     }
     if (!hit.detail.empty()) {
-      draw->AddText(ImVec2(hit.box.x, hit.box.y + 12.0f), ToIm(p.muted),
-                    hit.detail.c_str());
+      const float detailY = hit.box.y + theme_.LineHeight();
+      draw->AddText(ImGui::GetFont(), ImGui::GetFontSize(),
+                    ImVec2(hit.box.x, detailY), ToIm(p.muted), hit.detail.c_str(),
+                    nullptr, hit.box.w);
     }
   }
 
@@ -721,21 +774,16 @@ void ShellView::PaintTaskScreen(Simulation& sim) {
   const float right = layout_.content.Right() - 8.0f;
   const float column = 250.0f;
 
-  Text(screen.head.kind.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y), TypePx(9) , ToRay(p.muted));
-  Text(screen.head.title.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y + 12.0f), TypePx(20) , ToRay(p.ink));
-  Text(screen.head.sub.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y + 36.0f), TypePx(11) , ToRay(p.muted));
+  const float headerH = PaintTaskHeader(screen.head, left, layout_.content.y);
 
-  float y = layout_.content.y + 58.0f;
+  float y = layout_.content.y + headerH + 8.0f;
   for (const NavPanel& panel : screen.left) {
     const float panelH = std::max(118.0f, MeasurePanelHeight(panel, column));
     PaintPanel(panel, Area{left, y, column, panelH});
     y += panelH + 6.0f;
   }
 
-  float ry = layout_.content.y + 58.0f;
+  float ry = layout_.content.y + headerH + 8.0f;
   for (const NavPanel& panel : screen.right) {
     const float panelH = std::max(150.0f, MeasurePanelHeight(panel, column));
     PaintPanel(panel, Area{right - column, ry, column, panelH});
@@ -743,7 +791,7 @@ void ShellView::PaintTaskScreen(Simulation& sim) {
   }
 
   if (screen.hasStage) {
-    const Area origin{left + column + 16.0f, layout_.content.y + 58.0f,
+    const Area origin{left + column + 16.0f, layout_.content.y + headerH + 8.0f,
                       screen.stage.width, screen.stage.height};
     PaintStage(screen.stage, origin);
     const float uy = origin.y + screen.stage.height + 4.0f;
@@ -760,19 +808,21 @@ void ShellView::PaintTaskScreen(Simulation& sim) {
   }
 
   // The commitments band, along the bottom of the content column.
-  const float bandY = layout_.content.Bottom() - 96.0f;
+  const float bandY = layout_.content.Bottom() - 108.0f;
   DrawRectangle(static_cast<int>(left), static_cast<int>(bandY),
-                static_cast<int>(right - left), 90, ToRay(p.panel));
+                static_cast<int>(right - left), 102, ToRay(p.panel));
   DrawRectangleLines(static_cast<int>(left), static_cast<int>(bandY),
-                     static_cast<int>(right - left), 90, ToRay(p.border));
+                     static_cast<int>(right - left), 102, ToRay(p.border));
   Text("Actions", static_cast<int>(left + 8.0f),
-           static_cast<int>(bandY + 5.0f), TypePx(11) , ToRay(p.coffee));
+           static_cast<int>(bandY + 5.0f), TypePx(11), ToRay(p.coffee));
   Text(screen.bandNote.c_str(), static_cast<int>(left + 8.0f),
-           static_cast<int>(bandY + 20.0f), TypePx(10) , ToRay(p.muted));
+           static_cast<int>(bandY + 32.0f), TypePx(10), ToRay(p.muted));
 
   float bx = left + 12.0f;
+  const float progressH = theme_.LineHeight() + 6.0f;
+  const float progressY = bandY + 68.0f;
   for (const ProgressButton& button : screen.progress) {
-    const Area box{bx, bandY + 50.0f, 190.0f, 28.0f};
+    const Area box{bx, progressY, 190.0f, progressH};
     DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
                   static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel2));
     if (button.fillPercent > 0.0) {
@@ -784,7 +834,7 @@ void ShellView::PaintTaskScreen(Simulation& sim) {
                        static_cast<int>(box.w), static_cast<int>(box.h),
                        ToRay(p.borderDark));
     Text(button.text.c_str(), static_cast<int>(box.x + 8.0f),
-             static_cast<int>(box.y + 8.0f), TypePx(10) ,
+             static_cast<int>(box.y + (box.h - TypePx(10)) * 0.5f), TypePx(10) ,
              ToRay(button.state == ButtonState::Cooldown ? p.terracotta : p.ink));
     taskButtons_.push_back({box, button.taskId});
     bx += 198.0f;
@@ -805,18 +855,13 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   const float middleLeft = left + leftColumn + 12.0f;
   const float middleRight = right - rightColumn - 12.0f;
 
-  Text(screen.head.kind.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y), TypePx(9) , ToRay(p.muted));
-  Text(screen.head.title.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y + 12.0f), TypePx(20) , ToRay(p.ink));
-  Text(screen.head.sub.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y + 36.0f), TypePx(11) , ToRay(p.muted));
+  const float headerH = PaintTaskHeader(screen.head, left, layout_.content.y);
 
   // HTA #map fills the middle column up to 1100px. Its height is limited by
   // the remaining content height, 500px and half its width, with a 240px floor.
   const float spareW = std::max(1.0f, middleRight - middleLeft);
   const float chartW = std::min(1100.0f, spareW);
-  const float chartTop = layout_.content.y + 58.0f;
+  const float chartTop = layout_.content.y + headerH + 8.0f;
   const float availableH = layout_.content.Bottom() - chartTop - 300.0f;
   const float chartH = std::min({500.0f, chartW * 0.5f,
                                  std::max(240.0f, availableH)});
@@ -909,25 +954,12 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   }
   EndScissorMode();
 
-  // --- the zoom pair, the layer stack and the scale caption
-  float bx = box.x + 4.0f;
-  for (const std::string& key : NavLayerOrder()) {
-    const bool on = key == chart.layer;
-    const Area boxArea{bx, box.Bottom() - 20.0f, 54.0f, 16.0f};
-    DrawRectangle(static_cast<int>(boxArea.x), static_cast<int>(boxArea.y),
-                  static_cast<int>(boxArea.w), static_cast<int>(boxArea.h),
-                  ToRay(on ? p.panel3 : p.panel));
-    DrawRectangleLines(static_cast<int>(boxArea.x), static_cast<int>(boxArea.y),
-                       static_cast<int>(boxArea.w), static_cast<int>(boxArea.h),
-                       ToRay(p.borderDark));
-    Text(NavLayerLabel(key).c_str(), static_cast<int>(boxArea.x + 6.0f),
-             static_cast<int>(boxArea.y + 4.0f), TypePx(9) ,
-             ToRay(on ? p.ink : p.muted));
-    navHits_.push_back(NavHit{boxArea, "layer", key});
-    bx += 58.0f;
-  }
-  const Area zoomIn{box.Right() - 44.0f, box.y + 4.0f, 18.0f, 18.0f};
-  const Area zoomOut{box.Right() - 22.0f, box.y + 4.0f, 18.0f, 18.0f};
+  // Match the HTA controls: a vertical zoom pair, then vertical layer buttons
+  // pinned at the chart's upper-right edge.
+  const float zoomSize = std::max(21.0f, theme_.LineHeight() + 2.0f);
+  const float zoomX = box.Right() - zoomSize - 7.0f;
+  const Area zoomIn{zoomX, box.y + 7.0f, zoomSize, zoomSize};
+  const Area zoomOut{zoomX, zoomIn.Bottom() + 4.0f, zoomSize, zoomSize};
   for (const Area& z : {zoomIn, zoomOut}) {
     DrawRectangle(static_cast<int>(z.x), static_cast<int>(z.y),
                   static_cast<int>(z.w), static_cast<int>(z.h), ToRay(p.panel2));
@@ -935,16 +967,41 @@ void ShellView::PaintNavScreen(Simulation& sim) {
                        static_cast<int>(z.w), static_cast<int>(z.h),
                        ToRay(p.borderDark));
   }
-  Text("+", static_cast<int>(zoomIn.x + 6.0f), static_cast<int>(zoomIn.y + 3.0f), TypePx(11) , ToRay(p.ink));
-  Text("-", static_cast<int>(zoomOut.x + 6.0f),
-           static_cast<int>(zoomOut.y + 3.0f), TypePx(11) , ToRay(p.ink));
+  const float plusW = TextWidth("+", TypePx(11));
+  const float minusW = TextWidth("-", TypePx(11));
+  Text("+", static_cast<int>(zoomIn.x + (zoomSize - plusW) * 0.5f),
+       static_cast<int>(zoomIn.y + (zoomSize - TypePx(11)) * 0.5f),
+       TypePx(11), ToRay(p.ink));
+  Text("-", static_cast<int>(zoomOut.x + (zoomSize - minusW) * 0.5f),
+       static_cast<int>(zoomOut.y + (zoomSize - TypePx(11)) * 0.5f),
+       TypePx(11), ToRay(p.ink));
   navHits_.push_back(NavHit{zoomIn, "zoom-in", ""});
   navHits_.push_back(NavHit{zoomOut, "zoom-out", ""});
-  Text(chart.scaleText.c_str(), static_cast<int>(box.Right() - 260.0f),
-           static_cast<int>(box.Bottom() - 18.0f), TypePx(9) , ToRay(p.muted));
+
+  float layerY = box.y + 62.0f;
+  for (const std::string& key : NavLayerOrder()) {
+    const bool on = key == chart.layer;
+    const std::string label = NavLayerLabel(key);
+    const float layerW = std::max(64.0f, TextWidth(label.c_str(), TypePx(9)) + 16.0f);
+    const float layerH = std::max(19.0f, theme_.LineHeight() + 4.0f);
+    const Area layerBox{box.Right() - layerW - 7.0f, layerY, layerW, layerH};
+    DrawRectangle(static_cast<int>(layerBox.x), static_cast<int>(layerBox.y),
+                  static_cast<int>(layerBox.w), static_cast<int>(layerBox.h),
+                  ToRay(on ? p.panel3 : p.panel));
+    DrawRectangleLines(static_cast<int>(layerBox.x), static_cast<int>(layerBox.y),
+                       static_cast<int>(layerBox.w), static_cast<int>(layerBox.h),
+                       ToRay(p.borderDark));
+    Text(label.c_str(), static_cast<int>(layerBox.x + 6.0f),
+         static_cast<int>(layerBox.y + (layerH - TypePx(9)) * 0.5f), TypePx(9),
+         ToRay(on ? p.ink : p.muted));
+    navHits_.push_back(NavHit{layerBox, "layer", key});
+    layerY += layerH + 4.0f;
+  }
+  Text(chart.scaleText.c_str(), static_cast<int>(box.x + 8.0f),
+       static_cast<int>(box.y + 7.0f), TypePx(9), ToRay(p.muted));
 
   // --- panels: identity left, sensors right, the leg underneath the chart
-  float ly = layout_.content.y + 58.0f;
+  float ly = layout_.content.y + headerH + 8.0f;
   for (const NavPanel& panel : screen.left) {
     const float panelH = std::max(96.0f, MeasurePanelHeight(panel, leftColumn));
     PaintPanel(panel, Area{left, ly, leftColumn, panelH});
@@ -954,7 +1011,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     const float panelH = std::max(190.0f,
                                   MeasurePanelHeight(screen.right[0], rightColumn));
     PaintPanel(screen.right[0],
-               Area{right - rightColumn, layout_.content.y + 58.0f,
+               Area{right - rightColumn, layout_.content.y + headerH + 8.0f,
                     rightColumn, panelH});
   }
 
@@ -1039,15 +1096,10 @@ void ShellView::PaintCrewRecord(const Simulation& sim) {
   const float left = layout_.content.x + 8.0f;
   const float right = layout_.content.Right() - 8.0f;
 
-  Text(record_.head.kind.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y), TypePx(9) , ToRay(p.muted));
-  Text(record_.head.title.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y + 12.0f), TypePx(20) , ToRay(p.ink));
-  Text(record_.head.sub.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y + 36.0f), TypePx(11) , ToRay(p.muted));
+  const float headerH = PaintTaskHeader(record_.head, left, layout_.content.y);
 
   // Status across the top, then the three short shelves left to right.
-  float y = layout_.content.y + 58.0f;
+  float y = layout_.content.y + headerH + 8.0f;
   if (!record_.shelves.empty()) {
     const float panelH = std::max(96.0f,
                                   MeasurePanelHeight(record_.shelves[0], right - left));
@@ -1073,15 +1125,9 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
   const float right = layout_.content.Right() - 8.0f;
   const float column = 210.0f;
 
-  Text(screen.head.kind.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y), TypePx(9) , ToRay(p.muted));
-  Text(screen.head.title.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y + 12.0f), TypePx(20) , ToRay(p.ink));
-  Text(screen.head.sub.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y + 36.0f), TypePx(10) , ToRay(p.muted));
-
   // --- the roster, and the payroll above it
-  const float panelTop = layout_.content.y + 58.0f;
+  const float headerH = PaintTaskHeader(screen.head, left, layout_.content.y);
+  const float panelTop = layout_.content.y + headerH + 8.0f;
   if (!screen.left.empty()) {
     const float panelH = std::max(170.0f,
                                   MeasurePanelHeight(screen.left[0], column));
@@ -1127,22 +1173,24 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
 
   // --- the roster is clickable: looking at a hand is free
   float rowY = panelTop + 34.0f;
+  const float crewRowH = theme_.LineHeight() * 2.0f + 4.0f;
   for (const CrewRowView& row : quarters_.roster) {
-    const Area box{left + 6.0f, rowY, column - 12.0f, 24.0f};
+    const Area box{left + 6.0f, rowY, column - 12.0f, crewRowH};
     if (row.selected) {
       DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
                     static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel3));
     }
     Text(row.name.c_str(), static_cast<int>(box.x + 8.0f),
-             static_cast<int>(box.y + 3.0f), TypePx(10) , ToRay(p.ink));
+             static_cast<int>(box.y + 2.0f), TypePx(10), ToRay(p.ink));
     Text(row.role.c_str(), static_cast<int>(box.x + 8.0f),
-             static_cast<int>(box.y + 13.0f), TypePx(8) , ToRay(p.muted));
+             static_cast<int>(box.y + theme_.LineHeight() + 2.0f),
+             TypePx(8), ToRay(p.muted));
     if (!row.flag.empty()) {
       Text(row.flag.c_str(), static_cast<int>(box.Right() - 30.0f),
                static_cast<int>(box.y + 6.0f), TypePx(8) , ToRay(p.terracotta));
     }
     navHits_.push_back(NavHit{box, "select", row.id});
-    rowY += 26.0f;
+    rowY += crewRowH + 3.0f;
   }
 
   // --- condition and standing, under the hallway
@@ -1589,9 +1637,8 @@ void ShellView::PaintLoss(Simulation& sim) {
 
 // The handbook's search box, drawn as a real field over the index column.
 void ShellView::PaintWikiSearch(const Area& viewport) {
-  (void)viewport;
   if (panelsKind_ != ScreenKind::Wiki) { return; }
-  const Area box{layout_.content.x + 8.0f, layout_.content.y + 50.0f, 260.0f, 22.0f};
+  const Area box{layout_.content.x + 8.0f, viewport.y, 260.0f, 22.0f};
   ImGui::SetNextWindowPos(ImVec2(box.x - 4.0f, box.y - 4.0f));
   ImGui::SetNextWindowSize(ImVec2(box.w + 8.0f, 30.0f));
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4.0f, 4.0f));
@@ -1615,7 +1662,6 @@ void ShellView::PaintWikiSearch(const Area& viewport) {
 }
 
 void ShellView::PaintPanelsScreen(Simulation& sim) {
-  PaintWikiSearch(layout_.content);
   navHits_.clear();
   taskButtons_.clear();
   const Palette& p = theme_.palette;
@@ -1623,14 +1669,11 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
   const float left = layout_.content.x + 8.0f;
   const float right = layout_.content.Right() - 8.0f;
 
-  Text(screen.head.kind.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y), TypePx(9) , ToRay(p.muted));
-  Text(screen.head.title.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y + 12.0f), TypePx(20) , ToRay(p.ink));
-  Text(screen.head.sub.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y + 36.0f), TypePx(11) , ToRay(p.muted));
+  const float headerH = PaintTaskHeader(screen.head, left, layout_.content.y);
 
-  float top = layout_.content.y + 56.0f;
+  const float searchTop = layout_.content.y + headerH + 8.0f;
+  PaintWikiSearch(Area{layout_.content.x, searchTop, layout_.content.w, 0.0f});
+  float top = searchTop + (panelsKind_ == ScreenKind::Wiki ? 38.0f : 0.0f);
   if (screen.hasHero) {
     PaintHero(screen.hero, Area{left, top, right - left, screen.hero.hero.h});
     top += screen.hero.hero.h + 8.0f;
@@ -1649,9 +1692,10 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
     float y = top + noteH + 6.0f;
     if (i < screen.panelRows.size()) {
       for (std::size_t r = 0; r < screen.panelRows[i].size(); ++r) {
-        if (y + 24.0f > bottom) { break; }
+        const float rowH = theme_.LineHeight() + 6.0f;
+        if (y + rowH > bottom) { break; }
         const CommandRowView& row = screen.panelRows[i][r];
-        const Area box{x, y, columnW, 22.0f};
+        const Area box{x, y, columnW, rowH};
         DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
                       static_cast<int>(box.w), static_cast<int>(box.h),
                       ToRay(row.enabled ? p.panel2 : p.panel3));
@@ -1668,17 +1712,18 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
                    columnW - costW - 26.0f) {
           shown.pop_back();
         }
+        const float textTop = box.y + (box.h - TypePx(10)) * 0.5f;
         Text(shown.c_str(), static_cast<int>(box.x + 6.0f),
-                 static_cast<int>(box.y + 6.0f), TypePx(10) ,
+                 static_cast<int>(textTop), TypePx(10) ,
                  ToRay(row.enabled ? p.ink : p.muted));
         Text(cost.c_str(), static_cast<int>(box.Right() - 6.0f - costW),
-                 static_cast<int>(box.y + 6.0f), TypePx(9) ,
+                 static_cast<int>(textTop), TypePx(9) ,
                  ToRay(row.enabled ? p.coffee : p.muted));
         if (row.enabled && i < screen.panelRowIds.size() &&
             r < screen.panelRowIds[i].size()) {
           navHits_.push_back(NavHit{box, "row", screen.panelRowIds[i][r]});
         }
-        y += 25.0f;
+        y += rowH + 3.0f;
       }
     }
   }
