@@ -133,6 +133,32 @@ int main() {
       return r.color.r == 223 && r.color.g == 240 && r.color.b == 204 && r.w > 0;
     });
     Require(green != rects.end(), "Live filter-slot progress did not paint the HTA green fill");
+    Require(sim.StartCanisterInstall(1) && sim.StartCanisterInstall(2), "Could not seat probe bank");
+    sim.PerformAction("seating"); sim.PerformAction("seating");
+    Require(sim.StartFilterBank(), "Could not start probe bank");
+    Frame(view, sim);
+    Require(std::any_of(rects.begin(), rects.end(), [](const auto& r) {
+      return r.color.r == 127 && r.color.g == 145 && r.color.b == 97 && r.w == 544;
+    }), "Central cabin-air healthy bar was not submitted to the renderer");
+
+    sim.MutableState().docked = true;
+    sim.MutableMap().here = "tolme";
+    sim.MutableState().shiplets = 10000;
+    ship::OpenTask(sim, "station", "tolme", true);
+    Frame(view, sim);
+    const auto fuel = std::find_if(texts.begin(), texts.end(), [](const auto& t) {
+      return t.text.find("Fuel cell") == 0;
+    });
+    Require(fuel != texts.end(), "Station purchase label not painted");
+    const auto point = *fuel;
+    const double beforeBuy = sim.ActionCount();
+    view.Click(sim, point.x + 2, point.y + 2, ship::HitButton::Left, 0);
+    Frame(view, sim);
+    Require(sim.ActionCount() == beforeBuy + 1, "Native station click failed to buy");
+    FindText("COOLDOWN 5");
+    view.Click(sim, point.x + 2, point.y + 2, ship::HitButton::Left, 0);
+    Require(sim.ActionCount() == beforeBuy + 1, "Locked station row remained clickable");
+
     Texture2D title{}; title.id = 1; title.width = 1672; title.height = 941;
     view.SetTitleTexture(&title);
     view.ShowTitle(false);
@@ -144,7 +170,7 @@ int main() {
     Require(view.Panel() == ship::TitlePanel::Settings && textureCalls == 1,
             "Options replaced the title image instead of opening a sheet over it");
     ImGui::DestroyContext();
-    std::cout << "PASS: real Draw.cpp scroll direction, windowed Assignments, Vessel input/clamp, green action fills, title art retained behind Options; all text >=18px\n";
+    std::cout << "PASS: real Draw.cpp scroll direction, windowed Assignments, Vessel input/clamp, green action/air fills, visible station cooldown, title art retained behind Options; all text >=18px\n";
     return 0;
   } catch (const std::exception& error) {
     std::cerr << "draw probe: " << error.what() << '\n'; return 1;

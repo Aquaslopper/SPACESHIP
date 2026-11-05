@@ -778,6 +778,15 @@ void ShellView::PaintStage(const TaskStage& stage, const Area& origin) {
     const int y = static_cast<int>(origin.y + part.box.y);
     const int w = std::max(1, static_cast<int>(part.box.w));
     const int h = std::max(1, static_cast<int>(part.box.h));
+    if (!part.tone.empty()) {
+      const Color tone = HexColor(part.tone, ToRay(p.muted));
+      if (!part.text.empty()) {
+        Text(part.text.c_str(), x, y, TypePx(8), tone);
+      } else if (part.box.w > 0 && part.box.h > 0) {
+        DrawRectangle(x, y, w, h, tone);
+      }
+      continue;
+    }
     if (part.cls.find("pipe") != std::string::npos ||
         part.cls.find("duct") != std::string::npos ||
         part.cls.find("counter") != std::string::npos) {

@@ -448,3 +448,40 @@ TEST_CASE("a running task's button is inert until it is acknowledged", "[phase9]
   CHECK_FALSE(ship::PressProgressButton(sim, "maint"));   // running: inert
   CHECK(sim.ActionCount() == actions);
 }
+
+TEST_CASE("station purchases display the same five-action lock that dispatch enforces", "[audit][station][cooldown]") {
+  auto sim = Rich();
+  REQUIRE(ship::OpenTask(sim, "station", "tolme", true));
+  const auto fuelRow = [&]() {
+    const auto screen = ship::BuildTabScreen(sim, *ship::FindTab(sim.State(), sim.State().activeTab));
+    for (std::size_t c = 0; c < screen.panelRowIds.size(); ++c) {
+      for (std::size_t r = 0; r < screen.panelRowIds[c].size(); ++r) {
+        if (screen.panelRowIds[c][r] == "buy-fuel") { return screen.panelRows[c][r]; }
+      }
+    }
+    FAIL("Fuel purchase disappeared from station");
+    return ship::CommandRowView{};
+  };
+  REQUIRE(fuelRow().enabled);
+  const auto before = sim.ActionCount();
+  REQUIRE(ship::PressStationAction(sim, "buy-fuel"));
+  CHECK(sim.ActionCount() == before + 1);
+  CHECK(fuelRow().remaining == 5);
+  CHECK(fuelRow().displayCost == "COOLDOWN 5");
+  CHECK_FALSE(fuelRow().enabled);
+  CHECK_FALSE(ship::PressStationAction(sim, "buy-fuel"));
+  CHECK(sim.ActionCount() == before + 1);
+  // Rebuilding/reading a screen must never tick the action clock.
+  for (int read = 0; read < 12; ++read) { CHECK(fuelRow().remaining == 5); }
+  const char* others[] = {"buy-repair", "buy-medkit", "buy-canister", "buy-rations", "sell:ore"};
+  for (int i = 0; i < 5; ++i) {
+    REQUIRE(ship::PressStationAction(sim, others[i]));
+    CHECK(fuelRow().remaining == 4 - i);
+    CHECK(fuelRow().coolingDown == (i < 4));
+    CHECK(fuelRow().enabled == (i == 4));
+    if (i < 4) { CHECK_FALSE(ship::PressStationAction(sim, "buy-fuel")); }
+  }
+  REQUIRE(ship::PressStationAction(sim, "buy-fuel"));
+  CHECK(fuelRow().displayCost == "COOLDOWN 5");
+  CHECK(sim.ActionCount() == before + 7);
+}

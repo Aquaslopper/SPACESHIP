@@ -9,6 +9,7 @@
 // ============================================================================
 #include <catch2/catch_test_macros.hpp>
 
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -101,13 +102,15 @@ TEST_CASE("the engine is a 225-part machine on a 650x390 stage", "[ui][machine]"
   CHECK(fill->box.x == 24.0f);
 }
 
-TEST_CASE("the filter room is 44 parts and three live slots", "[ui][machine]") {
+TEST_CASE("the filter room retains its authored housing and three live slots", "[ui][machine]") {
   ship::Simulation sim = Fresh();
   const ship::TaskStage stage = ship::BuildFilterMachine(sim);
   CHECK(stage.id == "o2mach");
   CHECK(stage.width == 600.0f);
   CHECK(stage.height == 360.0f);
-  CHECK(stage.parts.size() == 44);
+  CHECK(CountClass(stage, "o2-can") == 0);  // empty slots must look empty
+  CHECK(CountClass(stage, "o2-airfill") == 1);
+  CHECK(CountClass(stage, "o2-airnotch") == 3);
   CHECK(stage.controls.size() == 3);
   CHECK(CountClass(stage, "o2-louvre") == 7);
   CHECK(CountClass(stage, "o2-flow") == 8);
@@ -576,4 +579,46 @@ TEST_CASE("maintenance clicks retain the rendered systems cooldown tier", "[ui][
   const auto key = ship::ActionCooldownKey(sim, "progress:maint");
   CHECK(ship::CooldownRemaining(sim, key) == 10);
   CHECK(sim.State().actionCooldowns.at(key).category == "systems");
+}
+
+
+TEST_CASE("filter illustration tracks clean air, slot charge and degradation", "[ui][machine][audit]") {
+  auto sim = Fresh();
+  const auto find = [](const ship::TaskStage& stage, const std::string& cls) -> ship::MachinePart {
+    for (const auto& part : stage.parts) { if (part.cls == cls) return part; }
+    FAIL("Missing filter illustration part: " + cls);
+    return {};
+  };
+  auto stage = ship::BuildFilterMachine(sim);
+  CHECK(find(stage, "o2-airfill").box.w == std::round(544 * sim.AirPercent() / 100));
+  CHECK(find(stage, "o2-airfill").tone == sim.AirSpec().tone);
+  CHECK(find(stage, "o2-airword").text == sim.AirSpec().word);
+  REQUIRE(sim.StartCanisterInstall(0));
+  REQUIRE(sim.StartCanisterInstall(1));
+  REQUIRE(sim.StartCanisterInstall(2));
+  sim.PerformAction("seating"); sim.PerformAction("seating");
+  REQUIRE(sim.BankReady());
+  REQUIRE(sim.StartFilterBank());
+  stage = ship::BuildFilterMachine(sim);
+  CHECK(CountClass(stage, "o2-can") == 3);
+  CHECK(CountClass(stage, "o2-streak") == 4);
+  CHECK(CountClass(stage, "o2-dust") == 0);
+  CHECK(find(stage, "o2-state").text == "ACTIVE");
+  CHECK(find(stage, "o2-airfill").tone == "#7f9161");
+  CHECK(find(stage, "o2-airfill").box.w == 544);
+  const auto life = sim.State().filterLife;
+  // Repaint is free: no life, air or action-clock advancement.
+  for (int i = 0; i < 20; ++i) { ship::BuildFilterMachine(sim); }
+  CHECK(sim.State().filterLife == life);
+  sim.PerformAction("advance filter");
+  stage = ship::BuildFilterMachine(sim);
+  const auto pct = std::round(sim.State().filterLife / sim.GameRules().life.lifeMax * 100);
+  CHECK(find(stage, "o2-fill").box.w == std::round(120 * pct / 100));
+  sim.FindStat("energy")->value = 0;
+  sim.MutableState().airHold = 0;
+  stage = ship::BuildFilterMachine(sim);
+  CHECK(find(stage, "o2-state").text == "NO POWER");
+  CHECK(find(stage, "o2-airfill").tone == sim.AirSpec().tone);
+  CHECK(CountClass(stage, "o2-streak") == 0);
+  CHECK(CountClass(stage, "o2-dust") == (4 - sim.AirStageIndex()) * 4);
 }

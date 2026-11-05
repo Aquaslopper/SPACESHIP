@@ -131,6 +131,10 @@ CommandRowView BuildCommandRow(const Simulation& sim, const std::string& label,
                                bool enabled, const std::string& cost,
                                const std::string& category, int occurrence);
 
+// Use the dispatcher's persistent key, not a second label-derived lock.
+void BindCommandCooldown(const Simulation& sim, CommandRowView& row,
+                         const std::string& key, const std::string& category);
+
 // ---------------------------------------------------------------------------
 //  The frame: header, panels, stage, band.
 // ---------------------------------------------------------------------------
@@ -168,6 +172,7 @@ struct MachinePart {
   std::string cls;
   Area box;
   std::string text;
+  std::string tone = "";  // authored CSS colour, when a part has a state-specific fill
 };
 
 // A live control drawn over the scenery: the O2 slot buttons.
