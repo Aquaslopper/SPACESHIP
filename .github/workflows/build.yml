@@ -43,7 +43,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure (Release)
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+        run: |
+          set -o pipefail
+          # The configure log is the one thing a failed run has to explain
+          # itself with: keep it, and surface its tail as an annotation.
+          if ! cmake -S . -B build -DCMAKE_BUILD_TYPE=Release 2>&1 | tee configure.log; then
+            cmake --version | head -1 | sed 's/^/::error::/'
+            tail -25 configure.log | sed 's/^/::error::/'
+            exit 1
+          fi
 
       - name: Build spaceship and spaceship_tests
         run: cmake --build build --config Release --parallel
@@ -124,7 +132,13 @@ jobs:
           node-version: '20'
 
       - name: Configure (Release)
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: |
+          set -o pipefail
+          if ! cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release 2>&1 | tee configure.log; then
+            cmake --version | head -1 | sed 's/^/::error::/'
+            tail -25 configure.log | sed 's/^/::error::/'
+            exit 1
+          fi
 
       - name: Build everything
         run: cmake --build build --parallel
