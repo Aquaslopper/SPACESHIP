@@ -75,12 +75,9 @@ struct Theme {
   // "rgba(139,111,78,0.13)" as the stylesheet writes it, for the raster hairlines.
   std::string Ink(float alpha) const;
 
-  // Text metrics. The reference has no zoom: it swaps to a larger face and one
-  // extra pixel of line height. The port keeps that habit but not its floor —
-  // Phase 9 raises the base face to 18 px, with four 5% steps above it
-  // (18, 19, 20, 21), and derives every line height from the face so nothing
-  // clips as the steps grow.
-  static constexpr float kFontFloorPx = 18.0f;
+  // The HTA base body face is 12px. Keep native text at that authored size;
+  // optional reading-size steps remain a port preference, not a larger default.
+  static constexpr float kFontFloorPx = 12.0f;
   static float FontPxForStep(int step);
   static float LineHeightForPx(float px);
   float FontPx() const {

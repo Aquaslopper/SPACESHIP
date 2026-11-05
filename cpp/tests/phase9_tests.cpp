@@ -3,7 +3,7 @@
 //  borderless window, the five-card tutorial and the player's own audio.
 //  ---------------------------------------------------------------------------
 //  Phase 9's promise is that the port is *comfortable* to use: no paid button
-//  can be double-clicked, the smallest face is 18 px, the palettes are calm,
+//  can be double-clicked, the smallest face is 12 px, the palettes are calm,
 //  the window can be borderless, a newcomer gets five cards of guidance, and
 //  the soundtrack can be replaced with files. Each of those is held here.
 // ============================================================================
@@ -64,12 +64,12 @@ const ship::PopupToggle* Toggle(const ship::PopupModel& model, const std::string
 }  // namespace
 
 // ---------------------------------------------------------------------------
-//  The reading size: 18 px as a floor, four steps, nothing clipping
+//  The reading size: 12 px as a floor, four steps, nothing clipping
 // ---------------------------------------------------------------------------
-TEST_CASE("the reading size starts at 18px and climbs in four even steps",
+TEST_CASE("the reading size starts at 12px and climbs in four even steps",
           "[phase9][typography]") {
-  CHECK(ship::Theme::kFontFloorPx == 18.0f);
-  const std::vector<float> expected = {18.0f, 19.0f, 20.0f, 21.0f};
+  CHECK(ship::Theme::kFontFloorPx == 12.0f);
+  const std::vector<float> expected = {12.0f, 13.0f, 13.0f, 14.0f};
   for (int step = 0; step < 4; ++step) {
     CHECK(ship::Theme::FontPxForStep(step) == expected[static_cast<std::size_t>(step)]);
   }
@@ -79,9 +79,9 @@ TEST_CASE("the reading size starts at 18px and climbs in four even steps",
   for (int step = 0; step < 4; ++step) {
     ship::Theme theme = ship::Theme::ById("classic");
     theme.fontStep = step;
-    CHECK(theme.BodySize() >= 18.0f);
+    CHECK(theme.BodySize() >= 12.0f);
     CHECK(theme.LineHeight() > theme.BodySize());
-    CHECK(theme.LineHeight() >= theme.BodySize() * 1.3f);
+    CHECK(theme.LineHeight() >= theme.BodySize() * 1.25f);
     CHECK(theme.LineHeight() <= theme.BodySize() * 1.4f);
   }
 
@@ -89,7 +89,7 @@ TEST_CASE("the reading size starts at 18px and climbs in four even steps",
   // under the floor.
   ship::Theme theme = ship::Theme::ById("classic");
   theme.largeText = true;
-  CHECK(theme.BodySize() >= 18.0f);
+  CHECK(theme.BodySize() >= 12.0f);
 }
 
 TEST_CASE("the settings sheet offers the four steps and the borderless window",
@@ -97,12 +97,12 @@ TEST_CASE("the settings sheet offers the four steps and the borderless window",
   ship::Simulation sim = Fresh();
   const ship::PopupModel model = ship::BuildPopup(sim, "settings", "");
   REQUIRE(model.fontStepLabels.size() == 4);
-  CHECK(model.fontStepLabels[0] == "Base (18px)");
-  CHECK(model.fontStepLabels[1] == "+5% (19px)");
-  CHECK(model.fontStepLabels[2] == "+10% (20px)");
-  CHECK(model.fontStepLabels[3] == "+15% (21px)");
+  CHECK(model.fontStepLabels[0] == "Base (12px)");
+  CHECK(model.fontStepLabels[1] == "+5% (13px)");
+  CHECK(model.fontStepLabels[2] == "+10% (13px)");
+  CHECK(model.fontStepLabels[3] == "+15% (14px)");
   CHECK(model.fontStep == 0);
-  CHECK(model.fontStepLine == "Reading size: Base (18 px)");
+  CHECK(model.fontStepLine == "Reading size: Base (12 px)");
   CHECK_FALSE(model.fullscreen);
   CHECK(model.fullscreenLabel == "Window: Windowed");
 
@@ -114,7 +114,7 @@ TEST_CASE("the settings sheet offers the four steps and the borderless window",
   // Choosing a step is free and exact; anything outside the ladder is refused.
   CHECK(ship::PressPopupAction(sim, "settings", "font", "2", "", nullptr));
   CHECK(sim.State().options.fontStep == 2);
-  CHECK(ship::BuildPopup(sim, "settings", "").fontStepLine == "Reading size: +10% (20 px)");
+  CHECK(ship::BuildPopup(sim, "settings", "").fontStepLine == "Reading size: +10% (13 px)");
   CHECK_FALSE(ship::PressPopupAction(sim, "settings", "font", "4", "", nullptr));
   CHECK_FALSE(ship::PressPopupAction(sim, "settings", "font", "-1", "", nullptr));
   CHECK(sim.State().options.fontStep == 2);

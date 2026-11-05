@@ -107,24 +107,24 @@ TEST_CASE("five themes, one palette, five inks", "[ui][theme]") {
 }
 
 TEST_CASE("theme flags drive type size and the compact deck", "[ui][theme]") {
-  // Phase 9's typography floor: 18 px, then four 5% steps, and a line box
+  // Phase 9's typography floor: 12 px, then four 5% steps, and a line box
   // derived from the face so nothing clips as the steps grow.
   ship::Theme theme = ship::Theme::ById("classic");
-  CHECK(ship::Theme::FontPxForStep(0) == 18.0f);
-  CHECK(ship::Theme::FontPxForStep(1) == 19.0f);
-  CHECK(ship::Theme::FontPxForStep(2) == 20.0f);
-  CHECK(ship::Theme::FontPxForStep(3) == 21.0f);
-  CHECK(ship::Theme::FontPxForStep(9) == 21.0f);    // clamped, never larger
-  CHECK(ship::Theme::FontPxForStep(-3) == 18.0f);   // and never below the floor
-  CHECK(theme.BodySize() == 18.0f);
-  CHECK(theme.LineHeight() == 24.0f);
+  CHECK(ship::Theme::FontPxForStep(0) == 12.0f);
+  CHECK(ship::Theme::FontPxForStep(1) == 13.0f);
+  CHECK(ship::Theme::FontPxForStep(2) == 13.0f);
+  CHECK(ship::Theme::FontPxForStep(3) == 14.0f);
+  CHECK(ship::Theme::FontPxForStep(9) == 14.0f);    // clamped, never larger
+  CHECK(ship::Theme::FontPxForStep(-3) == 12.0f);   // and never below the floor
+  CHECK(theme.BodySize() == 12.0f);
+  CHECK(theme.LineHeight() == 16.0f);
   CHECK_FALSE(theme.largeText);
   theme.fontStep = 2;
-  CHECK(theme.BodySize() == 20.0f);
-  CHECK(theme.LineHeight() == 26.0f);
+  CHECK(theme.BodySize() == 13.0f);
+  CHECK(theme.LineHeight() == 17.0f);
   theme.largeText = true;    // the old flag still adds its two pixels
-  CHECK(theme.BodySize() == 22.0f);
-  CHECK(theme.LineHeight() == 29.0f);
+  CHECK(theme.BodySize() == 15.0f);
+  CHECK(theme.LineHeight() == 20.0f);
 
   // rgba(107,83,56,0.13), trimmed the way the stylesheet writes it.
   CHECK(theme.Ink(0.13f) == "rgba(107,83,56,0.13)");
