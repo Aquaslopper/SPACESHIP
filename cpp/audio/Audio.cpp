@@ -6,6 +6,7 @@
 #include "core/JsNumber.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <filesystem>
 #include <cmath>
 #include <functional>

@@ -138,7 +138,32 @@ sudo apt install libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-d
 
 If they are missing, configure says so and skips the client; the simulation and
 its tests still build and run. On Windows, configure with
-`cmake -S . -B build -A x64` and build `build/Release/spaceship.exe`.
+`cmake -S . -B build -A x64` and build `build/Release/spaceship.exe`. That build
+is a windowed application (`/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup`), so a
+double-click opens the game and not a console, and the sources are compiled with
+`/utf-8` so the catalogue's `m³`, `O₂`, `×`, `—` and `→` survive the trip. If the
+current directory has no `assets/data`, the game moves to the directory the
+executable lives in before it loads anything, which is what makes a copied
+folder work from Explorer.
+
+### Download the Windows build
+
+Every push, pull request and manual dispatch runs
+`.github/workflows/build.yml`. The `windows-exe` job builds `spaceship.exe` on
+`windows-latest`, runs the 168-case suite, then uploads a portable folder as the
+**`Spaceship-Windows-x64`** artifact:
+
+```
+Spaceship/
+  spaceship.exe
+  assets/{data,art,fonts,audio}
+  runtime/saves/
+  README.md  PARITY.md  SPAM_AUDIT.md
+```
+
+Unzip it anywhere and double-click `spaceship.exe`. The `linux-parity` job links
+the same tree against real X11/OpenGL/ALSA and runs every CTest gate, including
+the differential voyages against `Spaceship.hta`.
 
 ### Targets
 

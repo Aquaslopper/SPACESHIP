@@ -30,6 +30,26 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
+# ---------------------------------------------------------------------------
+# Windows / MSVC
+# ---------------------------------------------------------------------------
+# The catalogue is full of UTF-8 (m³, O₂, ×, —, →), and MSVC reads source files
+# in the local code page unless told otherwise: /utf-8 sets both the source and
+# the execution charset, which is what stops C4819 and the mojibake that comes
+# with it. It is applied to every C++ target, dependencies included, because the
+# narrow string literals have to mean the same thing all the way down.
+#
+# NOMINMAX keeps <windows.h> from defining min/max as macros (which would break
+# every std::min/std::max in the port), and WIN32_LEAN_AND_MEAN drops the
+# sockets/RPC/COM half of <windows.h> so nothing it declares can collide with a
+# raylib symbol.
+if(MSVC)
+  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/utf-8>)
+endif()
+if(WIN32)
+  add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
+endif()
+
 option(SPACESHIP_BUILD_GUI   "Build the Raylib + Dear ImGui client" ON)
 option(SPACESHIP_BUILD_TESTS "Build the CTest suite"               ON)
 option(SPACESHIP_DATA_GATE   "Verify assets/data against Spaceship.hta via node" ON)
@@ -200,7 +220,17 @@ if(SPACESHIP_GUI)
     cpp/ui/Draw.cpp)
 
   target_link_libraries(spaceship PRIVATE spaceship_core spaceship_imgui raylib)
-  set_target_properties(spaceship PROPERTIES WIN32_EXECUTABLE OFF)
+
+  # A double-clicked spaceship.exe must open the game and nothing else. On MSVC
+  # that means the Windows subsystem; because the entry point is still main(),
+  # the CRT's mainCRTStartup is named explicitly, which is the pairing MSVC
+  # documents for a GUI application written with main(argc, argv).
+  if(WIN32 AND MSVC)
+    set_target_properties(spaceship PROPERTIES WIN32_EXECUTABLE ON)
+    target_link_options(spaceship PRIVATE
+      /SUBSYSTEM:WINDOWS
+      /ENTRY:mainCRTStartup)
+  endif()
 
   add_custom_command(TARGET spaceship POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory

@@ -174,9 +174,9 @@ TEST_CASE("the perspective raster bunches toward the far edge", "[nav]") {
 
   // Zoomed in, the rungs thin out and the fan widens with them.
   while (sim.Map().zoom < 2.0) { sim.ZoomMap(1); }
-  const ship::NavRaster near = ship::BuildNavRaster(sim);
-  CHECK(near.rungs.size() == 5);  // round(4.5) is 5, as Math.round is
-  CHECK(near.lines.size() == 13);
+  const ship::NavRaster nearby = ship::BuildNavRaster(sim);
+  CHECK(nearby.rungs.size() == 5);  // round(4.5) is 5, as Math.round is
+  CHECK(nearby.lines.size() == 13);
 }
 
 // ---------------------------------------------------------------------------
@@ -376,10 +376,10 @@ TEST_CASE("a reachable target reads out distance, transit and cost", "[nav]") {
   // An out-of-range contact is named for free and refused its numbers.
   sim.SetLayer("system");
   REQUIRE(sim.SelectTarget("vance-star"));  // a local body in another system
-  const ship::NavScreenModel far = ship::BuildNavScreen(sim);
-  CHECK(HasText(*Panel(far.screen.left, "nav-status"), "Out of sensor range"));
-  CHECK(HasText(*Panel(far.screen.under, "nav-dist"), ship::NavOutOfRange()));
-  CHECK(far.courseNote == "This contact is outside the local sensor range.");
+  const ship::NavScreenModel distant = ship::BuildNavScreen(sim);
+  CHECK(HasText(*Panel(distant.screen.left, "nav-status"), "Out of sensor range"));
+  CHECK(HasText(*Panel(distant.screen.under, "nav-dist"), ship::NavOutOfRange()));
+  CHECK(distant.courseNote == "This contact is outside the local sensor range.");
 
   // A region is a chart container, not a destination: it offers the sector.
   sim.SetLayer("galaxy");

@@ -5,3 +5,6 @@
 /runtime/saves/*.json*
 runtime/saves/*.json
 runtime/saves/*.txt
+
+# the Windows distribution the CI workflow assembles
+/dist/

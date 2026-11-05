@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <algorithm>
 #include <vector>
 
 #include "core/JsNumber.h"

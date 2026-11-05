@@ -36,6 +36,28 @@ namespace audio = ship::audio;
 constexpr int kDefaultWidth = 1440;
 constexpr int kDefaultHeight = 940;
 
+// ---------------------------------------------------------------------------
+//  Where "here" is.
+// ---------------------------------------------------------------------------
+//  A double-clicked executable is handed whatever working directory Explorer or
+//  the shell happened to be in - often C:\Windows\System32 - so ./assets and
+//  ./runtime are nowhere to be found even though they sit beside the exe. When
+//  the current directory has no catalogue, move to the directory the executable
+//  itself lives in, which is where the distribution keeps assets/ and runtime/.
+//  Raylib answers this without a window, so it can happen before anything loads.
+void EnsureWorkingDirectory() {
+  std::error_code ec;
+  if (std::filesystem::exists("assets/data/manifest.json", ec)) { return; }
+  const char* here = GetApplicationDirectory();
+  if (here == nullptr || here[0] == '\0') { return; }
+  if (!std::filesystem::exists(std::filesystem::path(here) / "assets" / "data" /
+                                   "manifest.json",
+                               ec)) {
+    return;  // a build tree: the catalogue is found by other means below
+  }
+  ChangeDirectory(here);
+}
+
 std::filesystem::path AssetDirBesideExecutable(const char* argv0) {
   std::error_code ec;
   std::filesystem::path exe = std::filesystem::weakly_canonical(argv0, ec);
@@ -230,11 +252,23 @@ class AudioDevice {
 int main(int argc, char** argv) {
   (void)argc;
 
+  // ---- working directory -------------------------------------------------
+  // Before a single asset is touched: if this is the distribution, stand in it.
+  EnsureWorkingDirectory();
+
   // ---- catalogue ---------------------------------------------------------
-  std::filesystem::path assets = AssetDirBesideExecutable(argv[0]);
+  std::filesystem::path assets("assets");
+  if (!std::filesystem::exists(assets / "data" / "manifest.json")) {
+    assets = AssetDirBesideExecutable(argv[0]);
+  }
   if (assets.empty() || !std::filesystem::exists(assets / "data" / "manifest.json")) {
     assets = ship::Catalog::DefaultAssetDir();
   }
+
+  // The three save slots live beside the assets; a fresh unzip has runtime/ but
+  // a build tree may not, and a missing folder is not worth a failed save.
+  std::error_code dirEc;
+  std::filesystem::create_directories("runtime/saves", dirEc);
 
   ship::Catalog catalog;
   try {

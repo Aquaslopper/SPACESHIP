@@ -28,10 +28,13 @@ add_candidates() {
   local base="$1"
   [ -d "$base" ] || return 0
   [ -z "$found_raylib" ]   && [ -f "$base/raylib-6.0/src/raylib.h" ] && found_raylib="$base/raylib-6.0/src"
+  [ -z "$found_raylib" ]   && [ -f "$base/raylib-src/src/raylib.h" ] && found_raylib="$base/raylib-src/src"
+  [ -z "$found_raylib" ]   && [ -f "$base/raylib/src/raylib.h" ] && found_raylib="$base/raylib/src"
   [ -z "$found_raylib" ]   && [ -f "$base/src/raylib.h" ] && found_raylib="$base/src"
   [ -z "$found_imgui" ]    && [ -f "$base/imgui-1.92.7/imgui.h" ] && found_imgui="$base/imgui-1.92.7"
   [ -z "$found_imgui" ]    && [ -f "$base/imgui/imgui.h" ] && found_imgui="$base/imgui"
   [ -z "$found_imgui" ]    && [ -f "$base/imgui-src/imgui.h" ] && found_imgui="$base/imgui-src"
+  [ -z "$found_imgui" ]    && [ -f "$base/imgui/imgui.h" ] && found_imgui="$base/imgui"
   [ -z "$found_rlimgui" ]  && [ -f "$base/rlImGui-Raylib_6_0/rlImGui.h" ] && found_rlimgui="$base/rlImGui-Raylib_6_0"
   [ -z "$found_rlimgui" ]  && [ -f "$base/rlImGui/rlImGui.h" ] && found_rlimgui="$base/rlImGui"
   [ -z "$found_rlimgui" ]  && [ -f "$base/rlImGui-src/rlImGui.h" ] && found_rlimgui="$base/rlImGui-src"

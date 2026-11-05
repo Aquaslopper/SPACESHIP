@@ -16,6 +16,10 @@ namespace ship {
 
 namespace {
 
+// pi, written out. <cmath> only promises kPi on some platforms (glibc defines
+// it, MSVC does not), and the port must build with both.
+constexpr double kPi = 3.14159265358979323846;
+
 std::string Num(double value) { return js::NumToString(value); }
 
 MachinePart Part(const std::string& cls, float x, float y, float w, float h,
@@ -90,14 +94,14 @@ TaskStage BuildEngineMachine(const Simulation& sim) {
   parts.push_back(Part("mach-ring", 124, 98, 164, 164));
   parts.push_back(Part("mach-ring2", 148, 122, 118, 118));
   for (int k = 0; k < 24; ++k) {  // inner encoder ring
-    const double a = k * M_PI / 12.0;
+    const double a = k * kPi / 12.0;
     parts.push_back(Part("mach-tick",
                          Round(cx + 52.0f * static_cast<float>(std::cos(a))) - 2.0f,
                          Round(cy + 52.0f * static_cast<float>(std::sin(a))) - 2.0f, 3,
                          3));
   }
   for (int k = 0; k < 12; ++k) {  // bolts on the band
-    const double a = k * M_PI / 6.0;
+    const double a = k * kPi / 6.0;
     parts.push_back(Part("mach-bolt",
                          Round(cx + 72.0f * static_cast<float>(std::cos(a))) - 4.0f,
                          Round(cy + 72.0f * static_cast<float>(std::sin(a))) - 4.0f, 8,
@@ -116,7 +120,7 @@ TaskStage BuildEngineMachine(const Simulation& sim) {
   parts.push_back(Part("mach-spoke", 306, 151, 80, 2));
   parts.push_back(Part("mach-spoke", 345, 112, 2, 80));
   for (int k = 0; k < 8; ++k) {  // blades
-    const double a = k * M_PI / 4.0 + M_PI / 8.0;
+    const double a = k * kPi / 4.0 + kPi / 8.0;
     parts.push_back(Part("mach-tick",
                          Round(346.0f + 30.0f * static_cast<float>(std::cos(a))) - 3.0f,
                          Round(152.0f + 30.0f * static_cast<float>(std::sin(a))) - 3.0f,
@@ -129,7 +133,7 @@ TaskStage BuildEngineMachine(const Simulation& sim) {
   parts.push_back(Part("mach-spoke", 318, 233, 56, 2));
   parts.push_back(Part("mach-spoke", 345, 206, 2, 56));
   for (int k = 0; k < 6; ++k) {
-    const double a = k * M_PI / 3.0;
+    const double a = k * kPi / 3.0;
     parts.push_back(Part("mach-tick",
                          Round(346.0f + 20.0f * static_cast<float>(std::cos(a))) - 2.0f,
                          Round(234.0f + 20.0f * static_cast<float>(std::sin(a))) - 2.0f,
@@ -157,12 +161,12 @@ TaskStage BuildEngineMachine(const Simulation& sim) {
     parts.push_back(Part("mach-mini", 22, p + 5.0f, 88, 10, gaugeName[k]));
     parts.push_back(Part("mach-dial", gx - 26.0f, gy - 26.0f, 50, 50));
     for (int i2 = 0; i2 < 11; ++i2) {  // 270 degree tick sweep
-      const double a = (135 + i2 * 27) * M_PI / 180.0;
+      const double a = (135 + i2 * 27) * kPi / 180.0;
       parts.push_back(Part(
           "mach-tick", Round(gx + 21.0f * static_cast<float>(std::cos(a))) - 1.0f,
           Round(gy + 21.0f * static_cast<float>(std::sin(a))) - 1.0f, 2, 2));
     }
-    const double a = (135 + gaugeValue[k] * 2.7) * M_PI / 180.0;
+    const double a = (135 + gaugeValue[k] * 2.7) * kPi / 180.0;
     for (int i2 = 0; i2 < 3; ++i2) {  // the needle, as three dots
       const float r = 7.0f + i2 * 5.0f;
       parts.push_back(Part(

@@ -3,6 +3,7 @@
 // ============================================================================
 #include "ui/IdleScreen.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include "core/JsNumber.h"

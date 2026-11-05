@@ -15,6 +15,8 @@
 // ============================================================================
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
+
 #include "core/JsNumber.h"
 #include "core/Simulation.h"
 

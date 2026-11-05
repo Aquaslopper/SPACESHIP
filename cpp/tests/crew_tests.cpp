@@ -9,6 +9,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
+#include <algorithm>
 #include <vector>
 
 #include "core/Simulation.h"
