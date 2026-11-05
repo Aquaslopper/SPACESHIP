@@ -1188,6 +1188,35 @@ void ShellView::PaintHero(const Vignette& vignette, const Area& box) {
 //  1672x941 art, five free commands down the left, and one dialog beside them.
 //  Nothing here can advance the clock: the menu is not a place in the voyage.
 // ============================================================================
+void ShellView::OpenPopup(const std::string& key) {
+  if (key.empty()) { return; }
+  popupKey_ = key;
+  popupScroll_ = 0.0f;
+  popupMaxScroll_ = 0.0f;
+  popupHits_.clear();
+  pendingConfirm_.clear();
+  pendingAction_.clear();
+  ++popupCount_;
+}
+
+void ShellView::ClosePopup() {
+  popupKey_.clear();
+  popupScroll_ = 0.0f;
+  popupMaxScroll_ = 0.0f;
+  popupHits_.clear();
+  pendingConfirm_.clear();
+  pendingAction_.clear();
+  confirmNewVoyage_ = false;
+}
+
+void ShellView::HideTitle() {
+  titleActive_ = false;
+  titleConfirm_ = false;
+  titlePanel_ = TitlePanel::None;
+  titleHits_.clear();
+  titleMessage_.clear();
+}
+
 void ShellView::ShowTitle(bool fromVoyage) {
   titleActive_ = true;
   fromVoyage_ = fromVoyage;
