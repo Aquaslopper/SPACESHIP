@@ -12,10 +12,10 @@ namespace {
 
 using Json = nlohmann::json;
 
-const Json& Field(const Json& object, const char* key, const std::string& where) {
+const Json& Field(const Json& object, const char* key, const char* where) {
   auto it = object.find(key);
   if (it == object.end()) {
-    throw CatalogError(where + ": missing field '" + key + "'");
+    throw CatalogError(std::string(where) + ": missing field '" + key + "'");
   }
   return *it;
 }
