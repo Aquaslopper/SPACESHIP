@@ -24,6 +24,7 @@
 #include "core/Simulation.h"
 #include "data/Catalog.h"
 #include "ui/Draw.h"
+#include "ui/PointerOwnership.h"
 #include "ui/Palette.h"
 #include "ui/Theme.h"
 
@@ -390,6 +391,7 @@ int main(int argc, char** argv) {
     ToggleBorderlessWindowed();
   }
 
+  ship::PointerOwnership leftPointer, rightPointer;
   while (!WindowShouldClose() && !shell.QuitRequested()) {
     if (IsKeyPressed(KEY_ESCAPE)) { shell.Escape(sim); }
     BeginDrawing();
@@ -397,13 +399,17 @@ int main(int argc, char** argv) {
     // raylib drawing frame, matching its documented render-loop contract.
     rlImGuiBegin();
 
-    // Every game control is hit-tested by ShellView in raylib coordinates.
-    // Do not gate these clicks on ImGui::WantCaptureMouse: the full-screen
-    // ImGui draw-list host can report capture despite owning no game controls.
-    // ImGui text fields still receive the event when no shell hit matches.
+    // Dear ImGui owns a complete press/release gesture. A close button may
+    // remove its window before release, but that release must not hit the ship.
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+      leftPointer.Press(ImGui::GetIO().WantCaptureMouse);
+    }
+    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
+      rightPointer.Press(ImGui::GetIO().WantCaptureMouse);
+    }
     const Vector2 pointer = GetMousePosition();
     shell.Move(pointer.x, pointer.y);
-    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && !leftPointer.UiOwned()) {
       const Vector2 delta = GetMouseDelta();
       shell.Drag(sim, pointer.x, pointer.y, delta.x, delta.y, true,
                  IsMouseButtonPressed(MOUSE_BUTTON_LEFT));
@@ -412,12 +418,16 @@ int main(int argc, char** argv) {
     if (wheel != 0.0f) { shell.Scroll(pointer.x, pointer.y, wheel); }
     if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
       const Vector2 mouse = GetMousePosition();
-      shell.Click(sim, mouse.x, mouse.y, ship::HitButton::Left,
-                  static_cast<double>(GetTime()) * 1000.0);
+      if (!leftPointer.Release()) {
+        shell.Click(sim, mouse.x, mouse.y, ship::HitButton::Left,
+                    static_cast<double>(GetTime()) * 1000.0);
+      }
     } else if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT)) {
       const Vector2 mouse = GetMousePosition();
-      shell.Click(sim, mouse.x, mouse.y, ship::HitButton::Right,
-                  static_cast<double>(GetTime()) * 1000.0);
+      if (!rightPointer.Release()) {
+        shell.Click(sim, mouse.x, mouse.y, ship::HitButton::Right,
+                    static_cast<double>(GetTime()) * 1000.0);
+      }
     }
 
     // Apply settings from either the title sheet or the in-game Options panel

@@ -21,6 +21,12 @@ Short entry point for current issues. Detailed evidence, history, and handoff no
 | UI-009 | IN PROGRESS | Navigation / map input | Fixed accumulated-pan-as-delta acceleration; >4px drag suppresses selection; viewport coordinates and ImGui input ownership handled. Real pointer testing blocked by missing graphical runtime. | [2026-11-05 input/layout investigation](damagecontrol_report.md#bughunt-2026-11-05-input-layout) |
 | UI-010 | IN PROGRESS | Floating windows / options / briefings | Independent nonmodal ImGui windows, keyed replacement, scrollable full bodies and source briefing content patched. Collection/model/syntax tests pass; real dragging, stacking, confirmations and reachability remain unverified. | [2026-11-05 input/layout investigation](damagecontrol_report.md#bughunt-2026-11-05-input-layout) |
 
+
+| UI-011 | IN PROGRESS | Floating-window close input | User reproduced click-through on close. Press/release ownership latch patched; actual ImGui CPU close-widget probe passes. Updated native client retest required. | [user feedback repair](damagecontrol_report.md#bughunt-2026-11-05-user-feedback) |
+| UI-012 | IN PROGRESS | Sidebar / Vessel / footer | Restored ship name/class/registry, measured/clipped sidebar text and pinned-only footer rendering. Source/model tests pass; visual retest required. | [user feedback repair](damagecontrol_report.md#bughunt-2026-11-05-user-feedback) |
+| UI-013 | IN PROGRESS | Main menu / sheets | Visible five-command bottom strip, literal title colours, centred scrollable sheets and shared settings controls replace invented column/invisible menu. Rendering unverified here. | [user feedback repair](damagecontrol_report.md#bughunt-2026-11-05-user-feedback) |
+| UI-014 | IN PROGRESS | Crew Quarters | Removed duplicate roster/payroll overlap; restored job selector, Talk, order notes, traits and content-following assignments; removed duplicate commit lock. Narrow viewport/visual verification outstanding. | [user feedback repair](damagecontrol_report.md#bughunt-2026-11-05-user-feedback) |
+
 ## Status key
 
 - **OPEN** — evidence indicates a defect or parity gap remains; fix or verification is still needed.
@@ -33,3 +39,5 @@ IDs are stable; do not reuse them. When an issue is closed, retain its row and c
 Latest source-audit corrections and partial patches: [2026-11-05 input/layout investigation](damagecontrol_report.md#bughunt-2026-11-05-input-layout). No visual parity sign-off.
 
 Continuation: [independent floating windows, settings/audio and source-theme test corrections](damagecontrol_report.md#bughunt-2026-11-05-floating-windows). 206/206 tests pass; native graphical runtime unavailable, no visual/interaction sign-off.
+
+Latest: [user-observed regression repairs](damagecontrol_report.md#bughunt-2026-11-05-user-feedback). 211/211 tests pass (including CPU ImGui input probe). User confirmed dragging/Navigation improvements on preceding build; new graphical changes need user retest.

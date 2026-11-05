@@ -16,6 +16,7 @@
 #pragma once
 
 #include <string>
+#include <functional>
 #include <vector>
 
 #include "core/Simulation.h"
@@ -108,12 +109,16 @@ struct SideHit {
   bool header = false;
   bool dim = false;
   bool stackValue = false;
+  bool pinned = false;
+  Area paintBox;
+  float valueOffset = 0.0f;
 };
 
 std::vector<SideHit> SideHits(const Simulation& sim, const Area& sidepanel,
                               const Area& foot, float lineHeight,
                               float scrollY = 0.0f,
-                              float* totalContentHeight = nullptr);
+                              float* totalContentHeight = nullptr,
+                              const std::function<float(const std::string&, float)>& measure = {});
 
 // The pinned foot.
 struct FootButton {

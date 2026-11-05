@@ -20,6 +20,7 @@
 #include "ui/Describe.h"
 #include "ui/Fx.h"
 #include "ui/FloatingPanels.h"
+#include "ui/PointerOwnership.h"
 #include "ui/TitleScreen.h"
 #include "ui/IdleScreen.h"
 #include "ui/Layout.h"
@@ -450,7 +451,10 @@ TEST_CASE("six blocks, five of them fold", "[ui][shell]") {
   CHECK(blocks[5].open);           // the glance never folds
   for (int i = 0; i < 5; ++i) { CHECK_FALSE(blocks[i].open); }
 
-  CHECK(blocks[0].rows.size() == 11);
+  CHECK(blocks[0].rows.size() == 13);
+  CHECK(blocks[0].rows[0].key == sim.Ship().Get("name"));
+  CHECK(blocks[0].rows[1].key == sim.Ship().Get("className"));
+  CHECK(blocks[0].rows[1].value == "Registry " + sim.Ship().Get("registry"));
   CHECK(blocks[0].rows.back().key == "Rooms");
   CHECK(blocks[0].rows.back().value == "21 aboard");
   CHECK(blocks[1].rows.size() == 8);
@@ -1115,4 +1119,48 @@ TEST_CASE("audio choices are available through settings and title without action
   CHECK(settings.toggles[0].help == "A quiet, synthesized shipboard theme. Audio begins after a click.");
   CHECK(settings.toggles[4].heading == "Confirmations");
   CHECK(sim.ActionCount() == before);
+}
+
+TEST_CASE("closing a UI window retains ownership through mouse release", "[ui][input]") {
+  ship::PointerOwnership gesture;
+  gesture.Press(true);
+  // Window may be removed now; the ownership must outlive its hover state.
+  CHECK(gesture.UiOwned());
+  CHECK(gesture.Release());
+  CHECK_FALSE(gesture.UiOwned());
+  gesture.Press(false);
+  CHECK_FALSE(gesture.Release());
+}
+
+TEST_CASE("classic colours are literal HTA CSS roles, including title sheets", "[ui][theme]") {
+  const auto p = ship::Theme::ById("classic").palette;
+  const ship::Rgb actual[] = {p.white,p.panel,p.panel2,p.panel3,p.border,p.borderDark,
+    p.coffee,p.coffeeDark,p.coffeeLight,p.ink,p.muted,p.terracotta,p.sage,p.amber,
+    p.titleBackground,p.titleDialog,p.titleBorder,p.titleInk};
+  const unsigned expected[] = {0xffffff,0xfaf7f2,0xf4efe6,0xefe8dc,0xe4dbcb,0xcbb89c,
+    0x8c6f4e,0x6b5338,0xb89b76,0x3b3630,0x8a7f72,0xb05a42,0x7f9161,0xc08a3e,
+    0xd8c4a6,0xf5ead8,0x8e7757,0x443528};
+  for (std::size_t i = 0; i < 18; ++i) {
+    CHECK(static_cast<unsigned>((actual[i].r << 16) | (actual[i].g << 8) | actual[i].b) == expected[i]);
+  }
+}
+
+TEST_CASE("sidebar paint origins survive clipping and footer hits stay pinned", "[ui][shell]") {
+  auto sim = Fresh();
+  sim.MutableState().spOpen["vessel"] = true;
+  const ship::Area sidebar{0,36,165,300}, foot{0,336,165,96};
+  float total = 0;
+  const auto hits = ship::SideHits(sim, sidebar, foot, 24, 30, &total,
+      [](const std::string& s, float w) { return std::max(1.0f, std::ceil(s.size() * 10.0f / w)) * 24.0f; });
+  CHECK(total > sidebar.h);
+  int pinned = 0;
+  bool partial = false;
+  for (const auto& hit : hits) {
+    if (hit.pinned) { ++pinned; CHECK(hit.box.y >= foot.y); continue; }
+    CHECK(hit.box.y >= sidebar.y);
+    CHECK(hit.box.Bottom() <= sidebar.Bottom());
+    if (hit.paintBox.y < hit.box.y) { partial = true; }
+  }
+  CHECK(pinned == 6);
+  CHECK(partial);
 }

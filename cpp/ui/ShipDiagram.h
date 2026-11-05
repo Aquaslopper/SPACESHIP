@@ -14,6 +14,7 @@
 #pragma once
 
 #include <string>
+#include <map>
 #include <vector>
 
 #include "core/Simulation.h"
@@ -48,6 +49,7 @@ struct DiagramModel {
   Area corridorLabelBox;
   Area conduit;
   std::vector<Room> rooms;
+  std::map<std::string, std::string> roomAccents;
   std::vector<Area> dividers;
   std::vector<DiagramCrew> crew;
 };

@@ -132,6 +132,7 @@ class ShellView {
   void PaintPopup(Simulation& sim);
   void PaintHero(const Vignette& vignette, const Area& box);
   void PaintTitle(Simulation& sim);
+  void PaintSettingsControls(Simulation& sim, const PopupModel& model);
   void PaintLoss(Simulation& sim);
   void PaintWikiSearch(const Area& box);
   void PaintNavScreen(Simulation& sim);

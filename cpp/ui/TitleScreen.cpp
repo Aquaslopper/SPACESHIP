@@ -103,10 +103,9 @@ TitleModel BuildTitleScreen(const Simulation& sim, bool fromVoyage, TitlePanel p
   };
   const std::vector<Command> commands = {
       {"new-voyage", "NEW VOYAGE", true},
-      {"load", "LOAD VOYAGE", AnySlotWritten(sim, saveDir) || !sim.State().tabs.empty()},
+      {"load", "LOAD VOYAGE", true},
       {"options", "OPTIONS", true},
       {"guide", "HOW TO PLAY", true},
-      {"tutorial", "TUTORIAL", true},
       {"resume", TitleButtonLabel(fromVoyage), true},
   };
   for (const Command& command : commands) {

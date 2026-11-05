@@ -260,6 +260,10 @@ if(SPACESHIP_BUILD_TESTS)
            COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/check-gui-syntax.sh"
            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
   set_tests_properties(ui.gui-syntax PROPERTIES SKIP_RETURN_CODE 77)
+  add_test(NAME ui.imgui-close-input
+           COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/check-imgui-input.sh"
+           WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+  set_tests_properties(ui.imgui-close-input PROPERTIES SKIP_RETURN_CODE 77)
 
   # The data gate: the committed catalogue must still match the HTA. This is
   # the test that stops a content edit shipping without its JSON.

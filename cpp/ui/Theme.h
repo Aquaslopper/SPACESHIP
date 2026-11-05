@@ -40,6 +40,7 @@ struct Palette {
   Rgb terracotta;
   Rgb sage;
   Rgb amber;
+  Rgb titleBackground, titleDialog, titleBorder, titleInk;
 };
 
 // One of THEMES: a name, a label for the settings screen, and the ink that the

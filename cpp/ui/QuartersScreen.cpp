@@ -184,6 +184,8 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
   stand.Field("Station", sim.CrewWhere(hand));
   stand.Field("Doing", sim.SimActivityOf(hand));
 
+  stand.Dim(hand.traits);
+
   // --- the pad ------------------------------------------------------------
   const bool out = sim.OrdersRunning();
   const Task* busy = sim.CrewBusy(hand);
@@ -337,10 +339,9 @@ bool PressQuartersActionRaw(Simulation& sim, const std::string& action,
 //  or from this harness. Free reads spend nothing and therefore lock nothing.
 // ============================================================================
 bool PressQuartersAction(Simulation& sim, const std::string& action, const std::string& arg) {
-  return CommitActionButton(
-      sim, ActionCooldownKey(sim, "press:quarters:" + action + ":" + arg),
-      ActionCooldownCategory(action + " " + arg),
-      [&]() { return PressQuartersActionRaw(sim, action, arg); });
+  // select/job/order/talk are free; commit already owns the progress lock.
+  // Wrapping it again creates an invisible lock and can block acknowledgment.
+  return PressQuartersActionRaw(sim, action, arg);
 }
 
 }  // namespace ship
