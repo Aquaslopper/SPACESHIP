@@ -380,21 +380,20 @@ int main(int argc, char** argv) {
   }
 
   while (!WindowShouldClose()) {
-    // Process the current raylib events and begin ImGui before deciding whether
-    // its actual text-entry windows own this frame's pointer.
+    BeginDrawing();
+    // rlImGui's event processing and frame setup happen inside the active
+    // raylib drawing frame, matching its documented render-loop contract.
     rlImGuiBegin();
 
-    // The shell owns hit-testing for its raylib-painted controls. Its ImGui root
-    // window is intentionally input-transparent; only real ImGui fields such
-    // as the handbook search can claim the pointer. The title has no ImGui
-    // widgets at all, so never let stale capture state swallow a menu click.
-    const bool overUi = ImGui::GetIO().WantCaptureMouse;
-    const bool acceptShellClick = shell.TitleActive() || !overUi;
-    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && acceptShellClick) {
+    // Every game control is hit-tested by ShellView in raylib coordinates.
+    // Do not gate these clicks on ImGui::WantCaptureMouse: the full-screen
+    // ImGui draw-list host can report capture despite owning no game controls.
+    // ImGui text fields still receive the event when no shell hit matches.
+    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
       const Vector2 mouse = GetMousePosition();
       shell.Click(sim, mouse.x, mouse.y, ship::HitButton::Left,
                   static_cast<double>(GetTime()) * 1000.0);
-    } else if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT) && acceptShellClick) {
+    } else if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT)) {
       const Vector2 mouse = GetMousePosition();
       shell.Click(sim, mouse.x, mouse.y, ship::HitButton::Right,
                   static_cast<double>(GetTime()) * 1000.0);
@@ -431,7 +430,6 @@ int main(int argc, char** argv) {
     audio.Configure(sim.State().options);
     audio.Tick(sim);
 
-    BeginDrawing();
     shell.Draw(sim, static_cast<double>(GetTime()) * 1000.0);
     rlImGuiEnd();
     EndDrawing();
