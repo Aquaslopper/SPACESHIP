@@ -4,6 +4,7 @@
 #include "ui/StationScreen.h"
 
 #include "core/JsNumber.h"
+#include "ui/Widgets.h"
 #include "ui/Shell.h"
 
 #include <algorithm>
@@ -291,7 +292,8 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   return model;
 }
 
-bool PressStationAction(Simulation& sim, const std::string& action,
+namespace {
+bool PressStationActionRaw(Simulation& sim, const std::string& action,
                         const std::string& arg) {
   // The economy names its fixed-price stores; the station names the verbs.
   if (action == "buy-fuel") return sim.BuySupply("fuel-cell");
@@ -329,6 +331,23 @@ bool PressStationAction(Simulation& sim, const std::string& action,
   if (action == "undock") return sim.Undock();
   (void)arg;
   return false;
+}
+
+}  // namespace
+
+// ============================================================================
+//  The press, with the anti-spam lock around it (Phase 9).
+//  ---------------------------------------------------------------------------
+//  One control is one control. The first press spends the action and starts the
+//  tier's lock in ACTION_COOLDOWN_RULES; a second press of the same button
+//  before another action resolves is refused, whether it comes from the window
+//  or from this harness. Free reads spend nothing and therefore lock nothing.
+// ============================================================================
+bool PressStationAction(Simulation& sim, const std::string& action, const std::string& arg) {
+  return CommitActionButton(
+      sim, ActionCooldownKey(sim, "press:station:" + action + ":" + arg),
+      ActionCooldownCategory(action + " " + arg),
+      [&]() { return PressStationActionRaw(sim, action, arg); });
 }
 
 }  // namespace ship

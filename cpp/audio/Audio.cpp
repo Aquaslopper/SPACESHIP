@@ -6,6 +6,7 @@
 #include "core/JsNumber.h"
 
 #include <algorithm>
+#include <filesystem>
 #include <cmath>
 #include <functional>
 
@@ -260,6 +261,35 @@ Buffer RenderCue(const std::string& kind, int sampleRate) {
                 [&kind](double t) { return CueSampleAt(kind, t); });
 }
 
+const std::vector<std::string>& SfxFileNames(const std::string& kind) {
+  // The names the README promises, then the port's own aliases, so a file
+  // dropped in by hand is found even if it is named after the synth cue.
+  static const std::vector<std::string> click = {"click.wav"};
+  static const std::vector<std::string> alert = {"alert.wav", "ping.wav"};
+  static const std::vector<std::string> action = {"action.wav", "thrust.wav"};
+  static const std::vector<std::string> complete = {"complete.wav", "arrive.wav",
+                                                    "chime.wav"};
+  static const std::vector<std::string> none;
+  if (kind == "click") { return click; }
+  if (kind == "ping") { return alert; }
+  if (kind == "thrust") { return action; }
+  if (kind == "chime") { return complete; }
+  return none;
+}
+
+namespace {
+
+bool HasMusicSuffix(const std::string& name) {
+  const auto ends = [&name](const char* suffix) {
+    const std::string tail(suffix);
+    return name.size() >= tail.size() &&
+           name.compare(name.size() - tail.size(), tail.size(), tail) == 0;
+  };
+  return ends(".ogg") || ends(".mp3") || ends(".wav");
+}
+
+}  // namespace
+
 std::vector<unsigned char> ToWav(const Buffer& buffer) {
   const std::uint32_t rate = static_cast<std::uint32_t>(buffer.sampleRate);
   const std::uint32_t dataSize = static_cast<std::uint32_t>(buffer.samples.size() * 2);
@@ -299,6 +329,39 @@ std::vector<unsigned char> ToWav(const Buffer& buffer) {
     put16(raw);
   }
   return bytes;
+}
+
+ExternalAudio FindExternalAudio(const std::string& assetsDir) {
+  namespace fs = std::filesystem;
+  ExternalAudio found;
+  if (assetsDir.empty()) { return found; }
+  const fs::path audioDir = fs::path(assetsDir) / "audio";
+  std::error_code ec;
+
+  const fs::path musicDir = audioDir / "music";
+  if (fs::is_directory(musicDir, ec)) {
+    for (const fs::directory_entry& entry : fs::directory_iterator(musicDir, ec)) {
+      if (!entry.is_regular_file(ec)) { continue; }
+      const std::string name = entry.path().filename().string();
+      if (!HasMusicSuffix(name)) { continue; }
+      found.music.push_back(fs::absolute(entry.path()).string());
+    }
+    std::sort(found.music.begin(), found.music.end());
+  }
+
+  const fs::path sfxDir = audioDir / "sfx";
+  if (fs::is_directory(sfxDir, ec)) {
+    for (const char* kind : {"click", "ping", "thrust", "chime"}) {
+      for (const std::string& name : SfxFileNames(kind)) {
+        const fs::path candidate = sfxDir / name;
+        if (fs::is_regular_file(candidate, ec)) {
+          found.sfx[kind] = fs::absolute(candidate).string();
+          break;
+        }
+      }
+    }
+  }
+  return found;
 }
 
 }  // namespace audio

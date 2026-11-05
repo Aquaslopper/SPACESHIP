@@ -90,16 +90,38 @@ void LoadFonts(const std::filesystem::path& assets) {
 // ============================================================================
 class AudioDevice {
  public:
-  bool Start() {
+  // Phase 9: the player's own files win. Each cue looks for its file first and
+  // falls back to the synthesised buffer; the bed streams the first track in
+  // music/, or the built-in sequencer when the folder is empty.
+  bool Start(const std::string& assetsDir) {
     InitAudioDevice();
     if (!IsAudioDeviceReady()) { return false; }
     ready_ = true;
+    external_ = audio::FindExternalAudio(assetsDir);
     for (std::size_t i = 0; i < kCueCount; ++i) {
-      cues_[i] = BuildSound(audio::RenderCue(kKinds[i]));
+      const auto found = external_.sfx.find(kKinds[i]);
+      if (found != external_.sfx.end()) {
+        cues_[i] = LoadSound(found->second.c_str());
+      }
+      if (cues_[i].frameCount == 0) {
+        cues_[i] = BuildSound(audio::RenderCue(kKinds[i]));
+      }
     }
-    music_ = BuildSound(audio::RenderMusic());
+    if (!external_.music.empty()) {
+      streamed_ = LoadMusicStream(external_.music.front().c_str());
+      if (streamed_.frameCount > 0) {
+        streamed_.looping = true;
+        tracks_ = external_.music;
+      } else {
+        tracks_.clear();
+      }
+    }
+    if (tracks_.empty()) { music_ = BuildSound(audio::RenderMusic()); }
     return true;
   }
+
+  // Which files were actually picked up, for the boot log.
+  const audio::ExternalAudio& External() const { return external_; }
 
   void Shutdown() {
     if (!ready_) { return; }
@@ -107,6 +129,7 @@ class AudioDevice {
       if (cue.frameCount > 0) { UnloadSound(cue); }
     }
     if (music_.frameCount > 0) { UnloadSound(music_); }
+    if (streamed_.frameCount > 0) { UnloadMusicStream(streamed_); }
     CloseAudioDevice();
     ready_ = false;
   }
@@ -122,6 +145,14 @@ class AudioDevice {
       }
     }
     const float musicVolume = static_cast<float>(gains.master * gains.music);
+    if (streamed_.frameCount > 0) {
+      SetMusicVolume(streamed_, musicVolume);
+      if (gains.musicOn) {
+        if (!IsMusicStreamPlaying(streamed_)) { PlayMusicStream(streamed_); }
+      } else if (IsMusicStreamPlaying(streamed_)) {
+        StopMusicStream(streamed_);
+      }
+    }
     if (music_.frameCount > 0) {
       SetSoundVolume(music_, musicVolume);
       if (gains.musicOn) {
@@ -146,6 +177,20 @@ class AudioDevice {
   // The log is the ship's voice: every new line is a cue, in order.
   void Tick(const Simulation& sim) {
     if (!ready_) { return; }
+    if (tracks_.size() > 1 && streamed_.frameCount > 0 && IsMusicStreamPlaying(streamed_)) {
+      UpdateMusicStream(streamed_);
+      // Cycle: a finished track hands over to the next one in filename order.
+      if (streamed_.looping && GetMusicTimePlayed(streamed_) >=
+                                    GetMusicTimeLength(streamed_) - 0.05f) {
+        track_ = (track_ + 1) % tracks_.size();
+        StopMusicStream(streamed_);
+        UnloadMusicStream(streamed_);
+        streamed_ = LoadMusicStream(tracks_[track_].c_str());
+        streamed_.looping = true;
+        SetMusicVolume(streamed_, static_cast<float>(gains_.master * gains_.music));
+        PlayMusicStream(streamed_);
+      }
+    }
     const std::vector<FeedLine>& log = sim.State().feed;
     if (log.empty()) { return; }
     if (logSeen_ == 0) {
@@ -171,6 +216,10 @@ class AudioDevice {
   static constexpr const char* kKinds[kCueCount] = {"click", "ping", "thrust", "chime"};
   bool ready_ = false;
   audio::Gains gains_;
+  audio::ExternalAudio external_;
+  std::vector<std::string> tracks_;   // the player's music, in filename order
+  std::size_t track_ = 0;
+  Music streamed_{};                  // an external track, streamed
   Sound cues_[4]{};
   Sound music_{};
   std::size_t logSeen_ = 0;
@@ -214,6 +263,7 @@ int main(int argc, char** argv) {
   SetTargetFPS(60);
 
   ship::Theme theme = ship::Theme::ById(sim.State().options.theme);
+  theme.fontStep = sim.State().options.fontStep;   // Phase 9's reading size
   theme.largeText = sim.State().options.largeText;
   theme.hideCrewLabels = sim.State().options.hideCrewLabels;
   theme.reducedMotion = sim.State().reducedMotion;
@@ -231,14 +281,33 @@ int main(int argc, char** argv) {
 
   // Sound is optional: a machine without a device keeps a silent, working ship.
   AudioDevice audio;
-  const bool audioReady = audio.Start();
+  const bool audioReady = audio.Start(assets);
   audio.Configure(sim.State().options);
+  std::printf("audio: %zu music file(s), %zu sound file(s)\n",
+              audio.External().music.size(), audio.External().sfx.size());
 
   // The reference opens on its title menu, with the voyage already begun.
   shell.ShowTitle(false);
 
+  // Phase 9: the borderless window follows Options, whichever way it changes.
+  bool fullscreen = sim.State().options.fullscreen;
+  if (fullscreen != IsWindowState(FLAG_BORDERLESS_WINDOWED_MODE)) {
+    ToggleBorderlessWindowed();
+  }
+
   while (!WindowShouldClose()) {
     // Resizing re-measures, exactly as the reference's coalesced handler does.
+    // The reading size travels with the theme, so a step change re-measures
+    // every row the shell lays out rather than only repainting the faces.
+    if (theme.fontStep != sim.State().options.fontStep) {
+      theme.fontStep = sim.State().options.fontStep;
+      shell.Configure(static_cast<float>(GetScreenWidth()),
+                      static_cast<float>(GetScreenHeight()), theme);
+    }
+    if (sim.State().options.fullscreen != fullscreen) {
+      fullscreen = sim.State().options.fullscreen;
+      ToggleBorderlessWindowed();
+    }
     if (IsWindowResized()) {
       theme.stageCompact = sim.State().shipClass == "wren";
       shell.Configure(static_cast<float>(GetScreenWidth()),

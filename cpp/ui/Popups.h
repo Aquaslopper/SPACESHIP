@@ -54,6 +54,13 @@ struct PopupModel {
   std::vector<std::string> themeLabels;
   std::string theme;
   std::string audioLevel;
+  // Phase 9: the reading-size ladder (18/19/20/21 px) and the borderless
+  // window switch. Both are preferences; both are drawn as their own rows.
+  int fontStep = 0;
+  std::vector<std::string> fontStepLabels;
+  std::string fontStepLine;    // "Reading size: +5% (19 px)"
+  bool fullscreen = false;
+  std::string fullscreenLabel; // "Window: Borderless fullscreen"
   std::vector<PopupSlot> slots;
   std::string message;
   bool free = true;

@@ -59,6 +59,9 @@ struct Theme {
 
   // Presentation flags that travel with the voyage's options.
   bool largeText = false;
+  // Phase 9: the typography floor and its four steps. Step 0 is 18 px — the
+  // smallest the port ever draws — and each step adds 5% of the floor, rounded.
+  int fontStep = 0;
   bool hideCrewLabels = false;
   bool reducedMotion = false;
 
@@ -72,10 +75,19 @@ struct Theme {
   // "rgba(139,111,78,0.13)" as the stylesheet writes it, for the raster hairlines.
   std::string Ink(float alpha) const;
 
-  // Text metrics: the reference has no zoom, it swaps to a larger face and one
-  // extra pixel of line height. The port does the same.
-  float BodySize() const { return largeText ? 15.0f : 13.0f; }
-  float LineHeight() const { return largeText ? 20.0f : 17.0f; }
+  // Text metrics. The reference has no zoom: it swaps to a larger face and one
+  // extra pixel of line height. The port keeps that habit but not its floor —
+  // Phase 9 raises the base face to 18 px, with four 5% steps above it
+  // (18, 19, 20, 21), and derives every line height from the face so nothing
+  // clips as the steps grow.
+  static constexpr float kFontFloorPx = 18.0f;
+  static float FontPxForStep(int step);
+  static float LineHeightForPx(float px);
+  float FontPx() const {
+    return FontPxForStep(fontStep) + (largeText ? 2.0f : 0.0f);
+  }
+  float BodySize() const { return FontPx(); }
+  float LineHeight() const { return LineHeightForPx(FontPx()); }
 };
 
 }  // namespace ship

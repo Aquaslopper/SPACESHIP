@@ -35,6 +35,39 @@ double Owned(const std::map<std::string, bool>& map) {
 
 }  // namespace
 
+const std::vector<TutorialCard>& TutorialCards() {
+  static const std::vector<TutorialCard> cards = {
+      {"1. Morning coffee philosophy",
+       "The ship runs on one thing: the captain's attention. Six actions a day, "
+       "spent one click at a time. There is no pause button because the coffee "
+       "is the pause - read the room, decide, then commit.",
+       "Spend the action only when the decision is already made."},
+      {"2. The Free Harbor idle screen",
+       "Time stands still here. Left-click anything to inspect it; right-click a "
+       "tab to read its panel. Looking never costs an action, so look first - "
+       "the whole ship is free to browse while the clock is stopped.",
+       "Inspect on the left click, read on the right."},
+      {"3. The 1-click action clock",
+       "Every paid button spends exactly one action and then locks itself: "
+       "routine work for 5, ship systems for 10, anything off the hull for 15, "
+       "and irreversible commitments for 20. The lock counts down as other "
+       "actions resolve, so a locked button is a queue, not a ban.",
+       "One click, one action - then wait your turn."},
+      {"4. Start the O2 filters first",
+       "A fresh voyage has stale air and a cold rack. Filters first, then the "
+       "engine, then the mess - in that order the work overlaps and the crew "
+       "never idles. The task bar under each button shows what is running and "
+       "what is waiting.",
+       "Air, then motion, then food."},
+      {"5. Reading the sidebar",
+       "The side panel never shouts. A hairline under a number means a trend, a "
+       "dot in the margin means a task is running, and a faint row is a want "
+       "rather than a warning. If nothing is marked, nothing needs you.",
+       "Quiet sidebar, quiet watch."},
+  };
+  return cards;
+}
+
 std::string TitleButtonLabel(bool fromVoyage) { return fromVoyage ? "RESUME" : "EXIT"; }
 
 bool AnySlotWritten(const Simulation& sim, const std::string& saveDir) {
@@ -48,7 +81,7 @@ bool AnySlotWritten(const Simulation& sim, const std::string& saveDir) {
 
 TitleModel BuildTitleScreen(const Simulation& sim, bool fromVoyage, TitlePanel panel,
                             const std::string& saveDir, int slot,
-                            const std::string& message) {
+                            const std::string& message, int tutorialCard) {
   TitleModel model;
   model.fromVoyage = fromVoyage;
   model.panel = panel;
@@ -69,6 +102,7 @@ TitleModel BuildTitleScreen(const Simulation& sim, bool fromVoyage, TitlePanel p
       {"load", "LOAD VOYAGE", AnySlotWritten(sim, saveDir) || !sim.State().tabs.empty()},
       {"options", "OPTIONS", true},
       {"guide", "HOW TO PLAY", true},
+      {"tutorial", "TUTORIAL", true},
       {"resume", TitleButtonLabel(fromVoyage), true},
   };
   for (const Command& command : commands) {
@@ -131,6 +165,31 @@ TitleModel BuildTitleScreen(const Simulation& sim, bool fromVoyage, TitlePanel p
   } else if (panel == TitlePanel::Guide) {
     model.panelTitle = "Your first watch";
     model.panelNote = std::string(kGuide) + "\n\n" + kGuideMore + "\n\n" + kGuideShip;
+  } else if (panel == TitlePanel::Tutorial) {
+    const std::vector<TutorialCard>& cards = TutorialCards();
+    const int count = static_cast<int>(cards.size());
+    const int card = tutorialCard < 0 ? 0 : (tutorialCard >= count ? count - 1 : tutorialCard);
+    model.tutorialCard = card;
+    model.tutorialCards = count;
+    model.panelTitle = cards[card].title;
+    model.panelNote = cards[card].body + "\n\n" + cards[card].habit;
+    model.cardTitle = cards[card].title;
+    model.cardBody = cards[card].body;
+    model.cardHabit = cards[card].habit;
+    ActionRowView prev;
+    prev.id = "card:prev";
+    prev.label = "PREVIOUS CARD";
+    prev.cost = "free";
+    prev.enabled = card > 0;
+    prev.reading = card == 0;
+    model.panelRows.push_back(prev);
+    ActionRowView next;
+    next.id = "card:next";
+    next.label = "NEXT CARD (" + Num(card + 1) + " of " + Num(count) + ")";
+    next.cost = "free";
+    next.enabled = card + 1 < count;
+    next.reading = card + 1 >= count;
+    model.panelRows.push_back(next);
   } else if (panel == TitlePanel::Quit) {
     model.panelTitle = "Leaving the game";
     model.panelNote = "Close this window to exit the preview.";
@@ -164,6 +223,12 @@ bool PressTitleAction(Simulation& sim, const std::string& action, const std::str
   if (action == "load") { *panel = TitlePanel::Load; return true; }
   if (action == "options") { *panel = TitlePanel::Settings; return true; }
   if (action == "guide") { *panel = TitlePanel::Guide; return true; }
+  if (action == "tutorial") { *panel = TitlePanel::Tutorial; return true; }
+  // The cards page with absolute ids, so the shell owns nothing but a number.
+  if (action.compare(0, 5, "card:") == 0) {
+    if (action == "card:next" || action == "card:prev") { return true; }
+    return false;
+  }
   if (action == "resume") {
     if (!*fromVoyage) { *panel = TitlePanel::Quit; return true; }
     return true;  // the caller hides the menu

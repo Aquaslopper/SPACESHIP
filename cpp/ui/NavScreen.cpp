@@ -4,6 +4,7 @@
 #include "ui/NavScreen.h"
 
 #include "core/JsNumber.h"
+#include "ui/Widgets.h"
 
 #include <algorithm>
 #include <cmath>
@@ -768,7 +769,8 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
 // ---------------------------------------------------------------------------
 //  Clicks
 // ---------------------------------------------------------------------------
-bool PressNavAction(Simulation& sim, const std::string& action, const std::string& arg) {
+namespace {
+bool PressNavActionRaw(Simulation& sim, const std::string& action, const std::string& arg) {
   if (action == "travel") { return PressProgressButton(sim, "travel"); }
   if (action == "scan") { return PressProgressButton(sim, "scan"); }
   if (action == "stand-watch") { return sim.StandWatch(); }
@@ -790,6 +792,23 @@ bool PressNavAction(Simulation& sim, const std::string& action, const std::strin
     return true;
   }
   return false;
+}
+
+}  // namespace
+
+// ============================================================================
+//  The press, with the anti-spam lock around it (Phase 9).
+//  ---------------------------------------------------------------------------
+//  One control is one control. The first press spends the action and starts the
+//  tier's lock in ACTION_COOLDOWN_RULES; a second press of the same button
+//  before another action resolves is refused, whether it comes from the window
+//  or from this harness. Free reads spend nothing and therefore lock nothing.
+// ============================================================================
+bool PressNavAction(Simulation& sim, const std::string& action, const std::string& arg) {
+  return CommitActionButton(
+      sim, ActionCooldownKey(sim, "press:nav:" + action + ":" + arg),
+      ActionCooldownCategory(action + " " + arg),
+      [&]() { return PressNavActionRaw(sim, action, arg); });
 }
 
 }  // namespace ship

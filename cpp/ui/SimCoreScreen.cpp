@@ -4,6 +4,7 @@
 #include "ui/SimCoreScreen.h"
 
 #include "core/JsNumber.h"
+#include "ui/Widgets.h"
 #include "ui/Shell.h"
 
 namespace ship {
@@ -104,7 +105,8 @@ SimScreenModel BuildSimCoreScreen(const Simulation& sim) {
   return model;
 }
 
-bool PressSimCoreAction(Simulation& sim, const std::string& action, const std::string& arg) {
+namespace {
+bool PressSimCoreActionRaw(Simulation& sim, const std::string& action, const std::string& arg) {
   (void)arg;
   if (action == "open-comms") {
     OpenTask(sim, "room", "r4", true);   // free
@@ -117,6 +119,23 @@ bool PressSimCoreAction(Simulation& sim, const std::string& action, const std::s
     return sim.StartDream(rest.substr(0, cut), rest.substr(cut + 1));
   }
   return false;
+}
+
+}  // namespace
+
+// ============================================================================
+//  The press, with the anti-spam lock around it (Phase 9).
+//  ---------------------------------------------------------------------------
+//  One control is one control. The first press spends the action and starts the
+//  tier's lock in ACTION_COOLDOWN_RULES; a second press of the same button
+//  before another action resolves is refused, whether it comes from the window
+//  or from this harness. Free reads spend nothing and therefore lock nothing.
+// ============================================================================
+bool PressSimCoreAction(Simulation& sim, const std::string& action, const std::string& arg) {
+  return CommitActionButton(
+      sim, ActionCooldownKey(sim, "press:simcore:" + action + ":" + arg),
+      ActionCooldownCategory(action + " " + arg),
+      [&]() { return PressSimCoreActionRaw(sim, action, arg); });
 }
 
 }  // namespace ship

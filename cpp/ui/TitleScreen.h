@@ -23,7 +23,17 @@
 namespace ship {
 
 // The dialog the menu can have open, in the order the reference offers it.
-enum class TitlePanel { None, Load, Settings, Guide, Quit };
+enum class TitlePanel { None, Load, Settings, Guide, Quit, Tutorial };
+
+// Phase 9's five-card guide, opened by TUTORIAL on the main menu. Each card is
+// one short idea and its one habit; the reader pages through them with the
+// arrow keys or the row buttons, and nothing here reaches the voyage.
+struct TutorialCard {
+  std::string title;
+  std::string body;
+  std::string habit;   // the one line the card wants remembered
+};
+const std::vector<TutorialCard>& TutorialCards();
 
 struct TitleModel {
   std::string heading = "SPACESHIP";
@@ -41,6 +51,12 @@ struct TitleModel {
   PopupModel settings;                    // the same sheet the footer opens
   int slot = 1;
   std::string message;
+  // Phase 9: the tutorial's card number and the card itself.
+  int tutorialCard = 0;
+  int tutorialCards = 0;
+  std::string cardTitle;
+  std::string cardBody;
+  std::string cardHabit;
 };
 
 std::string TitleButtonLabel(bool fromVoyage);
@@ -48,7 +64,8 @@ bool AnySlotWritten(const Simulation& sim, const std::string& saveDir);
 
 TitleModel BuildTitleScreen(const Simulation& sim, bool fromVoyage, TitlePanel panel,
                             const std::string& saveDir, int slot = 1,
-                            const std::string& message = std::string());
+                            const std::string& message = std::string(),
+                            int tutorialCard = 0);
 
 // Free menu verbs. `fromVoyage`/`panel` are the menu's own state; the press
 // returns true when something changed and the caller should repaint.
@@ -68,6 +85,12 @@ struct LossModel {
   std::vector<ActionRowView> actions;
   int slot = 1;
   std::string message;
+  // Phase 9: the tutorial's card number and the card itself.
+  int tutorialCard = 0;
+  int tutorialCards = 0;
+  std::string cardTitle;
+  std::string cardBody;
+  std::string cardHabit;
 };
 
 LossModel BuildLossScreen(const Simulation& sim, int slot = 1,

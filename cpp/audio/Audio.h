@@ -19,6 +19,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -131,6 +132,27 @@ Buffer RenderCue(const std::string& kind, int sampleRate = kSampleRate);
 
 // The 44-byte RIFF header the reference writes by hand, then the samples.
 std::vector<unsigned char> ToWav(const Buffer& buffer);
+
+// ---- the player's own audio (Phase 9) ---------------------------------------
+// The soundtrack the port synthesises is a fallback, not a rule. If the player
+// drops files into assets/audio, those win:
+//
+//   assets/audio/music/   every .ogg, .mp3 or .wav is streamed and cycled
+//   assets/audio/sfx/     click.wav, action.wav, complete.wav, alert.wav,
+//                         arrive.wav (and a few aliases) replace the synth cue
+//
+// Everything below is pure filesystem inspection so the headless tests can hold
+// the search rules to their word; main.cpp is the only place that loads.
+const std::vector<std::string>& SfxFileNames(const std::string& kind);
+
+struct ExternalAudio {
+  std::vector<std::string> music;                 // absolute paths, sorted
+  std::map<std::string, std::string> sfx;         // cue kind -> the file found
+  bool any() const { return !music.empty() || !sfx.empty(); }
+};
+
+// Scans `<assets>/audio`. A missing directory is an empty result, not an error.
+ExternalAudio FindExternalAudio(const std::string& assetsDir);
 
 }  // namespace audio
 }  // namespace ship

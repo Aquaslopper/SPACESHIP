@@ -9,6 +9,7 @@
 // ============================================================================
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <set>
 #include <string>
@@ -49,25 +50,55 @@ const ship::DescribeRow* Row(const ship::Description& t, const std::string& key)
 TEST_CASE("five themes, one palette, five inks", "[ui][theme]") {
   const std::vector<ship::ThemeSpec>& specs = ship::Theme::Specs();
   REQUIRE(specs.size() == 5);
+  // Phase 9: five calm, low-frequency palettes. The ids are the reference's so
+  // a save keeps its choice; the colours and the labels are the port's own.
   CHECK(specs[0].id == "classic");
-  CHECK(specs[0].label == "Flight Deck - parchment");
-  CHECK(specs[0].ink.r == 139);
-  CHECK(specs[0].ink.g == 111);
-  CHECK(specs[0].ink.b == 78);
-  CHECK(specs[1].id == "void");
-  CHECK(specs[1].label == "Deep Space - cyan");
-  CHECK(specs[4].id == "ember");
-  CHECK(specs[4].ink.r == 215);
+  CHECK(specs[0].label == "Flight Deck - warm parchment");
+  CHECK(specs[0].ink.r == 0x6b);
+  CHECK(specs[0].ink.g == 0x53);
+  CHECK(specs[0].ink.b == 0x38);
+  CHECK(specs[1].id == "aurora");
+  CHECK(specs[1].label == "Greenish Tea - matcha paper");
+  CHECK(specs[2].id == "void");
+  CHECK(specs[2].label == "Dusty Blue - overcast slate");
+  CHECK(specs[3].id == "ember");
+  CHECK(specs[3].label == "Oat & Linen - unbleached");
+  CHECK(specs[4].id == "nebula");
+  CHECK(specs[4].label == "Pressed Botanical - celadon");
+
+  // Every palette is a light paper with muted panels, deep ink and one accent:
+  // nothing dark, nothing highly saturated.
+  for (const ship::ThemeSpec& spec : specs) {
+    const ship::Theme theme = ship::Theme::ById(spec.id);
+    const int paper = (theme.palette.panel.r + theme.palette.panel.g +
+                       theme.palette.panel.b) / 3;
+    const int inkLevel = (theme.palette.ink.r + theme.palette.ink.g +
+                          theme.palette.ink.b) / 3;
+    CHECK(paper >= 0xe8);                 // a paper, not a wall
+    CHECK(inkLevel <= 0x58);              // deep, low-chroma text
+    CHECK(theme.palette.panel2.r <= theme.palette.panel.r + 1);  // panels sit under the paper
+    const int spread = std::max({theme.palette.coffee.r, theme.palette.coffee.g,
+                                 theme.palette.coffee.b}) -
+                       std::min({theme.palette.coffee.r, theme.palette.coffee.g,
+                                 theme.palette.coffee.b});
+    CHECK(spread <= 0x48);                // a muted accent, not a signal colour
+  }
 
   const ship::Theme classic = ship::Theme::ById("classic");
   CHECK(classic.palette.panel.r == 0xfa);
   CHECK(classic.palette.panel.g == 0xf7);
   CHECK(classic.palette.panel.b == 0xf2);
+  CHECK(classic.palette.ink.r == 0x6b);
   CHECK(classic.palette.coffee.r == 0x8c);
-  CHECK(classic.palette.ink.r == 0x3b);
-  CHECK(classic.palette.terracotta.r == 0xb0);
-  CHECK(classic.palette.sage.g == 0x91);
-  CHECK(classic.palette.amber.b == 0x3e);
+
+  // Greenish Tea is the authored four colours, whatever is derived from them.
+  const ship::Theme tea = ship::Theme::ById("aurora");
+  CHECK(tea.palette.panel.r == 0xf2);
+  CHECK(tea.palette.panel.g == 0xf5);
+  CHECK(tea.palette.panel2.r == 0xe6);
+  CHECK(tea.palette.panel2.g == 0xec);
+  CHECK(tea.palette.ink.g == 0x3d);
+  CHECK(tea.palette.coffee.g == 0x73);
 
   // An unknown id falls back to classic rather than to an unstyled interface.
   const ship::Theme other = ship::Theme::ById("no-such-theme");
@@ -76,18 +107,29 @@ TEST_CASE("five themes, one palette, five inks", "[ui][theme]") {
 }
 
 TEST_CASE("theme flags drive type size and the compact deck", "[ui][theme]") {
+  // Phase 9's typography floor: 18 px, then four 5% steps, and a line box
+  // derived from the face so nothing clips as the steps grow.
   ship::Theme theme = ship::Theme::ById("classic");
-  CHECK(theme.BodySize() == 13.0f);
-  CHECK(theme.LineHeight() == 17.0f);
+  CHECK(ship::Theme::FontPxForStep(0) == 18.0f);
+  CHECK(ship::Theme::FontPxForStep(1) == 19.0f);
+  CHECK(ship::Theme::FontPxForStep(2) == 20.0f);
+  CHECK(ship::Theme::FontPxForStep(3) == 21.0f);
+  CHECK(ship::Theme::FontPxForStep(9) == 21.0f);    // clamped, never larger
+  CHECK(ship::Theme::FontPxForStep(-3) == 18.0f);   // and never below the floor
+  CHECK(theme.BodySize() == 18.0f);
+  CHECK(theme.LineHeight() == 24.0f);
   CHECK_FALSE(theme.largeText);
-  theme.largeText = true;
-  CHECK(theme.BodySize() == 15.0f);
-  CHECK(theme.LineHeight() == 20.0f);
+  theme.fontStep = 2;
+  CHECK(theme.BodySize() == 20.0f);
+  CHECK(theme.LineHeight() == 26.0f);
+  theme.largeText = true;    // the old flag still adds its two pixels
+  CHECK(theme.BodySize() == 22.0f);
+  CHECK(theme.LineHeight() == 29.0f);
 
-  // rgba(139,111,78,0.13), trimmed the way the stylesheet writes it.
-  CHECK(theme.Ink(0.13f) == "rgba(139,111,78,0.13)");
-  CHECK(theme.Ink(1.0f) == "rgba(139,111,78,1)");
-  CHECK(ship::Theme::ById("void").Ink(0.5f) == "rgba(91,184,213,0.5)");
+  // rgba(107,83,56,0.13), trimmed the way the stylesheet writes it.
+  CHECK(theme.Ink(0.13f) == "rgba(107,83,56,0.13)");
+  CHECK(theme.Ink(1.0f) == "rgba(107,83,56,1)");
+  CHECK(ship::Theme::ById("void").Ink(0.5f) == "rgba(47,55,64,0.5)");
 }
 
 // ---------------------------------------------------------------------------

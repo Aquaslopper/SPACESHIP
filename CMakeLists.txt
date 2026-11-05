@@ -224,6 +224,8 @@ if(SPACESHIP_BUILD_TESTS)
     cpp/tests/jsnumber_tests.cpp
     cpp/tests/phase7_tests.cpp
     cpp/tests/phase8_tests.cpp
+    cpp/tests/spam_audit_tests.cpp
+    cpp/tests/phase9_tests.cpp
     cpp/tests/ui_tests.cpp
     cpp/tests/task_tests.cpp
     cpp/tests/nav_tests.cpp
@@ -241,6 +243,14 @@ if(SPACESHIP_BUILD_TESTS)
            COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/check-gui-syntax.sh"
            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
   set_tests_properties(ui.gui-syntax PROPERTIES SKIP_RETURN_CODE 77)
+
+  # Phase 9's anti-spam gate: the report is generated from the audit case, so a
+  # control that grows a double-click (or a report that drifts) fails here.
+  add_test(NAME ui.spam-audit
+           COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/tools/audit-spam-buttons.sh" --check
+           WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+  set_tests_properties(ui.spam-audit PROPERTIES
+                       ENVIRONMENT "BUILD_DIR=${CMAKE_CURRENT_BINARY_DIR}")
 
   # The data gate: the committed catalogue must still match the HTA. This is
   # the test that stops a content edit shipping without its JSON.

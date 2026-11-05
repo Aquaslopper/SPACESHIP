@@ -102,6 +102,12 @@ std::string TimeStamp(double actionCount) {
 
 }  // namespace
 
+int ShellView::TypePx(int reference) const {
+  return reference <= 0
+             ? reference
+             : static_cast<int>(std::lround(reference * (theme_.FontPx() / 13.0)));
+}
+
 ShellView::ShellView() { theme_ = Theme::ById("classic"); }
 
 void ShellView::Configure(float width, float height, const Theme& theme) {
@@ -380,9 +386,9 @@ void ShellView::PaintIdle(Simulation& sim) {
                        static_cast<int>(cell.box.w), static_cast<int>(cell.box.h),
                        ToRay(theme.palette.border));
     DrawText(cell.label.c_str(), static_cast<int>(cell.box.x + 6.0f),
-             static_cast<int>(cell.box.y + 4.0f), 11, ToRay(theme.palette.muted));
+             static_cast<int>(cell.box.y + 4.0f), TypePx(11) , ToRay(theme.palette.muted));
     DrawText(cell.value.c_str(), static_cast<int>(cell.box.x + 6.0f),
-             static_cast<int>(cell.box.y + 20.0f), 20, ToRay(theme.palette.ink));
+             static_cast<int>(cell.box.y + 20.0f), TypePx(20) , ToRay(theme.palette.ink));
     const float bar = cell.box.w - 12.0f;
     DrawRectangle(static_cast<int>(cell.box.x + 6.0f),
                   static_cast<int>(cell.box.Bottom() - 12.0f), static_cast<int>(bar), 4,
@@ -396,34 +402,33 @@ void ShellView::PaintIdle(Simulation& sim) {
   PaintDiagram(idle_.diagram);
 
   DrawText(idle_.stageNote.c_str(), static_cast<int>(idle_.content.x + 8.0f),
-           static_cast<int>(idle_.stageArea.Bottom() + 8.0f), 12,
+           static_cast<int>(idle_.stageArea.Bottom() + 8.0f), TypePx(12) ,
            ToRay(theme.palette.muted));
 
   // ---- nav strip, dock strip, info rail ---------------------------------
-  auto paintStrip = [&theme](const Strip& strip) {
+  auto paintStrip = [this, &theme](const Strip& strip) {
     DrawRectangleLines(static_cast<int>(strip.box.x), static_cast<int>(strip.box.y),
                        static_cast<int>(strip.box.w), static_cast<int>(strip.box.h),
                        ToRay(theme.palette.border));
     DrawText(strip.label.c_str(), static_cast<int>(strip.box.x + 8.0f),
-             static_cast<int>(strip.box.y + 6.0f), 11, ToRay(theme.palette.muted));
+             static_cast<int>(strip.box.y + 6.0f), TypePx(11) , ToRay(theme.palette.muted));
     DrawText(strip.main.c_str(), static_cast<int>(strip.box.x + 8.0f),
-             static_cast<int>(strip.box.y + 20.0f), 13, ToRay(theme.palette.ink));
+             static_cast<int>(strip.box.y + 20.0f), TypePx(13) , ToRay(theme.palette.ink));
     DrawText(strip.right.c_str(), static_cast<int>(strip.box.x + 8.0f),
-             static_cast<int>(strip.box.y + 32.0f), 10, ToRay(theme.palette.muted));
+             static_cast<int>(strip.box.y + 32.0f), TypePx(10) , ToRay(theme.palette.muted));
   };
   paintStrip(idle_.nav);
   if (idle_.docked) { paintStrip(idle_.dock); }
 
   for (const RailCell& cell : idle_.infos) {
-    DrawText(cell.label.c_str(), static_cast<int>(cell.box.x), static_cast<int>(cell.box.y),
-             10, ToRay(theme.palette.muted));
+    DrawText(cell.label.c_str(), static_cast<int>(cell.box.x), static_cast<int>(cell.box.y), TypePx(10) , ToRay(theme.palette.muted));
     DrawText(cell.value.c_str(), static_cast<int>(cell.box.x),
-             static_cast<int>(cell.box.y + 13.0f), 13, ToRay(theme.palette.ink));
+             static_cast<int>(cell.box.y + 13.0f), TypePx(13) , ToRay(theme.palette.ink));
   }
 
   // ---- feed --------------------------------------------------------------
   DrawText(idle_.feedHead.c_str(), static_cast<int>(idle_.feedBox.x),
-           static_cast<int>(idle_.feedBox.y - 16.0f), 11, ToRay(theme.palette.coffee));
+           static_cast<int>(idle_.feedBox.y - 16.0f), TypePx(11) , ToRay(theme.palette.coffee));
   DrawRectangleLines(static_cast<int>(idle_.feedBox.x),
                      static_cast<int>(idle_.feedBox.y),
                      static_cast<int>(idle_.feedBox.w),
@@ -432,7 +437,7 @@ void ShellView::PaintIdle(Simulation& sim) {
   for (const std::string& line : idle_.feed) {
     if (y > idle_.feedBox.Bottom() - 12.0f) { break; }
     DrawText(line.c_str(), static_cast<int>(idle_.feedBox.x + 6.0f),
-             static_cast<int>(y), 12, ToRay(theme.palette.ink));
+             static_cast<int>(y), TypePx(12) , ToRay(theme.palette.ink));
     y += theme.LineHeight();
   }
   (void)sim;
@@ -446,18 +451,18 @@ void ShellView::PaintPanel(const NavPanel& panel, const Area& box) {
                      static_cast<int>(box.w), static_cast<int>(box.h),
                      ToRay(p.border));
   DrawText(panel.title.c_str(), static_cast<int>(box.x + 8.0f),
-           static_cast<int>(box.y + 5.0f), 11, ToRay(p.coffee));
+           static_cast<int>(box.y + 5.0f), TypePx(11) , ToRay(p.coffee));
   float y = box.y + 24.0f;
   for (const PanelLine& line : panel.lines) {
     switch (line.kind) {
       case PanelLine::Kind::Name:
         DrawText(line.value.c_str(), static_cast<int>(box.x + 8.0f),
-                 static_cast<int>(y), 22, ToRay(p.ink));
+                 static_cast<int>(y), TypePx(22) , ToRay(p.ink));
         y += 22.0f;
         break;
       case PanelLine::Kind::Sub:
         DrawText(line.value.c_str(), static_cast<int>(box.x + 8.0f),
-                 static_cast<int>(y), 10, ToRay(p.muted));
+                 static_cast<int>(y), TypePx(10) , ToRay(p.muted));
         y += 13.0f;
         break;
       case PanelLine::Kind::Bar: {
@@ -473,15 +478,15 @@ void ShellView::PaintPanel(const NavPanel& panel, const Area& box) {
       case PanelLine::Kind::Dim:
       case PanelLine::Kind::Note:
         DrawText(line.value.c_str(), static_cast<int>(box.x + 8.0f),
-                 static_cast<int>(y), 10, ToRay(p.muted));
+                 static_cast<int>(y), TypePx(10) , ToRay(p.muted));
         y += 12.0f * static_cast<float>(1 + line.value.size() / 34);
         break;
       case PanelLine::Kind::Field:
         DrawText(line.key.c_str(), static_cast<int>(box.x + 8.0f),
-                 static_cast<int>(y), 10, ToRay(p.muted));
+                 static_cast<int>(y), TypePx(10) , ToRay(p.muted));
         DrawText(line.value.c_str(), static_cast<int>(box.x + box.w - 8.0f -
-                                                          static_cast<float>(MeasureText(line.value.c_str(), 10))),
-                 static_cast<int>(y), 10, ToRay(p.ink));
+                                                          static_cast<float>(MeasureText(line.value.c_str(), TypePx(10) ))),
+                 static_cast<int>(y), TypePx(10) , ToRay(p.ink));
         y += 14.0f;
         break;
     }
@@ -521,7 +526,7 @@ void ShellView::PaintStage(const TaskStage& stage, const Area& origin) {
       DrawRectangle(x, y, w, h, ToRay(p.coffeeLight));
     }
     if (!part.text.empty() && part.text[0] != 'm') {
-      DrawText(part.text.c_str(), x + 2, y + 1, 8, ToRay(p.muted));
+      DrawText(part.text.c_str(), x + 2, y + 1, TypePx(8) , ToRay(p.muted));
     }
   }
 
@@ -536,7 +541,7 @@ void ShellView::PaintStage(const TaskStage& stage, const Area& origin) {
                        static_cast<int>(box.w), static_cast<int>(box.h),
                        ToRay(p.borderDark));
     DrawText(control.button.text.c_str(), static_cast<int>(box.x + 6.0f),
-             static_cast<int>(box.y + 7.0f), 10,
+             static_cast<int>(box.y + 7.0f), TypePx(10) ,
              ToRay(locked ? p.terracotta : p.ink));
     taskButtons_.push_back({box, control.button.taskId});
   }
@@ -551,11 +556,11 @@ void ShellView::PaintTaskScreen(Simulation& sim) {
   const float column = 250.0f;
 
   DrawText(screen.head.kind.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y), 9, ToRay(p.muted));
+           static_cast<int>(layout_.content.y), TypePx(9) , ToRay(p.muted));
   DrawText(screen.head.title.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y + 12.0f), 20, ToRay(p.ink));
+           static_cast<int>(layout_.content.y + 12.0f), TypePx(20) , ToRay(p.ink));
   DrawText(screen.head.sub.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y + 36.0f), 11, ToRay(p.muted));
+           static_cast<int>(layout_.content.y + 36.0f), TypePx(11) , ToRay(p.muted));
 
   float y = layout_.content.y + 58.0f;
   for (const NavPanel& panel : screen.left) {
@@ -589,9 +594,9 @@ void ShellView::PaintTaskScreen(Simulation& sim) {
   DrawRectangleLines(static_cast<int>(left), static_cast<int>(bandY),
                      static_cast<int>(right - left), 90, ToRay(p.border));
   DrawText("Actions", static_cast<int>(left + 8.0f),
-           static_cast<int>(bandY + 5.0f), 11, ToRay(p.coffee));
+           static_cast<int>(bandY + 5.0f), TypePx(11) , ToRay(p.coffee));
   DrawText(screen.bandNote.c_str(), static_cast<int>(left + 8.0f),
-           static_cast<int>(bandY + 20.0f), 10, ToRay(p.muted));
+           static_cast<int>(bandY + 20.0f), TypePx(10) , ToRay(p.muted));
 
   float bx = left + 12.0f;
   for (const ProgressButton& button : screen.progress) {
@@ -607,7 +612,7 @@ void ShellView::PaintTaskScreen(Simulation& sim) {
                        static_cast<int>(box.w), static_cast<int>(box.h),
                        ToRay(p.borderDark));
     DrawText(button.text.c_str(), static_cast<int>(box.x + 8.0f),
-             static_cast<int>(box.y + 8.0f), 10,
+             static_cast<int>(box.y + 8.0f), TypePx(10) ,
              ToRay(button.state == ButtonState::Cooldown ? p.terracotta : p.ink));
     taskButtons_.push_back({box, button.taskId});
     bx += 198.0f;
@@ -628,11 +633,11 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   const float middleRight = right - column - 8.0f;
 
   DrawText(screen.head.kind.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y), 9, ToRay(p.muted));
+           static_cast<int>(layout_.content.y), TypePx(9) , ToRay(p.muted));
   DrawText(screen.head.title.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y + 12.0f), 20, ToRay(p.ink));
+           static_cast<int>(layout_.content.y + 12.0f), TypePx(20) , ToRay(p.ink));
   DrawText(screen.head.sub.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y + 36.0f), 11, ToRay(p.muted));
+           static_cast<int>(layout_.content.y + 36.0f), TypePx(11) , ToRay(p.muted));
 
   // --- the chart box: 638x278 at 1:1, shrunk only when the window is narrower
   const float spareW = middleRight - middleLeft;
@@ -715,7 +720,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     const int labelX =
         static_cast<int>(box.x + static_cast<float>(body.labelX) * zs);
     DrawText(body.name.c_str(), labelX,
-             static_cast<int>(box.y + static_cast<float>(body.labelY) * zs), 9,
+             static_cast<int>(box.y + static_cast<float>(body.labelY) * zs), TypePx(9) ,
              ToRay(body.scanned ? p.ink : p.muted));
     navHits_.push_back(NavHit{Area{cx - radius - 4.0f, cy - radius - 4.0f,
                                    radius * 2.0f + 8.0f, radius * 2.0f + 8.0f},
@@ -735,7 +740,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
                        static_cast<int>(boxArea.w), static_cast<int>(boxArea.h),
                        ToRay(p.borderDark));
     DrawText(NavLayerLabel(key).c_str(), static_cast<int>(boxArea.x + 6.0f),
-             static_cast<int>(boxArea.y + 4.0f), 9,
+             static_cast<int>(boxArea.y + 4.0f), TypePx(9) ,
              ToRay(on ? p.ink : p.muted));
     navHits_.push_back(NavHit{boxArea, "layer", key});
     bx += 58.0f;
@@ -749,14 +754,13 @@ void ShellView::PaintNavScreen(Simulation& sim) {
                        static_cast<int>(z.w), static_cast<int>(z.h),
                        ToRay(p.borderDark));
   }
-  DrawText("+", static_cast<int>(zoomIn.x + 6.0f), static_cast<int>(zoomIn.y + 3.0f),
-           11, ToRay(p.ink));
+  DrawText("+", static_cast<int>(zoomIn.x + 6.0f), static_cast<int>(zoomIn.y + 3.0f), TypePx(11) , ToRay(p.ink));
   DrawText("-", static_cast<int>(zoomOut.x + 6.0f),
-           static_cast<int>(zoomOut.y + 3.0f), 11, ToRay(p.ink));
+           static_cast<int>(zoomOut.y + 3.0f), TypePx(11) , ToRay(p.ink));
   navHits_.push_back(NavHit{zoomIn, "zoom-in", ""});
   navHits_.push_back(NavHit{zoomOut, "zoom-out", ""});
   DrawText(chart.scaleText.c_str(), static_cast<int>(box.Right() - 260.0f),
-           static_cast<int>(box.Bottom() - 18.0f), 9, ToRay(p.muted));
+           static_cast<int>(box.Bottom() - 18.0f), TypePx(9) , ToRay(p.muted));
 
   // --- panels: identity left, sensors right, the leg underneath the chart
   float ly = layout_.content.y + 58.0f;
@@ -782,10 +786,10 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   DrawRectangleLines(static_cast<int>(left), static_cast<int>(bandY),
                      static_cast<int>(right - left), 104, ToRay(p.border));
   DrawText("Target Actions", static_cast<int>(left + 8.0f),
-           static_cast<int>(bandY + 4.0f), 10, ToRay(p.coffee));
+           static_cast<int>(bandY + 4.0f), TypePx(10) , ToRay(p.coffee));
   float ty = bandY + 18.0f;
   DrawText(navScreen_.courseNote.c_str(), static_cast<int>(left + 8.0f),
-           static_cast<int>(ty), 10, ToRay(p.muted));
+           static_cast<int>(ty), TypePx(10) , ToRay(p.muted));
   ty += 14.0f;
 
   float px2 = left + 8.0f;
@@ -803,7 +807,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
                        static_cast<int>(buttonBox.w),
                        static_cast<int>(buttonBox.h), ToRay(p.borderDark));
     DrawText(button.text.c_str(), static_cast<int>(buttonBox.x + 6.0f),
-             static_cast<int>(buttonBox.y + 6.0f), 9,
+             static_cast<int>(buttonBox.y + 6.0f), TypePx(9) ,
              ToRay(button.state == ButtonState::Cooldown ? p.terracotta : p.ink));
     navHits_.push_back(NavHit{buttonBox, button.taskId, ""});
     px2 += 156.0f;
@@ -813,10 +817,10 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   for (const CommandRowView& row : screen.commands) {
     const Area rowBox{left + 8.0f, ty, 300.0f, 18.0f};
     DrawText(row.label.c_str(), static_cast<int>(rowBox.x + 34.0f),
-             static_cast<int>(rowBox.y + 4.0f), 10,
+             static_cast<int>(rowBox.y + 4.0f), TypePx(10) ,
              ToRay(row.enabled ? p.ink : p.muted));
     DrawText((row.displayCost + "  ").c_str(), static_cast<int>(rowBox.x),
-             static_cast<int>(rowBox.y + 4.0f), 9, ToRay(p.coffee));
+             static_cast<int>(rowBox.y + 4.0f), TypePx(9) , ToRay(p.coffee));
     std::string action;
     if (row.label.find("Stand watch") == 0) { action = "stand-watch"; }
     if (row.label.find("Dock at ") == 0) { action = "dock"; }
@@ -832,7 +836,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   }
   for (const std::string& note : navScreen_.notes) {
     if (ty > bandY + 96.0f) { break; }
-    DrawText(note.c_str(), static_cast<int>(left + 8.0f), static_cast<int>(ty), 9,
+    DrawText(note.c_str(), static_cast<int>(left + 8.0f), static_cast<int>(ty), TypePx(9) ,
              ToRay(p.muted));
     ty += 11.0f;
   }
@@ -845,11 +849,11 @@ void ShellView::PaintCrewRecord(const Simulation& sim) {
   const float right = layout_.content.Right() - 8.0f;
 
   DrawText(record_.head.kind.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y), 9, ToRay(p.muted));
+           static_cast<int>(layout_.content.y), TypePx(9) , ToRay(p.muted));
   DrawText(record_.head.title.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y + 12.0f), 20, ToRay(p.ink));
+           static_cast<int>(layout_.content.y + 12.0f), TypePx(20) , ToRay(p.ink));
   DrawText(record_.head.sub.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y + 36.0f), 11, ToRay(p.muted));
+           static_cast<int>(layout_.content.y + 36.0f), TypePx(11) , ToRay(p.muted));
 
   // Status across the top, then the three short shelves left to right.
   float y = layout_.content.y + 58.0f;
@@ -875,11 +879,11 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
   const float column = 210.0f;
 
   DrawText(screen.head.kind.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y), 9, ToRay(p.muted));
+           static_cast<int>(layout_.content.y), TypePx(9) , ToRay(p.muted));
   DrawText(screen.head.title.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y + 12.0f), 20, ToRay(p.ink));
+           static_cast<int>(layout_.content.y + 12.0f), TypePx(20) , ToRay(p.ink));
   DrawText(screen.head.sub.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y + 36.0f), 10, ToRay(p.muted));
+           static_cast<int>(layout_.content.y + 36.0f), TypePx(10) , ToRay(p.muted));
 
   // --- the roster, and the payroll above it
   const float panelTop = layout_.content.y + 58.0f;
@@ -911,7 +915,7 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
     if (part.cls.find("cq-lock") != std::string::npos) { ink = ToRay(p.coffee); }
     DrawRectangle(x, y, w, h, ink);
     if (!part.text.empty()) {
-      DrawText(part.text.c_str(), x + 2, y + 1, 8, ToRay(p.muted));
+      DrawText(part.text.c_str(), x + 2, y + 1, TypePx(8) , ToRay(p.muted));
     }
   }
   for (const SpritePixel& pixel : quarters_.scene.pixels) {
@@ -935,12 +939,12 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
                     static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel3));
     }
     DrawText(row.name.c_str(), static_cast<int>(box.x + 8.0f),
-             static_cast<int>(box.y + 3.0f), 10, ToRay(p.ink));
+             static_cast<int>(box.y + 3.0f), TypePx(10) , ToRay(p.ink));
     DrawText(row.role.c_str(), static_cast<int>(box.x + 8.0f),
-             static_cast<int>(box.y + 13.0f), 8, ToRay(p.muted));
+             static_cast<int>(box.y + 13.0f), TypePx(8) , ToRay(p.muted));
     if (!row.flag.empty()) {
       DrawText(row.flag.c_str(), static_cast<int>(box.Right() - 30.0f),
-               static_cast<int>(box.y + 6.0f), 8, ToRay(p.terracotta));
+               static_cast<int>(box.y + 6.0f), TypePx(8) , ToRay(p.terracotta));
     }
     navHits_.push_back(NavHit{box, "select", row.id});
     rowY += 26.0f;
@@ -965,10 +969,10 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
         const Area box{right - column + 6.0f, lineY, column - 12.0f, 18.0f};
         const std::string label = (line.on ? "[x] " : "[ ] ") + line.label;
         DrawText(label.c_str(), static_cast<int>(box.x),
-                 static_cast<int>(box.y), 9,
+                 static_cast<int>(box.y), TypePx(9) ,
                  ToRay(line.on ? p.ink : (line.locked ? p.muted : p.ink)));
         DrawText(line.cost.c_str(), static_cast<int>(box.Right() - 46.0f),
-                 static_cast<int>(box.y), 8, ToRay(p.coffee));
+                 static_cast<int>(box.y), TypePx(8) , ToRay(p.coffee));
         navHits_.push_back(NavHit{box, "order", line.id});
         lineY += 19.0f;
     }
@@ -983,9 +987,9 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
   DrawRectangleLines(static_cast<int>(left), static_cast<int>(bandY),
                      static_cast<int>(right - left), 72, ToRay(p.border));
   DrawText("Assignments", static_cast<int>(left + 8.0f),
-           static_cast<int>(bandY + 4.0f), 9, ToRay(p.coffee));
+           static_cast<int>(bandY + 4.0f), TypePx(9) , ToRay(p.coffee));
   DrawText(quarters_.bandNote.c_str(), static_cast<int>(left + 8.0f),
-           static_cast<int>(bandY + 18.0f), 10, ToRay(p.muted));
+           static_cast<int>(bandY + 18.0f), TypePx(10) , ToRay(p.muted));
   float bx = left + 8.0f;
   for (const ProgressButton& button : screen.progress) {
     const Area box{bx, bandY + 36.0f, 220.0f, 26.0f};
@@ -1001,7 +1005,7 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
                        static_cast<int>(box.w), static_cast<int>(box.h),
                        ToRay(p.borderDark));
     DrawText(button.text.c_str(), static_cast<int>(box.x + 8.0f),
-             static_cast<int>(box.y + 7.0f), 10, ToRay(p.ink));
+             static_cast<int>(box.y + 7.0f), TypePx(10) , ToRay(p.ink));
     navHits_.push_back(NavHit{box, "commit", ""});
     bx += 228.0f;
   }
@@ -1075,19 +1079,19 @@ void ShellView::PaintHero(const Vignette& vignette, const Area& box) {
 
   DrawText(vignette.code.c_str(),
            static_cast<int>(box.x + vignette.readout.x),
-           static_cast<int>(box.y + vignette.readout.y), 9, ToRay(p.coffee));
+           static_cast<int>(box.y + vignette.readout.y), TypePx(9) , ToRay(p.coffee));
   DrawText(vignette.label.c_str(),
            static_cast<int>(box.x + vignette.readout.x),
-           static_cast<int>(box.y + vignette.readout.y + 14.0f), 13, ToRay(p.ink));
+           static_cast<int>(box.y + vignette.readout.y + 14.0f), TypePx(13) , ToRay(p.ink));
   DrawText(vignette.description.c_str(),
            static_cast<int>(box.x + vignette.readout.x),
-           static_cast<int>(box.y + vignette.readout.y + 32.0f), 9, ToRay(p.muted));
+           static_cast<int>(box.y + vignette.readout.y + 32.0f), TypePx(9) , ToRay(p.muted));
   DrawText(vignette.statusTop.c_str(),
            static_cast<int>(box.x + vignette.readout.x),
-           static_cast<int>(box.y + box.h - 34.0f), 8, ToRay(p.muted));
+           static_cast<int>(box.y + box.h - 34.0f), TypePx(8) , ToRay(p.muted));
   DrawText(vignette.statusValue.c_str(),
            static_cast<int>(box.x + vignette.readout.x),
-           static_cast<int>(box.y + box.h - 22.0f), 9, ToRay(p.coffee));
+           static_cast<int>(box.y + box.h - 22.0f), TypePx(9) , ToRay(p.coffee));
 
   for (std::size_t i = 0; i < vignette.meter.size(); ++i) {
     const Area& bar = vignette.meter[i];
@@ -1116,7 +1120,8 @@ void ShellView::ShowTitle(bool fromVoyage) {
 void ShellView::PaintTitle(Simulation& sim) {
   const Palette& p = theme_.palette;
   titleHits_.clear();
-  title_ = BuildTitleScreen(sim, fromVoyage_, titlePanel_, saveDir_, titleSlot_, titleMessage_);
+  title_ = BuildTitleScreen(sim, fromVoyage_, titlePanel_, saveDir_, titleSlot_,
+                            titleMessage_, titleCard_);
 
   DrawRectangle(0, 0, static_cast<int>(width_), static_cast<int>(height_),
                 ToRay(p.panel));
@@ -1166,9 +1171,9 @@ void ShellView::PaintTitle(Simulation& sim) {
 
   const float headY = card.y + card.h * 0.55f + 18.0f;
   DrawText(title_.heading.c_str(), static_cast<int>(card.x + 34.0f),
-           static_cast<int>(headY), 40, ToRay(p.ink));
+           static_cast<int>(headY), TypePx(40) , ToRay(p.ink));
   DrawText(title_.subtitle.c_str(), static_cast<int>(card.x + 36.0f),
-           static_cast<int>(headY + 48.0f), 13, ToRay(p.muted));
+           static_cast<int>(headY + 48.0f), TypePx(13) , ToRay(p.muted));
 
   // The five commands, in a column under the title.
   float y = headY + 84.0f;
@@ -1181,7 +1186,7 @@ void ShellView::PaintTitle(Simulation& sim) {
                        static_cast<int>(box.w), static_cast<int>(box.h),
                        ToRay(action.enabled ? p.borderDark : p.border));
     DrawText(action.label.c_str(), static_cast<int>(box.x + 12.0f),
-             static_cast<int>(box.y + 9.0f), 12,
+             static_cast<int>(box.y + 9.0f), TypePx(12) ,
              ToRay(action.enabled ? p.ink : p.muted));
     if (action.enabled) { titleHits_.push_back(NavHit{box, action.id, ""}); }
     y += 38.0f;
@@ -1199,13 +1204,13 @@ void ShellView::PaintTitle(Simulation& sim) {
     float dy = dialog.y + 10.0f;
     if (!title_.panelTitle.empty()) {
       DrawText(title_.panelTitle.c_str(), static_cast<int>(dialog.x + 12.0f),
-               static_cast<int>(dy), 16, ToRay(p.ink));
+               static_cast<int>(dy), TypePx(16) , ToRay(p.ink));
       dy += 24.0f;
     }
     if (!title_.panelNote.empty()) {
       for (const std::string& line : WrapText(title_.panelNote, dialog.w - 24.0f, 10)) {
         DrawText(line.c_str(), static_cast<int>(dialog.x + 12.0f),
-                 static_cast<int>(dy), 10, ToRay(p.muted));
+                 static_cast<int>(dy), TypePx(10) , ToRay(p.muted));
         dy += 13.0f;
       }
       dy += 6.0f;
@@ -1220,7 +1225,7 @@ void ShellView::PaintTitle(Simulation& sim) {
                          static_cast<int>(box.w), static_cast<int>(box.h),
                          ToRay(row.enabled ? p.borderDark : p.border));
       DrawText(row.label.c_str(), static_cast<int>(box.x + 8.0f),
-               static_cast<int>(box.y + 6.0f), 10, ToRay(row.enabled ? p.ink : p.muted));
+               static_cast<int>(box.y + 6.0f), TypePx(10) , ToRay(row.enabled ? p.ink : p.muted));
       if (row.enabled) { titleHits_.push_back(NavHit{box, row.id, ""}); }
       dy += 26.0f;
     }
@@ -1228,7 +1233,7 @@ void ShellView::PaintTitle(Simulation& sim) {
 
   if (!titleMessage_.empty()) {
     DrawText(titleMessage_.c_str(), static_cast<int>(card.x + 36.0f),
-             static_cast<int>(card.Bottom() - 22.0f), 10, ToRay(p.coffee));
+             static_cast<int>(card.Bottom() - 22.0f), TypePx(10) , ToRay(p.coffee));
   }
 }
 
@@ -1251,26 +1256,26 @@ void ShellView::PaintLoss(Simulation& sim) {
 
   float y = card.y + 18.0f;
   DrawText(loss_.heading.c_str(), static_cast<int>(card.x + 20.0f),
-           static_cast<int>(y), 24, ToRay(p.terracotta));
+           static_cast<int>(y), TypePx(24) , ToRay(p.terracotta));
   y += 34.0f;
   for (const std::string& line : WrapText(loss_.cause, card.w - 40.0f, 12)) {
-    DrawText(line.c_str(), static_cast<int>(card.x + 20.0f), static_cast<int>(y), 12,
+    DrawText(line.c_str(), static_cast<int>(card.x + 20.0f), static_cast<int>(y), TypePx(12) ,
              ToRay(p.ink));
     y += 16.0f;
   }
   y += 4.0f;
   for (const std::string& line : WrapText(loss_.note, card.w - 40.0f, 10)) {
-    DrawText(line.c_str(), static_cast<int>(card.x + 20.0f), static_cast<int>(y), 10,
+    DrawText(line.c_str(), static_cast<int>(card.x + 20.0f), static_cast<int>(y), TypePx(10) ,
              ToRay(p.muted));
     y += 13.0f;
   }
   y += 10.0f;
   for (const PopupRow& row : loss_.summary) {
-    DrawText(row.key.c_str(), static_cast<int>(card.x + 20.0f), static_cast<int>(y), 10,
+    DrawText(row.key.c_str(), static_cast<int>(card.x + 20.0f), static_cast<int>(y), TypePx(10) ,
              ToRay(p.muted));
-    const float valueW = static_cast<float>(MeasureText(row.value.c_str(), 10));
+    const float valueW = static_cast<float>(MeasureText(row.value.c_str(), TypePx(10) ));
     DrawText(row.value.c_str(), static_cast<int>(card.Right() - 20.0f - valueW),
-             static_cast<int>(y), 10, ToRay(p.ink));
+             static_cast<int>(y), TypePx(10) , ToRay(p.ink));
     y += 14.0f;
   }
   y += 10.0f;
@@ -1283,13 +1288,13 @@ void ShellView::PaintLoss(Simulation& sim) {
                        static_cast<int>(box.w), static_cast<int>(box.h),
                        ToRay(p.borderDark));
     DrawText(action.label.c_str(), static_cast<int>(box.x + 8.0f),
-             static_cast<int>(box.y + 6.0f), 10, ToRay(p.ink));
+             static_cast<int>(box.y + 6.0f), TypePx(10) , ToRay(p.ink));
     lossHits_.push_back(NavHit{box, action.id, ""});
     y += 26.0f;
   }
   if (!lossMessage_.empty()) {
     DrawText(lossMessage_.c_str(), static_cast<int>(card.x + 20.0f),
-             static_cast<int>(card.Bottom() - 18.0f), 9, ToRay(p.coffee));
+             static_cast<int>(card.Bottom() - 18.0f), TypePx(9) , ToRay(p.coffee));
   }
 }
 
@@ -1329,11 +1334,11 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
   const float right = layout_.content.Right() - 8.0f;
 
   DrawText(screen.head.kind.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y), 9, ToRay(p.muted));
+           static_cast<int>(layout_.content.y), TypePx(9) , ToRay(p.muted));
   DrawText(screen.head.title.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y + 12.0f), 20, ToRay(p.ink));
+           static_cast<int>(layout_.content.y + 12.0f), TypePx(20) , ToRay(p.ink));
   DrawText(screen.head.sub.c_str(), static_cast<int>(left),
-           static_cast<int>(layout_.content.y + 36.0f), 11, ToRay(p.muted));
+           static_cast<int>(layout_.content.y + 36.0f), TypePx(11) , ToRay(p.muted));
 
   float top = layout_.content.y + 56.0f;
   if (screen.hasHero) {
@@ -1369,19 +1374,19 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
                            ToRay(row.enabled ? p.borderDark : p.border));
         const std::string cost = row.displayCost.empty() ? std::string("free")
                                                          : row.displayCost;
-        const float costW = static_cast<float>(MeasureText(cost.c_str(), 9));
+        const float costW = static_cast<float>(MeasureText(cost.c_str(), TypePx(9) ));
         const std::string label = row.label;
         std::string shown = label;
         while (!shown.empty() &&
-               static_cast<float>(MeasureText(shown.c_str(), 10)) >
+               static_cast<float>(MeasureText(shown.c_str(), TypePx(10) )) >
                    columnW - costW - 26.0f) {
           shown.pop_back();
         }
         DrawText(shown.c_str(), static_cast<int>(box.x + 6.0f),
-                 static_cast<int>(box.y + 6.0f), 10,
+                 static_cast<int>(box.y + 6.0f), TypePx(10) ,
                  ToRay(row.enabled ? p.ink : p.muted));
         DrawText(cost.c_str(), static_cast<int>(box.Right() - 6.0f - costW),
-                 static_cast<int>(box.y + 6.0f), 9,
+                 static_cast<int>(box.y + 6.0f), TypePx(9) ,
                  ToRay(row.enabled ? p.coffee : p.muted));
         if (row.enabled && i < screen.panelRowIds.size() &&
             r < screen.panelRowIds[i].size()) {
@@ -1400,29 +1405,29 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
                      static_cast<int>(right - left), 90, ToRay(p.border));
   if (!pendingConfirm_.empty()) {
     DrawText(pendingConfirm_.c_str(), static_cast<int>(left + 8.0f),
-             static_cast<int>(bandY + 24.0f), 10, ToRay(p.terracotta));
+             static_cast<int>(bandY + 24.0f), TypePx(10) , ToRay(p.terracotta));
     const struct {
       const char* action;
       const char* label;
     } answers[] = {{"confirm-yes", "Yes, do it"}, {"confirm-no", "Keep as it is"}};
     float ax = left + 12.0f;
     for (const auto& entry : answers) {
-      const float aw = static_cast<float>(MeasureText(entry.label, 10)) + 20.0f;
+      const float aw = static_cast<float>(MeasureText(entry.label, TypePx(10) )) + 20.0f;
       const Area box{ax, bandY + 46.0f, aw, 24.0f};
       DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
                          static_cast<int>(box.w), static_cast<int>(box.h),
                          ToRay(p.borderDark));
       DrawText(entry.label, static_cast<int>(box.x + 8.0f),
-               static_cast<int>(box.y + 7.0f), 10, ToRay(p.ink));
+               static_cast<int>(box.y + 7.0f), TypePx(10) , ToRay(p.ink));
       navHits_.push_back(NavHit{box, entry.action, ""});
       ax += aw + 8.0f;
     }
   }
 
   DrawText("Work in progress", static_cast<int>(left + 8.0f),
-           static_cast<int>(bandY + 5.0f), 11, ToRay(p.coffee));
+           static_cast<int>(bandY + 5.0f), TypePx(11) , ToRay(p.coffee));
   DrawText(screen.bandNote.c_str(), static_cast<int>(left + 8.0f),
-           static_cast<int>(bandY + 20.0f), 10, ToRay(p.muted));
+           static_cast<int>(bandY + 20.0f), TypePx(10) , ToRay(p.muted));
   float bx = left + 12.0f;
   for (const ProgressButton& button : screen.progress) {
     const Area box{bx, bandY + 50.0f, 190.0f, 28.0f};
@@ -1437,7 +1442,7 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
                        static_cast<int>(box.w), static_cast<int>(box.h),
                        ToRay(p.borderDark));
     DrawText(button.text.c_str(), static_cast<int>(box.x + 8.0f),
-             static_cast<int>(box.y + 8.0f), 10,
+             static_cast<int>(box.y + 8.0f), TypePx(10) ,
              ToRay(button.state == ButtonState::Cooldown ? p.terracotta : p.ink));
     taskButtons_.push_back({box, button.taskId});
     bx += 198.0f;
@@ -1474,32 +1479,32 @@ void ShellView::PaintPopup(Simulation& sim) {
   DrawRectangle(static_cast<int>(card.x), static_cast<int>(card.y),
                 static_cast<int>(card.w), 24, ToRay(p.panel2));
   DrawText(popup_.title.c_str(), static_cast<int>(card.x + 8.0f),
-           static_cast<int>(card.y + 6.0f), 12, ToRay(p.ink));
+           static_cast<int>(card.y + 6.0f), TypePx(12) , ToRay(p.ink));
   const Area closeBox{card.Right() - 26.0f, card.y + 3.0f, 20.0f, 18.0f};
   DrawText("x", static_cast<int>(closeBox.x + 7.0f),
-           static_cast<int>(closeBox.y + 3.0f), 12, ToRay(p.muted));
+           static_cast<int>(closeBox.y + 3.0f), TypePx(12) , ToRay(p.muted));
   popupHits_.push_back(NavHit{closeBox, "close", ""});
 
   float cy = card.y + 30.0f;
   const float pad = 10.0f;
   if (!popup_.notice.empty()) {
     DrawText(popup_.notice.c_str(), static_cast<int>(card.x + pad),
-             static_cast<int>(cy), 9, ToRay(p.muted));
+             static_cast<int>(cy), TypePx(9) , ToRay(p.muted));
     cy += 12.0f * static_cast<float>(1 + popup_.notice.size() / 74);
   }
 
   for (const PopupSection& section : popup_.sections) {
     DrawText(section.title.c_str(), static_cast<int>(card.x + pad),
-             static_cast<int>(cy), 10, ToRay(p.coffee));
+             static_cast<int>(cy), TypePx(10) , ToRay(p.coffee));
     cy += 14.0f;
     for (const PopupRow& row : section.rows) {
       if (cy + 14.0f > card.Bottom() - 8.0f) { break; }
       DrawText(row.key.c_str(), static_cast<int>(card.x + pad),
-               static_cast<int>(cy), 10, ToRay(p.ink));
-      const float valueW = static_cast<float>(MeasureText(row.value.c_str(), 9));
+               static_cast<int>(cy), TypePx(10) , ToRay(p.ink));
+      const float valueW = static_cast<float>(MeasureText(row.value.c_str(), TypePx(9) ));
       DrawText(row.value.c_str(),
                static_cast<int>(card.Right() - pad - valueW),
-               static_cast<int>(cy + 1.0f), 9, ToRay(p.muted));
+               static_cast<int>(cy + 1.0f), TypePx(9) , ToRay(p.muted));
       cy += 13.0f;
     }
     cy += 6.0f;
@@ -1510,28 +1515,27 @@ void ShellView::PaintPopup(Simulation& sim) {
     if (cy + 13.0f > card.Bottom() - 8.0f) { break; }
     std::string text = line;
     if (text.size() > 84) { text = text.substr(0, 84) + "..."; }
-    DrawText(text.c_str(), static_cast<int>(card.x + pad), static_cast<int>(cy), 9,
+    DrawText(text.c_str(), static_cast<int>(card.x + pad), static_cast<int>(cy), TypePx(9) ,
              ToRay(p.ink));
     cy += 12.0f;
     ++shownLines;
   }
   if (shownLines > 0 && shownLines < static_cast<int>(popup_.lines.size())) {
     const std::string more = "Older entries are folded away.";
-    DrawText(more.c_str(), static_cast<int>(card.x + pad), static_cast<int>(cy + 2.0f),
-             9, ToRay(p.muted));
+    DrawText(more.c_str(), static_cast<int>(card.x + pad), static_cast<int>(cy + 2.0f), TypePx(9) , ToRay(p.muted));
   }
 
   for (const PopupToggle& toggle : popup_.toggles) {
-    const Area box{card.x + pad, cy, card.w - pad * 2.0f, 22.0f};
+    const Area box{card.x + pad, cy, card.w - pad * 2.0f, TypeStep(22.0f)};
     DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
                   static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel2));
     DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
                        static_cast<int>(box.w), static_cast<int>(box.h),
                        ToRay(p.borderDark));
     DrawText(toggle.label.c_str(), static_cast<int>(box.x + 6.0f),
-             static_cast<int>(box.y + 6.0f), 10, ToRay(p.ink));
+             static_cast<int>(box.y + 6.0f), TypePx(10) , ToRay(p.ink));
     popupHits_.push_back(NavHit{box, "toggle", toggle.id});
-    cy += 24.0f;
+    cy += TypeStep(24.0f);
   }
 
   if (!popup_.themes.empty()) {
@@ -1540,7 +1544,7 @@ void ShellView::PaintPopup(Simulation& sim) {
       const std::string& key = popup_.themes[i];
       const bool active = key == popup_.theme;
       const float tw = static_cast<float>(
-          MeasureText(popup_.themeLabels[i].c_str(), 9)) + 16.0f;
+          MeasureText(popup_.themeLabels[i].c_str(), TypePx(9) )) + 16.0f;
       const Area box{tx, cy, tw, 20.0f};
       DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
                     static_cast<int>(box.w), static_cast<int>(box.h),
@@ -1549,11 +1553,47 @@ void ShellView::PaintPopup(Simulation& sim) {
                          static_cast<int>(box.w), static_cast<int>(box.h),
                          ToRay(active ? p.coffee : p.border));
       DrawText(popup_.themeLabels[i].c_str(), static_cast<int>(box.x + 8.0f),
-               static_cast<int>(box.y + 5.0f), 9, ToRay(p.ink));
+               static_cast<int>(box.y + 5.0f), TypePx(9) , ToRay(p.ink));
       popupHits_.push_back(NavHit{box, "theme", key});
       tx += tw + 6.0f;
     }
-    cy += 26.0f;
+    cy += TypeStep(26.0f);
+  }
+
+  // ---- the reading-size ladder and the window (Phase 9) ------------------
+  if (!popup_.fontStepLabels.empty()) {
+    DrawText(popup_.fontStepLine.c_str(), static_cast<int>(card.x + pad),
+             static_cast<int>(cy + 2.0f), TypePx(10), ToRay(p.muted));
+    float fx = card.x + pad;
+    for (std::size_t i = 0; i < popup_.fontStepLabels.size(); ++i) {
+      const bool active = static_cast<int>(i) == popup_.fontStep;
+      const float fw = static_cast<float>(MeasureText(popup_.fontStepLabels[i].c_str(),
+                                                      TypePx(10))) +
+                       18.0f;
+      const Area box{fx, cy + TypeStep(16.0f), fw, TypeStep(22.0f)};
+      DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                    static_cast<int>(box.w), static_cast<int>(box.h),
+                    ToRay(active ? p.white : p.panel3));
+      DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                         static_cast<int>(box.w), static_cast<int>(box.h),
+                         ToRay(active ? p.coffee : p.border));
+      DrawText(popup_.fontStepLabels[i].c_str(), static_cast<int>(box.x + 9.0f),
+               static_cast<int>(box.y + 5.0f), TypePx(10), ToRay(p.ink));
+      popupHits_.push_back(NavHit{box, "font", std::to_string(i)});
+      fx += fw + 6.0f;
+    }
+    cy += TypeStep(46.0f);
+    const Area row{card.x + pad, cy, card.w - pad * 2.0f, TypeStep(22.0f)};
+    DrawRectangle(static_cast<int>(row.x), static_cast<int>(row.y),
+                  static_cast<int>(row.w), static_cast<int>(row.h),
+                  ToRay(popup_.fullscreen ? p.panel3 : p.panel2));
+    DrawRectangleLines(static_cast<int>(row.x), static_cast<int>(row.y),
+                       static_cast<int>(row.w), static_cast<int>(row.h),
+                       ToRay(p.borderDark));
+    DrawText(popup_.fullscreenLabel.c_str(), static_cast<int>(row.x + 6.0f),
+             static_cast<int>(row.y + 5.0f), TypePx(10), ToRay(p.ink));
+    popupHits_.push_back(NavHit{row, "fullscreen", ""});
+    cy += TypeStep(26.0f);
   }
 
   for (const PopupSlot& slot : popup_.slots) {
@@ -1566,12 +1606,12 @@ void ShellView::PaintPopup(Simulation& sim) {
                        static_cast<int>(box.w), static_cast<int>(box.h),
                        ToRay(active ? p.coffee : p.border));
     DrawText(slot.label.c_str(), static_cast<int>(box.x + 6.0f),
-             static_cast<int>(box.y + 4.0f), 10, ToRay(p.ink));
+             static_cast<int>(box.y + 4.0f), TypePx(10) , ToRay(p.ink));
     DrawText(slot.summary.c_str(), static_cast<int>(box.x + 6.0f),
-             static_cast<int>(box.y + 17.0f), 9, ToRay(p.muted));
+             static_cast<int>(box.y + 17.0f), TypePx(9) , ToRay(p.muted));
     popupHits_.push_back(
         NavHit{box, "slot", std::to_string(slot.slot)});
-    cy += 33.0f;
+    cy += TypeStep(33.0f);
   }
 
   if (!popup_.slots.empty()) {
@@ -1584,7 +1624,7 @@ void ShellView::PaintPopup(Simulation& sim) {
                    {"main-menu", "Return to main menu"}};
     float bx = card.x + pad;
     for (const auto& entry : buttons) {
-      const float bw = static_cast<float>(MeasureText(entry.label, 10)) + 22.0f;
+      const float bw = static_cast<float>(MeasureText(entry.label, TypePx(10) )) + 22.0f;
       const Area box{bx, cy, bw, 24.0f};
       DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
                     static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel2));
@@ -1592,7 +1632,7 @@ void ShellView::PaintPopup(Simulation& sim) {
                          static_cast<int>(box.w), static_cast<int>(box.h),
                          ToRay(p.borderDark));
       DrawText(entry.label, static_cast<int>(box.x + 8.0f),
-               static_cast<int>(box.y + 7.0f), 10, ToRay(p.ink));
+               static_cast<int>(box.y + 7.0f), TypePx(10) , ToRay(p.ink));
       popupHits_.push_back(NavHit{box, entry.action, std::to_string(popupSlot_)});
       bx += bw + 6.0f;
     }
@@ -1601,7 +1641,7 @@ void ShellView::PaintPopup(Simulation& sim) {
 
   if (confirmNewVoyage_) {
     DrawText("Start a new voyage? Unsaved progress will be lost; saved slots are kept.",
-             static_cast<int>(card.x + pad), static_cast<int>(cy), 9,
+             static_cast<int>(card.x + pad), static_cast<int>(cy), TypePx(9) ,
              ToRay(p.terracotta));
     cy += 14.0f;
     const struct {
@@ -1610,13 +1650,13 @@ void ShellView::PaintPopup(Simulation& sim) {
     } answers[] = {{"new-voyage-yes", "Begin again"}, {"new-voyage-no", "Keep this voyage"}};
     float bx = card.x + pad;
     for (const auto& entry : answers) {
-      const float bw = static_cast<float>(MeasureText(entry.label, 10)) + 22.0f;
+      const float bw = static_cast<float>(MeasureText(entry.label, TypePx(10) )) + 22.0f;
       const Area box{bx, cy, bw, 22.0f};
       DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
                          static_cast<int>(box.w), static_cast<int>(box.h),
                          ToRay(p.borderDark));
       DrawText(entry.label, static_cast<int>(box.x + 8.0f),
-               static_cast<int>(box.y + 6.0f), 10, ToRay(p.ink));
+               static_cast<int>(box.y + 6.0f), TypePx(10) , ToRay(p.ink));
       popupHits_.push_back(NavHit{box, entry.action, ""});
       bx += bw + 6.0f;
     }
@@ -1625,7 +1665,7 @@ void ShellView::PaintPopup(Simulation& sim) {
 
   if (!popup_.message.empty()) {
     DrawText(popup_.message.c_str(), static_cast<int>(card.x + pad),
-             static_cast<int>(card.Bottom() - 16.0f), 9, ToRay(p.coffee));
+             static_cast<int>(card.Bottom() - 16.0f), TypePx(9) , ToRay(p.coffee));
   }
 }
 
@@ -1679,7 +1719,7 @@ void ShellView::PaintDiagram(const DiagramModel& diagram) {
                      ToRay(theme_.palette.borderDark));
   DrawText(diagram.corridorLabel.c_str(),
            static_cast<int>(ox + diagram.corridorLabelBox.x),
-           static_cast<int>(oy + diagram.corridorLabelBox.y), 9,
+           static_cast<int>(oy + diagram.corridorLabelBox.y), TypePx(9) ,
            ToRay(theme_.palette.muted));
 
   DrawRectangle(static_cast<int>(ox + diagram.conduit.x),
@@ -1696,9 +1736,9 @@ void ShellView::PaintDiagram(const DiagramModel& diagram) {
     DrawRectangleLines(x, y, w, h, ToRay(theme_.palette.borderDark));
     DrawRectangle(x, y, 3, h, ToRay(theme_.palette.coffee));
     if (!diagram.compact) {
-      DrawText(room.name.c_str(), x + 6, y + 4, 10, ToRay(theme_.palette.ink));
+      DrawText(room.name.c_str(), x + 6, y + 4, TypePx(10) , ToRay(theme_.palette.ink));
       if (!room.small) {
-        DrawText(room.tag.c_str(), x + w - 30, y + h - 14, 8,
+        DrawText(room.tag.c_str(), x + w - 30, y + h - 14, TypePx(8) ,
                  ToRay(theme_.palette.muted));
       }
     }
@@ -1725,7 +1765,7 @@ void ShellView::PaintDiagram(const DiagramModel& diagram) {
                   15, 15, ToRay(theme_.palette.coffeeDark));
     if (crew.labelled) {
       DrawText(crew.firstName.c_str(), static_cast<int>(ox + crew.label.x),
-               static_cast<int>(oy + crew.label.y), 9, ToRay(theme_.palette.muted));
+               static_cast<int>(oy + crew.label.y), TypePx(9) , ToRay(theme_.palette.muted));
     }
   }
 }
@@ -1756,6 +1796,13 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
                                              &titlePanel_, &titleSlot_, saveDir_,
                                              &titleMessage_);
         if (loaded) { HideTitle(); }
+        return;
+      }
+      if (hit.action == "card:next" || hit.action == "card:prev") {
+        const int count = static_cast<int>(TutorialCards().size());
+        const int step = hit.action == "card:next" ? 1 : -1;
+        const int card = titleCard_ + step;
+        if (card >= 0 && card < count) { titleCard_ = card; }
         return;
       }
       if (hit.action == "resume") {

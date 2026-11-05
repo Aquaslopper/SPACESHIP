@@ -4,6 +4,7 @@
 #include "ui/EventScreen.h"
 
 #include "core/JsNumber.h"
+#include "ui/Widgets.h"
 
 namespace ship {
 
@@ -79,11 +80,29 @@ EventScreenModel BuildEventScreen(const Simulation& sim, const std::string& even
   return model;
 }
 
-bool PressEventAction(Simulation& sim, const std::string& action, const std::string& arg) {
+namespace {
+bool PressEventActionRaw(Simulation& sim, const std::string& action, const std::string& arg) {
   (void)arg;
   if (action.compare(0, 7, "remedy:") == 0) { return sim.RemedyIncident(action.substr(7)); }
   if (action.compare(0, 7, "assign:") == 0) { return sim.AssignIncidentCrew(action.substr(7)); }
   return false;
+}
+
+}  // namespace
+
+// ============================================================================
+//  The press, with the anti-spam lock around it (Phase 9).
+//  ---------------------------------------------------------------------------
+//  One control is one control. The first press spends the action and starts the
+//  tier's lock in ACTION_COOLDOWN_RULES; a second press of the same button
+//  before another action resolves is refused, whether it comes from the window
+//  or from this harness. Free reads spend nothing and therefore lock nothing.
+// ============================================================================
+bool PressEventAction(Simulation& sim, const std::string& action, const std::string& arg) {
+  return CommitActionButton(
+      sim, ActionCooldownKey(sim, "press:event:" + action + ":" + arg),
+      ActionCooldownCategory(action + " " + arg),
+      [&]() { return PressEventActionRaw(sim, action, arg); });
 }
 
 }  // namespace ship

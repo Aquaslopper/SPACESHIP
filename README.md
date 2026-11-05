@@ -85,7 +85,9 @@ rooms), Phase 4 (Navigation and the star chart), Phase 5 (Crew Quarters and the
 crew records), Phase 6 (stations, the cargo hold and science room, and the four
 floating popups), Phase 7 (the fourteen fitted rooms, the Simulacron, the Silicon
 Marrow signal and the logbook) and Phase 8 (the handbook, the title and loss
-screens, and the synthesized soundscape) are complete and verified. Phase 2
+screens, and the synthesized soundscape) and Phase 9 (the anti-spam lock and its
+audit, the player's own audio, the 18 px typography floor, five calm palettes, the
+borderless window and the five-card tutorial) are complete and verified. Phase 2
 delivers the taskbar and its tabs, the sidebar and pinned foot, the status bar, and
 the idle screen with the ship cross-section, the feed and the two interaction
 verbs. Phase 3 adds the house task frame — head, panels, machine stage, commitment
@@ -145,7 +147,7 @@ its tests still build and run. On Windows, configure with
 | `spaceship_core` | the simulation: catalogue, state, action clock, tasks, saves. No window, no graphics |
 | `spaceship` | the Raylib + Dear ImGui client (only when the graphics packages are present) |
 | `spaceship_console` | scriptable harness that replays command scripts against the core |
-| `spaceship_tests` | CTest suite: 159 Catch2 cases / 16,742 assertions, plus the parity, catalogue and save gates (182 tests in all) |
+| `spaceship_tests` | CTest suite: 168 Catch2 cases / 17,185 assertions, plus the parity, catalogue, audit and save gates (192 tests in all) |
 
 ### Content pipeline
 

@@ -15,7 +15,7 @@ with no display.
 |---|---|---|
 | **Differential replay** | the simulation, byte for byte, against the reference running in a Node VM | `tools/trace-voyage.cjs`, `cpp/app/console_main.cpp`, `tests/parity/*.script`, `tools/run-parity.cmake` |
 | **Table gates** | the authored catalogue still matches the HTA's own tables | `node tools/export-data.cjs --check`, `catalogue.data` |
-| **Headless units** | every sentence, rectangle, cooldown, waveform and gating rule | `spaceship_tests` (Catch2), 159 cases |
+| **Headless units** | every sentence, rectangle, cooldown, waveform and gating rule | `spaceship_tests` (Catch2), 168 cases |
 
 ### 1.1 Differential replay
 
@@ -79,8 +79,8 @@ interface change is reviewable as a diff of numbers and sentences.
 
 | Gate | Result |
 |---|---|
-| `ctest` | **182 / 182 passing** |
-| `spaceship_tests` | **159 cases, 16,742 assertions** |
+| `ctest` | **192 / 192 passing** |
+| `spaceship_tests` | **168 cases, 17,185 assertions** |
 | Differential voyages | **15 scripts**, 15 `parity.*` tests, all traces identical |
 | C++ warnings | **zero** under `-Wall -Wextra -Wpedantic` (core, tests, console) |
 | GUI translation units | clean under `-fsyntax-only -Wall -Wextra -Wpedantic` |
@@ -158,7 +158,57 @@ discover it by surprise.
    in the source, so the port did not invent one. Remedies and assignment live on
    the report, which is where the reference puts them.
 
-### 3.3 Not negotiable, and checked
+### 3.3 Phase 9 — anti-spam, comfort and polish (declared additions)
+
+Phase 9 is the one phase that deliberately changes behaviour rather than
+reproducing it. Everything below is an addition on top of the HTA baseline, and
+each is held by a test; nothing here moves a number the reference owns.
+
+1. **The one-click lock (the priority).** The reference decrements a control's
+   cooldown only when another action resolves, so a script that clicks the same
+   button twice in a row advances the clock the second time. The port keeps the
+   rules (`ACTION_COOLDOWN_RULES`: routine 5, systems 10, space 15, critical 20)
+   and the key (`cd|<tab>|<id>`) but refuses the press outright while the lock
+   is up, for every paid control on every screen. `tools/audit-spam-buttons.sh`
+   plus `cpp/tests/spam_audit_tests.cpp` walk the *models* — so a new button is
+   audited the day it appears — prepare a valid enabled state, click once
+   (asserting `actionCounter` +1), click the same control again and assert both
+   that the press is refused and that the clock did not advance.
+   `SPAM_AUDIT.md` is generated from that run: 88 controls, 87 refusing the
+   second click, and the logbook's claims as the one free-by-design control
+   (they pay once and never advance the clock). Two real defects fell out of the
+   audit: the Science Room's packaging buttons had no dispatch in
+   `PressProgressButton` at all (a dead button), and every screen-level press now
+   routes through one guard so a new screen cannot forget it.
+2. **The player's own audio.** `assets/audio/music` and `assets/audio/sfx` with a
+   README that lists the exact filenames; an external file always wins over the
+   synthesised cue for that one sound, and `music/` is streamed and cycled in
+   filename order. Both halves of the search are pure filesystem inspection
+   (`audio::FindExternalAudio`) and are tested against a scratch tree, including
+   the alias names and the precedence of a promised name over its alias.
+3. **The typography floor.** The base face is 18 px rather than the reference's
+   13 px, with four steps — Base 18, +5% 19, +10% 20, +15% 21 — in Options, and
+   every line box derived from the face (1.32, rounded) so rows grow with the
+   text instead of clipping. The step travels in the save file and is clamped on
+   load, so an edited save cannot take the interface below the floor.
+4. **Five calm palettes.** The reference re-tints one parchment five times. The
+   port ships five complete low-frequency palettes — Flight Deck, Greenish Tea,
+   Dusty Blue, Oat & Linen and Pressed Botanical — none of them dark and none
+   high-chroma; the ids are unchanged so a save keeps its choice. The palette
+   table in `Popups.cpp` is derived from `Theme::Specs()` so the sheet can no
+   longer offer a theme the renderer has not got.
+5. **Borderless fullscreen.** `STATE.options.fullscreen`, a row in the settings
+   sheet, and `ToggleBorderlessWindowed()` in `main.cpp` — both at start-up and
+   whenever the preference changes while the game runs.
+6. **The five-card tutorial.** A TUTORIAL command on the main menu opens a card
+   deck: Morning Coffee Philosophy, the Free Harbor idle screen, the 1-click
+   action clock and its locks, starting the O2 filters first, and reading the
+   subtle sidebar. Paging is free, local, and never touches the voyage.
+
+None of this reaches the simulation's arithmetic: the differential voyages still
+agree with the reference byte for byte, and the catalogue gate is untouched.
+
+### 3.4 Not negotiable, and checked
 
 All numbers and their rounding (JavaScript's, via `js::`), all strings, action
 costs, cooldowns and their tiers, panel order, palette hexes, room coordinates,
@@ -172,8 +222,9 @@ asserts these as data, and the differential voyages assert them as behaviour.
 ```sh
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
-ctest --test-dir build --output-on-failure          # 182 tests
-./build/spaceship_tests --reporter compact          # 159 cases
+ctest --test-dir build --output-on-failure          # 192 tests
+./build/spaceship_tests --reporter compact          # 168 cases
+./tools/audit-spam-buttons.sh                       # the anti-spam audit + SPAM_AUDIT.md
 node tools/export-data.cjs --check                  # catalogue gate
 bash tools/check-gui-syntax.sh                      # -fsyntax-only, skips if no headers
 ```

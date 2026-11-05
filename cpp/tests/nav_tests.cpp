@@ -506,11 +506,18 @@ TEST_CASE("a voyage crosses, docks and scans through the navigation screen",
   CHECK(travel->left == 21);
   CHECK(sim.StatValue("fuel") == fuelBefore - 21);
 
-  // Standing watch advances the crossing, one action at a time, and nothing
-  // else on the screen can.
+  // Standing watch advances the crossing, one action at a time. Phase 9: the
+  // button carries the space tier's 15-action lock, so a second press of the
+  // same control is refused until another action has resolved; the rest of the
+  // crossing is walked with that pattern, exactly as a player would.
+  const double watchFirst = sim.ActionCount();
+  CHECK(ship::PressNavAction(sim, "stand-watch"));
+  CHECK(sim.ActionCount() == watchFirst + 1);
+  CHECK_FALSE(ship::PressNavAction(sim, "stand-watch"));   // locked: no second click
+  CHECK(sim.ActionCount() == watchFirst + 1);
   while (sim.FindOngoing("travel")->state == "running") {
     const double actions = sim.ActionCount();
-    CHECK(ship::PressNavAction(sim, "stand-watch"));
+    sim.PerformAction("Stood watch");   // the same action, taken elsewhere
     CHECK(sim.ActionCount() == actions + 1);
   }
   CHECK(sim.FindOngoing("travel")->state == "done");

@@ -786,8 +786,8 @@ every declared divergence.
 
 **Total: roughly 17–21 working days — all eight phases are complete; see `PARITY.md`.**
 
-**Status: Phases 0–8 complete and verified** — 182 CTest gates, 159 Catch2 cases
-and 16,742 assertions, fifteen differential voyages byte-identical to the
+**Status: Phases 0–9 complete and verified** — 192 CTest gates, 168 Catch2 cases
+and 17,185 assertions, fifteen differential voyages byte-identical to the
 reference, and `PARITY.md` recording both the proof and the declared visual
 exceptions.
 
@@ -823,3 +823,29 @@ exceptions.
 
 If you want a different order (for example, the navigation chart first because it is the riskiest visual), say so
 and I will re-sequence Phases 2–4; nothing in the module breakdown depends on the order.
+
+### Phase 9 — Anti-spam, custom audio, accessibility and polish — DONE
+
+The one deliberate change to behaviour, plus the comfort work around it. Every
+paid control now refuses the very next click — through the reference's own
+`ACTION_COOLDOWN_RULES` ladder, an ongoing task, or the state change the click
+caused — and `tools/audit-spam-buttons.sh` walks every screen/tab's *model*,
+presses each enabled paid control twice on a freshly prepared voyage and writes
+`SPAM_AUDIT.md` (88 controls, 87 locked, the logbook's claims free by design).
+The audit found two real defects: the Science Room's packaging buttons had no
+dispatch in `PressProgressButton` (dead in the UI), and the settings sheet kept
+its own copy of the theme table, which had drifted from `Theme::Specs()`.
+
+Around it: `assets/audio/{music,sfx}` with a README naming the exact files, an
+external file always beating the synthesised cue and `music/` streamed and cycled
+in filename order; an 18 px typography floor with four steps (Base 18, +5% 19,
++10% 20, +15% 21), line boxes derived from the face and the step saved and
+clamped on load; five calm palettes (Flight Deck, Greenish Tea, Dusty Blue, Oat &
+Linen, Pressed Botanical) that are all light paper, muted panels, deep ink and one
+soft accent; a borderless-fullscreen row wired to `ToggleBorderlessWindowed()` at
+start-up and on change; and a five-card tutorial on the main menu (coffee, the
+free harbor, the 1-click clock, O2 first, reading the sidebar).
+
+`PARITY.md` §3.3 declares all of it, and no differential voyage moved.
+**Gate:** `ctest` 192/192, `spaceship_tests` 168 cases / 17,185 assertions, both
+GUI translation units clean, catalogue and every parity script unchanged.

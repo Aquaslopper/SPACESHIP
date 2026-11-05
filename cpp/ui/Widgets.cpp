@@ -69,16 +69,6 @@ bool MentionsAction(const std::string& text) {
   return false;
 }
 
-std::string RuleLabel(const Simulation& sim, const std::string& category) {
-  auto it = sim.GameRules().cooldowns.find(category);
-  return it != sim.GameRules().cooldowns.end() ? it->second.label : "Action";
-}
-
-double RuleActions(const Simulation& sim, const std::string& category) {
-  auto it = sim.GameRules().cooldowns.find(category);
-  return it != sim.GameRules().cooldowns.end() ? it->second.actions : 5.0;
-}
-
 }  // namespace
 
 // ---------------------------------------------------------------------------
@@ -130,6 +120,16 @@ std::string ActionCooldownCategory(const std::string& subject,
 double CooldownRemaining(const Simulation& sim, const std::string& key) {
   auto it = sim.State().actionCooldowns.find(key);
   return it == sim.State().actionCooldowns.end() ? 0.0 : it->second.remaining;
+}
+
+std::string RuleLabel(const Simulation& sim, const std::string& category) {
+  auto it = sim.World().rules.cooldowns.find(category);
+  return it == sim.World().rules.cooldowns.end() ? std::string("Action") : it->second.label;
+}
+
+double RuleActions(const Simulation& sim, const std::string& category) {
+  auto it = sim.World().rules.cooldowns.find(category);
+  return it == sim.World().rules.cooldowns.end() ? 5.0 : it->second.actions;
 }
 
 bool IsActionCost(const std::string& cost, bool hasCost) {
@@ -249,6 +249,12 @@ bool PressProgressButton(Simulation& sim, const std::string& taskId) {
                                 const std::string id = taskId.substr(8);
                                 if (id == "social") { return false; }  // needs a pair
                                 return sim.StartProject(id);
+                              }
+                              // Science packaging: the Science Room's own
+                              // progress button (Phase 9 audit found it had no
+                              // dispatch at all, so the button was dead).
+                              if (taskId.compare(0, 4, "pkg-") == 0) {
+                                return sim.PackageSurvey(taskId.substr(4));
                               }
                               if (taskId.compare(0, 4, "doc-") == 0) {
                                 return sim.StartMedical(taskId.substr(4));

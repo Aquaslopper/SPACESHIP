@@ -5,6 +5,7 @@
 #include "ui/RoomsScreen.h"
 
 #include "core/JsNumber.h"
+#include "ui/Widgets.h"
 #include "ui/Shell.h"
 
 #include <algorithm>
@@ -302,7 +303,8 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
   return model;
 }
 
-bool PressRoomAction(Simulation& sim, const std::string& action, const std::string& arg) {
+namespace {
+bool PressRoomActionRaw(Simulation& sim, const std::string& action, const std::string& arg) {
   (void)arg;
   if (action == "open-nav") {
     OpenTask(sim, "nav", "main", true);   // looking at the chart is free
@@ -340,6 +342,23 @@ bool PressRoomAction(Simulation& sim, const std::string& action, const std::stri
     return sim.StartSocial(rest.substr(0, cut), rest.substr(cut + 1));
   }
   return false;
+}
+
+}  // namespace
+
+// ============================================================================
+//  The press, with the anti-spam lock around it (Phase 9).
+//  ---------------------------------------------------------------------------
+//  One control is one control. The first press spends the action and starts the
+//  tier's lock in ACTION_COOLDOWN_RULES; a second press of the same button
+//  before another action resolves is refused, whether it comes from the window
+//  or from this harness. Free reads spend nothing and therefore lock nothing.
+// ============================================================================
+bool PressRoomAction(Simulation& sim, const std::string& action, const std::string& arg) {
+  return CommitActionButton(
+      sim, ActionCooldownKey(sim, "press:room:" + action + ":" + arg),
+      ActionCooldownCategory(action + " " + arg),
+      [&]() { return PressRoomActionRaw(sim, action, arg); });
 }
 
 }  // namespace ship

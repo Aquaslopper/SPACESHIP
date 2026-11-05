@@ -112,7 +112,10 @@ std::string Simulation::SaveJson() const {
                       {"theme", state_.options.theme},
                       {"soundEffects", state_.options.soundEffects},
                       {"music", state_.options.music},
-                      {"audioLevel", Num(state_.options.audioLevel)}};
+                      {"audioLevel", Num(state_.options.audioLevel)},
+                      // Phase 9: the reading size and the window travel too.
+                      {"fontStep", Num(static_cast<double>(state_.options.fontStep))},
+                      {"fullscreen", state_.options.fullscreen}};
 
   Json chronicle = Json::object();
   chronicle["version"] = state_.chronicle.version;
@@ -1059,6 +1062,9 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
       state_.options.soundEffects = GetBool(*it, "soundEffects", true);
       state_.options.music = GetBool(*it, "music", true);
       state_.options.audioLevel = GetNumber(*it, "audioLevel", 0.4);
+      const double step = GetNumber(*it, "fontStep", 0.0);
+      state_.options.fontStep = step < 0 ? 0 : (step > 3 ? 3 : static_cast<int>(step));
+      state_.options.fullscreen = GetBool(*it, "fullscreen", false);
     }
 
     state_.chronicle = Chronicle();

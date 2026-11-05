@@ -4,6 +4,7 @@
 #include "ui/QuartersScreen.h"
 
 #include "core/JsNumber.h"
+#include "ui/Widgets.h"
 
 #include <algorithm>
 #include <map>
@@ -299,7 +300,8 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
 // ---------------------------------------------------------------------------
 // The pad's presses
 // ---------------------------------------------------------------------------
-bool PressQuartersAction(Simulation& sim, const std::string& action,
+namespace {
+bool PressQuartersActionRaw(Simulation& sim, const std::string& action,
                          const std::string& arg) {
   if (action == "select") {
     // FREE: looking at a crew member is free.
@@ -322,6 +324,23 @@ bool PressQuartersAction(Simulation& sim, const std::string& action,
     }
   }
   return false;
+}
+
+}  // namespace
+
+// ============================================================================
+//  The press, with the anti-spam lock around it (Phase 9).
+//  ---------------------------------------------------------------------------
+//  One control is one control. The first press spends the action and starts the
+//  tier's lock in ACTION_COOLDOWN_RULES; a second press of the same button
+//  before another action resolves is refused, whether it comes from the window
+//  or from this harness. Free reads spend nothing and therefore lock nothing.
+// ============================================================================
+bool PressQuartersAction(Simulation& sim, const std::string& action, const std::string& arg) {
+  return CommitActionButton(
+      sim, ActionCooldownKey(sim, "press:quarters:" + action + ":" + arg),
+      ActionCooldownCategory(action + " " + arg),
+      [&]() { return PressQuartersActionRaw(sim, action, arg); });
 }
 
 }  // namespace ship

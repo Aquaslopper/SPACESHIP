@@ -4,6 +4,7 @@
 #include "ui/Popups.h"
 
 #include "core/JsNumber.h"
+#include "ui/Theme.h"
 
 #include <algorithm>
 
@@ -11,11 +12,17 @@ namespace ship {
 
 namespace {
 
+// The same five themes the renderer knows, so the settings sheet can never
+// offer a palette the ship has not got (Phase 9 replaced the literal table that
+// used to drift from Theme::Specs()).
 const std::vector<std::pair<std::string, std::string>>& ThemeTable() {
-  static const std::vector<std::pair<std::string, std::string>> table = {
-      {"classic", "Flight Deck - parchment"}, {"void", "Deep Space - cyan"},
-      {"aurora", "Aurora - mint"},            {"nebula", "Nebula - violet"},
-      {"ember", "Ember - copper"}};
+  static const std::vector<std::pair<std::string, std::string>> table = [] {
+    std::vector<std::pair<std::string, std::string>> rows;
+    for (const ThemeSpec& spec : Theme::Specs()) {
+      rows.emplace_back(spec.id, spec.label);
+    }
+    return rows;
+  }();
   return table;
 }
 
@@ -129,6 +136,22 @@ PopupModel BuildPopup(const Simulation& sim, const std::string& key,
     model.themeLabels.push_back(theme.second);
   }
   model.theme = options.theme.empty() ? "classic" : options.theme;
+
+  // ---- typography floor and the window ----------------------------------
+  // Four steps, all of them legible: 18 px is the floor and each step adds 5%.
+  model.fontStep = options.fontStep < 0 ? 0 : (options.fontStep > 3 ? 3 : options.fontStep);
+  const char* stepNames[] = {"Base", "+5%", "+10%", "+15%"};
+  for (int step = 0; step < 4; ++step) {
+    const int px = static_cast<int>(Theme::FontPxForStep(step));
+    model.fontStepLabels.push_back(std::string(stepNames[step]) + " (" +
+                                   js::NumToString(px) + "px)");
+  }
+  const double stepPx = static_cast<double>(Theme::FontPxForStep(model.fontStep));
+  model.fontStepLine = "Reading size: " + std::string(stepNames[model.fontStep]) + " (" +
+                       js::NumToString(stepPx) + " px)";
+  model.fullscreen = options.fullscreen;
+  model.fullscreenLabel = options.fullscreen ? "Window: Borderless fullscreen"
+                                             : "Window: Windowed";
   return model;
 }
 
@@ -164,6 +187,26 @@ bool PressPopupAction(Simulation& sim, const std::string& key,
     }
     if (action == "audio") {
       options.audioLevel = std::stod(arg);
+      return true;
+    }
+    if (action == "font") {
+      // Free, and clamped to the four offered steps rather than trusted.
+      const int step = std::stoi(arg.empty() ? "0" : arg);
+      if (step < 0 || step > 3) { return false; }
+      options.fontStep = step;
+      return true;
+    }
+    if (action == "font-step") {
+      // The keyboard's version of the ladder: one step up or down, stopping at
+      // the ends instead of wrapping past them.
+      const int delta = arg == "-1" ? -1 : 1;
+      const int step = options.fontStep + delta;
+      if (step < 0 || step > 3) { return false; }
+      options.fontStep = step;
+      return true;
+    }
+    if (action == "fullscreen") {
+      options.fullscreen = !options.fullscreen;
       return true;
     }
     return false;

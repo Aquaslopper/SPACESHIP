@@ -36,6 +36,11 @@ std::string ActionCooldownCategory(const std::string& subject,
                                    const std::string& preferred = std::string());
 double CooldownRemaining(const Simulation& sim, const std::string& key);
 
+// The rule's own numbers, so a test can hold a lock to them instead of to a
+// literal: routine 5, systems 10, space 15, critical 20 actions.
+double RuleActions(const Simulation& sim, const std::string& category);
+std::string RuleLabel(const Simulation& sim, const std::string& category);
+
 // isActionCost(): undefined/null counts as an action cost, otherwise the cost
 // string has to say "action" or "actions".
 bool IsActionCost(const std::string& cost, bool hasCost = true);

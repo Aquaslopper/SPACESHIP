@@ -4,6 +4,7 @@
 #include "ui/StoresScreen.h"
 
 #include "core/JsNumber.h"
+#include "ui/Widgets.h"
 
 namespace ship {
 
@@ -95,7 +96,8 @@ StoresScreenModel BuildStoresScreen(const Simulation& sim, const std::string& ro
   return model;
 }
 
-bool PressStoresAction(Simulation& sim, const std::string& action,
+namespace {
+bool PressStoresActionRaw(Simulation& sim, const std::string& action,
                        const std::string& arg) {
   if (action.compare(0, 9, "jettison:") == 0) return sim.Jettison(action.substr(9));
   if (action.compare(0, 8, "salvage:") == 0) {
@@ -106,6 +108,23 @@ bool PressStoresAction(Simulation& sim, const std::string& action,
   }
   (void)arg;
   return false;
+}
+
+}  // namespace
+
+// ============================================================================
+//  The press, with the anti-spam lock around it (Phase 9).
+//  ---------------------------------------------------------------------------
+//  One control is one control. The first press spends the action and starts the
+//  tier's lock in ACTION_COOLDOWN_RULES; a second press of the same button
+//  before another action resolves is refused, whether it comes from the window
+//  or from this harness. Free reads spend nothing and therefore lock nothing.
+// ============================================================================
+bool PressStoresAction(Simulation& sim, const std::string& action, const std::string& arg) {
+  return CommitActionButton(
+      sim, ActionCooldownKey(sim, "press:stores:" + action + ":" + arg),
+      ActionCooldownCategory(action + " " + arg),
+      [&]() { return PressStoresActionRaw(sim, action, arg); });
 }
 
 }  // namespace ship

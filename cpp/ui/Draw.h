@@ -104,6 +104,17 @@ class ShellView {
   void SetTheme(const Theme& theme) { theme_ = theme; }
 
  private:
+  // Phase 9 typography: every face in the GUI is authored against the
+  // reference's 13 px and steps with the reader's choice, so the whole
+  // interface grows together instead of one label at a time.
+  int TypePx(int reference) const;
+  // The same factor for text-driven row cadences: a line box grows with the
+  // face so a list of toggles or slots never overlaps itself.
+  float TypeStep(float reference) const {
+    return reference * (theme_.FontPx() / 13.0f);
+  }
+  float TypeFace() const { return theme_.FontPx() / 13.0f; }
+
   Theme theme_;
   ShellLayout layout_;
   FxRng rng_;
@@ -162,6 +173,7 @@ class ShellView {
   bool fromVoyage_ = false;
   TitlePanel titlePanel_ = TitlePanel::None;
   int titleSlot_ = 1;
+  int titleCard_ = 0;   // which tutorial card is up (Phase 9)
   std::string titleMessage_;
   TitleModel title_;
   std::vector<NavHit> titleHits_;
