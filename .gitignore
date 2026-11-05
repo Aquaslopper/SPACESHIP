@@ -1,6 +1,7 @@
 /build/
 /build-*/
 /cmake-build-*/
+/hta-port-comparison/
 
 /runtime/saves/*.json*
 runtime/saves/*.json
