@@ -44,3 +44,7 @@ References: original `Spaceship.hta`, the supplied runtime montage `10_reference
 | Title/options/audio | Artwork/sheets, palettes, accessibility/readability, audio controls, runtime frame/resource stability | Prior fixes; visual/runtime audit OPEN |
 
 No complete-codebase or 1:1 sign-off. No merge authorized by this audit.
+
+## Pass 2 — focused health chain
+
+[Clause-by-clause HTA/native health audit](health_source_audit.md): read action ordering, filter/air stages, hunger/starvation, worker costs/availability, treatment and death cleanup before editing. Two new full-trace differential scenarios match source. Found missing Quarters condition bars and shared painter ignoring existing authored bar colours; repaired presentation without inventing core health rules. **219/219 local tests pass**; GPU appearance and the remaining health workflows are still open.

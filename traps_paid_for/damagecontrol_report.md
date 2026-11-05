@@ -427,3 +427,12 @@ Read the Developer Note and repair rules, reviewed the supplied images and trace
 Graphical OS/GPU comparison, all-room cooldown semantics, complete visual matching and the complete codebase audit remain OPEN. Do not infer full parity from this pass. Do not merge.
 
 Validation for pass 1: `cmake --build build --parallel 4` passes; **216/216 CTests pass**, with pinned GUI syntax, ImGui input and actual-painter CPU recording probes all executed (no skips). Final log `/tmp/code-audit-tests.log`; `git diff --check` clean. This does not establish GPU/OS visual fidelity. Windows CI result will be recorded separately from these checks.
+
+<a id="health-source-pass"></a>
+## 2026-11-05 — focused health/air/food/worker source pass
+
+User requested original code read and transported, not assumed missing mechanics. Read the relevant HTA clauses and native paths in execution order; [full clause-by-clause mapping and bounded evidence](health_source_audit.md). Existing native TickCrew includes air health loss, staggered feeding/hunger and starvation; work duration/thresholds use air; medical and death cleanup also exist. Two new traces run actual HTA tick callbacks and original startMedical against native boundary states and match byte-for-byte. No demonstrated core health mismatch in these scenarios, so no invented core rewrite.
+
+**Confirmed repairs:** Quarters omitted the four source condition bars; restored actual value/colour bars for Health, Morale, Fatigue, Hunger. Crew record already emitted bars but shared painter ignored their tone and painted brown; honour source tone with prior fallback. Inversion applies to bad-stat colour, not width. Actual painter probe detects red/amber and live health updates; restoring the old brown-only rendering deliberately reproduces failure.
+
+**Checks:** full build and **219/219 CTests pass**, all optional probes executed; `git diff --check` clean. Focused traces cover eating-before-starvation, empty rack, bad-air harm cadence, stacked harm/death, medical 50→75, worker death/canister refund, foul-air automatic task costs and food production, treatment refusal while busy and no retroactive task rescaling after air recovery. Trace fixtures only set named starting state; they do not reimplement health/ticks. No changed save schema, job costs, treatment rules or renderer build flags. No OS/GPU health screenshots or exhaustive whole-game claim. Keep PR draft/unmerged; remaining health workflows and broader audit stay OPEN.

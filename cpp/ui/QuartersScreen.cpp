@@ -168,10 +168,17 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
   const CrewMember& hand = *selected;
   model.scene = BuildCrewScene(sim, hand);
 
-  cond.Field("Health", js::NumToString(hand.health));
-  cond.Field("Morale", js::NumToString(hand.morale));
-  cond.Field("Fatigue", js::NumToString(hand.fatigue));
-  cond.Field("Hunger", js::NumToString(hand.hunger));
+  // HTA paintCrewPanels -> statLine: numbers AND coloured bars. Hunger and
+  // fatigue invert the colour judgement, never the actual bar width.
+  const auto vital = [&](const std::string& label, double value, bool bad) {
+    cond.Field(label, js::NumToString(value));
+    const double good = bad ? 100 - value : value;
+    cond.Bar(value, good >= 70 ? "#7f9161" : good >= 40 ? "#c08a3e" : "#b05a42");
+  };
+  vital("Health", hand.health, false);
+  vital("Morale", hand.morale, false);
+  vital("Fatigue", hand.fatigue, true);
+  vital("Hunger", hand.hunger, true);
 
   const JobDef* job = sim.FindJobDef(hand.job);
   stand.Field("Role", hand.role);

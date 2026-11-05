@@ -703,7 +703,7 @@ void ShellView::PaintPanel(const NavPanel& panel, const Area& box) {
                       static_cast<int>(w), 5, ToRay(p.panel3));
         DrawRectangle(static_cast<int>(box.x + 8.0f), static_cast<int>(y),
           static_cast<int>(w * std::max(0.0, std::min(100.0, item.pct)) / 100.0),
-          5, ToRay(p.coffee));
+          5, HexColor(item.tone, ToRay(p.coffee)));
         y += TypeStep(11.0f);
         break;
       }

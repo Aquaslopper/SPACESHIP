@@ -159,6 +159,23 @@ int main() {
     view.Click(sim, point.x + 2, point.y + 2, ship::HitButton::Left, 0);
     Require(sim.ActionCount() == beforeBuy + 1, "Locked station row remained clickable");
 
+    sim.FindCrew("jax")->health = 25;
+    sim.FindCrew("jax")->morale = 55;
+    sim.FindCrew("jax")->fatigue = 80;
+    sim.FindCrew("jax")->hunger = 90;
+    ship::OpenTask(sim, "crew", "jax", true);
+    Frame(view, sim);
+    FindText("Health");
+    Require(std::any_of(rects.begin(), rects.end(), [](const auto& r) {
+      return r.color.r == 176 && r.color.g == 90 && r.color.b == 66 && r.h == 5 && r.w > 0;
+    }), "Critical health/vital bars did not paint the source red");
+    Require(std::any_of(rects.begin(), rects.end(), [](const auto& r) {
+      return r.color.r == 192 && r.color.g == 138 && r.color.b == 62 && r.h == 5 && r.w > 0;
+    }), "Intermediate morale did not paint the source amber");
+    sim.FindCrew("jax")->health = 75;
+    Frame(view, sim);
+    FindText("75%  Excellent");
+
     Texture2D title{}; title.id = 1; title.width = 1672; title.height = 941;
     view.SetTitleTexture(&title);
     view.ShowTitle(false);
@@ -170,7 +187,7 @@ int main() {
     Require(view.Panel() == ship::TitlePanel::Settings && textureCalls == 1,
             "Options replaced the title image instead of opening a sheet over it");
     ImGui::DestroyContext();
-    std::cout << "PASS: real Draw.cpp scroll direction, windowed Assignments, Vessel input/clamp, green action/air fills, visible station cooldown, title art retained behind Options; all text >=18px\n";
+    std::cout << "PASS: real Draw.cpp scroll direction, windowed Assignments, Vessel input/clamp, green action/air fills, visible station cooldown, source health colours/live values, title art retained behind Options; all text >=18px\n";
     return 0;
   } catch (const std::exception& error) {
     std::cerr << "draw probe: " << error.what() << '\n'; return 1;
