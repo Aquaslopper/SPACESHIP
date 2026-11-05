@@ -133,7 +133,6 @@ class ShellView {
   void PaintQuartersScreen(Simulation& sim);
   void PaintCrewRecord(const Simulation& sim);
   void PaintPanel(const NavPanel& panel, const Area& box);
-  float MeasurePanelHeight(const NavPanel& panel, float width) const;
   void PaintStage(const TaskStage& stage, const Area& origin);
   void PaintIdle(Simulation& sim);
   void PaintDiagram(const DiagramModel& diagram, const Area& stageBox, float scale);

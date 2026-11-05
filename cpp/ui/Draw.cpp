@@ -946,8 +946,8 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   // --- panels: identity left, sensors right, the leg underneath the chart
   float ly = layout_.content.y + 58.0f;
   for (const NavPanel& panel : screen.left) {
-    const float panelH = std::max(96.0f, MeasurePanelHeight(panel, column));
-    PaintPanel(panel, Area{left, ly, column, panelH});
+    const float panelH = std::max(96.0f, MeasurePanelHeight(panel, leftColumn));
+    PaintPanel(panel, Area{left, ly, leftColumn, panelH});
     ly += panelH + 4.0f;
   }
   if (!screen.right.empty()) {
