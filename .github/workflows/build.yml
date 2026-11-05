@@ -3,15 +3,20 @@
 #  ---------------------------------------------------------------------------
 #  Two jobs, on every push, every pull request, and on demand:
 #
-#    windows-exe    MSVC builds spaceship.exe and the test binary, runs the
-#                   168-case suite, assembles dist/Spaceship/ and uploads it as
-#                   the Spaceship-Windows-x64 artifact.
+#    windows-exe    cross-compiles spaceship.exe with MinGW on ubuntu-latest
+#                   against the official prebuilt raylib 6.0 win64-mingw
+#                   archive (the same recipe as Xeno-koi's release build), runs
+#                   the 168-case suite under Wine, then uploads dist/Spaceship
+#                   as the Spaceship-Windows-x64 artifact.
 #    linux-parity   the same tree linked against real X11/OpenGL/ALSA — the GUI
 #                   binary and every CTest gate, including the differential
 #                   voyages against Spaceship.hta.
 #
-#  Everything is fetched by CMake (raylib 6.0, Dear ImGui v1.92.7, rlImGui,
-#  Catch2, nlohmann/json), so a runner needs only a compiler, CMake and network.
+#  Why cross-compile rather than run cl.exe on windows-latest: the Windows
+#  toolchain there is a moving target (CMake 4 rejects old cmake_minimum_required
+#  inside FetchContent subprojects such as raylib's glfw), while a MinGW build
+#  pins raylib to a released archive, needs no interop with MSVC's code page, and
+#  produces a statically linked executable — no DLLs beside it.
 # ============================================================================
 name: build
 
@@ -32,37 +37,78 @@ jobs:
   # --------------------------------------------------------------------------
   windows-exe:
     name: Windows x64 (spaceship.exe + artifact)
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 60
-    defaults:
-      run:
-        shell: bash
 
     steps:
       - name: Check out the repository
         uses: actions/checkout@v4
 
-      - name: Configure (Release)
+      - name: Install the MinGW cross-compiler, zip and Wine
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 zip wine64
+
+      - name: Download raylib 6.0 for Windows (MinGW)
+        run: |
+          curl -sSL -o raylib_win.zip \
+            https://github.com/raysan5/raylib/releases/download/6.0/raylib-6.0_win64_mingw-w64.zip
+          unzip -q raylib_win.zip
+          # the archive unpacks into raylib-6.0_win64_mingw-w64/
+          mv raylib-6.0_win64_mingw-w64 raylib_win 2>/dev/null || {
+            mkdir -p raylib_win
+            mv raylib-6.0_win64_mingw-w64/* raylib_win/
+          }
+          ls raylib_win raylib_win/lib
+          test -f raylib_win/include/raylib.h
+          test -f raylib_win/lib/libraylib.a
+
+      - name: Configure (cross-compile, Release)
         run: |
           set -o pipefail
-          # The configure log is the one thing a failed run has to explain
-          # itself with: keep it, and surface its tail as an annotation.
-          if ! cmake -S . -B build -DCMAKE_BUILD_TYPE=Release 2>&1 | tee configure.log; then
-            cmake --version | head -1 | sed 's/^/::error::/'
+          if ! cmake -S . -B build-win \
+                 -DCMAKE_BUILD_TYPE=Release \
+                 -DCMAKE_SYSTEM_NAME=Windows \
+                 -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc \
+                 -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++ \
+                 -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+                 -DSPACESHIP_RAYLIB_PREBUILT="$PWD/raylib_win" 2>&1 | tee configure.log; then
             echo "::error::--- error lines ---"
             grep -n -i -m 6 -E "cmake error|error:|could not|failed" configure.log | sed 's/^/::error::/' || true
-            echo "::error::--- context ---"
-            sed -n '/CMake Error/,+6p' configure.log | sed 's/^/::error::/' || true
             echo "::error::--- last lines ---"
-            tail -6 configure.log | sed 's/^/::error::/'
+            tail -12 configure.log | sed 's/^/::error::/'
             exit 1
           fi
 
       - name: Build spaceship and spaceship_tests
-        run: cmake --build build --config Release --parallel
+        run: |
+          set -o pipefail
+          if ! cmake --build build-win --parallel 2>&1 | tee build.log; then
+            echo "::error::--- error lines ---"
+            grep -n -i -m 8 -E "error|undefined reference|ld returned" build.log | sed 's/^/::error::/' || true
+            echo "::error::--- last lines ---"
+            tail -12 build.log | sed 's/^/::error::/'
+            exit 1
+          fi
 
-      - name: Run the unit suite
-        run: ./build/Release/spaceship_tests.exe --reporter compact
+      - name: Prove the executable is a Windows GUI binary
+        run: |
+          file build-win/spaceship.exe
+          # Subsystem 2 = GUI: double-clicking must not open a console.
+          x86_64-w64-mingw32-objdump -p build-win/spaceship.exe | grep -i "^Subsystem" | tee subsystem.txt
+          grep -q "Subsystem.*00000002" subsystem.txt
+
+      - name: Run the unit suite under Wine
+        run: |
+          set -o pipefail
+          export WINEDEBUG=-all
+          WINE=$(command -v wine64 || command -v wine)
+          echo "using $WINE"
+          # First run initialises the Wine prefix; the tests themselves are
+          # headless and read assets/ relative to the working directory.
+          "$WINE" build-win/spaceship_tests.exe --reporter compact 2>&1 | tee tests.log
+          grep -q "All tests passed" tests.log
 
       - name: Assemble dist/Spaceship
         run: |
@@ -71,7 +117,7 @@ jobs:
           rm -rf "$dist"
           mkdir -p "$dist/assets" "$dist/runtime/saves"
 
-          cp build/Release/spaceship.exe "$dist/spaceship.exe"
+          cp build-win/spaceship.exe "$dist/spaceship.exe"
 
           # The four asset folders the game loads, exactly as shipped.
           for part in data art fonts audio; do
@@ -80,28 +126,19 @@ jobs:
             fi
           done
 
-          # A save slot that exists but is empty: the game writes into it.
+          # A save folder that exists but is empty: the game writes into it.
           cp runtime/saves/.gitkeep "$dist/runtime/saves/.gitkeep" 2>/dev/null || true
           {
             echo "This folder holds the three save slots, beside spaceship.exe."
             echo "The game creates them on the first save; deleting one is a"
             echo "safe way to start a slot over."
           } > "$dist/runtime/saves/README.txt"
+
           cp README.md PARITY.md SPAM_AUDIT.md "$dist/"
 
           echo "---- distribution ----"
-          find "$dist" -maxdepth 3 -type d | sort
+          find "$dist" -maxdepth 3 | sort
           du -sh "$dist"
-
-      - name: Smoke-test the build headlessly
-        run: |
-          # spaceship.exe is a windowed binary and would sit there waiting for a
-          # window nobody is watching, so the smoke test drives the console
-          # harness instead: same core, same catalogue, same assets, and it
-          # prints a canonical trace for a real voyage.
-          ./build/Release/spaceship_console.exe tests/parity/voyage-01.script | head -5
-          test -f dist/Spaceship/spaceship.exe
-          test -f dist/Spaceship/assets/data/manifest.json
 
       - name: Upload the Windows build
         uses: actions/upload-artifact@v4
@@ -139,19 +176,25 @@ jobs:
       - name: Configure (Release)
         run: |
           set -o pipefail
-          if ! cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release 2>&1 | tee configure.log; then
-            cmake --version | head -1 | sed 's/^/::error::/'
+          if ! cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+                 -DCMAKE_POLICY_VERSION_MINIMUM=3.5 2>&1 | tee configure.log; then
             echo "::error::--- error lines ---"
             grep -n -i -m 6 -E "cmake error|error:|could not|failed" configure.log | sed 's/^/::error::/' || true
-            echo "::error::--- context ---"
-            sed -n '/CMake Error/,+6p' configure.log | sed 's/^/::error::/' || true
             echo "::error::--- last lines ---"
-            tail -6 configure.log | sed 's/^/::error::/'
+            tail -12 configure.log | sed 's/^/::error::/'
             exit 1
           fi
 
       - name: Build everything
-        run: cmake --build build --parallel
+        run: |
+          set -o pipefail
+          if ! cmake --build build --parallel 2>&1 | tee build.log; then
+            echo "::error::--- error lines ---"
+            grep -n -i -m 8 -E "error|undefined reference|ld returned" build.log | sed 's/^/::error::/' || true
+            echo "::error::--- last lines ---"
+            tail -12 build.log | sed 's/^/::error::/'
+            exit 1
+          fi
 
       - name: Run every gate
         run: ctest --test-dir build --output-on-failure -j 4

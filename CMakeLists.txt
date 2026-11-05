@@ -49,15 +49,32 @@ endif()
 if(WIN32)
   add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
 endif()
+if(MINGW)
+  # A downloadable build must not ask the player for libstdc++-6.dll.
+  add_link_options(-static)
+endif()
 
 option(SPACESHIP_BUILD_GUI   "Build the Raylib + Dear ImGui client" ON)
 option(SPACESHIP_BUILD_TESTS "Build the CTest suite"               ON)
 option(SPACESHIP_DATA_GATE   "Verify assets/data against Spaceship.hta via node" ON)
+# A directory holding a prebuilt raylib (include/raylib.h and lib/libraylib.a),
+# as the official release archives ship it. The Windows build downloads the
+# win64-mingw archive and points this at it, which is faster and more portable
+# than compiling the whole of raylib for Windows on every run.
+set(SPACESHIP_RAYLIB_PREBUILT "" CACHE PATH "Use a prebuilt raylib instead of fetching it")
 
 include(FetchContent)
 include(CTest)
 
 set(SPACESHIP_ASSETS "${CMAKE_CURRENT_SOURCE_DIR}/assets")
+
+# A cross-build ships next to its assets, so the compile-time fallback is the
+# relative folder rather than this machine's path. main.cpp prefers ./assets
+# anyway; this keeps the console harness and the tests working from the
+# repository root (and under Wine, where the host path does not exist).
+if(CMAKE_CROSSCOMPILING AND WIN32)
+  set(SPACESHIP_ASSETS "assets")
+endif()
 
 # ---------------------------------------------------------------------------
 # Dependencies. Every one is fetched, so a clean checkout needs nothing but a
@@ -74,7 +91,17 @@ FetchContent_Declare(nlohmann_json
 # raylib, Dear ImGui and rlImGui are only fetched when the GUI target is built.
 set(SPACESHIP_GUI_REASON "")
 if(SPACESHIP_BUILD_GUI)
-  if(UNIX AND NOT APPLE)
+  # WIN32 first, deliberately. A Windows target needs nothing beyond the
+  # compiler (raylib carries its own GDI/OpenGL backend), and checking UNIX
+  # before WIN32 made a MinGW cross-build ask a Windows target for X11.
+  if(WIN32 OR SPACESHIP_RAYLIB_PREBUILT)
+    # nothing to look for: the Win32 backend is self-contained
+  elseif(APPLE)
+    find_package(OpenGL QUIET)
+    if(NOT OpenGL_FOUND)
+      set(SPACESHIP_GUI_REASON "OpenGL framework not found")
+    endif()
+  else()
     find_package(OpenGL QUIET)
     find_package(X11 QUIET)
     if(NOT OpenGL_FOUND)
@@ -82,19 +109,35 @@ if(SPACESHIP_BUILD_GUI)
     elseif(NOT X11_FOUND)
       set(SPACESHIP_GUI_REASON "X11 development files not found (libx11-dev, libxrandr-dev, libxinerama-dev, libxcursor-dev, libxi-dev)")
     endif()
-  elseif(APPLE)
-    find_package(OpenGL QUIET)
-    if(NOT OpenGL_FOUND)
-      set(SPACESHIP_GUI_REASON "OpenGL framework not found")
-    endif()
   endif()
 endif()
 
 if(SPACESHIP_BUILD_GUI AND SPACESHIP_GUI_REASON STREQUAL "")
   set(SPACESHIP_GUI ON)
-  FetchContent_Declare(raylib
-    URL      https://codeload.github.com/raysan5/raylib/tar.gz/refs/tags/6.0
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+  if(SPACESHIP_RAYLIB_PREBUILT)
+    # The official release archive: include/raylib.h, lib/libraylib.a.
+    add_library(raylib STATIC IMPORTED)
+    set_target_properties(raylib PROPERTIES
+      IMPORTED_LOCATION             "${SPACESHIP_RAYLIB_PREBUILT}/lib/libraylib.a"
+      INTERFACE_INCLUDE_DIRECTORIES "${SPACESHIP_RAYLIB_PREBUILT}/include")
+    if(WIN32)
+      # What a static raylib asks of the Windows loader, as its own build files
+      # list them. Listed here because an IMPORTED target has no build to read.
+      set_target_properties(raylib PROPERTIES INTERFACE_LINK_LIBRARIES
+        "opengl32;gdi32;winmm;ole32;shell32;user32")
+    elseif(APPLE)
+      set_target_properties(raylib PROPERTIES INTERFACE_LINK_LIBRARIES
+        "-framework OpenGL;-framework Cocoa;-framework IOKit;-framework CoreAudio")
+    else()
+      set_target_properties(raylib PROPERTIES INTERFACE_LINK_LIBRARIES
+        "GL;m;pthread;dl;rt;X11")
+    endif()
+    message(STATUS "Spaceship: using the prebuilt raylib at ${SPACESHIP_RAYLIB_PREBUILT}")
+  else()
+    FetchContent_Declare(raylib
+      URL      https://codeload.github.com/raysan5/raylib/tar.gz/refs/tags/6.0
+      DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+  endif()
   FetchContent_Declare(imgui
     URL      https://codeload.github.com/ocornut/imgui/tar.gz/refs/tags/v1.92.7
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
@@ -112,7 +155,11 @@ if(SPACESHIP_BUILD_GUI AND SPACESHIP_GUI_REASON STREQUAL "")
   set(CUSTOMIZE_BUILD       OFF CACHE BOOL "" FORCE)
   set(SUPPORT_FILEFORMAT_TTF ON CACHE BOOL "" FORCE)  # the bundled fonts
 
-  FetchContent_MakeAvailable(raylib imgui rlimgui)
+  if(SPACESHIP_RAYLIB_PREBUILT)
+    FetchContent_MakeAvailable(imgui rlimgui)
+  else()
+    FetchContent_MakeAvailable(raylib imgui rlimgui)
+  endif()
 elseif(SPACESHIP_BUILD_GUI)
   set(SPACESHIP_GUI OFF)
   message(WARNING
@@ -235,11 +282,16 @@ if(SPACESHIP_GUI)
     target_link_options(spaceship PRIVATE
       /SUBSYSTEM:WINDOWS
       /ENTRY:mainCRTStartup)
+  elseif(MINGW)
+    # -mwindows by another name: same subsystem, same "no console behind the
+    # game", and main() stays the entry point.
+    set_target_properties(spaceship PROPERTIES WIN32_EXECUTABLE ON)
   endif()
 
   add_custom_command(TARGET spaceship POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${SPACESHIP_ASSETS}" "$<TARGET_FILE_DIR:spaceship>/assets"
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+            "$<TARGET_FILE_DIR:spaceship>/assets"
     COMMENT "Copying assets beside the executable")
 endif()
 
