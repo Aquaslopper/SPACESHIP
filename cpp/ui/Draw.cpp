@@ -1245,13 +1245,42 @@ void ShellView::PaintTitle(Simulation& sim) {
   if (cardH > height_) { cardH = height_; cardW = cardH * ratio; }
   const Area card{(width_ - cardW) * 0.5f, (height_ - cardH) * 0.5f, cardW, cardH};
   DrawRectangle(0, 0, static_cast<int>(width_), static_cast<int>(height_), ToRay(p.panel2));
-  if (titleArt_ != nullptr) {
-    const Texture2D* texture = static_cast<const Texture2D*>(titleArt_);
+  const Texture2D* texture = static_cast<const Texture2D*>(titleArt_);
+  const bool hasTitleArt = texture != nullptr && texture->id != 0 &&
+                           texture->width > 0 && texture->height > 0;
+  if (hasTitleArt) {
     DrawTexturePro(*texture,
                    Rectangle{0.0f, 0.0f, static_cast<float>(texture->width),
                              static_cast<float>(texture->height)},
                    Rectangle{card.x, card.y, card.w, card.h}, Vector2{0.0f, 0.0f}, 0.0f,
                    ToRay(p.white));
+  }
+
+  // A missing optional title image must never leave a blank window. Keep the
+  // title and all menu actions usable, with explicit native controls as a
+  // fallback for packaged builds where an asset might be absent or unreadable.
+  if (!hasTitleArt && titlePanel_ == TitlePanel::None && !titleConfirm_) {
+    Text("SPACESHIP", static_cast<int>(card.x + 42.0f),
+         static_cast<int>(card.y + 48.0f), TypePx(40), ToRay(p.ink));
+    Text("A SIMULATION GAME OF DEPTH, PATIENCE AND EVERY DECISION MATTERS",
+         static_cast<int>(card.x + 46.0f), static_cast<int>(card.y + 106.0f),
+         TypePx(12), ToRay(p.muted));
+    float y = card.y + 190.0f;
+    for (const ActionRowView& action : title_.actions) {
+      const Area box{card.x + 46.0f, y, std::min(360.0f, card.w - 92.0f), 42.0f};
+      DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                    static_cast<int>(box.w), static_cast<int>(box.h),
+                    ToRay(action.enabled ? p.white : p.panel3));
+      DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                         static_cast<int>(box.w), static_cast<int>(box.h),
+                         ToRay(action.enabled ? p.borderDark : p.border));
+      Text(action.label.c_str(), static_cast<int>(box.x + 14.0f),
+           static_cast<int>(box.y + 12.0f), TypePx(12),
+           ToRay(action.enabled ? p.ink : p.muted));
+      if (action.enabled) { titleHits_.push_back(NavHit{box, action.id, ""}); }
+      y += 52.0f;
+    }
+    return;
   }
 
   // The artwork itself contains the six menu labels and button treatments.
