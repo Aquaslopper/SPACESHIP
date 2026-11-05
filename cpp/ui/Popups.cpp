@@ -21,19 +21,19 @@ const std::vector<std::pair<std::string, std::string>>& ThemeTable() {
 
 // slotSummary(): a label, not a machine. Read by loading the file into a
 // throw-away voyage, so a corrupt slot reports Empty rather than lying.
-std::string SlotSummary(const Simulation& sim, int slot, const std::string& saveDir,
-                        bool* written) {
-  *written = false;
+}  // namespace
+
+std::string SaveSlotSummary(const Simulation& sim, int slot, const std::string& saveDir,
+                            bool* written) {
+  if (written != nullptr) { *written = false; }
   if (saveDir.empty()) { return "Empty"; }
   Simulation probe = sim;
   std::string error;
   if (!probe.LoadSlot(slot, saveDir, &error)) { return "Empty"; }
-  *written = true;
+  if (written != nullptr) { *written = true; }
   return js::NumToString(probe.ActionCount()) + " actions, " +
          js::NumToString(probe.State().shiplets) + " sh";
 }
-
-}  // namespace
 
 const std::vector<std::string>& PopupKeys() {
   static const std::vector<std::string> keys = {"manifest", "log", "files", "settings"};
@@ -92,7 +92,7 @@ PopupModel BuildPopup(const Simulation& sim, const std::string& key,
       entry.slot = slot;
       entry.label = slot == 1 ? "Slot 1 (original)"
                               : "Slot " + js::NumToString(slot);
-      entry.summary = SlotSummary(sim, slot, saveDir, &entry.written);
+      entry.summary = SaveSlotSummary(sim, slot, saveDir, &entry.written);
       model.slots.push_back(entry);
     }
     return model;
@@ -187,6 +187,12 @@ bool PressPopupAction(Simulation& sim, const std::string& key,
     if (action == "new-voyage") {
       sim.RestartVoyage();
       if (message != nullptr) { *message = "A new voyage has begun."; }
+      return true;
+    }
+    if (action == "main-menu") {
+      // The shell hides the voyage and shows the menu; nothing here changes the
+      // voyage, so the command is free like every other one on this sheet.
+      if (message != nullptr) { *message = "Returning to the main menu."; }
       return true;
     }
     if (action == "load") {

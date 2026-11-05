@@ -64,6 +64,9 @@ class Catalog {
   // report a relay will hand over for the price of two percent energy.
   std::map<std::string, std::vector<std::string>> worldHistory;
 
+  // WIKI: twenty-one handbook entries, in the reference's order.
+  std::vector<WikiEntry> wiki;
+
   std::vector<Body> regions;
   std::vector<Body> systems;
   std::vector<Body> bodies;

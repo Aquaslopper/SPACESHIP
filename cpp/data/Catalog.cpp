@@ -387,7 +387,18 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     rule.label = Text(it.value(), "label", "cooldownRules");
     catalog.rules.cooldowns[it.key()] = rule;
   }
-  catalog.counts.wiki = static_cast<int>(Field(content, "wiki", "content.json").size());
+  for (const Json& entry : Field(content, "wiki", "content.json")) {
+    WikiEntry wiki;
+    wiki.id = Text(entry, "id", "wiki");
+    wiki.group = Text(entry, "group", "wiki");
+    wiki.title = Text(entry, "title", "wiki");
+    wiki.text = Text(entry, "text", "wiki");
+    wiki.link = Text(entry, "link", "wiki");
+    wiki.linkLabel = Text(entry, "linkLabel", "wiki");
+    wiki.spoiler = wiki.title.find("(spoilers)") != std::string::npos;
+    catalog.wiki.push_back(wiki);
+  }
+  catalog.counts.wiki = static_cast<int>(catalog.wiki.size());
   catalog.counts.themes = static_cast<int>(Field(content, "themes", "content.json").size());
   catalog.counts.taskTypes = static_cast<int>(catalog.taskTypes.size());
 

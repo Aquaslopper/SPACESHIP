@@ -23,6 +23,7 @@
 #include "ui/Popups.h"
 #include "ui/RoomsScreen.h"
 #include "ui/SimCoreScreen.h"
+#include "ui/WikiScreen.h"
 #include "ui/QuartersScreen.h"
 #include "ui/StationScreen.h"
 #include "ui/StoresScreen.h"
@@ -396,6 +397,7 @@ ScreenKind ScreenKindFor(const Tab& tab) {
   if (tab.kind == "room" && tab.id == "quarters") { return ScreenKind::Quarters; }
   // Phase 7: the Simulacron, the fitted bays and the logbook.
   if (tab.kind == "awards") { return ScreenKind::Awards; }
+  if (tab.kind == "wiki") { return ScreenKind::Wiki; }
   if (tab.kind == "event") { return ScreenKind::Event; }
   if (tab.kind == "room" && tab.id == "simulacron") { return ScreenKind::SimCore; }
   if (tab.kind != "room") { return ScreenKind::Described; }
@@ -422,7 +424,8 @@ ScreenKind ScreenKindFor(const Tab& tab) {
   return ScreenKind::Described;
 }
 
-TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab) {
+TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
+                               const WikiView& wiki) {
   switch (ScreenKindFor(tab)) {
     case ScreenKind::Nav: return BuildNavScreen(sim).screen;
     case ScreenKind::Quarters: return BuildQuartersScreen(sim).screen;
@@ -540,6 +543,55 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab) {
       screen.hasHero = true;
       return screen;
     }
+    case ScreenKind::Wiki: {
+      const WikiModel page = BuildWikiScreen(sim, wiki);
+      TaskScreenModel screen;
+      screen.head = page.head;
+      NavPanel index;
+      index.id = "wiki-index";
+      index.title = "Index";
+      if (!page.emptyNote.empty()) { index.Dim(page.emptyNote); }
+      screen.panels.push_back(index);
+
+      NavPanel article;
+      article.id = "wiki-article";
+      article.title = page.group.empty() ? "Article" : page.group;
+      article.Sub(page.title);
+      article.Note(page.body);
+      screen.panels.push_back(article);
+
+      std::vector<CommandRowView> indexRows;
+      std::vector<std::string> indexIds;
+      for (const WikiIndexEntry& entry : page.index) {
+        CommandRowView view;
+        view.label = entry.group.empty() ? entry.entry->title
+                                         : entry.group + " - " + entry.entry->title;
+        view.cost = entry.selected ? "reading" : "free";
+        view.displayCost = view.cost;
+        view.enabled = true;
+        view.live = true;
+        indexRows.push_back(view);
+        indexIds.push_back("entry:" + entry.entry->id);
+      }
+      screen.panelRows.push_back(indexRows);
+      screen.panelRowIds.push_back(indexIds);
+
+      std::vector<CommandRowView> articleRows;
+      std::vector<std::string> articleIds;
+      for (const ActionRowView& row : page.rows) {
+        CommandRowView view;
+        view.label = row.label;
+        view.cost = row.cost;
+        view.displayCost = row.cost.empty() ? "free" : row.cost;
+        view.enabled = row.enabled;
+        view.live = row.enabled;
+        articleRows.push_back(view);
+        articleIds.push_back(row.id);
+      }
+      screen.panelRows.push_back(articleRows);
+      screen.panelRowIds.push_back(articleIds);
+      return screen;
+    }
     case ScreenKind::Awards: {
       const AwardsScreenModel awards = BuildAwardsScreen(sim);
       TaskScreenModel screen;
@@ -596,7 +648,6 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab) {
     case ScreenKind::Engine: return BuildEngineScreen(sim).screen;
     case ScreenKind::O2: return BuildO2Screen(sim).screen;
     case ScreenKind::Mess: return BuildMessScreen(sim).screen;
-    case ScreenKind::Deferred:
     case ScreenKind::Described:
     default:
       break;

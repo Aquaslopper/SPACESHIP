@@ -148,13 +148,16 @@ add_library(spaceship_core STATIC
   cpp/ui/QuartersScreen.cpp
   cpp/ui/Popups.cpp
   cpp/core/Signal.cpp
+  cpp/audio/Audio.cpp
   cpp/ui/RoomsScreen.cpp
   cpp/ui/SimCoreScreen.cpp
   cpp/ui/AwardsScreen.cpp
   cpp/ui/EventScreen.cpp
   cpp/ui/StationScreen.cpp
   cpp/ui/StoresScreen.cpp
-  cpp/ui/NavScreen.cpp)
+  cpp/ui/NavScreen.cpp
+  cpp/ui/WikiScreen.cpp
+  cpp/ui/TitleScreen.cpp)
 
 target_include_directories(spaceship_core PUBLIC cpp)
 target_link_libraries(spaceship_core PUBLIC spaceship_json)
@@ -220,6 +223,7 @@ if(SPACESHIP_BUILD_TESTS)
     cpp/tests/world_tests.cpp
     cpp/tests/jsnumber_tests.cpp
     cpp/tests/phase7_tests.cpp
+    cpp/tests/phase8_tests.cpp
     cpp/tests/ui_tests.cpp
     cpp/tests/task_tests.cpp
     cpp/tests/nav_tests.cpp

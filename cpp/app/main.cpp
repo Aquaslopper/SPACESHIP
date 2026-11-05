@@ -18,6 +18,7 @@
 #include "raylib.h"
 #include "rlImGui.h"
 
+#include "audio/Audio.h"
 #include "core/Simulation.h"
 #include "data/Catalog.h"
 #include "ui/Draw.h"
@@ -25,6 +26,11 @@
 #include "ui/Theme.h"
 
 namespace {
+
+using ship::FeedLine;
+using ship::Options;
+using ship::Simulation;
+namespace audio = ship::audio;
 
 // The reference opens itself at 1440x940 and centres the window.
 constexpr int kDefaultWidth = 1440;
@@ -76,6 +82,99 @@ void LoadFonts(const std::filesystem::path& assets) {
               sans ? sans : "ImGui default",
               mono ? (std::string(" + ") + mono).c_str() : "");
 }
+
+// ============================================================================
+//  AudioDevice — the only place a sound becomes a device. Every buffer comes
+//  from audio:: (Section D-3's arithmetic); this class decides when to play it
+//  and what the ship's own options allow.
+// ============================================================================
+class AudioDevice {
+ public:
+  bool Start() {
+    InitAudioDevice();
+    if (!IsAudioDeviceReady()) { return false; }
+    ready_ = true;
+    for (std::size_t i = 0; i < kCueCount; ++i) {
+      cues_[i] = BuildSound(audio::RenderCue(kKinds[i]));
+    }
+    music_ = BuildSound(audio::RenderMusic());
+    return true;
+  }
+
+  void Shutdown() {
+    if (!ready_) { return; }
+    for (Sound& cue : cues_) {
+      if (cue.frameCount > 0) { UnloadSound(cue); }
+    }
+    if (music_.frameCount > 0) { UnloadSound(music_); }
+    CloseAudioDevice();
+    ready_ = false;
+  }
+
+  // syncAudioOptions(): the three gains, and starting or stopping the bed.
+  void Configure(const Options& options) {
+    if (!ready_) { return; }
+    const audio::Gains gains = audio::GainsFor(options);
+    gains_ = gains;
+    for (Sound& cue : cues_) {
+      if (cue.frameCount > 0) {
+        SetSoundVolume(cue, static_cast<float>(gains.master * gains.effects));
+      }
+    }
+    const float musicVolume = static_cast<float>(gains.master * gains.music);
+    if (music_.frameCount > 0) {
+      SetSoundVolume(music_, musicVolume);
+      if (gains.musicOn) {
+        if (!IsSoundPlaying(music_)) { PlaySound(music_); }
+      } else if (IsSoundPlaying(music_)) {
+        StopSound(music_);
+      }
+    }
+  }
+
+  // One committed action: the detail's sentence picks the cue.
+  void Cue(const std::string& detail) {
+    if (!ready_ || !gains_.effectsOn) { return; }
+    const std::string kind = audio::CueKindFor(detail);
+    for (std::size_t i = 0; i < kCueCount; ++i) {
+      if (kind != kKinds[i]) { continue; }
+      if (cues_[i].frameCount > 0) { PlaySound(cues_[i]); }
+      return;
+    }
+  }
+
+  // The log is the ship's voice: every new line is a cue, in order.
+  void Tick(const Simulation& sim) {
+    if (!ready_) { return; }
+    const std::vector<FeedLine>& log = sim.State().feed;
+    if (log.empty()) { return; }
+    if (logSeen_ == 0) {
+      logSeen_ = log.size();
+      return;
+    }
+    if (log.size() < logSeen_) { logSeen_ = log.size(); return; }  // a load
+    for (std::size_t i = logSeen_; i < log.size(); ++i) { Cue(log[i].text); }
+    logSeen_ = log.size();
+  }
+
+ private:
+  static Sound BuildSound(const audio::Buffer& buffer) {
+    const std::vector<unsigned char> bytes = audio::ToWav(buffer);
+    Wave wave = LoadWaveFromMemory(".wav", bytes.data(), static_cast<int>(bytes.size()));
+    if (wave.frameCount == 0) { return Sound{}; }
+    Sound sound = LoadSoundFromWave(wave);
+    UnloadWave(wave);
+    return sound;
+  }
+
+  static constexpr std::size_t kCueCount = 4;
+  static constexpr const char* kKinds[kCueCount] = {"click", "ping", "thrust", "chime"};
+  bool ready_ = false;
+  audio::Gains gains_;
+  Sound cues_[4]{};
+  Sound music_{};
+  std::size_t logSeen_ = 0;
+};
 
 }  // namespace
 
@@ -130,6 +229,14 @@ int main(int argc, char** argv) {
   shell.Configure(static_cast<float>(GetScreenWidth()),
                   static_cast<float>(GetScreenHeight()), theme);
 
+  // Sound is optional: a machine without a device keeps a silent, working ship.
+  AudioDevice audio;
+  const bool audioReady = audio.Start();
+  audio.Configure(sim.State().options);
+
+  // The reference opens on its title menu, with the voyage already begun.
+  shell.ShowTitle(false);
+
   while (!WindowShouldClose()) {
     // Resizing re-measures, exactly as the reference's coalesced handler does.
     if (IsWindowResized()) {
@@ -152,12 +259,17 @@ int main(int argc, char** argv) {
                   static_cast<double>(GetTime()) * 1000.0);
     }
 
+    audio.Configure(sim.State().options);
+    audio.Tick(sim);
+
     rlImGuiBegin();
     shell.Draw(sim, static_cast<double>(GetTime()) * 1000.0);
     rlImGuiEnd();
   }
 
+  audio.Shutdown();
   rlImGuiShutdown();
   CloseWindow();
+  (void)audioReady;
   return 0;
 }

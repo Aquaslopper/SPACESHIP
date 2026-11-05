@@ -307,6 +307,13 @@ function runCommand(g, line) {
     if (t) { t.by = 'the commander'; t.rate = rate; }
     return true;
   }
+  if (command === 'stat' && parts.length >= 3) {
+    /* Setup only, mirroring the console harness. */
+    const stat = g.STATS.find(function (s) { return s.id === parts[1]; });
+    if (!stat) { console.error('stat: no such stat ' + parts[1]); process.exit(3); }
+    stat.value = parseFloat(parts[2]);
+    return true;
+  }
   if (command === 'purse' && parts.length >= 2) {
     g.STATE.shiplets = parseFloat(parts[1]);
     return true;

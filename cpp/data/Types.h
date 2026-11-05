@@ -258,6 +258,13 @@ struct Commendation {
   Reward reward;
 };
 
+// One handbook entry, exactly as authored in content.json. `link` names the tab
+// the entry can open; it is free, like every other read in the reference.
+struct WikiEntry {
+  std::string id, group, title, text, link, linkLabel;
+  bool spoiler = false;   // the title carries the reference's "(spoilers)" tag
+};
+
 struct ProjectDef {
   std::string id, label, room, lot;
   double energy = 0, work = 0;

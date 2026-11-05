@@ -723,19 +723,73 @@ broadcast, bank, two claims, a crossing, a salvage, a dock, a project, a remedy,
 assignment, a dream, the signal's request and its sale — against the reference with
 all seventeen traces identical.
 
-### Phase 7 — Simulacron, projects, story, awards (2–3 days)
+### Phase 7 — Simulacron, projects, story, awards (2–3 days) — DONE
 The 10 ship projects and their interlocks, memories/dreams/insight/bonds/name anchors/desire fire, the Silicon
 Marrow signal chain, 14 commendations, captain's rank.
 **Gate:** every project and story branch reachable in the console harness with the JS build agreeing step for
 step; commendation rewards pay once.
 
-### Phase 8 — Content, audio, polish (2 days)
-21 wiki entries with search, title menu, loss screen, five palettes everywhere, large-text/crew-label toggles,
-synthesised music beds and SFX (Raylib audio), action-mark cursor, dot drift, target 1280×720 → 2560×1440.
-**Gate:** full manual checklist; `PARITY.md` lists every deliberate divergence.
+### Phase 8 — Handbook, title and loss screens, soundscape — DONE
 
-**Total: roughly 17–21 working days.** The single biggest lever on that number is how much of §9.2's visual
-fidelity we chase.
+`data/Types.h` and `Catalog.cpp` now read the twenty-one `WIKI` entries out of
+`content.json` (id, group, title, text and the optional room link).
+`ui/WikiScreen` is the handbook: the grouped index, a live case-insensitive search
+over title, group and body, the selection that falls back to the first match when
+the search filters it away, the "No matching entries." state, and the entry's own
+room shortcut. The story entry is the reference's, word for word, but its body sits
+behind a reveal row (free, local, off by default) so a first watch is not spoiled;
+`WikiView` travels in the shell and is cleared with a new voyage.
+
+`ui/TitleScreen` is the menu and the loss overlay. The menu is the reference's card:
+a 3:2 crop of `assets/art/title.jpg`, the heading and subtitle, and five free
+commands in order — NEW VOYAGE, LOAD VOYAGE, OPTIONS, HOW TO PLAY and RESUME/EXIT —
+beside a dialog that holds the three validated slots, the same settings sheet the
+footer opens (six toggles and five palettes, pressed through the same function) or
+the three-paragraph guide. A new voyage or a load from the menu asks first when a
+voyage is live. The loss overlay prints `STATE.gameOver` verbatim, the reference's
+"Load a saved game or start a new voyage.", and the three ways out — load a slot,
+start again, or return to the menu — plus the run's own record (actions, shiplets,
+rank, commendations, systems and regions, crew remaining), which the HTA does not
+print and `PARITY.md` declares. `Popups.cpp` finally carries the "Return to main
+menu" command Phase 6 had to defer, free like everything else on that sheet.
+
+`audio/Audio` keeps Section D-3's numbers as arithmetic rather than as a browser:
+the audio level (default 0.4, clamped, non-finite to default) and its three gains
+(master `level * 0.62`, effects 0.8, music 0.18, each zeroed by its own switch);
+the drone's three partials and levels; the six-note phrase, its 2.45-second
+interval, its 2.3-second length and 0.09 peak; a headless `Sequencer` that emits
+every note that fell due, keeps its place while muted and resumes rather than
+replaying silence; the four cues with `cueKind`'s own precedence (scan/sensor/
+signal/comms → ping, course/travel/jump/crossing → thrust, complete/arriv/paid →
+chime, otherwise click), their durations, waves, start and target frequencies and
+their 25 ms attack with an exponential fall; and the fallback PCM — 8000 Hz, mono,
+16-bit, eight seconds of the four-chord bed and 0.42 seconds per cue, clamped to
+±0.85 and scaled by 32767, written out with the reference's hand-built 44-byte RIFF
+header. `app/main.cpp` owns the only device: an `AudioDevice` turns those buffers
+into `Sound`s, gates them by the ship's options every frame, plays a cue for each
+new line of the feed, and plays the bed the reference itself falls back to.
+
+The router lost its last placeholder: `ScreenKind::Deferred` is gone, `wiki` routes
+to its own window, and a test walks every compartment, crew record, the chart, the
+logbook and the handbook to prove that only a hull room with no work of its own
+still uses the reference's briefing frame. `main.cpp` opens on the title menu with
+the voyage already begun, exactly as the HTA does.
+
+*Verification:* `phase8_tests` adds 22 cases and 7,112 assertions; the suite is now
+159 cases and 16,742 assertions, `ctest` is 182/182 with `ui.gui-syntax` compiling
+both GUI translation units clean under `-Wall -Wextra -Wpedantic`, and
+`parity.voyage-15` drives a whole lifecycle — boot, three canisters and the bank, a
+crossing to Tolme, a contract, a hire, a workshop project, a treatment, a shared
+meal, a dream, a traffic report, a claimed commendation, then a lost hull — with all
+fourteen traces identical. `PARITY.md` records the architecture, the counts and
+every declared divergence.
+
+**Total: roughly 17–21 working days — all eight phases are complete; see `PARITY.md`.**
+
+**Status: Phases 0–8 complete and verified** — 182 CTest gates, 159 Catch2 cases
+and 16,742 assertions, fifteen differential voyages byte-identical to the
+reference, and `PARITY.md` recording both the proof and the declared visual
+exceptions.
 
 ---
 

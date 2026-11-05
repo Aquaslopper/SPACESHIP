@@ -34,6 +34,8 @@
 #include "ui/StationScreen.h"
 #include "ui/StoresScreen.h"
 #include "ui/Theme.h"
+#include "ui/TitleScreen.h"
+#include "ui/WikiView.h"
 
 namespace ship {
 
@@ -79,6 +81,25 @@ class ShellView {
   }
   int PopupCount() const { return popupCount_; }
   void ClosePopup() { popupKey_.clear(); popupHits_.clear(); confirmNewVoyage_ = false; }
+  // ---- the main menu (Section N) -----------------------------------------
+  // The menu covers the window; while. it is up nothing reaches the ship.
+  void ShowTitle(bool fromVoyage);
+  void HideTitle() { titleActive_ = false; titlePanel_ = TitlePanel::None; }
+  bool TitleActive() const { return titleActive_; }
+  bool TitleFromVoyage() const { return fromVoyage_; }
+  TitlePanel Panel() const { return titlePanel_; }
+  const std::string& TitleMessage() const { return titleMessage_; }
+
+  // ---- the handbook's session view ---------------------------------------
+  const WikiView& Wiki() const { return wiki_; }
+  void SetWikiView(const WikiView& view) { wiki_ = view; }
+
+  // The loss overlay is shown while the voyage has ended and the reader has not
+  // dealt with it; `LossDismissed` keeps it down after a load or a fresh start.
+  bool LossVisible(const Simulation& sim) const {
+    return !sim.State().gameOver.empty() && !lossDismissed_;
+  }
+
   const Theme& CurrentTheme() const { return theme_; }
   void SetTheme(const Theme& theme) { theme_ = theme; }
 
@@ -115,7 +136,7 @@ class ShellView {
   std::vector<NavHit> navHits_;
 
   bool screenPanels_ = false;
-  ScreenKind panelsKind_ = ScreenKind::Deferred;
+  ScreenKind panelsKind_ = ScreenKind::Described;
   std::string popupKey_;
   std::string saveDir_ = "runtime/saves";
   std::string popupMessage_;
@@ -129,9 +150,33 @@ class ShellView {
 
   void PaintTaskScreen(Simulation& sim);
   void PaintPanelsScreen(Simulation& sim);
-  static bool PressPanelRow(Simulation& sim, ScreenKind kind, const std::string& id);
   void PaintPopup(Simulation& sim);
   void PaintHero(const Vignette& vignette, const Area& box);
+  void PaintTitle(Simulation& sim);
+  void PaintLoss(Simulation& sim);
+  void PaintWikiSearch();
+  bool PressPanelRow(Simulation& sim, ScreenKind kind, const std::string& id);
+
+  bool titleActive_ = false;
+  bool titleConfirm_ = false;
+  bool fromVoyage_ = false;
+  TitlePanel titlePanel_ = TitlePanel::None;
+  int titleSlot_ = 1;
+  std::string titleMessage_;
+  TitleModel title_;
+  std::vector<NavHit> titleHits_;
+  std::string artPath_;
+  void* titleArt_ = nullptr;      // Texture2D, owned once the art is loaded
+  bool titleArtLoaded_ = false;
+
+  WikiView wiki_;
+  char wikiQuery_[96] = {};
+  bool lossDismissed_ = false;
+  int lossSlot_ = 1;
+  std::string lossMessage_;
+  LossModel loss_;
+  std::vector<NavHit> lossHits_;
+  void* audioBridge_ = nullptr;  // the app's AudioDevice, untouched by this file
   void PaintNavScreen(Simulation& sim);
   void PaintQuartersScreen(Simulation& sim);
   void PaintCrewRecord(const Simulation& sim);

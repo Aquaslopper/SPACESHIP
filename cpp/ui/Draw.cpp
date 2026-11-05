@@ -22,6 +22,9 @@
 #include "raylib.h"
 #include "rlImGui.h"
 
+#include "audio/Audio.h"
+#include "ui/WikiScreen.h"
+
 namespace ship {
 
 namespace {
@@ -50,6 +53,40 @@ Rgb RgbFromHex(const std::string& hex, const Rgb& fallback) {
     channels[i] = hi * 16 + lo;
   }
   return Rgb{channels[0], channels[1], channels[2]};
+}
+
+// WrapText(): greedy wrapping by measured width, so a long paragraph in a
+// dialog or an article breaks where the reference's CSS would break it.
+std::vector<std::string> WrapText(const std::string& text, float width, int size) {
+  std::vector<std::string> lines;
+  std::string line;
+  std::size_t i = 0;
+  while (i <= text.size()) {
+    // A explicit newline is a break of its own.
+    if (i == text.size() || text[i] == '\n') {
+      lines.push_back(line);
+      line.clear();
+      if (i == text.size()) { break; }
+      i += 1;
+      continue;
+    }
+    if (text[i] == ' ') {
+      const std::string withSpace = line.empty() ? line : line + " ";
+      if (!line.empty() && static_cast<float>(MeasureText((withSpace + "x").c_str(), size)) >
+                               width) {
+        lines.push_back(line);
+        line.clear();
+      } else {
+        line = withSpace;
+      }
+      i += 1;
+      continue;
+    }
+    line.push_back(text[i]);
+    i += 1;
+  }
+  if (lines.empty()) { lines.push_back(std::string()); }
+  return lines;
 }
 
 ImU32 ToIm(const Rgb& rgb, int alpha = 255) {
@@ -103,8 +140,19 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
 
   UpdateMarks(marks_, nowMs);
 
+  // A lost voyage that has been dealt with (loaded or restarted) puts the
+  // overlay away for good; a fresh loss brings it back.
+  if (sim.State().gameOver.empty()) { lossDismissed_ = false; }
+
   BeginDrawing();
   ClearBackground(ToRay(theme_.palette.panel));
+
+  if (titleActive_) {
+    PaintTitle(sim);
+    rlImGuiEnd();
+    EndDrawing();
+    return;
+  }
 
   if (sim.State().activeTab == "home") {
     PaintIdle(sim);
@@ -119,14 +167,14 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
     screenPanels_ = kind == ScreenKind::Station || kind == ScreenKind::Cargo ||
                     kind == ScreenKind::Science || kind == ScreenKind::Room ||
                     kind == ScreenKind::SimCore || kind == ScreenKind::Awards ||
-                    kind == ScreenKind::Event;
+                    kind == ScreenKind::Event || kind == ScreenKind::Wiki;
     panelsKind_ = kind;
     if (taskTabKey_ != sim.State().activeTab) {
       pendingConfirm_.clear();
       pendingAction_.clear();
     }
     taskTabKey_ = sim.State().activeTab;
-    taskScreen_ = BuildTabScreen(sim, *FindTab(sim.State(), taskTabKey_));
+    taskScreen_ = BuildTabScreen(sim, *FindTab(sim.State(), taskTabKey_), wiki_);
     if (screenNav_) {
       navScreen_ = BuildNavScreen(sim);
       PaintNavScreen(sim);
@@ -144,6 +192,7 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   }
   PaintChrome(sim);
   if (!popupKey_.empty()) { PaintPopup(sim); }
+  if (LossVisible(sim)) { PaintLoss(sim); }
 
   // Action marks last, over everything, because they are the player's hand.
   for (const ActionMark& mark : marks_) {
@@ -974,6 +1023,12 @@ bool ShellView::PressPanelRow(Simulation& sim, ScreenKind kind, const std::strin
     case ScreenKind::SimCore: return PressSimCoreAction(sim, id, "");
     case ScreenKind::Awards: return PressAwardsAction(sim, id, "");
     case ScreenKind::Event: return PressEventAction(sim, id, "");
+    case ScreenKind::Wiki: {
+      const std::size_t cut = id.find(':');
+      const std::string verb = cut == std::string::npos ? id : id.substr(0, cut);
+      const std::string arg = cut == std::string::npos ? std::string() : id.substr(cut + 1);
+      return PressWikiAction(sim, verb, arg, &wiki_);
+    }
     default: return false;
   }
 }
@@ -1042,7 +1097,230 @@ void ShellView::PaintHero(const Vignette& vignette, const Area& box) {
   }
 }
 
+
+// ============================================================================
+//  The main menu (Section N). The card is the reference's: a 3:2 crop of the
+//  1672x941 art, five free commands down the left, and one dialog beside them.
+//  Nothing here can advance the clock: the menu is not a place in the voyage.
+// ============================================================================
+void ShellView::ShowTitle(bool fromVoyage) {
+  titleActive_ = true;
+  fromVoyage_ = fromVoyage;
+  titlePanel_ = TitlePanel::None;
+  titleMessage_.clear();
+  titleHits_.clear();
+  popupKey_.clear();
+  ClosePopup();
+}
+
+void ShellView::PaintTitle(Simulation& sim) {
+  const Palette& p = theme_.palette;
+  titleHits_.clear();
+  title_ = BuildTitleScreen(sim, fromVoyage_, titlePanel_, saveDir_, titleSlot_, titleMessage_);
+
+  DrawRectangle(0, 0, static_cast<int>(width_), static_cast<int>(height_),
+                ToRay(p.panel));
+
+  // The card keeps the art's ratio; the reference caps it at 1672 px wide.
+  const float margin = 12.0f;
+  float cardW = std::min(width_ - margin * 2.0f, 1672.0f);
+  const float ratio = 1672.0f / 941.0f;
+  const float cardH = cardW / ratio;
+  if (cardH > height_ - margin * 2.0f) {
+    cardW = (height_ - margin * 2.0f) * ratio;
+  }
+  const float measuredH = cardW / ratio;
+  const Area card{(width_ - cardW) * 0.5f, (height_ - measuredH) * 0.5f, cardW, measuredH};
+  DrawRectangle(static_cast<int>(card.x), static_cast<int>(card.y),
+                static_cast<int>(card.w), static_cast<int>(card.h), ToRay(p.panel2));
+  DrawRectangleLines(static_cast<int>(card.x), static_cast<int>(card.y),
+                     static_cast<int>(card.w), static_cast<int>(card.h), ToRay(p.borderDark));
+
+  // The art, once. A missing file is not fatal: the card keeps its panel colour
+  // and the menu works.
+  if (!titleArtLoaded_) {
+    titleArtLoaded_ = true;
+    artPath_ = title_.artPath;
+    if (!artPath_.empty() && FileExists(artPath_.c_str())) {
+      Texture2D* texture = new Texture2D(LoadTexture(artPath_.c_str()));
+      if (texture->id != 0) {
+        SetTextureFilter(*texture, TEXTURE_FILTER_BILINEAR);
+        titleArt_ = texture;
+      } else {
+        delete texture;
+      }
+    }
+  }
+  if (titleArt_ != nullptr) {
+    Texture2D* texture = static_cast<Texture2D*>(titleArt_);
+    const float artW = card.w;
+    const float artH = card.h * 0.55f;
+    const Rectangle source{0.0f, 0.0f, static_cast<float>(texture->width),
+                           static_cast<float>(texture->height)};
+    DrawTexturePro(*texture, source,
+                   Rectangle{card.x, card.y, artW, artH}, Vector2{0.0f, 0.0f}, 0.0f,
+                   Fade(WHITE, 1.0f));
+    DrawRectangleLines(static_cast<int>(card.x), static_cast<int>(card.y),
+                       static_cast<int>(artW), static_cast<int>(artH), ToRay(p.border));
+  }
+
+  const float headY = card.y + card.h * 0.55f + 18.0f;
+  DrawText(title_.heading.c_str(), static_cast<int>(card.x + 34.0f),
+           static_cast<int>(headY), 40, ToRay(p.ink));
+  DrawText(title_.subtitle.c_str(), static_cast<int>(card.x + 36.0f),
+           static_cast<int>(headY + 48.0f), 13, ToRay(p.muted));
+
+  // The five commands, in a column under the title.
+  float y = headY + 84.0f;
+  for (const ActionRowView& action : title_.actions) {
+    const Area box{card.x + 36.0f, y, 260.0f, 30.0f};
+    DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                  static_cast<int>(box.w), static_cast<int>(box.h),
+                  ToRay(action.enabled ? p.white : p.panel3));
+    DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                       static_cast<int>(box.w), static_cast<int>(box.h),
+                       ToRay(action.enabled ? p.borderDark : p.border));
+    DrawText(action.label.c_str(), static_cast<int>(box.x + 12.0f),
+             static_cast<int>(box.y + 9.0f), 12,
+             ToRay(action.enabled ? p.ink : p.muted));
+    if (action.enabled) { titleHits_.push_back(NavHit{box, action.id, ""}); }
+    y += 38.0f;
+  }
+
+  // The dialog: the three slots, the settings sheet or the guide.
+  const Area dialog{card.x + 330.0f, card.y + card.h * 0.55f + 18.0f,
+                    card.w - 330.0f - 36.0f, card.h * 0.45f - 54.0f};
+  if (dialog.w > 40.0f && dialog.h > 40.0f) {
+    DrawRectangle(static_cast<int>(dialog.x), static_cast<int>(dialog.y),
+                  static_cast<int>(dialog.w), static_cast<int>(dialog.h), ToRay(p.panel));
+    DrawRectangleLines(static_cast<int>(dialog.x), static_cast<int>(dialog.y),
+                       static_cast<int>(dialog.w), static_cast<int>(dialog.h),
+                       ToRay(p.border));
+    float dy = dialog.y + 10.0f;
+    if (!title_.panelTitle.empty()) {
+      DrawText(title_.panelTitle.c_str(), static_cast<int>(dialog.x + 12.0f),
+               static_cast<int>(dy), 16, ToRay(p.ink));
+      dy += 24.0f;
+    }
+    if (!title_.panelNote.empty()) {
+      for (const std::string& line : WrapText(title_.panelNote, dialog.w - 24.0f, 10)) {
+        DrawText(line.c_str(), static_cast<int>(dialog.x + 12.0f),
+                 static_cast<int>(dy), 10, ToRay(p.muted));
+        dy += 13.0f;
+      }
+      dy += 6.0f;
+    }
+    for (const ActionRowView& row : title_.panelRows) {
+      if (dy + 24.0f > dialog.Bottom() - 8.0f) { break; }
+      const Area box{dialog.x + 12.0f, dy, dialog.w - 24.0f, 22.0f};
+      DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                    static_cast<int>(box.w), static_cast<int>(box.h),
+                    ToRay(row.enabled ? p.panel2 : p.panel3));
+      DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                         static_cast<int>(box.w), static_cast<int>(box.h),
+                         ToRay(row.enabled ? p.borderDark : p.border));
+      DrawText(row.label.c_str(), static_cast<int>(box.x + 8.0f),
+               static_cast<int>(box.y + 6.0f), 10, ToRay(row.enabled ? p.ink : p.muted));
+      if (row.enabled) { titleHits_.push_back(NavHit{box, row.id, ""}); }
+      dy += 26.0f;
+    }
+  }
+
+  if (!titleMessage_.empty()) {
+    DrawText(titleMessage_.c_str(), static_cast<int>(card.x + 36.0f),
+             static_cast<int>(card.Bottom() - 22.0f), 10, ToRay(p.coffee));
+  }
+}
+
+// ============================================================================
+//  The loss overlay: the voyage ended, and the run's own record with it.
+// ============================================================================
+void ShellView::PaintLoss(Simulation& sim) {
+  const Palette& p = theme_.palette;
+  lossHits_.clear();
+  loss_ = BuildLossScreen(sim, lossSlot_, lossMessage_);
+
+  DrawRectangle(0, 0, static_cast<int>(width_), static_cast<int>(height_),
+                ToRay(p.panel, 226));
+  const float cardW = std::min(420.0f, width_ - 60.0f);
+  const Area card{(width_ - cardW) * 0.5f, 90.0f, cardW, std::min(560.0f, height_ - 120.0f)};
+  DrawRectangle(static_cast<int>(card.x), static_cast<int>(card.y),
+                static_cast<int>(card.w), static_cast<int>(card.h), ToRay(p.panel));
+  DrawRectangleLines(static_cast<int>(card.x), static_cast<int>(card.y),
+                     static_cast<int>(card.w), static_cast<int>(card.h), ToRay(p.borderDark));
+
+  float y = card.y + 18.0f;
+  DrawText(loss_.heading.c_str(), static_cast<int>(card.x + 20.0f),
+           static_cast<int>(y), 24, ToRay(p.terracotta));
+  y += 34.0f;
+  for (const std::string& line : WrapText(loss_.cause, card.w - 40.0f, 12)) {
+    DrawText(line.c_str(), static_cast<int>(card.x + 20.0f), static_cast<int>(y), 12,
+             ToRay(p.ink));
+    y += 16.0f;
+  }
+  y += 4.0f;
+  for (const std::string& line : WrapText(loss_.note, card.w - 40.0f, 10)) {
+    DrawText(line.c_str(), static_cast<int>(card.x + 20.0f), static_cast<int>(y), 10,
+             ToRay(p.muted));
+    y += 13.0f;
+  }
+  y += 10.0f;
+  for (const PopupRow& row : loss_.summary) {
+    DrawText(row.key.c_str(), static_cast<int>(card.x + 20.0f), static_cast<int>(y), 10,
+             ToRay(p.muted));
+    const float valueW = static_cast<float>(MeasureText(row.value.c_str(), 10));
+    DrawText(row.value.c_str(), static_cast<int>(card.Right() - 20.0f - valueW),
+             static_cast<int>(y), 10, ToRay(p.ink));
+    y += 14.0f;
+  }
+  y += 10.0f;
+  for (const ActionRowView& action : loss_.actions) {
+    if (y + 24.0f > card.Bottom() - 12.0f) { break; }
+    const Area box{card.x + 20.0f, y, card.w - 40.0f, 22.0f};
+    DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                  static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel2));
+    DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                       static_cast<int>(box.w), static_cast<int>(box.h),
+                       ToRay(p.borderDark));
+    DrawText(action.label.c_str(), static_cast<int>(box.x + 8.0f),
+             static_cast<int>(box.y + 6.0f), 10, ToRay(p.ink));
+    lossHits_.push_back(NavHit{box, action.id, ""});
+    y += 26.0f;
+  }
+  if (!lossMessage_.empty()) {
+    DrawText(lossMessage_.c_str(), static_cast<int>(card.x + 20.0f),
+             static_cast<int>(card.Bottom() - 18.0f), 9, ToRay(p.coffee));
+  }
+}
+
+// The handbook's search box, drawn as a real field over the index column.
+void ShellView::PaintWikiSearch() {
+  if (panelsKind_ != ScreenKind::Wiki) { return; }
+  const Area box{layout_.content.x + 8.0f, layout_.content.y + 50.0f, 260.0f, 22.0f};
+  ImGui::SetNextWindowPos(ImVec2(box.x - 4.0f, box.y - 4.0f));
+  ImGui::SetNextWindowSize(ImVec2(box.w + 8.0f, 30.0f));
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4.0f, 4.0f));
+  const bool host = ImGui::Begin("##wiki-search-host", nullptr,
+                                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                                     ImGuiWindowFlags_NoMove |
+                                     ImGuiWindowFlags_NoScrollbar |
+                                     ImGuiWindowFlags_NoSavedSettings |
+                                     ImGuiWindowFlags_NoBackground);
+  if (!host) { ImGui::End(); ImGui::PopStyleVar(); return; }
+  ImGui::SetNextItemWidth(box.w);
+  ImGui::PushStyleColor(ImGuiCol_FrameBg, ToIm(theme_.palette.panel2));
+  ImGui::PushStyleColor(ImGuiCol_Text, ToIm(theme_.palette.ink));
+  if (ImGui::InputTextWithHint("##wiki-search", "Search the handbook", wikiQuery_,
+                               sizeof(wikiQuery_))) {
+    wiki_.query = wikiQuery_;
+  }
+  ImGui::PopStyleColor(2);
+  ImGui::End();
+  ImGui::PopStyleVar();
+}
+
 void ShellView::PaintPanelsScreen(Simulation& sim) {
+  PaintWikiSearch();
   navHits_.clear();
   taskButtons_.clear();
   const Palette& p = theme_.palette;
@@ -1302,7 +1580,8 @@ void ShellView::PaintPopup(Simulation& sim) {
       const char* label;
     } buttons[] = {{"save", "Save voyage"},
                    {"load", "Load voyage"},
-                   {"new-voyage", "Start a new voyage"}};
+                   {"new-voyage", "Start a new voyage"},
+                   {"main-menu", "Return to main menu"}};
     float bx = card.x + pad;
     for (const auto& entry : buttons) {
       const float bw = static_cast<float>(MeasureText(entry.label, 10)) + 22.0f;
@@ -1455,6 +1734,60 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
                       double nowMs) {
   if (button == HitButton::None) { return; }
 
+  // The menu covers everything below it, and the loss overlay covers the ship.
+  if (titleActive_) {
+    for (const NavHit& hit : titleHits_) {
+      if (!hit.box.Contains(x, y)) { continue; }
+      if (hit.action == "new-voyage" && fromVoyage_) {
+        // A live voyage makes the question explicit; one more click confirms.
+        if (!titleConfirm_) {
+          titleConfirm_ = true;
+          titleMessage_ =
+              "Start a new voyage? Unsaved progress will be lost; saved slots are kept.";
+          return;
+        }
+        titleConfirm_ = false;
+        PressTitleAction(sim, "new-voyage", "", &fromVoyage_, &titlePanel_, &titleSlot_,
+                         saveDir_, &titleMessage_);
+        return;
+      }
+      if (hit.action == "load-slot") {
+        const bool loaded = PressTitleAction(sim, "load-slot", "", &fromVoyage_,
+                                             &titlePanel_, &titleSlot_, saveDir_,
+                                             &titleMessage_);
+        if (loaded) { HideTitle(); }
+        return;
+      }
+      if (hit.action == "resume") {
+        PressTitleAction(sim, "resume", "", &fromVoyage_, &titlePanel_, &titleSlot_,
+                         saveDir_, &titleMessage_);
+        if (fromVoyage_) { HideTitle(); }
+        return;
+      }
+      PressTitleAction(sim, hit.action, "", &fromVoyage_, &titlePanel_, &titleSlot_,
+                       saveDir_, &titleMessage_);
+      return;
+    }
+    return;
+  }
+
+  if (LossVisible(sim)) {
+    for (const NavHit& hit : lossHits_) {
+      if (!hit.box.Contains(x, y)) { continue; }
+      bool toTitle = false;
+      const bool changed = PressLossAction(sim, hit.action, "", &lossSlot_, &toTitle,
+                                          saveDir_, &lossMessage_);
+      if (hit.action == "main-menu" || toTitle) {
+        lossDismissed_ = true;
+        ShowTitle(true);
+      } else if (changed && sim.State().gameOver.empty()) {
+        lossDismissed_ = true;
+      }
+      return;
+    }
+    return;
+  }
+
   // A floating popup covers the window: it is the topmost thing, and it is
   // free. Closing it puts the reader back exactly where they were.
   if (!popupKey_.empty()) {
@@ -1463,6 +1796,11 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
       if (hit.action == "close") { ClosePopup(); return; }
       if (hit.action == "slot") { popupSlot_ = std::stoi(hit.arg); return; }
       if (hit.action == "new-voyage") { confirmNewVoyage_ = true; return; }
+      if (hit.action == "main-menu") {
+        ClosePopup();
+        ShowTitle(true);
+        return;
+      }
       if (hit.action == "new-voyage-no") {
         confirmNewVoyage_ = false;
         popupMessage_.clear();

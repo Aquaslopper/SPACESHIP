@@ -63,6 +63,11 @@ struct PopupModel {
 const std::vector<std::string>& PopupKeys();
 std::string PopupTitle(const std::string& key);
 
+// slotSummary(): a label, not a machine — read by loading the file into a
+// throw-away voyage, so a corrupt slot reports Empty rather than lying.
+std::string SaveSlotSummary(const Simulation& sim, int slot, const std::string& saveDir,
+                            bool* written);
+
 PopupModel BuildPopup(const Simulation& sim, const std::string& key,
                       const std::string& saveDir = std::string());
 

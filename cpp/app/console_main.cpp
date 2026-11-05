@@ -13,6 +13,7 @@
 //    bank                 turnOnFilter()           — throw the filter switch
 //    job <crewId> <jobId> applyJob()             — scenario setup
 //    purse <n>            set STATE.shiplets     — scenario setup
+//    stat <id> <n>        set a gauge             — scenario setup
 //    target <body>        select a chart body (free)
 //    travel               startTravel()          — plot a crossing
 //    scan                 startScan()            — run the sensors
@@ -130,6 +131,15 @@ int main(int argc, char** argv) {
       simulation.StartFilterBank();
     } else if (command == "job" && parts.size() >= 3) {
       simulation.ApplyJob(parts[1], parts[2]);
+    } else if (command == "stat" && parts.size() >= 3) {
+      // Setup only: a parity script may need a voyage in a particular condition
+      // (a dead hull, say) without spending a hundred actions to get there.
+      ship::Stat* stat = simulation.FindStat(parts[1]);
+      if (stat == nullptr) {
+        std::fprintf(stderr, "spaceship_console: no such stat '%s'\n", parts[1].c_str());
+        return 1;
+      }
+      stat->value = std::stod(parts[2]);
     } else if (command == "purse" && parts.size() >= 2) {
       simulation.MutableState().shiplets = std::atof(parts[1].c_str());
     } else if (command == "target" && parts.size() >= 2) {

@@ -23,6 +23,7 @@
 #include "core/Simulation.h"
 #include "ui/Describe.h"
 #include "ui/Layout.h"
+#include "ui/WikiView.h"
 
 namespace ship {
 
@@ -232,11 +233,19 @@ struct TaskScreenModel {
 // The generic path: a described target that owns no bespoke screen.
 TaskScreenModel BuildDescribedScreen(const Simulation& sim, const Description& described);
 
-// Which builder a tab would use. Phase 3 owns the three machine rooms; every
-// other window still opens on the described frame until its own phase.
-enum class ScreenKind { Described, Nav, Engine, O2, Mess, Quarters, CrewRecord, Station, Cargo, Science, Room, SimCore, Awards, Event, Deferred };
+// Which builder a tab would use. Every window the ship can open has its own
+// builder now: the three machine rooms, the chart, quarters and records, the
+// station and the stores, the fitted bays with the Simulacron, the logbook, the
+// incident reports and the handbook. `Described` is not a placeholder but the
+// reference's own briefing frame, and it is what a hull room that owns no work
+// still uses.
+enum class ScreenKind { Described, Nav, Engine, O2, Mess, Quarters, CrewRecord, Station, Cargo, Science, Room, SimCore, Awards, Event, Wiki };
 ScreenKind ScreenKindFor(const Tab& tab);
-TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab);
+
+// The handbook needs its session view (the search text and the selection), so
+// the builder takes it as an argument rather than reaching into the shell.
+TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
+                               const WikiView& wiki = WikiView());
 
 Vignette BuildVignette(const Simulation& sim, const std::string& roomId);
 

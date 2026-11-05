@@ -52,7 +52,7 @@ To begin **Silicon Marrow**, deep-scan Halvan's Reach, build an insight in the c
 
 ## Handbook, commendations and commissions
 
-The pinned **Wiki** button opens a searchable, offline handbook covering controls, survival, exploration, the crew, ship systems, and Simulacron. Its Silicon Marrow entry is explicitly marked as a spoiler. Reading and following its room shortcuts are free.
+The pinned **Wiki** button opens a searchable, offline handbook covering controls, survival, exploration, the crew, ship systems, and Simulacron. Its Silicon Marrow entry is explicitly marked as a spoiler and its body stays behind a reveal row until you ask for it. Reading and following its room shortcuts are free.
 
 The **Rewards** button opens the captain's log. Fourteen commendations track milestones such as starting the filters, scanning worlds, visiting systems and regions, caring for the crew, resolving incidents, completing contracts and commissions, and concluding the signal story. Earned rewards can be claimed once for shiplets or supplies without spending an action. The captain's rank is cosmetic. The button shows the number of unclaimed rewards.
 
@@ -74,12 +74,18 @@ Existing Kessler-only and expanded-galaxy saves still load, including active leg
 
 ## Native C++ edition and development
 
-The repository also contains a native C++ port of the game. It is a **work in
-progress**: Phase 0 (build system, extracted catalogue, data gate), Phase 1 (the
-whole headless simulation), Phase 2 (the cockpit), Phase 3 (the task frame and the
-three machine rooms), Phase 4 (Navigation and the star chart), Phase 5 (Crew
-Quarters and the crew records) and Phase 6 (stations, the cargo hold and science
-room, and the four floating popups) are complete and verified against the reference. Phase 2
+The repository also contains a native C++ port of the game, and it is **complete**:
+Phases 0–8 are finished and verified against the reference. `PARITY.md` is the
+sign-off — it lists the verification architecture, the final counts and the short
+list of declared toolkit and port-only differences.
+
+Phase 0 (build system, extracted catalogue, data gate), Phase 1 (the whole headless
+simulation), Phase 2 (the cockpit), Phase 3 (the task frame and the three machine
+rooms), Phase 4 (Navigation and the star chart), Phase 5 (Crew Quarters and the
+crew records), Phase 6 (stations, the cargo hold and science room, and the four
+floating popups), Phase 7 (the fourteen fitted rooms, the Simulacron, the Silicon
+Marrow signal and the logbook) and Phase 8 (the handbook, the title and loss
+screens, and the synthesized soundscape) are complete and verified. Phase 2
 delivers the taskbar and its tabs, the sidebar and pinned foot, the status bar, and
 the idle screen with the ship cross-section, the feed and the two interaction
 verbs. Phase 3 adds the house task frame — head, panels, machine stage, commitment
@@ -94,10 +100,14 @@ work), job and trade changes, station training, the medical bay and the roster.
 Phase 6 adds the port window (market, sales, mission board, yard and tavern), the
 cargo hold and the science room, and the four floating panels behind the pinned
 foot — manifest, activity log, three save slots and settings — with the save and
-load buttons free and a corrupt slot rolled back. The router hands any tab that
-still has no window the same frame as a placeholder; the remaining subjects are
-the Simulacron and ship projects (Phase 7). Until then `Spaceship.hta` remains the
-reference edition.
+load buttons free and a corrupt slot rolled back. Phase 7 opens the fourteen fitted
+bays and the bridge, each with its authored vignette, its own fields and the work it
+owns; the Simulacron's mosaic, anchors, dream engine and signal desk; the logbook of
+fourteen commendations; and the incident report. Phase 8 closes the port: the
+searchable twenty-one-entry handbook, the title menu with its three slots and its
+guide, the loss screen with the run's own record, and a synthesized soundscape whose
+numbers are the reference's own. Every tab the ship can open now has a window;
+`Spaceship.hta` remains the reference edition and the arbiter of every behaviour.
 
 `spaceship_core` is feature-complete as a simulation: the action clock, drive
 wear, life support, crew, tasks, incidents, the Simulacron, commendations,
@@ -135,7 +145,7 @@ its tests still build and run. On Windows, configure with
 | `spaceship_core` | the simulation: catalogue, state, action clock, tasks, saves. No window, no graphics |
 | `spaceship` | the Raylib + Dear ImGui client (only when the graphics packages are present) |
 | `spaceship_console` | scriptable harness that replays command scripts against the core |
-| `spaceship_tests` | CTest suite: 67 Catch2 cases / 7,478 assertions, plus the parity, catalogue and save gates |
+| `spaceship_tests` | CTest suite: 159 Catch2 cases / 16,742 assertions, plus the parity, catalogue and save gates (182 tests in all) |
 
 ### Content pipeline
 
@@ -167,9 +177,11 @@ runs the C++ core. Both read the same script and print the same canonical
 snapshot — sorted keys, JavaScript number formatting, no wall-clock stamps — at
 every checkpoint. `ctest` runs each script in `tests/parity/` as a `parity.*`
 test and fails on the first byte that differs. Add a script whenever a behaviour
-is ported; the five committed voyages cover the opening loop, a 900-action
-unattended haul, the filter hand's own initiative, running out of air, and a
-payday that cannot pay everyone.
+is ported; the fifteen committed voyages cover the opening loop, a 900-action
+unattended haul, the filter hand's own initiative, running out of air, a payday
+that cannot pay everyone, the task frame and machine rooms, Navigation and the
+chart scales, a full station visit, the Phase 7 story chain, and a whole lifecycle
+from boot to a lost hull.
 
 Script commands:
 
@@ -179,7 +191,8 @@ Script commands:
 | life support | `seat <slot>`, `bank`, `job <crew> <job>` |
 | navigation | `target <body>`, `travel`, `scan`, `ack <task>`, `dock`, `undock`, `layer <key>`, `sector <region>` |
 | ports | `buy <item>`, `sellgood <lot>`, `sellsurvey <record>`, `jettison <lot>`, `package <record>`, `hire <crew>`, `upgrade <id>`, `shipyard`, `contract accept\|collect <id>`, `commission accept <kind>\|collect\|abandon` |
-| the ship | `project <id>`, `medical <crew>`, `social <a> <b>`, `salvage <bay>` |
+| the ship | `project <id>`, `medical <crew>`, `social <a> <b>`, `salvage <bay>`, `dream <a> <b>`, `broadcast`, `signal <preserved\|sold>`, `claim <award>`, `remedy <report>`, `assign <report>`, `signalstate <state>` |
+| scenario setup (no press path) | `purse <n>`, `stat <id> <n>` |
 | persistence | `save <file> [utf16]`, `load <file>`, `saveslot <1\|2\|3>`, `loadslot <1\|2\|3>` |
 
 `#` starts a comment.
