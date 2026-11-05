@@ -13,80 +13,37 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Prepare CMake and Windows GCC Compatibility
-        shell: python
-        run: |
-          import pathlib, re
-
-          # 1. CMakeLists.txt fixes for CMake 4.0 + Windows + portable relative asset path
-          cmake_path = pathlib.Path("CMakeLists.txt")
-          if cmake_path.exists():
-              txt = cmake_path.read_text(encoding="utf-8")
-              txt = re.sub(r'catch_discover_tests\s*\([^)]*\)', '# skipped for EXE packaging', txt)
-              txt = txt.replace('-Werror', '')
-              txt = txt.replace('find_package(X11 QUIET)', 'set(X11_FOUND TRUE)')
-              txt = txt.replace('${RLIMGUI_SOURCE_DIR}', '${rlimgui_SOURCE_DIR}')
-              txt = txt.replace('${IMGUI_SOURCE_DIR}', '${imgui_SOURCE_DIR}')
-              txt = txt.replace('${RAYLIB_SOURCE_DIR}', '${raylib_SOURCE_DIR}')
-              txt = txt.replace('${CMAKE_SOURCE_DIR}/assets', 'assets')
-              txt = txt.replace('${PROJECT_SOURCE_DIR}/assets', 'assets')
-              cmake_path.write_text(txt, encoding="utf-8")
-
-          # 2. Catalog.cpp: avoid GCC 13/14 false-positive -Wdangling-reference
-          cat_path = pathlib.Path("cpp/data/Catalog.cpp")
-          if cat_path.exists():
-              txt = cat_path.read_text(encoding="utf-8")
-              txt = txt.replace("const std::string& file)", "std::string file)")
-              txt = txt.replace("const std::string& ctx)", "std::string ctx)")
-              cat_path.write_text(txt, encoding="utf-8")
-
-          # 3. main.cpp line 284: audio.Start(assets) -> audio.Start(assets.string())
-          main_path = pathlib.Path("cpp/app/main.cpp")
-          if main_path.exists():
-              txt = main_path.read_text(encoding="utf-8")
-              txt = txt.replace("audio.Start(assets)", "audio.Start(assets.string())")
-              main_path.write_text(txt, encoding="utf-8")
-
-      - name: Pre-fetch ImGui & rlImGui sources explicitly
-        shell: bash
-        run: |
-          git clone --depth 1 --branch v1.92.7 https://github.com/ocornut/imgui.git build-deps/imgui
-          git clone --depth 1 --branch Raylib_6_0 https://github.com/raylib-extras/rlImGui.git build-deps/rlimgui
-
       - name: Configure CMake (Release)
         shell: bash
         run: |
-          cmake -B build-win -G Ninja \
+          set -euo pipefail
+          cmake -S . -B build-win -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_C_COMPILER=gcc \
             -DCMAKE_CXX_COMPILER=g++ \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
             -DOPENGL_gl_LIBRARY=opengl32 \
-            -DFETCHCONTENT_SOURCE_DIR_IMGUI="$PWD/build-deps/imgui" \
-            -DFETCHCONTENT_SOURCE_DIR_RLIMGUI="$PWD/build-deps/rlimgui" \
-            -DimGui_SOURCE_DIR="$PWD/build-deps/imgui" \
-            -Dimgui_SOURCE_DIR="$PWD/build-deps/imgui" \
-            -DrlImGui_SOURCE_DIR="$PWD/build-deps/rlimgui" \
-            -Drlimgui_SOURCE_DIR="$PWD/build-deps/rlimgui" \
-            -DCMAKE_CXX_FLAGS="-D_USE_MATH_DEFINES -DM_PI=3.14159265358979323846 -Wno-dangling-reference -Wno-error" \
+            -DSPACESHIP_BUILD_TESTS=OFF \
+            -DSPACESHIP_DATA_GATE=OFF \
+            -DCMAKE_CXX_FLAGS="-D_USE_MATH_DEFINES -DM_PI=3.14159265358979323846" \
             -DCMAKE_EXE_LINKER_FLAGS="-static -static-libgcc -static-libstdc++"
 
       - name: Build spaceship.exe
         shell: bash
         run: |
+          set -euo pipefail
           cmake --build build-win --target spaceship --parallel
 
-      - name: Package Portable Windows Folder
+      - name: Package portable Windows folder
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p dist/Spaceship/runtime/saves
           cp build-win/spaceship.exe dist/Spaceship/
           cp -r assets dist/Spaceship/
-          for doc in README.md PARITY.md SPAM_AUDIT.md; do
-            [ -f "$doc" ] && cp "$doc" dist/Spaceship/
-          done
+          cp README.md dist/Spaceship/
 
-      - name: Upload Windows EXE Artifact
+      - name: Upload Windows EXE artifact
         uses: actions/upload-artifact@v4
         with:
           name: Spaceship-Windows-x64

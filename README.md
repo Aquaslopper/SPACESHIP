@@ -74,48 +74,9 @@ Existing Kessler-only and expanded-galaxy saves still load, including active leg
 
 ## Native C++ edition and development
 
-The repository also contains a native C++ port of the game, and it is **complete**:
-Phases 0–8 are finished and verified against the reference. `PARITY.md` is the
-sign-off — it lists the verification architecture, the final counts and the short
-list of declared toolkit and port-only differences.
+A native C++ client and headless simulation are present, but the port is **still in progress**. The scripted differential suite compares selected game-state traces against `Spaceship.hta`; it does not render the HTA or prove that native controls are visible, correctly placed, or clickable. The native UI is being checked and corrected against the HTA screen by screen.
 
-Phase 0 (build system, extracted catalogue, data gate), Phase 1 (the whole headless
-simulation), Phase 2 (the cockpit), Phase 3 (the task frame and the three machine
-rooms), Phase 4 (Navigation and the star chart), Phase 5 (Crew Quarters and the
-crew records), Phase 6 (stations, the cargo hold and science room, and the four
-floating popups), Phase 7 (the fourteen fitted rooms, the Simulacron, the Silicon
-Marrow signal and the logbook) and Phase 8 (the handbook, the title and loss
-screens, and the synthesized soundscape) and Phase 9 (the anti-spam lock and its
-audit, the player's own audio, the 18 px typography floor, five calm palettes, the
-borderless window and the five-card tutorial) are complete and verified. Phase 2
-delivers the taskbar and its tabs, the sidebar and pinned foot, the status bar, and
-the idle screen with the ship cross-section, the feed and the two interaction
-verbs. Phase 3 adds the house task frame — head, panels, machine stage, commitment
-band and the three-state progress button on the shared cooldown ladder — plus the
-Engine Room (a 225-part 650x390 drive), the O2 Filter Room and the Mess Hall. Phase 4
-adds the Navigation window: three chart scales, the perspective raster, the zoom and
-pan ladder, the ship's ring and the two controls that cost anything (Start Travel and
-Run Deep Scan), with the panels' distance, transit and fuel readouts derived exactly.
-Phase 5 adds the quarters: the pixel sprites built from the reference's character
-maps, the order sheet (staging free, one action to hand it over, the price paid as
-work), job and trade changes, station training, the medical bay and the roster.
-Phase 6 adds the port window (market, sales, mission board, yard and tavern), the
-cargo hold and the science room, and the four floating panels behind the pinned
-foot — manifest, activity log, three save slots and settings — with the save and
-load buttons free and a corrupt slot rolled back. Phase 7 opens the fourteen fitted
-bays and the bridge, each with its authored vignette, its own fields and the work it
-owns; the Simulacron's mosaic, anchors, dream engine and signal desk; the logbook of
-fourteen commendations; and the incident report. Phase 8 closes the port: the
-searchable twenty-one-entry handbook, the title menu with its three slots and its
-guide, the loss screen with the run's own record, and a synthesized soundscape whose
-numbers are the reference's own. Every tab the ship can open now has a window;
-`Spaceship.hta` remains the reference edition and the arbiter of every behaviour.
-
-`spaceship_core` is feature-complete as a simulation: the action clock, drive
-wear, life support, crew, tasks, incidents, the Simulacron, commendations,
-navigation (three chart scales, crossings, sensors), ports and trade, contracts,
-commissions, the twelve task hooks, the ten ship projects, both hulls, and
-bidirectional saves in the original file format.
+`Spaceship.hta` is the behavioral and visual reference. Do not treat passing simulation tests as sign-off for the native UI.
 
 ### Build
 
@@ -147,7 +108,7 @@ its tests still build and run. On Windows, configure with
 | `spaceship_core` | the simulation: catalogue, state, action clock, tasks, saves. No window, no graphics |
 | `spaceship` | the Raylib + Dear ImGui client (only when the graphics packages are present) |
 | `spaceship_console` | scriptable harness that replays command scripts against the core |
-| `spaceship_tests` | CTest suite: 168 Catch2 cases / 17,185 assertions, plus the parity, catalogue, audit and save gates (192 tests in all) |
+| `spaceship_tests` | headless Catch2 suite plus selected parity, catalogue, GUI syntax and save tests |
 
 ### Content pipeline
 
@@ -166,7 +127,7 @@ licence) come from the same pipeline and are committed.
 
 ### Differential harness
 
-The strongest test in the repository is not a unit test. It is a replay:
+A model-level differential check replays selected voyages:
 
 ```sh
 node tools/trace-voyage.cjs tests/parity/voyage-01.script > reference.trace
@@ -201,17 +162,10 @@ Script commands:
 
 ### The interface, without a window
 
-The cockpit's decisions are data, not drawing. `cpp/ui` keeps the theme, the
-layout arithmetic, the tab router, the sidebar, the briefing text, the deck plan
-and the effect timings in translation units that never include Raylib or ImGui,
-so `ctest` holds them to the reference: exact rectangles, exact sentences, exact
-timings. Only `cpp/ui/Draw.cpp` and `cpp/app/main.cpp` name a graphics library.
-
-That is why an interface change can be reviewed on a machine with no display.
-`tools/check-gui-syntax.sh` (registered as `ui.gui-syntax`) runs both of those
-translation units through the compiler with `-fsyntax-only -Wall -Wextra
--Wpedantic` against whatever Raylib/ImGui headers it can find, and skips cleanly
-when none are installed.
+Headless `cpp/ui` view-model tests cover routing, layout data and action models.
+They do not execute `Draw.cpp`, exercise native pointer hitboxes, or prove visual
+parity. `tools/check-gui-syntax.sh` checks that the GUI translation units compile;
+a syntax check is not a UI test. Full graphical comparison remains open work.
 
 ### Save compatibility
 
@@ -235,16 +189,9 @@ with no ticks left, a decoding signal must have the work to decode it, and
 cooldowns must be whole numbers inside their rule. A failed load leaves the live
 voyage untouched.
 
-### Fidelity
+### Fidelity status
 
-The port aims to be numerically, textually and behaviourally identical to the
-HTA: the same action costs, cooldowns, tick order, wording and save format, with
-the illustration geometry reproduced from the same coordinate tables. Visual
-differences are limited to what a different toolkit cannot reproduce (text
-metrics, border-radius arcs). `PORTING_PLAN.md` records the rules being
-preserved and the declared exceptions. Where fidelity is provable it is proven:
-the differential harness above replays the same command script through both
-editions and compares the resulting state, line by line.
+The current parity scripts replay selected command sequences through the HTA's JavaScript model and the C++ simulation, then compare state traces. They do not exercise the actual HTA presentation layer or C++ pointer hitboxes. Visual parity, widget reachability, text clipping, and complete screen-by-screen interaction parity remain open work.
 
 The original interface's gameplay JavaScript is inline, and its dependency-free
 Node tests load it in a VM with small DOM stubs. Run those regression tests from

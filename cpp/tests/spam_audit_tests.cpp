@@ -6,17 +6,12 @@
 //  ACTION_COOLDOWN_RULES (routine 5, systems 10, space 15, critical 20), running
 //  as an ongoing task, or disabled by the state change it caused.
 //
-//  The audit is model-driven, not a hand-written list: it asks each screen for
-//  the rows it would paint, keeps the ones that are enabled and cost an action,
-//  and then presses each one twice on a freshly prepared voyage. If a screen
-//  grows a button tomorrow, it is audited tomorrow.
+//  These behavioral tests exercise paid controls through their view-model
+//  actions; they do not claim that the graphical widgets are all reachable.
 //
-//  `tools/audit-spam-buttons.sh` runs this case and turns the AUDIT lines below
-//  into SPAM_AUDIT.md.
 // ============================================================================
 #include <catch2/catch_test_macros.hpp>
 
-#include <cstdio>
 #include <functional>
 #include <string>
 #include <vector>
@@ -44,8 +39,6 @@ ship::Catalog& World() {
       ship::Catalog::LoadFromAssets(ship::Catalog::DefaultAssetDir());
   return catalog;
 }
-
-void RememberLine(const std::string& line) { std::printf("%s\n", line.c_str()); }
 
 // A voyage prepared so that as many paid controls as possible are live: money,
 // power, supplies, a berth at a port, an uncommitted salvage lot of each kind,
@@ -107,16 +100,12 @@ void AuditOne(const Probe& probe, int* checked, int* freeControl) {
   if (!first) {
     // A control the model offered but the press refused is a bug in the model,
     // not a locked button: say so loudly.
-    RememberLine("AUDIT|" + probe.screen + "|" + probe.control + "|" + probe.tier +
-                 "|UNREACHABLE");
     CHECK(first);
     return;
   }
   const double afterFirst = sim.ActionCount();
   if (afterFirst == before) {
     // Free after all: reading, selecting, opening. Nothing to lock.
-    RememberLine("AUDIT|" + probe.screen + "|" + probe.control + "|" + probe.tier +
-                 "|FREE");
     *freeControl += 1;
     return;
   }
@@ -124,8 +113,6 @@ void AuditOne(const Probe& probe, int* checked, int* freeControl) {
 
   const bool second = probe.press(sim);
   const bool locked = !second && sim.ActionCount() == afterFirst;
-  RememberLine("AUDIT|" + probe.screen + "|" + probe.control + "|" + probe.tier + "|" +
-               (locked ? "LOCKED" : "SPAMMABLE"));
   CHECK_FALSE(second);
   CHECK(sim.ActionCount() == afterFirst);
   *checked += 1;
@@ -422,8 +409,6 @@ TEST_CASE("every paid control refuses the very next click", "[phase9][spam]") {
   int freeControl = 0;
   for (const Probe& probe : probes) { AuditOne(probe, &checked, &freeControl); }
 
-  RememberLine("AUDIT-SUMMARY|" + std::to_string(probes.size()) + "|" +
-               std::to_string(checked) + "|" + std::to_string(freeControl));
   CHECK(checked >= 25);
   // The only free controls the audit offered are the logbook's claims: a claim
   // is free by design and is audited for paying exactly once.

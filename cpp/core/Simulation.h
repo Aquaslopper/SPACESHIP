@@ -73,6 +73,7 @@ class Simulation {
   bool StartFilterBank();               // the player throws the switch
   bool StartMaintenanceSelf();          // startMaint(e, "maint", "the commander")
   bool StartCookingSelf();              // startCook(e, "cook", "the commander")
+  bool ServiceSystem(const std::string& statId);  // buildSystemScreen() service row
   bool ApplyJob(const std::string& crewId, const std::string& jobId);  // scenario setup
 
   // ---- queries -----------------------------------------------------------

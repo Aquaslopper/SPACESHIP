@@ -97,35 +97,39 @@ IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout
                                 float othersHeight, FxRng& rng) {
   IdleScreenModel out;
   out.content = layout.content;
-  out.stageArea = layout.stage;
   out.stageNote =
       "Left-click anything here to read what it is. "
       "Right-click opens its task window.";
 
   const float inner = std::max(0.0f, layout.content.w - 16.0f);
-  out.stats = StatRail(sim, Area{layout.content.x + 8.0f, layout.content.y, inner, 62.0f});
+  out.stats = StatRail(sim, Area{layout.content.x + 8.0f, layout.content.y + 4.0f, inner, 62.0f});
+  const float statsBottom =
+      out.stats.empty() ? layout.content.y + 66.0f : out.stats.front().box.Bottom();
+
+  out.stageArea = layout.stage;
+  out.stageArea.y = statsBottom + 8.0f;
 
   const float noteTop = out.stageArea.Bottom() + 6.0f;
-  const float navTop = noteTop + 22.0f;
-  out.nav = NavStrip(sim, Area{layout.content.x + 8.0f, navTop, inner, 44.0f});
+  const float navTop = noteTop + 24.0f;
+  out.nav = NavStrip(sim, Area{layout.content.x + 8.0f, navTop, inner, 50.0f});
 
   float after = out.nav.box.Bottom();
   if (sim.State().docked) {
     out.docked = true;
-    out.dock = DockStrip(sim, Area{layout.content.x + 8.0f, navTop + 44.0f + 12.0f,
-                                   inner, 44.0f});
+    out.dock = DockStrip(sim, Area{layout.content.x + 8.0f, navTop + 50.0f + 10.0f,
+                                   inner, 50.0f});
     after = out.dock.box.Bottom();
   } else {
     out.dock.box = Area{layout.content.x + 8.0f, after, inner, 0.0f};
   }
 
   out.infos = InfoRail(sim,
-                       Area{layout.content.x + 8.0f, after + 12.0f, inner, 40.0f});
-  const float infoBottom = out.infos.empty() ? after + 12.0f : out.infos.front().box.Bottom();
+                       Area{layout.content.x + 8.0f, after + 10.0f, inner, 42.0f});
+  const float infoBottom = out.infos.empty() ? after + 10.0f : out.infos.front().box.Bottom();
 
   // measure-and-give, now that everything above the feed has a height.
   out.feedHeight = GiveFeedHeight(layout.content.h, othersHeight);
-  out.feedBox = Area{layout.content.x + 8.0f, infoBottom + 4.0f, inner, out.feedHeight};
+  out.feedBox = Area{layout.content.x + 8.0f, infoBottom + 26.0f, inner, out.feedHeight};
 
   out.diagram = BuildDiagram(sim, out.stageArea, hideCrewLabels, rng);
   out.feed = FeedLinesNewestFirst(sim, 200);

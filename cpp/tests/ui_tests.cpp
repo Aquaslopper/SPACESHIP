@@ -107,7 +107,7 @@ TEST_CASE("five themes, one palette, five inks", "[ui][theme]") {
 }
 
 TEST_CASE("theme flags drive type size and the compact deck", "[ui][theme]") {
-  // Phase 9's typography floor: 18 px, then four 5% steps, and a line box
+  // Typography floor: 18 px, then four 5% steps, and a line box
   // derived from the face so nothing clips as the steps grow.
   ship::Theme theme = ship::Theme::ById("classic");
   CHECK(ship::Theme::FontPxForStep(0) == 18.0f);

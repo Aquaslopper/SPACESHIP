@@ -86,7 +86,8 @@ std::string TimeStamp(double actionCount) {
 int ShellView::TypePx(int reference) const {
   return reference <= 0
              ? reference
-             : static_cast<int>(std::lround(reference * (theme_.FontPx() / 13.0)));
+             : std::max(18, static_cast<int>(
+                                std::lround(reference * (theme_.FontPx() / 13.0))));
 }
 
 void ShellView::Text(const char* text, int x, int y, int size, ::Color tint,
@@ -96,8 +97,9 @@ void ShellView::Text(const char* text, int x, int y, int size, ::Color tint,
              static_cast<float>(size), 1.0f, tint);
 }
 
-float ShellView::TextWidth(const char* text, int size) const {
-  return MeasureTextEx(bodyFont_, text, static_cast<float>(size), 1.0f).x;
+float ShellView::TextWidth(const char* text, int size, bool mono) const {
+  const Font& font = mono ? monoFont_ : bodyFont_;
+  return MeasureTextEx(font, text, static_cast<float>(size), 1.0f).x;
 }
 
 ShellView::ShellView() { theme_ = Theme::ById("classic"); }
@@ -115,24 +117,14 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   const float contentH = height_ - Metrics::kContentTop - Metrics::kStatusH;
   layout_ = ComputeLayout(width_, height_, contentH, others_, theme_.stageCompact);
 
-  // The dot drift is cosmetic and confined to the idle screen; it is left in
-  // step with the diagram that is about to be painted.
-  if (!sim.State().reducedMotion && sim.State().activeTab == "home") {
+  // Always build Home, including when reduced motion is enabled. Keep drift
+  // state across frames and advance it at the reference cadence; rebuilding
+  // random dots every frame caused teleporting and a blank reduced-motion view.
+  if (sim.State().activeTab == "home") {
     FxRng seeded = rng_;
-    idle_ = BuildIdleScreen(sim, layout_, theme_, theme_.hideCrewLabels, others_,
-                            seeded);
-    dots_.clear();
-    for (const DiagramCrew& crew : idle_.diagram.crew) {
-      DriftDot dot;
-      dot.id = crew.id;
-      dot.roomId = crew.roomId;
-      dot.x = crew.dot.x;
-      dot.y = crew.dot.y;
-      dot.tx = crew.dot.x;
-      dot.ty = crew.dot.y;
-      dots_.push_back(dot);
-    }
+    idle_ = BuildIdleScreen(sim, layout_, theme_, theme_.hideCrewLabels, others_, seeded);
     rng_ = seeded;
+    SyncIdleDots(sim, nowMs);
   }
 
   UpdateMarks(marks_, nowMs);
@@ -149,6 +141,15 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   }
 
   if (sim.State().activeTab == "home") {
+    // Screen hit lists belong to the window that was painted last frame. Clear
+    // them when Home becomes active, otherwise a stale quarters/stores early
+    // return can swallow every click on the ship.
+    screenNav_ = false;
+    screenQuarters_ = false;
+    screenRecord_ = false;
+    screenPanels_ = false;
+    navHits_.clear();
+    taskButtons_.clear();
     PaintIdle(sim);
   } else {
     // Ask the router for the window the active tab owns - the same function the
@@ -161,7 +162,8 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
     screenPanels_ = kind == ScreenKind::Station || kind == ScreenKind::Cargo ||
                     kind == ScreenKind::Science || kind == ScreenKind::Room ||
                     kind == ScreenKind::SimCore || kind == ScreenKind::Awards ||
-                    kind == ScreenKind::Event || kind == ScreenKind::Wiki;
+                    kind == ScreenKind::Event || kind == ScreenKind::Wiki ||
+                    kind == ScreenKind::System || kind == ScreenKind::Info;
     panelsKind_ = kind;
     if (taskTabKey_ != sim.State().activeTab) {
       pendingConfirm_.clear();
@@ -204,6 +206,48 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
 
 }
 
+void ShellView::SyncIdleDots(const Simulation& sim, double nowMs) {
+  const bool compact = sim.State().shipClass == "wren";
+  if (dots_.size() != idle_.diagram.crew.size()) {
+    dots_.clear();
+    for (const DiagramCrew& crew : idle_.diagram.crew) {
+      DriftDot dot;
+      dot.id = crew.id;
+      dot.roomId = crew.roomId;
+      dot.x = dot.tx = crew.dot.x;
+      dot.y = dot.ty = crew.dot.y;
+      dots_.push_back(dot);
+    }
+    lastDriftMs_ = nowMs;
+  }
+  if (!sim.State().reducedMotion && lastDriftMs_ <= 0.0) { lastDriftMs_ = nowMs; }
+  const int ticks = sim.State().reducedMotion || lastDriftMs_ <= 0.0
+                        ? 0
+                        : std::min(8, static_cast<int>((nowMs - lastDriftMs_) / FxTiming::kDriftMs));
+  if (ticks > 0) {
+    for (DriftDot& dot : dots_) {
+      const auto room = std::find_if(idle_.diagram.rooms.begin(), idle_.diagram.rooms.end(),
+                                     [&dot](const Room& r) { return r.id == dot.roomId; });
+      if (room == idle_.diagram.rooms.end()) { continue; }
+      const Area roomBox{static_cast<float>(room->box.x), static_cast<float>(room->box.y),
+                         static_cast<float>(room->box.w), static_cast<float>(room->box.h)};
+      for (int i = 0; i < ticks; ++i) { DriftStep(dot, roomBox, compact, driftRng_); }
+    }
+    lastDriftMs_ += static_cast<double>(ticks * FxTiming::kDriftMs);
+  }
+  for (DiagramCrew& crew : idle_.diagram.crew) {
+    const auto dot = std::find_if(dots_.begin(), dots_.end(),
+                                  [&crew](const DriftDot& d) { return d.id == crew.id; });
+    if (dot == dots_.end()) { continue; }
+    const float dx = dot->x - crew.dot.x;
+    const float dy = dot->y - crew.dot.y;
+    crew.dot.x = dot->x;
+    crew.dot.y = dot->y;
+    crew.label.x += dx;
+    crew.label.y += dy;
+  }
+}
+
 void ShellView::PaintChrome(Simulation& sim) {
   ImGuiIO& io = ImGui::GetIO();
   (void)io;
@@ -225,24 +269,45 @@ void ShellView::PaintChrome(Simulation& sim) {
   draw->AddLine(ImVec2(0.0f, Metrics::kTaskbarH - 1.0f),
                 ImVec2(width_, Metrics::kTaskbarH - 1.0f), ToIm(p.borderDark));
 
-  float x = 4.0f;
-  for (const TabView& tab : TabBar(sim)) {
-    const std::string label = tab.title;
-    const float w = ImGui::CalcTextSize(label.c_str()).x + 22.0f;
-    if (x + w > layout_.tabStrip.w) { break; }
+  const std::vector<TabView> tabs = TabBar(sim);
+  std::vector<float> tabWidths;
+  float tabsWidth = 4.0f;
+  for (const TabView& tab : tabs) {
+    const float tabW = ImGui::CalcTextSize(tab.title.c_str()).x + (tab.closable ? 30.0f : 18.0f);
+    tabWidths.push_back(tabW);
+    tabsWidth += tabW + 4.0f;
+  }
+  maxTabScroll_ = std::max(0.0f, tabsWidth - layout_.tabStrip.w);
+  tabScroll_ = std::max(0.0f, std::min(maxTabScroll_, tabScroll_));
+  const auto active = std::find_if(tabs.begin(), tabs.end(), [](const TabView& t) { return t.active; });
+  if (active != tabs.end() && active->key != lastRevealedTab_) {
+    const std::size_t index = static_cast<std::size_t>(active - tabs.begin());
+    float start = 4.0f;
+    for (std::size_t i = 0; i < index; ++i) { start += tabWidths[i] + 4.0f; }
+    const float end = start + tabWidths[index];
+    if (end - tabScroll_ > layout_.tabStrip.w) { tabScroll_ = std::min(maxTabScroll_, end - layout_.tabStrip.w); }
+    if (start - tabScroll_ < 0.0f) { tabScroll_ = start; }
+    lastRevealedTab_ = active->key;
+  }
+  tabHits_.clear();
+  draw->PushClipRect(ImVec2(0.0f, 0.0f), ImVec2(layout_.tabStrip.w, Metrics::kTaskbarH), true);
+  float x = 4.0f - tabScroll_;
+  for (std::size_t i = 0; i < tabs.size(); ++i) {
+    const TabView& tab = tabs[i];
+    const float w = tabWidths[i];
+    const Area tabBox{x, 3.0f, w, Metrics::kTaskbarH - 5.0f};
+    const Area closeBox{tabBox.Right() - 19.0f, tabBox.y, 18.0f, tabBox.h};
+    tabHits_.push_back(TabHit{tab.key, tabBox, closeBox, tab.closable});
     const ImU32 fill = tab.active ? ToIm(p.white)
                        : tab.fresh ? ToIm(p.coffeeLight)
                                    : ToIm(p.panel3);
-    draw->AddRectFilled(ImVec2(x, 3.0f), ImVec2(x + w, Metrics::kTaskbarH - 2.0f), fill,
-                        3.0f);
-    draw->AddRect(ImVec2(x, 3.0f), ImVec2(x + w, Metrics::kTaskbarH - 2.0f),
-                  ToIm(p.border), 3.0f);
-    draw->AddText(ImVec2(x + 7.0f, 9.0f), ToIm(p.muted), label.c_str());
-    if (tab.closable) {
-      draw->AddText(ImVec2(x + w - 13.0f, 9.0f), ToIm(p.muted), "x");
-    }
+    draw->AddRectFilled(ImVec2(x, 3.0f), ImVec2(x + w, Metrics::kTaskbarH - 2.0f), fill, 3.0f);
+    draw->AddRect(ImVec2(x, 3.0f), ImVec2(x + w, Metrics::kTaskbarH - 2.0f), ToIm(p.border), 3.0f);
+    draw->AddText(ImVec2(x + 7.0f, 9.0f), ToIm(p.muted), tab.title.c_str());
+    if (tab.closable) { draw->AddText(ImVec2(x + w - 13.0f, 9.0f), ToIm(p.muted), "x"); }
     x += w + 4.0f;
   }
+  draw->PopClipRect();
 
   // Home and the two scroll arrows live in the reserved right-hand slot.
   draw->AddRectFilled(ImVec2(layout_.home.x, 0.0f),
@@ -257,8 +322,9 @@ void ShellView::PaintChrome(Simulation& sim) {
                       ImVec2(layout_.sidepanel.Right(), layout_.sidepanel.Bottom()),
                       ToIm(p.panel));
 
-  const std::vector<SideHit> hits =
-      SideHits(sim, layout_.sidepanel, layout_.sidefoot, theme_.LineHeight());
+  sideHits_ = SideHits(sim, layout_.sidepanel, layout_.sidefoot, theme_.LineHeight(),
+                       sideScroll_, &sideContentH_);
+  const std::vector<SideHit>& hits = sideHits_;
   const std::vector<SideBlock> blocks = SideBlocks(sim);
   for (const SideHit& hit : hits) {
     if (hit.action == SideAction::Toggle && hit.header) {
@@ -354,6 +420,11 @@ void ShellView::PaintChrome(Simulation& sim) {
     for (const DescribeAct& act : selection_.acts) {
       ImGui::TextDisabled("%s - %s", act.label.c_str(), act.cost.c_str());
     }
+    if (ImGui::Button("Open Window")) {
+      OpenTask(sim, briefingKind_, briefingId_, true);
+      hasSelection_ = false;
+    }
+    ImGui::SameLine();
     if (ImGui::Button("Close")) { hasSelection_ = false; }
     ImGui::End();
     ImGui::PopStyleColor(3);
@@ -386,7 +457,7 @@ void ShellView::PaintIdle(Simulation& sim) {
                   4, ToRay(theme.palette.coffee));
   }
 
-  PaintDiagram(idle_.diagram);
+  PaintDiagram(idle_.diagram, idle_.stageArea, idleDiagramScale_);
 
   Text(idle_.stageNote.c_str(), static_cast<int>(idle_.content.x + 8.0f),
            static_cast<int>(idle_.stageArea.Bottom() + 8.0f), TypePx(12) ,
@@ -435,50 +506,71 @@ void ShellView::PaintPanel(const NavPanel& panel, const Area& box) {
   DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
                 static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel));
   DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
-                     static_cast<int>(box.w), static_cast<int>(box.h),
-                     ToRay(p.border));
+                     static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.border));
+  BeginScissorMode(static_cast<int>(box.x + 1.0f), static_cast<int>(box.y + 1.0f),
+                   std::max(0, static_cast<int>(box.w - 2.0f)),
+                   std::max(0, static_cast<int>(box.h - 2.0f)));
+  const int small = TypePx(10);
+  const float line = TypeStep(14.0f);
   Text(panel.title.c_str(), static_cast<int>(box.x + 8.0f),
-           static_cast<int>(box.y + 5.0f), TypePx(11) , ToRay(p.coffee));
-  float y = box.y + 24.0f;
-  for (const PanelLine& line : panel.lines) {
-    switch (line.kind) {
+       static_cast<int>(box.y + 5.0f), TypePx(11), ToRay(p.coffee));
+  float y = box.y + TypeStep(24.0f);
+  const float textW = std::max(1.0f, box.w - 16.0f);
+  auto paintWrapped = [&](const std::string& value, float x, float width,
+                          ::Color color) {
+    const std::vector<std::string> rows = WrapText(value, std::max(1.0f, width), small, bodyFont_);
+    for (const std::string& row : rows) {
+      if (y + line > box.Bottom() - 3.0f) { break; }
+      Text(row.c_str(), static_cast<int>(x), static_cast<int>(y), small, color);
+      y += line;
+    }
+  };
+  for (const PanelLine& item : panel.lines) {
+    if (y >= box.Bottom() - 3.0f) { break; }
+    switch (item.kind) {
       case PanelLine::Kind::Name:
-        Text(line.value.c_str(), static_cast<int>(box.x + 8.0f),
-                 static_cast<int>(y), TypePx(22) , ToRay(p.ink));
-        y += 22.0f;
+        Text(item.value.c_str(), static_cast<int>(box.x + 8.0f), static_cast<int>(y),
+             TypePx(18), ToRay(p.ink));
+        y += TypeStep(23.0f);
         break;
       case PanelLine::Kind::Sub:
-        Text(line.value.c_str(), static_cast<int>(box.x + 8.0f),
-                 static_cast<int>(y), TypePx(10) , ToRay(p.muted));
-        y += 13.0f;
+        paintWrapped(item.value, box.x + 8.0f, textW, ToRay(p.muted));
+        y += TypeStep(2.0f);
         break;
       case PanelLine::Kind::Bar: {
         const float w = box.w - 16.0f;
         DrawRectangle(static_cast<int>(box.x + 8.0f), static_cast<int>(y),
                       static_cast<int>(w), 5, ToRay(p.panel3));
         DrawRectangle(static_cast<int>(box.x + 8.0f), static_cast<int>(y),
-                      static_cast<int>(w * std::max(0.0, std::min(100.0, line.pct)) / 100.0),
-                      5, ToRay(p.coffee));
-        y += 11.0f;
+          static_cast<int>(w * std::max(0.0, std::min(100.0, item.pct)) / 100.0),
+          5, ToRay(p.coffee));
+        y += TypeStep(11.0f);
         break;
       }
       case PanelLine::Kind::Dim:
       case PanelLine::Kind::Note:
-        Text(line.value.c_str(), static_cast<int>(box.x + 8.0f),
-                 static_cast<int>(y), TypePx(10) , ToRay(p.muted));
-        y += 12.0f * static_cast<float>(1 + line.value.size() / 34);
+        paintWrapped(item.value, box.x + 8.0f, textW, ToRay(p.muted));
+        y += TypeStep(2.0f);
         break;
-      case PanelLine::Kind::Field:
-        Text(line.key.c_str(), static_cast<int>(box.x + 8.0f),
-                 static_cast<int>(y), TypePx(10) , ToRay(p.muted));
-        Text(line.value.c_str(), static_cast<int>(box.x + box.w - 8.0f -
-                                                          static_cast<float>(TextWidth(line.value.c_str(), TypePx(10) ))),
-                 static_cast<int>(y), TypePx(10) , ToRay(p.ink));
-        y += 14.0f;
+      case PanelLine::Kind::Field: {
+        const float x = box.x + 8.0f;
+        const float keyW = TextWidth(item.key.c_str(), small);
+        const float valueW = TextWidth(item.value.c_str(), small);
+        const float roomW = textW - keyW - TypeStep(8.0f);
+        Text(item.key.c_str(), static_cast<int>(x), static_cast<int>(y), small, ToRay(p.muted));
+        if (valueW <= roomW) {
+          Text(item.value.c_str(), static_cast<int>(box.Right() - 8.0f - valueW),
+               static_cast<int>(y), small, ToRay(p.ink));
+          y += line;
+        } else {
+          y += line;
+          paintWrapped(item.value, x + TypeStep(6.0f), textW - TypeStep(6.0f), ToRay(p.ink));
+        }
         break;
+      }
     }
-    if (y > box.Bottom() - 4.0f) { break; }
   }
+  EndScissorMode();
 }
 
 void ShellView::PaintStage(const TaskStage& stage, const Area& origin) {
@@ -632,6 +724,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   if (chart.zoom >= 0 && spareW < 638.0f) { scale = spareW / 638.0f; }
   const Area box{middleLeft, layout_.content.y + 58.0f, 638.0f * scale,
                  278.0f * scale};
+  navChartBox_ = box;
 
   DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
                 static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel));
@@ -1007,6 +1100,8 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
 // ============================================================================
 bool ShellView::PressPanelRow(Simulation& sim, ScreenKind kind, const std::string& id) {
   switch (kind) {
+    case ScreenKind::System: return PressSystemAction(sim, id);
+    case ScreenKind::Info: return PressInfoAction(sim, id);
     case ScreenKind::Station: return PressStationAction(sim, id, "");
     case ScreenKind::Cargo:
     case ScreenKind::Science: return PressStoresAction(sim, id, "");
@@ -1094,6 +1189,35 @@ void ShellView::PaintHero(const Vignette& vignette, const Area& box) {
 //  1672x941 art, five free commands down the left, and one dialog beside them.
 //  Nothing here can advance the clock: the menu is not a place in the voyage.
 // ============================================================================
+void ShellView::OpenPopup(const std::string& key) {
+  if (key.empty()) { return; }
+  popupKey_ = key;
+  popupScroll_ = 0.0f;
+  popupMaxScroll_ = 0.0f;
+  popupHits_.clear();
+  pendingConfirm_.clear();
+  pendingAction_.clear();
+  ++popupCount_;
+}
+
+void ShellView::ClosePopup() {
+  popupKey_.clear();
+  popupScroll_ = 0.0f;
+  popupMaxScroll_ = 0.0f;
+  popupHits_.clear();
+  pendingConfirm_.clear();
+  pendingAction_.clear();
+  confirmNewVoyage_ = false;
+}
+
+void ShellView::HideTitle() {
+  titleActive_ = false;
+  titleConfirm_ = false;
+  titlePanel_ = TitlePanel::None;
+  titleHits_.clear();
+  titleMessage_.clear();
+}
+
 void ShellView::ShowTitle(bool fromVoyage) {
   titleActive_ = true;
   fromVoyage_ = fromVoyage;
@@ -1114,47 +1238,75 @@ void ShellView::PaintTitle(Simulation& sim) {
   DrawRectangle(0, 0, static_cast<int>(width_), static_cast<int>(height_),
                 ToRay(p.panel));
 
-  // The card keeps the art's ratio; the reference caps it at 1672 px wide.
-  const float margin = 12.0f;
-  float cardW = std::min(width_ - margin * 2.0f, 1672.0f);
+  // title.jpg is the complete menu card, not a hero image to decorate with a
+  // second, invented menu. Fit the entire 1672x941 artwork without cropping.
   const float ratio = 1672.0f / 941.0f;
-  const float cardH = cardW / ratio;
-  if (cardH > height_ - margin * 2.0f) {
-    cardW = (height_ - margin * 2.0f) * ratio;
+  float cardW = std::min(width_, 1672.0f);
+  float cardH = cardW / ratio;
+  if (cardH > height_) { cardH = height_; cardW = cardH * ratio; }
+  const Area card{(width_ - cardW) * 0.5f, (height_ - cardH) * 0.5f, cardW, cardH};
+  DrawRectangle(0, 0, static_cast<int>(width_), static_cast<int>(height_), ToRay(p.panel2));
+  const Texture2D* texture = static_cast<const Texture2D*>(titleArt_);
+  const bool hasTitleArt = texture != nullptr && texture->id != 0 &&
+                           texture->width > 0 && texture->height > 0;
+  if (hasTitleArt) {
+    DrawTexturePro(*texture,
+                   Rectangle{0.0f, 0.0f, static_cast<float>(texture->width),
+                             static_cast<float>(texture->height)},
+                   Rectangle{card.x, card.y, card.w, card.h}, Vector2{0.0f, 0.0f}, 0.0f,
+                   ToRay(p.white));
   }
-  const float measuredH = cardW / ratio;
-  const Area card{(width_ - cardW) * 0.5f, (height_ - measuredH) * 0.5f, cardW, measuredH};
-  DrawRectangle(static_cast<int>(card.x), static_cast<int>(card.y),
-                static_cast<int>(card.w), static_cast<int>(card.h), ToRay(p.panel2));
-  DrawRectangleLines(static_cast<int>(card.x), static_cast<int>(card.y),
-                     static_cast<int>(card.w), static_cast<int>(card.h), ToRay(p.borderDark));
 
-  // The app loads the title art beside its assets and owns the texture. Keep
-  // the source and destination at the authored 3:2 ratio, centre-cropping the
-  // 16:9 artwork rather than stretching it into a banner.
-  if (titleArt_ != nullptr) {
-    const Texture2D* texture = static_cast<const Texture2D*>(titleArt_);
-    const float artH = card.h * 0.55f;
-    const float artW = artH * 1.5f;
-    Rectangle source{0.0f, 0.0f, static_cast<float>(texture->width),
-                     static_cast<float>(texture->height)};
-    const float sourceAspect = source.width / source.height;
-    if (sourceAspect > 1.5f) {
-      source.width = source.height * 1.5f;
-      source.x = (static_cast<float>(texture->width) - source.width) * 0.5f;
-    } else if (sourceAspect < 1.5f) {
-      source.height = source.width / 1.5f;
-      source.y = (static_cast<float>(texture->height) - source.height) * 0.5f;
+  // A missing optional title image must never leave a blank window. Keep the
+  // title and all menu actions usable, with explicit native controls as a
+  // fallback for packaged builds where an asset might be absent or unreadable.
+  if (!hasTitleArt && titlePanel_ == TitlePanel::None && !titleConfirm_) {
+    Text("SPACESHIP", static_cast<int>(card.x + 42.0f),
+         static_cast<int>(card.y + 48.0f), TypePx(40), ToRay(p.ink));
+    Text("A SIMULATION GAME OF DEPTH, PATIENCE AND EVERY DECISION MATTERS",
+         static_cast<int>(card.x + 46.0f), static_cast<int>(card.y + 106.0f),
+         TypePx(12), ToRay(p.muted));
+    float y = card.y + 190.0f;
+    for (const ActionRowView& action : title_.actions) {
+      const Area box{card.x + 46.0f, y, std::min(360.0f, card.w - 92.0f), 42.0f};
+      DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                    static_cast<int>(box.w), static_cast<int>(box.h),
+                    ToRay(action.enabled ? p.white : p.panel3));
+      DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                         static_cast<int>(box.w), static_cast<int>(box.h),
+                         ToRay(action.enabled ? p.borderDark : p.border));
+      Text(action.label.c_str(), static_cast<int>(box.x + 14.0f),
+           static_cast<int>(box.y + 12.0f), TypePx(12),
+           ToRay(action.enabled ? p.ink : p.muted));
+      if (action.enabled) { titleHits_.push_back(NavHit{box, action.id, ""}); }
+      y += 52.0f;
     }
-    const float artX = card.x + (card.w - artW) * 0.5f;
-    DrawTexturePro(*texture, source,
-                   Rectangle{artX, card.y, artW, artH}, Vector2{0.0f, 0.0f}, 0.0f,
-                   Fade(ToRay(p.white), 1.0f));
-    DrawRectangleLines(static_cast<int>(artX), static_cast<int>(card.y),
-                       static_cast<int>(artW), static_cast<int>(artH), ToRay(p.border));
+    return;
   }
 
-  const float headY = card.y + card.h * 0.55f + 18.0f;
+  // The artwork itself contains the six menu labels and button treatments.
+  // Their click regions are derived from the authored bottom menu strip.
+  if (titlePanel_ == TitlePanel::None && !titleConfirm_) {
+    const Area menu{card.x + card.w * 0.02f, card.y + card.h * 0.903f,
+                    card.w * 0.818f, card.h * 0.0565f};
+    const std::size_t count = title_.actions.size();
+    if (count > 0) {
+      const float cell = menu.w / static_cast<float>(count);
+      for (std::size_t i = 0; i < count; ++i) {
+        titleHits_.push_back(NavHit{Area{menu.x + cell * static_cast<float>(i), menu.y,
+                                         cell, menu.h}, title_.actions[i].id, ""});
+      }
+    }
+    if (!titleMessage_.empty()) {
+      Text(titleMessage_.c_str(), static_cast<int>(card.x + 12.0f),
+           static_cast<int>(card.Bottom() - TypeStep(24.0f)), TypePx(10), ToRay(p.coffee));
+    }
+    return;
+  }
+
+  // Secondary sheets are overlays on the real artwork; never redraw a mock
+  // title, a substitute button column, or a cropped copy of the art.
+  const float headY = card.y + 24.0f;
   Text(title_.heading.c_str(), static_cast<int>(card.x + 34.0f),
            static_cast<int>(headY), TypePx(40) , ToRay(p.ink));
   Text(title_.subtitle.c_str(), static_cast<int>(card.x + 36.0f),
@@ -1320,7 +1472,8 @@ void ShellView::PaintLoss(Simulation& sim) {
 }
 
 // The handbook's search box, drawn as a real field over the index column.
-void ShellView::PaintWikiSearch() {
+void ShellView::PaintWikiSearch(const Area& viewport) {
+  (void)viewport;
   if (panelsKind_ != ScreenKind::Wiki) { return; }
   const Area box{layout_.content.x + 8.0f, layout_.content.y + 50.0f, 260.0f, 22.0f};
   ImGui::SetNextWindowPos(ImVec2(box.x - 4.0f, box.y - 4.0f));
@@ -1346,7 +1499,7 @@ void ShellView::PaintWikiSearch() {
 }
 
 void ShellView::PaintPanelsScreen(Simulation& sim) {
-  PaintWikiSearch();
+  PaintWikiSearch(layout_.content);
   navHits_.clear();
   taskButtons_.clear();
   const Palette& p = theme_.palette;
@@ -1418,7 +1571,8 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
     }
   }
 
-  // The action band: salvage and packaging buttons, and the clocks left.
+  // Only screens with commitments, progress, or a confirmation get a bottom band.
+  if (!screen.progress.empty() || !pendingConfirm_.empty() || !screen.bandNote.empty()) {
   const float bandY = layout_.content.Bottom() - 96.0f;
   DrawRectangle(static_cast<int>(left), static_cast<int>(bandY),
                 static_cast<int>(right - left), 90, ToRay(p.panel));
@@ -1467,6 +1621,7 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
              ToRay(button.state == ButtonState::Cooldown ? p.terracotta : p.ink));
     taskButtons_.push_back({box, button.taskId});
     bx += 198.0f;
+  }
   }
   (void)sim;
 }
@@ -1690,7 +1845,9 @@ void ShellView::PaintPopup(Simulation& sim) {
   }
 }
 
-void ShellView::PaintDiagram(const DiagramModel& diagram) {
+void ShellView::PaintDiagram(const DiagramModel& diagram, const Area& stageBox, float scale) {
+  (void)stageBox;
+  (void)scale;
   const ::Color frame = ToRay(theme_.palette.coffee);
   const ::Color hull = ToRay(theme_.palette.white);
   const ::Color spine = ToRay(theme_.palette.panel);
@@ -1791,6 +1948,48 @@ void ShellView::PaintDiagram(const DiagramModel& diagram) {
   }
 }
 
+void ShellView::Move(float x, float y) {
+  mouseX_ = x;
+  mouseY_ = y;
+}
+
+void ShellView::Drag(Simulation& sim, float x, float y, float dx, float dy, bool down) {
+  Move(x, y);
+  if (!screenNav_ || !navChartBox_.Contains(x, y)) { draggingChart_ = false; return; }
+  if (!down) { draggingChart_ = false; return; }
+  if (!draggingChart_) {
+    chartDragAccumX_ = navScreen_.chart.panX;
+    chartDragAccumY_ = navScreen_.chart.panY;
+  } else {
+    chartDragAccumX_ += dx;
+    chartDragAccumY_ += dy;
+    char pan[64];
+    std::snprintf(pan, sizeof(pan), "%.2f,%.2f", chartDragAccumX_, chartDragAccumY_);
+    PressNavAction(sim, "pan", pan);
+  }
+  draggingChart_ = true;
+}
+
+void ShellView::Scroll(float x, float y, float wheelDelta) {
+  Move(x, y);
+  const float step = wheelDelta * TypeStep(40.0f);
+  if (!popupKey_.empty()) { popupScroll_ = std::max(0.0f, std::min(popupMaxScroll_, popupScroll_ - step)); }
+  else if (titleActive_) { titleScroll_ = std::max(0.0f, std::min(titleMaxScroll_, titleScroll_ - step)); }
+  else if (wikiIndexBox_.Contains(x, y)) { wikiIndexScroll_ = std::max(0.0f, std::min(wikiIndexMaxScroll_, wikiIndexScroll_ - step)); }
+  else if (wikiBodyBox_.Contains(x, y)) { wikiBodyScroll_ = std::max(0.0f, std::min(wikiBodyMaxScroll_, wikiBodyScroll_ - step)); }
+  else if (layout_.sidepanel.Contains(x, y)) { sideScroll_ = std::max(0.0f, std::min(std::max(0.0f, sideContentH_ - layout_.sidepanel.h), sideScroll_ - step)); }
+  else { contentScroll_ = std::max(0.0f, std::min(contentMaxScroll_, contentScroll_ - step)); }
+}
+
+void ShellView::Escape(Simulation& sim) {
+  if (LossVisible(sim)) { lossDismissed_ = true; return; }
+  if (titleActive_) { if (titleConfirm_) { titleConfirm_ = false; } else { HideTitle(); } return; }
+  if (!popupKey_.empty()) { ClosePopup(); return; }
+  if (!pendingConfirm_.empty()) { pendingConfirm_.clear(); pendingAction_.clear(); return; }
+  if (hasSelection_) { hasSelection_ = false; return; }
+  ShowTitle(true);
+}
+
 void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
                       double nowMs) {
   if (button == HitButton::None) { return; }
@@ -1839,9 +2038,10 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         return;
       }
       if (hit.action == "resume") {
+        if (!fromVoyage_) { quitRequested_ = true; return; }
         PressTitleAction(sim, "resume", "", &fromVoyage_, &titlePanel_, &titleSlot_,
                          saveDir_, &titleMessage_, &titleActive_);
-        if (fromVoyage_) { HideTitle(); }
+        HideTitle();
         return;
       }
       PressTitleAction(sim, hit.action, "", &fromVoyage_, &titlePanel_, &titleSlot_,
@@ -1906,40 +2106,40 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
     return;  // clicks outside a popup card do not reach the ship
   }
 
-  // Chrome first: the sidebar (blocks, events, foot), Home, then the ship.
-  for (const SideHit& hit : SideHits(sim, layout_.sidepanel, layout_.sidefoot,
-                                     theme_.LineHeight())) {
+  // A briefing is modal: ImGui owns its Open Window and Close buttons, and
+  // clicks anywhere else must not leak through to the screen underneath.
+  if (hasSelection_) { return; }
+
+  // Chrome hit-testing follows paint order: taskbar controls and tabs, then
+  // sidebar and pinned foot, then the screen behind them.
+  if (layout_.scrollLeft.Contains(x, y)) {
+    tabScroll_ = std::max(0.0f, tabScroll_ - layout_.tabStrip.w * 0.65f);
+    return;
+  }
+  if (layout_.scrollRight.Contains(x, y)) {
+    tabScroll_ = std::min(maxTabScroll_, tabScroll_ + layout_.tabStrip.w * 0.65f);
+    return;
+  }
+  if (layout_.home.Contains(x, y)) { SwitchTab(sim, "home"); return; }
+  for (const TabHit& hit : tabHits_) {
+    if (hit.closable && hit.closeBox.Contains(x, y)) { CloseTab(sim, hit.key); return; }
+    if (hit.box.Contains(x, y)) { SwitchTab(sim, hit.key); return; }
+  }
+  for (const SideHit& hit : sideHits_) {
     if (!hit.box.Contains(x, y)) { continue; }
     switch (hit.action) {
       case SideAction::Toggle:
-        if (hit.key == "indicators") { return; }  // the glance never folds
-        sim.MutableState().spOpen[hit.key] = !sim.MutableState().spOpen[hit.key];
+        if (hit.key != "indicators") { sim.MutableState().spOpen[hit.key] = !sim.MutableState().spOpen[hit.key]; }
         return;
-      case SideAction::OpenEvent:
-        OpenTask(sim, "event", hit.key, false);   // tab only - no jump
-        return;
-      case SideAction::Wiki:
-        OpenTask(sim, "wiki", "main", true);
-        return;
-      case SideAction::Rewards:
-        OpenTask(sim, "awards", "main", true);
-        return;
-      case SideAction::Manifest:
-        OpenPopup("manifest");
-        return;
-      case SideAction::Log:
-        OpenPopup("log");
-        return;
-      case SideAction::Files:
-        OpenPopup("files");
-        return;
-      case SideAction::Settings:
-        OpenPopup("settings");
-        return;
-      case SideAction::None:
-        break;
+      case SideAction::OpenEvent: OpenTask(sim, "event", hit.key, false); return;
+      case SideAction::Wiki: OpenTask(sim, "wiki", "main", true); return;
+      case SideAction::Rewards: OpenTask(sim, "awards", "main", true); return;
+      case SideAction::Manifest: OpenPopup("manifest"); return;
+      case SideAction::Log: OpenPopup("log"); return;
+      case SideAction::Files: OpenPopup("files"); return;
+      case SideAction::Settings: OpenPopup("settings"); return;
+      case SideAction::None: break;
     }
-    break;
   }
 
   // The quarters: a roster row, a job, an order, the sheet, a word.
@@ -1964,10 +2164,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         const std::string action = pendingAction_;
         pendingConfirm_.clear();
         pendingAction_.clear();
-        const bool acted =
-            panelsKind_ == ScreenKind::Station
-                ? PressStationAction(sim, action, "")
-                : PressStoresAction(sim, action, "");
+        const bool acted = PressPanelRow(sim, panelsKind_, action);
         if (acted) { SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion); }
         return;
       }
@@ -2029,11 +2226,16 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
       const float localY = y - idle_.stageArea.y;
       for (const DiagramCrew& crew : idle_.diagram.crew) {
         const Area hit{crew.dot.x - 6.0f, crew.dot.y - 6.0f, 27.0f, 27.0f};
-        if (!hit.Contains(localX, localY)) { continue; }
+        const Area labelHit{crew.label.x, crew.label.y,
+                            crew.labelled ? TextWidth(crew.firstName.c_str(), TypePx(9)) : 0.0f,
+                            crew.labelled ? TypeStep(12.0f) : 0.0f};
+        if (!hit.Contains(localX, localY) && !labelHit.Contains(localX, localY)) { continue; }
         if (button == HitButton::Right) {
-          OpenTask(sim, "crew", crew.id, true);
+          OpenTask(sim, "crew", crew.id, false);
         } else {
           selection_ = DescribeTarget(sim, "crew", crew.id);
+          briefingKind_ = "crew";
+          briefingId_ = crew.id;
           hasSelection_ = true;
         }
         return;
@@ -2044,9 +2246,11 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
           continue;
         }
         if (button == HitButton::Right) {
-          OpenTask(sim, "room", room.id, true);
+          OpenTask(sim, "room", room.id, false);
         } else {
           selection_ = DescribeTarget(sim, "room", room.id);
+          briefingKind_ = "room";
+          briefingId_ = room.id;
           hasSelection_ = true;
           SpawnMark(marks_, x - layout_.content.x, y, nowMs,
                     sim.State().reducedMotion);
@@ -2057,9 +2261,11 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
     for (const RailCell& cell : idle_.stats) {
       if (!cell.box.Contains(x, y)) { continue; }
       if (button == HitButton::Right) {
-        OpenTask(sim, "system", cell.id, true);
+        OpenTask(sim, "system", cell.id, false);
       } else {
         selection_ = DescribeTarget(sim, "system", cell.id);
+        briefingKind_ = "system";
+        briefingId_ = cell.id;
         hasSelection_ = true;
       }
       return;
@@ -2068,21 +2274,36 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
       if (!cell.box.Contains(x, y)) { continue; }
       if (button == HitButton::Right) {
         if (cell.id == "life") {
-          OpenTask(sim, "room", "o2", true);
+          OpenTask(sim, "room", "o2", false);
         } else {
-          OpenTask(sim, "info", cell.id, true);
+          OpenTask(sim, "info", cell.id, false);
         }
       } else {
         selection_ = DescribeTarget(sim, "info", cell.id);
+        briefingKind_ = "info";
+        briefingId_ = cell.id;
         hasSelection_ = true;
       }
       return;
     }
     if (idle_.nav.box.Contains(x, y)) {
       if (button == HitButton::Right) {
-        OpenTask(sim, "nav", "main", true);
+        OpenTask(sim, "nav", "main", false);
       } else {
         selection_ = DescribeTarget(sim, "nav", "main");
+        briefingKind_ = "nav";
+        briefingId_ = "main";
+        hasSelection_ = true;
+      }
+      return;
+    }
+    if (idle_.docked && idle_.dock.box.Contains(x, y)) {
+      if (button == HitButton::Right) {
+        OpenTask(sim, "station", sim.Map().here, false);
+      } else {
+        selection_ = DescribeTarget(sim, "station", sim.Map().here);
+        briefingKind_ = "station";
+        briefingId_ = sim.Map().here;
         hasSelection_ = true;
       }
       return;

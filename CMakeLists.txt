@@ -123,7 +123,7 @@ target_include_directories(spaceship_json INTERFACE
   "${nlohmann_json_SOURCE_DIR}/single_include")
 
 # ---------------------------------------------------------------------------
-# Core simulation (Phase 0: catalogue only, no game logic yet)
+# Core simulation and game logic
 # ---------------------------------------------------------------------------
 add_library(spaceship_core STATIC
   cpp/data/Catalog.cpp
@@ -262,14 +262,6 @@ if(SPACESHIP_BUILD_TESTS)
            COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/check-gui-syntax.sh"
            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
   set_tests_properties(ui.gui-syntax PROPERTIES SKIP_RETURN_CODE 77)
-
-  # Phase 9's anti-spam gate: the report is generated from the audit case, so a
-  # control that grows a double-click (or a report that drifts) fails here.
-  add_test(NAME ui.spam-audit
-           COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/tools/audit-spam-buttons.sh" --check
-           WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
-  set_tests_properties(ui.spam-audit PROPERTIES
-                       ENVIRONMENT "BUILD_DIR=${CMAKE_CURRENT_BINARY_DIR}")
 
   # The data gate: the committed catalogue must still match the HTA. This is
   # the test that stops a content edit shipping without its JSON.

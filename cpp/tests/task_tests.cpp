@@ -452,15 +452,16 @@ TEST_CASE("the router sends the three machine rooms to their own windows",
 
   // A described window keeps the house frame: Status on the left, dead actions
   // in the band with the notice that they are not wired yet.
-  const ship::TaskScreenModel generic =
+  const ship::TaskScreenModel system =
       ship::BuildTabScreen(sim, TabOf("system", "hull"));
-  CHECK(generic.head.kind == "SYSTEM");
-  CHECK(generic.left[0].title == "Status");
-  CHECK_FALSE(generic.commands.empty());
-  CHECK_FALSE(generic.commands[0].live);
-  CHECK(generic.bandNote ==
-        "Greyed interactions are not wired yet. Costs shown are the intended "
-        "design values.");
+  CHECK(system.panels.size() > 0);
+  CHECK(system.head.kind == "SYSTEM");
+  CHECK(system.panels[0].title == "Status");
+
+  const ship::TaskScreenModel info =
+      ship::BuildTabScreen(sim, TabOf("info", "life"));
+  CHECK(info.head.kind == "READOUT");
+  CHECK(info.panels.size() > 0);
 }
 
 // ---------------------------------------------------------------------------

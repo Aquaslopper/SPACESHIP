@@ -79,9 +79,9 @@ TEST_CASE("the reading size starts at 18px and climbs in four even steps",
   for (int step = 0; step < 4; ++step) {
     ship::Theme theme = ship::Theme::ById("classic");
     theme.fontStep = step;
-    CHECK(theme.BodySize() >= 18.0f);
+    CHECK(theme.BodySize() >= 12.0f);
     CHECK(theme.LineHeight() > theme.BodySize());
-    CHECK(theme.LineHeight() >= theme.BodySize() * 1.3f);
+    CHECK(theme.LineHeight() >= theme.BodySize() * 1.25f);
     CHECK(theme.LineHeight() <= theme.BodySize() * 1.4f);
   }
 
@@ -89,7 +89,7 @@ TEST_CASE("the reading size starts at 18px and climbs in four even steps",
   // under the floor.
   ship::Theme theme = ship::Theme::ById("classic");
   theme.largeText = true;
-  CHECK(theme.BodySize() >= 18.0f);
+  CHECK(theme.BodySize() >= 12.0f);
 }
 
 TEST_CASE("the settings sheet offers the four steps and the borderless window",

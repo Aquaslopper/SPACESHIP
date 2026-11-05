@@ -102,14 +102,17 @@ struct SideHit {
   SideAction action = SideAction::None;
   std::string key;   // block key, event id, or foot button key
   std::string text;
-  std::string detail;   // a long row's value, drawn beneath its label
+  std::string detail;      // a long row's value, drawn beneath its label
+  std::string rightValue;  // a pair row's value, drawn flush right
   Area box;
   bool header = false;
   bool dim = false;
 };
 
 std::vector<SideHit> SideHits(const Simulation& sim, const Area& sidepanel,
-                              const Area& foot, float lineHeight);
+                              const Area& foot, float lineHeight,
+                              float scrollY = 0.0f,
+                              float* totalContentHeight = nullptr);
 
 // The pinned foot.
 struct FootButton {
