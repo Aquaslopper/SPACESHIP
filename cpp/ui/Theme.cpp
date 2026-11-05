@@ -1,12 +1,12 @@
 // ============================================================================
 //  Theme.cpp — five calm palettes.
 //  ---------------------------------------------------------------------------
-//  The reference's five themes all sat on the same parchment and only re-tinted
-//  the chart ink. Phase 9 replaces them with five complete, low-frequency
-//  palettes: every one is a light paper with muted panels, deep low-chroma ink
-//  and one soft accent, and none of them is dark or highly saturated. The ids
-//  are unchanged so old saves keep their choice; only the colours and the
-//  labels move.
+//  The reference has one light parchment theme (classic) and four dark themes
+//  (void, aurora, nebula, ember). The classic theme keeps the parchment palette;
+//  the four dark themes each author their own surface colours, borders, inks
+//  and accents, mirroring the HTA's theme-<id> CSS blocks. The ids are
+//  unchanged so old saves keep their choice; only the colours and the labels
+//  move.
 //
 //  Each palette is authored as six colours and derived once: panels darken by a
 //  hair per level, borders are the panel colour with a little ink, and the
@@ -76,19 +76,30 @@ Palette FromFour(const char* paper, const char* panel, const char* ink,
 }
 
 Palette PaletteForId(const std::string& id) {
-  if (id == "void") {          // Dusty Blue
-    return FromFour("#f0f3f6", "#e2e8ee", "#2f3740", "#587085");
+  // FromFour(paper, panel, ink, accent): paper→panel bg, panel→body bg,
+  // ink→text/chart ink, accent→highlight. Mapping mirrors the HTA's
+  // theme-<id> CSS blocks.
+  // classic: Flight Deck - parchment (the HTA's default, light theme)
+  if (id == "classic") {
+    return FromFour("#faf7f2", "#f4efe6", "#6b5338", "#8c6f4e");
   }
-  if (id == "aurora") {        // Greenish Tea
-    return FromFour("#f2f5ee", "#e6ece0", "#333d32", "#5c7356");
+  // void: Deep Space - cyan (dark theme)
+  if (id == "void") {
+    return FromFour("#152437", "#0b1320", "#dce8f2", "#65d7ed");
   }
-  if (id == "nebula") {        // Pressed Botanical
-    return FromFour("#f4f5f0", "#e7e9e0", "#363830", "#7a8464");
+  // aurora: Aurora - mint (dark theme)
+  if (id == "aurora") {
+    return FromFour("#162d2a", "#0b1717", "#e2f1e9", "#7cddb4");
   }
-  if (id == "ember") {         // Oat & Linen
-    return FromFour("#f7f3eb", "#ebe3d5", "#3d352e", "#8c6d46");
+  // nebula: Nebula - violet (dark theme)
+  if (id == "nebula") {
+    return FromFour("#281f3b", "#130f20", "#eee6f7", "#c8a3ff");
   }
-  // Flight Deck: warm parchment and espresso.
+  // ember: Ember - copper (dark theme)
+  if (id == "ember") {
+    return FromFour("#30231d", "#1a1210", "#f5e7d9", "#ffba76");
+  }
+  // Unknown ids fall back to classic.
   return FromFour("#faf7f2", "#f4efe6", "#6b5338", "#8c6f4e");
 }
 
@@ -108,14 +119,13 @@ float Theme::LineHeightForPx(float px) {
 
 const std::vector<ThemeSpec>& Theme::Specs() {
   static const std::vector<ThemeSpec> specs = {
-      // Phase 9: five calm, low-frequency palettes. The ids are the reference's
-      // so a save keeps its choice; the labels name the colour, not the theme
-      // it used to be.
-      {"classic", "Flight Deck - warm parchment", {0x6b, 0x53, 0x38}},
-      {"aurora", "Greenish Tea - matcha paper", {0x33, 0x3d, 0x32}},
-      {"void", "Dusty Blue - overcast slate", {0x2f, 0x37, 0x40}},
-      {"ember", "Oat & Linen - unbleached", {0x3d, 0x35, 0x2e}},
-      {"nebula", "Pressed Botanical - celadon", {0x36, 0x38, 0x30}},
+      // The HTA's five themes, in the reference's order. The ids are the
+      // reference's so a save keeps its choice; the labels match the HTA.
+      {"classic", "Flight Deck - parchment", {0x6b, 0x53, 0x38}},
+      {"void", "Deep Space - cyan", {0x5b, 0xb8, 0xd5}},
+      {"aurora", "Aurora - mint", {0x5b, 0xbe, 0x9d}},
+      {"nebula", "Nebula - violet", {0x9b, 0x79, 0xd0}},
+      {"ember", "Ember - copper", {0xd7, 0x90, 0x5b}},
   };
   return specs;
 }

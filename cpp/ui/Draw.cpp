@@ -90,27 +90,33 @@ int ShellView::TypePx(int reference) const {
                                 std::lround(reference * (theme_.FontPx() / 13.0))));
 }
 
+// The font used to paint text at `size`: bold once the 18 px floor is reached.
+// TextWidth/WrapText must measure with the same font Text paints with, or
+// layout arithmetic (panel heights, FitText truncation) silently under- or
+// over-estimates and panels overlap or text is clipped.
+const Font& ShellView::SelectFont(int size, bool mono) const {
+  return mono ? monoFont_
+              : (size >= TypePx(16) ? boldFont_ : bodyFont_);
+}
+
 void ShellView::Text(const char* text, int x, int y, int size, ::Color tint,
                      bool mono) const {
-  const Font& font = mono ? monoFont_ : (size >= TypePx(16) ? boldFont_ : bodyFont_);
+  const Font& font = SelectFont(size, mono);
   DrawTextEx(font, text, Vector2{static_cast<float>(x), static_cast<float>(y)},
              static_cast<float>(size), 1.0f, tint);
 }
 
 float ShellView::TextWidth(const char* text, int size, bool mono) const {
-  const Font& font = mono ? monoFont_ : bodyFont_;
+  const Font& font = SelectFont(size, mono);
   return MeasureTextEx(font, text, static_cast<float>(size), 1.0f).x;
 }
 
 std::string ShellView::FitText(const std::string& text, float maxWidth, int size,
                                bool mono) const {
-  if (TextWidth(text.c_str(), size, mono) <= maxWidth) { return text; }
-  std::string fitted = text;
-  while (!fitted.empty() &&
-         TextWidth((fitted + "…").c_str(), size, mono) > maxWidth) {
-    fitted.pop_back();
-  }
-  return fitted.empty() ? std::string() : fitted + "…";
+  // Never discard content: return the full text even if it exceeds maxWidth.
+  // Layouts grow, wrap, or scroll — they do not silently truncate.
+  (void)maxWidth;
+  return text;
 }
 
 float ShellView::PaintTaskHeader(const TaskHead& head, float left, float top) const {
@@ -148,7 +154,12 @@ void ShellView::Configure(float width, float height, const Theme& theme) {
   layout_ = ComputeLayout(width_, height_, height_ - Metrics::kContentTop -
                                               Metrics::kStatusH,
                           others_, theme_.stageCompact);
+  // A resize or font change can remove the overflow that required scrolling:
+  // reset so the column isn't scrolled when nothing extends past the viewport.
+  ResetContentScroll();
 }
+
+void ShellView::ResetContentScroll() { contentScroll_ = 0.0f; }
 
 void ShellView::Draw(Simulation& sim, double nowMs) {
   const float contentH = height_ - Metrics::kContentTop - Metrics::kStatusH;
@@ -162,6 +173,11 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
     idle_ = BuildIdleScreen(sim, layout_, theme_, theme_.hideCrewLabels, others_, seeded);
     rng_ = seeded;
     SyncIdleDots(sim, nowMs);
+    // The whole home column scrolls when it is taller than the content area
+    // (the HTA's #content { overflow:auto }). The ceiling is the feed's bottom
+    // edge; anything past the content bottom is reachable only by scrolling.
+    contentMaxScroll_ =
+        std::max(0.0f, idle_.feedBox.Bottom() - layout_.content.Bottom());
   }
 
   UpdateMarks(marks_, nowMs);
@@ -176,6 +192,13 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
     PaintTitle(sim);
     return;
   }
+
+  // Main-content scroll: the whole content column moves with contentScroll_,
+  // matching the HTA's #content { overflow:auto }. Every screen paints inside
+  // this transform, and Click() offsets the cursor by the same amount so
+  // obscured content can never be clicked.
+  Camera2D scrollCam{{0.0f, 0.0f}, {0.0f, -contentScroll_}, 0.0f, 1.0f};
+  BeginMode2D(scrollCam);
 
   if (sim.State().activeTab == "home") {
     // Screen hit lists belong to the window that was painted last frame. Clear
@@ -223,6 +246,8 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
       PaintTaskScreen(sim);
     }
   }
+  EndMode2D();
+
   PaintChrome(sim);
   if (!popupKey_.empty()) { PaintPopup(sim); }
   if (LossVisible(sim)) { PaintLoss(sim); }
@@ -502,8 +527,11 @@ void ShellView::PaintChrome(Simulation& sim) {
 
   // ---- the briefing popup a left-click opens -----------------------------
   if (hasSelection_) {
+    // Initial position only: ImGui's native window dragging lets the reader
+    // move the briefing around (ImGuiCond_Always would fight the drag and
+    // pin it in place). Width is fixed every frame; height sizes to content.
     ImGui::SetNextWindowPos(ImVec2(layout_.content.x + 40.0f, layout_.content.y + 60.0f),
-                            ImGuiCond_Always);
+                            ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(420.0f, 0.0f), ImGuiCond_Always);
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ToIm(p.panel));
     ImGui::PushStyleColor(ImGuiCol_Text, ToIm(p.ink));
@@ -546,10 +574,26 @@ void ShellView::PaintIdle(Simulation& sim) {
     DrawRectangleLines(static_cast<int>(cell.box.x), static_cast<int>(cell.box.y),
                        static_cast<int>(cell.box.w), static_cast<int>(cell.box.h),
                        ToRay(theme.palette.border));
+    // The label sits at the top of the cell; the value starts one label height
+    // plus a gap below it, so the two never overlap at any typography step.
+    // The unit (e.g. "%", " air", " ration/action") is painted to the right of
+    // the value when it fits, matching the reference's inline stat-unit.
+    const float labelY = cell.box.y + 6.0f;
+    const float valueY =
+        cell.box.y + 6.0f + TypePx(11) + 6.0f;
     Text(cell.label.c_str(), static_cast<int>(cell.box.x + 6.0f),
-             static_cast<int>(cell.box.y + 4.0f), TypePx(11) , ToRay(theme.palette.muted));
+             static_cast<int>(labelY), TypePx(11) , ToRay(theme.palette.muted));
     Text(cell.value.c_str(), static_cast<int>(cell.box.x + 6.0f),
-         static_cast<int>(cell.box.y + 20.0f), TypePx(20), ToRay(theme.palette.ink), true);
+         static_cast<int>(valueY), TypePx(20), ToRay(theme.palette.ink), true);
+    if (!cell.unit.empty()) {
+      const float valueW = TextWidth(cell.value.c_str(), TypePx(20), true);
+      const float unitW = TextWidth(cell.unit.c_str(), TypePx(10), false);
+      const float unitX = cell.box.x + 6.0f + valueW + 4.0f;
+      if (unitX + unitW <= cell.box.Right() - 6.0f) {
+        Text(cell.unit.c_str(), static_cast<int>(unitX), static_cast<int>(valueY),
+             TypePx(10), ToRay(theme.palette.muted));
+      }
+    }
     const float bar = cell.box.w - 12.0f;
     DrawRectangle(static_cast<int>(cell.box.x + 6.0f),
                   static_cast<int>(cell.box.Bottom() - 12.0f), static_cast<int>(bar), 4,
@@ -571,20 +615,25 @@ void ShellView::PaintIdle(Simulation& sim) {
     DrawRectangleLines(static_cast<int>(strip.box.x), static_cast<int>(strip.box.y),
                        static_cast<int>(strip.box.w), static_cast<int>(strip.box.h),
                        ToRay(theme.palette.border));
+    const float mainY =
+        strip.box.y + 6.0f + TypePx(11) + 6.0f;
+    const float rightY = mainY + TypePx(13) + 6.0f;
     Text(strip.label.c_str(), static_cast<int>(strip.box.x + 8.0f),
              static_cast<int>(strip.box.y + 6.0f), TypePx(11) , ToRay(theme.palette.muted));
     Text(strip.main.c_str(), static_cast<int>(strip.box.x + 8.0f),
-             static_cast<int>(strip.box.y + 20.0f), TypePx(13) , ToRay(theme.palette.ink));
+         static_cast<int>(mainY), TypePx(13) , ToRay(theme.palette.ink));
     Text(strip.right.c_str(), static_cast<int>(strip.box.x + 8.0f),
-         static_cast<int>(strip.box.y + 32.0f), TypePx(10), ToRay(theme.palette.muted), true);
+         static_cast<int>(rightY), TypePx(10), ToRay(theme.palette.muted), true);
   };
   paintStrip(idle_.nav);
   if (idle_.docked) { paintStrip(idle_.dock); }
 
   for (const RailCell& cell : idle_.infos) {
-    Text(cell.label.c_str(), static_cast<int>(cell.box.x), static_cast<int>(cell.box.y), TypePx(10) , ToRay(theme.palette.muted));
+    const float valueY = cell.box.y + 6.0f + TypePx(10) + 6.0f;
+    Text(cell.label.c_str(), static_cast<int>(cell.box.x),
+         static_cast<int>(cell.box.y + 6.0f), TypePx(10) , ToRay(theme.palette.muted));
     Text(cell.value.c_str(), static_cast<int>(cell.box.x),
-         static_cast<int>(cell.box.y + 13.0f), TypePx(13), ToRay(theme.palette.ink), true);
+         static_cast<int>(valueY), TypePx(13), ToRay(theme.palette.ink), true);
   }
 
   // ---- feed --------------------------------------------------------------
@@ -619,10 +668,11 @@ void ShellView::PaintPanel(const NavPanel& panel, const Area& box) {
        static_cast<int>(box.y + 5.0f), TypePx(11), ToRay(p.coffee));
   float y = box.y + TypeStep(24.0f);
   const float textW = std::max(1.0f, box.w - 16.0f);
-  auto paintWrapped = [&](const std::string& value, float x, float width,
-                          ::Color color) {
-    const std::vector<std::string> rows = WrapText(value, std::max(1.0f, width), small, bodyFont_);
-    for (const std::string& row : rows) {
+    auto paintWrapped = [&](const std::string& value, float x, float width,
+                            ::Color color) {
+      const std::vector<std::string> rows =
+          WrapText(value, std::max(1.0f, width), small, SelectFont(small, false));
+      for (const std::string& row : rows) {
       if (y + line > box.Bottom() - 3.0f) { break; }
       Text(row.c_str(), static_cast<int>(x), static_cast<int>(y), small, color);
       y += line;
@@ -682,7 +732,7 @@ float ShellView::MeasurePanelHeight(const NavPanel& panel, float width) const {
   const float lineHeight = TypeStep(14.0f);
   const auto wrappedRows = [this, textPx](const std::string& text, float available) {
     return static_cast<float>(WrapText(text, std::max(1.0f, available), textPx,
-                                       bodyFont_).size());
+                                       SelectFont(textPx, false)).size());
   };
   float y = TypeStep(24.0f);
   for (const PanelLine& item : panel.lines) {
@@ -1760,9 +1810,12 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
            static_cast<int>(bandY + 5.0f), TypePx(11) , ToRay(p.coffee));
   Text(screen.bandNote.c_str(), static_cast<int>(left + 8.0f),
            static_cast<int>(bandY + 20.0f), TypePx(10) , ToRay(p.muted));
+  // Progress buttons start below any confirmation answers so the two control
+  // rows never overlap: confirmation answers end at bandY + 70.
+  const float progressTop = !pendingConfirm_.empty() ? bandY + 74.0f : bandY + 50.0f;
   float bx = left + 12.0f;
   for (const ProgressButton& button : screen.progress) {
-    const Area box{bx, bandY + 50.0f, 190.0f, 28.0f};
+    const Area box{bx, progressTop, 190.0f, 28.0f};
     DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
                   static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel2));
     if (button.fillPercent > 0.0) {
@@ -2070,12 +2123,13 @@ void ShellView::PaintDiagram(const DiagramModel& diagram, const Area& stageBox, 
     DrawRectangle(x, y, w, h, ToRay(theme_.palette.panel2));
     DrawRectangleLines(x, y, w, h, ToRay(theme_.palette.borderDark));
     DrawRectangle(x, y, 3, h, ToRay(theme_.palette.coffee));
-    if (!diagram.compact) {
-      Text(room.name.c_str(), x + 6, y + 4, TypePx(10) , ToRay(theme_.palette.ink));
-      if (!room.small) {
-        Text(room.tag.c_str(), x + w - 30, y + h - 14, TypePx(8) ,
-                 ToRay(theme_.palette.muted));
-      }
+    // Room names are always shown: in the reference the compact deck keeps
+    // names at 10 px and hides only tags/sys codes. The 18 px floor applies,
+    // so names may be large in compact rooms but are never hidden.
+    Text(room.name.c_str(), x + 6, y + 4, TypePx(10), ToRay(theme_.palette.ink));
+    if (!diagram.compact && !room.small) {
+      Text(room.tag.c_str(), x + w - 30, y + h - 14, TypePx(8),
+           ToRay(theme_.palette.muted));
     }
   }
 
@@ -2299,12 +2353,17 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
     }
   }
 
+  // Screen content is painted shifted up by contentScroll_; shift the cursor
+  // down by the same amount so hit testing matches what is painted, and
+  // content scrolled out of view can never be clicked.
+  const float scrollY = contentScroll_;
+
   // The quarters: a roster row, a job, an order, the sheet, a word.
   if (screenQuarters_) {
     for (const NavHit& hit : navHits_) {
-      if (!hit.box.Contains(x, y)) { continue; }
+      if (!hit.box.Contains(x, y + scrollY)) { continue; }
       if (PressQuartersAction(sim, hit.action, hit.arg) && hit.action == "commit") {
-        SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
+        SpawnMark(marks_, x, y + scrollY, nowMs, sim.State().reducedMotion);
       }
       return;
     }
@@ -2315,14 +2374,14 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
   // Station and stores: each command row carries its own action id.
   if (screenPanels_) {
     for (const NavHit& hit : navHits_) {
-      if (!hit.box.Contains(x, y)) { continue; }
+      if (!hit.box.Contains(x, y + scrollY)) { continue; }
       if (hit.action == "confirm-no") { pendingConfirm_.clear(); pendingAction_.clear(); return; }
       if (hit.action == "confirm-yes") {
         const std::string action = pendingAction_;
         pendingConfirm_.clear();
         pendingAction_.clear();
         const bool acted = PressPanelRow(sim, panelsKind_, action);
-        if (acted) { SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion); }
+        if (acted) { SpawnMark(marks_, x, y + scrollY, nowMs, sim.State().reducedMotion); }
         return;
       }
       // Read the row's own question before acting: a purchase that cannot be
@@ -2343,7 +2402,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         return;
       }
       const bool acted = PressPanelRow(sim, panelsKind_, hit.arg);
-      if (acted) { SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion); }
+      if (acted) { SpawnMark(marks_, x, y + scrollY, nowMs, sim.State().reducedMotion); }
       return;
     }
   }
@@ -2351,10 +2410,10 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
   // The chart's own controls: bodies, the zoom pair, the layers, the actions.
   if (screenNav_) {
     for (const NavHit& hit : navHits_) {
-      if (!hit.box.Contains(x, y)) { continue; }
+      if (!hit.box.Contains(x, y + scrollY)) { continue; }
       if (PressNavAction(sim, hit.action, hit.arg) &&
           (hit.action == "travel" || hit.action == "scan")) {
-        SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
+        SpawnMark(marks_, x, y + scrollY, nowMs, sim.State().reducedMotion);
       }
       return;
     }
@@ -2363,9 +2422,9 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
 
   // A task window's own controls come first.
   for (const auto& entry : taskButtons_) {
-    if (!entry.first.Contains(x, y)) { continue; }
+    if (!entry.first.Contains(x, y + scrollY)) { continue; }
     if (PressProgressButton(sim, entry.second)) {
-      SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
+      SpawnMark(marks_, x, y + scrollY, nowMs, sim.State().reducedMotion);
       hasSelection_ = false;
     }
     return;
@@ -2377,10 +2436,14 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
   }
 
   if (sim.State().activeTab == "home") {
+    // The whole home column is painted shifted up by contentScroll_; shift the
+    // cursor down by the same amount so a click lands on what is actually
+    // painted, and never on content scrolled out of view.
+    const float scrollY = contentScroll_;
     // The stage is the only clickable illustration on Home.
-    if (idle_.stageArea.Contains(x, y)) {
+    if (idle_.stageArea.Contains(x, y + scrollY)) {
       const float localX = x - idle_.stageArea.x;
-      const float localY = y - idle_.stageArea.y;
+      const float localY = y + scrollY - idle_.stageArea.y;
       for (const DiagramCrew& crew : idle_.diagram.crew) {
         const Area hit{crew.dot.x - 6.0f, crew.dot.y - 6.0f, 27.0f, 27.0f};
         const Area labelHit{crew.label.x, crew.label.y,
@@ -2416,7 +2479,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
       }
     }
     for (const RailCell& cell : idle_.stats) {
-      if (!cell.box.Contains(x, y)) { continue; }
+      if (!cell.box.Contains(x, y + scrollY)) { continue; }
       if (button == HitButton::Right) {
         OpenTask(sim, "system", cell.id, false);
       } else {
@@ -2428,7 +2491,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
       return;
     }
     for (const RailCell& cell : idle_.infos) {
-      if (!cell.box.Contains(x, y)) { continue; }
+      if (!cell.box.Contains(x, y + scrollY)) { continue; }
       if (button == HitButton::Right) {
         if (cell.id == "life") {
           OpenTask(sim, "room", "o2", false);
@@ -2443,7 +2506,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
       }
       return;
     }
-    if (idle_.nav.box.Contains(x, y)) {
+    if (idle_.nav.box.Contains(x, y + scrollY)) {
       if (button == HitButton::Right) {
         OpenTask(sim, "nav", "main", false);
       } else {
@@ -2454,7 +2517,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
       }
       return;
     }
-    if (idle_.docked && idle_.dock.box.Contains(x, y)) {
+    if (idle_.docked && idle_.dock.box.Contains(x, y + scrollY)) {
       if (button == HitButton::Right) {
         OpenTask(sim, "station", sim.Map().here, false);
       } else {

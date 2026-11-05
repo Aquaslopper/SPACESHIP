@@ -105,6 +105,10 @@ class ShellView {
   };
 
   int TypePx(int reference) const;
+  // Font used to paint text at `size`: bold once the 18 px floor is reached.
+  // TextWidth/WrapText measure with the same font Text paints with so panel
+  // heights and truncation never drift from what is actually drawn.
+  const Font& SelectFont(int size, bool mono) const;
   float TypeStep(float reference) const {
     return reference * (theme_.FontPx() / 13.0f);
   }

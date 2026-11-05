@@ -20,6 +20,43 @@ float Share(int count) {
   return std::floor(10000.0 / static_cast<double>(count)) / 100.0f;
 }
 
+// The height one line of text needs at the reference size, mirroring
+// ShellView::TypePx exactly: an 18 px floor, then the size scales with the
+// theme's font px. Used so a container's box is never shorter than the text it
+// paints, at any typography step.
+float TextLineHeight(const Theme& theme, int refSize) {
+  return static_cast<float>(
+      std::max(18, static_cast<int>(std::lround(refSize * theme.FontPx() / 13.0f))));
+}
+
+// Stat cell: pad + label + gap + value + bar zone (drawn at Bottom()-12) + pad.
+// The value always ends above the bar; nothing overlaps.
+float StatCellHeight(const Theme& theme) {
+  const float pad = 6.0f;
+  const float gap = 6.0f;
+  const float bottomPad = 6.0f;
+  return pad + TextLineHeight(theme, 11) + gap + TextLineHeight(theme, 20) +
+         12.0f + bottomPad;
+}
+
+// Strip (nav or dock): pad + label + gap + main + gap + right + pad.
+float StripHeight(const Theme& theme) {
+  const float pad = 6.0f;
+  const float gap = 6.0f;
+  const float bottomPad = 6.0f;
+  return pad + TextLineHeight(theme, 11) + gap + TextLineHeight(theme, 13) +
+         gap + TextLineHeight(theme, 10) + bottomPad;
+}
+
+// Info rail cell: pad + label + gap + value + pad.
+float InfoCellHeight(const Theme& theme) {
+  const float pad = 6.0f;
+  const float gap = 6.0f;
+  const float bottomPad = 6.0f;
+  return pad + TextLineHeight(theme, 10) + gap + TextLineHeight(theme, 13) +
+         bottomPad;
+}
+
 }  // namespace
 
 std::vector<RailCell> StatRail(const Simulation& sim, const Area& rail) {
@@ -102,29 +139,34 @@ IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout
       "Right-click opens its task window.";
 
   const float inner = std::max(0.0f, layout.content.w - 16.0f);
-  out.stats = StatRail(sim, Area{layout.content.x + 8.0f, layout.content.y + 4.0f, inner, 62.0f});
+  const float statH = StatCellHeight(theme);
+  out.stats = StatRail(sim, Area{layout.content.x + 8.0f, layout.content.y + 4.0f, inner, statH});
   const float statsBottom =
-      out.stats.empty() ? layout.content.y + 66.0f : out.stats.front().box.Bottom();
+      out.stats.empty() ? layout.content.y + 4.0f + statH : out.stats.front().box.Bottom();
 
   out.stageArea = layout.stage;
   out.stageArea.y = statsBottom + 8.0f;
 
   const float noteTop = out.stageArea.Bottom() + 6.0f;
   const float navTop = noteTop + 24.0f;
-  out.nav = NavStrip(sim, Area{layout.content.x + 8.0f, navTop, inner, 50.0f});
+  const float stripH = StripHeight(theme);
+  out.nav = NavStrip(sim, Area{layout.content.x + 8.0f, navTop, inner, stripH});
 
   float after = out.nav.box.Bottom();
   if (sim.State().docked) {
     out.docked = true;
-    out.dock = DockStrip(sim, Area{layout.content.x + 8.0f, navTop + 50.0f + 10.0f,
-                                   inner, 50.0f});
+    // The dock strip sits below the *actual* nav strip bottom, never at a
+    // hard-coded 50 px offset, so growing the nav strip cannot overlap it.
+    out.dock = DockStrip(sim, Area{layout.content.x + 8.0f, out.nav.box.Bottom() + 10.0f,
+                                   inner, stripH});
     after = out.dock.box.Bottom();
   } else {
     out.dock.box = Area{layout.content.x + 8.0f, after, inner, 0.0f};
   }
 
+  const float infoH = InfoCellHeight(theme);
   out.infos = InfoRail(sim,
-                       Area{layout.content.x + 8.0f, after + 10.0f, inner, 42.0f});
+                       Area{layout.content.x + 8.0f, after + 10.0f, inner, infoH});
   const float infoBottom = out.infos.empty() ? after + 10.0f : out.infos.front().box.Bottom();
 
   // measure-and-give, now that everything above the feed has a height.

@@ -204,3 +204,56 @@
 - **OPEN (PAR-002, reinforced):** treat the native core as a partial reimplementation of unknown fidelity, not as "the original game with UI bugs". Any future parity claim must name the HTA source path, the port path, the exercised state, and the comparison evidence.
 - **OPEN:** extend differential coverage beyond the port-authored scripts and projection before any "core parity" language is used again: project the full save-relevant state, drive HTA-side actions the console cannot currently express, and add scripts derived from HTA workflows rather than from port capabilities.
 - **Next action:** unchanged from the prior entry (fresh Windows captures; one evidenced defect at a time), with the added rule that test-pass counts are never reported as health or parity without their scope.
+
+---
+
+<a id="ui-001-repair-2026-11-05"></a>
+
+## 2026-11-05 — UI-001 repair: home stat/strip/info containers grow with the 18 px font; dock strip follows nav; main-content scroll wired
+
+- Agent / commit: Arena Agent; working tree `arena/57bedb16-spaceship` at `74ea1a8` (uncommitted). Branch identical to `main`.
+- Status: **IN PROGRESS** — implementation complete and source/build/test verified; **not visually verified** (no Windows/mshta/GUI runtime in this environment).
+- Scope: home screen stat rail, nav strip, dock strip, info rail, and home main-content scroll reachability.
+
+### Reproduction and evidence
+- Starting state: clean checkout of `74ea1a8`; no save state involved (headless source tracing plus test builds).
+- Evidence files: none (no GUI runtime; no fresh captures).
+- Observed in HTA (source-confirmed): `#content { overflow:auto }` (`Spaceship.hta:129-133`) scrolls the whole main column; `.stat`/`.info` cells have content-driven padding (`padding:7px 10px 8px 10px`) and natural stacking; `#feed { min-height:62px; overflow-y:auto }` is a **separate** internal scroll (`Spaceship.hta:541-553`). `layoutIdle()` (`Spaceship.hta:2431-2444`) sizes the feed from the actual stack height.
+- Observed in native port (source-confirmed, the defects fixed here):
+  - `PaintIdle` (`Draw.cpp`) painted stat label at `box.y+4` (18 px) and value at `box.y+20` (TypePx(20) = 28 px at the 18 px floor) — 2 px label/value overlap; nav strip label `y+6`/main `y+20`/right `y+32` overlapped by 4–6 px; info rail label `y+0`/value `y+13` overlapped by ~5 px. Fixed container heights 62/50/42 px were shorter than the text they held.
+  - `BuildIdleScreen` (`IdleScreen.cpp`) placed the dock strip at hard-coded `navTop + 50 + 10`, so a grown nav strip would overlap the dock.
+  - `contentScroll_` was written by wheel (`Draw.cpp:2138`) but never read for paint or hit-test; `contentMaxScroll_` stayed 0, so an overflowing home column was clipped/unreachable.
+  - `others_` was hard-coded `300.0f` (`Draw.h:164`, never `SetOthersHeight`'d), so growing the boxes did **not** shrink the feed via `GiveFeedHeight`; `feedBox.top = infoBottom + 26` moved down as the stack grew instead.
+
+### Findings
+- **Observed — fixed heights are too small:** at the 18 px floor the stat cell needs 6+18+6+28+12+6 = 76 px (value alone is TypePx(20)=28 px), the nav/dock strip needs 78 px, the info cell needs 54 px — all exceeding the fixed 62/50/42 px. Source-confirmed arithmetic.
+- **Observed — dock hard-coded position:** `navTop + 50 + 10` is independent of `nav.box.Bottom()`; growing nav overlaps dock. Source-confirmed.
+- **Observed — scroll unwired:** `contentScroll_` unwired for paint/hit-test; `contentMaxScroll_` never assigned. Source-confirmed (UI-003).
+- **Observed — othersHeight does not shrink the feed:** growing boxes leaves `GiveFeedHeight(content.h, 300)` unchanged; only `feedBox.top` moves down. Source-confirmed (user's point 2).
+- **Hypothesis — narrow/larger-font viewports overflow:** at 1024×768 the column bottom (feedBox.Bottom() ≈ 819) exceeds content bottom (746), so `contentMaxScroll_` > 0 and scrolling is required to reach the feed. Arithmetic-confirmed, not runtime-observed (no GUI).
+
+### Changes
+- `cpp/ui/IdleScreen.cpp`: added `TextLineHeight`, `StatCellHeight`, `StripHeight`, `InfoCellHeight` helpers mirroring `ShellView::TypePx`; stat/nav/dock/info box heights now computed from text metrics at each typography step instead of fixed 62/50/42; dock strip y changed to `out.nav.box.Bottom() + 10.0f` (was hard-coded `navTop + 50.0f + 10.0f`).
+- `cpp/ui/Draw.cpp`: `PaintIdle` wrapped in a `Camera2D` offset by `-contentScroll_` so the whole home column scrolls with main-content scroll (matching HTA `#content`); stat/value/strip/right/info paint offsets now cumulative (label, then value one label height + gap below, then strip main/right stacked) so nothing overlaps at any typography step; `Draw()` computes `contentMaxScroll_ = max(0, feedBox.Bottom() - content.Bottom())` after `BuildIdleScreen`; `Click()` offsets the home-screen cursor by `+contentScroll_` so hit-testing matches the painted (scrolled) column and obscured content cannot be clicked.
+- `cpp/tests/ui_tests.cpp`: added 4 focused checks (stat growth/no-overlap, strip growth/no-overlap, dock y docked+undocked, narrow-viewport overflow).
+- `traps_paid_for/damagcontrol_index.md`: UI-001 → IN PROGRESS; added UI-007 (stat unit not painted).
+- `traps_paid_for/damagecontrol_report.md`: this entry.
+
+### Deliberately not changed (scope)
+- `cell.unit` is **not** painted: it is present in the model (`Stat.unit`/`cell.unit`) but absent from `PaintIdle`. Recorded as open gap **UI-007**, not described as preserved.
+- Feed-internal scrolling (`#feed { overflow-y:auto }` in HTA) is out of this slice; only main-content scroll (`#content`) is wired. Distinct mechanisms, deliberately not conflated.
+- Horizontal overflow of long values, UI-002 (font metric mismatch), UI-004 (panel scissor), UI-005 (Text/TextWidth font mismatch), UI-006 (compact diagram names/glyphs), PAR-002/PAR-003 unchanged.
+
+### Verification
+- Environment: Debian sandbox, g++ 12.2.0, CMake 4.4.4 + Ninja, Node v22.22.3. GUI client auto-skipped (no OpenGL/X11 dev packages); `ui.gui-syntax` skipped.
+- Commands and results:
+  - `. .venv-build/bin/activate && cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -G Ninja`: success; client OFF, tests ON.
+  - `cmake --build build --target spaceship_tests --parallel`: success.
+  - `ctest --test-dir build --output-on-failure`: **196/196 passed**, 1 skipped (`ui.gui-syntax`, not counted as a pass), 0 failed. Includes the 4 new UI-001 checks (#113-#116).
+  - `node tests/galaxy.test.cjs tests/progression.test.cjs tests/ships.test.cjs tests/simulacron.test.cjs`: all PASS (4 suites).
+- Interpretation: the layout calculations compile and pass focused checks; the C++ core and model tests are unaffected. None of these execute `Draw.cpp` painting or a Windows GUI, so they establish geometry arithmetic, not visual parity.
+
+### Remaining risk and next step
+- **NOT VERIFIED FIX:** no Windows build, no `mshta.exe`, no interactive desktop, no `tools/compare-hta-port.ps1` run. Visual overlap, hit-target alignment, font-step rendering, narrow-window scrolling, and feed reachability remain unconfirmed at runtime.
+- **Next action:** run `tools/compare-hta-port.ps1` on an interactive Windows machine at checkpoint `ship-home` (1440×940 and a narrow size), docked and undocked, each typography step; confirm no label/value/strip overlap, identical ordering/values to the HTA, click targets aligned with painted text, and feed reachable via scroll. Only then may UI-001 be marked `VERIFIED FIX`.
+- UI-007 (stat unit) remains OPEN and is not addressed by this slice.
