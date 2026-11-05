@@ -25,6 +25,7 @@
 #include "ui/SimCoreScreen.h"
 #include "ui/WikiScreen.h"
 #include "ui/QuartersScreen.h"
+#include "ui/Shell.h"
 #include "ui/StationScreen.h"
 #include "ui/StoresScreen.h"
 #include "ui/O2Screen.h"
@@ -256,6 +257,9 @@ bool PressProgressButton(Simulation& sim, const std::string& taskId) {
                               if (taskId.compare(0, 4, "pkg-") == 0) {
                                 return sim.PackageSurvey(taskId.substr(4));
                               }
+                              if (taskId.compare(0, 8, "salvage-") == 0) {
+                                return sim.StartSalvage(std::stoi(taskId.substr(8)));
+                              }
                               if (taskId.compare(0, 4, "doc-") == 0) {
                                 return sim.StartMedical(taskId.substr(4));
                               }
@@ -405,6 +409,8 @@ ScreenKind ScreenKindFor(const Tab& tab) {
   if (tab.kind == "awards") { return ScreenKind::Awards; }
   if (tab.kind == "wiki") { return ScreenKind::Wiki; }
   if (tab.kind == "event") { return ScreenKind::Event; }
+  if (tab.kind == "system") { return ScreenKind::System; }
+  if (tab.kind == "info") { return ScreenKind::Info; }
   if (tab.kind == "room" && tab.id == "simulacron") { return ScreenKind::SimCore; }
   if (tab.kind != "room") { return ScreenKind::Described; }
   if (tab.id == "engine") { return ScreenKind::Engine; }
@@ -432,9 +438,101 @@ ScreenKind ScreenKindFor(const Tab& tab) {
 
 TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
                                const WikiView& wiki) {
+  if (tab.kind != "event" && !DescribeTargetExists(sim, tab.kind, tab.id)) {
+    return BuildDescribedScreen(sim, DescribeTarget(sim, tab.kind, tab.id));
+  }
   switch (ScreenKindFor(tab)) {
     case ScreenKind::Nav: return BuildNavScreen(sim).screen;
     case ScreenKind::Quarters: return BuildQuartersScreen(sim).screen;
+    case ScreenKind::System: {
+      const Stat* found = nullptr;
+      for (const Stat& s : sim.Stats()) {
+        if (s.id == tab.id) { found = &s; break; }
+      }
+      if (found == nullptr) { break; }
+      const bool useKit = (tab.id == "hull" || tab.id == "shield");
+      const std::string label =
+          tab.id == "hull" ? "Patch hull (+25%)"
+          : tab.id == "shield" ? "Service shields (+25%)"
+          : tab.id == "energy" ? "Recharge energy (+20%)"
+                               : "Transfer fuel (+15%)";
+      const double have = useKit ? sim.State().repairKits : sim.State().fuelCells;
+
+      TaskScreenModel screen;
+      screen.head.kind = "SYSTEM";
+      screen.head.title = found->label;
+      screen.head.sub = "Condition and onboard service";
+
+      NavPanel status;
+      status.id = "system-status";
+      status.title = "Status";
+      status.Field("Reading", Num(found->value) + "%");
+      status.Field("Available",
+                   Num(have) + (useKit ? " repair kits" : " fuel cells"));
+      status.Note(std::string("Service uses one ") +
+                  (useKit ? "repair kit" : "fuel cell") +
+                  ". Supplies can be bought at a station.");
+      screen.panels.push_back(status);
+
+      const bool enabled =
+          found->value < 100.0 && have > 0.0 && sim.State().gameOver.empty();
+      CommandRowView row = BuildCommandRow(sim, label, enabled, std::string(),
+                                           "systems", 0);
+      row.live = enabled;
+      screen.panelRows.push_back({row});
+      screen.panelRowIds.push_back({tab.id});
+      return screen;
+    }
+    case ScreenKind::Info: {
+      const InfoRow* info = nullptr;
+      for (const InfoRow& candidate : sim.Infos()) {
+        if (candidate.id == tab.id) { info = &candidate; break; }
+      }
+      if (info == nullptr) { break; }
+      const Body* sys = sim.CurrentSystem();
+      std::string regionName;
+      if (sys != nullptr) {
+        const Body* region = sim.FindBodyById(sys->region);
+        if (region != nullptr) { regionName = region->name; }
+      }
+
+      TaskScreenModel screen;
+      screen.head.kind = "READOUT";
+      screen.head.title = info->label;
+      screen.head.sub = "Live ship information";
+
+      NavPanel readout;
+      readout.id = "info-readout";
+      readout.title = "Readout";
+      readout.Field("Reading", info->value);
+      if (sys != nullptr) { readout.Field("System", sys->name); }
+      if (!regionName.empty()) { readout.Field("Region", regionName); }
+      screen.panels.push_back(readout);
+
+      std::vector<CommandRowView> rows;
+      std::vector<std::string> ids;
+      if (tab.id == "life") {
+        CommandRowView o2 =
+            BuildCommandRow(sim, "Open O2 Filter Room", true, "free", std::string(), 0);
+        o2.live = true;
+        rows.push_back(o2);
+        ids.push_back("room:o2");
+      } else {
+        CommandRowView nav =
+            BuildCommandRow(sim, "Open Navigation", true, "free", std::string(), 0);
+        nav.live = true;
+        CommandRowView comms =
+            BuildCommandRow(sim, "Open Comms Relay", true, "free", std::string(), 1);
+        comms.live = true;
+        rows.push_back(nav);
+        ids.push_back("nav:main");
+        rows.push_back(comms);
+        ids.push_back("room:r4");
+      }
+      screen.panelRows.push_back(rows);
+      screen.panelRowIds.push_back(ids);
+      return screen;
+    }
     case ScreenKind::Station: {
       const StationScreenModel station = BuildStationScreen(sim, tab.id);
       TaskScreenModel screen;
@@ -699,6 +797,31 @@ Vignette BuildVignette(const Simulation& sim, const std::string& roomId) {
   }
   v.squareCore = v.glyph == "reactor";
   return v;
+}
+
+bool PressSystemAction(Simulation& sim, const std::string& statId) {
+  std::string label;
+  if (statId == "hull") {
+    label = "Patch hull (+25%)";
+  } else if (statId == "shield") {
+    label = "Service shields (+25%)";
+  } else if (statId == "energy") {
+    label = "Recharge energy (+20%)";
+  } else if (statId == "fuel") {
+    label = "Transfer fuel (+15%)";
+  } else {
+    return false;
+  }
+  const CommandRowView row =
+      BuildCommandRow(sim, label, true, std::string(), "systems", 0);
+  return CommitActionButton(sim, row.cooldownKey, row.category,
+                            [&sim, &statId]() { return sim.ServiceSystem(statId); });
+}
+
+bool PressInfoAction(Simulation& sim, const std::string& target) {
+  const std::size_t cut = target.find(':');
+  if (cut == std::string::npos) { return false; }
+  return OpenTask(sim, target.substr(0, cut), target.substr(cut + 1), true);
 }
 
 }  // namespace ship

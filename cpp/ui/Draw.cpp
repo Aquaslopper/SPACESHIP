@@ -96,8 +96,9 @@ void ShellView::Text(const char* text, int x, int y, int size, ::Color tint,
              static_cast<float>(size), 1.0f, tint);
 }
 
-float ShellView::TextWidth(const char* text, int size) const {
-  return MeasureTextEx(bodyFont_, text, static_cast<float>(size), 1.0f).x;
+float ShellView::TextWidth(const char* text, int size, bool mono) const {
+  const Font& font = mono ? monoFont_ : bodyFont_;
+  return MeasureTextEx(font, text, static_cast<float>(size), 1.0f).x;
 }
 
 ShellView::ShellView() { theme_ = Theme::ById("classic"); }
@@ -386,7 +387,7 @@ void ShellView::PaintIdle(Simulation& sim) {
                   4, ToRay(theme.palette.coffee));
   }
 
-  PaintDiagram(idle_.diagram);
+  PaintDiagram(idle_.diagram, idle_.stageArea, idleDiagramScale_);
 
   Text(idle_.stageNote.c_str(), static_cast<int>(idle_.content.x + 8.0f),
            static_cast<int>(idle_.stageArea.Bottom() + 8.0f), TypePx(12) ,
@@ -1320,7 +1321,8 @@ void ShellView::PaintLoss(Simulation& sim) {
 }
 
 // The handbook's search box, drawn as a real field over the index column.
-void ShellView::PaintWikiSearch() {
+void ShellView::PaintWikiSearch(const Area& viewport) {
+  (void)viewport;
   if (panelsKind_ != ScreenKind::Wiki) { return; }
   const Area box{layout_.content.x + 8.0f, layout_.content.y + 50.0f, 260.0f, 22.0f};
   ImGui::SetNextWindowPos(ImVec2(box.x - 4.0f, box.y - 4.0f));
@@ -1346,7 +1348,7 @@ void ShellView::PaintWikiSearch() {
 }
 
 void ShellView::PaintPanelsScreen(Simulation& sim) {
-  PaintWikiSearch();
+  PaintWikiSearch(layout_.content);
   navHits_.clear();
   taskButtons_.clear();
   const Palette& p = theme_.palette;
@@ -1690,7 +1692,9 @@ void ShellView::PaintPopup(Simulation& sim) {
   }
 }
 
-void ShellView::PaintDiagram(const DiagramModel& diagram) {
+void ShellView::PaintDiagram(const DiagramModel& diagram, const Area& stageBox, float scale) {
+  (void)stageBox;
+  (void)scale;
   const ::Color frame = ToRay(theme_.palette.coffee);
   const ::Color hull = ToRay(theme_.palette.white);
   const ::Color spine = ToRay(theme_.palette.panel);
@@ -1789,6 +1793,43 @@ void ShellView::PaintDiagram(const DiagramModel& diagram) {
                static_cast<int>(oy + crew.label.y), TypePx(9) , ToRay(theme_.palette.muted));
     }
   }
+}
+
+void ShellView::Move(float x, float y) {
+  mouseX_ = x;
+  mouseY_ = y;
+}
+
+void ShellView::Drag(Simulation& sim, float x, float y, float dx, float dy, bool down) {
+  Move(x, y);
+  if (!screenNav_ || !navChartBox_.Contains(x, y)) { draggingChart_ = false; return; }
+  if (!down) { draggingChart_ = false; return; }
+  if (draggingChart_) {
+    char delta[64];
+    std::snprintf(delta, sizeof(delta), "%.0f,%.0f", dx, dy);
+    PressNavAction(sim, "pan", delta);
+  }
+  draggingChart_ = true;
+}
+
+void ShellView::Scroll(float x, float y, float wheelDelta) {
+  Move(x, y);
+  const float step = wheelDelta * TypeStep(40.0f);
+  if (!popupKey_.empty()) { popupScroll_ = std::max(0.0f, std::min(popupMaxScroll_, popupScroll_ - step)); }
+  else if (titleActive_) { titleScroll_ = std::max(0.0f, std::min(titleMaxScroll_, titleScroll_ - step)); }
+  else if (wikiIndexBox_.Contains(x, y)) { wikiIndexScroll_ = std::max(0.0f, std::min(wikiIndexMaxScroll_, wikiIndexScroll_ - step)); }
+  else if (wikiBodyBox_.Contains(x, y)) { wikiBodyScroll_ = std::max(0.0f, std::min(wikiBodyMaxScroll_, wikiBodyScroll_ - step)); }
+  else if (layout_.sidepanel.Contains(x, y)) { sideScroll_ = std::max(0.0f, std::min(std::max(0.0f, sideContentH_ - layout_.sidepanel.h), sideScroll_ - step)); }
+  else { contentScroll_ = std::max(0.0f, std::min(contentMaxScroll_, contentScroll_ - step)); }
+}
+
+void ShellView::Escape(Simulation& sim) {
+  if (LossVisible(sim)) { lossDismissed_ = true; return; }
+  if (titleActive_) { if (titleConfirm_) { titleConfirm_ = false; } else { HideTitle(); } return; }
+  if (!popupKey_.empty()) { ClosePopup(); return; }
+  if (!pendingConfirm_.empty()) { pendingConfirm_.clear(); pendingAction_.clear(); return; }
+  if (hasSelection_) { hasSelection_ = false; return; }
+  ShowTitle(true);
 }
 
 void ShellView::Click(Simulation& sim, float x, float y, HitButton button,

@@ -324,21 +324,38 @@ std::vector<IndicatorLine> IndicatorLines(const Simulation& sim) {
 }
 
 std::vector<SideHit> SideHits(const Simulation& sim, const Area& sidepanel,
-                              const Area& foot, float lineHeight) {
+                              const Area& foot, float lineHeight,
+                              float scrollY, float* totalContentHeight) {
   std::vector<SideHit> hits;
-  float y = sidepanel.y + 8.0f;
+  const float top = sidepanel.y;
+  const float bottom = sidepanel.Bottom();
+  float cursor = 8.0f;
+
+  const auto pushInPanel = [&](SideHit hit, float rawTop, float h) {
+    const float y = top + rawTop - scrollY;
+    // Keep every emitted box strictly inside sidepanel [top, bottom) so folded
+    // or scrolled rows never spill over the taskbar or the pinned foot.
+    if (y + h <= top + 1.0f || y >= bottom - 1.0f) { return; }
+    const float clippedTop = std::max(top, y);
+    const float clippedBottom = std::min(bottom - 0.5f, y + h);
+    if (clippedBottom <= clippedTop + 2.0f) { return; }
+    hit.box = Area{hit.box.x, clippedTop, hit.box.w, clippedBottom - clippedTop};
+    hits.push_back(std::move(hit));
+  };
+
   for (const SideBlock& block : SideBlocks(sim)) {
+    const float headH = lineHeight + 3.0f;
     SideHit head;
     head.action = SideAction::Toggle;
     head.key = block.key;
     head.text = block.title;
-    head.box = Area{sidepanel.x + 6.0f, y, sidepanel.w - 12.0f, lineHeight + 3.0f};
+    head.box = Area{sidepanel.x + 6.0f, 0.0f, sidepanel.w - 12.0f, headH};
     head.header = true;
-    hits.push_back(head);
-    y += lineHeight + 3.0f;
+    pushInPanel(head, cursor, headH);
+    cursor += headH;
 
     if (block.indicators) {
-      y += Metrics::kIndH + 6.0f;   // the strip is drawn, never clicked
+      cursor += Metrics::kIndH + 6.0f;   // the strip is drawn, never clicked
       continue;
     }
     if (!block.open) { continue; }
@@ -346,31 +363,33 @@ std::vector<SideHit> SideHits(const Simulation& sim, const Area& sidepanel,
       SideHit dim;
       dim.text = block.empty;
       dim.dim = true;
-      dim.box = Area{sidepanel.x + 12.0f, y, sidepanel.w - 18.0f, lineHeight};
-      hits.push_back(dim);
-      y += lineHeight;
+      dim.box = Area{sidepanel.x + 12.0f, 0.0f, sidepanel.w - 18.0f, lineHeight};
+      pushInPanel(dim, cursor, lineHeight);
+      cursor += lineHeight;
       continue;
     }
     for (const SideRow& row : block.rows) {
       float height = lineHeight;
       // A long value gets its own line beneath its label.
-      if (row.kind == "long" || row.kind == "event") { height += 12.0f; }
+      if (row.kind == "long" || row.kind == "event") { height += 14.0f; }
       SideHit hit;
       hit.text = row.key;
       hit.detail = row.kind == "long" ? row.value : std::string();
+      hit.rightValue = row.kind == "pair" ? row.value : std::string();
       hit.dim = row.dim;
-      hit.box = Area{sidepanel.x + 12.0f, y, sidepanel.w - 18.0f, height};
+      hit.box = Area{sidepanel.x + 12.0f, 0.0f, sidepanel.w - 18.0f, height};
       if (row.kind == "event") {
         hit.action = SideAction::OpenEvent;
         hit.key = row.id;
       }
-      hits.push_back(hit);
-      y += height;
-      if (y > sidepanel.Bottom() - 4.0f) { return hits; }
+      pushInPanel(hit, cursor, height);
+      cursor += height;
     }
   }
+  if (totalContentHeight != nullptr) { *totalContentHeight = cursor + 8.0f; }
 
   // The pinned foot: four ship functions, then the two reference windows.
+  // Always emitted regardless of how many sidebar blocks are unfolded above.
   float fx = foot.x + 8.0f;
   const std::vector<FootButton> buttons = FootButtons();
   const SideAction actions[4] = {SideAction::Manifest, SideAction::Log,
@@ -380,23 +399,24 @@ std::vector<SideHit> SideHits(const Simulation& sim, const Area& sidepanel,
     hit.action = actions[i];
     hit.key = buttons[i].key;
     hit.text = buttons[i].title;
-    hit.box = Area{fx, foot.y + 8.0f, 26.0f, 26.0f};
+    hit.box = Area{fx, foot.y + 8.0f, 32.0f, 28.0f};
     hits.push_back(hit);
-    fx += 34.0f;
+    fx += 38.0f;
   }
 
   SideHit wiki;
   wiki.action = SideAction::Wiki;
   wiki.key = "wiki";
   wiki.text = "Wiki";
-  wiki.box = Area{foot.x + 8.0f, foot.y + 42.0f, 34.0f, 18.0f};
+  wiki.box = Area{foot.x + 8.0f, foot.y + 42.0f, 52.0f, 24.0f};
   hits.push_back(wiki);
 
   SideHit rewards;
   rewards.action = SideAction::Rewards;
+  wiki.dim = false;
   rewards.key = "awards";
   rewards.text = RewardsLabel(sim);
-  rewards.box = Area{foot.x + 48.0f, foot.y + 42.0f, 100.0f, 18.0f};
+  rewards.box = Area{foot.x + 64.0f, foot.y + 42.0f, 93.0f, 24.0f};
   hits.push_back(rewards);
   return hits;
 }

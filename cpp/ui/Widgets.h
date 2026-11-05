@@ -244,8 +244,29 @@ TaskScreenModel BuildDescribedScreen(const Simulation& sim, const Description& d
 // incident reports and the handbook. `Described` is not a placeholder but the
 // reference's own briefing frame, and it is what a hull room that owns no work
 // still uses.
-enum class ScreenKind { Described, Nav, Engine, O2, Mess, Quarters, CrewRecord, Station, Cargo, Science, Room, SimCore, Awards, Event, Wiki };
+enum class ScreenKind {
+  Described,
+  Nav,
+  Engine,
+  O2,
+  Mess,
+  Quarters,
+  CrewRecord,
+  Station,
+  Cargo,
+  Science,
+  Room,
+  SimCore,
+  Awards,
+  Event,
+  Wiki,
+  System,
+  Info
+};
 ScreenKind ScreenKindFor(const Tab& tab);
+
+bool PressSystemAction(Simulation& sim, const std::string& statId);
+bool PressInfoAction(Simulation& sim, const std::string& target);
 
 // The handbook needs its session view (the search text and the selection), so
 // the builder takes it as an argument rather than reaching into the shell.

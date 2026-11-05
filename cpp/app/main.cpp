@@ -257,7 +257,7 @@ class AudioDevice {
   // The log is the ship's voice: every new line is a cue, in order.
   void Tick(const Simulation& sim) {
     if (!ready_) { return; }
-    if (tracks_.size() > 1 && streamed_.frameCount > 0 && IsMusicStreamPlaying(streamed_)) {
+    if (!tracks_.empty() && streamed_.frameCount > 0 && IsMusicStreamPlaying(streamed_)) {
       UpdateMusicStream(streamed_);
       // Cycle: a finished track hands over to the next one in filename order.
       if (streamed_.looping && GetMusicTimePlayed(streamed_) >=
@@ -339,6 +339,7 @@ int main(int argc, char** argv) {
   InitWindow(kDefaultWidth, kDefaultHeight, "Spaceship Command");
   SetWindowMinSize(1180, 720);
   SetTargetFPS(60);
+  SetExitKey(KEY_NULL);
 
   ship::Theme theme = ship::Theme::ById(sim.State().options.theme);
   theme.fontStep = sim.State().options.fontStep;   // Phase 9's reading size
@@ -379,7 +380,8 @@ int main(int argc, char** argv) {
     ToggleBorderlessWindowed();
   }
 
-  while (!WindowShouldClose()) {
+  while (!WindowShouldClose() && !shell.QuitRequested()) {
+    if (IsKeyPressed(KEY_ESCAPE)) { shell.Escape(sim); }
     BeginDrawing();
     // rlImGui's event processing and frame setup happen inside the active
     // raylib drawing frame, matching its documented render-loop contract.
@@ -389,6 +391,14 @@ int main(int argc, char** argv) {
     // Do not gate these clicks on ImGui::WantCaptureMouse: the full-screen
     // ImGui draw-list host can report capture despite owning no game controls.
     // ImGui text fields still receive the event when no shell hit matches.
+    const Vector2 pointer = GetMousePosition();
+    shell.Move(pointer.x, pointer.y);
+    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+      const Vector2 delta = GetMouseDelta();
+      shell.Drag(sim, pointer.x, pointer.y, delta.x, delta.y, true);
+    }
+    const float wheel = GetMouseWheelMove();
+    if (wheel != 0.0f) { shell.Scroll(pointer.x, pointer.y, wheel); }
     if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
       const Vector2 mouse = GetMousePosition();
       shell.Click(sim, mouse.x, mouse.y, ship::HitButton::Left,

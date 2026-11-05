@@ -107,4 +107,40 @@ void Simulation::RunBank(const std::string& line) {
   LogLine(line);
 }
 
+bool Simulation::ServiceSystem(const std::string& statId) {
+  if (!state_.gameOver.empty()) { return false; }
+  Stat* stat = FindStat(statId);
+  if (stat == nullptr || stat->value >= 100.0) { return false; }
+
+  std::string label;
+  bool useKit = false;
+  double delta = 0.0;
+  if (statId == "hull") {
+    label = "Patch hull (+25%)";
+    useKit = true;
+    delta = 25.0;
+  } else if (statId == "shield") {
+    label = "Service shields (+25%)";
+    useKit = true;
+    delta = 25.0;
+  } else if (statId == "energy") {
+    label = "Recharge energy (+20%)";
+    useKit = false;
+    delta = 20.0;
+  } else if (statId == "fuel") {
+    label = "Transfer fuel (+15%)";
+    useKit = false;
+    delta = 15.0;
+  } else {
+    return false;
+  }
+
+  double& stock = useKit ? state_.repairKits : state_.fuelCells;
+  if (stock <= 0.0) { return false; }
+  stock -= 1.0;
+  ClampStat(statId, delta);
+  PerformAction(label);
+  return true;
+}
+
 }  // namespace ship
