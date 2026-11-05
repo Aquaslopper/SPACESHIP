@@ -109,7 +109,7 @@ TEST_CASE("the settings sheet offers the four steps and the borderless window",
   // The palette chips are still there and still five.
   REQUIRE(model.themes.size() == 5);
   CHECK(model.themes[0] == "classic");
-  CHECK(model.themeLabels[0] == "Flight Deck - warm parchment");
+  CHECK(model.themeLabels[0] == "Flight Deck - parchment");
 
   // Choosing a step is free and exact; anything outside the ladder is refused.
   CHECK(ship::PressPopupAction(sim, "settings", "font", "2", "", nullptr));
@@ -169,7 +169,7 @@ TEST_CASE("the reading size and the window survive a save and a load",
 // ---------------------------------------------------------------------------
 //  The tutorial: five cards, each one idea and one habit
 // ---------------------------------------------------------------------------
-TEST_CASE("the main menu opens a five-card tutorial", "[phase9][tutorial]") {
+TEST_CASE("legacy tutorial remains callable without adding an HTA menu command", "[phase9][tutorial]") {
   const std::vector<ship::TutorialCard>& cards = ship::TutorialCards();
   REQUIRE(cards.size() == 5);
   for (const ship::TutorialCard& card : cards) {
@@ -189,7 +189,8 @@ TEST_CASE("the main menu opens a five-card tutorial", "[phase9][tutorial]") {
   int slot = 1;
   std::string message;
 
-  // TUTORIAL is on the menu, and it is free like every other menu verb.
+  // The HTA has five commands and no TUTORIAL. Preserve the old module
+  // for compatibility without painting an invented sixth menu button.
   const ship::TitleModel menu = ship::BuildTitleScreen(sim, false, panel, "");
   bool hasTutorial = false;
   for (const ship::ActionRowView& row : menu.actions) {
@@ -199,7 +200,7 @@ TEST_CASE("the main menu opens a five-card tutorial", "[phase9][tutorial]") {
       CHECK(row.cost == "free");
     }
   }
-  CHECK(hasTutorial);
+  CHECK_FALSE(hasTutorial);
   REQUIRE(ship::PressTitleAction(sim, "tutorial", "", &fromVoyage, &panel, &slot, "",
                                  &message));
   CHECK(panel == ship::TitlePanel::Tutorial);

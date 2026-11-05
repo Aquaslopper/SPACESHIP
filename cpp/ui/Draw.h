@@ -20,6 +20,7 @@
 #include "ui/Describe.h"
 #include "ui/EventScreen.h"
 #include "ui/Fx.h"
+#include "ui/FloatingPanels.h"
 #include "ui/IdleScreen.h"
 #include "ui/Layout.h"
 #include "ui/NavScreen.h"
@@ -55,14 +56,14 @@ class ShellView {
   void Draw(Simulation& sim, double nowMs);
   void Click(Simulation& sim, float x, float y, HitButton button, double nowMs);
   void Move(float x, float y);
-  void Drag(Simulation& sim, float x, float y, float dx, float dy, bool down);
+  void Drag(Simulation& sim, float x, float y, float dx, float dy, bool down, bool pressed);
   void Scroll(float x, float y, float wheelDelta);
   void Escape(Simulation& sim);
 
   bool QuitRequested() const { return quitRequested_; }
 
   const Description& Selection() const { return selection_; }
-  bool HasSelection() const { return hasSelection_; }
+  bool HasSelection() const { return floating_.HasBriefings(); }
   const ShellLayout& LayoutNow() const { return layout_; }
 
   void SetSaveDir(std::string dir) { saveDir_ = std::move(dir); }
@@ -125,12 +126,13 @@ class ShellView {
 
   void SyncIdleDots(const Simulation& sim, double nowMs);
   void PaintChrome(Simulation& sim);
-  void PaintBriefing(const Simulation& sim);
+  void OpenBriefing(const Simulation& sim, const std::string& kind, const std::string& id);
   void PaintTaskScreen(Simulation& sim);
   void PaintPanelsScreen(Simulation& sim);
   void PaintPopup(Simulation& sim);
   void PaintHero(const Vignette& vignette, const Area& box);
   void PaintTitle(Simulation& sim);
+  void PaintSettingsControls(Simulation& sim, const PopupModel& model);
   void PaintLoss(Simulation& sim);
   void PaintWikiSearch(const Area& box);
   void PaintNavScreen(Simulation& sim);
@@ -157,18 +159,20 @@ class ShellView {
   float idleDiagramScale_ = 1.0f;
 
   Description selection_;
-  std::string briefingKind_;
-  std::string briefingId_;
-  bool hasSelection_ = false;
-  Area briefingCard_{};
-  std::vector<NavHit> briefingHits_;
+  FloatingPanels floating_;
+  int focusedPanel_ = 0;
 
   float width_ = 1440.0f;
   float height_ = 940.0f;
   float others_ = 300.0f;
   float mouseX_ = -1.0f;
   float mouseY_ = -1.0f;
+  float quartersBandTop_ = 0.0f;
   bool draggingChart_ = false;
+  bool chartDragMoved_ = false;
+  std::string scrollTabKey_;
+  mutable bool paintingContent_ = false;
+  mutable float contentPaintBottom_ = 0.0f;
   double chartDragAccumX_ = 0.0;
   double chartDragAccumY_ = 0.0;
   bool quitRequested_ = false;
@@ -211,17 +215,9 @@ class ShellView {
 
   std::string popupKey_;
   std::string saveDir_ = "runtime/saves";
-  std::string popupMessage_;
-  bool confirmNewVoyage_ = false;
-  int popupSlot_ = 1;
   int popupCount_ = 0;
-  float popupScroll_ = 0.0f;
-  float popupMaxScroll_ = 0.0f;
-  Area popupCard_{};
   std::string pendingConfirm_;
   std::string pendingAction_;
-  PopupModel popup_;
-  std::vector<NavHit> popupHits_;
 
   bool titleActive_ = false;
   bool titleConfirm_ = false;

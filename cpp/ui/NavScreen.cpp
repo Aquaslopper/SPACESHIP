@@ -718,20 +718,19 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
         "Scan Complete", "space"));
   }
 
-  int occurrence = 0;
   if (target != nullptr && target->type == "region") {
     screen.commands.push_back(BuildCommandRow(
         sim, "View " + target->name + " sector chart", true, "free", std::string(),
-        occurrence++));
+        0));
   }
   screen.commands.push_back(BuildCommandRow(
       sim, "Stand watch - advance ongoing work", sim.State().gameOver.empty(),
-      std::string(), "space", occurrence++));
+      std::string(), "space", 0));
 
   const Port* port = sim.World().FindPort(sim.Map().here);
   if (port != nullptr && !sim.State().docked && running == nullptr) {
     screen.commands.push_back(BuildCommandRow(
-        sim, "Dock at " + port->name, true, std::string(), "space", occurrence++));
+        sim, "Dock at " + port->name, true, std::string(), "space", 0));
   }
 
   // The band's two notes: what standing watch costs, then why a button may be
@@ -805,10 +804,29 @@ bool PressNavActionRaw(Simulation& sim, const std::string& action, const std::st
 //  or from this harness. Free reads spend nothing and therefore lock nothing.
 // ============================================================================
 bool PressNavAction(Simulation& sim, const std::string& action, const std::string& arg) {
-  return CommitActionButton(
-      sim, ActionCooldownKey(sim, "press:nav:" + action + ":" + arg),
-      ActionCooldownCategory(action + " " + arg),
-      [&]() { return PressNavActionRaw(sim, action, arg); });
+  // Progress controls acknowledge before consulting cooldowns (HTA
+  // onProgressClick). Do not add a second lock around that dispatcher.
+  const auto screen = BuildNavScreen(sim).screen;
+  if (action == "travel" || action == "scan") {
+    for (const auto& button : screen.progress) {
+      if (button.taskId == action) { return PressProgressButton(sim, button); }
+    }
+    return false;
+  }
+  for (const auto& row : screen.commands) {
+    const bool matches =
+        (action == "stand-watch" && row.label.find("Stand watch") == 0) ||
+        (action == "dock" && row.label.find("Dock at ") == 0) ||
+        (action == "view-sector" && row.label.find("View ") == 0);
+    if (!matches) { continue; }
+    if (!row.enabled || row.coolingDown) { return false; }
+    return CommitActionButton(sim, row.cooldownKey, row.category,
+        [&]() { return PressNavActionRaw(sim, action, arg); });
+  }
+  if (action == "stand-watch" || action == "dock" || action == "view-sector") {
+    return false;
+  }
+  return PressNavActionRaw(sim, action, arg);
 }
 
 }  // namespace ship

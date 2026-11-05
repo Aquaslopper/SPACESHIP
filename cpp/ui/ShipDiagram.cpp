@@ -65,6 +65,10 @@ DiagramModel BuildDiagram(const Simulation& sim, const Area& stage,
   const DeckPlan& plan = ActivePlan(sim);
   out.hull = plan.hull;
   out.rooms = plan.rooms;
+  for (const auto& room : plan.rooms) {
+    const auto it = sim.World().roomScenes.find(room.id);
+    out.roomAccents[room.id] = it == sim.World().roomScenes.end() ? "#8c6f4e" : it->second.accent;
+  }
   out.corridor = Area{static_cast<float>(plan.corridor.x),
                       static_cast<float>(plan.corridor.y),
                       static_cast<float>(plan.corridor.w),

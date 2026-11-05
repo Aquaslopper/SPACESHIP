@@ -103,10 +103,9 @@ TitleModel BuildTitleScreen(const Simulation& sim, bool fromVoyage, TitlePanel p
   };
   const std::vector<Command> commands = {
       {"new-voyage", "NEW VOYAGE", true},
-      {"load", "LOAD VOYAGE", AnySlotWritten(sim, saveDir) || !sim.State().tabs.empty()},
+      {"load", "LOAD VOYAGE", true},
       {"options", "OPTIONS", true},
       {"guide", "HOW TO PLAY", true},
-      {"tutorial", "TUTORIAL", true},
       {"resume", TitleButtonLabel(fromVoyage), true},
   };
   for (const Command& command : commands) {
@@ -162,6 +161,14 @@ TitleModel BuildTitleScreen(const Simulation& sim, bool fromVoyage, TitlePanel p
       row.label = "Palette: " + (i < model.settings.themeLabels.size()
                                      ? model.settings.themeLabels[i]
                                      : model.settings.themes[i]);
+      row.cost = "free";
+      row.enabled = true;
+      model.panelRows.push_back(row);
+    }
+    for (const auto& choice : model.settings.audioChoices) {
+      ActionRowView row;
+      row.id = "audio:" + choice.value;
+      row.label = "Audio level: " + choice.label;
       row.cost = "free";
       row.enabled = true;
       model.panelRows.push_back(row);
@@ -279,6 +286,9 @@ bool PressTitleAction(Simulation& sim, const std::string& action, const std::str
   }
   if (action.compare(0, 6, "theme:") == 0) {
     return PressPopupAction(sim, "settings", "theme", action.substr(6), saveDir, message);
+  }
+  if (action.compare(0, 6, "audio:") == 0) {
+    return PressPopupAction(sim, "settings", "audio", action.substr(6), saveDir, message);
   }
   if (action.compare(0, 5, "font:") == 0) {
     return PressPopupAction(sim, "settings", "font", action.substr(5), saveDir, message);

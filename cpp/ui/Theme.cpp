@@ -72,6 +72,23 @@ Palette FromFour(const char* paper, const char* panel, const char* ink,
   p.terracotta = Mix(accentRgb, inkRgb, 0.15);
   p.sage = accentRgb;
   p.amber = Mix(accentRgb, paperRgb, 0.25);
+  p.titleBackground = panelRgb; p.titleDialog = paperRgb;
+  p.titleBorder = accentRgb; p.titleInk = inkRgb;
+  return p;
+}
+
+Palette ClassicPalette() {
+  // Literal Section 1 CSS roles; do not derive one role from another.
+  Palette p;
+  p.white = Hex("#ffffff"); p.panel = Hex("#faf7f2");
+  p.panel2 = Hex("#f4efe6"); p.panel3 = Hex("#efe8dc");
+  p.border = Hex("#e4dbcb"); p.borderDark = Hex("#cbb89c");
+  p.coffee = Hex("#8c6f4e"); p.coffeeDark = Hex("#6b5338");
+  p.coffeeLight = Hex("#b89b76"); p.ink = Hex("#3b3630");
+  p.muted = Hex("#8a7f72"); p.terracotta = Hex("#b05a42");
+  p.sage = Hex("#7f9161"); p.amber = Hex("#c08a3e");
+  p.titleBackground = Hex("#d8c4a6"); p.titleDialog = Hex("#f5ead8");
+  p.titleBorder = Hex("#8e7757"); p.titleInk = Hex("#443528");
   return p;
 }
 
@@ -81,7 +98,7 @@ Palette PaletteForId(const std::string& id) {
   // theme-<id> CSS blocks.
   // classic: Flight Deck - parchment (the HTA's default, light theme)
   if (id == "classic") {
-    return FromFour("#faf7f2", "#f4efe6", "#6b5338", "#8c6f4e");
+    return ClassicPalette();
   }
   // void: Deep Space - cyan (dark theme)
   if (id == "void") {
@@ -100,7 +117,7 @@ Palette PaletteForId(const std::string& id) {
     return FromFour("#30231d", "#1a1210", "#f5e7d9", "#ffba76");
   }
   // Unknown ids fall back to classic.
-  return FromFour("#faf7f2", "#f4efe6", "#6b5338", "#8c6f4e");
+  return ClassicPalette();
 }
 
 }  // namespace
@@ -121,7 +138,7 @@ const std::vector<ThemeSpec>& Theme::Specs() {
   static const std::vector<ThemeSpec> specs = {
       // The HTA's five themes, in the reference's order. The ids are the
       // reference's so a save keeps its choice; the labels match the HTA.
-      {"classic", "Flight Deck - parchment", {0x6b, 0x53, 0x38}},
+      {"classic", "Flight Deck - parchment", {139, 111, 78}},
       {"void", "Deep Space - cyan", {0x5b, 0xb8, 0xd5}},
       {"aurora", "Aurora - mint", {0x5b, 0xbe, 0x9d}},
       {"nebula", "Nebula - violet", {0x9b, 0x79, 0xd0}},

@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "core/Simulation.h"
+#include "ui/Describe.h"
 
 namespace ship {
 
@@ -34,6 +35,13 @@ struct PopupToggle {
   std::string id;
   std::string label;
   bool on = false;
+  std::string heading = {};
+  std::string help = {};
+};
+
+struct PopupChoice {
+  std::string value;
+  std::string label;
 };
 
 struct PopupSlot {
@@ -54,6 +62,7 @@ struct PopupModel {
   std::vector<std::string> themeLabels;
   std::string theme;
   std::string audioLevel;
+  std::vector<PopupChoice> audioChoices;
   // Phase 9: the reading-size ladder (18/19/20/21 px) and the borderless
   // window switch. Both are preferences; both are drawn as their own rows.
   int fontStep = 0;
@@ -63,6 +72,8 @@ struct PopupModel {
   std::string fullscreenLabel; // "Window: Borderless fullscreen"
   std::vector<PopupSlot> slots;
   std::string message;
+  std::vector<DescribeAct> acts;
+  std::vector<std::string> footer;
   bool free = true;
 };
 
@@ -74,6 +85,9 @@ std::string PopupTitle(const std::string& key);
 // throw-away voyage, so a corrupt slot reports Empty rather than lying.
 std::string SaveSlotSummary(const Simulation& sim, int slot, const std::string& saveDir,
                             bool* written);
+
+PopupModel BuildBriefPopup(const Simulation& sim, const std::string& kind,
+                           const std::string& id);
 
 PopupModel BuildPopup(const Simulation& sim, const std::string& key,
                       const std::string& saveDir = std::string());

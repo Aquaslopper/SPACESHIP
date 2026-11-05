@@ -428,3 +428,16 @@ TEST_CASE("the quarters and the record open from their own tabs", "[crew]") {
   CHECK(record.left[0].title == "Status");
   CHECK(record.left[3].title == "Employment");
 }
+
+TEST_CASE("quarters commits only the displayed progress cooldown", "[crew][ui][cooldown]") {
+  auto sim = Fresh();
+  REQUIRE(ship::OpenTask(sim, "room", "quarters", true));
+  REQUIRE(ship::PressQuartersAction(sim, "select", "suri"));
+  REQUIRE(ship::PressQuartersAction(sim, "order", "learnOn"));
+  const auto screen = ship::BuildQuartersScreen(sim).screen;
+  REQUIRE(screen.progress.size() == 1);
+  const auto button = screen.progress.front();
+  REQUIRE(ship::PressQuartersAction(sim, "commit"));
+  CHECK(ship::CooldownRemaining(sim, button.cooldownKey) == ship::RuleActions(sim, button.category));
+  CHECK(sim.State().actionCooldowns.size() == 1);
+}

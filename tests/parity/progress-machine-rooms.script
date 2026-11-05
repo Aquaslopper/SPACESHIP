@@ -1,0 +1,30 @@
+# Source button painter/dispatch, not guessed cooldown values.
+active room:engine
+progress maint 0 Run Maintenance
+progress-click maint 0 Run Maintenance
+trace
+# Five other actions wear the perfect engine; a refused click has no lock.
+action
+action
+action
+action
+action
+progress maint 1 Run Maintenance
+progress-click maint 1 Run Maintenance
+progress maint 1 Run Maintenance
+progress-click maint 1 Run Maintenance
+trace
+action
+progress maint 0 Run Maintenance
+trace
+active room:mess
+progress cook 1 Cook a Batch
+progress-click cook 1 Cook a Batch
+progress cook 1 Cook a Batch
+progress-click cook 1 Cook a Batch
+trace
+action
+progress cook 1 Cook a Batch
+action
+progress cook 1 Cook a Batch
+trace

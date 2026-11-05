@@ -554,3 +554,42 @@ TEST_CASE("a voyage crosses, docks and scans through the navigation screen",
   CHECK(sim.ActionCount() > start);
   CHECK(sim.State().gameOver.empty());
 }
+
+TEST_CASE("navigation completion remains clickable during its start cooldown", "[ui][nav][cooldown]") {
+  auto sim = Fresh();
+  REQUIRE(ship::OpenTask(sim, "room", "nav", true));
+  REQUIRE(sim.SelectTarget("tolme"));
+  REQUIRE(ship::PressNavAction(sim, "travel"));
+  const auto key = ship::ActionCooldownKey(sim, "progress:travel");
+  REQUIRE(ship::CooldownRemaining(sim, key) == 15);
+  // Explicit finished-work fixture: acknowledgment is a free read even when
+  // this control still has a start lock (HTA onProgressClick ordering).
+  auto* task = sim.FindOngoing("travel");
+  REQUIRE(task != nullptr);
+  task->state = "done";
+  task->left = 0;
+  const auto before = sim.ActionCount();
+  CHECK(ship::PressNavAction(sim, "travel"));
+  CHECK(sim.FindOngoing("travel") == nullptr);
+  CHECK(sim.ActionCount() == before);
+  CHECK(ship::CooldownRemaining(sim, key) == 15);
+  CHECK(sim.State().actionCooldowns.size() == 1);
+}
+
+TEST_CASE("navigation uses the displayed command lock and disabled progress guard", "[ui][nav][cooldown]") {
+  auto sim = Fresh();
+  REQUIRE(ship::OpenTask(sim, "room", "nav", true));
+  const auto before = sim.ActionCount();
+  CHECK_FALSE(ship::PressNavAction(sim, "travel")); // no destination
+  CHECK(sim.ActionCount() == before);
+  REQUIRE(ship::PressNavAction(sim, "stand-watch"));
+  const auto screen = ship::BuildNavScreen(sim).screen;
+  const auto& row = screen.commands.front();
+  CHECK(row.coolingDown);
+  CHECK(row.remaining == 15);
+  CHECK(sim.State().actionCooldowns.size() == 1);
+  CHECK_FALSE(ship::PressNavAction(sim, "stand-watch"));
+  CHECK(sim.ActionCount() == before + 1);
+  sim.PerformAction("another control");
+  CHECK(ship::BuildNavScreen(sim).screen.commands.front().remaining == 14);
+}

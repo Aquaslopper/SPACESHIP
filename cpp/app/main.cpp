@@ -24,6 +24,7 @@
 #include "core/Simulation.h"
 #include "data/Catalog.h"
 #include "ui/Draw.h"
+#include "ui/PointerOwnership.h"
 #include "ui/Palette.h"
 #include "ui/Theme.h"
 
@@ -71,7 +72,7 @@ struct FontResources {
   Font body{};
   Font bold{};
   Font mono{};
-  std::array<ImFont*, 4> imguiBody{};
+  std::array<ImFont*, 6> imguiBody{};
 };
 
 std::string FirstFont(const std::vector<std::filesystem::path>& candidates) {
@@ -122,11 +123,14 @@ FontResources LoadFonts(const std::filesystem::path& assets) {
   if (loaded.mono.texture.id == 0) { loaded.mono = loaded.body; }
 
   ImGuiIO& io = ImGui::GetIO();
-  const int sizes[4] = {18, 19, 20, 21};
-  for (int i = 0; i < 4; ++i) {
-    loaded.imguiBody[static_cast<std::size_t>(i)] =
-        sansPath.empty() ? nullptr : io.Fonts->AddFontFromFileTTF(
-                                        sansPath.c_str(), static_cast<float>(sizes[i]));
+  // Include the +2px larger-reading preference, not only the four steps.
+  // Even without an installed font file the ImGui fallback must stay >=18px.
+  for (int i = 0; i < 6; ++i) {
+    ImFontConfig config;
+    config.SizePixels = static_cast<float>(18 + i);
+    loaded.imguiBody[static_cast<std::size_t>(i)] = sansPath.empty()
+        ? io.Fonts->AddFontDefault(&config)
+        : io.Fonts->AddFontFromFileTTF(sansPath.c_str(), config.SizePixels);
   }
   if (!monoPath.empty()) { io.Fonts->AddFontFromFileTTF(monoPath.c_str(), 18.0f); }
   std::printf("fonts: %s | %s | %s\n", sansPath.c_str(), boldPath.c_str(), monoPath.c_str());
@@ -140,9 +144,9 @@ void ReloadImGuiFonts() {
   ImGui::GetIO().Fonts->Build();
 }
 
-void SelectImGuiFont(const FontResources& fonts, int fontStep) {
+void SelectImGuiFont(const FontResources& fonts, int fontStep, bool largeText) {
   const int clamped = fontStep < 0 ? 0 : (fontStep > 3 ? 3 : fontStep);
-  ImFont* selected = fonts.imguiBody[static_cast<std::size_t>(clamped)];
+  ImFont* selected = fonts.imguiBody[static_cast<std::size_t>(clamped + (largeText ? 2 : 0))];
   if (selected != nullptr) { ImGui::GetIO().FontDefault = selected; }
 }
 
@@ -165,8 +169,10 @@ Texture2D LoadTitleTexture(const std::filesystem::path& assets) {
       std::printf("title artwork: %s\n", candidate.string().c_str());
       return texture;
     }
+    std::fprintf(stderr, "spaceship: title artwork exists but could not be decoded/uploaded: %s\n",
+                 candidate.string().c_str());
   }
-  std::fprintf(stderr, "spaceship: title artwork not found\n");
+  std::fprintf(stderr, "spaceship: no usable title artwork\n");
   return Texture2D{};
 }
 
@@ -315,11 +321,21 @@ class AudioDevice {
 }  // namespace
 
 int main(int argc, char** argv) {
-  (void)argc;
-  (void)argv;
+  // This CPU-only probe exercises the *linked raylib decoder*, not a separate
+  // JPEG library or an existence check. Run it against the packaged executable
+  // in CI before opening any window or initializing graphics/audio.
+  const std::filesystem::path assets = FindAssetDir();
+  if (argc == 2 && std::string(argv[1]) == "--check-title-art") {
+    const auto path = assets / "art" / "title.jpg";
+    Image image = LoadImage(path.string().c_str());
+    const bool decoded = image.data != nullptr && image.width > 0 && image.height > 0;
+    std::printf("title JPEG decode: %s (%d x %d): %s\n",
+                decoded ? "PASS" : "FAIL", image.width, image.height, path.string().c_str());
+    if (image.data != nullptr) { UnloadImage(image); }
+    return decoded ? 0 : 1;
+  }
 
   // ---- catalogue ---------------------------------------------------------
-  const std::filesystem::path assets = FindAssetDir();
 
   ship::Catalog catalog;
   try {
@@ -361,7 +377,7 @@ int main(int argc, char** argv) {
   const FontResources fonts = LoadFonts(assets);
   rlImGuiEndInitImGui();
   ReloadImGuiFonts();
-  SelectImGuiFont(fonts, sim.State().options.fontStep);
+  SelectImGuiFont(fonts, sim.State().options.fontStep, sim.State().options.largeText);
   ship::ui::ApplyPalette(theme);
 
   Texture2D titleTexture = LoadTitleTexture(assets);
@@ -387,6 +403,7 @@ int main(int argc, char** argv) {
     ToggleBorderlessWindowed();
   }
 
+  ship::PointerOwnership leftPointer, rightPointer;
   while (!WindowShouldClose() && !shell.QuitRequested()) {
     if (IsKeyPressed(KEY_ESCAPE)) { shell.Escape(sim); }
     BeginDrawing();
@@ -394,26 +411,35 @@ int main(int argc, char** argv) {
     // raylib drawing frame, matching its documented render-loop contract.
     rlImGuiBegin();
 
-    // Every game control is hit-tested by ShellView in raylib coordinates.
-    // Do not gate these clicks on ImGui::WantCaptureMouse: the full-screen
-    // ImGui draw-list host can report capture despite owning no game controls.
-    // ImGui text fields still receive the event when no shell hit matches.
+    // Dear ImGui owns a complete press/release gesture. A close button may
+    // remove its window before release, but that release must not hit the ship.
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+      leftPointer.Press(ImGui::GetIO().WantCaptureMouse);
+    }
+    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
+      rightPointer.Press(ImGui::GetIO().WantCaptureMouse);
+    }
     const Vector2 pointer = GetMousePosition();
     shell.Move(pointer.x, pointer.y);
-    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && !leftPointer.UiOwned()) {
       const Vector2 delta = GetMouseDelta();
-      shell.Drag(sim, pointer.x, pointer.y, delta.x, delta.y, true);
+      shell.Drag(sim, pointer.x, pointer.y, delta.x, delta.y, true,
+                 IsMouseButtonPressed(MOUSE_BUTTON_LEFT));
     }
     const float wheel = GetMouseWheelMove();
     if (wheel != 0.0f) { shell.Scroll(pointer.x, pointer.y, wheel); }
     if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
       const Vector2 mouse = GetMousePosition();
-      shell.Click(sim, mouse.x, mouse.y, ship::HitButton::Left,
-                  static_cast<double>(GetTime()) * 1000.0);
+      if (!leftPointer.Release()) {
+        shell.Click(sim, mouse.x, mouse.y, ship::HitButton::Left,
+                    static_cast<double>(GetTime()) * 1000.0);
+      }
     } else if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT)) {
       const Vector2 mouse = GetMousePosition();
-      shell.Click(sim, mouse.x, mouse.y, ship::HitButton::Right,
-                  static_cast<double>(GetTime()) * 1000.0);
+      if (!rightPointer.Release()) {
+        shell.Click(sim, mouse.x, mouse.y, ship::HitButton::Right,
+                    static_cast<double>(GetTime()) * 1000.0);
+      }
     }
 
     // Apply settings from either the title sheet or the in-game Options panel
@@ -437,7 +463,7 @@ int main(int argc, char** argv) {
                       static_cast<float>(GetScreenHeight()), theme);
       ship::ui::ApplyPalette(theme);
     }
-    SelectImGuiFont(fonts, sim.State().options.fontStep);
+    SelectImGuiFont(fonts, sim.State().options.fontStep, sim.State().options.largeText);
 
     if (sim.State().options.fullscreen != fullscreen) {
       fullscreen = sim.State().options.fullscreen;

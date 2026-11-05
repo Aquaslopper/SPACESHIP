@@ -192,6 +192,8 @@ std::vector<SideBlock> SideBlocks(const Simulation& sim) {
   vessel.key = "vessel";
   vessel.title = "Vessel";
   vessel.open = open("vessel");
+  vessel.rows.push_back({ship.Get("name"), "", false, false, "identity", ""});
+  vessel.rows.push_back({ship.Get("className"), "Registry " + ship.Get("registry"), true, false, "long", ""});
   vessel.rows.push_back({"Built", ship.Get("built"), true, false, "pair", ""});
   vessel.rows.push_back({"Yard", ship.Get("yard"), true, false, "long", ""});
   vessel.rows.push_back({"Refit", ship.Get("refit"), true, false, "long", ""});
@@ -325,11 +327,16 @@ std::vector<IndicatorLine> IndicatorLines(const Simulation& sim) {
 
 std::vector<SideHit> SideHits(const Simulation& sim, const Area& sidepanel,
                               const Area& foot, float lineHeight,
-                              float scrollY, float* totalContentHeight) {
+                              float scrollY, float* totalContentHeight,
+                              const std::function<float(const std::string&, float)>& measure) {
   std::vector<SideHit> hits;
   const float top = sidepanel.y;
   const float bottom = sidepanel.Bottom();
   float cursor = 8.0f;
+  const auto textHeight = [&](const std::string& text, float width) {
+    if (measure) { return std::max(lineHeight, measure(text, std::max(1.0f, width))); }
+    return lineHeight * std::max(1.0f, std::ceil(text.size() * lineHeight * 0.5f / std::max(1.0f, width)));
+  };
 
   const auto pushInPanel = [&](SideHit hit, float rawTop, float h) {
     const float y = top + rawTop - scrollY;
@@ -339,6 +346,7 @@ std::vector<SideHit> SideHits(const Simulation& sim, const Area& sidepanel,
     const float clippedTop = std::max(top, y);
     const float clippedBottom = std::min(bottom - 0.5f, y + h);
     if (clippedBottom <= clippedTop + 2.0f) { return; }
+    hit.paintBox = Area{hit.box.x, y, hit.box.w, h};
     hit.box = Area{hit.box.x, clippedTop, hit.box.w, clippedBottom - clippedTop};
     hits.push_back(std::move(hit));
   };
@@ -370,24 +378,22 @@ std::vector<SideHit> SideHits(const Simulation& sim, const Area& sidepanel,
     }
     for (const SideRow& row : block.rows) {
       const float rowWidth = std::max(1.0f, sidepanel.w - 18.0f);
-      const float averageCharWidth = std::max(6.0f, lineHeight * 0.5f);
-      const float maxChars = std::max(1.0f, rowWidth / averageCharWidth);
-      float height = lineHeight;
       SideHit hit;
       hit.text = row.key;
       hit.detail = row.kind == "long" ? row.value : std::string();
       hit.rightValue = row.kind == "pair" ? row.value : std::string();
       hit.dim = row.dim;
+      const float labelWidth = row.kind == "event" ? std::max(1.0f, rowWidth - 60.0f) : rowWidth;
+      float height = textHeight(row.key, labelWidth);
       if (row.kind == "long") {
-        const float detailLines = std::max(
-            1.0f, std::ceil(static_cast<float>(row.value.size()) / maxChars));
-        height += detailLines * lineHeight + 4.0f;
+        hit.valueOffset = height + 2.0f;
+        height += textHeight(row.value, rowWidth) + 6.0f;
       } else if (row.kind == "event") {
-        height = std::max(lineHeight + 6.0f, 30.0f);
-      } else if (row.kind == "pair" &&
-                 static_cast<float>(row.key.size() + row.value.size()) > maxChars) {
+        height = std::max(height + 6.0f, 30.0f);
+      } else if (row.kind == "pair" && textHeight(row.key + "  " + row.value, rowWidth) > lineHeight + 0.5f) {
         hit.stackValue = true;
-        height += lineHeight;
+        hit.valueOffset = height;
+        height += textHeight(row.value, rowWidth);
       }
       hit.box = Area{sidepanel.x + 12.0f, 0.0f, rowWidth, height};
       if (row.kind == "event") {
@@ -412,6 +418,7 @@ std::vector<SideHit> SideHits(const Simulation& sim, const Area& sidepanel,
     hit.key = buttons[i].key;
     hit.text = buttons[i].title;
     hit.box = Area{fx, foot.y + 8.0f, 32.0f, 28.0f};
+    hit.pinned = true;
     hits.push_back(hit);
     fx += 32.0f;
   }
@@ -421,6 +428,7 @@ std::vector<SideHit> SideHits(const Simulation& sim, const Area& sidepanel,
   wiki.key = "wiki";
   wiki.text = "Wiki";
   wiki.box = Area{foot.x + 8.0f, foot.y + 42.0f, 52.0f, 24.0f};
+  wiki.pinned = true;
   hits.push_back(wiki);
 
   SideHit rewards;
@@ -429,6 +437,7 @@ std::vector<SideHit> SideHits(const Simulation& sim, const Area& sidepanel,
   rewards.key = "awards";
   rewards.text = RewardsLabel(sim);
   rewards.box = Area{foot.x + 64.0f, foot.y + 42.0f, 93.0f, 24.0f};
+  rewards.pinned = true;
   hits.push_back(rewards);
   return hits;
 }

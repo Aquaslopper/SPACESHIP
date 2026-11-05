@@ -264,22 +264,22 @@ TEST_CASE("the menu offers six free commands and says resume or exit",
                                                         ship::TitlePanel::None, dir);
   CHECK(fresh.heading == "SPACESHIP");
   CHECK(fresh.artPath == "assets/art/title.jpg");
-  REQUIRE(fresh.actions.size() == 6);
+  REQUIRE(fresh.actions.size() == 5);
   CHECK(fresh.actions[0].id == "new-voyage");
   CHECK(fresh.actions[0].label == "NEW VOYAGE");
   CHECK(fresh.actions[1].id == "load");
   CHECK(fresh.actions[2].id == "options");
   CHECK(fresh.actions[3].id == "guide");
-  CHECK(fresh.actions[4].id == "tutorial");       // Phase 9
-  CHECK(fresh.actions[4].label == "TUTORIAL");
-  CHECK(fresh.actions[5].label == "EXIT");
+  CHECK(fresh.actions[4].id == "resume");
+  CHECK(fresh.actions[4].label == "EXIT");
+  CHECK(fresh.actions[1].enabled);
   for (const ship::ActionRowView& row : fresh.actions) {
     CHECK(row.cost == "free");
   }
 
   const ship::TitleModel live = ship::BuildTitleScreen(sim, true, ship::TitlePanel::None,
                                                        dir);
-  CHECK(live.actions[5].label == "RESUME");
+  CHECK(live.actions[4].label == "RESUME");
   CHECK(ship::TitleButtonLabel(true) == "RESUME");
   CHECK(ship::TitleButtonLabel(false) == "EXIT");
   CHECK_FALSE(ship::AnySlotWritten(sim, dir));
@@ -318,7 +318,9 @@ TEST_CASE("settings and the guide are the same sheets the ship shows",
       sim, true, ship::TitlePanel::Settings, dir);
   CHECK(options.panelTitle == "Options");
   REQUIRE(options.settings.toggles.size() == 6);
-  CHECK(options.panelRows.size() == 6 + 5 + 4 + 1);  // toggles, palettes, font steps, back
+  CHECK(options.panelRows.size() == 6 + 5 + 4 + 4 + 1);  // toggles, palettes, audio, font steps, back
+  CHECK(Row(options.panelRows, "audio:0.18") != nullptr);
+  CHECK(Row(options.panelRows, "audio:0.9") != nullptr);
   CHECK(Row(options.panelRows, "theme:classic") != nullptr);
   CHECK(Row(options.panelRows, "font:0") != nullptr);
   CHECK(Row(options.panelRows, "font:3") != nullptr);

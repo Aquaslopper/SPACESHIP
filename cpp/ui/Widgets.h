@@ -83,6 +83,8 @@ struct ProgressButton {
   bool acknowledge = false;
 };
 
+bool PressProgressButton(Simulation& sim, const ProgressButton& button);
+
 ProgressButton BuildProgressButton(const Simulation& sim, const std::string& taskId,
                                    const std::string& idleLabel, bool enabled,
                                    const std::string& doneLabel = "Complete",

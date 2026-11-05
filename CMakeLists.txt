@@ -84,10 +84,18 @@ if(SPACESHIP_BUILD_GUI AND SPACESHIP_GUI_REASON STREQUAL "")
 
   set(BUILD_EXAMPLES        OFF CACHE BOOL "" FORCE)
   set(BUILD_SHARED_LIBS     OFF CACHE BOOL "" FORCE)
-  set(CUSTOMIZE_BUILD       OFF CACHE BOOL "" FORCE)
-  set(SUPPORT_FILEFORMAT_TTF ON CACHE BOOL "" FORCE)  # the bundled fonts
+  # Keep config.h's numeric defaults. Raylib 6's custom CMake parser treats
+  # even '#define SUPPORT_CUSTOM_FRAME_CONTROL 0' as ON, disabling normal
+  # screen swapping, pacing and input polling. Never enable that broad mode.
+  set(CUSTOMIZE_BUILD OFF CACHE BOOL "" FORCE)
 
   FetchContent_MakeAvailable(raylib imgui rlImGui)
+  # config.h guards JPG with #ifndef, so override this one format directly
+  # without replacing every other raylib feature flag.
+  target_compile_definitions(raylib PRIVATE SUPPORT_FILEFORMAT_JPG=1)
+  # Compile these guards INSIDE raylib with its actual private definitions.
+  target_sources(raylib PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/cpp/tests/raylib_config_guard.c")
+  target_include_directories(raylib PRIVATE "${raylib_SOURCE_DIR}/src")
 
   # FetchContent's SOURCE_DIR spelling has varied with declaration casing
   # across CMake releases. Resolve both spellings before forming source paths.
@@ -260,6 +268,14 @@ if(SPACESHIP_BUILD_TESTS)
            COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/check-gui-syntax.sh"
            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
   set_tests_properties(ui.gui-syntax PROPERTIES SKIP_RETURN_CODE 77)
+  add_test(NAME ui.imgui-close-input
+           COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/check-imgui-input.sh"
+           WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+  set_tests_properties(ui.imgui-close-input PROPERTIES SKIP_RETURN_CODE 77)
+  add_test(NAME ui.native-draw-recorder
+           COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/check-draw.sh" "${CMAKE_CURRENT_BINARY_DIR}"
+           WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+  set_tests_properties(ui.native-draw-recorder PROPERTIES SKIP_RETURN_CODE 77)
 
   # The data gate: the committed catalogue must still match the HTA. This is
   # the test that stops a content edit shipping without its JSON.

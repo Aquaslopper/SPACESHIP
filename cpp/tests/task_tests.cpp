@@ -195,7 +195,7 @@ TEST_CASE("a lock reads back as a cooldown, in actions", "[ui][button]") {
   const ship::ProgressButton button =
       ship::BuildProgressButton(sim, "maint", "Run Maintenance", true);
   CHECK(button.state == ship::ButtonState::Cooldown);
-  CHECK(button.text == "COOLDOWN 7");
+  CHECK(button.text == "Cooldown: 7 actions");
   CHECK(button.title ==
         "Ship systems cooldown: 7 more actions. Other committed actions advance it; waiting does not.");
   CHECK(button.fillPercent == 0.0);
@@ -392,7 +392,7 @@ TEST_CASE("the filter room reads the rack, the bank and the air", "[ui][o2]") {
   CHECK(running.slots[0].barPercent == 100.0);
   // The switch has just been thrown, so its lock is running down.
   CHECK(running.screen.progress[0].state == ship::ButtonState::Cooldown);
-  CHECK(running.screen.progress[0].text == "COOLDOWN 10");
+  CHECK(running.screen.progress[0].text == "Cooldown: 10 actions");
 }
 
 TEST_CASE("the galley reads the rack and the four clocks", "[ui][mess]") {
@@ -548,9 +548,9 @@ TEST_CASE("the opening loop runs on the controls themselves", "[ui][loop]") {
   while (sim.FindOngoing("maint") != nullptr) { sim.PerformAction(); }
   CHECK(sim.State().engineCondition == 100.0);
   // The work is consumed on completion, and a perfect drive refuses a new
-  // spanner - the button goes Off rather than spending a click.
+  // spanner. The systems cooldown is still shown until other actions expire it.
   CHECK(ship::BuildProgressButton(sim, "maint", "Run Maintenance", false).state ==
-        ship::ButtonState::Off);
+        ship::ButtonState::Cooldown);
   CHECK_FALSE(ship::PressProgressButton(sim, "maint"));
 
   // Empty the rack and cook it back up.
@@ -566,4 +566,14 @@ TEST_CASE("the opening loop runs on the controls themselves", "[ui][loop]") {
   // Twenty rations cooked, four eaten while the pot was on: the rack lands at
   // twenty, not at its ceiling - the five clocks the window draws, working.
   CHECK(sim.MessRack() == 20.0);
+}
+
+TEST_CASE("maintenance clicks retain the rendered systems cooldown tier", "[ui][cooldown]") {
+  auto sim = Fresh();
+  REQUIRE(ship::OpenTask(sim, "room", "engine", true));
+  sim.MutableState().engineCondition = 50;
+  REQUIRE(ship::PressProgressButton(sim, "maint"));
+  const auto key = ship::ActionCooldownKey(sim, "progress:maint");
+  CHECK(ship::CooldownRemaining(sim, key) == 10);
+  CHECK(sim.State().actionCooldowns.at(key).category == "systems");
 }
