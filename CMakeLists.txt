@@ -222,8 +222,6 @@ if(SPACESHIP_GUI)
   add_custom_command(TARGET spaceship POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${SPACESHIP_ASSETS}" "$<TARGET_FILE_DIR:spaceship>/assets"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_CURRENT_SOURCE_DIR}/spaceship.png" "$<TARGET_FILE_DIR:spaceship>/spaceship.png"
     COMMENT "Copying assets beside the executable")
 endif()
 
