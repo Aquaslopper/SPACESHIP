@@ -1,93 +1,155 @@
-name: Build Spaceship Windows EXE
+# ============================================================================
+#  build.yml — build the game on Windows and on Linux.
+#  ---------------------------------------------------------------------------
+#  Nothing here edits the sources. The portability fixes the Windows build needs
+#  (UTF-8 literals, NOMINMAX, M_PI, the lowercased FetchContent variables, a
+#  relative asset directory, a GUI subsystem) live in CMakeLists.txt and in the
+#  C++ files, so a developer's local build and this one are the same build.
+#
+#    windows-exe   windows-latest, Ninja + MinGW gcc/g++, builds spaceship.exe,
+#                  runs the Catch2 suite natively, assembles dist/Spaceship/ and
+#                  uploads it as the Spaceship-Windows-x64 artifact.
+#    linux-parity  ubuntu-latest, X11/OpenGL/ALSA, links the real client and runs
+#                  every CTest gate, including the differential voyages against
+#                  Spaceship.hta.
+#
+#  -DCMAKE_POLICY_VERSION_MINIMUM=3.5 is passed on both: CMake 4 rejects the
+#  cmake_minimum_required() that raylib's bundled glfw declares, and this is the
+#  supported way to say "treat these older projects as compatible".
+# ============================================================================
+name: build
 
 on:
   push:
-    branches: [ main, master, "arena/**" ]
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build-windows:
+  # --------------------------------------------------------------------------
+  #  Windows: the downloadable build
+  # --------------------------------------------------------------------------
+  windows-exe:
+    name: Windows x64 (spaceship.exe + artifact)
     runs-on: windows-latest
+    timeout-minutes: 60
+
     steps:
-      - name: Checkout repository
+      - name: Check out the repository
         uses: actions/checkout@v4
 
-      - name: Prepare CMake and Windows GCC Compatibility
-        shell: python
+      # windows-latest ships CMake and Ninja but not a GNU toolchain, and the
+      # port's Windows build is the MinGW one (the same recipe as Xeno-koi's
+      # release): no MSVC code-page surprises, and -static means the zip needs
+      # no DLLs beside it.
+      - name: Install MinGW-w64
         run: |
-          import pathlib, re
+          choco install mingw -y --no-progress
+          # Chocolatey edits the machine PATH, which later steps only sometimes
+          # inherit; GITHUB_PATH is the reliable way to hand gcc to the build.
+          echo "C:\ProgramData\mingw64\mingw64\bin" >> $env:GITHUB_PATH
 
-          # 1. CMakeLists.txt fixes for CMake 4.0 + Windows + portable relative asset path
-          cmake_path = pathlib.Path("CMakeLists.txt")
-          if cmake_path.exists():
-              txt = cmake_path.read_text(encoding="utf-8")
-              txt = re.sub(r'catch_discover_tests\s*\([^)]*\)', '# skipped for EXE packaging', txt)
-              txt = txt.replace('-Werror', '')
-              txt = txt.replace('find_package(X11 QUIET)', 'set(X11_FOUND TRUE)')
-              txt = txt.replace('${RLIMGUI_SOURCE_DIR}', '${rlimgui_SOURCE_DIR}')
-              txt = txt.replace('${IMGUI_SOURCE_DIR}', '${imgui_SOURCE_DIR}')
-              txt = txt.replace('${RAYLIB_SOURCE_DIR}', '${raylib_SOURCE_DIR}')
-              txt = txt.replace('${CMAKE_SOURCE_DIR}/assets', 'assets')
-              txt = txt.replace('${PROJECT_SOURCE_DIR}/assets', 'assets')
-              cmake_path.write_text(txt, encoding="utf-8")
+      - name: Show the toolchain
+        run: |
+          cmake --version
+          ninja --version
+          gcc --version
+          g++ --version
 
-          # 2. Catalog.cpp: avoid GCC 13/14 false-positive -Wdangling-reference
-          cat_path = pathlib.Path("cpp/data/Catalog.cpp")
-          if cat_path.exists():
-              txt = cat_path.read_text(encoding="utf-8")
-              txt = txt.replace("const std::string& file)", "std::string file)")
-              txt = txt.replace("const std::string& ctx)", "std::string ctx)")
-              cat_path.write_text(txt, encoding="utf-8")
+      - name: Configure (Ninja + MinGW, Release)
+        run: >
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER=gcc
+          -DCMAKE_CXX_COMPILER=g++
+          -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 
-          # 3. main.cpp line 284: audio.Start(assets) -> audio.Start(assets.string())
-          main_path = pathlib.Path("cpp/app/main.cpp")
-          if main_path.exists():
-              txt = main_path.read_text(encoding="utf-8")
-              txt = txt.replace("audio.Start(assets)", "audio.Start(assets.string())")
-              main_path.write_text(txt, encoding="utf-8")
+      - name: Build spaceship and spaceship_tests
+        run: cmake --build build --parallel
 
-      - name: Pre-fetch ImGui & rlImGui sources explicitly
+      - name: Run the unit suite
+        run: .\build\spaceship_tests.exe --reporter compact
+
+      - name: Assemble dist/Spaceship
         shell: bash
         run: |
-          git clone --depth 1 --branch v1.92.7 https://github.com/ocornut/imgui.git build-deps/imgui
-          git clone --depth 1 --branch Raylib_6_0 https://github.com/raylib-extras/rlImGui.git build-deps/rlimgui
+          set -euo pipefail
+          dist="dist/Spaceship"
+          rm -rf "$dist"
+          mkdir -p "$dist/assets" "$dist/runtime/saves"
 
-      - name: Configure CMake (Release)
-        shell: bash
-        run: |
-          cmake -B build-win -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_COMPILER=gcc \
-            -DCMAKE_CXX_COMPILER=g++ \
-            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-            -DOPENGL_gl_LIBRARY=opengl32 \
-            -DFETCHCONTENT_SOURCE_DIR_IMGUI="$PWD/build-deps/imgui" \
-            -DFETCHCONTENT_SOURCE_DIR_RLIMGUI="$PWD/build-deps/rlimgui" \
-            -DimGui_SOURCE_DIR="$PWD/build-deps/imgui" \
-            -Dimgui_SOURCE_DIR="$PWD/build-deps/imgui" \
-            -DrlImGui_SOURCE_DIR="$PWD/build-deps/rlimgui" \
-            -Drlimgui_SOURCE_DIR="$PWD/build-deps/rlimgui" \
-            -DCMAKE_CXX_FLAGS="-D_USE_MATH_DEFINES -DM_PI=3.14159265358979323846 -Wno-dangling-reference -Wno-error" \
-            -DCMAKE_EXE_LINKER_FLAGS="-static -static-libgcc -static-libstdc++"
+          cp build/spaceship.exe "$dist/spaceship.exe"
 
-      - name: Build spaceship.exe
-        shell: bash
-        run: |
-          cmake --build build-win --target spaceship --parallel
-
-      - name: Package Portable Windows Folder
-        shell: bash
-        run: |
-          mkdir -p dist/Spaceship/runtime/saves
-          cp build-win/spaceship.exe dist/Spaceship/
-          cp -r assets dist/Spaceship/
-          for doc in README.md PARITY.md SPAM_AUDIT.md; do
-            [ -f "$doc" ] && cp "$doc" dist/Spaceship/
+          # The four asset folders the game loads, exactly as shipped.
+          for part in data art fonts audio; do
+            if [ -d "assets/$part" ]; then
+              cp -r "assets/$part" "$dist/assets/$part"
+            fi
           done
 
-      - name: Upload Windows EXE Artifact
+          # A save folder that exists but is empty: the game writes into it.
+          cp runtime/saves/.gitkeep "$dist/runtime/saves/.gitkeep" 2>/dev/null || true
+          {
+            echo "This folder holds the three save slots, beside spaceship.exe."
+            echo "The game creates them on the first save; deleting one is a"
+            echo "safe way to start a slot over."
+          } > "$dist/runtime/saves/README.txt"
+
+          cp README.md PARITY.md SPAM_AUDIT.md "$dist/"
+
+          echo "---- distribution ----"
+          find "$dist" -maxdepth 2 | sort
+
+      - name: Prove the executable is a Windows GUI binary
+        shell: bash
+        run: |
+          objdump -p dist/Spaceship/spaceship.exe | grep -i "^Subsystem" | tee subsystem.txt
+          grep -q "Subsystem.*00000002" subsystem.txt
+
+      - name: Upload the Windows build
         uses: actions/upload-artifact@v4
         with:
           name: Spaceship-Windows-x64
           path: dist/Spaceship/
+          if-no-files-found: error
+          retention-days: 90
+
+  # --------------------------------------------------------------------------
+  #  Linux: the linked GUI and every gate
+  # --------------------------------------------------------------------------
+  linux-parity:
+    name: Linux x64 (linked GUI + all CTest gates)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Install the windowing, GL and audio development packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build pkg-config \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libgl1-mesa-dev libasound2-dev
+
+      - name: Install Node.js (the reference harness and the catalogue gate)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Configure (Ninja, Release)
+        run: >
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+
+      - name: Build everything
+        run: cmake --build build --parallel
+
+      - name: Run every gate
+        run: ctest --test-dir build --output-on-failure -j 4

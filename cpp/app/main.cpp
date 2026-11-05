@@ -36,11 +36,57 @@ namespace audio = ship::audio;
 constexpr int kDefaultWidth = 1440;
 constexpr int kDefaultHeight = 940;
 
+bool HasCatalogue(const std::filesystem::path& dir) {
+  if (dir.empty()) { return false; }
+  std::error_code ec;
+  return std::filesystem::exists(dir / "data" / "manifest.json", ec);
+}
+
 std::filesystem::path AssetDirBesideExecutable(const char* argv0) {
   std::error_code ec;
   std::filesystem::path exe = std::filesystem::weakly_canonical(argv0, ec);
   if (ec) { return {}; }
   return exe.parent_path() / "assets";
+}
+
+// Where the game looks for its assets, in order:
+//
+//   1. "assets" in the current directory - a terminal in the game folder, a
+//      build tree, or the tests' working directory;
+//   2. the directory the executable lives in - a double-click from Explorer,
+//      whose working directory is wherever the shell happened to be;
+//   3. the compile-time fallback, which is the relative "assets" unless a build
+//      asked for something else.
+//
+// When (2) answers, the process also moves there: the save slots must land
+// beside the executable, not in C:\Windows\System32. Preferring a relative
+// path over a baked-in absolute one is what lets the same binary work from any
+// folder it is unzipped into.
+std::filesystem::path ResolveAssetDir(const char* argv0) {
+  if (HasCatalogue("assets")) { return std::filesystem::path("assets"); }
+
+  const std::filesystem::path besideExe = AssetDirBesideExecutable(argv0);
+  const char* appDir = GetApplicationDirectory();  // needs no window
+  const std::filesystem::path appRoot =
+      (appDir != nullptr && appDir[0] != '\0') ? std::filesystem::path(appDir)
+                                                : std::filesystem::path();
+
+  std::filesystem::path home;
+  if (HasCatalogue(appRoot / "assets")) {
+    home = appRoot;
+  } else if (HasCatalogue(besideExe)) {
+    home = besideExe.parent_path();
+  }
+
+  if (!home.empty()) {
+    std::error_code ec;
+    std::filesystem::current_path(home, ec);   // the portable one
+    const std::string narrow = home.string();
+    ChangeDirectory(narrow.c_str());           // and raylib's, for the record
+    return std::filesystem::path("assets");
+  }
+
+  return ship::Catalog::DefaultAssetDir();
 }
 
 // Prefer the real Windows faces when they are installed, so metrics match the
@@ -230,10 +276,14 @@ class AudioDevice {
 int main(int argc, char** argv) {
   (void)argc;
 
-  // ---- catalogue ---------------------------------------------------------
-  std::filesystem::path assets = AssetDirBesideExecutable(argv[0]);
-  if (assets.empty() || !std::filesystem::exists(assets / "data" / "manifest.json")) {
-    assets = ship::Catalog::DefaultAssetDir();
+  // ---- where the ship lives ----------------------------------------------
+  const std::filesystem::path assets = ResolveAssetDir(argc > 0 ? argv[0] : "");
+
+  // The three save slots sit beside the assets; a fresh unzip has runtime/ but
+  // a build tree may not, and a missing folder is not worth a failed save.
+  {
+    std::error_code ec;
+    std::filesystem::create_directories("runtime/saves", ec);
   }
 
   ship::Catalog catalog;
@@ -281,7 +331,10 @@ int main(int argc, char** argv) {
 
   // Sound is optional: a machine without a device keeps a silent, working ship.
   AudioDevice audio;
-  const bool audioReady = audio.Start(assets);
+  // std::filesystem::path::value_type is wchar_t on Windows, so the path has to
+  // be converted explicitly: passing the path itself does not bind to a
+  // const std::string&.
+  const bool audioReady = audio.Start(assets.string());
   audio.Configure(sim.State().options);
   std::printf("audio: %zu music file(s), %zu sound file(s)\n",
               audio.External().music.size(), audio.External().sfx.size());

@@ -10,6 +10,14 @@
 
 #include <cmath>
 
+// M_PI is a BSD/glibc extension, not standard C++: MSVC's <cmath> leaves it
+// undefined unless _USE_MATH_DEFINES precedes it, and even then only on some
+// releases. The machine's geometry needs pi on every platform, so it is defined
+// here, guarded, rather than relied upon.
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 #include "core/JsNumber.h"
 
 namespace ship {

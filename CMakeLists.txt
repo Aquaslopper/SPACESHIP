@@ -30,14 +30,43 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
+# ---------------------------------------------------------------------------
+# Windows toolchains
+# ---------------------------------------------------------------------------
+# The catalogue is full of UTF-8 (m³, O₂, ×, —, →). MSVC reads sources in the
+# local code page unless told otherwise, so /utf-8 sets both charsets; without
+# it the strings arrive as mojibake. NOMINMAX keeps <windows.h> from defining
+# min/max as macros (which would break every std::min in the port), and
+# WIN32_LEAN_AND_MEAN keeps the sockets/RPC half out of the translation units.
+if(MSVC)
+  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/utf-8>)
+endif()
+if(WIN32)
+  add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
+endif()
+if(MINGW)
+  # A downloadable build must not ask the player for libstdc++-6.dll.
+  add_link_options(-static)
+endif()
+
 option(SPACESHIP_BUILD_GUI   "Build the Raylib + Dear ImGui client" ON)
+# The same switch under the name a release script is likely to pass. Accepting
+# both costs a line and saves a confusing "option ignored" build.
+if(DEFINED SPACESHIP_BUILD_CLIENT)
+  set(SPACESHIP_BUILD_GUI "${SPACESHIP_BUILD_CLIENT}" CACHE BOOL "Build the client" FORCE)
+endif()
 option(SPACESHIP_BUILD_TESTS "Build the CTest suite"               ON)
 option(SPACESHIP_DATA_GATE   "Verify assets/data against Spaceship.hta via node" ON)
 
 include(FetchContent)
 include(CTest)
 
-set(SPACESHIP_ASSETS "${CMAKE_CURRENT_SOURCE_DIR}/assets")
+# What the binary falls back to when neither ./assets nor the folder beside the
+# executable holds the catalogue. Relative by default: a build tree, the tests
+# and a packaged folder all run from a directory that has assets/ in it, and a
+# baked-in absolute path would only ever be right on the machine that built it.
+set(SPACESHIP_ASSETS "assets" CACHE STRING
+    "Asset directory compiled into the binary (relative to the working directory, or absolute)")
 
 # ---------------------------------------------------------------------------
 # Dependencies. Every one is fetched, so a clean checkout needs nothing but a
@@ -54,18 +83,24 @@ FetchContent_Declare(nlohmann_json
 # raylib, Dear ImGui and rlImGui are only fetched when the GUI target is built.
 set(SPACESHIP_GUI_REASON "")
 if(SPACESHIP_BUILD_GUI)
-  if(UNIX AND NOT APPLE)
+  # WIN32 first. A Windows target needs nothing but the compiler (raylib carries
+  # its own GDI/OpenGL backend), and asking a Win32 build for X11 - which the old
+  # UNIX-first order did for every MinGW cross-build - is what made the client
+  # impossible to configure off-Linux.
+  if(WIN32)
+    # nothing to find
+  elseif(APPLE)
+    find_package(OpenGL QUIET)
+    if(NOT OpenGL_FOUND)
+      set(SPACESHIP_GUI_REASON "OpenGL framework not found")
+    endif()
+  else()
     find_package(OpenGL QUIET)
     find_package(X11 QUIET)
     if(NOT OpenGL_FOUND)
       set(SPACESHIP_GUI_REASON "OpenGL development files not found")
     elseif(NOT X11_FOUND)
       set(SPACESHIP_GUI_REASON "X11 development files not found (libx11-dev, libxrandr-dev, libxinerama-dev, libxcursor-dev, libxi-dev)")
-    endif()
-  elseif(APPLE)
-    find_package(OpenGL QUIET)
-    if(NOT OpenGL_FOUND)
-      set(SPACESHIP_GUI_REASON "OpenGL framework not found")
     endif()
   endif()
 endif()
@@ -78,7 +113,11 @@ if(SPACESHIP_BUILD_GUI AND SPACESHIP_GUI_REASON STREQUAL "")
   FetchContent_Declare(imgui
     URL      https://codeload.github.com/ocornut/imgui/tar.gz/refs/tags/v1.92.7
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
-  FetchContent_Declare(rlImGui
+  # Lowercase by contract: FetchContent exposes <name>_SOURCE_DIR with the name
+  # lowercased, so declaring this "rlImGui" left rlImGui_SOURCE_DIR empty and the
+  # client's add_library() pointed at "//rlImGui.cpp". The library target below
+  # keeps its proper name; only the fetch is lowercase.
+  FetchContent_Declare(rlimgui
     URL      https://codeload.github.com/raylib-extras/rlImGui/tar.gz/refs/tags/Raylib_6_0
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
 
@@ -87,7 +126,7 @@ if(SPACESHIP_BUILD_GUI AND SPACESHIP_GUI_REASON STREQUAL "")
   set(CUSTOMIZE_BUILD       OFF CACHE BOOL "" FORCE)
   set(SUPPORT_FILEFORMAT_TTF ON CACHE BOOL "" FORCE)  # the bundled fonts
 
-  FetchContent_MakeAvailable(raylib imgui rlImGui)
+  FetchContent_MakeAvailable(raylib imgui rlimgui)
 elseif(SPACESHIP_BUILD_GUI)
   set(SPACESHIP_GUI OFF)
   message(WARNING
@@ -186,12 +225,12 @@ if(SPACESHIP_GUI)
     "${imgui_SOURCE_DIR}/imgui_draw.cpp"
     "${imgui_SOURCE_DIR}/imgui_tables.cpp"
     "${imgui_SOURCE_DIR}/imgui_widgets.cpp"
-    "${rlImGui_SOURCE_DIR}/rlImGui.cpp")
+    "${rlimgui_SOURCE_DIR}/rlImGui.cpp")
 
   target_include_directories(spaceship_imgui PUBLIC
     "${imgui_SOURCE_DIR}"
-    "${rlImGui_SOURCE_DIR}"
-    "${rlImGui_SOURCE_DIR}/extras")
+    "${rlimgui_SOURCE_DIR}"
+    "${rlimgui_SOURCE_DIR}/extras")
   target_link_libraries(spaceship_imgui PUBLIC raylib)
   set_target_properties(spaceship_imgui PROPERTIES CXX_STANDARD 17)
 
@@ -200,11 +239,21 @@ if(SPACESHIP_GUI)
     cpp/ui/Draw.cpp)
 
   target_link_libraries(spaceship PRIVATE spaceship_core spaceship_imgui raylib)
+  # A double-clicked spaceship.exe must open the game and nothing else. MSVC
+  # needs the Windows subsystem plus mainCRTStartup (the entry point is still
+  # main); MinGW gets the same thing as -mwindows.
   set_target_properties(spaceship PROPERTIES WIN32_EXECUTABLE OFF)
+  if(WIN32 AND MSVC)
+    set_target_properties(spaceship PROPERTIES WIN32_EXECUTABLE ON)
+    target_link_options(spaceship PRIVATE /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup)
+  elseif(MINGW)
+    set_target_properties(spaceship PROPERTIES WIN32_EXECUTABLE ON)
+  endif()
 
   add_custom_command(TARGET spaceship POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${SPACESHIP_ASSETS}" "$<TARGET_FILE_DIR:spaceship>/assets"
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+            "$<TARGET_FILE_DIR:spaceship>/assets"
     COMMENT "Copying assets beside the executable")
 endif()
 
