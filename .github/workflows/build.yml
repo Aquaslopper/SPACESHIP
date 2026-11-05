@@ -14,9 +14,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Prepare CMake and Windows GCC Compatibility
-        shell: bash
+        shell: python
         run: |
-          python3 - << 'EOF'
           import pathlib, re
 
           # 1. CMakeLists.txt fixes for CMake 4.0 + Windows
@@ -38,7 +37,17 @@ jobs:
               txt = txt.replace("const std::string& file)", "std::string file)")
               txt = txt.replace("const std::string& ctx)", "std::string ctx)")
               cat_path.write_text(txt, encoding="utf-8")
-          EOF
+
+          # 3. main.cpp line 318: ensure std::filesystem::path converts to std::string on Windows
+          main_path = pathlib.Path("cpp/app/main.cpp")
+          if main_path.exists():
+              lines = main_path.read_text(encoding="utf-8").splitlines()
+              for i in range(max(0, 310), min(len(lines), 326)):
+                  # Convert e.g. SaveSlotPath(sim, slot) or fs::path args passed to functions taking const std::string&
+                  if ".string()" not in lines[i]:
+                      lines[i] = re.sub(r'(SaveSlotPath\s*\([^)]+\))', r'\1.string()', lines[i])
+                      lines[i] = re.sub(r'([a-zA-Z0-9_]+\.path\(\))', r'\1.string()', lines[i])
+              main_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
       - name: Pre-fetch ImGui & rlImGui sources explicitly
         shell: bash
@@ -67,47 +76,7 @@ jobs:
       - name: Build spaceship.exe
         shell: bash
         run: |
-          if ! cmake --build build-win --target spaceship --parallel 2>&1 | tee build_err.log; then
-            echo "Checking for Windows std::filesystem::path -> std::string implicit conversion..."
-            python3 - << 'EOF'
-            import pathlib, re
-            log = pathlib.Path("build_err.log").read_text(encoding="utf-8", errors="ignore")
-            patched = set()
-            for m in re.finditer(r'([A-Za-z]:/[^\s:]+\.(?:cpp|h)):(\d+):(\d+): error: cannot convert .*path.* to .*basic_string', log):
-                fpath, lno, col = m.group(1), int(m.group(2)), int(m.group(3))
-                if (fpath, lno) in patched:
-                    continue
-                patched.add((fpath, lno))
-                p = pathlib.Path(fpath)
-                lines = p.read_text(encoding="utf-8").splitlines()
-                line = lines[lno - 1]
-                pos = min(max(col - 1, 0), len(line) - 1)
-                # Find argument bounds around pos at paren depth 0
-                l_idx, depth = pos, 0
-                while l_idx > 0:
-                    c = line[l_idx - 1]
-                    if c == ')': depth += 1
-                    elif c == '(':
-                        if depth == 0: break
-                        depth -= 1
-                    elif c in ',;=' and depth == 0: break
-                    l_idx -= 1
-                r_idx, depth = pos, 0
-                while r_idx < len(line):
-                    c = line[r_idx]
-                    if c == '(': depth += 1
-                    elif c == ')':
-                        if depth == 0: break
-                        depth -= 1
-                    elif c in ',;' and depth == 0: break
-                    r_idx += 1
-                expr = line[l_idx:r_idx].strip()
-                lines[lno - 1] = line[:l_idx] + f"({expr}).string()" + line[r_idx:]
-                print(f"Auto-patched {fpath}:{lno} -> {lines[lno - 1]}")
-                p.write_text("\n".join(lines) + "\n", encoding="utf-8")
-            EOF
-            cmake --build build-win --target spaceship --parallel
-          fi
+          cmake --build build-win --target spaceship --parallel
 
       - name: Package Portable Windows Folder
         shell: bash
