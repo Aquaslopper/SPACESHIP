@@ -34,18 +34,16 @@ jobs:
           set -euo pipefail
           cmake --build build-win --target spaceship --parallel
 
-      - name: Package Portable Windows Folder
+      - name: Package portable Windows folder
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p dist/Spaceship/runtime/saves
           cp build-win/spaceship.exe dist/Spaceship/
           cp -r assets dist/Spaceship/
-          for doc in README.md PARITY.md SPAM_AUDIT.md; do
-            [ -f "$doc" ] && cp "$doc" dist/Spaceship/
-          done
+          cp README.md dist/Spaceship/
 
-      - name: Upload Windows EXE Artifact
+      - name: Upload Windows EXE artifact
         uses: actions/upload-artifact@v4
         with:
           name: Spaceship-Windows-x64
