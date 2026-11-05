@@ -36,11 +36,33 @@ namespace audio = ship::audio;
 constexpr int kDefaultWidth = 1440;
 constexpr int kDefaultHeight = 940;
 
-std::filesystem::path AssetDirBesideExecutable(const char* argv0) {
-  std::error_code ec;
-  std::filesystem::path exe = std::filesystem::weakly_canonical(argv0, ec);
-  if (ec) { return {}; }
-  return exe.parent_path() / "assets";
+bool HasCatalog(const std::filesystem::path& assets) {
+  return std::filesystem::exists(assets / "data" / "manifest.json");
+}
+
+std::filesystem::path FindAssetDir() {
+  std::filesystem::path selected;
+  const std::filesystem::path relativeAssets = "assets";
+  if (HasCatalog(relativeAssets)) {
+    std::error_code ec;
+    selected = std::filesystem::absolute(relativeAssets, ec);
+    if (ec) { selected = relativeAssets; }
+  }
+
+  const char* applicationDirectory = GetApplicationDirectory();
+  if (applicationDirectory != nullptr && *applicationDirectory != '\0') {
+    const std::filesystem::path appDir(applicationDirectory);
+    const std::filesystem::path besideExecutable = appDir / "assets";
+    if (selected.empty() && HasCatalog(besideExecutable)) { selected = besideExecutable; }
+
+    // Save slots are relative to the working directory. Explorer may launch an
+    // application with an unrelated current directory, so anchor runtime data
+    // beside the executable before the UI or save system is initialized.
+    std::error_code ec;
+    std::filesystem::current_path(appDir, ec);
+  }
+
+  return selected.empty() ? ship::Catalog::DefaultAssetDir() : selected;
 }
 
 // Prefer the real Windows faces when they are installed, so metrics match the
@@ -229,12 +251,10 @@ class AudioDevice {
 
 int main(int argc, char** argv) {
   (void)argc;
+  (void)argv;
 
   // ---- catalogue ---------------------------------------------------------
-  std::filesystem::path assets = AssetDirBesideExecutable(argv[0]);
-  if (assets.empty() || !std::filesystem::exists(assets / "data" / "manifest.json")) {
-    assets = ship::Catalog::DefaultAssetDir();
-  }
+  const std::filesystem::path assets = FindAssetDir();
 
   ship::Catalog catalog;
   try {
@@ -281,7 +301,7 @@ int main(int argc, char** argv) {
 
   // Sound is optional: a machine without a device keeps a silent, working ship.
   AudioDevice audio;
-  const bool audioReady = audio.Start(assets);
+  const bool audioReady = audio.Start(assets.string());
   audio.Configure(sim.State().options);
   std::printf("audio: %zu music file(s), %zu sound file(s)\n",
               audio.External().music.size(), audio.External().sfx.size());

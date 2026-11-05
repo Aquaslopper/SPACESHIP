@@ -54,7 +54,7 @@ FetchContent_Declare(nlohmann_json
 # raylib, Dear ImGui and rlImGui are only fetched when the GUI target is built.
 set(SPACESHIP_GUI_REASON "")
 if(SPACESHIP_BUILD_GUI)
-  if(UNIX AND NOT APPLE)
+  if(UNIX AND NOT APPLE AND NOT WIN32)
     find_package(OpenGL QUIET)
     find_package(X11 QUIET)
     if(NOT OpenGL_FOUND)
@@ -88,6 +88,20 @@ if(SPACESHIP_BUILD_GUI AND SPACESHIP_GUI_REASON STREQUAL "")
   set(SUPPORT_FILEFORMAT_TTF ON CACHE BOOL "" FORCE)  # the bundled fonts
 
   FetchContent_MakeAvailable(raylib imgui rlImGui)
+
+  # FetchContent's SOURCE_DIR spelling has varied with declaration casing
+  # across CMake releases. Resolve both spellings before forming source paths.
+  set(SPACESHIP_IMGUI_SOURCE_DIR "${IMGUI_SOURCE_DIR}")
+  if(NOT SPACESHIP_IMGUI_SOURCE_DIR)
+    set(SPACESHIP_IMGUI_SOURCE_DIR "${imgui_SOURCE_DIR}")
+  endif()
+  set(SPACESHIP_RLIMGUI_SOURCE_DIR "${RLIMGUI_SOURCE_DIR}")
+  if(NOT SPACESHIP_RLIMGUI_SOURCE_DIR)
+    set(SPACESHIP_RLIMGUI_SOURCE_DIR "${rlimgui_SOURCE_DIR}")
+  endif()
+  if(NOT SPACESHIP_IMGUI_SOURCE_DIR OR NOT SPACESHIP_RLIMGUI_SOURCE_DIR)
+    message(FATAL_ERROR "Spaceship: FetchContent did not provide ImGui/rlImGui source directories")
+  endif()
 elseif(SPACESHIP_BUILD_GUI)
   set(SPACESHIP_GUI OFF)
   message(WARNING
@@ -162,7 +176,7 @@ add_library(spaceship_core STATIC
 target_include_directories(spaceship_core PUBLIC cpp)
 target_link_libraries(spaceship_core PUBLIC spaceship_json)
 target_compile_definitions(spaceship_core PUBLIC
-  SPACESHIP_ASSET_DIR="${SPACESHIP_ASSETS}")
+  SPACESHIP_ASSET_DIR=\"assets\")
 
 if(MSVC)
   target_compile_options(spaceship_core PRIVATE /W4 /permissive-)
@@ -182,16 +196,16 @@ target_link_libraries(spaceship_console PRIVATE spaceship_core)
 # ---------------------------------------------------------------------------
 if(SPACESHIP_GUI)
   add_library(spaceship_imgui STATIC
-    "${imgui_SOURCE_DIR}/imgui.cpp"
-    "${imgui_SOURCE_DIR}/imgui_draw.cpp"
-    "${imgui_SOURCE_DIR}/imgui_tables.cpp"
-    "${imgui_SOURCE_DIR}/imgui_widgets.cpp"
-    "${rlImGui_SOURCE_DIR}/rlImGui.cpp")
+    "${SPACESHIP_IMGUI_SOURCE_DIR}/imgui.cpp"
+    "${SPACESHIP_IMGUI_SOURCE_DIR}/imgui_draw.cpp"
+    "${SPACESHIP_IMGUI_SOURCE_DIR}/imgui_tables.cpp"
+    "${SPACESHIP_IMGUI_SOURCE_DIR}/imgui_widgets.cpp"
+    "${SPACESHIP_RLIMGUI_SOURCE_DIR}/rlImGui.cpp")
 
   target_include_directories(spaceship_imgui PUBLIC
-    "${imgui_SOURCE_DIR}"
-    "${rlImGui_SOURCE_DIR}"
-    "${rlImGui_SOURCE_DIR}/extras")
+    "${SPACESHIP_IMGUI_SOURCE_DIR}"
+    "${SPACESHIP_RLIMGUI_SOURCE_DIR}"
+    "${SPACESHIP_RLIMGUI_SOURCE_DIR}/extras")
   target_link_libraries(spaceship_imgui PUBLIC raylib)
   set_target_properties(spaceship_imgui PROPERTIES CXX_STANDARD 17)
 
