@@ -566,6 +566,33 @@ signal story's two endings (`finishSignal`) and the broadcasts they unlock, clai
 the rank it feeds, and the crew order sheet's remaining payloads (a rest is the only order the clock can create on
 its own). All three are state-complete and save-compatible; they are waiting for their UI.
 
+### Phase 6 — Stations, stores and the floating popups — DONE
+
+`ui/StationScreen` is the port window: five columns over the authored tables —
+the market (five fixed-price stores and every commodity at `ceil(value * 1.2)`,
+gated on purse and hold space), the sales counter (lots at their own price,
+contract freight refused by name, survey records at value), the mission board
+(all 18 contracts with their status tags, the origin and volume gates, and the
+payout on collection), the yard (the Wren's trade-up notice, the 4,000-shiplet
+Kestrel purchase, the five refits, the station hull service and the five
+candidates with their berth and purse gates) and the tavern (the port's own tip,
+the training note and the departure). `ui/StoresScreen` is the hold and the lab:
+the capacity sentence, the three salvage bays (a crossing only, 4% energy, two
+actions of work, 3 m3 reserved), jettison rows that name the contract they would
+fail, and survey records that package in one action plus two of work before they
+can be sold. `ui/Popups` builds the four floating panels Section K pins to the
+foot — the manifest (crew and compartments), the log newest-first, the three
+independent save slots with their summaries, and the settings sheet whose
+buttons name what the click will do — and `PressPopupAction` keeps every one of
+them free. The app paints them over whatever is behind, stepping each new card
+by `(popups % 5) * 22`, and asks the reader's own confirmation question before a
+jettison or the Kestrel purchase when `confirmRisk` is on. `station_tests` covers
+the columns, the prices, the board's three states, hiring, the refits, the trade
+and the transfer, the hold, the bays, the lab, every popup, the three slots with
+a corrupt file rolled back, and the router; `voyage-13` replays a station visit,
+a mid-crossing salvage, a packaging, a hire and a preference sweep against the
+reference with all eleven traces identical.
+
 ### Phase 5 — Crew quarters and the crew records — DONE
 
 `data/crew-art.json` now carries the sprite tables out of the reference verbatim

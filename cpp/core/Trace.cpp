@@ -214,6 +214,20 @@ std::string Simulation::TraceJson() const {
   out["cargo"] = Json{{"capacity", Num(cargo_.capacity)},
                       {"used", Num(CargoUsed())},
                       {"reserved", Num(CargoReserved())}};
+  // Phase 6: preferences travel in the trace because the settings popup is a
+  // free control, and a free control still has to agree between editions.
+  {
+    Json options = Json::object();
+    options["largeText"] = state_.options.largeText;
+    options["confirmRisk"] = state_.options.confirmRisk;
+    options["hideCrewLabels"] = state_.options.hideCrewLabels;
+    options["theme"] = state_.options.theme;
+    options["soundEffects"] = state_.options.soundEffects;
+    options["music"] = state_.options.music;
+    options["audioLevel"] = Num(state_.options.audioLevel);
+    out["options"] = options;
+    out["reducedMotion"] = state_.reducedMotion;
+  }
 
   {
     Json contracts = Json::object();

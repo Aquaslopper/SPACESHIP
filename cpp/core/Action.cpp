@@ -197,6 +197,17 @@ Simulation Simulation::NewVoyage(const Catalog& catalog) {
   return sim;
 }
 
+void Simulation::RestartVoyage() {
+  // The reference re-applies its boot snapshot and then puts the preferences
+  // back; a fresh intentional voyage is the same thing from the outside.
+  const Options options = state_.options;
+  const bool motion = state_.reducedMotion;
+  const Catalog catalog = catalog_;
+  *this = Simulation::NewVoyage(catalog);
+  state_.options = options;
+  state_.reducedMotion = motion;
+}
+
 void Simulation::PerformAction(const std::string& detail) {
   if (!state_.gameOver.empty()) { return; }
 

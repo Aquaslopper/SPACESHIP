@@ -97,6 +97,7 @@ struct CommandRowView {
   std::string category;
   bool enabled = false;
   bool live = false;        // a `live()` action, wired to something
+  std::string confirm;      // asked first when the reader keeps confirmations on
   bool actionCost = true;
   bool coolingDown = false;
   double remaining = 0.0;
@@ -174,6 +175,13 @@ struct TaskScreenModel {
   std::vector<CommandRowView> commands;  // the generic frame's action rows
   std::string bandNote;
   bool hasStage = false;
+
+  // Free-standing columns: the station and the stores are lists of command
+  // rows under a heading, not a stage with panels around it. The ids travel
+  // beside the rows so a click can be dispatched without parsing a label.
+  std::vector<NavPanel> panels;
+  std::vector<std::vector<CommandRowView>> panelRows;
+  std::vector<std::vector<std::string>> panelRowIds;
 };
 
 // The generic path: a described target that owns no bespoke screen.
@@ -181,7 +189,7 @@ TaskScreenModel BuildDescribedScreen(const Simulation& sim, const Description& d
 
 // Which builder a tab would use. Phase 3 owns the three machine rooms; every
 // other window still opens on the described frame until its own phase.
-enum class ScreenKind { Described, Nav, Engine, O2, Mess, Quarters, CrewRecord, Deferred };
+enum class ScreenKind { Described, Nav, Engine, O2, Mess, Quarters, CrewRecord, Station, Cargo, Science, Deferred };
 ScreenKind ScreenKindFor(const Tab& tab);
 TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab);
 

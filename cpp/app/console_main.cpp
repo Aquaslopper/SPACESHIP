@@ -45,6 +45,7 @@
 
 #include "core/Simulation.h"
 #include "data/Catalog.h"
+#include "ui/Popups.h"
 
 namespace {
 
@@ -156,6 +157,20 @@ int main(int argc, char** argv) {
         if (crew.id != parts[1]) { continue; }
         const std::string said = simulation.AskCrew(crew);
         simulation.LogLine(crew.name + ": \"" + said + "\"");
+      }
+    } else if (command == "option" && parts.size() >= 2) {
+      // The settings popup's own free paths, so a script drives the same rows
+      // a reader would press.
+      if (parts[1] == "theme" || parts[1] == "audio") {
+        if (parts.size() < 3) { continue; }
+        std::string message;
+        ship::PressPopupAction(simulation, "settings",
+                               parts[1] == "theme" ? "theme" : "audio", parts[2],
+                               "runtime/saves", &message);
+      } else {
+        std::string message;
+        ship::PressPopupAction(simulation, "settings", "toggle", parts[1],
+                               "runtime/saves", &message);
       }
     } else if (command == "layer" && parts.size() >= 2) {
       simulation.SetLayer(parts[1]);

@@ -110,8 +110,10 @@ std::vector<SpritePixel> Rasterise(const Simulation& sim, const CrewMember& crew
       const char ch = row[q];
       if (ch == '.') { continue; }
       SpritePixel pixel;
-      pixel.box = Area{ox + static_cast<double>(q) * px,
-                       oy + static_cast<double>(r) * px, px, px};
+      const float x = static_cast<float>(ox + static_cast<double>(q) * px);
+      const float y = static_cast<float>(oy + static_cast<double>(r) * px);
+      const float size = static_cast<float>(px);
+      pixel.box = Area{x, y, size, size};
       pixel.colour = PixelColour(sim, crew, look, ch);
       pixels.push_back(pixel);
     }

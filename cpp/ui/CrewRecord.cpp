@@ -34,7 +34,7 @@ std::string GenderWord(const std::string& sex) {
 namespace {
 
 // One vital: the number, the bar, and the word that agrees with the tone.
-void AddVital(NavPanel& panel, const Simulation& sim, const std::string& label,
+void AddVital(NavPanel& panel, const Simulation& /*sim*/, const std::string& label,
               double value, bool bad, const std::vector<std::string>& words) {
   panel.Field(label, js::NumToString(value) + "%  " + VitalWord(value, bad, words));
   const double good = bad ? 100.0 - value : value;

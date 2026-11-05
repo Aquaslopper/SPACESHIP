@@ -25,32 +25,6 @@ std::string ShortRole(const std::string& role) {
   const std::size_t cut = role.find(" /");
   return cut != std::string::npos && cut > 0 ? role.substr(0, cut) : role;
 }
-
-std::string BodyName(const Simulation& sim, const std::string& id) {
-  const Body* const body = sim.FindBodyById(id);
-  return body != nullptr ? body->name : id;
-}
-
-std::string CommissionDescription(const Simulation& sim, const Commission& active) {
-  const Body* const body = sim.FindBodyById(active.target);
-  std::string where;
-  if (body != nullptr) {
-    const Body* const system = sim.FindBodyById(body->system);
-    if (system != nullptr) {
-      where = " (" + system->name;
-      const Body* const region = sim.FindBodyById(system->region);
-      if (region != nullptr) { where += ", " + region->name; }
-      where += ")";
-    }
-  }
-  if (active.kind == "visit") { return "Visit " + BodyName(sim, active.target) + where; }
-  if (active.kind == "scan") {
-    return "Read a deep scan of " + BodyName(sim, active.target) + where;
-  }
-  return "Recover two salvage lots while under way";
-}
-
-double CommissionGoal(const std::string& kind) { return kind == "salvage" ? 2.0 : 1.0; }
 }  // namespace
 
 // ---------------------------------------------------------------------------

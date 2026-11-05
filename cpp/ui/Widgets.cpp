@@ -18,7 +18,10 @@
 #include "ui/MessScreen.h"
 #include "ui/CrewRecord.h"
 #include "ui/NavScreen.h"
+#include "ui/Popups.h"
 #include "ui/QuartersScreen.h"
+#include "ui/StationScreen.h"
+#include "ui/StoresScreen.h"
 #include "ui/O2Screen.h"
 
 namespace ship {
@@ -369,6 +372,9 @@ ScreenKind ScreenKindFor(const Tab& tab) {
   // A crew tab is a read-only record, and a room tab for the quarters is the
   // order sheet. Neither is a room screen in the machine sense.
   if (tab.kind == "crew") { return ScreenKind::CrewRecord; }
+  if (tab.kind == "station") { return ScreenKind::Station; }
+  if (tab.kind == "room" && tab.id == "cargo") { return ScreenKind::Cargo; }
+  if (tab.kind == "room" && tab.id == "science") { return ScreenKind::Science; }
   if (tab.kind == "room" && tab.id == "quarters") { return ScreenKind::Quarters; }
   if (tab.kind != "room") { return ScreenKind::Described; }
   if (tab.id == "engine") { return ScreenKind::Engine; }
@@ -377,9 +383,7 @@ ScreenKind ScreenKindFor(const Tab& tab) {
   // Cargo, science, the fitted systems, the bridge and the quarters each have a
   // window of their own in a later phase; until then they open on the house
   // frame rather than on nothing.
-  if (tab.id == "cargo" || tab.id == "science") {
-    return ScreenKind::Deferred;
-  }
+
   for (const std::string& glyph : SceneGlyphs()) { (void)glyph; }
   if (tab.id == "bridge") { return ScreenKind::Deferred; }
   return ScreenKind::Described;
@@ -389,6 +393,65 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab) {
   switch (ScreenKindFor(tab)) {
     case ScreenKind::Nav: return BuildNavScreen(sim).screen;
     case ScreenKind::Quarters: return BuildQuartersScreen(sim).screen;
+    case ScreenKind::Station: {
+      const StationScreenModel station = BuildStationScreen(sim, tab.id);
+      TaskScreenModel screen;
+      screen.head = station.head;
+      for (const StationColumn& column : station.columns) {
+        NavPanel panel;
+        panel.id = "station-panel";
+        panel.title = column.title;
+        for (const std::string& note : column.notes) { panel.Dim(note); }
+        screen.panels.push_back(panel);
+        std::vector<CommandRowView> rows;
+        std::vector<std::string> ids;
+        for (const StationRow& row : column.rows) {
+          CommandRowView view;
+          view.label = row.label;
+          view.cost = row.cost;
+          view.displayCost = row.cost.empty() ? "1 action" : row.cost;
+          view.enabled = row.enabled;
+          view.live = row.enabled;
+          view.confirm = row.confirm;
+          rows.push_back(view);
+          ids.push_back(row.id);
+        }
+        screen.panelRows.push_back(rows);
+        screen.panelRowIds.push_back(ids);
+      }
+      return screen;
+    }
+    case ScreenKind::Cargo:
+    case ScreenKind::Science: {
+      const StoresScreenModel stores = BuildStoresScreen(sim, tab.kind == "room" ? tab.id : "cargo");
+      TaskScreenModel screen;
+      screen.head = stores.head;
+      NavPanel panel;
+      panel.id = "stores-panel";
+      panel.title = stores.cargo ? "Cargo manifest" : "Survey records";
+      panel.Note(stores.notice);
+      if (!stores.hint.empty()) { panel.Note(stores.hint); }
+      panel.Dim(stores.tally);
+      screen.panels.push_back(panel);
+      std::vector<CommandRowView> rows;
+      std::vector<std::string> ids;
+      for (const StoreRowView& row : stores.rows) {
+        CommandRowView view;
+        view.label = row.label;
+        view.cost = row.cost;
+        view.displayCost = row.cost.empty() ? "1 action" : row.cost;
+        view.enabled = row.enabled;
+        view.live = row.enabled;
+        view.confirm = row.confirm;
+        rows.push_back(view);
+        ids.push_back(row.id);
+      }
+      screen.panelRows.push_back(rows);
+      screen.panelRowIds.push_back(ids);
+      screen.progress = stores.buttons;
+      screen.hasStage = false;
+      return screen;
+    }
     case ScreenKind::CrewRecord: {
       // The record's four shelves are the whole window.
       const CrewRecordModel record = BuildCrewRecord(sim, tab.id);

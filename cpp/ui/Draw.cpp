@@ -96,6 +96,13 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
     screenNav_ = kind == ScreenKind::Nav;
     screenQuarters_ = kind == ScreenKind::Quarters;
     screenRecord_ = kind == ScreenKind::CrewRecord;
+    screenPanels_ = kind == ScreenKind::Station || kind == ScreenKind::Cargo ||
+                    kind == ScreenKind::Science;
+    panelsKind_ = kind;
+    if (taskTabKey_ != sim.State().activeTab) {
+      pendingConfirm_.clear();
+      pendingAction_.clear();
+    }
     taskTabKey_ = sim.State().activeTab;
     taskScreen_ = BuildTabScreen(sim, *FindTab(sim.State(), taskTabKey_));
     if (screenNav_) {
@@ -107,11 +114,14 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
     } else if (screenRecord_) {
       record_ = BuildCrewRecord(sim, tab->id);
       PaintCrewRecord(sim);
+    } else if (screenPanels_) {
+      PaintPanelsScreen(sim);
     } else {
       PaintTaskScreen(sim);
     }
   }
   PaintChrome(sim);
+  if (!popupKey_.empty()) { PaintPopup(sim); }
 
   // Action marks last, over everything, because they are the player's hand.
   for (const ActionMark& mark : marks_) {
@@ -927,6 +937,316 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
   (void)sim;
 }
 
+
+// ============================================================================
+//  Station and stores: free-standing columns of command rows. The layout is a
+//  plain even split - the reference does the same - and every row is a hit box
+//  whose id comes from the view-model, never from the label.
+// ============================================================================
+void ShellView::PaintPanelsScreen(Simulation& sim) {
+  navHits_.clear();
+  taskButtons_.clear();
+  const Palette& p = theme_.palette;
+  const TaskScreenModel& screen = taskScreen_;
+  const float left = layout_.content.x + 8.0f;
+  const float right = layout_.content.Right() - 8.0f;
+
+  DrawText(screen.head.kind.c_str(), static_cast<int>(left),
+           static_cast<int>(layout_.content.y), 9, ToRay(p.muted));
+  DrawText(screen.head.title.c_str(), static_cast<int>(left),
+           static_cast<int>(layout_.content.y + 12.0f), 20, ToRay(p.ink));
+  DrawText(screen.head.sub.c_str(), static_cast<int>(left),
+           static_cast<int>(layout_.content.y + 36.0f), 11, ToRay(p.muted));
+
+  const float top = layout_.content.y + 56.0f;
+  const float bottom = layout_.content.Bottom() - 104.0f;
+  const std::size_t count = screen.panels.empty() ? 1 : screen.panels.size();
+  const float gap = 8.0f;
+  const float columnW = (right - left - gap * static_cast<float>(count - 1)) /
+                        static_cast<float>(count);
+
+  for (std::size_t i = 0; i < screen.panels.size(); ++i) {
+    const float x = left + static_cast<float>(i) * (columnW + gap);
+    const NavPanel& panel = screen.panels[i];
+    float noteH = 34.0f;
+    for (const PanelLine& line : panel.lines) {
+      noteH += 12.0f * static_cast<float>(1 + line.value.size() / 30);
+    }
+    PaintPanel(panel, Area{x, top, columnW, noteH});
+
+    float y = top + noteH + 6.0f;
+    if (i < screen.panelRows.size()) {
+      for (std::size_t r = 0; r < screen.panelRows[i].size(); ++r) {
+        if (y + 24.0f > bottom) { break; }
+        const CommandRowView& row = screen.panelRows[i][r];
+        const Area box{x, y, columnW, 22.0f};
+        DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                      static_cast<int>(box.w), static_cast<int>(box.h),
+                      ToRay(row.enabled ? p.panel2 : p.panel3));
+        DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                           static_cast<int>(box.w), static_cast<int>(box.h),
+                           ToRay(row.enabled ? p.borderDark : p.border));
+        const std::string cost = row.displayCost.empty() ? std::string("free")
+                                                         : row.displayCost;
+        const float costW = static_cast<float>(MeasureText(cost.c_str(), 9));
+        const std::string label = row.label;
+        std::string shown = label;
+        while (!shown.empty() &&
+               static_cast<float>(MeasureText(shown.c_str(), 10)) >
+                   columnW - costW - 26.0f) {
+          shown.pop_back();
+        }
+        DrawText(shown.c_str(), static_cast<int>(box.x + 6.0f),
+                 static_cast<int>(box.y + 6.0f), 10,
+                 ToRay(row.enabled ? p.ink : p.muted));
+        DrawText(cost.c_str(), static_cast<int>(box.Right() - 6.0f - costW),
+                 static_cast<int>(box.y + 6.0f), 9,
+                 ToRay(row.enabled ? p.coffee : p.muted));
+        if (row.enabled && i < screen.panelRowIds.size() &&
+            r < screen.panelRowIds[i].size()) {
+          navHits_.push_back(NavHit{box, "row", screen.panelRowIds[i][r]});
+        }
+        y += 25.0f;
+      }
+    }
+  }
+
+  // The action band: salvage and packaging buttons, and the clocks left.
+  const float bandY = layout_.content.Bottom() - 96.0f;
+  DrawRectangle(static_cast<int>(left), static_cast<int>(bandY),
+                static_cast<int>(right - left), 90, ToRay(p.panel));
+  DrawRectangleLines(static_cast<int>(left), static_cast<int>(bandY),
+                     static_cast<int>(right - left), 90, ToRay(p.border));
+  if (!pendingConfirm_.empty()) {
+    DrawText(pendingConfirm_.c_str(), static_cast<int>(left + 8.0f),
+             static_cast<int>(bandY + 24.0f), 10, ToRay(p.terracotta));
+    const struct {
+      const char* action;
+      const char* label;
+    } answers[] = {{"confirm-yes", "Yes, do it"}, {"confirm-no", "Keep as it is"}};
+    float ax = left + 12.0f;
+    for (const auto& entry : answers) {
+      const float aw = static_cast<float>(MeasureText(entry.label, 10)) + 20.0f;
+      const Area box{ax, bandY + 46.0f, aw, 24.0f};
+      DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                         static_cast<int>(box.w), static_cast<int>(box.h),
+                         ToRay(p.borderDark));
+      DrawText(entry.label, static_cast<int>(box.x + 8.0f),
+               static_cast<int>(box.y + 7.0f), 10, ToRay(p.ink));
+      navHits_.push_back(NavHit{box, entry.action, ""});
+      ax += aw + 8.0f;
+    }
+  }
+
+  DrawText("Work in progress", static_cast<int>(left + 8.0f),
+           static_cast<int>(bandY + 5.0f), 11, ToRay(p.coffee));
+  DrawText(screen.bandNote.c_str(), static_cast<int>(left + 8.0f),
+           static_cast<int>(bandY + 20.0f), 10, ToRay(p.muted));
+  float bx = left + 12.0f;
+  for (const ProgressButton& button : screen.progress) {
+    const Area box{bx, bandY + 50.0f, 190.0f, 28.0f};
+    DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                  static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel2));
+    if (button.fillPercent > 0.0) {
+      DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                    static_cast<int>(box.w * button.fillPercent / 100.0),
+                    static_cast<int>(box.h), ToRay(p.white));
+    }
+    DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                       static_cast<int>(box.w), static_cast<int>(box.h),
+                       ToRay(p.borderDark));
+    DrawText(button.text.c_str(), static_cast<int>(box.x + 8.0f),
+             static_cast<int>(box.y + 8.0f), 10,
+             ToRay(button.state == ButtonState::Cooldown ? p.terracotta : p.ink));
+    taskButtons_.push_back({box, button.taskId});
+    bx += 198.0f;
+  }
+  (void)sim;
+}
+
+// ============================================================================
+//  The floating popups (Section K). They never replace the window: a veil and
+//  a card float over whatever is behind, and every control inside is free.
+//  Successive popups step down and right by (count % 5) * 22, as in the
+//  reference, so the reader can see one behind another.
+// ============================================================================
+void ShellView::PaintPopup(Simulation& sim) {
+  popupHits_.clear();
+  const Palette& p = theme_.palette;
+  popup_ = BuildPopup(sim, popupKey_, saveDir_);
+  if (!popupMessage_.empty()) { popup_.message = popupMessage_; }
+
+  const float off = static_cast<float>(popupCount_ % 5) * 22.0f;
+  const float w = std::min(520.0f, width_ - 60.0f);
+  const float h = std::min(430.0f, height_ - 100.0f);
+  const float x = 300.0f + off;
+  const float y = 90.0f + off;
+  const Area card{x, y, w, h};
+
+  DrawRectangle(static_cast<int>(card.x + 6.0f), static_cast<int>(card.y + 6.0f),
+                static_cast<int>(card.w), static_cast<int>(card.h), ToRay(p.border));
+  DrawRectangle(static_cast<int>(card.x), static_cast<int>(card.y),
+                static_cast<int>(card.w), static_cast<int>(card.h), ToRay(p.panel));
+  DrawRectangleLines(static_cast<int>(card.x), static_cast<int>(card.y),
+                     static_cast<int>(card.w), static_cast<int>(card.h),
+                     ToRay(p.borderDark));
+  DrawRectangle(static_cast<int>(card.x), static_cast<int>(card.y),
+                static_cast<int>(card.w), 24, ToRay(p.panel2));
+  DrawText(popup_.title.c_str(), static_cast<int>(card.x + 8.0f),
+           static_cast<int>(card.y + 6.0f), 12, ToRay(p.ink));
+  const Area closeBox{card.Right() - 26.0f, card.y + 3.0f, 20.0f, 18.0f};
+  DrawText("x", static_cast<int>(closeBox.x + 7.0f),
+           static_cast<int>(closeBox.y + 3.0f), 12, ToRay(p.muted));
+  popupHits_.push_back(NavHit{closeBox, "close", ""});
+
+  float cy = card.y + 30.0f;
+  const float pad = 10.0f;
+  if (!popup_.notice.empty()) {
+    DrawText(popup_.notice.c_str(), static_cast<int>(card.x + pad),
+             static_cast<int>(cy), 9, ToRay(p.muted));
+    cy += 12.0f * static_cast<float>(1 + popup_.notice.size() / 74);
+  }
+
+  for (const PopupSection& section : popup_.sections) {
+    DrawText(section.title.c_str(), static_cast<int>(card.x + pad),
+             static_cast<int>(cy), 10, ToRay(p.coffee));
+    cy += 14.0f;
+    for (const PopupRow& row : section.rows) {
+      if (cy + 14.0f > card.Bottom() - 8.0f) { break; }
+      DrawText(row.key.c_str(), static_cast<int>(card.x + pad),
+               static_cast<int>(cy), 10, ToRay(p.ink));
+      const float valueW = static_cast<float>(MeasureText(row.value.c_str(), 9));
+      DrawText(row.value.c_str(),
+               static_cast<int>(card.Right() - pad - valueW),
+               static_cast<int>(cy + 1.0f), 9, ToRay(p.muted));
+      cy += 13.0f;
+    }
+    cy += 6.0f;
+  }
+
+  int shownLines = 0;
+  for (const std::string& line : popup_.lines) {
+    if (cy + 13.0f > card.Bottom() - 8.0f) { break; }
+    std::string text = line;
+    if (text.size() > 84) { text = text.substr(0, 84) + "..."; }
+    DrawText(text.c_str(), static_cast<int>(card.x + pad), static_cast<int>(cy), 9,
+             ToRay(p.ink));
+    cy += 12.0f;
+    ++shownLines;
+  }
+  if (shownLines > 0 && shownLines < static_cast<int>(popup_.lines.size())) {
+    const std::string more = "Older entries are folded away.";
+    DrawText(more.c_str(), static_cast<int>(card.x + pad), static_cast<int>(cy + 2.0f),
+             9, ToRay(p.muted));
+  }
+
+  for (const PopupToggle& toggle : popup_.toggles) {
+    const Area box{card.x + pad, cy, card.w - pad * 2.0f, 22.0f};
+    DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                  static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel2));
+    DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                       static_cast<int>(box.w), static_cast<int>(box.h),
+                       ToRay(p.borderDark));
+    DrawText(toggle.label.c_str(), static_cast<int>(box.x + 6.0f),
+             static_cast<int>(box.y + 6.0f), 10, ToRay(p.ink));
+    popupHits_.push_back(NavHit{box, "toggle", toggle.id});
+    cy += 24.0f;
+  }
+
+  if (!popup_.themes.empty()) {
+    float tx = card.x + pad;
+    for (std::size_t i = 0; i < popup_.themes.size(); ++i) {
+      const std::string& key = popup_.themes[i];
+      const bool active = key == popup_.theme;
+      const float tw = static_cast<float>(
+          MeasureText(popup_.themeLabels[i].c_str(), 9)) + 16.0f;
+      const Area box{tx, cy, tw, 20.0f};
+      DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                    static_cast<int>(box.w), static_cast<int>(box.h),
+                    ToRay(active ? p.white : p.panel3));
+      DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                         static_cast<int>(box.w), static_cast<int>(box.h),
+                         ToRay(active ? p.coffee : p.border));
+      DrawText(popup_.themeLabels[i].c_str(), static_cast<int>(box.x + 8.0f),
+               static_cast<int>(box.y + 5.0f), 9, ToRay(p.ink));
+      popupHits_.push_back(NavHit{box, "theme", key});
+      tx += tw + 6.0f;
+    }
+    cy += 26.0f;
+  }
+
+  for (const PopupSlot& slot : popup_.slots) {
+    const bool active = slot.slot == popupSlot_;
+    const Area box{card.x + pad, cy, card.w - pad * 2.0f, 30.0f};
+    DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                  static_cast<int>(box.w), static_cast<int>(box.h),
+                  ToRay(active ? p.white : p.panel2));
+    DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                       static_cast<int>(box.w), static_cast<int>(box.h),
+                       ToRay(active ? p.coffee : p.border));
+    DrawText(slot.label.c_str(), static_cast<int>(box.x + 6.0f),
+             static_cast<int>(box.y + 4.0f), 10, ToRay(p.ink));
+    DrawText(slot.summary.c_str(), static_cast<int>(box.x + 6.0f),
+             static_cast<int>(box.y + 17.0f), 9, ToRay(p.muted));
+    popupHits_.push_back(
+        NavHit{box, "slot", std::to_string(slot.slot)});
+    cy += 33.0f;
+  }
+
+  if (!popup_.slots.empty()) {
+    const struct {
+      const char* action;
+      const char* label;
+    } buttons[] = {{"save", "Save voyage"},
+                   {"load", "Load voyage"},
+                   {"new-voyage", "Start a new voyage"}};
+    float bx = card.x + pad;
+    for (const auto& entry : buttons) {
+      const float bw = static_cast<float>(MeasureText(entry.label, 10)) + 22.0f;
+      const Area box{bx, cy, bw, 24.0f};
+      DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                    static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel2));
+      DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                         static_cast<int>(box.w), static_cast<int>(box.h),
+                         ToRay(p.borderDark));
+      DrawText(entry.label, static_cast<int>(box.x + 8.0f),
+               static_cast<int>(box.y + 7.0f), 10, ToRay(p.ink));
+      popupHits_.push_back(NavHit{box, entry.action, std::to_string(popupSlot_)});
+      bx += bw + 6.0f;
+    }
+    cy += 30.0f;
+  }
+
+  if (confirmNewVoyage_) {
+    DrawText("Start a new voyage? Unsaved progress will be lost; saved slots are kept.",
+             static_cast<int>(card.x + pad), static_cast<int>(cy), 9,
+             ToRay(p.terracotta));
+    cy += 14.0f;
+    const struct {
+      const char* action;
+      const char* label;
+    } answers[] = {{"new-voyage-yes", "Begin again"}, {"new-voyage-no", "Keep this voyage"}};
+    float bx = card.x + pad;
+    for (const auto& entry : answers) {
+      const float bw = static_cast<float>(MeasureText(entry.label, 10)) + 22.0f;
+      const Area box{bx, cy, bw, 22.0f};
+      DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                         static_cast<int>(box.w), static_cast<int>(box.h),
+                         ToRay(p.borderDark));
+      DrawText(entry.label, static_cast<int>(box.x + 8.0f),
+               static_cast<int>(box.y + 6.0f), 10, ToRay(p.ink));
+      popupHits_.push_back(NavHit{box, entry.action, ""});
+      bx += bw + 6.0f;
+    }
+    cy += 24.0f;
+  }
+
+  if (!popup_.message.empty()) {
+    DrawText(popup_.message.c_str(), static_cast<int>(card.x + pad),
+             static_cast<int>(card.Bottom() - 16.0f), 9, ToRay(p.coffee));
+  }
+}
+
 void ShellView::PaintDiagram(const DiagramModel& diagram) {
   const ::Color frame = ToRay(theme_.palette.coffee);
   const ::Color hull = ToRay(Rgb{253, 251, 247});
@@ -1032,6 +1352,39 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
                       double nowMs) {
   if (button == HitButton::None) { return; }
 
+  // A floating popup covers the window: it is the topmost thing, and it is
+  // free. Closing it puts the reader back exactly where they were.
+  if (!popupKey_.empty()) {
+    for (const NavHit& hit : popupHits_) {
+      if (!hit.box.Contains(x, y)) { continue; }
+      if (hit.action == "close") { ClosePopup(); return; }
+      if (hit.action == "slot") { popupSlot_ = std::stoi(hit.arg); return; }
+      if (hit.action == "new-voyage") { confirmNewVoyage_ = true; return; }
+      if (hit.action == "new-voyage-no") {
+        confirmNewVoyage_ = false;
+        popupMessage_.clear();
+        return;
+      }
+      if (hit.action == "new-voyage-yes") {
+        confirmNewVoyage_ = false;
+        std::string message;
+        PressPopupAction(sim, popupKey_, "new-voyage", hit.arg, saveDir_, &message);
+        popupMessage_ = message;
+        popupSlot_ = 1;
+        return;
+      }
+      std::string message;
+      const bool changed = PressPopupAction(sim, popupKey_, hit.action, hit.arg,
+                                            saveDir_, &message);
+      popupMessage_ = message;
+      (void)changed;
+      // A preference takes effect on the next paint: the app re-reads the
+      // options and reconfigures the theme every frame.
+      return;
+    }
+    return;  // clicks outside a popup card do not reach the ship
+  }
+
   // Chrome first: the sidebar (blocks, events, foot), Home, then the ship.
   for (const SideHit& hit : SideHits(sim, layout_.sidepanel, layout_.sidefoot,
                                      theme_.LineHeight())) {
@@ -1051,11 +1404,16 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         OpenTask(sim, "awards", "main", true);
         return;
       case SideAction::Manifest:
+        OpenPopup("manifest");
+        return;
       case SideAction::Log:
+        OpenPopup("log");
+        return;
       case SideAction::Files:
+        OpenPopup("files");
+        return;
       case SideAction::Settings:
-        // These four open the ship's own windows in Phase 6; until then they
-        // answer their tooltip and nothing else.
+        OpenPopup("settings");
         return;
       case SideAction::None:
         break;
@@ -1075,6 +1433,47 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
     return;
   }
   if (screenRecord_) { return; }
+
+  // Station and stores: each command row carries its own action id.
+  if (screenPanels_) {
+    for (const NavHit& hit : navHits_) {
+      if (!hit.box.Contains(x, y)) { continue; }
+      if (hit.action == "confirm-no") { pendingConfirm_.clear(); pendingAction_.clear(); return; }
+      if (hit.action == "confirm-yes") {
+        const std::string action = pendingAction_;
+        pendingConfirm_.clear();
+        pendingAction_.clear();
+        const bool acted =
+            panelsKind_ == ScreenKind::Station
+                ? PressStationAction(sim, action, "")
+                : PressStoresAction(sim, action, "");
+        if (acted) { SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion); }
+        return;
+      }
+      // Read the row's own question before acting: a purchase that cannot be
+      // undone asks first when the reader keeps confirmations on.
+      std::string question;
+      const TaskScreenModel& screen = taskScreen_;
+      for (std::size_t c = 0; c < screen.panelRowIds.size(); ++c) {
+        for (std::size_t r = 0; r < screen.panelRowIds[c].size(); ++r) {
+          if (screen.panelRowIds[c][r] != hit.arg) { continue; }
+          if (c < screen.panelRows.size() && r < screen.panelRows[c].size()) {
+            question = screen.panelRows[c][r].confirm;
+          }
+        }
+      }
+      if (!question.empty() && sim.State().options.confirmRisk) {
+        pendingConfirm_ = question;
+        pendingAction_ = hit.arg;
+        return;
+      }
+      const bool acted = panelsKind_ == ScreenKind::Station
+                             ? PressStationAction(sim, hit.arg, "")
+                             : PressStoresAction(sim, hit.arg, "");
+      if (acted) { SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion); }
+      return;
+    }
+  }
 
   // The chart's own controls: bodies, the zoom pair, the layers, the actions.
   if (screenNav_) {

@@ -399,8 +399,9 @@ bool Simulation::BuyUpgrade(const std::string& upgradeId) {
 // Commissions
 // ---------------------------------------------------------------------------
 
-namespace {
 double CommissionGoal(const std::string& kind) { return kind == "salvage" ? 2.0 : 1.0; }
+
+namespace {
 double CommissionPrice(const std::string& kind) {
   if (kind == "visit") { return 450; }
   if (kind == "scan") { return 550; }
@@ -434,9 +435,34 @@ void Simulation::CommissionProgress(const std::string& kind, const std::string& 
   LogLine("Commission objective complete. Collect at any station.");
 }
 
-bool Simulation::AcceptCommission(const std::string& kind) {
-  if (!state_.gameOver.empty() || state_.commissions.active.has_value()) { return false; }
-  if (!state_.docked || HerePort() == nullptr || CommissionPrice(kind) <= 0) { return false; }
+namespace {
+std::string BodyName(const Simulation& sim, const std::string& id) {
+  const Body* const body = sim.FindBodyById(id);
+  return body != nullptr ? body->name : id;
+}
+}  // namespace
+
+std::string CommissionDescription(const Simulation& sim, const Commission& active) {
+  const Body* const body = sim.FindBodyById(active.target);
+  std::string where;
+  if (body != nullptr) {
+    const Body* const system = sim.FindBodyById(body->system);
+    if (system != nullptr) {
+      where = " (" + system->name;
+      const Body* const region = sim.FindBodyById(system->region);
+      if (region != nullptr) { where += ", " + region->name; }
+      where += ")";
+    }
+  }
+  if (active.kind == "visit") { return "Visit " + BodyName(sim, active.target) + where; }
+  if (active.kind == "scan") {
+    return "Read a deep scan of " + BodyName(sim, active.target) + where;
+  }
+  return "Recover two salvage lots while under way";
+}
+
+std::optional<Commission> Simulation::CommissionOffer(const std::string& kind) const {
+  if (CommissionPrice(kind) <= 0) { return std::nullopt; }
 
   // commissionOffer(): a deterministic draw from the bodies this station can
   // reasonably point at, rotated by the commission serial - no randomness.
@@ -497,7 +523,7 @@ bool Simulation::AcceptCommission(const std::string& kind) {
     }
 
     const std::vector<const Body*>& pool = !fresh.empty() ? fresh : (!local.empty() ? local : all);
-    if (pool.empty()) { return false; }
+    if (pool.empty()) { return std::nullopt; }
 
     double hash = 0;
     for (std::size_t index = 0; index < map_.here.size(); ++index) {
@@ -507,7 +533,15 @@ bool Simulation::AcceptCommission(const std::string& kind) {
     offer.target = pool[static_cast<std::size_t>(slot)]->id;
   }
 
-  state_.commissions.active = offer;
+  return offer;
+}
+
+bool Simulation::AcceptCommission(const std::string& kind) {
+  if (!state_.gameOver.empty() || state_.commissions.active.has_value()) { return false; }
+  if (!state_.docked || HerePort() == nullptr) { return false; }
+  const std::optional<Commission> offer = CommissionOffer(kind);
+  if (!offer.has_value()) { return false; }
+  state_.commissions.active = *offer;
   PerformAction("Commission accepted");
   return true;
 }

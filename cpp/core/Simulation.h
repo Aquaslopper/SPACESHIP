@@ -60,6 +60,11 @@ class Simulation {
   // ---- the clock ---------------------------------------------------------
   // The only function that advances the world. Mirrors performAction(detail).
   void PerformAction(const std::string& detail = std::string());
+  // restartVoyage(): a fresh voyage in the state NewVoyage produces, with the
+  // player's preferences carried across. Free - it is the new-voyage command,
+  // not a turn.
+  void RestartVoyage();
+
   // A burst of work that is NOT an action: the filter bank's reward.
   void ProAction(double n);
 
@@ -98,6 +103,7 @@ class Simulation {
   const std::vector<Passenger>& Passengers() const { return state_.passengers; }
   const std::vector<Good>& Market() const { return catalog_.goods; }
   const std::vector<SurveyRecord>& Survey() const { return survey_; }
+  std::vector<SurveyRecord>& MutableSurvey() { return survey_; }
   double ScanCost() const { return scanCost_; }
   bool InRange(const Body& body) const;
   bool AtTarget(const Body& body) const;
@@ -198,6 +204,9 @@ class Simulation {
   bool BuyUpgrade(const std::string& upgradeId);   // bay, bay2, drive, rack, scanner, hull
   void ContractProgress(const std::string& goal, const std::string& target);
   void CommissionProgress(const std::string& kind, const std::string& target);
+  // commissionOffer(): the same deterministic draw the board shows before the
+  // player accepts it, so the offer and the acceptance can never disagree.
+  std::optional<Commission> CommissionOffer(const std::string& kind) const;
   bool AcceptCommission(const std::string& kind);
   bool CollectCommission();
   bool AbandonCommission();
@@ -382,5 +391,10 @@ class Simulation {
   std::string projectClaim_;
   std::map<std::string, bool> crewClaims_;
 };
+
+// The commission board's own words: the goal is a count, the description is a
+// sentence naming the body. Both editions share one spelling of each.
+double CommissionGoal(const std::string& kind);
+std::string CommissionDescription(const Simulation& sim, const Commission& commission);
 
 }  // namespace ship

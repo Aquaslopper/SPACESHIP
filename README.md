@@ -77,8 +77,9 @@ Existing Kessler-only and expanded-galaxy saves still load, including active leg
 The repository also contains a native C++ port of the game. It is a **work in
 progress**: Phase 0 (build system, extracted catalogue, data gate), Phase 1 (the
 whole headless simulation), Phase 2 (the cockpit), Phase 3 (the task frame and the
-three machine rooms), Phase 4 (Navigation and the star chart) and Phase 5 (Crew
-Quarters and the crew records) are complete and verified against the reference. Phase 2
+three machine rooms), Phase 4 (Navigation and the star chart), Phase 5 (Crew
+Quarters and the crew records) and Phase 6 (stations, the cargo hold and science
+room, and the four floating popups) are complete and verified against the reference. Phase 2
 delivers the taskbar and its tabs, the sidebar and pinned foot, the status bar, and
 the idle screen with the ship cross-section, the feed and the two interaction
 verbs. Phase 3 adds the house task frame — head, panels, machine stage, commitment
@@ -89,10 +90,14 @@ pan ladder, the ship's ring and the two controls that cost anything (Start Trave
 Run Deep Scan), with the panels' distance, transit and fuel readouts derived exactly.
 Phase 5 adds the quarters: the pixel sprites built from the reference's character
 maps, the order sheet (staging free, one action to hand it over, the price paid as
-work), job and trade changes, station training, the medical bay and the roster. The
-router hands every tab that has no window yet the same frame as a placeholder;
-those remaining windows are Phase 6. Until then `Spaceship.hta` remains the playable
-edition.
+work), job and trade changes, station training, the medical bay and the roster.
+Phase 6 adds the port window (market, sales, mission board, yard and tavern), the
+cargo hold and the science room, and the four floating panels behind the pinned
+foot — manifest, activity log, three save slots and settings — with the save and
+load buttons free and a corrupt slot rolled back. The router hands any tab that
+still has no window the same frame as a placeholder; the remaining subjects are
+the Simulacron and ship projects (Phase 7). Until then `Spaceship.hta` remains the
+reference edition.
 
 `spaceship_core` is feature-complete as a simulation: the action clock, drive
 wear, life support, crew, tasks, incidents, the Simulacron, commendations,

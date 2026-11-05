@@ -146,6 +146,9 @@ add_library(spaceship_core STATIC
   cpp/ui/CrewSprites.cpp
   cpp/ui/CrewRecord.cpp
   cpp/ui/QuartersScreen.cpp
+  cpp/ui/Popups.cpp
+  cpp/ui/StationScreen.cpp
+  cpp/ui/StoresScreen.cpp
   cpp/ui/NavScreen.cpp)
 
 target_include_directories(spaceship_core PUBLIC cpp)
@@ -214,7 +217,8 @@ if(SPACESHIP_BUILD_TESTS)
     cpp/tests/ui_tests.cpp
     cpp/tests/task_tests.cpp
     cpp/tests/nav_tests.cpp
-    cpp/tests/crew_tests.cpp)
+    cpp/tests/crew_tests.cpp
+    cpp/tests/station_tests.cpp)
   target_link_libraries(spaceship_tests PRIVATE spaceship_core Catch2::Catch2WithMain)
 
   include(Catch)

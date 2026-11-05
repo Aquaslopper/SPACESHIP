@@ -94,6 +94,16 @@ function trace(g) {
   out.scanCost = g.SCAN_COST;
   out.cargo = { capacity: g.CARGO.capacity, used: g.cargoUsed(), reserved: g.cargoReserved() };
 
+  /* Phase 6: the settings popup is free, but its numbers are still compared. */
+  const o = S.options || {};
+  out.options = {
+    largeText: !!o.largeText, confirmRisk: !!o.confirmRisk,
+    hideCrewLabels: !!o.hideCrewLabels, theme: o.theme || 'classic',
+    soundEffects: !!o.soundEffects, music: !!o.music,
+    audioLevel: typeof o.audioLevel === 'number' ? o.audioLevel : 0.4
+  };
+  out.reducedMotion = !!S.reducedMotion;
+
   out.contracts = {};
   for (const key of Object.keys(S.contracts || {})) { out.contracts[key] = S.contracts[key]; }
 
@@ -682,6 +692,23 @@ function runCommand(g, line) {
     const d = JSON.parse(fs.readFileSync(parts[1], 'utf8'));
     if (!g.validSave(d)) { console.error('loadjs: invalid save'); process.exit(3); }
     g.applySnapshot(d);
+    return true;
+  }
+  if (command === 'option' && parts.length >= 2) {
+    /* The settings popup's toggle rows. Free: a preference is not a turn. */
+    const key = parts[1], o = g.STATE.options;
+    if (!o) { return true; }
+    if (key === 'reducedMotion') { g.STATE.reducedMotion = !g.STATE.reducedMotion; return true; }
+    if (key === 'music' || key === 'soundEffects' || key === 'largeText' ||
+        key === 'confirmRisk' || key === 'hideCrewLabels') {
+      o[key] = !o[key];
+      return true;
+    }
+    if (key === 'theme' && parts.length >= 3) {
+      if (g.THEMES[parts[2]]) { o.theme = parts[2]; }
+      return true;
+    }
+    if (key === 'audio' && parts.length >= 3) { o.audioLevel = parseFloat(parts[2]); return true; }
     return true;
   }
   if (command === 'job' && parts.length >= 3) {

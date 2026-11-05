@@ -13,6 +13,7 @@
 #pragma once
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "core/Simulation.h"
@@ -24,7 +25,10 @@
 #include "ui/Widgets.h"
 #include "ui/CrewRecord.h"
 #include "ui/NavScreen.h"
+#include "ui/Popups.h"
 #include "ui/QuartersScreen.h"
+#include "ui/StationScreen.h"
+#include "ui/StoresScreen.h"
 #include "ui/Theme.h"
 
 namespace ship {
@@ -55,6 +59,22 @@ class ShellView {
   bool HasSelection() const { return hasSelection_; }
 
   const ShellLayout& LayoutNow() const { return layout_; }
+
+  // Where save slots live. The app points this at runtime/saves/; the tests
+  // point it at a scratch directory.
+  void SetSaveDir(std::string dir) { saveDir_ = std::move(dir); }
+  const std::string& SaveDir() const { return saveDir_; }
+
+  // A popup opened by the pinned foot, if one is up. Free to open and close.
+  const std::string& PopupKey() const { return popupKey_; }
+  void OpenPopup(const std::string& key) {
+    popupKey_ = key;
+    popupHits_.clear();
+    popupMessage_.clear();
+    ++popupCount_;
+  }
+  int PopupCount() const { return popupCount_; }
+  void ClosePopup() { popupKey_.clear(); popupHits_.clear(); confirmNewVoyage_ = false; }
   const Theme& CurrentTheme() const { return theme_; }
   void SetTheme(const Theme& theme) { theme_ = theme; }
 
@@ -90,7 +110,22 @@ class ShellView {
   CrewRecordModel record_;
   std::vector<NavHit> navHits_;
 
+  bool screenPanels_ = false;
+  ScreenKind panelsKind_ = ScreenKind::Deferred;
+  std::string popupKey_;
+  std::string saveDir_ = "runtime/saves";
+  std::string popupMessage_;
+  bool confirmNewVoyage_ = false;
+  int popupSlot_ = 1;
+  int popupCount_ = 0;
+  std::string pendingConfirm_;   // the question on the band, if any
+  std::string pendingAction_;
+  PopupModel popup_;
+  std::vector<NavHit> popupHits_;
+
   void PaintTaskScreen(Simulation& sim);
+  void PaintPanelsScreen(Simulation& sim);
+  void PaintPopup(Simulation& sim);
   void PaintNavScreen(Simulation& sim);
   void PaintQuartersScreen(Simulation& sim);
   void PaintCrewRecord(const Simulation& sim);

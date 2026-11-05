@@ -436,7 +436,9 @@ TEST_CASE("the router sends the three machine rooms to their own windows",
   CHECK(ship::ScreenKindFor(TabOf("room", "engine")) == ScreenKind::Engine);
   CHECK(ship::ScreenKindFor(TabOf("room", "o2")) == ScreenKind::O2);
   CHECK(ship::ScreenKindFor(TabOf("room", "mess")) == ScreenKind::Mess);
-  CHECK(ship::ScreenKindFor(TabOf("room", "cargo")) == ScreenKind::Deferred);
+  // Phase 6 gave the cargo hold and the science room their own windows.
+  CHECK(ship::ScreenKindFor(TabOf("room", "cargo")) == ScreenKind::Cargo);
+  CHECK(ship::ScreenKindFor(TabOf("room", "science")) == ScreenKind::Science);
   CHECK(ship::ScreenKindFor(TabOf("room", "cabin")) == ScreenKind::Described);
   // Phase 5 gave a crew tab its own read-only record.
   CHECK(ship::ScreenKindFor(TabOf("crew", "jax")) == ScreenKind::CrewRecord);
