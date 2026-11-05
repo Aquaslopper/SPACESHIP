@@ -1,5 +1,7 @@
 # Damagcontrol index — open defects
 
+**URGENT: previous `a8617c3`/`1e80182` Windows builds withdrawn after black-screen/crash/hot-CPU report.** [Frame-control build regression and hotfix](damagecontrol_report.md#bughunt-2026-11-05-black-screen). JPEG decode success did not validate rendering. Do not merge.
+
 Short entry point for current issues. Detailed evidence, history, and handoff notes live in [`damagecontrol_report.md`](damagecontrol_report.md). Keep this index concise; update statuses here and append investigation details to the report rather than rewriting its history.
 
 | ID | Status | Affected screen / area | Defect summary | Investigation log |

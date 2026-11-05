@@ -84,13 +84,18 @@ if(SPACESHIP_BUILD_GUI AND SPACESHIP_GUI_REASON STREQUAL "")
 
   set(BUILD_EXAMPLES        OFF CACHE BOOL "" FORCE)
   set(BUILD_SHARED_LIBS     OFF CACHE BOOL "" FORCE)
-  # Raylib 6 disables JPG by default. Cached format flags are ignored unless
-  # customization is enabled: the title is the HTA's extracted title.jpg.
-  set(CUSTOMIZE_BUILD       ON CACHE BOOL "" FORCE)
-  set(SUPPORT_FILEFORMAT_JPG ON CACHE BOOL "" FORCE)
-  set(SUPPORT_FILEFORMAT_TTF ON CACHE BOOL "" FORCE)  # the bundled fonts
+  # Keep config.h's numeric defaults. Raylib 6's custom CMake parser treats
+  # even '#define SUPPORT_CUSTOM_FRAME_CONTROL 0' as ON, disabling normal
+  # screen swapping, pacing and input polling. Never enable that broad mode.
+  set(CUSTOMIZE_BUILD OFF CACHE BOOL "" FORCE)
 
   FetchContent_MakeAvailable(raylib imgui rlImGui)
+  # config.h guards JPG with #ifndef, so override this one format directly
+  # without replacing every other raylib feature flag.
+  target_compile_definitions(raylib PRIVATE SUPPORT_FILEFORMAT_JPG=1)
+  # Compile these guards INSIDE raylib with its actual private definitions.
+  target_sources(raylib PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/cpp/tests/raylib_config_guard.c")
+  target_include_directories(raylib PRIVATE "${raylib_SOURCE_DIR}/src")
 
   # FetchContent's SOURCE_DIR spelling has varied with declaration casing
   # across CMake releases. Resolve both spellings before forming source paths.

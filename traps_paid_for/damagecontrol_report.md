@@ -400,3 +400,15 @@ Extended both script harnesses with `progress`, `progress-click` and scoped `act
 ### Packaged Windows verification for `a8617c3`
 
 Push run [42100284609](https://github.com/Aquaslopper/SPACESHIP/actions/runs/42100284609) and PR run [42100292804](https://github.com/Aquaslopper/SPACESHIP/actions/runs/42100292804) both **succeeded** for `a8617c3cb5203f4efeea4f2cb5ba780388a4fbed`. The `Decode packaged title JPEG with the shipped raylib build` step succeeded: the packaged GUI executable returned zero from `--check-title-art`, so its linked raylib decoded a nonempty image from the shipped JPEG when launched from an unrelated working directory. This is actual decoder evidence, not merely a successful Windows compile or a file-existence check. The run's `Spaceship-Windows-x64` artifact is the retest build. Detailed run-log download was blocked by the sandbox's host allowlist; step/run conclusions were retrieved through GitHub's API. No GPU/native screenshot verification or merge.
+
+
+<a id="bughunt-2026-11-05-black-screen"></a>
+## URGENT — black window, hot CPU and user-reported crash after `a8617c3`
+
+**Withdraw the `a8617c3`/`1e80182` Windows builds from the previous retest recommendation.** User reports a black screen, then crash, apparent memory leak and hot CPU. Do not rerun those artifacts. The CPU JPEG-decoding gate passed but did not exercise `EndDrawing` or an OS window; this was insufficient to detect the regression.
+
+Confirmed build-configuration regression: raylib 6 `cmake/ParseConfigHeader.cmake` maps every uncommented `SUPPORT_*` definition to `ON`, ignoring numeric zero. Enabling `CUSTOMIZE_BUILD` therefore enables `SUPPORT_CUSTOM_FRAME_CONTROL` (source default **0**) and `SUPPORT_BUSY_WAIT_LOOP` (also **0**), among other unintended flags. In `rcore.c`, `#if !SUPPORT_CUSTOM_FRAME_CONTROL` surrounds normal `EndDrawing` screen swapping, frame timing and input polling. Our app delegates those jobs to `EndDrawing`; bypassing them explains the black/unresponsive window and unpaced hot loop. This is a concrete cause, not a theory about the user's asset extraction. A separate memory leak or exact crash mechanism has **not** been measured or proven.
+
+Repair: restore `CUSTOMIZE_BUILD=OFF` and all original numeric defaults. Enable **only** `SUPPORT_FILEFORMAT_JPG=1` directly on the raylib target; its `config.h` already guards this flag with `#ifndef`, so this does not require external/custom configuration. Add `raylib_config_guard.c` to the raylib target itself, compiled with the exact private definitions used by `rcore`/`rtextures`. It rejects external configuration, custom frame control, full busy waiting, absent JPG decoding and missing core drawing modules. Positive compile against the pinned 6.0 header passes; deliberately enabling custom frame control reproduces a compile failure. Keep the packaged JPEG decoder gate, but do not describe it as a graphics/runtime test.
+
+Windows CI and user runtime verification pending for the hotfix at time of this entry. No graphical test or memory profile was run locally. Other open visual defects remain open. PR15 must not be merged.
