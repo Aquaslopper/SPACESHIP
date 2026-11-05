@@ -237,9 +237,20 @@ target_compile_definitions(spaceship_core PUBLIC
   SPACESHIP_ASSET_DIR="${SPACESHIP_ASSETS}")
 
 if(MSVC)
+  # No /WX: a warning from a different MSVC servicing branch must not stop a
+  # release build, and this codebase is warning-clean by discipline, not force.
   target_compile_options(spaceship_core PRIVATE /W4 /permissive-)
 else()
   target_compile_options(spaceship_core PRIVATE -Wall -Wextra -Wpedantic)
+  # GCC 13 turned -Wdangling-reference on inside -Wall. It misfires on helpers
+  # that return a reference into a JSON object while being handed a context
+  # string; Catalog.cpp passes the context as a string_view now, but the warning
+  # has changed shape across 13/14 and the fix should not depend on which image
+  # the runner happens to use.
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND
+     CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 13)
+    target_compile_options(spaceship_core PRIVATE -Wno-dangling-reference)
+  endif()
 endif()
 
 # ---------------------------------------------------------------------------

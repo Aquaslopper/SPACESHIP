@@ -4,6 +4,7 @@
 #include <fstream>
 #include <set>
 #include <sstream>
+#include <string_view>
 
 #include <nlohmann/json.hpp>
 
@@ -12,31 +13,38 @@ namespace {
 
 using Json = nlohmann::json;
 
-const Json& Field(const Json& object, const char* key, const std::string& where) {
+// The context is a string_view on purpose. GCC 13's -Wdangling-reference sees a
+// reference-returning function whose argument is a temporary std::string and
+// assumes the reference came from it - a false positive here, since what is
+// returned is *it, owned by the JSON object. Taking a view means a literal
+// argument never creates a temporary at all, so the warning has nothing to go on
+// and the code stays honest about lifetimes.
+const Json& Field(const Json& object, const char* key, std::string_view where) {
   auto it = object.find(key);
   if (it == object.end()) {
-    throw CatalogError(where + ": missing field '" + key + "'");
+    throw CatalogError(std::string(where) + ": missing field '" + key + "'");
   }
   return *it;
 }
 
-std::string Text(const Json& object, const char* key, const std::string& where,
+std::string Text(const Json& object, const char* key, std::string_view where,
                  const std::string& fallback = "") {
   auto it = object.find(key);
   if (it == object.end() || it->is_null()) { return fallback; }
   if (it->is_string()) { return it->get<std::string>(); }
   if (!it->is_number() && !it->is_boolean()) {
-    throw CatalogError(where + ": field '" + key + "' is not text");
+    throw CatalogError(std::string(where) + ": field '" + key + "' is not text");
   }
   // The reference stores a few detail values as numbers; keep them printable.
   return it->dump();
 }
 
-double Number(const Json& object, const char* key, const std::string& where, double fallback = 0.0) {
+double Number(const Json& object, const char* key, std::string_view where,
+              double fallback = 0.0) {
   auto it = object.find(key);
   if (it == object.end() || it->is_null()) { return fallback; }
   if (!it->is_number()) {
-    throw CatalogError(where + ": field '" + key + "' is not a number");
+    throw CatalogError(std::string(where) + ": field '" + key + "' is not a number");
   }
   return it->get<double>();
 }
@@ -46,7 +54,7 @@ bool Flag(const Json& object, const char* key) {
   return it != object.end() && it->is_boolean() && it->get<bool>();
 }
 
-Rect ReadRect(const Json& object, const std::string& where) {
+Rect ReadRect(const Json& object, std::string_view where) {
   Rect r;
   r.x = Number(object, "x", where);
   r.y = Number(object, "y", where);
@@ -131,7 +139,7 @@ CrewDefinition ReadCrew(const Json& object) {
   return c;
 }
 
-Body ReadBody(const Json& object, const std::string& where) {
+Body ReadBody(const Json& object, std::string_view where) {
   Body b;
   b.id = Text(object, "id", where);
   b.type = Text(object, "type", where);
