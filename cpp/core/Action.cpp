@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <ctime>
 #include <utility>
 
 namespace ship {
@@ -61,6 +62,7 @@ Simulation Simulation::NewVoyage(const Catalog& catalog) {
   Simulation sim;
   sim.catalog_ = catalog;
   sim.rules_ = catalog.rules;
+  sim.scanCost_ = catalog.rules.scanCost;
 
   // ---- crew --------------------------------------------------------------
   for (const CrewDefinition& def : catalog.startingCrew) {
@@ -282,9 +284,19 @@ void Simulation::ClampStat(const std::string& id, double delta) {
 }
 
 void Simulation::LogLine(const std::string& text) {
-  // The reference stamps lines with the wall clock. The port keeps the field
-  // (saves carry it) but leaves it empty: nothing may depend on real time.
-  state_.feed.push_back(FeedLine{"", text});
+  // Cosmetic local-clock information, deliberately excluded from parity traces.
+  // It never advances the action clock or any simulation countdown.
+  const std::time_t now = std::time(nullptr);
+  std::tm local{};
+#ifdef _WIN32
+  localtime_s(&local, &now);
+#else
+  localtime_r(&now, &local);
+#endif
+  char stamp[9]{};
+  std::strftime(stamp, sizeof(stamp), "%H:%M:%S", &local);
+  state_.feed.push_back(FeedLine{stamp, text});
+  ++feedRevision_;
   if (state_.feed.size() > 200) { state_.feed.erase(state_.feed.begin()); }
 }
 

@@ -20,6 +20,7 @@
 // ============================================================================
 #pragma once
 
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <string>
@@ -78,6 +79,7 @@ class Simulation {
 
   // ---- queries -----------------------------------------------------------
   double ActionCount() const { return actionCounter_; }
+  std::uint64_t FeedRevision() const { return feedRevision_; }
   double MessRack() const { return mess_.rack; }
   double MessCapacity() const { return mess_.capacity; }
   const GameState& State() const { return state_; }
@@ -407,6 +409,7 @@ class Simulation {
   double scanCost_ = 5;
 
   double actionCounter_ = 0;
+  std::uint64_t feedRevision_ = 0; // presentation invalidation, not saved game time
 
   // Re-entry guards. A command spends its action BEFORE it registers the work
   // it starts, and the tick inside that action must not let a crew member grab

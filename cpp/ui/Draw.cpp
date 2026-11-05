@@ -199,6 +199,7 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   if (scrollTabKey_ != sim.State().activeTab) {
     scrollTabKey_ = sim.State().activeTab;
     ResetContentScroll();
+    if (sim.State().activeTab == "home") { feedScroll_ = 0; draggingFeed_ = false; }
     draggingChart_ = false;
   }
 
@@ -207,7 +208,7 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   // random dots every frame caused teleporting and a blank reduced-motion view.
   if (sim.State().activeTab == "home") {
     FxRng seeded = rng_;
-    idle_ = BuildIdleScreen(sim, layout_, theme_, theme_.hideCrewLabels, others_, seeded);
+    idle_ = BuildIdleScreen(sim, layout_, theme_, theme_.hideCrewLabels, seeded);
     rng_ = seeded;
     SyncIdleDots(sim, nowMs);
     // The whole home column scrolls when it is taller than the content area
@@ -669,10 +670,19 @@ void ShellView::PaintIdle(Simulation& sim) {
   const bool trackFeed = paintingContent_;
   paintingContent_ = false;
   feedBox_ = idle_.feedBox;
+  std::vector<std::string> log;
+  for (auto it = sim.State().feed.rbegin(); it != sim.State().feed.rend(); ++it)
+    log.push_back(it->stamp.empty() ? it->text : it->stamp + "  " + it->text);
+  if (feedRevision_ != sim.FeedRevision() || feedSeen_ != log) {
+    feedScroll_ = 0;
+    draggingFeed_ = false;
+    feedRevision_ = sim.FeedRevision();
+    feedSeen_ = log;
+  }
   const int size = TypePx(12);
   const float lineH = std::max(theme.LineHeight(), static_cast<float>(size) + 4);
   std::vector<std::string> rows;
-  for (const auto& entry : idle_.feed) {
+  for (const auto& entry : log) {
     const auto wrapped = WrapText(entry, std::max(1.0f, feedBox_.w - 28), size, SelectFont(size, false));
     rows.insert(rows.end(), wrapped.begin(), wrapped.end());
   }
@@ -948,8 +958,8 @@ void ShellView::PaintStage(const TaskStage& stage, const Area& origin) {
   }
 }
 
-void ShellView::PaintActionBand(const std::string& title, const std::string& note,
-                                const std::vector<ProgressButton>& buttons, const std::string& warning) {
+float ShellView::PaintActionBand(const std::string& title, const std::string& note,
+                                const std::vector<ProgressButton>& buttons, const std::string& warning, bool measureOnly) {
   const auto& p = theme_.palette;
   const float left = layout_.content.x + 8, width = layout_.content.w - 16;
   const float inner = std::max(1.0f, width - 24), gap = 10;
@@ -974,6 +984,7 @@ void ShellView::PaintActionBand(const std::string& title, const std::string& not
     if (h) buttonsH += h + gap;
   }
   const float h = 12 + line + 10 + buttonsH + (notes.size() + warnings.size()) * line + 12;
+  if (measureOnly) return h;
   actionBandTop_ = layout_.content.Bottom() - 8 - h;
   const float top = actionBandTop_ + contentScroll_;
   // A pinned overlay must not inflate the scroll extent of the body beneath it.
@@ -1013,6 +1024,7 @@ void ShellView::PaintActionBand(const std::string& title, const std::string& not
     y += line;
   }
   paintingContent_ = tracked;
+  return h;
 }
 
 void ShellView::PaintTaskScreen(Simulation& sim) {
@@ -1025,37 +1037,38 @@ void ShellView::PaintTaskScreen(Simulation& sim) {
 
   const float headerH = PaintTaskHeader(screen.head, left, layout_.content.y);
 
-  float y = layout_.content.y + headerH + 8.0f;
+  const float bodyTop = layout_.content.y + headerH + 8;
+  const float stageX = left + (right - left - screen.stage.width) / 2;
+  const bool beside = !screen.hasStage ||
+      (stageX >= left + column + 16 && stageX + screen.stage.width <= right - column - 16);
+  const float panelTop = screen.hasStage && !beside ? bodyTop + screen.stage.height + 12 : bodyTop;
+  float y = panelTop;
   for (const NavPanel& panel : screen.left) {
     const float panelH = std::max(118.0f, MeasurePanelHeight(panel, column));
     PaintPanel(panel, Area{left, y, column, panelH});
-    y += panelH + 6.0f;
+    y += panelH + 6;
   }
-
-  float ry = layout_.content.y + headerH + 8.0f;
+  float ry = panelTop;
   for (const NavPanel& panel : screen.right) {
     const float panelH = std::max(150.0f, MeasurePanelHeight(panel, column));
     PaintPanel(panel, Area{right - column, ry, column, panelH});
-    ry += panelH + 6.0f;
+    ry += panelH + 6;
   }
-
-  float stageBottom = layout_.content.y + headerH;
+  float stageBottom = bodyTop;
   if (screen.hasStage) {
-    const Area origin{left + column + 16.0f, layout_.content.y + headerH + 8.0f,
-                      screen.stage.width, screen.stage.height};
+    // Fixed-size instrument, centered independently of viewport width. When
+    // the side panels cannot fit beside it, they flow beneath, never over it.
+    const Area origin{stageX, bodyTop, screen.stage.width, screen.stage.height};
     PaintStage(screen.stage, origin);
-    const float uy = origin.y + screen.stage.height + 4.0f;
-    const float halfW = (right - column - 16.0f - (left + column + 16.0f) - 4.0f) / 2.0f;
-    float underH = 110.0f;
-    for (const NavPanel& panel : screen.under) {
-      underH = std::max(underH, MeasurePanelHeight(panel, halfW));
-    }
+    const float uy = beside ? origin.Bottom() + 4 : std::max({origin.Bottom(), y, ry}) + 12;
+    const float gap = 6;
+    const float panelW = (origin.w - gap * std::max(0, static_cast<int>(screen.under.size()) - 1)) /
+                         std::max(1, static_cast<int>(screen.under.size()));
+    float underH = 0;
+    for (const auto& panel : screen.under) underH = std::max(underH, MeasurePanelHeight(panel, panelW));
     stageBottom = uy + underH;
-    for (std::size_t i = 0; i < screen.under.size(); ++i) {
-      PaintPanel(screen.under[i],
-                 Area{origin.x + static_cast<float>(i) * (halfW + 4.0f), uy, halfW,
-                      underH});
-    }
+    for (std::size_t i = 0; i < screen.under.size(); ++i)
+      PaintPanel(screen.under[i], {origin.x + i * (panelW + gap), uy, panelW, underH});
   }
 
   contentPaintBottom_ = std::max({contentPaintBottom_, y, ry, stageBottom});
@@ -1083,10 +1096,23 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   const float spareW = std::max(1.0f, middleRight - middleLeft);
   const float chartW = std::min(1100.0f, spareW);
   const float chartTop = layout_.content.y + headerH + 8.0f;
-  const float availableH = layout_.content.Bottom() - chartTop - 300.0f;
-  const float chartH = std::min({500.0f, chartW * 0.5f,
-                                 std::max(240.0f, availableH)});
-  const Area box{middleLeft, chartTop, chartW, chartH};
+  // Park at 240 and measure every other drawn item, as HTA layoutNav does.
+  const float halfW = (chartW - 6) / 2;
+  float underH = 112;
+  for (const auto& panel : screen.under) underH = std::max(underH, MeasurePanelHeight(panel, halfW));
+  float leftH = 0;
+  for (const auto& panel : screen.left) leftH += std::max(96.0f, MeasurePanelHeight(panel, leftColumn)) + 4;
+  const float rightH = screen.right.empty() ? 0 : std::max(190.0f, MeasurePanelHeight(screen.right[0], rightColumn));
+  float tailH = screen.commands.size() * (theme_.LineHeight() + 12);
+  for (const auto& note : navScreen_.notes)
+    tailH += WrapText(note, right - left - 16, TypePx(9), SelectFont(TypePx(9), false)).size() * theme_.LineHeight() + 4;
+  const float footerH = PaintActionBand("Target Actions", navScreen_.courseNote, screen.progress, "", true);
+  const float parkedBody = std::max({240 + 22 + underH, leftH, rightH}) + 12 + tailH;
+  const float otherH = headerH + 8 + parkedBody - 240 + footerH + 8;
+  const float availableH = layout_.content.h - otherH - 4;
+  // Preserve the existing logical viewport and cap/floor ordering by request.
+  const float chartH = std::min({500.0f, chartW * 0.5f, std::max(240.0f, availableH)});
+  const Area box{middleLeft + (spareW - chartW) / 2, chartTop, chartW, chartH};
   navChartBox_ = box;
   const ship::NavRaster raster = BuildNavRaster(sim);
   const float sx = box.w / static_cast<float>(raster.width);
@@ -1238,11 +1264,6 @@ void ShellView::PaintNavScreen(Simulation& sim) {
                     rightColumn, panelH});
   }
 
-  const float halfW = (box.w - 6.0f) / 2.0f;
-  float underH = 112.0f;
-  for (const NavPanel& panel : screen.under) {
-    underH = std::max(underH, MeasurePanelHeight(panel, halfW));
-  }
   const float uy = box.Bottom() + 22.0f;
   for (std::size_t i = 0; i < screen.under.size(); ++i) {
     PaintPanel(screen.under[i],
@@ -1345,7 +1366,9 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
   quartersBandTop_ = layout_.content.Bottom() - bandHeight;
   // Payroll and roster are separate in paintRoster(). Do not paint the full
   // roster as a table and then overlay clickable copies over its payroll rows.
-  float rowY = panelTop;
+  const Area hall{(left + right - 560) / 2, panelTop, 560, 300};
+  const bool stacked = hall.x < left + column + 10 || hall.Right() > right - column - 10;
+  float rowY = stacked ? hall.Bottom() + 10 : panelTop;
   if (!screen.left.empty()) {
     auto payroll = screen.left.front();
     if (payroll.lines.size() > 4) { payroll.lines.resize(4); }
@@ -1372,7 +1395,6 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
     navHits_.push_back({box, "select", row.id});
     rowY += h + 3;
   }
-  const Area hall{left + column + 10, panelTop, 560, 300};
   DrawRectangle(static_cast<int>(hall.x), static_cast<int>(hall.y),
                 static_cast<int>(hall.w), static_cast<int>(hall.h),
                 theme_.id == "classic" ? HexColor("#fdfbf7", ToRay(p.panel)) : ToRay(p.chrome));
@@ -1413,8 +1435,7 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
 
   // Orders retain the HTA dropdown and every note/cost. At narrow widths the
   // whole column moves below the hall instead of painting through its figure.
-  const bool stacked = right - column < hall.Right() + 10;
-  const float orderX = stacked ? hall.x : right - column;
+  const float orderX = right - column;
   float oy = stacked ? hall.Bottom() + 10 : panelTop;
   for (const auto& panel : screen.right) {
     const float h = MeasurePanelHeight(panel, column);
@@ -1466,7 +1487,7 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
       oy += h + 4;
     }
   }
-  float uy = stacked ? oy + 10 : hall.Bottom() + 10;
+  float uy = stacked ? std::max(rowY, oy) + 10 : hall.Bottom() + 10;
   for (const auto& panel : screen.under) {
     const float h = MeasurePanelHeight(panel, hall.w);
     PaintPanel(panel, {hall.x, uy, hall.w, h}); uy += h + 6;

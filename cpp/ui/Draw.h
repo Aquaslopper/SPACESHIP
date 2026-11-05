@@ -142,9 +142,9 @@ class ShellView {
   bool PaintScenePart(const MachinePart& part, const Area& origin);
   void PaintStage(const TaskStage& stage, const Area& origin);
   void PaintIdle(Simulation& sim);
-  void PaintActionBand(const std::string& title, const std::string& note,
+  float PaintActionBand(const std::string& title, const std::string& note,
                        const std::vector<ProgressButton>& buttons,
-                       const std::string& warning = "");
+                       const std::string& warning = "", bool measureOnly = false);
   void PaintDiagram(const DiagramModel& diagram, const Area& stageBox, float scale);
   bool PressPanelRow(Simulation& sim, ScreenKind kind, const std::string& id);
 
@@ -193,6 +193,8 @@ class ShellView {
 
   float actionBandTop_ = 0.0f;
   std::vector<NavHit> actionBandHits_;
+  std::uint64_t feedRevision_ = 0;
+  std::vector<std::string> feedSeen_;
   float feedScroll_ = 0.0f;
   float feedMaxScroll_ = 0.0f;
   Area feedBox_{};

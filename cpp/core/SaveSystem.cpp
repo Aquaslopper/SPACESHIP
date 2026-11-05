@@ -1263,6 +1263,7 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     }
 
     ApplySnapshotDefaults();
+    ++feedRevision_; // A restored log is rendered newest-first, like renderFeed().
     return true;
   } catch (const std::exception& failure) {
     *this = before;

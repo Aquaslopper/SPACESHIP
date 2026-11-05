@@ -256,6 +256,66 @@ int main() {
       }
     }
 
+    // Real painter geometry: fixed centered instruments with non-overlapping panels.
+    for (const int width : {1180, 1280, 2200}) {
+      for (const auto& target : std::vector<std::pair<std::string, ship::Area>>{
+          {"engine", {0, 0, 650, 390}}, {"o2", {0, 0, 600, 360}}, {"mess", {0, 0, 600, 360}}}) {
+        auto check = ship::Simulation::NewVoyage(sim.World());
+        ship::ShellView shell;
+        shell.Configure(width, 720, ship::Theme::ById("classic"));
+        ship::OpenTask(check, "room", target.first, true);
+        Frame(shell, check);
+        const auto c = shell.LayoutNow().content;
+        const auto scene = std::find_if(rects.begin(), rects.end(), [&](const auto& r) {
+          return r.w == target.second.w && r.h == target.second.h;
+        });
+        Require(scene != rects.end(), "Fixed-size instrument frame missing");
+        Require(std::abs(scene->x + scene->w / 2 - (c.x + c.w / 2)) < 2, "Instrument is not centered in its viewport");
+        if (target.first == "engine") {
+          for (const auto* title : {"Engine Condition", "Engineering Crew"}) {
+            const auto text = FindText(title);
+            const bool outsideHorizontally = text.x < scene->x || text.x >= scene->x + scene->w;
+            Require(outsideHorizontally || text.y >= scene->y + scene->h, "Side panel painted over the fixed machine");
+          }
+        }
+      }
+    }
+    for (const int width : {1180, 1280, 2200}) {
+      auto check = ship::Simulation::NewVoyage(sim.World());
+      ship::ShellView shell;
+      shell.Configure(width, 720, ship::Theme::ById("classic"));
+      ship::OpenTask(check, "room", "quarters", true);
+      Frame(shell, check);
+      const auto hall = std::find_if(rects.begin(), rects.end(), [](const auto& r) { return r.w == 560 && r.h == 300; });
+      Require(hall != rects.end(), "Crew hall frame missing");
+      const auto c = shell.LayoutNow().content;
+      Require(std::abs(hall->x + hall->w / 2 - (c.x + c.w / 2)) < 2, "Crew hall is not centered");
+    }
+    // Wide capped maps center in their middle column. Long scan content takes
+    // real height away from the map instead of relying on a 300px allowance.
+    {
+      auto catalog = sim.World();
+      float shortMapH = 0;
+      for (const bool longScan : {false, true}) {
+        if (longScan) for (auto& body : catalog.bodies) if (body.id == "kessler") body.scan.assign(60, "Measured scan row");
+        auto check = ship::Simulation::NewVoyage(catalog);
+        check.MutableState().navTarget = "kessler";
+        check.MutableState().scanned["kessler"] = true;
+        ship::ShellView shell;
+        shell.Configure(2600, 1400, ship::Theme::ById("classic"));
+        ship::OpenTask(check, "nav", "main", true);
+        Frame(shell, check);
+        const auto map = std::find_if(rects.begin(), rects.end(), [](const auto& r) { return r.w == 1100 && r.h >= 240 && r.h <= 500; });
+        Require(map != rects.end(), "Capped chart missing");
+        const auto c = shell.LayoutNow().content;
+        const float middleLeft = c.x + 8 + 214 + 12, middleRight = c.Right() - 8 - 252 - 12;
+        Require(std::abs(map->x + map->w / 2 - (middleLeft + middleRight) / 2) < 2, "Capped chart is not centered in its column");
+        if (!longScan) shortMapH = map->h;
+        else Require(map->h < shortMapH, "Wrapped scan panel did not affect measured chart height");
+        Require(check.Map().vw == 638 && check.Map().vh == 278, "Approved logical map viewport was changed");
+      }
+    }
+
     // The feed owns its wheel/drag offset; the surrounding Home column must not move.
     {
       auto check = ship::Simulation::NewVoyage(sim.World());
@@ -291,6 +351,13 @@ int main() {
       Frame(shell, check);
       FindText("Feed-probe-0");
       Require(check.ActionCount() == actions, "Feed wheel/drag advanced the simulation");
+      // Log arrival resets only the inner feed, paints HH:MM:SS, and is free.
+      check.LogLine("Newest feed probe");
+      const auto stamp = check.State().feed.back().stamp;
+      Frame(shell, check);
+      FindText(stamp + "  Newest feed probe");
+      Require(std::abs(scissors.back().y - clip.y) < 1, "New activity shifted the surrounding Home column");
+      Require(check.ActionCount() == actions, "Cosmetic log update spent an action");
       // Shortened history clamps safely, and long entries wrap within the feed.
       check.MutableState().feed = {{"", std::string(300, 'W')}};
       Frame(shell, check);
@@ -388,7 +455,7 @@ int main() {
     Require(view.Panel() == ship::TitlePanel::Settings && textureCalls == 1,
             "Options replaced the title image instead of opening a sheet over it");
     ImGui::DestroyContext();
-    std::cout << "PASS: real Draw.cpp scroll direction, windowed Assignments, Vessel input/clamp, green action/air fills, visible station cooldown, source health colours/live values, literal engine pipe, screen-space green click mark/glow after scrolling, pinned/centered measured action bands at 1180/1280, independent feed wheel/drag/wrap/clamp, preserved purchase confirmation, free-click feedback/rise/fade, four dark title menus, title art retained behind Options; all text >=18px\n";
+    std::cout << "PASS: real Draw.cpp scroll direction, windowed Assignments, Vessel input/clamp, green action/air fills, visible station cooldown, source health colours/live values, literal engine pipe, screen-space green click mark/glow after scrolling, pinned/centered measured action bands at 1180/1280, independent feed wheel/drag/wrap/clamp plus timestamp/reset, centered fixed machine/crew scenes with panel reflow, measured chart height and wide centering, preserved purchase confirmation, free-click feedback/rise/fade, four dark title menus, title art retained behind Options; all text >=18px\n";
     return 0;
   } catch (const std::exception& error) {
     std::cerr << "draw probe: " << error.what() << '\n'; return 1;

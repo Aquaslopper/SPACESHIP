@@ -623,3 +623,102 @@ TEST_CASE("filter illustration tracks clean air, slot charge and degradation", "
   CHECK(CountClass(stage, "o2-streak") == 0);
   CHECK(CountClass(stage, "o2-dust") == (4 - sim.AirStageIndex()) * 4);
 }
+
+TEST_CASE("task retirement is explicit and automatic workers need no acknowledgment", "[simulation][tasks][audit]") {
+  auto sim = Fresh();
+  REQUIRE(sim.AddOngoing("unknown", "Future readout", 1, "unregistered") != nullptr);
+  REQUIRE(sim.AddOngoing("repair", "Automatic repair", 1, "maint") != nullptr);
+  sim.MutableState().engineCondition = 40;
+  const auto actions = sim.ActionCount();
+  sim.ProAction(1);
+  CHECK(sim.FindOngoing("repair") == nullptr);
+  CHECK(sim.State().engineCondition == 100);
+  CHECK(sim.State().wearTick == 0);
+  REQUIRE(sim.FindOngoing("unknown") != nullptr);
+  CHECK(sim.FindOngoing("unknown")->state == "done");
+  CHECK(sim.ActionCount() == actions);
+}
+
+TEST_CASE("training starts autonomous maintenance earlier with less work and no commander click", "[simulation][crew][audit]") {
+  for (const bool trained : {false, true}) {
+    auto sim = Fresh();
+    auto* engineer = sim.FindCrew("jax");
+    REQUIRE(engineer != nullptr);
+    REQUIRE(engineer->job == "maintenance");
+    if (trained) sim.TrainCrew(*engineer, 2, "aboard");
+    const double threshold = trained ? 60 : 30;
+    CHECK(engineer->jobAt == threshold);
+    sim.MutableState().engineCondition = threshold;
+    sim.PerformAction();
+    REQUIRE(sim.ActionCount() == 1);
+    const auto* task = sim.FindOngoing("maint-eng");
+    REQUIRE(task != nullptr);
+    const double work = trained ? 4 : 7;
+    CHECK(task->total == work);
+    CHECK(task->left == work); // the birth action must not charge new work
+    for (int i = 0; i < static_cast<int>(work); ++i) sim.PerformAction();
+    CHECK(sim.FindOngoing("maint-eng") == nullptr); // no acknowledgment click
+    CHECK(sim.State().engineCondition == 100);
+    CHECK(sim.State().wearTick == 0);
+    CHECK(sim.ActionCount() == 1 + work);
+    for (int i = 0; i < 4; ++i) sim.PerformAction();
+    CHECK(sim.State().engineCondition == 99); // original four-action wear cycle
+  }
+}
+
+TEST_CASE("scan work uses catalogue cost and HTA sensor bonus rather than travel distance", "[simulation][scan][audit]") {
+  auto catalog = World();
+  catalog.rules.scanCost = 9;
+  for (const auto& target : {"halvan", "tolme"}) {
+    auto sim = ship::Simulation::NewVoyage(catalog);
+    sim.MutableState().navTarget = target;
+    sim.MutableState().sim.sensor = 1;
+    REQUIRE(sim.StartScan());
+    REQUIRE(sim.FindOngoing("scan") != nullptr);
+    CHECK(sim.ScanCost() == 9);
+    CHECK(sim.FindOngoing("scan")->left == 7);
+    CHECK(sim.State().sim.sensor == 0);
+    CHECK(sim.ActionCount() == 1);
+  }
+  auto upgraded = Fresh();
+  upgraded.MutableState().docked = true;
+  upgraded.MutableMap().here = "tolme";
+  upgraded.MutableState().shiplets = 1000;
+  REQUIRE(upgraded.BuyUpgrade("scanner"));
+  CHECK(upgraded.ScanCost() == 3);
+  upgraded.MutableState().navTarget = "halvan";
+  upgraded.MutableState().sim.sensor = 1;
+  REQUIRE(upgraded.StartScan());
+  REQUIRE(upgraded.FindOngoing("scan") != nullptr);
+  CHECK(upgraded.FindOngoing("scan")->total == 1);
+}
+
+TEST_CASE("cosmetic log timestamps do not tick the voyage and survive saves", "[simulation][feed][audit]") {
+  auto sim = Fresh();
+  const auto actions = sim.ActionCount();
+  const auto life = sim.State().airHold;
+  const auto revision = sim.FeedRevision();
+  sim.LogLine("Timestamp probe");
+  REQUIRE(sim.State().feed.size() == 1);
+  const auto stamp = sim.State().feed.back().stamp;
+  REQUIRE(stamp.size() == 8);
+  CHECK(stamp[2] == ':'); CHECK(stamp[5] == ':');
+  for (const int i : {0, 1, 3, 4, 6, 7}) CHECK((stamp[i] >= '0' && stamp[i] <= '9'));
+  CHECK(sim.ActionCount() == actions);
+  CHECK(sim.State().airHold == life);
+  CHECK(sim.FeedRevision() == revision + 1);
+  auto loaded = Fresh();
+  std::string error;
+  REQUIRE(loaded.LoadJson(sim.SaveJson(), &error));
+  CHECK(loaded.State().feed.back().stamp == stamp);
+  CHECK(loaded.State().feed.back().text == "Timestamp probe");
+}
+
+TEST_CASE("HTA cooldown tiers remain distinct and missing rules fall back to five", "[ui][cooldown][audit]") {
+  auto sim = Fresh();
+  CHECK(ship::RuleActions(sim, "routine") == 5);
+  CHECK(ship::RuleActions(sim, "systems") == 10);
+  CHECK(ship::RuleActions(sim, "space") == 15);
+  CHECK(ship::RuleActions(sim, "critical") == 20);
+  CHECK(ship::RuleActions(sim, "unregistered") == 5);
+}

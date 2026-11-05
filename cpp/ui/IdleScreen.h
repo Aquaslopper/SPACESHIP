@@ -77,4 +77,10 @@ IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout
                                 const Theme& theme, bool hideCrewLabels,
                                 float othersHeight, FxRng& rng);
 
+// Production layout measures its complete built content instead of accepting
+// a guessed non-feed allowance. The explicit-height overload remains available
+// for callers that already measured their surrounding host.
+IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout,
+                                const Theme& theme, bool hideCrewLabels, FxRng& rng);
+
 }  // namespace ship

@@ -1164,3 +1164,21 @@ TEST_CASE("sidebar paint origins survive clipping and footer hits stay pinned", 
   CHECK(pinned == 6);
   CHECK(partial);
 }
+
+TEST_CASE("the rendered Home feed measures rails hull and conditional dock strip", "[ui][layout][audit]") {
+  auto sim = Fresh();
+  for (const bool docked : {false, true}) {
+    sim.MutableState().docked = docked;
+    for (const float height : {720.0f, 1000.0f, 1600.0f}) {
+      const auto theme = ship::Theme::ById("classic");
+      const auto layout = ship::ComputeLayout(1280, height, height - 58, 0, true);
+      ship::FxRng rng;
+      const auto idle = ship::BuildIdleScreen(sim, layout, theme, false, rng);
+      CHECK(idle.feedHeight == ship::GiveFeedHeight(layout.content.h, idle.feedBox.y - layout.content.y));
+      CHECK(idle.feedHeight >= 62);
+      CHECK(idle.feedHeight <= 132);
+      CHECK(idle.feedBox.h == idle.feedHeight);
+      CHECK(idle.docked == docked);
+    }
+  }
+}
