@@ -1115,47 +1115,46 @@ void ShellView::PaintTitle(Simulation& sim) {
   DrawRectangle(0, 0, static_cast<int>(width_), static_cast<int>(height_),
                 ToRay(p.panel));
 
-  // The card keeps the art's ratio; the reference caps it at 1672 px wide.
-  const float margin = 12.0f;
-  float cardW = std::min(width_ - margin * 2.0f, 1672.0f);
+  // title.jpg is the complete menu card, not a hero image to decorate with a
+  // second, invented menu. Fit the entire 1672x941 artwork without cropping.
   const float ratio = 1672.0f / 941.0f;
-  const float cardH = cardW / ratio;
-  if (cardH > height_ - margin * 2.0f) {
-    cardW = (height_ - margin * 2.0f) * ratio;
-  }
-  const float measuredH = cardW / ratio;
-  const Area card{(width_ - cardW) * 0.5f, (height_ - measuredH) * 0.5f, cardW, measuredH};
-  DrawRectangle(static_cast<int>(card.x), static_cast<int>(card.y),
-                static_cast<int>(card.w), static_cast<int>(card.h), ToRay(p.panel2));
-  DrawRectangleLines(static_cast<int>(card.x), static_cast<int>(card.y),
-                     static_cast<int>(card.w), static_cast<int>(card.h), ToRay(p.borderDark));
-
-  // The app loads the title art beside its assets and owns the texture. Keep
-  // the source and destination at the authored 3:2 ratio, centre-cropping the
-  // 16:9 artwork rather than stretching it into a banner.
+  float cardW = std::min(width_, 1672.0f);
+  float cardH = cardW / ratio;
+  if (cardH > height_) { cardH = height_; cardW = cardH * ratio; }
+  const Area card{(width_ - cardW) * 0.5f, (height_ - cardH) * 0.5f, cardW, cardH};
+  DrawRectangle(0, 0, static_cast<int>(width_), static_cast<int>(height_), ToRay(p.panel2));
   if (titleArt_ != nullptr) {
     const Texture2D* texture = static_cast<const Texture2D*>(titleArt_);
-    const float artH = card.h * 0.55f;
-    const float artW = artH * 1.5f;
-    Rectangle source{0.0f, 0.0f, static_cast<float>(texture->width),
-                     static_cast<float>(texture->height)};
-    const float sourceAspect = source.width / source.height;
-    if (sourceAspect > 1.5f) {
-      source.width = source.height * 1.5f;
-      source.x = (static_cast<float>(texture->width) - source.width) * 0.5f;
-    } else if (sourceAspect < 1.5f) {
-      source.height = source.width / 1.5f;
-      source.y = (static_cast<float>(texture->height) - source.height) * 0.5f;
-    }
-    const float artX = card.x + (card.w - artW) * 0.5f;
-    DrawTexturePro(*texture, source,
-                   Rectangle{artX, card.y, artW, artH}, Vector2{0.0f, 0.0f}, 0.0f,
-                   Fade(ToRay(p.white), 1.0f));
-    DrawRectangleLines(static_cast<int>(artX), static_cast<int>(card.y),
-                       static_cast<int>(artW), static_cast<int>(artH), ToRay(p.border));
+    DrawTexturePro(*texture,
+                   Rectangle{0.0f, 0.0f, static_cast<float>(texture->width),
+                             static_cast<float>(texture->height)},
+                   Rectangle{card.x, card.y, card.w, card.h}, Vector2{0.0f, 0.0f}, 0.0f,
+                   ToRay(p.white));
   }
 
-  const float headY = card.y + card.h * 0.55f + 18.0f;
+  // The artwork itself contains the six menu labels and button treatments.
+  // Their click regions are derived from the authored bottom menu strip.
+  if (titlePanel_ == TitlePanel::None && !titleConfirm_) {
+    const Area menu{card.x + card.w * 0.02f, card.y + card.h * 0.903f,
+                    card.w * 0.818f, card.h * 0.0565f};
+    const std::size_t count = title_.actions.size();
+    if (count > 0) {
+      const float cell = menu.w / static_cast<float>(count);
+      for (std::size_t i = 0; i < count; ++i) {
+        titleHits_.push_back(NavHit{Area{menu.x + cell * static_cast<float>(i), menu.y,
+                                         cell, menu.h}, title_.actions[i].id, ""});
+      }
+    }
+    if (!titleMessage_.empty()) {
+      Text(titleMessage_.c_str(), static_cast<int>(card.x + 12.0f),
+           static_cast<int>(card.Bottom() - TypeStep(24.0f)), TypePx(10), ToRay(p.coffee));
+    }
+    return;
+  }
+
+  // Secondary sheets are overlays on the real artwork; never redraw a mock
+  // title, a substitute button column, or a cropped copy of the art.
+  const float headY = card.y + 24.0f;
   Text(title_.heading.c_str(), static_cast<int>(card.x + 34.0f),
            static_cast<int>(headY), TypePx(40) , ToRay(p.ink));
   Text(title_.subtitle.c_str(), static_cast<int>(card.x + 36.0f),
@@ -1880,9 +1879,10 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         return;
       }
       if (hit.action == "resume") {
+        if (!fromVoyage_) { quitRequested_ = true; return; }
         PressTitleAction(sim, "resume", "", &fromVoyage_, &titlePanel_, &titleSlot_,
                          saveDir_, &titleMessage_, &titleActive_);
-        if (fromVoyage_) { HideTitle(); }
+        HideTitle();
         return;
       }
       PressTitleAction(sim, hit.action, "", &fromVoyage_, &titlePanel_, &titleSlot_,
