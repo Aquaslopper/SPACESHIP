@@ -18,7 +18,7 @@ jobs:
         run: |
           import pathlib, re
 
-          # 1. CMakeLists.txt fixes for CMake 4.0 + Windows
+          # 1. CMakeLists.txt fixes for CMake 4.0 + Windows + portable relative asset path
           cmake_path = pathlib.Path("CMakeLists.txt")
           if cmake_path.exists():
               txt = cmake_path.read_text(encoding="utf-8")
@@ -28,6 +28,8 @@ jobs:
               txt = txt.replace('${RLIMGUI_SOURCE_DIR}', '${rlimgui_SOURCE_DIR}')
               txt = txt.replace('${IMGUI_SOURCE_DIR}', '${imgui_SOURCE_DIR}')
               txt = txt.replace('${RAYLIB_SOURCE_DIR}', '${raylib_SOURCE_DIR}')
+              txt = txt.replace('${CMAKE_SOURCE_DIR}/assets', 'assets')
+              txt = txt.replace('${PROJECT_SOURCE_DIR}/assets', 'assets')
               cmake_path.write_text(txt, encoding="utf-8")
 
           # 2. Catalog.cpp: avoid GCC 13/14 false-positive -Wdangling-reference
@@ -38,16 +40,12 @@ jobs:
               txt = txt.replace("const std::string& ctx)", "std::string ctx)")
               cat_path.write_text(txt, encoding="utf-8")
 
-          # 3. main.cpp line 318: ensure std::filesystem::path converts to std::string on Windows
+          # 3. main.cpp line 284: audio.Start(assets) -> audio.Start(assets.string())
           main_path = pathlib.Path("cpp/app/main.cpp")
           if main_path.exists():
-              lines = main_path.read_text(encoding="utf-8").splitlines()
-              for i in range(max(0, 310), min(len(lines), 326)):
-                  # Convert e.g. SaveSlotPath(sim, slot) or fs::path args passed to functions taking const std::string&
-                  if ".string()" not in lines[i]:
-                      lines[i] = re.sub(r'(SaveSlotPath\s*\([^)]+\))', r'\1.string()', lines[i])
-                      lines[i] = re.sub(r'([a-zA-Z0-9_]+\.path\(\))', r'\1.string()', lines[i])
-              main_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+              txt = main_path.read_text(encoding="utf-8")
+              txt = txt.replace("audio.Start(assets)", "audio.Start(assets.string())")
+              main_path.write_text(txt, encoding="utf-8")
 
       - name: Pre-fetch ImGui & rlImGui sources explicitly
         shell: bash
