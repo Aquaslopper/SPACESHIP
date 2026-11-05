@@ -60,15 +60,31 @@ jobs:
           g++ --version
 
       - name: Configure (Ninja + MinGW, Release)
-        run: >
-          cmake -S . -B build -G Ninja
-          -DCMAKE_BUILD_TYPE=Release
-          -DCMAKE_C_COMPILER=gcc
-          -DCMAKE_CXX_COMPILER=g++
-          -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+        shell: bash
+        run: |
+          set -o pipefail
+          # Keep the log and put its failure lines in the check annotations: the
+          # raw job log is not visible from every tooling environment, and
+          # "exit code 1" alone never says which dependency complained.
+          if ! cmake -S . -B build -G Ninja \
+                 -DCMAKE_BUILD_TYPE=Release \
+                 -DCMAKE_C_COMPILER=gcc \
+                 -DCMAKE_CXX_COMPILER=g++ \
+                 -DCMAKE_POLICY_VERSION_MINIMUM=3.5 2>&1 | tee configure.log; then
+            grep -n -i -m 8 -E "cmake error|error:|could not|cannot|failed" configure.log | sed 's/^/::error::/' || true
+            tail -15 configure.log | sed 's/^/::error::/'
+            exit 1
+          fi
 
       - name: Build spaceship and spaceship_tests
-        run: cmake --build build --parallel
+        shell: bash
+        run: |
+          set -o pipefail
+          if ! cmake --build build --parallel 2>&1 | tee build.log; then
+            grep -n -i -m 10 -E "error|undefined reference|ld returned" build.log | sed 's/^/::error::/' || true
+            tail -15 build.log | sed 's/^/::error::/'
+            exit 1
+          fi
 
       - name: Run the unit suite
         run: .\build\spaceship_tests.exe --reporter compact
