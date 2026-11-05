@@ -568,6 +568,18 @@ TEST_CASE("the sidebar's controls are where they are painted", "[ui][shell]") {
   const int folded = rowsFor("vessel");
   sim.MutableState().spOpen["vessel"] = true;
   CHECK(rowsFor("vessel") > folded);
+
+  // SideHit carries the right-hand values that the HTA renders beside each
+  // resource label; the native painter must not silently drop these fields.
+  sim.MutableState().spOpen["resources"] = true;
+  bool shipletsShown = false;
+  for (const ship::SideHit& hit :
+       ship::SideHits(sim, layout.sidepanel, layout.sidefoot, 17.0f)) {
+    if (hit.text == "Shiplets" && hit.rightValue == "340") {
+      shipletsShown = true;
+    }
+  }
+  CHECK(shipletsShown);
 }
 
 TEST_CASE("the foot and the rewards count", "[ui][shell]") {

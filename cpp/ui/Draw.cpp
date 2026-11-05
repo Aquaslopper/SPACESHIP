@@ -363,6 +363,13 @@ void ShellView::PaintChrome(Simulation& sim) {
     if (hit.box.y < layout_.sidepanel.y) { continue; }   // the foot is drawn below
     draw->AddText(ImVec2(hit.box.x, hit.box.y),
                   ToIm(hit.dim ? p.muted : p.ink), hit.text.c_str());
+    if (!hit.rightValue.empty()) {
+      const ImVec2 valueSize = ImGui::CalcTextSize(hit.rightValue.c_str());
+      const float valueX = std::max(hit.box.x,
+                                    hit.box.Right() - valueSize.x - 1.0f);
+      draw->AddText(ImVec2(valueX, hit.box.y),
+                    ToIm(hit.dim ? p.muted : p.ink), hit.rightValue.c_str());
+    }
     if (!hit.detail.empty()) {
       draw->AddText(ImVec2(hit.box.x, hit.box.y + 12.0f), ToIm(p.muted),
                     hit.detail.c_str());
