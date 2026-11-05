@@ -188,6 +188,8 @@ class ShellView {
   Area wikiIndexBox_{};
   Area wikiBodyBox_{};
   Area navChartBox_{};
+  float navChartScaleX_ = 1.0f;
+  float navChartScaleY_ = 1.0f;
 
   TaskScreenModel taskScreen_;
   std::vector<std::pair<Area, std::string>> taskButtons_;

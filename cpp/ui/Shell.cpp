@@ -1,18 +1,18 @@
 // ============================================================================
 //  Shell.cpp — tabs, sidebar, foot, status line.
 //  ---------------------------------------------------------------------------
-//  Faithful to Section H (tab system), Section J (sidebar) and Section L
-//  (status bar). The UI-only state kept here is the same state the reference
-//  saves with the voyage: which tabs are open, which one is on screen, which
-//  ones still owe the player a cream pulse, and which sidebar blocks are folded
-//  open. Nothing else is retained between paints - the numbers are read fresh
-//  from the voyage every time, which is what stops a tab showing a stale ship.
+//  Implements the native tab system, sidebar and status bar corresponding to
+//  Sections H, J and L of the HTA. This correspondence is not by itself proof
+//  of visual or interaction parity. UI-only state tracks open tabs, the active
+//  screen, unread-tab pulses and folded sidebar blocks; voyage values are read
+//  from the simulation on each paint to avoid stale displayed ship state.
 // ============================================================================
 #include "ui/Shell.h"
 
 #include "ui/Describe.h"
 
 #include <algorithm>
+#include <cmath>
 
 #include "core/JsNumber.h"
 
@@ -369,15 +369,27 @@ std::vector<SideHit> SideHits(const Simulation& sim, const Area& sidepanel,
       continue;
     }
     for (const SideRow& row : block.rows) {
+      const float rowWidth = std::max(1.0f, sidepanel.w - 18.0f);
+      const float averageCharWidth = std::max(6.0f, lineHeight * 0.5f);
+      const float maxChars = std::max(1.0f, rowWidth / averageCharWidth);
       float height = lineHeight;
-      // A long value gets its own line beneath its label.
-      if (row.kind == "long" || row.kind == "event") { height += 14.0f; }
       SideHit hit;
       hit.text = row.key;
       hit.detail = row.kind == "long" ? row.value : std::string();
       hit.rightValue = row.kind == "pair" ? row.value : std::string();
       hit.dim = row.dim;
-      hit.box = Area{sidepanel.x + 12.0f, 0.0f, sidepanel.w - 18.0f, height};
+      if (row.kind == "long") {
+        const float detailLines = std::max(
+            1.0f, std::ceil(static_cast<float>(row.value.size()) / maxChars));
+        height += detailLines * lineHeight + 4.0f;
+      } else if (row.kind == "event") {
+        height = std::max(lineHeight + 6.0f, 30.0f);
+      } else if (row.kind == "pair" &&
+                 static_cast<float>(row.key.size() + row.value.size()) > maxChars) {
+        hit.stackValue = true;
+        height += lineHeight;
+      }
+      hit.box = Area{sidepanel.x + 12.0f, 0.0f, rowWidth, height};
       if (row.kind == "event") {
         hit.action = SideAction::OpenEvent;
         hit.key = row.id;
@@ -390,8 +402,8 @@ std::vector<SideHit> SideHits(const Simulation& sim, const Area& sidepanel,
 
   // The pinned foot: four ship functions, then the two reference windows.
   // Always emitted regardless of how many sidebar blocks are unfolded above.
-  float fx = foot.x + 8.0f;
   const std::vector<FootButton> buttons = FootButtons();
+  float fx = foot.x + std::max(0.0f, (foot.w - 128.0f) * 0.5f);
   const SideAction actions[4] = {SideAction::Manifest, SideAction::Log,
                                  SideAction::Files, SideAction::Settings};
   for (std::size_t i = 0; i < buttons.size() && i < 4; ++i) {
@@ -401,7 +413,7 @@ std::vector<SideHit> SideHits(const Simulation& sim, const Area& sidepanel,
     hit.text = buttons[i].title;
     hit.box = Area{fx, foot.y + 8.0f, 32.0f, 28.0f};
     hits.push_back(hit);
-    fx += 38.0f;
+    fx += 32.0f;
   }
 
   SideHit wiki;

@@ -1,9 +1,10 @@
 // ============================================================================
 //  simulation_tests.cpp — the parts of the action loop worth pinning down.
 //  ---------------------------------------------------------------------------
-//  The heavy proof of parity is the differential harness (tools/trace-voyage.cjs
-//  against the reference, diffed with spaceship_console). These are the units
-//  that should fail loudly and quickly when someone edits the wrong number.
+//  Selected differential scenarios are exercised by tools/trace-voyage.cjs
+//  against the reference and diffed with spaceship_console. That coverage is a
+//  useful model check, not proof of complete gameplay or UI parity. These unit
+//  tests pin focused invariants that should fail loudly when edited incorrectly.
 // ============================================================================
 #include <catch2/catch_test_macros.hpp>
 

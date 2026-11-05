@@ -107,6 +107,7 @@ struct SideHit {
   Area box;
   bool header = false;
   bool dim = false;
+  bool stackValue = false;
 };
 
 std::vector<SideHit> SideHits(const Simulation& sim, const Area& sidepanel,

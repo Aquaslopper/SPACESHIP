@@ -147,9 +147,16 @@ void SelectImGuiFont(const FontResources& fonts, int fontStep) {
 }
 
 Texture2D LoadTitleTexture(const std::filesystem::path& assets) {
+  const char* appDirectory = GetApplicationDirectory();
+  const std::filesystem::path appDir =
+      appDirectory != nullptr && *appDirectory != '\0'
+          ? std::filesystem::path(appDirectory)
+          : std::filesystem::current_path();
   const std::vector<std::filesystem::path> candidates = {
-      assets / "art" / "title.jpg", std::filesystem::current_path() / "spaceship.png",
-      assets / "art" / "spaceship.png"};
+      assets / "art" / "title.jpg", appDir / "assets" / "art" / "title.jpg",
+      std::filesystem::current_path() / "assets" / "art" / "title.jpg",
+      std::filesystem::current_path() / "spaceship.png",
+      assets / "art" / "spaceship.png", appDir / "spaceship.png"};
   for (const std::filesystem::path& candidate : candidates) {
     if (!std::filesystem::exists(candidate)) { continue; }
     Texture2D texture = LoadTexture(candidate.string().c_str());

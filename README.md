@@ -1,5 +1,7 @@
 # Spaceship Command
 
+> **Working on the native port?** Start with [Repair & Rescue](REPAIR_AND_RESCUE.md): `Spaceship.hta` is the 1:1 reference, and parity claims require source tracing and side-by-side verification.
+
 Run `Spaceship.hta` on Windows, or use the browser preview to try it. The title menu uses the supplied artwork and lets you start a voyage, load any of three slots, adjust options or read a quick guide. The game is action-driven: waiting, reading, opening tabs and choosing map targets are free. Starting work costs one action; work in progress advances as you spend actions elsewhere. Navigation also has a **Stand watch** command that spends one action to advance work and survival clocks without a direct item cost, useful when the hold is full; normal life-support and crew consumption still applies. Power-dependent projects, travel, scans and salvage pause if energy runs out.
 
 ## Getting started
@@ -170,9 +172,10 @@ a syntax check is not a UI test. Full graphical comparison remains open work.
 ### Save compatibility
 
 `SaveSystem.cpp` writes and reads the original format one key at a time: the same
-seventeen top-level keys, the same `state` fields, the same `format` string. It is
-proven in both directions by `tools/run-save-parity.cmake`, which `ctest` runs as
-`parity.save-roundtrip`:
+seventeen top-level keys, the same `state` fields, the same `format` string. The
+`tools/run-save-parity.cmake` test, run by `ctest` as `parity.save-roundtrip`,
+checks bidirectional compatibility for the scripted voyage and save round-trip
+below. This is scoped save-flow coverage, not a proof of every save/version/state combination:
 
 1. the port flies a voyage and writes a save;
 2. the reference loads that file and spends twenty actions; the port loads the
