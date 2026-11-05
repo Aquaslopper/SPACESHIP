@@ -1,0 +1,21 @@
+# Damagcontrol index — open defects
+
+Short entry point for current issues. Detailed evidence, history, and handoff notes live in [`damagecontrol_report.md`](damagecontrol_report.md). Keep this index concise; update statuses here and append investigation details to the report rather than rewriting its history.
+
+| ID | Status | Affected screen / area | Defect summary | Investigation log |
+|---|---|---|---|---|
+| UI-001 | OPEN | Ship / home dashboard | Stat labels and values use 18 px minimum text with fixed vertical offsets that can overlap. | [2026-11-05 baseline](damagecontrol_report.md#baseline-2026-11-05) |
+| UI-002 | OPEN | Shared chrome and content | ImGui chrome and Raylib content use different effective font metrics; layout and hitboxes may not match rendered text. | [2026-11-05 baseline](damagecontrol_report.md#baseline-2026-11-05) |
+| UI-003 | OPEN | Main content / all overflowing screens | Wheel input updates `contentScroll_`, but painting and hit testing do not consume it; long screens cannot be relied on to scroll. | [2026-11-05 baseline](damagecontrol_report.md#baseline-2026-11-05) |
+| UI-004 | OPEN | Task headers and panels | Text fitting can truncate content and panel scissoring can hide it; verify information is preserved when fixing geometry. | [2026-11-05 baseline](damagecontrol_report.md#baseline-2026-11-05) |
+| PAR-001 | OPEN | Ship/home, Engine Room, Mess Hall, Navigation | Visual/content parity is not verified against fresh, matched runtime captures from the current port build. | [2026-11-05 baseline](damagecontrol_report.md#baseline-2026-11-05) |
+| PAR-002 | OPEN | Gameplay systems and save/reload | Overall behavior parity is unverified. The earlier service comparison covered only a narrow implementation segment. | [2026-11-05 baseline](damagecontrol_report.md#baseline-2026-11-05) |
+
+## Status key
+
+- **OPEN** — evidence indicates a defect or parity gap remains; fix or verification is still needed.
+- **IN PROGRESS** — someone is actively reproducing or changing it; add the owner/commit in a new report entry.
+- **BLOCKED** — cannot proceed until a named dependency or environment is available; state what is missing.
+- **VERIFIED FIX** — reproduced before, fixed, and checked against the same reference/state afterward. Record exact commit, environment, and comparison evidence in the report before using this status.
+
+IDs are stable; do not reuse them. When an issue is closed, retain its row and change its status to `VERIFIED FIX`, linking the verification entry. Add newly confirmed issues as new rows.

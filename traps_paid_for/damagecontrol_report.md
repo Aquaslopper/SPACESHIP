@@ -1,5 +1,7 @@
 # Damage-control report — Spaceship port
 
+> Current defect statuses: [`damagcontrol_index.md`](damagcontrol_index.md). Use the index as the short entry point; append investigation and verification details below.
+
 **Purpose:** an append-only handover log for work on the native port. Keep evidence, decisions, verification results, and unresolved defects together so future work does not repeat unverified assumptions or make a plausible-looking edit without checking the HTA.
 
 ## Rules for every future entry
@@ -47,6 +49,8 @@
 ```
 
 ---
+
+<a id="baseline-2026-11-05"></a>
 
 ## 2026-11-05 — Baseline handover from screenshot audit and comparison harness
 
