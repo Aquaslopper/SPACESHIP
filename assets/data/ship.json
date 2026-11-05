@@ -1,0 +1,905 @@
+{
+  "cargoByClass": {
+    "kestrel": [
+      60,
+      90,
+      120
+    ],
+    "wren": [
+      40,
+      60,
+      90
+    ]
+  },
+  "comment": "Hull geometry, deck plans and ship classes. Stage coordinates, pixels.",
+  "corridors": {
+    "kestrel": {
+      "h": 26,
+      "w": 740,
+      "x": 100,
+      "y": 210
+    },
+    "wren": {
+      "h": 24,
+      "w": 411,
+      "x": 35,
+      "y": 154
+    }
+  },
+  "hulls": {
+    "kestrel": [
+      {
+        "cls": "hp-nacelle",
+        "h": 30,
+        "id": "nac-d",
+        "w": 420,
+        "x": 140,
+        "y": 6
+      },
+      {
+        "cls": "hp-pylon",
+        "h": 12,
+        "id": "pyl-d1",
+        "w": 18,
+        "x": 214,
+        "y": 36
+      },
+      {
+        "cls": "hp-pylon",
+        "h": 12,
+        "id": "pyl-d2",
+        "w": 18,
+        "x": 468,
+        "y": 36
+      },
+      {
+        "cls": "hp-spine",
+        "h": 58,
+        "id": "spine",
+        "w": 580,
+        "x": 200,
+        "y": 46
+      },
+      {
+        "cls": "hp-body",
+        "h": 256,
+        "id": "body",
+        "w": 810,
+        "x": 90,
+        "y": 102
+      },
+      {
+        "cls": "hp-pod",
+        "h": 58,
+        "id": "pod",
+        "w": 480,
+        "x": 240,
+        "y": 358
+      },
+      {
+        "cls": "hp-pylon",
+        "h": 8,
+        "id": "pyl-v1",
+        "w": 18,
+        "x": 300,
+        "y": 416
+      },
+      {
+        "cls": "hp-pylon",
+        "h": 8,
+        "id": "pyl-v2",
+        "w": 18,
+        "x": 642,
+        "y": 416
+      },
+      {
+        "cls": "hp-nacelle",
+        "h": 30,
+        "id": "nac-v",
+        "w": 420,
+        "x": 230,
+        "y": 424
+      },
+      {
+        "cls": "hp-lens",
+        "h": 160,
+        "id": "lens",
+        "w": 290,
+        "x": 850,
+        "y": 150
+      }
+    ],
+    "wren": [
+      {
+        "cls": "hp-nacelle",
+        "h": 22,
+        "id": "nac-d",
+        "w": 280,
+        "x": 55,
+        "y": 3
+      },
+      {
+        "cls": "hp-pylon",
+        "h": 10,
+        "id": "pyl-d1",
+        "w": 14,
+        "x": 108,
+        "y": 25
+      },
+      {
+        "cls": "hp-pylon",
+        "h": 10,
+        "id": "pyl-d2",
+        "w": 14,
+        "x": 300,
+        "y": 25
+      },
+      {
+        "cls": "hp-spine",
+        "h": 44,
+        "id": "spine",
+        "w": 360,
+        "x": 65,
+        "y": 35
+      },
+      {
+        "cls": "hp-body",
+        "h": 270,
+        "id": "body",
+        "w": 420,
+        "x": 25,
+        "y": 78
+      },
+      {
+        "cls": "hp-lens",
+        "h": 140,
+        "id": "lens",
+        "w": 175,
+        "x": 415,
+        "y": 130
+      }
+    ]
+  },
+  "priceKestrel": 4000,
+  "roomFits": {
+    "r1": [
+      "Medical Bay",
+      "Triage / treatment"
+    ],
+    "r10": [
+      "Fuel Reserve",
+      "Salvage / fuel cells"
+    ],
+    "r11": [
+      "Damage Control",
+      "Emergency hull patching"
+    ],
+    "r12": [
+      "Observation",
+      "Local survey / history"
+    ],
+    "r13": [
+      "Recreation",
+      "Crew relationships"
+    ],
+    "r2": [
+      "Workshop",
+      "Salvage / repair kits"
+    ],
+    "r3": [
+      "Sensor Array",
+      "Sensor calibration"
+    ],
+    "r4": [
+      "Comms Relay",
+      "Local traffic / signals"
+    ],
+    "r5": [
+      "Thermal Control",
+      "Drive cooling"
+    ],
+    "r6": [
+      "Power Bus",
+      "Emergency distribution"
+    ],
+    "r7": [
+      "Shield Array",
+      "Power / shield transfer"
+    ],
+    "r8": [
+      "Hydroponics",
+      "Produce / rations"
+    ],
+    "r9": [
+      "Recyclers",
+      "Salvage / O2 canisters"
+    ],
+    "simulacron": [
+      "Simulacron Core",
+      "Memory mosaic / dream engine"
+    ]
+  },
+  "roomScenes": {
+    "bridge": {
+      "accent": "#dfb85e",
+      "code": "COMMAND / 20",
+      "description": "Navigation, crew status and the ship's working board.",
+      "glyph": "network",
+      "label": "Flight and watch control"
+    },
+    "cargo": {
+      "accent": "#83a8c7",
+      "code": "STORES / 06",
+      "description": "Three restrained bays keep recovered material secure.",
+      "glyph": "cargo",
+      "label": "Cargo and salvage"
+    },
+    "engine": {
+      "accent": "#d18a4c",
+      "code": "PROPULSION / 01",
+      "description": "Twin coolant loops feed the compact core.",
+      "glyph": "reactor",
+      "label": "Primary drive manifold"
+    },
+    "mess": {
+      "accent": "#d3a257",
+      "code": "GALLEY / 04",
+      "description": "The rack, stove and water line share one counter.",
+      "glyph": "habitat",
+      "label": "Rations and meal prep"
+    },
+    "o2": {
+      "accent": "#42aaa3",
+      "code": "LIFE SUPPORT / 02",
+      "description": "Three canisters scrub and recirculate cabin air.",
+      "glyph": "filter",
+      "label": "Atmosphere recovery"
+    },
+    "quarters": {
+      "accent": "#b59670",
+      "code": "HABITAT / 03",
+      "description": "Six berths, lockers and a shared watch board.",
+      "glyph": "habitat",
+      "label": "Crew quarters"
+    },
+    "r1": {
+      "accent": "#d66d71",
+      "code": "MEDICAL / 05",
+      "description": "A compact care station with monitored recovery beds.",
+      "glyph": "medical",
+      "label": "Triage and treatment"
+    },
+    "r10": {
+      "accent": "#d39a51",
+      "code": "FUEL RESERVE / 17",
+      "description": "A small press recovers one fuel cell from salvage.",
+      "glyph": "cargo",
+      "label": "Cell refinery"
+    },
+    "r11": {
+      "accent": "#d56d5d",
+      "code": "DAMAGE CONTROL / 18",
+      "description": "Brace plates are cut to fit the damaged section.",
+      "glyph": "cargo",
+      "label": "Hull patch station"
+    },
+    "r12": {
+      "accent": "#80c8d5",
+      "code": "OBSERVATION / 19",
+      "description": "A clear forward window records each place once.",
+      "glyph": "orbit",
+      "label": "External survey port"
+    },
+    "r13": {
+      "accent": "#c68eb4",
+      "code": "RECREATION / 21",
+      "description": "Two crew can share a meal and repair a strained bond.",
+      "glyph": "habitat",
+      "label": "Common room"
+    },
+    "r2": {
+      "accent": "#ce9564",
+      "code": "WORKSHOP / 09",
+      "description": "Recovered alloys become tools and repair kits.",
+      "glyph": "cargo",
+      "label": "Fabrication bench"
+    },
+    "r3": {
+      "accent": "#55c3d6",
+      "code": "SENSORS / 10",
+      "description": "The array calibrates one scan at a time.",
+      "glyph": "orbit",
+      "label": "Long-range aperture"
+    },
+    "r4": {
+      "accent": "#78a9e8",
+      "code": "COMMS / 11",
+      "description": "Local traffic and old transmissions share a receiver.",
+      "glyph": "network",
+      "label": "Relay and signal desk"
+    },
+    "r5": {
+      "accent": "#e37e57",
+      "code": "THERMAL / 12",
+      "description": "Heat exchangers protect the worn drive.",
+      "glyph": "reactor",
+      "label": "Radiator control"
+    },
+    "r6": {
+      "accent": "#e0b85e",
+      "code": "POWER / 13",
+      "description": "A protected bus routes power between systems.",
+      "glyph": "reactor",
+      "label": "Emergency distribution"
+    },
+    "r7": {
+      "accent": "#6d9fc6",
+      "code": "DEFENCE / 14",
+      "description": "The array trades reserve power for protection.",
+      "glyph": "network",
+      "label": "Shield harmonics"
+    },
+    "r8": {
+      "accent": "#7daf69",
+      "code": "HYDROPONICS / 15",
+      "description": "Produce can be turned into fresh shipboard rations.",
+      "glyph": "garden",
+      "label": "Grow beds"
+    },
+    "r9": {
+      "accent": "#69b88a",
+      "code": "RECYCLING / 16",
+      "description": "Salvage is separated into useful life-support stock.",
+      "glyph": "filter",
+      "label": "Material recovery"
+    },
+    "science": {
+      "accent": "#6ebed4",
+      "code": "SCIENCE / 07",
+      "description": "Scans, observations and packaged data are filed here.",
+      "glyph": "orbit",
+      "label": "Survey archive"
+    },
+    "simulacron": {
+      "accent": "#a981d0",
+      "code": "SIMULACRON / 08",
+      "description": "A quiet core turns lived experience into insight.",
+      "glyph": "core",
+      "label": "Memory mosaic"
+    }
+  },
+  "rooms": {
+    "kestrel": [
+      {
+        "h": 94,
+        "id": "engine",
+        "name": "Engine Room",
+        "systems": "Propulsion / Power",
+        "tag": "AFT",
+        "tone": "#f4efe6",
+        "w": 160,
+        "x": 100,
+        "y": 112
+      },
+      {
+        "h": 94,
+        "id": "o2",
+        "name": "O2 Filter Room",
+        "systems": "Life support - filters and canister rack",
+        "tag": "DECK A",
+        "tone": "#f4efe6",
+        "w": 126,
+        "x": 268,
+        "y": 112
+      },
+      {
+        "h": 94,
+        "id": "quarters",
+        "name": "Crew Quarters",
+        "systems": "Habitation - shared bunks",
+        "tag": "DECK A",
+        "tone": "#faf7f2",
+        "w": 130,
+        "x": 402,
+        "y": 112
+      },
+      {
+        "h": 94,
+        "id": "mess",
+        "name": "Mess Hall",
+        "systems": "Galley / Rations",
+        "tag": "DECK A",
+        "tone": "#faf7f2",
+        "w": 142,
+        "x": 540,
+        "y": 112
+      },
+      {
+        "h": 94,
+        "id": "r1",
+        "name": "Medical Bay",
+        "systems": "Triage / treatment",
+        "tag": "DECK A",
+        "tone": "#fdfbf7",
+        "w": 150,
+        "x": 690,
+        "y": 112
+      },
+      {
+        "h": 94,
+        "id": "cargo",
+        "name": "Cargo Hold",
+        "systems": "Storage - 3 bays",
+        "tag": "DECK B",
+        "tone": "#f4efe6",
+        "w": 308,
+        "x": 100,
+        "y": 240
+      },
+      {
+        "h": 94,
+        "id": "science",
+        "name": "Science Room",
+        "systems": "Survey records / scan logs",
+        "tag": "DECK B",
+        "tone": "#faf7f2",
+        "w": 160,
+        "x": 416,
+        "y": 240
+      },
+      {
+        "h": 94,
+        "id": "simulacron",
+        "name": "Simulacron Core",
+        "systems": "Memory / dreams",
+        "tag": "DECK B",
+        "tone": "#f7efe9",
+        "w": 90,
+        "x": 584,
+        "y": 240
+      },
+      {
+        "h": 94,
+        "id": "r2",
+        "name": "Workshop",
+        "systems": "Salvage / repair kits",
+        "tag": "DECK B",
+        "tone": "#fdfbf7",
+        "w": 158,
+        "x": 682,
+        "y": 240
+      },
+      {
+        "h": 44,
+        "id": "r3",
+        "name": "Sensor Array",
+        "small": true,
+        "systems": "Sensor calibration",
+        "tag": "SPINE",
+        "tone": "#faf7f2",
+        "w": 106,
+        "x": 206,
+        "y": 54
+      },
+      {
+        "h": 44,
+        "id": "r4",
+        "name": "Comms Relay",
+        "small": true,
+        "systems": "Local traffic / signals",
+        "tag": "SPINE",
+        "tone": "#fdfbf7",
+        "w": 106,
+        "x": 320,
+        "y": 54
+      },
+      {
+        "h": 44,
+        "id": "r5",
+        "name": "Thermal Control",
+        "small": true,
+        "systems": "Drive cooling",
+        "tag": "SPINE",
+        "tone": "#faf7f2",
+        "w": 106,
+        "x": 434,
+        "y": 54
+      },
+      {
+        "h": 44,
+        "id": "r6",
+        "name": "Power Bus",
+        "small": true,
+        "systems": "Emergency distribution",
+        "tag": "SPINE",
+        "tone": "#fdfbf7",
+        "w": 106,
+        "x": 548,
+        "y": 54
+      },
+      {
+        "h": 44,
+        "id": "r7",
+        "name": "Shield Array",
+        "small": true,
+        "systems": "Power / shield transfer",
+        "tag": "SPINE",
+        "tone": "#faf7f2",
+        "w": 106,
+        "x": 662,
+        "y": 54
+      },
+      {
+        "h": 44,
+        "id": "r8",
+        "name": "Hydroponics",
+        "small": true,
+        "systems": "Produce / rations",
+        "tag": "POD",
+        "tone": "#faf7f2",
+        "w": 106,
+        "x": 252,
+        "y": 366
+      },
+      {
+        "h": 44,
+        "id": "r9",
+        "name": "Recyclers",
+        "small": true,
+        "systems": "Salvage / O2 canisters",
+        "tag": "POD",
+        "tone": "#fdfbf7",
+        "w": 106,
+        "x": 366,
+        "y": 366
+      },
+      {
+        "h": 44,
+        "id": "r10",
+        "name": "Fuel Reserve",
+        "small": true,
+        "systems": "Salvage / fuel cells",
+        "tag": "POD",
+        "tone": "#faf7f2",
+        "w": 106,
+        "x": 480,
+        "y": 366
+      },
+      {
+        "h": 44,
+        "id": "r11",
+        "name": "Damage Control",
+        "small": true,
+        "systems": "Emergency hull patching",
+        "tag": "POD",
+        "tone": "#fdfbf7",
+        "w": 106,
+        "x": 594,
+        "y": 366
+      },
+      {
+        "h": 32,
+        "id": "r12",
+        "name": "Observation",
+        "small": true,
+        "systems": "Local survey / history",
+        "tag": "LENS",
+        "tone": "#fdfbf7",
+        "w": 110,
+        "x": 940,
+        "y": 160
+      },
+      {
+        "h": 68,
+        "id": "bridge",
+        "name": "Bridge",
+        "systems": "Navigation / Comms",
+        "tag": "FWD",
+        "tone": "#f7f2e9",
+        "w": 210,
+        "x": 890,
+        "y": 196
+      },
+      {
+        "h": 32,
+        "id": "r13",
+        "name": "Recreation",
+        "small": true,
+        "systems": "Crew relationships",
+        "tag": "LENS",
+        "tone": "#fdfbf7",
+        "w": 110,
+        "x": 940,
+        "y": 268
+      }
+    ],
+    "wren": [
+      {
+        "h": 64,
+        "id": "engine",
+        "name": "Engine Room",
+        "small": false,
+        "systems": "Propulsion / Power",
+        "tag": "DECK A",
+        "tone": "#f4efe6",
+        "w": 79,
+        "x": 35,
+        "y": 86
+      },
+      {
+        "h": 64,
+        "id": "o2",
+        "name": "O2 Filter Room",
+        "small": false,
+        "systems": "Life support - filters and canister rack",
+        "tag": "DECK A",
+        "tone": "#f4efe6",
+        "w": 79,
+        "x": 118,
+        "y": 86
+      },
+      {
+        "h": 64,
+        "id": "quarters",
+        "name": "Crew Quarters",
+        "small": false,
+        "systems": "Habitation - shared bunks",
+        "tag": "DECK A",
+        "tone": "#faf7f2",
+        "w": 79,
+        "x": 201,
+        "y": 86
+      },
+      {
+        "h": 64,
+        "id": "mess",
+        "name": "Mess Hall",
+        "small": false,
+        "systems": "Galley / Rations",
+        "tag": "DECK A",
+        "tone": "#faf7f2",
+        "w": 79,
+        "x": 284,
+        "y": 86
+      },
+      {
+        "h": 64,
+        "id": "r1",
+        "name": "Medical Bay",
+        "small": false,
+        "systems": "Triage / treatment",
+        "tag": "DECK A",
+        "tone": "#fdfbf7",
+        "w": 79,
+        "x": 367,
+        "y": 86
+      },
+      {
+        "h": 76,
+        "id": "cargo",
+        "name": "Cargo Hold",
+        "small": false,
+        "systems": "Storage - 3 bays",
+        "tag": "DECK B",
+        "tone": "#f4efe6",
+        "w": 105,
+        "x": 35,
+        "y": 184
+      },
+      {
+        "h": 76,
+        "id": "science",
+        "name": "Science Room",
+        "small": false,
+        "systems": "Survey records / scan logs",
+        "tag": "DECK B",
+        "tone": "#faf7f2",
+        "w": 97,
+        "x": 144,
+        "y": 184
+      },
+      {
+        "h": 76,
+        "id": "simulacron",
+        "name": "Simulacron Core",
+        "small": false,
+        "systems": "Memory / dreams",
+        "tag": "DECK B",
+        "tone": "#f7efe9",
+        "w": 97,
+        "x": 245,
+        "y": 184
+      },
+      {
+        "h": 76,
+        "id": "r2",
+        "name": "Workshop",
+        "small": false,
+        "systems": "Salvage / repair kits",
+        "tag": "DECK B",
+        "tone": "#fdfbf7",
+        "w": 100,
+        "x": 346,
+        "y": 184
+      },
+      {
+        "h": 33,
+        "id": "r3",
+        "name": "Sensor Array",
+        "small": true,
+        "systems": "Sensor calibration",
+        "tag": "SPINE",
+        "tone": "#faf7f2",
+        "w": 67,
+        "x": 70,
+        "y": 41
+      },
+      {
+        "h": 33,
+        "id": "r4",
+        "name": "Comms Relay",
+        "small": true,
+        "systems": "Local traffic / signals",
+        "tag": "SPINE",
+        "tone": "#fdfbf7",
+        "w": 67,
+        "x": 141,
+        "y": 41
+      },
+      {
+        "h": 33,
+        "id": "r5",
+        "name": "Thermal Control",
+        "small": true,
+        "systems": "Drive cooling",
+        "tag": "SPINE",
+        "tone": "#faf7f2",
+        "w": 67,
+        "x": 212,
+        "y": 41
+      },
+      {
+        "h": 33,
+        "id": "r6",
+        "name": "Power Bus",
+        "small": true,
+        "systems": "Emergency distribution",
+        "tag": "SPINE",
+        "tone": "#fdfbf7",
+        "w": 67,
+        "x": 283,
+        "y": 41
+      },
+      {
+        "h": 33,
+        "id": "r7",
+        "name": "Shield Array",
+        "small": true,
+        "systems": "Power / shield transfer",
+        "tag": "SPINE",
+        "tone": "#faf7f2",
+        "w": 67,
+        "x": 354,
+        "y": 41
+      },
+      {
+        "h": 65,
+        "id": "r8",
+        "name": "Hydroponics",
+        "small": true,
+        "systems": "Produce / rations",
+        "tag": "DECK C",
+        "tone": "#faf7f2",
+        "w": 99,
+        "x": 35,
+        "y": 270
+      },
+      {
+        "h": 65,
+        "id": "r9",
+        "name": "Recyclers",
+        "small": true,
+        "systems": "Salvage / O2 canisters",
+        "tag": "DECK C",
+        "tone": "#fdfbf7",
+        "w": 99,
+        "x": 138,
+        "y": 270
+      },
+      {
+        "h": 65,
+        "id": "r10",
+        "name": "Fuel Reserve",
+        "small": true,
+        "systems": "Salvage / fuel cells",
+        "tag": "DECK C",
+        "tone": "#faf7f2",
+        "w": 99,
+        "x": 241,
+        "y": 270
+      },
+      {
+        "h": 65,
+        "id": "r11",
+        "name": "Damage Control",
+        "small": true,
+        "systems": "Emergency hull patching",
+        "tag": "DECK C",
+        "tone": "#fdfbf7",
+        "w": 99,
+        "x": 344,
+        "y": 270
+      },
+      {
+        "h": 27,
+        "id": "r12",
+        "name": "Observation",
+        "small": true,
+        "systems": "Local survey / history",
+        "tag": "LENS",
+        "tone": "#fdfbf7",
+        "w": 74,
+        "x": 465,
+        "y": 139
+      },
+      {
+        "h": 58,
+        "id": "bridge",
+        "name": "Bridge",
+        "small": false,
+        "systems": "Navigation / Comms",
+        "tag": "FWD",
+        "tone": "#f7f2e9",
+        "w": 122,
+        "x": 448,
+        "y": 169
+      },
+      {
+        "h": 27,
+        "id": "r13",
+        "name": "Recreation",
+        "small": true,
+        "systems": "Crew relationships",
+        "tag": "LENS",
+        "tone": "#fdfbf7",
+        "w": 74,
+        "x": 465,
+        "y": 230
+      }
+    ]
+  },
+  "ships": {
+    "kestrel": {
+      "beam": "64 m",
+      "berths": "14",
+      "built": "2387",
+      "className": "Kestrel-series light hauler",
+      "commander": "Commander",
+      "decks": "4",
+      "drive": "Twin nacelle, single primary core",
+      "height": "48 m",
+      "length": "212 m",
+      "mass": "9,400 t laden",
+      "name": "SC Tessellate",
+      "refit": "2391 - spine and dorsal pod added",
+      "registry": "TX-4471",
+      "yard": "Halvan Reach Yards, slip 9"
+    },
+    "wren": {
+      "beam": "28 m",
+      "berths": "6",
+      "built": "2388",
+      "className": "Wren-series compact courier",
+      "commander": "Commander",
+      "decks": "3",
+      "drive": "Single nacelle, compact core",
+      "height": "22 m",
+      "length": "88 m",
+      "mass": "2,100 t laden",
+      "name": "SC Wren",
+      "refit": "Compact multipurpose fit",
+      "registry": "WN-1083",
+      "yard": "Kessler Cooperative Yards"
+    }
+  }
+}

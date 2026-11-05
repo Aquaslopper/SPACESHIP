@@ -1,0 +1,226 @@
+{
+  "air": {
+    "holdMax": 20,
+    "step": 5
+  },
+  "airStages": [
+    {
+      "harm": 5,
+      "jobDrop": 10,
+      "slow": 2,
+      "tone": "#b05a42",
+      "word": "FOUL"
+    },
+    {
+      "harm": 10,
+      "jobDrop": 10,
+      "slow": 1.5,
+      "tone": "#b05a42",
+      "word": "BAD"
+    },
+    {
+      "harm": 0,
+      "jobDrop": 5,
+      "slow": 1.25,
+      "tone": "#c08a3e",
+      "word": "THIN"
+    },
+    {
+      "harm": 0,
+      "jobDrop": 0,
+      "slow": 1,
+      "tone": "#bda43f",
+      "word": "FADING"
+    },
+    {
+      "harm": 0,
+      "jobDrop": 0,
+      "slow": 1,
+      "tone": "#7f9161",
+      "word": "OPTIMAL"
+    }
+  ],
+  "cargo": {
+    "capacity": 40
+  },
+  "comment": "Life support, air stages, rations, drive wear and the store definitions.",
+  "engine": {
+    "perAction": 10,
+    "warnBelow": 50,
+    "wearEvery": 4,
+    "wearStep": 1
+  },
+  "goods": [
+    {
+      "id": "ore",
+      "kind": "Bulk metal",
+      "name": "Refined ore",
+      "risk": false,
+      "value": 280,
+      "vol": 14
+    },
+    {
+      "id": "parts",
+      "kind": "Components",
+      "name": "Drive components",
+      "risk": false,
+      "value": 840,
+      "vol": 6
+    },
+    {
+      "id": "greens",
+      "kind": "Perishable",
+      "name": "Hydroponic produce",
+      "risk": false,
+      "value": 210,
+      "vol": 9
+    },
+    {
+      "id": "amps",
+      "kind": "Unregistered",
+      "name": "Unmarked ampoules",
+      "risk": true,
+      "value": 1450,
+      "vol": 3
+    }
+  ],
+  "infos": [
+    {
+      "id": "location",
+      "label": "Current Location",
+      "value": "Kessler Drift - open space"
+    },
+    {
+      "id": "contacts",
+      "label": "Nearby Objects",
+      "value": "No contacts in scan range"
+    },
+    {
+      "id": "life",
+      "label": "Life Support",
+      "value": "Nominal - atmosphere stable"
+    }
+  ],
+  "life": {
+    "canisters": 6,
+    "capacity": 10,
+    "decay": 4,
+    "lifeMax": 200,
+    "slots": [
+      {
+        "id": "s0",
+        "name": "Slot 1",
+        "state": "empty"
+      },
+      {
+        "id": "s1",
+        "name": "Slot 2",
+        "state": "empty"
+      },
+      {
+        "id": "s2",
+        "name": "Slot 3",
+        "state": "empty"
+      }
+    ]
+  },
+  "mess": {
+    "capacity": 24,
+    "rack": 18
+  },
+  "messEvery": 25,
+  "messStarve": 90,
+  "messStarveEvery": 8,
+  "resources": [
+    {
+      "from": "purse",
+      "label": "Shiplets"
+    },
+    {
+      "from": "fuelCells",
+      "label": "Fuel cells"
+    },
+    {
+      "from": "rations",
+      "label": "Rations"
+    },
+    {
+      "from": "repairKits",
+      "label": "Repair kits"
+    },
+    {
+      "from": "medkits",
+      "label": "Medkits"
+    },
+    {
+      "from": "o2",
+      "label": "O2 tanks"
+    },
+    {
+      "from": "goods",
+      "label": "Goods"
+    },
+    {
+      "from": "survey",
+      "label": "Survey data"
+    }
+  ],
+  "scanCost": 5,
+  "stats": [
+    {
+      "colour": "#7f9161",
+      "id": "hull",
+      "label": "Hull Integrity",
+      "unit": "%",
+      "value": 100
+    },
+    {
+      "colour": "#c08a3e",
+      "id": "shield",
+      "label": "Shields",
+      "unit": "%",
+      "value": 62
+    },
+    {
+      "colour": "#7f9161",
+      "id": "energy",
+      "label": "Energy",
+      "unit": "%",
+      "value": 88
+    },
+    {
+      "colour": "#8c6f4e",
+      "id": "fuel",
+      "label": "Fuel",
+      "unit": "%",
+      "value": 74
+    }
+  ],
+  "survey": [
+    {
+      "id": "sv1",
+      "name": "Coldwell debris field",
+      "src": "Salvage",
+      "state": "filed",
+      "value": 260
+    },
+    {
+      "id": "sv2",
+      "name": "Tolme approach traffic",
+      "src": "Contract",
+      "state": "packaged",
+      "value": 90
+    }
+  ],
+  "surveyWorth": {
+    "belt": 120,
+    "moon": 90,
+    "origin": 60,
+    "planet": 110,
+    "region": 0,
+    "site": 160,
+    "star": 140,
+    "station": 90,
+    "system": 0
+  }
+}

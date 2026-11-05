@@ -1,0 +1,24 @@
+# Save parity, stage 4: read back what the other edition wrote.
+load runtime/saves/rt-b.json
+trace
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+trace

@@ -1,0 +1,541 @@
+{
+  "commendations": [
+    {
+      "detail": "Start a filter bank.",
+      "goal": 1,
+      "id": "breath",
+      "metric": "banks",
+      "reward": {
+        "fuel": 1
+      },
+      "title": "First Breath"
+    },
+    {
+      "detail": "Reach Tolme Anchorage.",
+      "goal": 1,
+      "id": "berth",
+      "metric": "berth",
+      "reward": {
+        "cash": 100
+      },
+      "title": "A Port in the Drift"
+    },
+    {
+      "detail": "Read a deep scan.",
+      "goal": 1,
+      "id": "eyes",
+      "metric": "scans",
+      "reward": {
+        "med": 1
+      },
+      "title": "Eyes Open"
+    },
+    {
+      "detail": "Read five different deep scans.",
+      "goal": 5,
+      "id": "survey",
+      "metric": "scans",
+      "reward": {
+        "cash": 250
+      },
+      "title": "The Patient Surveyor"
+    },
+    {
+      "detail": "Visit three star systems.",
+      "goal": 3,
+      "id": "atlas",
+      "metric": "systems",
+      "reward": {
+        "fuel": 2
+      },
+      "title": "Pocket Atlas"
+    },
+    {
+      "detail": "Visit every region.",
+      "goal": 7,
+      "id": "horizons",
+      "metric": "regions",
+      "reward": {
+        "cash": 900
+      },
+      "title": "Seven Horizons"
+    },
+    {
+      "detail": "Complete three ship projects, treatments or meals.",
+      "goal": 3,
+      "id": "work",
+      "metric": "projects",
+      "reward": {
+        "kits": 2
+      },
+      "title": "Working Hands"
+    },
+    {
+      "detail": "Complete two dreams in the Core.",
+      "goal": 2,
+      "id": "dream",
+      "metric": "dreams",
+      "reward": {
+        "med": 1
+      },
+      "title": "Thread and Loom"
+    },
+    {
+      "detail": "Complete two shared meals.",
+      "goal": 2,
+      "id": "table",
+      "metric": "meals",
+      "reward": {
+        "cash": 150
+      },
+      "title": "A Table for Two"
+    },
+    {
+      "detail": "Resolve three incident reports.",
+      "goal": 3,
+      "id": "crisis",
+      "metric": "incidents",
+      "reward": {
+        "med": 2
+      },
+      "title": "Crisis Hand"
+    },
+    {
+      "detail": "Complete and collect three regular contracts.",
+      "goal": 3,
+      "id": "courier",
+      "metric": "contracts",
+      "reward": {
+        "cash": 350
+      },
+      "title": "Licensed Courier"
+    },
+    {
+      "detail": "Complete and collect three repeatable commissions.",
+      "goal": 3,
+      "id": "commission",
+      "metric": "commissions",
+      "reward": {
+        "fuel": 2
+      },
+      "title": "A Name on the Board"
+    },
+    {
+      "detail": "Spend 200 actions on the voyage.",
+      "goal": 200,
+      "id": "watch",
+      "metric": "actions",
+      "reward": {
+        "fuel": 1,
+        "kits": 1
+      },
+      "title": "Long Watch"
+    },
+    {
+      "detail": "Reach a conclusion to the Silicon Marrow story.",
+      "goal": 1,
+      "id": "signal",
+      "metric": "signal",
+      "reward": {
+        "cash": 200
+      },
+      "title": "Signal Witness"
+    }
+  ],
+  "comment": "Contracts, incidents, ship projects, commendations, commissions and world history.",
+  "contracts": [
+    {
+      "goal": "visit",
+      "id": "arrival",
+      "note": "Reach Tolme Anchorage and report to its mission board.",
+      "reward": 120,
+      "target": "tolme",
+      "title": "A first berth"
+    },
+    {
+      "goal": "scan",
+      "id": "sirrus",
+      "note": "Run and read a deep scan of Sirrus Minor.",
+      "reward": 300,
+      "target": "sirrus",
+      "title": "The quiet star"
+    },
+    {
+      "goal": "scan",
+      "id": "halvan",
+      "note": "Run and read a deep scan of Halvan's Reach.",
+      "reward": 340,
+      "target": "halvan",
+      "title": "The debris ring"
+    },
+    {
+      "goal": "visit",
+      "id": "relay",
+      "note": "Visit Coldwell Relay, then collect at either station.",
+      "reward": 260,
+      "target": "relay",
+      "title": "Coldwell connection"
+    },
+    {
+      "goal": "freight",
+      "id": "freight",
+      "note": "Take 8 m3 of medical supplies from Tolme to Coldwell Relay.",
+      "origin": "tolme",
+      "reward": 420,
+      "target": "relay",
+      "title": "Medical shipment",
+      "vol": 8
+    },
+    {
+      "goal": "passenger",
+      "id": "passage",
+      "note": "Bring a passenger from Coldwell Relay to Tolme; one berth is needed.",
+      "origin": "relay",
+      "reward": 350,
+      "target": "tolme",
+      "title": "A passage home"
+    },
+    {
+      "goal": "visit",
+      "id": "orrin-route",
+      "note": "Jump to the Orrin Gate system and report back.",
+      "recognizePrior": true,
+      "reward": 480,
+      "target": "sec-orrin",
+      "title": "A familiar beacon"
+    },
+    {
+      "goal": "visit",
+      "id": "vance-visit",
+      "note": "Dock at Vance Exchange in the Vance Cluster.",
+      "recognizePrior": true,
+      "reward": 550,
+      "target": "vance-port",
+      "title": "Foundry lights"
+    },
+    {
+      "goal": "scan",
+      "id": "pell-survey",
+      "note": "Scan Blackglass in Pell Hollow.",
+      "recognizePrior": true,
+      "reward": 650,
+      "target": "pell-world",
+      "title": "The blackglass record"
+    },
+    {
+      "goal": "passenger",
+      "id": "core-passenger",
+      "note": "Carry a passenger from Vance Exchange to Lumen Arcology.",
+      "origin": "vance-port",
+      "reward": 1150,
+      "target": "lumen-port",
+      "title": "Passage to the Crown"
+    },
+    {
+      "cargo": "Relief supplies",
+      "goal": "freight",
+      "id": "verge-aid",
+      "note": "Deliver 8 m3 of relief supplies from Tolme to Lorn Harbour.",
+      "origin": "tolme",
+      "reward": 1400,
+      "target": "lorn-port",
+      "title": "Aid for the Verge",
+      "vol": 8
+    },
+    {
+      "cargo": "Thermal equipment",
+      "goal": "freight",
+      "id": "frost-haul",
+      "note": "Carry 6 m3 of thermal equipment from Coldwell Relay to Frostline Station.",
+      "origin": "relay",
+      "reward": 1600,
+      "target": "frost-port",
+      "title": "The long cold haul",
+      "vol": 6
+    },
+    {
+      "goal": "scan",
+      "id": "shoal-survey",
+      "note": "Scan the Choir Array in Echo Shoal.",
+      "recognizePrior": true,
+      "reward": 850,
+      "target": "echo-site",
+      "title": "Voices in the Shoal"
+    },
+    {
+      "goal": "visit",
+      "id": "rift-visit",
+      "note": "Visit Needle Dock in Needle Crossing.",
+      "recognizePrior": true,
+      "reward": 950,
+      "target": "needle-port",
+      "title": "Through the Rift"
+    },
+    {
+      "goal": "passenger",
+      "id": "salvage-passenger",
+      "note": "Take a passenger from Salvagers Rest to Meridian Exchange.",
+      "origin": "shipgrave-port",
+      "reward": 1250,
+      "target": "meridian-port",
+      "title": "One last berth"
+    },
+    {
+      "goal": "visit",
+      "id": "auriga-visit",
+      "note": "Visit Auriga Junction in the Outer Reach.",
+      "recognizePrior": true,
+      "reward": 850,
+      "target": "auriga-port",
+      "title": "The outer junction"
+    },
+    {
+      "goal": "scan",
+      "id": "archive-scan",
+      "note": "Read a deep scan of the Archive Hull in Palimpsest.",
+      "recognizePrior": true,
+      "reward": 900,
+      "target": "palimpsest-site",
+      "title": "An old catalogue"
+    },
+    {
+      "goal": "passenger",
+      "id": "halo-passenger",
+      "note": "Take a passenger from Frostline Station to Kiteward Haven.",
+      "origin": "frost-port",
+      "reward": 800,
+      "target": "kite-port",
+      "title": "Across the Halo"
+    }
+  ],
+  "incidents": [
+    {
+      "every": 100,
+      "first": 45,
+      "id": "fracture",
+      "kind": "Mechanical",
+      "remedy": "Seal the fracture",
+      "source": "Hull sensors",
+      "stages": [
+        {
+          "text": "A hairline fracture needs attention.",
+          "ticks": 10
+        },
+        {
+          "hull": -8,
+          "text": "The fracture is spreading.",
+          "ticks": 10
+        },
+        {
+          "hull": -12,
+          "text": "A bulkhead is losing pressure.",
+          "ticks": 8
+        },
+        {
+          "hull": -10,
+          "text": "The crew sealed the section, but the hull is damaged.",
+          "ticks": 0
+        }
+      ],
+      "title": "Hull micro-fracture"
+    },
+    {
+      "every": 120,
+      "first": 75,
+      "id": "surge",
+      "kind": "Electrical",
+      "remedy": "Isolate the damaged circuit",
+      "source": "Power distribution",
+      "stages": [
+        {
+          "text": "A circuit is drawing uneven power.",
+          "ticks": 9
+        },
+        {
+          "shield": -12,
+          "text": "The surge is stressing the shield generator.",
+          "ticks": 9
+        },
+        {
+          "energy": -15,
+          "text": "The circuit trips and drains the reserve.",
+          "ticks": 0
+        }
+      ],
+      "title": "Power surge"
+    },
+    {
+      "every": 140,
+      "first": 110,
+      "id": "crew",
+      "kind": "Crew",
+      "remedy": "Mediate the dispute",
+      "source": "Mess hall",
+      "stages": [
+        {
+          "text": "Two hands are arguing over shifts.",
+          "ticks": 12
+        },
+        {
+          "morale": -6,
+          "text": "The disagreement is affecting the whole crew.",
+          "ticks": 10
+        },
+        {
+          "morale": -6,
+          "text": "The argument subsides, leaving tempers frayed.",
+          "ticks": 0
+        }
+      ],
+      "title": "Crew dispute"
+    },
+    {
+      "every": 220,
+      "first": 210,
+      "id": "radiation",
+      "kind": "Environmental",
+      "remedy": "Shield the exposed sections",
+      "source": "Radiation sensors",
+      "stages": [
+        {
+          "text": "A radiation front is approaching the ship.",
+          "ticks": 12
+        },
+        {
+          "shield": -12,
+          "text": "The front is stressing the shields.",
+          "ticks": 9
+        },
+        {
+          "hull": -8,
+          "text": "The front has passed, leaving the hull scorched.",
+          "ticks": 0
+        }
+      ],
+      "title": "Radiation front"
+    },
+    {
+      "every": 260,
+      "first": 265,
+      "id": "static",
+      "kind": "Contact",
+      "remedy": "Filter and acknowledge the signal",
+      "requiresKit": false,
+      "source": "Comms array",
+      "stages": [
+        {
+          "text": "An unknown signal is interrupting routine traffic.",
+          "ticks": 12
+        },
+        {
+          "morale": -4,
+          "text": "The interference is wearing on the crew.",
+          "ticks": 10
+        },
+        {
+          "energy": -5,
+          "text": "The signal fades back into the static.",
+          "ticks": 0
+        }
+      ],
+      "title": "Unidentified signal"
+    }
+  ],
+  "projects": {
+    "brace": {
+      "energy": 4,
+      "label": "Use salvage to patch the hull (+15%)",
+      "lot": "Salvage",
+      "room": "r11",
+      "work": 4
+    },
+    "cooling": {
+      "energy": 5,
+      "label": "Cool and stabilize the drive (+15% condition)",
+      "room": "r5",
+      "work": 4
+    },
+    "decode": {
+      "energy": 4,
+      "label": "Decode the Silicon Marrow signal",
+      "room": "r4",
+      "work": 4
+    },
+    "dream": {
+      "energy": 3,
+      "label": "Consolidate two memories into an insight",
+      "room": "simulacron",
+      "work": 4
+    },
+    "food": {
+      "energy": 3,
+      "label": "Process produce into eight rations",
+      "lot": "Perishable",
+      "room": "r8",
+      "work": 3
+    },
+    "fuel": {
+      "energy": 4,
+      "label": "Refine salvage into a fuel cell",
+      "lot": "Salvage",
+      "room": "r10",
+      "work": 5
+    },
+    "kit": {
+      "energy": 3,
+      "label": "Turn recovered salvage into one repair kit",
+      "lot": "Salvage",
+      "room": "r2",
+      "work": 4
+    },
+    "observe": {
+      "energy": 3,
+      "label": "Record the present location",
+      "room": "r12",
+      "work": 4
+    },
+    "oxygen": {
+      "energy": 3,
+      "label": "Recycle salvage into an O2 canister",
+      "lot": "Salvage",
+      "room": "r9",
+      "work": 4
+    },
+    "sensors": {
+      "energy": 4,
+      "label": "Calibrate the next deep scan",
+      "room": "r3",
+      "work": 3
+    }
+  },
+  "worldHistory": {
+    "gal-core": [
+      "The Compact joined crowded worlds into a common market.",
+      "The archives remember agreements the markets outgrew."
+    ],
+    "gal-halo": [
+      "Ice haulers carried the first lamps into the cold.",
+      "Isolation makes water, shelter and a working beacon precious."
+    ],
+    "gal-inner": [
+      "The first lanes were chartered by independent haulers.",
+      "Old salvage rights still divide the ports."
+    ],
+    "gal-outer": [
+      "Convoys built their own stations beyond the assembly's reach.",
+      "Long supply lines remain their common obligation."
+    ],
+    "gal-rift": [
+      "Broken lanes forced scattered havens to negotiate passage.",
+      "Every crossing still relies on a promise between pilots."
+    ],
+    "gal-shoal": [
+      "Wrecks and listening posts mark an older migration.",
+      "The names of many vessels were lost before their signals."
+    ],
+    "gal-verge": [
+      "Small harbours grew around ships that could go no farther.",
+      "Weather and empty fuel tanks erase routes every year."
+    ]
+  }
+}

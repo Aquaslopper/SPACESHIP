@@ -1,0 +1,32 @@
+# Phase 3 gate: the three machine rooms, driven by their own controls.
+# Seat all three canisters, start the bank, wear the drive, repair it, cook.
+seat 0
+action Waiting on the rack
+action Waiting on the rack
+seat 1
+action Waiting on the rack
+action Waiting on the rack
+seat 2
+action Waiting on the rack
+action Waiting on the rack
+bank
+action Walking the deck
+action Walking the deck
+action Walking the deck
+maint
+action Watching the spanner
+action Watching the spanner
+action Watching the spanner
+action Watching the spanner
+action Watching the spanner
+action Watching the spanner
+action Watching the spanner
+cook
+action Waiting on the galley
+action Waiting on the galley
+action Waiting on the galley
+action Waiting on the galley
+action Waiting on the galley
+action Waiting on the galley
+action Waiting on the galley
+trace

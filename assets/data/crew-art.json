@@ -1,0 +1,389 @@
+{
+  "comment": "The quarters sprite tables, straight out of Spaceship.hta.",
+  "floory": 230,
+  "hairStyles": [
+    {
+      "id": "bald",
+      "rows": [
+        {
+          "row": 0,
+          "text": ".................."
+        },
+        {
+          "row": 1,
+          "text": ".................."
+        },
+        {
+          "row": 2,
+          "text": ".................."
+        },
+        {
+          "row": 3,
+          "text": ".................."
+        },
+        {
+          "row": 5,
+          "text": "..kkssssssssssskk."
+        },
+        {
+          "row": 6,
+          "text": ".kssssssssssssssk."
+        },
+        {
+          "row": 7,
+          "text": ".kssssssssssssssk."
+        },
+        {
+          "row": 8,
+          "text": ".kssssssssssssssk."
+        },
+        {
+          "row": 9,
+          "text": ".kssssssssssssssk."
+        },
+        {
+          "row": 10,
+          "text": ".ksssseesseessssk."
+        },
+        {
+          "row": 11,
+          "text": ".ksssseesseessssk."
+        },
+        {
+          "row": 12,
+          "text": ".kssssssssssssssk."
+        },
+        {
+          "row": 13,
+          "text": "..kssssssssssssk.."
+        }
+      ]
+    },
+    {
+      "id": "bun",
+      "rows": [
+        {
+          "row": 0,
+          "text": ".................."
+        },
+        {
+          "row": 1,
+          "text": ".......kkk........"
+        },
+        {
+          "row": 2,
+          "text": "......khHk........"
+        },
+        {
+          "row": 3,
+          "text": "......khhk........"
+        }
+      ]
+    },
+    {
+      "id": "cowlick",
+      "rows": []
+    },
+    {
+      "id": "crop",
+      "rows": [
+        {
+          "row": 0,
+          "text": ".................."
+        },
+        {
+          "row": 1,
+          "text": ".................."
+        },
+        {
+          "row": 2,
+          "text": ".................."
+        },
+        {
+          "row": 3,
+          "text": ".................."
+        }
+      ]
+    },
+    {
+      "id": "long",
+      "rows": [
+        {
+          "row": 0,
+          "text": ".................."
+        },
+        {
+          "row": 1,
+          "text": ".................."
+        },
+        {
+          "row": 2,
+          "text": ".................."
+        },
+        {
+          "row": 3,
+          "text": ".................."
+        },
+        {
+          "row": 14,
+          "text": "..khksssssssskhk.."
+        },
+        {
+          "row": 15,
+          "text": "..khkcccccccckhk.."
+        },
+        {
+          "row": 16,
+          "text": ".khcccccccccccchk."
+        },
+        {
+          "row": 17,
+          "text": ".khsccccyyccccshk."
+        }
+      ]
+    },
+    {
+      "id": "thin",
+      "rows": [
+        {
+          "row": 0,
+          "text": ".................."
+        },
+        {
+          "row": 1,
+          "text": ".................."
+        },
+        {
+          "row": 2,
+          "text": ".................."
+        },
+        {
+          "row": 3,
+          "text": ".................."
+        },
+        {
+          "row": 5,
+          "text": "..kkssssssssssskk."
+        },
+        {
+          "row": 6,
+          "text": ".kssssssssssssssk."
+        },
+        {
+          "row": 7,
+          "text": ".khsssssssssssshk."
+        }
+      ]
+    }
+  ],
+  "hats": {
+    "bandana": [
+      "...kkkkkkkk...",
+      "..kjjjjjjjjk..",
+      ".kjjjjjjjjjjk.",
+      ".kkjjjjjjjjkk.",
+      "..k.kk..kk.k.."
+    ],
+    "cap": [
+      "...kkkkkkkk...",
+      "..kjjjjjjjjk..",
+      ".kjjjjyjjjjjk.",
+      ".kkkkkkkkkkkk.",
+      "..kkkkkkkkkk.."
+    ],
+    "helmet": [
+      "...kkkkkkkk...",
+      "..kjjjjjjjjk..",
+      ".kjjjjjjjjjjk.",
+      ".kjjjjjjjjjjk.",
+      "kkkkkkkkkkkkkk"
+    ]
+  },
+  "jobHat": {
+    "cleaner": [
+      "bandana",
+      "#7f9161"
+    ],
+    "filters": [
+      "helmet",
+      "#6e8491"
+    ],
+    "maintenance": [
+      "helmet",
+      "#e0b53a"
+    ],
+    "navigation": [
+      "cap",
+      "#faf7f2"
+    ]
+  },
+  "jobTool": {
+    "cleaner": "mop",
+    "filters": "tank",
+    "maintenance": "wrench",
+    "navigation": "chart"
+  },
+  "lie": [
+    "......kkkk................",
+    "....kkhhhhkk..kkkkkkkkk...",
+    "...khhhhhhhhkkcccccccckk..",
+    "..khhsssssshkcccccccccckk.",
+    "..khseesssshkcccccccccddk.",
+    "..khhssssshkkcccccccccddk.",
+    "...khhhhhhkk.kkkkkkkkkddk.",
+    "....kkkkkk.........kbbbbk.",
+    "....................kkkkk."
+  ],
+  "props": {
+    "bed": [
+      "..wwwwww..................",
+      ".kwwwwwwkkkkkkkkkkkkkkkkk.",
+      ".kwwwwwwkmmmmmmmmmmmmmmmk.",
+      ".kkkkkkkkmmmmmmmmmmmmmmmk.",
+      ".kkkkkkkkkkkkkkkkkkkkkkkk.",
+      ".k......................k.",
+      ".k......................k.",
+      ".kk....................kk."
+    ],
+    "chart": [
+      "kkkkkkkkk",
+      "kwwwwwwwk",
+      "kwkwwwwwk",
+      "kwwkwwwwk",
+      "kwwwkwwwk",
+      "kwwwwkwwk",
+      "kwwwwwwwk",
+      "kkkkkkkkk"
+    ],
+    "crate": [
+      "kkkkkkkkkk",
+      "kcccccccck",
+      "kcckkkkcck",
+      "kcccccccck",
+      "kcckkkkcck",
+      "kcccccccck",
+      "kkkkkkkkkk"
+    ],
+    "cross": [
+      "wwwwwww",
+      "wwwrwww",
+      "wwwrwww",
+      "wrrrrrw",
+      "wwwrwww",
+      "wwwrwww",
+      "wwwwwww"
+    ],
+    "desk": [
+      ".....kkkkkkkkkk.....",
+      ".....kggggggggk.....",
+      ".....kggggggggk.....",
+      ".....kggggggggk.....",
+      ".....kggggggggk.....",
+      ".....kkkkkkkkkk.....",
+      ".......kkkkkk.......",
+      "......kkkkkkkk......",
+      "kkkkkkkkkkkkkkkkkkkk",
+      "kddddddddddddddddddd",
+      "kkkkkkkkkkkkkkkkkkkk",
+      "..k..............k..",
+      "..k..............k..",
+      "..k..............k..",
+      "..k..............k..",
+      "..k..............k.."
+    ],
+    "mop": [
+      ".....k.....",
+      ".....k.....",
+      ".....k.....",
+      ".....k.....",
+      ".....k.....",
+      ".....k.....",
+      "...kkkkk...",
+      "..kmmmmmk..",
+      "..kmmmmmk..",
+      "...kkkkk..."
+    ],
+    "tank": [
+      "...kk...",
+      "...kk...",
+      "..kkkk..",
+      ".kmmmmk.",
+      "kmmmmmmk",
+      "kmmmmmmk",
+      "kmmmmmmk",
+      "kmmmmmmk",
+      "kmmmmmmk",
+      ".kkkkkk."
+    ],
+    "wrench": [
+      "..kk...kk..",
+      "..kkk.kkk..",
+      "...kkkkk...",
+      "....kkk....",
+      "....mkm....",
+      "....mkm....",
+      "....mkm....",
+      "....mkm....",
+      "....mkm....",
+      "...kkkkk..."
+    ],
+    "zzz": [
+      ".........kkkk",
+      ".........k.k.",
+      ".........kk..",
+      "........k.k..",
+      ".........kkkk",
+      "..kkkk.......",
+      "...k.k.......",
+      "..kk.........",
+      "..kkkk.......",
+      "kkk..........",
+      "k.k..........",
+      "kk...........",
+      "kkk.........."
+    ]
+  },
+  "px": 4,
+  "sit": [
+    "......kkkkkkkk....",
+    "....kkhhhhhhhhkk..",
+    "...khhhhhhhhhhhhk.",
+    "...khhHHhhhhhhhhk.",
+    "...khhhssssssshhk.",
+    "..khhhhssssssshhk.",
+    "..khhhhkkssskkshk.",
+    "..khhhhssssssshhk.",
+    "..kkhhhsssssssshk.",
+    "...kkssssssssskk..",
+    "....kkcccccccckk..",
+    "..kkccccccccccck..",
+    "..kscccyycccccsk..",
+    "..kkdddddddddkk...",
+    ".kddddddddddddddk.",
+    ".kbbkkkkkkkkkkbbk."
+  ],
+  "spBlank": "..................",
+  "sprite": [
+    ".......kkk........",
+    "......khhk........",
+    ".......khhk.......",
+    "........khk.......",
+    "....kkkkkkkkkk....",
+    "..kkhhhhhhhhhhkk..",
+    ".khhHHhhhhhhhhhhk.",
+    ".khhHhhhhhhhhhhhk.",
+    ".khhhsssssssshhhk.",
+    ".khhhsssssssshhhk.",
+    ".khhhseesseeshhhk.",
+    ".khhhseesseeshhhk.",
+    ".khhhsssssssshhhk.",
+    "..khhsssssssshhk..",
+    "...kksssssssskk...",
+    "...kkcccccccckk...",
+    "..kcccccccccccck..",
+    "..ksccccyyccccsk..",
+    "...kkddddddddkk...",
+    "...kkdddkkdddkk...",
+    "...kkbbbkkbbbkk..."
+  ]
+}

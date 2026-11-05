@@ -1,0 +1,32 @@
+# Phase 5 gate: the order sheet, a trade change, a lay-off, a doc visit and the
+# crew answering for themselves. Staging is free; only "orders" spends.
+jobassign rell cleaner
+stage rell rest
+stage rell learnOn
+orders
+watch
+watch
+watch
+talk rell
+jobassign bo cleaner
+stage bo fire
+orders
+watch
+watch
+watch
+watch
+watch
+watch
+talk jax
+stage jax doc
+orders
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+talk suri
+trace

@@ -1,4 +1,7 @@
 /build/
+/build-*/
 /cmake-build-*/
 
 /runtime/saves/*.json*
+runtime/saves/*.json
+runtime/saves/*.txt

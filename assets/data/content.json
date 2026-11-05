@@ -1,0 +1,375 @@
+{
+  "comment": "Handbook, palettes, layout and pacing constants.",
+  "cooldownRules": {
+    "critical": {
+      "actions": 20,
+      "label": "Critical"
+    },
+    "routine": {
+      "actions": 5,
+      "label": "Routine"
+    },
+    "space": {
+      "actions": 15,
+      "label": "Space operations"
+    },
+    "systems": {
+      "actions": 10,
+      "label": "Ship systems"
+    }
+  },
+  "defaults": {
+    "chronicle": {
+      "banks": 0,
+      "claimed": {},
+      "dreams": 0,
+      "earned": {},
+      "incidents": 0,
+      "meals": 0,
+      "projects": 0,
+      "regions": {},
+      "systems": {},
+      "version": 1
+    },
+    "commissions": {
+      "active": null,
+      "completed": 0,
+      "serial": 0,
+      "version": 1
+    },
+    "options": {
+      "audioLevel": 0.4,
+      "confirmRisk": false,
+      "hideCrewLabels": false,
+      "largeText": false,
+      "music": true,
+      "soundEffects": true,
+      "theme": "classic"
+    },
+    "sim": {
+      "bonds": {},
+      "broadcasts": {},
+      "dreams": [],
+      "insight": 0,
+      "memories": [
+        {
+          "at": 0,
+          "id": 1,
+          "kind": "Watch",
+          "other": "",
+          "processed": false,
+          "text": "The ship's memory archive begins a new watch.",
+          "who": ""
+        }
+      ],
+      "observed": {},
+      "sensor": 0,
+      "serial": 1,
+      "signal": "dormant",
+      "version": 1
+    }
+  },
+  "feed": {
+    "max": 132,
+    "min": 62
+  },
+  "fx": {
+    "duration": 950,
+    "frame": 16,
+    "hold": 220,
+    "maxMarks": 5,
+    "rise": 26,
+    "size": 11
+  },
+  "ind": {
+    "gap": 5,
+    "h": 104
+  },
+  "resize": {
+    "debounceMs": 90
+  },
+  "stage": {
+    "crew": {
+      "h": 300,
+      "w": 560
+    },
+    "engine": {
+      "h": 390,
+      "w": 650
+    },
+    "map": {
+      "h": 500,
+      "w": 1100
+    },
+    "mess": {
+      "h": 360,
+      "w": 600
+    },
+    "o2": {
+      "h": 360,
+      "w": 600
+    },
+    "ship": {
+      "h": 460,
+      "w": 1160
+    }
+  },
+  "taskTypes": [
+    {
+      "autoClear": false,
+      "hasOnAcknowledge": true,
+      "hasOnDone": false,
+      "quiet": false,
+      "type": "travel"
+    },
+    {
+      "autoClear": false,
+      "hasOnAcknowledge": true,
+      "hasOnDone": false,
+      "quiet": false,
+      "type": "scan"
+    },
+    {
+      "autoClear": true,
+      "hasOnAcknowledge": false,
+      "hasOnDone": true,
+      "quiet": true,
+      "type": "crewOrder"
+    },
+    {
+      "autoClear": true,
+      "hasOnAcknowledge": false,
+      "hasOnDone": true,
+      "quiet": true,
+      "type": "crewJob"
+    },
+    {
+      "autoClear": true,
+      "hasOnAcknowledge": false,
+      "hasOnDone": true,
+      "quiet": true,
+      "type": "crewDoc"
+    },
+    {
+      "autoClear": true,
+      "hasOnAcknowledge": false,
+      "hasOnDone": true,
+      "quiet": true,
+      "type": "o2slot"
+    },
+    {
+      "autoClear": true,
+      "hasOnAcknowledge": false,
+      "hasOnDone": true,
+      "quiet": true,
+      "type": "maint"
+    },
+    {
+      "autoClear": true,
+      "hasOnAcknowledge": false,
+      "hasOnDone": true,
+      "quiet": true,
+      "type": "cook"
+    },
+    {
+      "autoClear": true,
+      "hasOnAcknowledge": false,
+      "hasOnDone": true,
+      "quiet": true,
+      "type": "incident"
+    },
+    {
+      "autoClear": true,
+      "hasOnAcknowledge": false,
+      "hasOnDone": true,
+      "quiet": true,
+      "type": "salvage"
+    },
+    {
+      "autoClear": true,
+      "hasOnAcknowledge": false,
+      "hasOnDone": true,
+      "quiet": true,
+      "type": "surveyPackage"
+    },
+    {
+      "autoClear": true,
+      "hasOnAcknowledge": false,
+      "hasOnDone": true,
+      "quiet": true,
+      "type": "shipProject"
+    }
+  ],
+  "themes": {
+    "aurora": {
+      "ink": "91,190,157",
+      "label": "Aurora - mint"
+    },
+    "classic": {
+      "ink": "139,111,78",
+      "label": "Flight Deck - parchment"
+    },
+    "ember": {
+      "ink": "215,144,91",
+      "label": "Ember - copper"
+    },
+    "nebula": {
+      "ink": "155,121,208",
+      "label": "Nebula - violet"
+    },
+    "void": {
+      "ink": "91,184,213",
+      "label": "Deep Space - cyan"
+    }
+  },
+  "wiki": [
+    {
+      "group": "Getting started",
+      "id": "first-watch",
+      "link": "o2",
+      "linkLabel": "Open O2 Filter Room",
+      "text": "Start at Kessler Drift. Right-click Navigation, choose Tolme Anchorage and start a crossing. Seat all three canisters in the O2 Filter Room and start the bank. While crossing, recover salvage in the Cargo Hold. Acknowledge arrival in Navigation; open the Docked indicator to trade and use the mission board.",
+      "title": "Your first watch"
+    },
+    {
+      "group": "Getting started",
+      "id": "controls",
+      "text": "Left-click a ship element for a briefing; right-click it to open a task tab. Use the arrows to scroll tabs and Home to return to the ship. The disk icon has three independent save slots, a new-voyage command and a return to the main menu; slot one reads the original save. The gear holds five bridge palettes, ambient music, sound effects, volume, motion, reading, crew labels and confirmations. Rapid repeat action clicks are briefly ignored while each command settles. Reading and changing options are free.",
+      "title": "Controls, tabs and saves"
+    },
+    {
+      "group": "Getting started",
+      "id": "ships",
+      "text": "A new voyage begins on the compact Wren courier: 40 m3 of cargo and six berths, with all ship systems fitted. At any station shipyard, buy the larger Kestrel-series SC Tessellate for 4,000 shiplets. It has 60 m3 of cargo and 14 berths before refits. Cargo, crew, active work, equipment, refits, condition and records transfer; the purchase is permanent and takes one action. Cargo refits increase the Wren to 60 then 90 m3; the same refits carry over to 90 then 120 m3 on the Kestrel.",
+      "title": "Your ships and the shipyard"
+    },
+    {
+      "group": "Getting started",
+      "id": "actions",
+      "text": "One committed action advances the ship clock once. Starting a process costs one action, then its remaining work progresses on later actions. Completed crossings and scans must be acknowledged. Use Stand watch in Navigation to spend one action advancing work and survival clocks, even with a full hold. The filter bank grants ten units of work progress without advancing the world clock. Opening tabs, reading and selecting map targets never cost an action.",
+      "title": "Actions and ongoing work"
+    },
+    {
+      "group": "Survival",
+      "id": "air",
+      "link": "o2",
+      "linkLabel": "Open O2 Filter Room",
+      "text": "The O2 Filter Room needs three canisters seated before the bank can start. A full bank contains 200 charge and uses four per action. After it stops, cabin air gradually worsens: bad air slows crew and eventually harms health. The Recyclers can make a canister from salvage, or stations sell supplies.",
+      "title": "Air and the filter bank"
+    },
+    {
+      "group": "Survival",
+      "id": "power",
+      "link": "engine",
+      "linkLabel": "Open Engine Room",
+      "text": "The engine loses one condition every four actions. Maintenance restores it; an engineer can maintain it automatically. A dead drive stops travel. Energy falls over time; powered work pauses at zero. Right-click the energy or fuel gauge to use a fuel cell. The Power Bus and Shield Array exchange energy and shields with conversion loss.",
+      "title": "Power, fuel and drive"
+    },
+    {
+      "group": "Survival",
+      "id": "care",
+      "link": "mess",
+      "linkLabel": "Open Mess Hall",
+      "text": "Crew eat from the ration rack on their own staggered clocks. With no food, hunger rises and severe hunger damages health. The galley cooks and Hydroponics turns produce into rations. Medical Bay treatment uses a medkit and energy; the slower medical order in Crew Quarters needs no medkit.",
+      "title": "Food and medicine"
+    },
+    {
+      "group": "Survival",
+      "id": "hazards",
+      "text": "Reports appear in Events as actions pass and can escalate if ignored. Open a report to resolve it with supplies or assign an available crew member for six actions of work. Hull failure or the loss of all crew ends the voyage. Load a saved slot or start a new voyage after a loss.",
+      "title": "Incidents and loss"
+    },
+    {
+      "group": "Exploration",
+      "id": "charts",
+      "link": "nav",
+      "linkLabel": "Open Navigation",
+      "text": "The chart has System, Sector and Galaxy layers. Galaxy selects a region for browsing; Sector selects a system for a jump; System selects a local destination. Travel requires fuel, power and a working drive. Start a crossing, spend actions elsewhere, then acknowledge the finished crossing. Undock before plotting another course.",
+      "title": "Charts and travel"
+    },
+    {
+      "group": "Exploration",
+      "id": "scans",
+      "link": "science",
+      "linkLabel": "Open Science Room",
+      "text": "Deep-scan a local destination, let the work finish, then acknowledge the readout. Unique scanned bodies count toward exploration commendations. Observation records each visited location once. Surveys go to the Science Room, where packaging adds value before sale. The Sensor Array can spend insight to shorten one scan.",
+      "title": "Scans, observation and surveys"
+    },
+    {
+      "group": "Exploration",
+      "id": "markets",
+      "text": "Seven regions contain 48 navigable systems, 243 local destinations and 30 ports. Charts include stars, worlds and their natural moons. Prices vary by port and commodity. Buy where goods are plentiful, carry them within the hold limit, then sell where they are scarce. Stock fuel, canisters and repair kits for long routes; not every system has a station.",
+      "title": "Regions, ports and trade"
+    },
+    {
+      "group": "Crew",
+      "id": "jobs",
+      "link": "quarters",
+      "linkLabel": "Open Crew Quarters",
+      "text": "In Crew Quarters, stage jobs and orders, then issue the sheet. Work takes the listed actions and training has a fee. A navigator reduces departure fuel use, a cleaner supports morale, and an engineer, filter hand and cook can work autonomously. Wages are paid from the ship's purse on the action clock.",
+      "title": "Jobs, training and wages"
+    },
+    {
+      "group": "Crew",
+      "id": "needs",
+      "link": "r13",
+      "linkLabel": "Open Recreation",
+      "text": "Health, air, fatigue, hunger, morale and work shape a crew member's outlook. Recreation lets two available hands share a meal, raising their bond and morale. Disputes can hurt a bond; mediation can repair it. A healthy exhausted person may rest on their own. A person already assigned to work cannot be double-booked.",
+      "title": "Needs, bonds and rest"
+    },
+    {
+      "group": "Simulacron",
+      "id": "anchors",
+      "link": "simulacron",
+      "linkLabel": "Open Simulacron Core",
+      "text": "The Simulacron is an offline, bounded simulation, not a language model. Authored biographies give crew stable name anchors such as Wayfinder, Maker, Keeper and Witness. Desire Fire reflects present needs and drives dialogue and voluntary rest. Shared anchors give a small extra bond bonus to a meal.",
+      "title": "Name anchors and Desire Fire"
+    },
+    {
+      "group": "Simulacron",
+      "id": "memory",
+      "link": "simulacron",
+      "linkLabel": "Open Simulacron Core",
+      "text": "Arrivals, discoveries, care, conflicts, work and choices enter the Memory Mosaic; personal records appear on crew profiles. The core retains the latest 32 records. Choose two distinct unconsolidated memories in the Dream Engine to make insight. Exploration pairs give extra insight; shared people recover morale; matched conflict and reconciliation help a bond.",
+      "title": "Memory Mosaic and the Observer"
+    },
+    {
+      "group": "Simulacron",
+      "id": "signal",
+      "link": "r4",
+      "linkLabel": "Open Comms Relay",
+      "text": "Deep-scan Halvan's Reach to intercept the signal. Make insight in the Core, then decode it in Comms. Scan the Choir Array in Echo Shoal to learn the archive's request. At Palimpsest's Archive Hull, shelter it using a repair kit and power, or sell it while docked. These choices are permanent for the voyage.",
+      "title": "Silicon Marrow: story guide (spoilers)"
+    },
+    {
+      "group": "Ship systems",
+      "id": "rooms",
+      "text": "Workshop makes repair kits; Recyclers make canisters; Fuel Reserve refines cells; Damage Control patches the hull. Each uses salvage and power. Hydroponics converts produce to rations, Thermal Control stabilizes the drive, and the Medical Bay treats crew. Inputs are consumed at the start; powered work pauses without energy.",
+      "title": "Fitted rooms and production"
+    },
+    {
+      "group": "Ship systems",
+      "id": "interlocks",
+      "text": "Cargo recovery reserves hold space while it runs. Canister and ration production reserve their output space. Hydroponics cannot overlap cooking, and Thermal Control cannot overlap engine maintenance. Crew cannot be assigned to simultaneous medical, social, incident or order work. Check the room's status when an action is unavailable.",
+      "title": "Reservations and space"
+    },
+    {
+      "group": "Rewards",
+      "id": "contracts",
+      "text": "At a station, accept contracts from the mission board. Some carry freight or passengers; others ask for a visit or a scan. Complete the objective and collect payment at a station. Contract freight occupies cargo space and cannot be sold. Jettisoning it fails the contract.",
+      "title": "Contracts and mission boards"
+    },
+    {
+      "group": "Rewards",
+      "id": "commissions",
+      "text": "Stations also offer one active repeatable commission at a time: visit another port, scan a specified body, or recover two salvage lots. Acceptance and collection cost one action each. Finish the objective after acceptance, then collect at any station. Abandoning costs one action and rotates the offers. No freight is reserved for these commissions.",
+      "title": "Repeatable commissions"
+    },
+    {
+      "group": "Rewards",
+      "id": "commendations",
+      "text": "The Rewards button opens a log of optional milestones for exploration, care, engineering, contracts and the signal. Earn them by playing and claim each listed supply or shiplet reward once, for free. Captain's rank is a cosmetic record of earned commendations. Nothing is awarded merely for opening the screen.",
+      "title": "Commendations and captain's rank"
+    }
+  ]
+}

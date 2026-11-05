@@ -52,7 +52,7 @@ To begin **Silicon Marrow**, deep-scan Halvan's Reach, build an insight in the c
 
 ## Handbook, commendations and commissions
 
-The pinned **Wiki** button opens a searchable, offline handbook covering controls, survival, exploration, the crew, ship systems, and Simulacron. Its Silicon Marrow entry is explicitly marked as a spoiler. Reading and following its room shortcuts are free.
+The pinned **Wiki** button opens a searchable, offline handbook covering controls, survival, exploration, the crew, ship systems, and Simulacron. Its Silicon Marrow entry is explicitly marked as a spoiler and its body stays behind a reveal row until you ask for it. Reading and following its room shortcuts are free.
 
 The **Rewards** button opens the captain's log. Fourteen commendations track milestones such as starting the filters, scanning worlds, visiting systems and regions, caring for the crew, resolving incidents, completing contracts and commissions, and concluding the signal story. Earned rewards can be claimed once for shiplets or supplies without spending an action. The captain's rank is cosmetic. The button shows the number of unclaimed rewards.
 
@@ -74,56 +74,194 @@ Existing Kessler-only and expanded-galaxy saves still load, including active leg
 
 ## Native C++ edition and development
 
-The Windows `spaceship.exe` is now a **native C++ application**, with its own
-Win32 interface, GDI deck/chart views and C++ simulation. It does not launch the
-HTA or embed a browser/JavaScript engine. Its authored catalog is compiled in.
+The repository also contains a native C++ port of the game, and it is **complete**:
+Phases 0–8 are finished and verified against the reference. `PARITY.md` is the
+sign-off — it lists the verification architecture, the final counts and the short
+list of declared toolkit and port-only differences.
 
-**This is a playable migration build, not yet a feature-identical conversion.**
-Read [NATIVE-PORT.md](NATIVE-PORT.md) for implemented systems and specific parity
-gaps. The original `Spaceship.hta` is preserved as the reference edition. In
-particular, artwork, most settings and full edge-case parity remain unfinished.
-Native music/effects now play from optional bundled WAV files in `music/` and
-`sounds/`, with free toggles and volume controls on Home/Handbook. Native saves go
-in `saves/` next to the EXE, or the per-user `SpaceshipCommand\saves` directory
-when the install folder is read-only. Older per-user native slots remain loadable.
-Each gameplay control, including Stand watch, has an action-count cooldown;
-labelled cooldown readouts distinguish it from ongoing work.
-The native version now has staged crew sheets, autonomous work, selected dreams,
-free travel/scan acknowledgements and reference-tested navigation/commission rules.
-It can **import supported HTA saves**, including Windows UTF-16 files, without
-modifying the source. Unknown tasks or unmapped live cooldowns are explicitly
-refused rather than discarded. Native slots use separate files in
-`saves/` (with the per-user fallback above). See the migration notes for limitations.
+Phase 0 (build system, extracted catalogue, data gate), Phase 1 (the whole headless
+simulation), Phase 2 (the cockpit), Phase 3 (the task frame and the three machine
+rooms), Phase 4 (Navigation and the star chart), Phase 5 (Crew Quarters and the
+crew records), Phase 6 (stations, the cargo hold and science room, and the four
+floating popups), Phase 7 (the fourteen fitted rooms, the Simulacron, the Silicon
+Marrow signal and the logbook) and Phase 8 (the handbook, the title and loss
+screens, and the synthesized soundscape) and Phase 9 (the anti-spam lock and its
+audit, the player's own audio, the 18 px typography floor, five calm palettes, the
+borderless window and the five-card tutorial) are complete and verified. Phase 2
+delivers the taskbar and its tabs, the sidebar and pinned foot, the status bar, and
+the idle screen with the ship cross-section, the feed and the two interaction
+verbs. Phase 3 adds the house task frame — head, panels, machine stage, commitment
+band and the three-state progress button on the shared cooldown ladder — plus the
+Engine Room (a 225-part 650x390 drive), the O2 Filter Room and the Mess Hall. Phase 4
+adds the Navigation window: three chart scales, the perspective raster, the zoom and
+pan ladder, the ship's ring and the two controls that cost anything (Start Travel and
+Run Deep Scan), with the panels' distance, transit and fuel readouts derived exactly.
+Phase 5 adds the quarters: the pixel sprites built from the reference's character
+maps, the order sheet (staging free, one action to hand it over, the price paid as
+work), job and trade changes, station training, the medical bay and the roster.
+Phase 6 adds the port window (market, sales, mission board, yard and tavern), the
+cargo hold and the science room, and the four floating panels behind the pinned
+foot — manifest, activity log, three save slots and settings — with the save and
+load buttons free and a corrupt slot rolled back. Phase 7 opens the fourteen fitted
+bays and the bridge, each with its authored vignette, its own fields and the work it
+owns; the Simulacron's mosaic, anchors, dream engine and signal desk; the logbook of
+fourteen commendations; and the incident report. Phase 8 closes the port: the
+searchable twenty-one-entry handbook, the title menu with its three slots and its
+guide, the loss screen with the run's own record, and a synthesized soundscape whose
+numbers are the reference's own. Every tab the ship can open now has a window;
+`Spaceship.hta` remains the reference edition and the arbiter of every behaviour.
 
-Build the shared native simulation, text client and tests:
+`spaceship_core` is feature-complete as a simulation: the action clock, drive
+wear, life support, crew, tasks, incidents, the Simulacron, commendations,
+navigation (three chart scales, crossings, sensors), ports and trade, contracts,
+commissions, the twelve task hooks, the ten ship projects, both hulls, and
+bidirectional saves in the original file format.
+
+### Build
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
-./build/spaceship_console
 ```
 
-On Windows, configure with `cmake -S . -B build -A x64`, build with
-`cmake --build build --config Release`, and run `build/Release/spaceship.exe`.
-The `spaceship-windows-x64` CI artifact contains the native EXE and documentation;
-it no longer bundles or needs `Spaceship.hta`. CTest creates the actual native
-window and dispatches an action in its `--smoke-test` mode. Visual/manual gameplay
-verification on a player's Windows PC is still required.
+Everything is fetched at configure time by CMake (`FetchContent`):
+nlohmann/json 3.11.3 and Catch2 3.7.1 always; raylib 6.0, Dear ImGui 1.92.7 and
+rlImGui (the `Raylib_6_0` tag) only when the client can be built. There is no
+other runtime dependency and nothing is downloaded by the game itself.
 
-The C++ implementation is under `cpp/`. `spaceship_console` uses the same
-`Voyage` simulation as the GUI, rather than a separate stripped-down game. The
-only vendored dependency is nlohmann/json 3.11.3 (MIT). No runtime downloads are
-needed. `node tools/export-native-data.cjs` regenerates the authored catalog at
-development time; its output is committed and checked by CI.
+The client needs the platform's graphics development packages. On Debian/Ubuntu:
 
-The original interface's gameplay JavaScript is inline, and its dependency-free Node tests load it in a VM with small DOM stubs. Run those regression tests from the repository root:
+```sh
+sudo apt install libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev
+```
+
+If they are missing, configure says so and skips the client; the simulation and
+its tests still build and run. On Windows, configure with
+`cmake -S . -B build -A x64` and build `build/Release/spaceship.exe`.
+
+### Targets
+
+| Target | What it is |
+|---|---|
+| `spaceship_core` | the simulation: catalogue, state, action clock, tasks, saves. No window, no graphics |
+| `spaceship` | the Raylib + Dear ImGui client (only when the graphics packages are present) |
+| `spaceship_console` | scriptable harness that replays command scripts against the core |
+| `spaceship_tests` | CTest suite: 168 Catch2 cases / 17,185 assertions, plus the parity, catalogue, audit and save gates (192 tests in all) |
+
+### Content pipeline
+
+The authored catalogues live in `assets/data/*.json`. They are generated from the
+reference edition, never typed by hand:
+
+```sh
+node tools/export-data.cjs           # regenerate after an HTA content change
+node tools/export-data.cjs --check   # fail if the JSON no longer matches
+```
+
+`ctest` runs that `--check` as a test, so the committed catalogue cannot drift
+from `Spaceship.hta`. `assets/art/title.jpg` (extracted from the stylesheet's
+embedded JPEG) and `assets/fonts/` (DejaVu Sans and DejaVu Sans Mono, with their
+licence) come from the same pipeline and are committed.
+
+### Differential harness
+
+The strongest test in the repository is not a unit test. It is a replay:
+
+```sh
+node tools/trace-voyage.cjs tests/parity/voyage-01.script > reference.trace
+./build/spaceship_console   tests/parity/voyage-01.script > port.trace
+diff reference.trace port.trace
+```
+
+`tools/trace-voyage.cjs` loads the reference game in a Node VM; `spaceship_console`
+runs the C++ core. Both read the same script and print the same canonical
+snapshot — sorted keys, JavaScript number formatting, no wall-clock stamps — at
+every checkpoint. `ctest` runs each script in `tests/parity/` as a `parity.*`
+test and fails on the first byte that differs. Add a script whenever a behaviour
+is ported; the fifteen committed voyages cover the opening loop, a 900-action
+unattended haul, the filter hand's own initiative, running out of air, a payday
+that cannot pay everyone, the task frame and machine rooms, Navigation and the
+chart scales, a full station visit, the Phase 7 story chain, and a whole lifecycle
+from boot to a lost hull.
+
+Script commands:
+
+| Group | Commands |
+|---|---|
+| the clock | `action [text]`, `watch`, `purse <n>`, `trace` |
+| life support | `seat <slot>`, `bank`, `job <crew> <job>` |
+| navigation | `target <body>`, `travel`, `scan`, `ack <task>`, `dock`, `undock`, `layer <key>`, `sector <region>` |
+| ports | `buy <item>`, `sellgood <lot>`, `sellsurvey <record>`, `jettison <lot>`, `package <record>`, `hire <crew>`, `upgrade <id>`, `shipyard`, `contract accept\|collect <id>`, `commission accept <kind>\|collect\|abandon` |
+| the ship | `project <id>`, `medical <crew>`, `social <a> <b>`, `salvage <bay>`, `dream <a> <b>`, `broadcast`, `signal <preserved\|sold>`, `claim <award>`, `remedy <report>`, `assign <report>`, `signalstate <state>` |
+| scenario setup (no press path) | `purse <n>`, `stat <id> <n>` |
+| persistence | `save <file> [utf16]`, `load <file>`, `saveslot <1\|2\|3>`, `loadslot <1\|2\|3>` |
+
+`#` starts a comment.
+
+### The interface, without a window
+
+The cockpit's decisions are data, not drawing. `cpp/ui` keeps the theme, the
+layout arithmetic, the tab router, the sidebar, the briefing text, the deck plan
+and the effect timings in translation units that never include Raylib or ImGui,
+so `ctest` holds them to the reference: exact rectangles, exact sentences, exact
+timings. Only `cpp/ui/Draw.cpp` and `cpp/app/main.cpp` name a graphics library.
+
+That is why an interface change can be reviewed on a machine with no display.
+`tools/check-gui-syntax.sh` (registered as `ui.gui-syntax`) runs both of those
+translation units through the compiler with `-fsyntax-only -Wall -Wextra
+-Wpedantic` against whatever Raylib/ImGui headers it can find, and skips cleanly
+when none are installed.
+
+### Save compatibility
+
+`SaveSystem.cpp` writes and reads the original format one key at a time: the same
+seventeen top-level keys, the same `state` fields, the same `format` string. It is
+proven in both directions by `tools/run-save-parity.cmake`, which `ctest` runs as
+`parity.save-roundtrip`:
+
+1. the port flies a voyage and writes a save;
+2. the reference loads that file and spends twenty actions; the port loads the
+   same file and spends twenty actions — the two traces must match;
+3. the reference re-saves what it advanced;
+4. both editions load *that* file and advance — the traces must match again;
+5. slot 1 is written as UTF-16LE with a BOM, as the HTA writes it, and must read
+   back identically.
+
+`ValidSave` is the reference's validation, including the cross-checks: the hold
+cannot be fuller than the hold (salvage in flight counts against it), a task
+cannot point at a body that does not exist, an incident cannot wait on a stage
+with no ticks left, a decoding signal must have the work to decode it, and
+cooldowns must be whole numbers inside their rule. A failed load leaves the live
+voyage untouched.
+
+### Fidelity
+
+The port aims to be numerically, textually and behaviourally identical to the
+HTA: the same action costs, cooldowns, tick order, wording and save format, with
+the illustration geometry reproduced from the same coordinate tables. Visual
+differences are limited to what a different toolkit cannot reproduce (text
+metrics, border-radius arcs). `PORTING_PLAN.md` records the rules being
+preserved and the declared exceptions. Where fidelity is provable it is proven:
+the differential harness above replays the same command script through both
+editions and compares the resulting state, line by line.
+
+The original interface's gameplay JavaScript is inline, and its dependency-free
+Node tests load it in a VM with small DOM stubs. Run those regression tests from
+the repository root:
 
 ```sh
 for test in tests/*.test.cjs; do node "$test"; done
 ```
 
-The key action-flow boundary is `performAction(detail)`: a committed action increments the counter, ticks active button cooldowns once, then advances the world. Keep free navigation and presentation handlers outside that path. Wire repeatable action controls through `commandRow`, `wireAction` or `buildProgressButton`; those UI wrappers start the source control's cooldown only if the callback actually committed an action. Per-control countdowns live in `STATE.actionCooldowns`, so they are included in saves and validated/migrated with other state. `AGENTS.md` records these invariants and the expected workflow for future changes.
+The key action-flow boundary is `performAction(detail)`: a committed action
+increments the counter, ticks active button cooldowns once, then advances the
+world. Keep free navigation and presentation handlers outside that path. Wire
+repeatable action controls through `commandRow`, `wireAction` or
+`buildProgressButton`; those UI wrappers start the source control's cooldown only
+if the callback actually committed an action. Per-control countdowns live in
+`STATE.actionCooldowns`, so they are included in saves and validated/migrated
+with other state.
 
 ## Scope
 

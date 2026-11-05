@@ -1,0 +1,43 @@
+# Voyage 06: the chart is free, the crossings are not.
+trace
+layer sector
+trace
+layer galaxy
+trace
+layer system
+trace
+target kessler
+trace
+target sirrus
+trace
+scan
+trace
+watch
+watch
+watch
+trace
+ack scan
+trace
+target sec-tolme
+trace
+travel
+trace
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+watch
+trace
+ack travel
+trace
+dock
+trace
+undock
+trace
