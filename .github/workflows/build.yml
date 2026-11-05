@@ -19,13 +19,22 @@ jobs:
           python3 - << 'EOF'
           import pathlib, re
 
-          # 1. CMakeLists.txt: skip test discovery on EXE build, remove -Werror, ensure GUI builds on WIN32
+          # 1. CMakeLists.txt fixes for CMake 4.0 + Windows
           cmake_path = pathlib.Path("CMakeLists.txt")
           if cmake_path.exists():
               txt = cmake_path.read_text(encoding="utf-8")
               txt = re.sub(r'catch_discover_tests\s*\([^)]*\)', '# skipped for EXE packaging', txt)
               txt = txt.replace('-Werror', '')
               txt = txt.replace('find_package(X11 QUIET)', 'set(X11_FOUND TRUE)')
+              # Fix case-sensitive FetchContent _SOURCE_DIR variables in CMake 4.0
+              txt = txt.replace('${RLIMGUI_SOURCE_DIR}', '${rlimgui_SOURCE_DIR}')
+              txt = txt.replace('${IMGUI_SOURCE_DIR}', '${imgui_SOURCE_DIR}')
+              txt = txt.replace('${RAYLIB_SOURCE_DIR}', '${raylib_SOURCE_DIR}')
+              # Ensure FetchContent_MakeAvailable is called for header/source-only repos
+              if 'FetchContent_GetProperties(rlimgui)' in txt and 'FetchContent_MakeAvailable(rlimgui)' not in txt:
+                  txt = txt.replace('FetchContent_GetProperties(rlimgui)', 'FetchContent_MakeAvailable(rlimgui)\nFetchContent_GetProperties(rlimgui)')
+              if 'FetchContent_GetProperties(imgui)' in txt and 'FetchContent_MakeAvailable(imgui)' not in txt:
+                  txt = txt.replace('FetchContent_GetProperties(imgui)', 'FetchContent_MakeAvailable(imgui)\nFetchContent_GetProperties(imgui)')
               cmake_path.write_text(txt, encoding="utf-8")
 
           # 2. Catalog.cpp: avoid GCC 13/14 false-positive -Wdangling-reference
@@ -35,7 +44,20 @@ jobs:
               txt = txt.replace("const std::string& file)", "std::string file)")
               txt = txt.replace("const std::string& ctx)", "std::string ctx)")
               cat_path.write_text(txt, encoding="utf-8")
+
+          # 3. main.cpp: ensure std::filesystem::path is converted via .string() on Windows (where path::value_type is wchar_t)
+          main_path = pathlib.Path("cpp/app/main.cpp")
+          if main_path.exists():
+              txt = main_path.read_text(encoding="utf-8")
+              txt = re.sub(r'LoadMusicStream\s*\(\s*([a-zA-Z0-9_]+)\.c_str\(\)\s*\)', r'LoadMusicStream(\1.string().c_str())', txt)
+              main_path.write_text(txt, encoding="utf-8")
           EOF
+
+      - name: Pre-fetch ImGui & rlImGui sources explicitly
+        shell: bash
+        run: |
+          git clone --depth 1 --branch v1.92.7 https://github.com/ocornut/imgui.git build-deps/imgui
+          git clone --depth 1 --branch Raylib_6_0 https://github.com/raylib-extras/rlImGui.git build-deps/rlimgui
 
       - name: Configure CMake (Release)
         shell: bash
@@ -46,6 +68,12 @@ jobs:
             -DCMAKE_CXX_COMPILER=g++ \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
             -DOPENGL_gl_LIBRARY=opengl32 \
+            -DFETCHCONTENT_SOURCE_DIR_IMGUI="$PWD/build-deps/imgui" \
+            -DFETCHCONTENT_SOURCE_DIR_RLIMGUI="$PWD/build-deps/rlimgui" \
+            -DimGui_SOURCE_DIR="$PWD/build-deps/imgui" \
+            -Dimgui_SOURCE_DIR="$PWD/build-deps/imgui" \
+            -DrlImGui_SOURCE_DIR="$PWD/build-deps/rlimgui" \
+            -Drlimgui_SOURCE_DIR="$PWD/build-deps/rlimgui" \
             -DCMAKE_CXX_FLAGS="-Wno-dangling-reference -Wno-error" \
             -DCMAKE_EXE_LINKER_FLAGS="-static -static-libgcc -static-libstdc++"
 
