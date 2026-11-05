@@ -169,8 +169,10 @@ Texture2D LoadTitleTexture(const std::filesystem::path& assets) {
       std::printf("title artwork: %s\n", candidate.string().c_str());
       return texture;
     }
+    std::fprintf(stderr, "spaceship: title artwork exists but could not be decoded/uploaded: %s\n",
+                 candidate.string().c_str());
   }
-  std::fprintf(stderr, "spaceship: title artwork not found\n");
+  std::fprintf(stderr, "spaceship: no usable title artwork\n");
   return Texture2D{};
 }
 
@@ -319,11 +321,21 @@ class AudioDevice {
 }  // namespace
 
 int main(int argc, char** argv) {
-  (void)argc;
-  (void)argv;
+  // This CPU-only probe exercises the *linked raylib decoder*, not a separate
+  // JPEG library or an existence check. Run it against the packaged executable
+  // in CI before opening any window or initializing graphics/audio.
+  const std::filesystem::path assets = FindAssetDir();
+  if (argc == 2 && std::string(argv[1]) == "--check-title-art") {
+    const auto path = assets / "art" / "title.jpg";
+    Image image = LoadImage(path.string().c_str());
+    const bool decoded = image.data != nullptr && image.width > 0 && image.height > 0;
+    std::printf("title JPEG decode: %s (%d x %d): %s\n",
+                decoded ? "PASS" : "FAIL", image.width, image.height, path.string().c_str());
+    if (image.data != nullptr) { UnloadImage(image); }
+    return decoded ? 0 : 1;
+  }
 
   // ---- catalogue ---------------------------------------------------------
-  const std::filesystem::path assets = FindAssetDir();
 
   ship::Catalog catalog;
   try {

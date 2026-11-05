@@ -167,6 +167,7 @@ class ShellView {
   float others_ = 300.0f;
   float mouseX_ = -1.0f;
   float mouseY_ = -1.0f;
+  float quartersBandTop_ = 0.0f;
   bool draggingChart_ = false;
   bool chartDragMoved_ = false;
   std::string scrollTabKey_;

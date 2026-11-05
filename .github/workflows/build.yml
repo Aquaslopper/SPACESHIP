@@ -43,6 +43,13 @@ jobs:
           cp -r assets dist/Spaceship/
           cp README.md dist/Spaceship/
 
+      - name: Decode packaged title JPEG with the shipped raylib build
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "${RUNNER_TEMP}"
+          "${GITHUB_WORKSPACE}/dist/Spaceship/spaceship.exe" --check-title-art
+
       - name: Upload Windows EXE artifact
         uses: actions/upload-artifact@v4
         with:

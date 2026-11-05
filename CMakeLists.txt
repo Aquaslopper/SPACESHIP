@@ -84,7 +84,10 @@ if(SPACESHIP_BUILD_GUI AND SPACESHIP_GUI_REASON STREQUAL "")
 
   set(BUILD_EXAMPLES        OFF CACHE BOOL "" FORCE)
   set(BUILD_SHARED_LIBS     OFF CACHE BOOL "" FORCE)
-  set(CUSTOMIZE_BUILD       OFF CACHE BOOL "" FORCE)
+  # Raylib 6 disables JPG by default. Cached format flags are ignored unless
+  # customization is enabled: the title is the HTA's extracted title.jpg.
+  set(CUSTOMIZE_BUILD       ON CACHE BOOL "" FORCE)
+  set(SUPPORT_FILEFORMAT_JPG ON CACHE BOOL "" FORCE)
   set(SUPPORT_FILEFORMAT_TTF ON CACHE BOOL "" FORCE)  # the bundled fonts
 
   FetchContent_MakeAvailable(raylib imgui rlImGui)
@@ -264,6 +267,10 @@ if(SPACESHIP_BUILD_TESTS)
            COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/check-imgui-input.sh"
            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
   set_tests_properties(ui.imgui-close-input PROPERTIES SKIP_RETURN_CODE 77)
+  add_test(NAME ui.native-draw-recorder
+           COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/check-draw.sh" "${CMAKE_CURRENT_BINARY_DIR}"
+           WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+  set_tests_properties(ui.native-draw-recorder PROPERTIES SKIP_RETURN_CODE 77)
 
   # The data gate: the committed catalogue must still match the HTA. This is
   # the test that stops a content edit shipping without its JSON.

@@ -32,6 +32,9 @@
 //    project <id> | medical <crewId> | social <a> <b>
 //    save <file> [utf16]  |  load <file>
 //    saveslot <1|2|3> | loadslot <1|2|3>   the HTA's own three slots
+//    active <tab>         select cooldown scope (UI test setup)
+//    progress[-click] <id> <0|1 enabled> <idle label>
+//                         inspect/click the real progress-button model
 //    trace                print the canonical snapshot
 // ============================================================================
 
@@ -47,6 +50,8 @@
 #include "core/Simulation.h"
 #include "data/Catalog.h"
 #include "ui/Popups.h"
+#include "ui/Widgets.h"
+#include "core/JsNumber.h"
 
 namespace {
 
@@ -137,7 +142,28 @@ int main(int argc, char** argv) {
     if (parts.empty()) { continue; }
     const std::string& command = parts[0];
 
-    if (command == "action") {
+    if (command == "active" && parts.size() >= 2) {
+      simulation.MutableState().activeTab = parts[1];
+    } else if ((command == "progress" || command == "progress-click") && parts.size() >= 4) {
+      const auto label = RestOfLine(RestOfLine(RestOfLine(line, command), parts[1]), parts[2]);
+      const auto button = ship::BuildProgressButton(simulation, parts[1], label, parts[2] == "1");
+      if (command == "progress-click") { ship::PressProgressButton(simulation, button); }
+      else {
+        const char* state = "idle";
+        switch (button.state) {
+          case ship::ButtonState::Off: state = "off"; break;
+          case ship::ButtonState::Running: state = "run"; break;
+          case ship::ButtonState::Done: state = "done"; break;
+          case ship::ButtonState::Cooldown: state = "cooldown"; break;
+          case ship::ButtonState::Idle: break;
+        }
+        const auto cd = simulation.State().actionCooldowns.find(button.cooldownKey);
+        const double remaining = cd == simulation.State().actionCooldowns.end() ? 0 : cd->second.remaining;
+        std::printf("PROGRESS %s %s %s %s %s %s\n", button.taskId.c_str(), button.category.c_str(),
+            ship::js::NumToString(button.fillPercent).c_str(), state,
+            ship::js::NumToString(remaining).c_str(), button.text.c_str());
+      }
+    } else if (command == "action") {
       std::string detail = RestOfLine(line, "action");
       if (detail.empty()) { detail = "Scripted action"; }
       simulation.PerformAction(detail);

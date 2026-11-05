@@ -27,6 +27,8 @@ Short entry point for current issues. Detailed evidence, history, and handoff no
 | UI-013 | IN PROGRESS | Main menu / sheets | Visible five-command bottom strip, literal title colours, centred scrollable sheets and shared settings controls replace invented column/invisible menu. Rendering unverified here. | [user feedback repair](damagecontrol_report.md#bughunt-2026-11-05-user-feedback) |
 | UI-014 | IN PROGRESS | Crew Quarters | Removed duplicate roster/payroll overlap; restored job selector, Talk, order notes, traits and content-following assignments; removed duplicate commit lock. Narrow viewport/visual verification outstanding. | [user feedback repair](damagecontrol_report.md#bughunt-2026-11-05-user-feedback) |
 
+| UI-015 | IN PROGRESS | Action progress / filter-slot live controls | Shared source green fill now paints all five progress paths; actual draw-call recorder covers filter/Quarters; HTA/native button lifecycle traces match. Graphical verification outstanding. | [decoder/scroll/progress follow-up](damagecontrol_report.md#bughunt-2026-11-05-decoder-scroll-progress) |
+
 ## Status key
 
 - **OPEN** — evidence indicates a defect or parity gap remains; fix or verification is still needed.
@@ -41,3 +43,6 @@ Latest source-audit corrections and partial patches: [2026-11-05 input/layout in
 Continuation: [independent floating windows, settings/audio and source-theme test corrections](damagecontrol_report.md#bughunt-2026-11-05-floating-windows). 206/206 tests pass; native graphical runtime unavailable, no visual/interaction sign-off.
 
 Latest: [user-observed regression repairs](damagecontrol_report.md#bughunt-2026-11-05-user-feedback). 211/211 tests pass (including CPU ImGui input probe). User confirmed dragging/Navigation improvements on preceding build; new graphical changes need user retest.
+
+
+Latest follow-up: [JPEG decoder, reversed scroll camera, reachable Assignments, sidebar scroll clamp and real progress painter](damagecontrol_report.md#bughunt-2026-11-05-decoder-scroll-progress). **214/214 tests pass**, including real-Draw.cpp CPU recording and HTA button lifecycle comparisons. Engine caption layout remains open. Windows packaged JPEG probe and graphical retest are separate evidence; no merge or parity sign-off.

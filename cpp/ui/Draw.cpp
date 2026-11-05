@@ -36,6 +36,18 @@ namespace {
                  static_cast<unsigned char>(alpha)};
 }
 
+// Spaceship.hta .pbtn-fill: #dff0cc, with a #7ec63f right edge.
+// Share this across machine controls, generic bands, chart and quarters.
+void PaintProgressFill(const Area& box, double percent) {
+  const float width = box.w * static_cast<float>(std::clamp(percent, 0.0, 100.0)) / 100.0f;
+  if (width <= 0.0f) { return; }
+  DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                static_cast<int>(width), static_cast<int>(box.h), ::Color{223, 240, 204, 255});
+  DrawLine(static_cast<int>(box.x + width - 1), static_cast<int>(box.y),
+           static_cast<int>(box.x + width - 1), static_cast<int>(box.Bottom() - 1),
+           ::Color{126, 198, 63, 255});
+}
+
 ::Color HexColor(const std::string& value, ::Color fallback) {
   if (value.size() != 7 || value[0] != '#') { return fallback; }
   char* end = nullptr;
@@ -221,7 +233,7 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   // matching the HTA's #content { overflow:auto }. Every screen paints inside
   // this transform, and Click() offsets the cursor by the same amount so
   // obscured content can never be clicked.
-  Camera2D scrollCam{{0.0f, 0.0f}, {0.0f, -contentScroll_}, 0.0f, 1.0f};
+  Camera2D scrollCam{{0.0f, 0.0f}, {0.0f, contentScroll_}, 0.0f, 1.0f};
   contentPaintBottom_ = layout_.content.y;
   paintingContent_ = true;
   BeginMode2D(scrollCam);
@@ -274,7 +286,8 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   }
   EndMode2D();
   paintingContent_ = false;
-  contentMaxScroll_ = std::max(0.0f, contentPaintBottom_ - layout_.content.Bottom());
+  const float readingBottom = screenQuarters_ ? quartersBandTop_ : layout_.content.Bottom();
+  contentMaxScroll_ = std::max(0.0f, contentPaintBottom_ - readingBottom);
   contentScroll_ = std::min(contentScroll_, contentMaxScroll_);
 
   PaintChrome(sim);
@@ -413,11 +426,22 @@ void ShellView::PaintChrome(Simulation& sim) {
                       ImVec2(layout_.sidepanel.Right(), layout_.sidepanel.Bottom()),
                       ToIm(p.panel));
 
+  const auto measureSide = [&](const std::string& text, float width) {
+    const float h = ImGui::CalcTextSize(text.c_str(), nullptr, false, width).y;
+    return std::max(1.0f, std::ceil(h / ImGui::GetFontSize())) * theme_.LineHeight();
+  };
   sideHits_ = SideHits(sim, layout_.sidepanel, layout_.sidefoot, theme_.LineHeight(),
-                       sideScroll_, &sideContentH_, [&](const std::string& text, float width) {
-                         const float h = ImGui::CalcTextSize(text.c_str(), nullptr, false, width).y;
-                         return std::max(1.0f, std::ceil(h / ImGui::GetFontSize())) * theme_.LineHeight();
-                       });
+                       sideScroll_, &sideContentH_, measureSide);
+  // A browser clamps scrollTop when a section folds or a new voyage replaces
+  // its contents. Do the same here; an old offset must not erase Vessel and
+  // the other collapsed headings after the sidebar becomes shorter.
+  const float boundedSideScroll = std::clamp(sideScroll_, 0.0f,
+      std::max(0.0f, sideContentH_ - layout_.sidepanel.h));
+  if (boundedSideScroll != sideScroll_) {
+    sideScroll_ = boundedSideScroll;
+    sideHits_ = SideHits(sim, layout_.sidepanel, layout_.sidefoot, theme_.LineHeight(),
+                         sideScroll_, &sideContentH_, measureSide);
+  }
   const std::vector<SideHit>& hits = sideHits_;
   const std::vector<SideBlock> blocks = SideBlocks(sim);
   draw->PushClipRect(ImVec2(layout_.sidepanel.x, layout_.sidepanel.y),
@@ -790,6 +814,7 @@ void ShellView::PaintStage(const TaskStage& stage, const Area& origin) {
     DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
                   static_cast<int>(box.w), static_cast<int>(box.h),
                   ToRay(control.button.enabled ? p.panel2 : p.panel3));
+    PaintProgressFill(box, control.button.fillPercent);
     DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
                        static_cast<int>(box.w), static_cast<int>(box.h),
                        ToRay(p.borderDark));
@@ -865,11 +890,7 @@ void ShellView::PaintTaskScreen(Simulation& sim) {
     const Area box{bx, progressY, buttonW, progressH};
     DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
                   static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel2));
-    if (button.fillPercent > 0.0) {
-      DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
-                    static_cast<int>(box.w * button.fillPercent / 100.0),
-                    static_cast<int>(box.h), ToRay(p.white));
-    }
+    PaintProgressFill(box, button.fillPercent);
     DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
                        static_cast<int>(box.w), static_cast<int>(box.h),
                        ToRay(p.borderDark));
@@ -1091,11 +1112,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     DrawRectangle(static_cast<int>(buttonBox.x), static_cast<int>(buttonBox.y),
                   static_cast<int>(buttonBox.w), static_cast<int>(buttonBox.h),
                   ToRay(button.enabled ? p.panel2 : p.panel3));
-    if (button.fillPercent > 0.0) {
-      DrawRectangle(static_cast<int>(buttonBox.x), static_cast<int>(buttonBox.y),
-                    static_cast<int>(buttonBox.w * button.fillPercent / 100.0),
-                    static_cast<int>(buttonBox.h), ToRay(p.white));
-    }
+    PaintProgressFill(buttonBox, button.fillPercent);
     DrawRectangleLines(static_cast<int>(buttonBox.x), static_cast<int>(buttonBox.y),
                        static_cast<int>(buttonBox.w),
                        static_cast<int>(buttonBox.h), ToRay(p.borderDark));
@@ -1179,6 +1196,23 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
       y += line;
     }
   };
+  // Preserve the complete order sheet at readable type, but reserve the
+  // Assignments band at the viewport bottom. Only the readings scroll: the
+  // sole commit action must not require fullscreen to be reachable.
+  const float bandWidth = right - left - 16;
+  const auto countRows = [&](const std::string& text, float width) {
+    return WrapText(text, width, TypePx(10), SelectFont(TypePx(10), false)).size();
+  };
+  const auto buttonWidth = [&](const ProgressButton& button) {
+    // Leave two pixels beyond the measured text, avoiding float roundoff at
+    // an exact wrap boundary. Measure footer height with this *same* width.
+    return std::min(bandWidth, std::max(220.0f, TextWidth(button.text.c_str(), TypePx(10)) + 18));
+  };
+  float bandHeight = 12 + line + countRows(quarters_.bandNote, bandWidth) * line;
+  for (const auto& button : screen.progress) {
+    bandHeight += 6 + countRows(button.text, buttonWidth(button) - 16) * line + 12 + 8;
+  }
+  quartersBandTop_ = layout_.content.Bottom() - bandHeight;
   // Payroll and roster are separate in paintRoster(). Do not paint the full
   // roster as a table and then overlay clickable copies over its payroll rows.
   float rowY = panelTop;
@@ -1259,7 +1293,7 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
     // owns ImGui input; the rest of the screen uses the measured Raylib hits.
     const float comboH = line + 12;
     const float screenY = oy - contentScroll_;
-    if (screenY >= layout_.content.y && screenY + comboH < layout_.content.Bottom()) {
+    if (screenY >= layout_.content.y && screenY + comboH < quartersBandTop_) {
       ImGui::SetNextWindowPos(ImVec2(orderX, screenY), ImGuiCond_Always);
       ImGui::SetNextWindowSize(ImVec2(column, comboH), ImGuiCond_Always);
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
@@ -1316,22 +1350,31 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
     wrapped(quarters_.said.empty() ? "You have not asked them anything yet." : "\"" + quarters_.said + "\"", hall.x + 8, y, hall.w - 16, ToRay(p.muted));
     uy = y + 8;
   }
-  const float bandY = std::max({rowY, oy, uy}) + 10;
+  contentPaintBottom_ = std::max(contentPaintBottom_, std::max({rowY, oy, uy}) + 10);
+  // Footer coordinates are in the camera's content space, while its screen
+  // position is fixed. Exclude its text from the scrolling body's extent.
+  paintingContent_ = false;
+  const float bandY = quartersBandTop_ + contentScroll_;
+  DrawRectangle(static_cast<int>(left - 8), static_cast<int>(bandY),
+                static_cast<int>(right - left + 16), static_cast<int>(bandHeight), ToRay(p.panel));
+  DrawLine(static_cast<int>(left), static_cast<int>(bandY), static_cast<int>(right),
+           static_cast<int>(bandY), ToRay(p.border));
   float y = bandY + 6;
-  wrapped("Assignments", left + 8, y, right - left - 16, ToRay(p.coffee));
-  wrapped(quarters_.bandNote, left + 8, y, right - left - 16, ToRay(p.muted));
+  wrapped("Assignments", left + 8, y, bandWidth, ToRay(p.coffee));
+  wrapped(quarters_.bandNote, left + 8, y, bandWidth, ToRay(p.muted));
   for (const auto& button : screen.progress) {
-    const float width = std::max(220.0f, TextWidth(button.text.c_str(), TypePx(10)) + 16);
-    const Area box{left + 8, y + 6, width, line + 12};
+    const float width = buttonWidth(button);
+    const float buttonH = countRows(button.text, width - 16) * line + 12;
+    const Area box{left + 8, y + 6, width, buttonH};
     DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.w), static_cast<int>(box.h), ToRay(button.enabled ? p.panel2 : p.panel3));
-    if (button.fillPercent > 0) {
-      DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.w * button.fillPercent / 100), static_cast<int>(box.h), ToRay(p.white));
-    }
+    PaintProgressFill(box, button.fillPercent);
     DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.borderDark));
-    Text(button.text.c_str(), static_cast<int>(box.x + 8), static_cast<int>(box.y + 6), TypePx(10), ToRay(p.ink));
+    float textY = box.y + 6;
+    wrapped(button.text, box.x + 8, textY, width - 16, ToRay(p.ink));
     navHits_.push_back({box, "commit", ""});
     y = box.Bottom() + 8;
   }
+  paintingContent_ = true;
 }
 
 bool ShellView::PressPanelRow(Simulation& sim, ScreenKind kind, const std::string& id) {
@@ -1841,11 +1884,7 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
     const Area box{bx, progressTop, 190.0f, 28.0f};
     DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
                   static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel2));
-    if (button.fillPercent > 0.0) {
-      DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
-                    static_cast<int>(box.w * button.fillPercent / 100.0),
-                    static_cast<int>(box.h), ToRay(p.white));
-    }
+    PaintProgressFill(box, button.fillPercent);
     DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
                        static_cast<int>(box.w), static_cast<int>(box.h),
                        ToRay(p.borderDark));
@@ -2290,6 +2329,9 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
   // The quarters: a roster row, a job, an order, the sheet, a word.
   if (screenQuarters_) {
     for (const NavHit& hit : navHits_) {
+      // The opaque pinned band occludes body controls, including blank parts
+      // of the band. Never activate an order painted behind that footer.
+      if (y >= quartersBandTop_ && hit.action != "commit") { continue; }
       if (!hit.box.Contains(x, y + scrollY)) { continue; }
       if (PressQuartersAction(sim, hit.action, hit.arg) && hit.action == "commit") {
         SpawnMark(marks_, x, y + scrollY, nowMs, sim.State().reducedMotion);

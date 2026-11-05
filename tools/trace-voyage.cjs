@@ -30,18 +30,20 @@ function loadReference(htaPath) {
   if (!match) { throw new Error('game script not found in ' + htaPath); }
 
   const sandbox = {
-    document: { getElementById: () => null, createElement: () => ({ style: {} }) },
+    document: { getElementById: () => null, createElement: () => ({ style: {}, appendChild() {}, addEventListener() {} }) },
     window: { location: { protocol: 'http:' }, localStorage: { setItem() {}, getItem() { return null; } } }
   };
   vm.createContext(sandbox);
   vm.runInContext(match[1], sandbox, { filename: 'Spaceship.hta' });
 
   /* The reference calls paint*() after every change. Those are presentation
-     only; with no DOM to paint into they are replaced by no-ops so the script
-     exercises the model and nothing else. */
+     only; with no DOM to paint into they are replaced by no-ops. The progress
+     builder/painter are retained for the explicit progress/progress-click
+     probes, using lightweight DOM nodes; this is not a browser rendering. */
   for (const name of Object.keys(sandbox)) {
     if (/^(paint|build|render|layout|draw|update|show|hide|refresh)/.test(name) &&
-        typeof sandbox[name] === 'function') {
+        typeof sandbox[name] === 'function' &&
+        name !== 'buildProgressButton' && name !== 'paintProgress') {
       sandbox[name] = () => {};
     }
   }
@@ -242,6 +244,32 @@ function runCommand(g, line) {
   const parts = line.trim().split(/\s+/);
   const command = parts[0];
 
+  if (command === 'active' && parts.length >= 2) {
+    g.STATE.activeTab = parts[1];
+    return true;
+  }
+  if ((command === 'progress' || command === 'progress-click') && parts.length >= 4) {
+    const id = parts[1], enabled = parts[2] === '1', label = parts.slice(3).join(' ');
+    // Keep the reference's actual button builder, painter, click handler and
+    // cooldown wrapper. Only DOM nodes and the surrounding repaint are stubbed.
+    const start = () => {
+      if (/^o2s[0-2]$/.test(id)) { g.startInstall(null, Number(id.slice(3))); }
+      else if (id === 'o2-run') { g.turnOnFilter(null); }
+      else if (id === 'maint') { g.startMaint(null, 'maint', 'the commander'); }
+      else if (id === 'cook') { g.startCook(null, 'cook', 'the commander'); }
+      else { throw new Error('progress-click has no reference callback for ' + id); }
+    };
+    g.buildProgressButton(id, label, start, enabled);
+    if (command === 'progress-click') { g.onProgressClick(null, id, start); }
+    else {
+      g.paintProgress(id);
+      const ui = g.PROGRESS_UI[id], cd = g.actionCooldownFor(ui.cooldownKey);
+      const state = ui.wrap.className === 'pbtn' ? 'idle' : ui.wrap.className.replace('pbtn pbtn-', '');
+      process.stdout.write('PROGRESS ' + [id, ui.cooldownCategory, parseFloat(ui.fill.style.width),
+        state, cd ? cd.remaining : 0, ui.text.innerHTML].join(' ') + '\n');
+    }
+    return true;
+  }
   if (command === 'action') {
     const detail = line.trim().slice('action'.length).trim() || 'Scripted action';
     g.performAction(detail);
