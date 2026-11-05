@@ -418,6 +418,11 @@ void ShellView::PaintChrome(Simulation& sim) {
     for (const DescribeAct& act : selection_.acts) {
       ImGui::TextDisabled("%s - %s", act.label.c_str(), act.cost.c_str());
     }
+    if (ImGui::Button("Open Window")) {
+      OpenTask(sim, briefingKind_, briefingId_, true);
+      hasSelection_ = false;
+    }
+    ImGui::SameLine();
     if (ImGui::Button("Close")) { hasSelection_ = false; }
     ImGui::End();
     ImGui::PopStyleColor(3);
@@ -2037,6 +2042,10 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
     return;  // clicks outside a popup card do not reach the ship
   }
 
+  // A briefing is modal: ImGui owns its Open Window and Close buttons, and
+  // clicks anywhere else must not leak through to the screen underneath.
+  if (hasSelection_) { return; }
+
   // Chrome hit-testing follows paint order: taskbar controls and tabs, then
   // sidebar and pinned foot, then the screen behind them.
   if (layout_.scrollLeft.Contains(x, y)) {
@@ -2161,6 +2170,8 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
           OpenTask(sim, "crew", crew.id, true);
         } else {
           selection_ = DescribeTarget(sim, "crew", crew.id);
+          briefingKind_ = "crew";
+          briefingId_ = crew.id;
           hasSelection_ = true;
         }
         return;
@@ -2174,6 +2185,8 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
           OpenTask(sim, "room", room.id, true);
         } else {
           selection_ = DescribeTarget(sim, "room", room.id);
+          briefingKind_ = "room";
+          briefingId_ = room.id;
           hasSelection_ = true;
           SpawnMark(marks_, x - layout_.content.x, y, nowMs,
                     sim.State().reducedMotion);
@@ -2187,6 +2200,8 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         OpenTask(sim, "system", cell.id, true);
       } else {
         selection_ = DescribeTarget(sim, "system", cell.id);
+        briefingKind_ = "system";
+        briefingId_ = cell.id;
         hasSelection_ = true;
       }
       return;
@@ -2201,6 +2216,8 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         }
       } else {
         selection_ = DescribeTarget(sim, "info", cell.id);
+        briefingKind_ = "info";
+        briefingId_ = cell.id;
         hasSelection_ = true;
       }
       return;
@@ -2210,6 +2227,8 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         OpenTask(sim, "nav", "main", true);
       } else {
         selection_ = DescribeTarget(sim, "nav", "main");
+        briefingKind_ = "nav";
+        briefingId_ = "main";
         hasSelection_ = true;
       }
       return;
@@ -2219,6 +2238,8 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         OpenTask(sim, "station", sim.Map().here, true);
       } else {
         selection_ = DescribeTarget(sim, "station", sim.Map().here);
+        briefingKind_ = "station";
+        briefingId_ = sim.Map().here;
         hasSelection_ = true;
       }
       return;
