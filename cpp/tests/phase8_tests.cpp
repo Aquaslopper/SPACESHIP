@@ -318,7 +318,9 @@ TEST_CASE("settings and the guide are the same sheets the ship shows",
       sim, true, ship::TitlePanel::Settings, dir);
   CHECK(options.panelTitle == "Options");
   REQUIRE(options.settings.toggles.size() == 6);
-  CHECK(options.panelRows.size() == 6 + 5 + 4 + 1);  // toggles, palettes, font steps, back
+  CHECK(options.panelRows.size() == 6 + 5 + 4 + 4 + 1);  // toggles, palettes, audio, font steps, back
+  CHECK(Row(options.panelRows, "audio:0.18") != nullptr);
+  CHECK(Row(options.panelRows, "audio:0.9") != nullptr);
   CHECK(Row(options.panelRows, "theme:classic") != nullptr);
   CHECK(Row(options.panelRows, "font:0") != nullptr);
   CHECK(Row(options.panelRows, "font:3") != nullptr);

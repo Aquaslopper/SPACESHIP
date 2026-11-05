@@ -109,7 +109,7 @@ TEST_CASE("the settings sheet offers the four steps and the borderless window",
   // The palette chips are still there and still five.
   REQUIRE(model.themes.size() == 5);
   CHECK(model.themes[0] == "classic");
-  CHECK(model.themeLabels[0] == "Flight Deck - warm parchment");
+  CHECK(model.themeLabels[0] == "Flight Deck - parchment");
 
   // Choosing a step is free and exact; anything outside the ladder is refused.
   CHECK(ship::PressPopupAction(sim, "settings", "font", "2", "", nullptr));

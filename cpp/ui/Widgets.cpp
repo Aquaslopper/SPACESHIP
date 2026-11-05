@@ -193,7 +193,7 @@ ProgressButton BuildProgressButton(const Simulation& sim, const std::string& tas
     button.fillPercent = 0.0;
     if (remaining > 0.0) {
       button.state = ButtonState::Cooldown;
-      button.text = "COOLDOWN " + Num(remaining);
+      button.text = "Cooldown: " + Num(remaining) + " actions";
       button.title = RuleLabel(sim, sim.State().actionCooldowns.at(button.cooldownKey).category) +
                      " cooldown: " + Num(remaining) + " more actions. Other committed actions advance it; waiting does not.";
     } else {
@@ -219,12 +219,27 @@ ProgressButton BuildProgressButton(const Simulation& sim, const std::string& tas
 }
 
 bool PressProgressButton(Simulation& sim, const std::string& taskId) {
+  // Resolve the actual rendered control, including its label/category and
+  // enabled condition; a synthetic "action" label loses e.g. Maintenance's tier.
+  const Tab* tab = FindTab(sim.State(), sim.State().activeTab);
+  if (tab != nullptr) {
+    const auto screen = BuildTabScreen(sim, *tab);
+    for (const auto& button : screen.progress) {
+      if (button.taskId == taskId) { return PressProgressButton(sim, button); }
+    }
+    for (const auto& control : screen.stage.controls) {
+      if (control.button.taskId == taskId) { return PressProgressButton(sim, control.button); }
+    }
+  }
+  return PressProgressButton(sim, BuildProgressButton(sim, taskId, "action", true));
+}
+
+bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
+  const std::string& taskId = button.taskId;
   const Task* task = sim.FindOngoing(taskId);
   if (task != nullptr && task->state == "running") { return false; }  // inert
   if (task != nullptr && task->state == "done") { return sim.Acknowledge(taskId); }
 
-  const ProgressButton button =
-      BuildProgressButton(sim, taskId, "action", true);
   if (button.state == ButtonState::Cooldown) { return false; }
   if (button.state == ButtonState::Off) { return false; }
   if (button.state == ButtonState::Running) { return false; }

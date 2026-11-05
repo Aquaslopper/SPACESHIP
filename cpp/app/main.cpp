@@ -71,7 +71,7 @@ struct FontResources {
   Font body{};
   Font bold{};
   Font mono{};
-  std::array<ImFont*, 4> imguiBody{};
+  std::array<ImFont*, 6> imguiBody{};
 };
 
 std::string FirstFont(const std::vector<std::filesystem::path>& candidates) {
@@ -122,11 +122,14 @@ FontResources LoadFonts(const std::filesystem::path& assets) {
   if (loaded.mono.texture.id == 0) { loaded.mono = loaded.body; }
 
   ImGuiIO& io = ImGui::GetIO();
-  const int sizes[4] = {18, 19, 20, 21};
-  for (int i = 0; i < 4; ++i) {
-    loaded.imguiBody[static_cast<std::size_t>(i)] =
-        sansPath.empty() ? nullptr : io.Fonts->AddFontFromFileTTF(
-                                        sansPath.c_str(), static_cast<float>(sizes[i]));
+  // Include the +2px larger-reading preference, not only the four steps.
+  // Even without an installed font file the ImGui fallback must stay >=18px.
+  for (int i = 0; i < 6; ++i) {
+    ImFontConfig config;
+    config.SizePixels = static_cast<float>(18 + i);
+    loaded.imguiBody[static_cast<std::size_t>(i)] = sansPath.empty()
+        ? io.Fonts->AddFontDefault(&config)
+        : io.Fonts->AddFontFromFileTTF(sansPath.c_str(), config.SizePixels);
   }
   if (!monoPath.empty()) { io.Fonts->AddFontFromFileTTF(monoPath.c_str(), 18.0f); }
   std::printf("fonts: %s | %s | %s\n", sansPath.c_str(), boldPath.c_str(), monoPath.c_str());
@@ -140,9 +143,9 @@ void ReloadImGuiFonts() {
   ImGui::GetIO().Fonts->Build();
 }
 
-void SelectImGuiFont(const FontResources& fonts, int fontStep) {
+void SelectImGuiFont(const FontResources& fonts, int fontStep, bool largeText) {
   const int clamped = fontStep < 0 ? 0 : (fontStep > 3 ? 3 : fontStep);
-  ImFont* selected = fonts.imguiBody[static_cast<std::size_t>(clamped)];
+  ImFont* selected = fonts.imguiBody[static_cast<std::size_t>(clamped + (largeText ? 2 : 0))];
   if (selected != nullptr) { ImGui::GetIO().FontDefault = selected; }
 }
 
@@ -361,7 +364,7 @@ int main(int argc, char** argv) {
   const FontResources fonts = LoadFonts(assets);
   rlImGuiEndInitImGui();
   ReloadImGuiFonts();
-  SelectImGuiFont(fonts, sim.State().options.fontStep);
+  SelectImGuiFont(fonts, sim.State().options.fontStep, sim.State().options.largeText);
   ship::ui::ApplyPalette(theme);
 
   Texture2D titleTexture = LoadTitleTexture(assets);
@@ -402,7 +405,8 @@ int main(int argc, char** argv) {
     shell.Move(pointer.x, pointer.y);
     if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
       const Vector2 delta = GetMouseDelta();
-      shell.Drag(sim, pointer.x, pointer.y, delta.x, delta.y, true);
+      shell.Drag(sim, pointer.x, pointer.y, delta.x, delta.y, true,
+                 IsMouseButtonPressed(MOUSE_BUTTON_LEFT));
     }
     const float wheel = GetMouseWheelMove();
     if (wheel != 0.0f) { shell.Scroll(pointer.x, pointer.y, wheel); }
@@ -437,7 +441,7 @@ int main(int argc, char** argv) {
                       static_cast<float>(GetScreenHeight()), theme);
       ship::ui::ApplyPalette(theme);
     }
-    SelectImGuiFont(fonts, sim.State().options.fontStep);
+    SelectImGuiFont(fonts, sim.State().options.fontStep, sim.State().options.largeText);
 
     if (sim.State().options.fullscreen != fullscreen) {
       fullscreen = sim.State().options.fullscreen;

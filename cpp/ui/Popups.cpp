@@ -55,6 +55,39 @@ std::string PopupTitle(const std::string& key) {
   return std::string();
 }
 
+PopupModel BuildBriefPopup(const Simulation& sim, const std::string& kind,
+                           const std::string& id) {
+  const auto description = DescribeTarget(sim, kind, id);
+  PopupModel model;
+  model.title = description.kindLabel + " - " + description.title;
+  model.notice = description.sub;
+  PopupSection details;
+  // briefSpec deliberately shows at most five rows; the task has the file.
+  for (std::size_t i = 0; i < description.rows.size() && i < 5; ++i) {
+    details.rows.push_back({description.rows[i].key, description.rows[i].value});
+  }
+  model.acts = description.acts;
+  model.footer.push_back("Right-click to open the " + description.title +
+      " window. It waits in the tab bar - you are not taken there.");
+  if (kind == "nav") { // navBrief is authored separately from describeTarget
+    model.notice = "The ship chart. Everything that is only LOOKING at it is free.";
+    details.rows = {{"Scales", "System, Sector and Galaxy"},
+        {"Switching", "The three buttons on the chart - free"},
+        {"Panning", "Hold the left button and drag the chart"},
+        {"Selecting", "Click any marker to read it - free"},
+        {"Galaxy", "Select a region, then open its sector chart - free"},
+        {"Sector", "Select a system and jump to its entry star"}};
+    const double cost = std::max(1.0, sim.ScanCost() - (sim.State().sim.sensor ? 2.0 : 0.0));
+    model.acts = {{"Start Travel", "varies", true},
+                  {"Run Deep Scan", js::NumToString(cost) + " actions", true}};
+    model.footer = {
+        "Travel costs one action per step of charted distance, so the price is the crossing itself. Both run in the background and drain from actions spent anywhere on the ship.",
+        "Travel also uses fuel; right-click the fuel gauge to transfer a cell. Right-click to open the Navigation window. It waits in the tab bar - you are not taken there."};
+  }
+  model.sections.push_back(std::move(details));
+  return model;
+}
+
 PopupModel BuildPopup(const Simulation& sim, const std::string& key,
                       const std::string& saveDir) {
   PopupModel model;
@@ -116,6 +149,8 @@ PopupModel BuildPopup(const Simulation& sim, const std::string& key,
       "soundEffects", options.soundEffects ? "Sound effects: On" : "Sound effects: Off",
       options.soundEffects});
   model.audioLevel = js::NumToString(options.audioLevel);
+  model.audioChoices = {{"0.18", "Quiet"}, {"0.4", "Standard"},
+                        {"0.65", "Loud"}, {"0.9", "Very loud"}};
   model.toggles.push_back(PopupToggle{
       "reducedMotion",
       state.reducedMotion ? "Enable decorative motion" : "Reduce decorative motion",
@@ -131,6 +166,18 @@ PopupModel BuildPopup(const Simulation& sim, const std::string& key,
   model.toggles.push_back(PopupToggle{
       "hideCrewLabels", options.hideCrewLabels ? "Show crew labels" : "Hide crew labels",
       options.hideCrewLabels});
+  const char* headings[] = {"Ambient soundtrack", "Sound effects", "Decorative motion", "Reading text", "Confirmations", "Crew labels"};
+  const char* help[] = {
+      "A quiet, synthesized shipboard theme. Audio begins after a click.",
+      "Soft console clicks, scan pings, drive cues and completion chimes.",
+      "Pause map and crew drift, tab glows and action marks.",
+      "Enlarge the main reading and action text.",
+      "Ask before jettisoning, abandoning, story decisions, saving or loading.",
+      "Show or hide names on the ship diagram."};
+  for (std::size_t i = 0; i < model.toggles.size(); ++i) {
+    model.toggles[i].heading = headings[i];
+    model.toggles[i].help = help[i];
+  }
   for (const auto& theme : ThemeTable()) {
     model.themes.push_back(theme.first);
     model.themeLabels.push_back(theme.second);

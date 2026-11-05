@@ -166,6 +166,14 @@ TitleModel BuildTitleScreen(const Simulation& sim, bool fromVoyage, TitlePanel p
       row.enabled = true;
       model.panelRows.push_back(row);
     }
+    for (const auto& choice : model.settings.audioChoices) {
+      ActionRowView row;
+      row.id = "audio:" + choice.value;
+      row.label = "Audio level: " + choice.label;
+      row.cost = "free";
+      row.enabled = true;
+      model.panelRows.push_back(row);
+    }
     for (std::size_t i = 0; i < model.settings.fontStepLabels.size(); ++i) {
       ActionRowView row;
       row.id = "font:" + Num(static_cast<double>(i));
@@ -279,6 +287,9 @@ bool PressTitleAction(Simulation& sim, const std::string& action, const std::str
   }
   if (action.compare(0, 6, "theme:") == 0) {
     return PressPopupAction(sim, "settings", "theme", action.substr(6), saveDir, message);
+  }
+  if (action.compare(0, 6, "audio:") == 0) {
+    return PressPopupAction(sim, "settings", "audio", action.substr(6), saveDir, message);
   }
   if (action.compare(0, 5, "font:") == 0) {
     return PressPopupAction(sim, "settings", "font", action.substr(5), saveDir, message);

@@ -423,7 +423,7 @@ TEST_CASE("a locked control is unlocked by the clock, not by waiting", "[phase9]
   const double before = sim.ActionCount();
   CHECK(ship::PressNavAction(sim, "stand-watch"));
   const std::string guardKey =
-      ship::ActionCooldownKey(sim, "press:nav:stand-watch:");
+      ship::ActionCooldownKey(sim, "command:stand-watch-advance-ongoing-work:0");
   CHECK(ship::CooldownRemaining(sim, guardKey) > 0.0);
   CHECK(ship::CooldownRemaining(sim, guardKey) == ship::RuleActions(sim, "space"));
 

@@ -19,6 +19,8 @@
 #include "data/Catalog.h"
 #include "ui/Describe.h"
 #include "ui/Fx.h"
+#include "ui/FloatingPanels.h"
+#include "ui/TitleScreen.h"
 #include "ui/IdleScreen.h"
 #include "ui/Layout.h"
 #include "ui/Shell.h"
@@ -47,63 +49,30 @@ const ship::DescribeRow* Row(const ship::Description& t, const std::string& key)
 // ---------------------------------------------------------------------------
 //  Palette
 // ---------------------------------------------------------------------------
-TEST_CASE("five themes, one palette, five inks", "[ui][theme]") {
-  const std::vector<ship::ThemeSpec>& specs = ship::Theme::Specs();
+TEST_CASE("theme names and chart inks match the HTA THEMES table", "[ui][theme]") {
+  const auto& specs = ship::Theme::Specs();
   REQUIRE(specs.size() == 5);
-  // Phase 9: five calm, low-frequency palettes. The ids are the reference's so
-  // a save keeps its choice; the colours and the labels are the port's own.
-  CHECK(specs[0].id == "classic");
-  CHECK(specs[0].label == "Flight Deck - warm parchment");
-  CHECK(specs[0].ink.r == 0x6b);
-  CHECK(specs[0].ink.g == 0x53);
-  CHECK(specs[0].ink.b == 0x38);
-  CHECK(specs[1].id == "aurora");
-  CHECK(specs[1].label == "Greenish Tea - matcha paper");
-  CHECK(specs[2].id == "void");
-  CHECK(specs[2].label == "Dusty Blue - overcast slate");
-  CHECK(specs[3].id == "ember");
-  CHECK(specs[3].label == "Oat & Linen - unbleached");
-  CHECK(specs[4].id == "nebula");
-  CHECK(specs[4].label == "Pressed Botanical - celadon");
-
-  // Every palette is a light paper with muted panels, deep ink and one accent:
-  // nothing dark, nothing highly saturated.
-  for (const ship::ThemeSpec& spec : specs) {
-    const ship::Theme theme = ship::Theme::ById(spec.id);
-    const int paper = (theme.palette.panel.r + theme.palette.panel.g +
-                       theme.palette.panel.b) / 3;
-    const int inkLevel = (theme.palette.ink.r + theme.palette.ink.g +
-                          theme.palette.ink.b) / 3;
-    CHECK(paper >= 0xe8);                 // a paper, not a wall
-    CHECK(inkLevel <= 0x58);              // deep, low-chroma text
-    CHECK(theme.palette.panel2.r <= theme.palette.panel.r + 1);  // panels sit under the paper
-    const int spread = std::max({theme.palette.coffee.r, theme.palette.coffee.g,
-                                 theme.palette.coffee.b}) -
-                       std::min({theme.palette.coffee.r, theme.palette.coffee.g,
-                                 theme.palette.coffee.b});
-    CHECK(spread <= 0x48);                // a muted accent, not a signal colour
+  const char* ids[] = {"classic", "void", "aurora", "nebula", "ember"};
+  const char* labels[] = {"Flight Deck - parchment", "Deep Space - cyan", "Aurora - mint", "Nebula - violet", "Ember - copper"};
+  const ship::Rgb inks[] = {{139,111,78}, {91,184,213}, {91,190,157}, {155,121,208}, {215,144,91}};
+  for (std::size_t i = 0; i < 5; ++i) {
+    CHECK(specs[i].id == ids[i]);
+    CHECK(specs[i].label == labels[i]);
+    CHECK(specs[i].ink.r == inks[i].r);
+    CHECK(specs[i].ink.g == inks[i].g);
+    CHECK(specs[i].ink.b == inks[i].b);
   }
-
-  const ship::Theme classic = ship::Theme::ById("classic");
-  CHECK(classic.palette.panel.r == 0xfa);
-  CHECK(classic.palette.panel.g == 0xf7);
-  CHECK(classic.palette.panel.b == 0xf2);
-  CHECK(classic.palette.ink.r == 0x6b);
-  CHECK(classic.palette.coffee.r == 0x8c);
-
-  // Greenish Tea is the authored four colours, whatever is derived from them.
-  const ship::Theme tea = ship::Theme::ById("aurora");
-  CHECK(tea.palette.panel.r == 0xf2);
-  CHECK(tea.palette.panel.g == 0xf5);
-  CHECK(tea.palette.panel2.r == 0xe6);
-  CHECK(tea.palette.panel2.g == 0xec);
-  CHECK(tea.palette.ink.g == 0x3d);
-  CHECK(tea.palette.coffee.g == 0x73);
-
-  // An unknown id falls back to classic rather than to an unstyled interface.
-  const ship::Theme other = ship::Theme::ById("no-such-theme");
-  CHECK(other.id == "classic");
-  CHECK(other.palette.panel.b == 0xf2);
+  // Literal .panel backgrounds from theme-* CSS, not the old invented
+  // light-only palette requirement. This does not cover all derived roles.
+  const ship::Rgb panels[] = {{0xfa,0xf7,0xf2}, {0x15,0x24,0x37},
+      {0x16,0x2d,0x2a}, {0x28,0x1f,0x3b}, {0x30,0x23,0x1d}};
+  for (std::size_t i = 0; i < 5; ++i) {
+    const auto palette = ship::Theme::ById(ids[i]).palette;
+    CHECK(palette.panel.r == panels[i].r);
+    CHECK(palette.panel.g == panels[i].g);
+    CHECK(palette.panel.b == panels[i].b);
+  }
+  CHECK(ship::Theme::ById("no-such-theme").id == "classic");
 }
 
 TEST_CASE("theme flags drive type size and the compact deck", "[ui][theme]") {
@@ -126,10 +95,10 @@ TEST_CASE("theme flags drive type size and the compact deck", "[ui][theme]") {
   CHECK(theme.BodySize() == 22.0f);
   CHECK(theme.LineHeight() == 29.0f);
 
-  // rgba(107,83,56,0.13), trimmed the way the stylesheet writes it.
-  CHECK(theme.Ink(0.13f) == "rgba(107,83,56,0.13)");
-  CHECK(theme.Ink(1.0f) == "rgba(107,83,56,1)");
-  CHECK(ship::Theme::ById("void").Ink(0.5f) == "rgba(47,55,64,0.5)");
+  // rgba(139,111,78,0.13), trimmed the way the stylesheet writes it.
+  CHECK(theme.Ink(0.13f) == "rgba(139,111,78,0.13)");
+  CHECK(theme.Ink(1.0f) == "rgba(139,111,78,1)");
+  CHECK(ship::Theme::ById("void").Ink(0.5f) == "rgba(91,184,213,0.5)");
 }
 
 // ---------------------------------------------------------------------------
@@ -1045,4 +1014,105 @@ TEST_CASE("home diagram compact rooms carry names and tags in the model "
     CHECK_FALSE(room.name.empty());
     CHECK_FALSE(room.tag.empty());
   }
+}
+
+TEST_CASE("floating briefings coexist and keyed settings replace only themselves", "[ui][popups]") {
+  ship::FloatingPanels windows;
+  const int first = windows.Open("", {}).serial;
+  const int settings = windows.Open("settings").serial;
+  const int log = windows.Open("log").serial;
+  const int second = windows.Open("", {}).serial;
+  const int replacement = windows.Open("settings").serial;
+  REQUIRE(windows.Panels().size() == 4);
+  CHECK(windows.HasBriefings());
+  CHECK(windows.OpenedCount() == 5);
+  CHECK(windows.Panels()[0].serial == first);
+  CHECK(windows.Panels()[1].serial == log);
+  CHECK(windows.Panels()[2].serial == second);
+  CHECK(windows.Panels()[3].serial == replacement);
+  CHECK(windows.Panels()[3].serial != settings);
+  CHECK(windows.Panels()[0].x == 300);
+  CHECK(windows.Panels()[0].y == 90);
+  CHECK(windows.Panels()[3].x == 388);
+  CHECK(windows.Panels()[3].y == 178);
+  const int wrapped = windows.Open("manifest").serial;
+  CHECK(windows.Panels().back().x == 300);
+  windows.Close(log);
+  CHECK(windows.Panels().size() == 4);
+  CHECK(windows.Panels().back().serial == wrapped);
+  windows.Clear();
+  CHECK(windows.Panels().empty());
+}
+
+TEST_CASE("file windows replace only files and retain independent panel state", "[ui][popups]") {
+  ship::FloatingPanels windows;
+  const int log = windows.Open("log").serial;
+  auto& files = windows.Open("files");
+  const int oldFiles = files.serial;
+  files.slot = 3;
+  files.message = "Saved voyage restored.";
+  files.pendingAction = "save";
+  CHECK(windows.HasConfirmation());
+  files.pendingSlot = 3;
+  files.slot = 1;
+  CHECK(files.pendingSlot == 3);
+  windows.Open("files");
+  REQUIRE(windows.Panels().size() == 2);
+  CHECK(windows.Panels()[0].serial == log);
+  CHECK(windows.Panels()[1].serial != oldFiles);
+  CHECK(windows.Panels()[1].slot == 1);
+  CHECK(windows.Panels()[1].pendingAction.empty());
+  CHECK_FALSE(windows.HasConfirmation());
+  CHECK(windows.Panels()[1].message.empty());
+}
+
+TEST_CASE("brief popup models preserve authored rows actions and right-click instructions", "[ui][popups]") {
+  auto sim = Fresh();
+  const auto before = sim.ActionCount();
+  const auto brief = ship::BuildBriefPopup(sim, "room", "o2");
+  const auto original = ship::DescribeTarget(sim, "room", "o2");
+  CHECK(brief.title == "ROOM - O2 Filter Room");
+  CHECK(brief.notice == original.sub);
+  REQUIRE(brief.sections.size() == 1);
+  REQUIRE(brief.sections[0].rows.size() == std::min<std::size_t>(5, original.rows.size()));
+  for (std::size_t i = 0; i < brief.sections[0].rows.size(); ++i) {
+    CHECK(brief.sections[0].rows[i].key == original.rows[i].key);
+    CHECK(brief.sections[0].rows[i].value == original.rows[i].value);
+  }
+  CHECK(brief.acts.size() == original.acts.size());
+  REQUIRE(brief.footer.size() == 1);
+  CHECK(brief.footer[0] == "Right-click to open the O2 Filter Room window. It waits in the tab bar - you are not taken there.");
+  const auto nav = ship::BuildBriefPopup(sim, "nav", "main");
+  CHECK(nav.title == "NAV - Navigation");
+  REQUIRE(nav.sections[0].rows.size() == 6); // navBrief is not limited to five
+  CHECK(nav.sections[0].rows[2].value == "Hold the left button and drag the chart");
+  REQUIRE(nav.acts.size() == 2);
+  CHECK(nav.acts[0].label == "Start Travel");
+  CHECK(nav.acts[0].live);
+  REQUIRE(nav.footer.size() == 2);
+  CHECK(sim.ActionCount() == before);
+  CHECK(sim.State().tabs.empty());
+}
+
+TEST_CASE("audio choices are available through settings and title without actions", "[ui][popups][settings]") {
+  auto sim = Fresh();
+  const auto before = sim.ActionCount();
+  const auto settings = ship::BuildPopup(sim, "settings");
+  REQUIRE(settings.audioChoices.size() == 4);
+  const char* values[] = {"0.18", "0.4", "0.65", "0.9"};
+  const char* labels[] = {"Quiet", "Standard", "Loud", "Very loud"};
+  bool fromVoyage = true;
+  auto panel = ship::TitlePanel::Settings;
+  int slot = 1;
+  std::string message;
+  for (std::size_t i = 0; i < 4; ++i) {
+    CHECK(settings.audioChoices[i].value == values[i]);
+    CHECK(settings.audioChoices[i].label == labels[i]);
+    REQUIRE(ship::PressTitleAction(sim, "audio:" + std::string(values[i]), "", &fromVoyage, &panel, &slot, "", &message));
+    CHECK(sim.State().options.audioLevel == std::stod(values[i]));
+  }
+  REQUIRE(settings.toggles.size() == 6);
+  CHECK(settings.toggles[0].help == "A quiet, synthesized shipboard theme. Audio begins after a click.");
+  CHECK(settings.toggles[4].heading == "Confirmations");
+  CHECK(sim.ActionCount() == before);
 }

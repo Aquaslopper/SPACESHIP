@@ -36,7 +36,7 @@ float StatCellHeight(const Theme& theme) {
   const float gap = 6.0f;
   const float bottomPad = 6.0f;
   return pad + TextLineHeight(theme, 11) + gap + TextLineHeight(theme, 20) +
-         12.0f + bottomPad;
+         4.0f + TextLineHeight(theme, 10) + 12.0f + bottomPad;
 }
 
 // Strip (nav or dock): pad + label + gap + main + gap + right + pad.

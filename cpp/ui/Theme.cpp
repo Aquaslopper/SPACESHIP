@@ -121,7 +121,7 @@ const std::vector<ThemeSpec>& Theme::Specs() {
   static const std::vector<ThemeSpec> specs = {
       // The HTA's five themes, in the reference's order. The ids are the
       // reference's so a save keeps its choice; the labels match the HTA.
-      {"classic", "Flight Deck - parchment", {0x6b, 0x53, 0x38}},
+      {"classic", "Flight Deck - parchment", {139, 111, 78}},
       {"void", "Deep Space - cyan", {0x5b, 0xb8, 0xd5}},
       {"aurora", "Aurora - mint", {0x5b, 0xbe, 0x9d}},
       {"nebula", "Nebula - violet", {0x9b, 0x79, 0xd0}},
