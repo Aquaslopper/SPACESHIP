@@ -98,7 +98,12 @@ if(SPACESHIP_BUILD_GUI AND SPACESHIP_GUI_REASON STREQUAL "")
   FetchContent_Declare(imgui
     URL      https://codeload.github.com/ocornut/imgui/tar.gz/refs/tags/v1.92.7
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
-  FetchContent_Declare(rlImGui
+  # Lowercase by contract: FetchContent's variables are <name>_SOURCE_DIR with
+  # the name lowercased (rlimgui_SOURCE_DIR). Declaring it "rlImGui" produced an
+  # empty variable and an add_library with a source file of "//rlImGui.cpp",
+  # which no machine with X11 had ever hit because the client never configured
+  # here. The library target below is still called rlImGui: that name is ours.
+  FetchContent_Declare(rlimgui
     URL      https://codeload.github.com/raylib-extras/rlImGui/tar.gz/refs/tags/Raylib_6_0
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
 
@@ -107,7 +112,7 @@ if(SPACESHIP_BUILD_GUI AND SPACESHIP_GUI_REASON STREQUAL "")
   set(CUSTOMIZE_BUILD       OFF CACHE BOOL "" FORCE)
   set(SUPPORT_FILEFORMAT_TTF ON CACHE BOOL "" FORCE)  # the bundled fonts
 
-  FetchContent_MakeAvailable(raylib imgui rlImGui)
+  FetchContent_MakeAvailable(raylib imgui rlimgui)
 elseif(SPACESHIP_BUILD_GUI)
   set(SPACESHIP_GUI OFF)
   message(WARNING
@@ -206,12 +211,12 @@ if(SPACESHIP_GUI)
     "${imgui_SOURCE_DIR}/imgui_draw.cpp"
     "${imgui_SOURCE_DIR}/imgui_tables.cpp"
     "${imgui_SOURCE_DIR}/imgui_widgets.cpp"
-    "${rlImGui_SOURCE_DIR}/rlImGui.cpp")
+    "${rlimgui_SOURCE_DIR}/rlImGui.cpp")
 
   target_include_directories(spaceship_imgui PUBLIC
     "${imgui_SOURCE_DIR}"
-    "${rlImGui_SOURCE_DIR}"
-    "${rlImGui_SOURCE_DIR}/extras")
+    "${rlimgui_SOURCE_DIR}"
+    "${rlimgui_SOURCE_DIR}/extras")
   target_link_libraries(spaceship_imgui PUBLIC raylib)
   set_target_properties(spaceship_imgui PROPERTIES CXX_STANDARD 17)
 
