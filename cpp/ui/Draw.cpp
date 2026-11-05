@@ -162,6 +162,11 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
     idle_ = BuildIdleScreen(sim, layout_, theme_, theme_.hideCrewLabels, others_, seeded);
     rng_ = seeded;
     SyncIdleDots(sim, nowMs);
+    // The whole home column scrolls when it is taller than the content area
+    // (the HTA's #content { overflow:auto }). The ceiling is the feed's bottom
+    // edge; anything past the content bottom is reachable only by scrolling.
+    contentMaxScroll_ =
+        std::max(0.0f, idle_.feedBox.Bottom() - layout_.content.Bottom());
   }
 
   UpdateMarks(marks_, nowMs);
@@ -541,15 +546,28 @@ void ShellView::PaintChrome(Simulation& sim) {
 void ShellView::PaintIdle(Simulation& sim) {
   const Theme& theme = theme_;
 
+  // Main-content scroll: the whole home column moves with contentScroll_,
+  // matching the HTA's #content { overflow:auto }. The feed is part of this
+  // scrolling column; it is deliberately not given a separate internal scroll
+  // here (that is a distinct HTA mechanism, #feed { overflow-y:auto }, left
+  // out of this slice). Hit testing in Click() offsets the cursor by the same
+  // scroll so content painted above the viewport can never be clicked.
+  Camera2D scrollCam{{0.0f, 0.0f}, {0.0f, -contentScroll_}, 0.0f, 1.0f};
+  BeginMode2D(scrollCam);
+
   // ---- stat and info rails ----------------------------------------------
   for (const RailCell& cell : idle_.stats) {
     DrawRectangleLines(static_cast<int>(cell.box.x), static_cast<int>(cell.box.y),
                        static_cast<int>(cell.box.w), static_cast<int>(cell.box.h),
                        ToRay(theme.palette.border));
+    // The label sits at the top of the cell; the value starts one label height
+    // plus a gap below it, so the two never overlap at any typography step.
+    const float valueY =
+        cell.box.y + 6.0f + TypePx(11) + 6.0f;
     Text(cell.label.c_str(), static_cast<int>(cell.box.x + 6.0f),
-             static_cast<int>(cell.box.y + 4.0f), TypePx(11) , ToRay(theme.palette.muted));
+             static_cast<int>(cell.box.y + 6.0f), TypePx(11) , ToRay(theme.palette.muted));
     Text(cell.value.c_str(), static_cast<int>(cell.box.x + 6.0f),
-         static_cast<int>(cell.box.y + 20.0f), TypePx(20), ToRay(theme.palette.ink), true);
+         static_cast<int>(valueY), TypePx(20), ToRay(theme.palette.ink), true);
     const float bar = cell.box.w - 12.0f;
     DrawRectangle(static_cast<int>(cell.box.x + 6.0f),
                   static_cast<int>(cell.box.Bottom() - 12.0f), static_cast<int>(bar), 4,
@@ -571,20 +589,25 @@ void ShellView::PaintIdle(Simulation& sim) {
     DrawRectangleLines(static_cast<int>(strip.box.x), static_cast<int>(strip.box.y),
                        static_cast<int>(strip.box.w), static_cast<int>(strip.box.h),
                        ToRay(theme.palette.border));
+    const float mainY =
+        strip.box.y + 6.0f + TypePx(11) + 6.0f;
+    const float rightY = mainY + TypePx(13) + 6.0f;
     Text(strip.label.c_str(), static_cast<int>(strip.box.x + 8.0f),
              static_cast<int>(strip.box.y + 6.0f), TypePx(11) , ToRay(theme.palette.muted));
     Text(strip.main.c_str(), static_cast<int>(strip.box.x + 8.0f),
-             static_cast<int>(strip.box.y + 20.0f), TypePx(13) , ToRay(theme.palette.ink));
+         static_cast<int>(mainY), TypePx(13) , ToRay(theme.palette.ink));
     Text(strip.right.c_str(), static_cast<int>(strip.box.x + 8.0f),
-         static_cast<int>(strip.box.y + 32.0f), TypePx(10), ToRay(theme.palette.muted), true);
+         static_cast<int>(rightY), TypePx(10), ToRay(theme.palette.muted), true);
   };
   paintStrip(idle_.nav);
   if (idle_.docked) { paintStrip(idle_.dock); }
 
   for (const RailCell& cell : idle_.infos) {
-    Text(cell.label.c_str(), static_cast<int>(cell.box.x), static_cast<int>(cell.box.y), TypePx(10) , ToRay(theme.palette.muted));
+    const float valueY = cell.box.y + 6.0f + TypePx(10) + 6.0f;
+    Text(cell.label.c_str(), static_cast<int>(cell.box.x),
+         static_cast<int>(cell.box.y + 6.0f), TypePx(10) , ToRay(theme.palette.muted));
     Text(cell.value.c_str(), static_cast<int>(cell.box.x),
-         static_cast<int>(cell.box.y + 13.0f), TypePx(13), ToRay(theme.palette.ink), true);
+         static_cast<int>(valueY), TypePx(13), ToRay(theme.palette.ink), true);
   }
 
   // ---- feed --------------------------------------------------------------
@@ -601,6 +624,7 @@ void ShellView::PaintIdle(Simulation& sim) {
              static_cast<int>(y), TypePx(12) , ToRay(theme.palette.ink));
     y += theme.LineHeight();
   }
+  EndMode2D();
   (void)sim;
 }
 
@@ -2377,10 +2401,14 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
   }
 
   if (sim.State().activeTab == "home") {
+    // The whole home column is painted shifted up by contentScroll_; shift the
+    // cursor down by the same amount so a click lands on what is actually
+    // painted, and never on content scrolled out of view.
+    const float scrollY = contentScroll_;
     // The stage is the only clickable illustration on Home.
-    if (idle_.stageArea.Contains(x, y)) {
+    if (idle_.stageArea.Contains(x, y + scrollY)) {
       const float localX = x - idle_.stageArea.x;
-      const float localY = y - idle_.stageArea.y;
+      const float localY = y + scrollY - idle_.stageArea.y;
       for (const DiagramCrew& crew : idle_.diagram.crew) {
         const Area hit{crew.dot.x - 6.0f, crew.dot.y - 6.0f, 27.0f, 27.0f};
         const Area labelHit{crew.label.x, crew.label.y,
@@ -2416,7 +2444,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
       }
     }
     for (const RailCell& cell : idle_.stats) {
-      if (!cell.box.Contains(x, y)) { continue; }
+      if (!cell.box.Contains(x, y + scrollY)) { continue; }
       if (button == HitButton::Right) {
         OpenTask(sim, "system", cell.id, false);
       } else {
@@ -2428,7 +2456,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
       return;
     }
     for (const RailCell& cell : idle_.infos) {
-      if (!cell.box.Contains(x, y)) { continue; }
+      if (!cell.box.Contains(x, y + scrollY)) { continue; }
       if (button == HitButton::Right) {
         if (cell.id == "life") {
           OpenTask(sim, "room", "o2", false);
@@ -2443,7 +2471,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
       }
       return;
     }
-    if (idle_.nav.box.Contains(x, y)) {
+    if (idle_.nav.box.Contains(x, y + scrollY)) {
       if (button == HitButton::Right) {
         OpenTask(sim, "nav", "main", false);
       } else {
@@ -2454,7 +2482,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
       }
       return;
     }
-    if (idle_.docked && idle_.dock.box.Contains(x, y)) {
+    if (idle_.docked && idle_.dock.box.Contains(x, y + scrollY)) {
       if (button == HitButton::Right) {
         OpenTask(sim, "station", sim.Map().here, false);
       } else {

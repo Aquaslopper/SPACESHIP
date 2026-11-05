@@ -733,6 +733,128 @@ TEST_CASE("a docked ship grows a dock strip, and a crossing says so", "[ui][idle
 }
 
 // ---------------------------------------------------------------------------
+//  Home layout under the 18 px typography floor (UI-001)
+// ---------------------------------------------------------------------------
+
+TEST_CASE("home stat cells grow with the font and hold label above value",
+          "[ui][idle][layout]") {
+  ship::Simulation sim = Fresh();
+  ship::FxRng rng;
+  const ship::ShellLayout layout =
+      ship::ComputeLayout(1440.0f, 940.0f, 940.0f - 36.0f - 22.0f, 300.0f, true);
+  auto typePx = [](int ref, float fontPx) {
+    return std::max(18.0f, std::round(ref * fontPx / 13.0f));
+  };
+  float prevH = -1.0f;
+  for (int step : {0, 2, 3}) {
+    ship::Theme theme = ship::Theme::ById("classic");
+    theme.fontStep = step;
+    const float fontPx = ship::Theme::FontPxForStep(step);
+    const float labelH = typePx(11, fontPx);
+    const float valueH = typePx(20, fontPx);
+    // Cell must hold: pad + label + gap + value + bar zone (Bottom()-12) + pad.
+    const float need =
+        6.0f + labelH + 6.0f + valueH + 12.0f + 6.0f;
+    const ship::IdleScreenModel idle =
+        ship::BuildIdleScreen(sim, layout, theme, false, 300.0f, rng);
+    REQUIRE_FALSE(idle.stats.empty());
+    CHECK(idle.stats.front().box.h >= need);
+    // Boxes grow as the typography step grows; they never shrink below the fit.
+    if (prevH >= 0.0f) {
+      CHECK(idle.stats.front().box.h > prevH);
+    }
+    prevH = idle.stats.front().box.h;
+    // The value baseline is one label height plus a gap below the label, and
+    // the bar is drawn at Bottom()-12, so both fit inside the cell.
+    const float valueBottom = 6.0f + labelH + 6.0f + valueH;
+    CHECK(valueBottom <= idle.stats.front().box.h - 12.0f);
+  }
+}
+
+TEST_CASE("home nav and dock strips grow with the font and never overlap",
+          "[ui][idle][layout]") {
+  ship::Simulation sim = Fresh();
+  ship::FxRng rng;
+  const ship::ShellLayout layout =
+      ship::ComputeLayout(1440.0f, 940.0f, 940.0f - 36.0f - 22.0f, 300.0f, true);
+  auto typePx = [](int ref, float fontPx) {
+    return std::max(18.0f, std::round(ref * fontPx / 13.0f));
+  };
+  for (int step : {0, 2}) {
+    ship::Theme theme = ship::Theme::ById("classic");
+    theme.fontStep = step;
+    const float fontPx = ship::Theme::FontPxForStep(step);
+    const float labelH = typePx(11, fontPx);
+    const float mainH = typePx(13, fontPx);
+    const float rightH = typePx(10, fontPx);
+    const float need =
+        6.0f + labelH + 6.0f + mainH + 6.0f + rightH + 6.0f;
+    const ship::IdleScreenModel idle =
+        ship::BuildIdleScreen(sim, layout, theme, false, 300.0f, rng);
+    CHECK(idle.nav.box.h >= need);
+    // label < main < right in vertical order, each below the previous bottom.
+    CHECK(idle.nav.box.y + 6.0f + labelH + 6.0f <=
+          idle.nav.box.y + 6.0f + labelH + 6.0f + mainH);
+    const float rightBottom =
+        6.0f + labelH + 6.0f + mainH + 6.0f + rightH;
+    CHECK(rightBottom <= idle.nav.box.h - 6.0f);
+  }
+}
+
+TEST_CASE("home dock strip sits below the actual nav strip, docked and undocked",
+          "[ui][idle][layout]") {
+  ship::Simulation sim = Fresh();
+  ship::FxRng rng;
+  const ship::Theme theme = ship::Theme::ById("classic");
+  const ship::ShellLayout layout =
+      ship::ComputeLayout(1440.0f, 940.0f, 940.0f - 36.0f - 22.0f, 300.0f, true);
+
+  // Undocked: no dock strip, nothing below the nav strip.
+  {
+    const ship::IdleScreenModel idle =
+        ship::BuildIdleScreen(sim, layout, theme, false, 300.0f, rng);
+    CHECK_FALSE(idle.docked);
+    CHECK(idle.dock.box.h == 0.0f);
+    CHECK(idle.dock.box.y == idle.nav.box.Bottom());
+  }
+
+  // Docked: the dock strip starts at the nav strip's real bottom + 10, never at
+  // a hard-coded 50 px offset, so a grown nav strip cannot overlap it.
+  {
+    const std::string port = World().ports.front().id;
+    sim.MutableMap().here = port;
+    sim.MutableState().docked = true;
+    const ship::IdleScreenModel docked =
+        ship::BuildIdleScreen(sim, layout, theme, false, 300.0f, rng);
+    CHECK(docked.docked);
+    CHECK(docked.dock.label == "Docked");
+    CHECK(docked.dock.main == World().ports.front().name);
+    CHECK(docked.dock.box.y == docked.nav.box.Bottom() + 10.0f);
+    CHECK(docked.dock.box.h > 0.0f);
+  }
+}
+
+TEST_CASE("home column overflows the content area on a short/narrow viewport",
+          "[ui][idle][layout]") {
+  ship::Simulation sim = Fresh();
+  ship::FxRng rng;
+  ship::Theme theme = ship::Theme::ById("classic");
+  // A short, narrow window: the stacked home column is taller than the content.
+  const ship::ShellLayout layout =
+      ship::ComputeLayout(1024.0f, 768.0f, 768.0f - 36.0f - 22.0f, 300.0f, true);
+  const ship::IdleScreenModel idle =
+      ship::BuildIdleScreen(sim, layout, theme, false, 300.0f, rng);
+  // content.Bottom() = 36 + (768 - 36 - 22) = 746.
+  CHECK(idle.feedBox.Bottom() > idle.content.Bottom());
+  // When the column overflows, the feed (and everything above it) is clipped
+  // and unreachable unless the shell scrolls. Draw() converts this condition
+  // into contentMaxScroll_ = feedBox.Bottom() - content.Bottom() (> 0); the
+  // same offset is applied to home hit testing so obscured content can't be
+  // clicked. This is main-content scrolling (#content { overflow:auto }), not
+  // a separate feed-internal scroll.
+}
+
+// ---------------------------------------------------------------------------
 //  Effects: cosmetic, deterministic, and never in the way
 // ---------------------------------------------------------------------------
 TEST_CASE("dots drift half a pixel and pause when they arrive", "[ui][fx]") {
