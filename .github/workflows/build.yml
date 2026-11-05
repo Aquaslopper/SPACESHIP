@@ -1,0 +1,75 @@
+name: Build Spaceship Windows EXE
+
+on:
+  push:
+    branches: [ main, master, "arena/**" ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Add Pre-installed MinGW-w64 to PATH
+        shell: bash
+        run: |
+          echo "C:/msys64/mingw64/bin" >> $GITHUB_PATH
+
+      - name: Prepare CMake and GCC 13/14 Compatibility
+        shell: bash
+        run: |
+          python3 - << 'EOF'
+          import pathlib, re
+
+          # 1. Prevent CMake from running test discovery during EXE packaging
+          cmake_path = pathlib.Path("CMakeLists.txt")
+          if cmake_path.exists():
+              txt = cmake_path.read_text(encoding="utf-8")
+              txt = re.sub(r'catch_discover_tests\s*\([^)]*\)', '# skipped for EXE packaging', txt)
+              txt = txt.replace('-Werror', '')
+              cmake_path.write_text(txt, encoding="utf-8")
+
+          # 2. Prevent GCC 13/14 false-positive -Wdangling-reference in Catalog.cpp
+          cat_path = pathlib.Path("cpp/data/Catalog.cpp")
+          if cat_path.exists():
+              txt = cat_path.read_text(encoding="utf-8")
+              txt = txt.replace("const std::string& file)", "std::string file)")
+              txt = txt.replace("const std::string& ctx)", "std::string ctx)")
+              cat_path.write_text(txt, encoding="utf-8")
+          EOF
+
+      - name: Configure CMake (Release)
+        shell: bash
+        run: |
+          cmake -B build-win -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=C:/msys64/mingw64/bin/gcc.exe \
+            -DCMAKE_CXX_COMPILER=C:/msys64/mingw64/bin/g++.exe \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DOPENGL_gl_LIBRARY=opengl32 \
+            -DCMAKE_CXX_FLAGS="-Wno-dangling-reference -Wno-error" \
+            -DCMAKE_EXE_LINKER_FLAGS="-static -static-libgcc -static-libstdc++"
+
+      - name: Build spaceship.exe
+        shell: bash
+        run: |
+          cmake --build build-win --target spaceship --parallel
+
+      - name: Package Portable Windows Folder
+        shell: bash
+        run: |
+          mkdir -p dist/Spaceship/runtime/saves
+          cp build-win/spaceship.exe dist/Spaceship/
+          cp -r assets dist/Spaceship/
+          for doc in README.md PARITY.md SPAM_AUDIT.md; do
+            [ -f "$doc" ] && cp "$doc" dist/Spaceship/
+          done
+
+      - name: Upload Windows EXE Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Spaceship-Windows-x64
+          path: dist/Spaceship/
