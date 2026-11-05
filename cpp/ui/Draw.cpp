@@ -150,6 +150,15 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   }
 
   if (sim.State().activeTab == "home") {
+    // Screen hit lists belong to the window that was painted last frame. Clear
+    // them when Home becomes active, otherwise a stale quarters/stores early
+    // return can swallow every click on the ship.
+    screenNav_ = false;
+    screenQuarters_ = false;
+    screenRecord_ = false;
+    screenPanels_ = false;
+    navHits_.clear();
+    taskButtons_.clear();
     PaintIdle(sim);
   } else {
     // Ask the router for the window the active tab owns - the same function the
@@ -2124,6 +2133,15 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         OpenTask(sim, "nav", "main", true);
       } else {
         selection_ = DescribeTarget(sim, "nav", "main");
+        hasSelection_ = true;
+      }
+      return;
+    }
+    if (idle_.docked && idle_.dock.box.Contains(x, y)) {
+      if (button == HitButton::Right) {
+        OpenTask(sim, "station", sim.Map().here, true);
+      } else {
+        selection_ = DescribeTarget(sim, "station", sim.Map().here);
         hasSelection_ = true;
       }
       return;
