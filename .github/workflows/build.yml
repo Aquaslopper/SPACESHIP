@@ -26,15 +26,9 @@ jobs:
               txt = re.sub(r'catch_discover_tests\s*\([^)]*\)', '# skipped for EXE packaging', txt)
               txt = txt.replace('-Werror', '')
               txt = txt.replace('find_package(X11 QUIET)', 'set(X11_FOUND TRUE)')
-              # Fix case-sensitive FetchContent _SOURCE_DIR variables in CMake 4.0
               txt = txt.replace('${RLIMGUI_SOURCE_DIR}', '${rlimgui_SOURCE_DIR}')
               txt = txt.replace('${IMGUI_SOURCE_DIR}', '${imgui_SOURCE_DIR}')
               txt = txt.replace('${RAYLIB_SOURCE_DIR}', '${raylib_SOURCE_DIR}')
-              # Ensure FetchContent_MakeAvailable is called for header/source-only repos
-              if 'FetchContent_GetProperties(rlimgui)' in txt and 'FetchContent_MakeAvailable(rlimgui)' not in txt:
-                  txt = txt.replace('FetchContent_GetProperties(rlimgui)', 'FetchContent_MakeAvailable(rlimgui)\nFetchContent_GetProperties(rlimgui)')
-              if 'FetchContent_GetProperties(imgui)' in txt and 'FetchContent_MakeAvailable(imgui)' not in txt:
-                  txt = txt.replace('FetchContent_GetProperties(imgui)', 'FetchContent_MakeAvailable(imgui)\nFetchContent_GetProperties(imgui)')
               cmake_path.write_text(txt, encoding="utf-8")
 
           # 2. Catalog.cpp: avoid GCC 13/14 false-positive -Wdangling-reference
@@ -44,13 +38,6 @@ jobs:
               txt = txt.replace("const std::string& file)", "std::string file)")
               txt = txt.replace("const std::string& ctx)", "std::string ctx)")
               cat_path.write_text(txt, encoding="utf-8")
-
-          # 3. main.cpp: ensure std::filesystem::path is converted via .string() on Windows (where path::value_type is wchar_t)
-          main_path = pathlib.Path("cpp/app/main.cpp")
-          if main_path.exists():
-              txt = main_path.read_text(encoding="utf-8")
-              txt = re.sub(r'LoadMusicStream\s*\(\s*([a-zA-Z0-9_]+)\.c_str\(\)\s*\)', r'LoadMusicStream(\1.string().c_str())', txt)
-              main_path.write_text(txt, encoding="utf-8")
           EOF
 
       - name: Pre-fetch ImGui & rlImGui sources explicitly
@@ -74,13 +61,53 @@ jobs:
             -Dimgui_SOURCE_DIR="$PWD/build-deps/imgui" \
             -DrlImGui_SOURCE_DIR="$PWD/build-deps/rlimgui" \
             -Drlimgui_SOURCE_DIR="$PWD/build-deps/rlimgui" \
-            -DCMAKE_CXX_FLAGS="-Wno-dangling-reference -Wno-error" \
+            -DCMAKE_CXX_FLAGS="-D_USE_MATH_DEFINES -DM_PI=3.14159265358979323846 -Wno-dangling-reference -Wno-error" \
             -DCMAKE_EXE_LINKER_FLAGS="-static -static-libgcc -static-libstdc++"
 
       - name: Build spaceship.exe
         shell: bash
         run: |
-          cmake --build build-win --target spaceship --parallel
+          if ! cmake --build build-win --target spaceship --parallel 2>&1 | tee build_err.log; then
+            echo "Checking for Windows std::filesystem::path -> std::string implicit conversion..."
+            python3 - << 'EOF'
+            import pathlib, re
+            log = pathlib.Path("build_err.log").read_text(encoding="utf-8", errors="ignore")
+            patched = set()
+            for m in re.finditer(r'([A-Za-z]:/[^\s:]+\.(?:cpp|h)):(\d+):(\d+): error: cannot convert .*path.* to .*basic_string', log):
+                fpath, lno, col = m.group(1), int(m.group(2)), int(m.group(3))
+                if (fpath, lno) in patched:
+                    continue
+                patched.add((fpath, lno))
+                p = pathlib.Path(fpath)
+                lines = p.read_text(encoding="utf-8").splitlines()
+                line = lines[lno - 1]
+                pos = min(max(col - 1, 0), len(line) - 1)
+                # Find argument bounds around pos at paren depth 0
+                l_idx, depth = pos, 0
+                while l_idx > 0:
+                    c = line[l_idx - 1]
+                    if c == ')': depth += 1
+                    elif c == '(':
+                        if depth == 0: break
+                        depth -= 1
+                    elif c in ',;=' and depth == 0: break
+                    l_idx -= 1
+                r_idx, depth = pos, 0
+                while r_idx < len(line):
+                    c = line[r_idx]
+                    if c == '(': depth += 1
+                    elif c == ')':
+                        if depth == 0: break
+                        depth -= 1
+                    elif c in ',;' and depth == 0: break
+                    r_idx += 1
+                expr = line[l_idx:r_idx].strip()
+                lines[lno - 1] = line[:l_idx] + f"({expr}).string()" + line[r_idx:]
+                print(f"Auto-patched {fpath}:{lno} -> {lines[lno - 1]}")
+                p.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            EOF
+            cmake --build build-win --target spaceship --parallel
+          fi
 
       - name: Package Portable Windows Folder
         shell: bash
