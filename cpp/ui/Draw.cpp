@@ -161,7 +161,8 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
     screenPanels_ = kind == ScreenKind::Station || kind == ScreenKind::Cargo ||
                     kind == ScreenKind::Science || kind == ScreenKind::Room ||
                     kind == ScreenKind::SimCore || kind == ScreenKind::Awards ||
-                    kind == ScreenKind::Event || kind == ScreenKind::Wiki;
+                    kind == ScreenKind::Event || kind == ScreenKind::Wiki ||
+                    kind == ScreenKind::System || kind == ScreenKind::Info;
     panelsKind_ = kind;
     if (taskTabKey_ != sim.State().activeTab) {
       pendingConfirm_.clear();
@@ -1098,6 +1099,8 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
 // ============================================================================
 bool ShellView::PressPanelRow(Simulation& sim, ScreenKind kind, const std::string& id) {
   switch (kind) {
+    case ScreenKind::System: return PressSystemAction(sim, id);
+    case ScreenKind::Info: return PressInfoAction(sim, id);
     case ScreenKind::Station: return PressStationAction(sim, id, "");
     case ScreenKind::Cargo:
     case ScreenKind::Science: return PressStoresAction(sim, id, "");
@@ -1509,7 +1512,8 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
     }
   }
 
-  // The action band: salvage and packaging buttons, and the clocks left.
+  // Only screens with commitments, progress, or a confirmation get a bottom band.
+  if (!screen.progress.empty() || !pendingConfirm_.empty() || !screen.bandNote.empty()) {
   const float bandY = layout_.content.Bottom() - 96.0f;
   DrawRectangle(static_cast<int>(left), static_cast<int>(bandY),
                 static_cast<int>(right - left), 90, ToRay(p.panel));
@@ -1558,6 +1562,7 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
              ToRay(button.state == ButtonState::Cooldown ? p.terracotta : p.ink));
     taskButtons_.push_back({box, button.taskId});
     bx += 198.0f;
+  }
   }
   (void)sim;
 }
@@ -2100,10 +2105,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         const std::string action = pendingAction_;
         pendingConfirm_.clear();
         pendingAction_.clear();
-        const bool acted =
-            panelsKind_ == ScreenKind::Station
-                ? PressStationAction(sim, action, "")
-                : PressStoresAction(sim, action, "");
+        const bool acted = PressPanelRow(sim, panelsKind_, action);
         if (acted) { SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion); }
         return;
       }
