@@ -48,7 +48,7 @@ TaskStage BuildFilterMachine(const Simulation& sim) {
   };
   const bool running = sim.BankRunning();
   const auto& air = sim.AirSpec();
-  add("o2-air", 20, 52, 560, 66, "", running ? "#f1f6ea" : "#efe7d8");
+  add("o2-air", 20, 52, 560, 66, "", sim.AirStageIndex() == 4 ? "#f1f6ea" : "#efe7d8");
   // Reflow the source's 8/11px labels inside the same chamber for >=18px.
   add("o2-airlab", 28, 60, 200, 18, "CABIN AIR", "#a2947f");
   add("o2-airword", 330, 58, 240, 18, air.word, air.tone);

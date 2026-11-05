@@ -593,6 +593,7 @@ TEST_CASE("filter illustration tracks clean air, slot charge and degradation", "
   CHECK(find(stage, "o2-airfill").box.w == std::round(544 * sim.AirPercent() / 100));
   CHECK(find(stage, "o2-airfill").tone == sim.AirSpec().tone);
   CHECK(find(stage, "o2-airword").text == sim.AirSpec().word);
+  CHECK(find(stage, "o2-air").tone == (sim.AirStageIndex() == 4 ? "#f1f6ea" : "#efe7d8"));
   REQUIRE(sim.StartCanisterInstall(0));
   REQUIRE(sim.StartCanisterInstall(1));
   REQUIRE(sim.StartCanisterInstall(2));
