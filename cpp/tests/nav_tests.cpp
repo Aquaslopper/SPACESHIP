@@ -593,3 +593,86 @@ TEST_CASE("navigation uses the displayed command lock and disabled progress guar
   sim.PerformAction("another control");
   CHECK(ship::BuildNavScreen(sim).screen.commands.front().remaining == 14);
 }
+
+TEST_CASE("an opening crossing progresses through actual task controls", "[ui][nav][logic-audit]") {
+  auto sim = Fresh();
+  REQUIRE(ship::OpenTask(sim, "room", "nav", true));
+  REQUIRE(ship::PressNavAction(sim, "select", "tolme"));
+  const auto before = sim.ActionCount();
+  REQUIRE(ship::PressNavAction(sim, "travel"));
+  REQUIRE(sim.FindOngoing("travel") != nullptr);
+  CHECK(sim.ActionCount() == before + 1);
+  CHECK(sim.FindOngoing("travel")->left == 21);
+
+  REQUIRE(ship::OpenTask(sim, "room", "o2", true));
+  for (int i = 0; i < 3; ++i) {
+    REQUIRE(ship::PressProgressButton(sim, "o2s" + std::to_string(i)));
+  }
+  REQUIRE(ship::OpenTask(sim, "room", "nav", true));
+  REQUIRE(ship::PressNavAction(sim, "stand-watch"));
+  const auto lockedAt = sim.ActionCount();
+  CHECK_FALSE(ship::PressNavAction(sim, "stand-watch"));
+  CHECK(sim.ActionCount() == lockedAt);
+
+  REQUIRE(ship::OpenTask(sim, "room", "cargo", true));
+  for (int i = 0; i < 2; ++i) {
+    REQUIRE(ship::PressProgressButton(sim, "salvage-" + std::to_string(i)));
+  }
+  // The starting hold has room for two lots, not three; refusal costs nothing.
+  const auto beforeFullHold = sim.ActionCount();
+  CHECK_FALSE(ship::PressProgressButton(sim, "salvage-2"));
+  CHECK(sim.ActionCount() == beforeFullHold);
+  REQUIRE(sim.BankReady());
+  const double priorBurst = sim.FindOngoing("travel")->left;
+  REQUIRE(ship::OpenTask(sim, "room", "o2", true));
+  const auto beforeBank = sim.ActionCount();
+  REQUIRE(ship::PressProgressButton(sim, "o2-run"));
+  CHECK(sim.ActionCount() == beforeBank + 1);
+  REQUIRE(sim.FindOngoing("travel") != nullptr);
+  CHECK(sim.FindOngoing("travel")->left == priorBurst - 11);
+  CHECK(sim.BankRunning());
+  CHECK(sim.State().gameOver.empty());
+
+  REQUIRE(ship::OpenTask(sim, "system", "fuel", true));
+  REQUIRE(ship::PressSystemAction(sim, "fuel"));
+  REQUIRE(ship::OpenTask(sim, "room", "engine", true));
+  REQUIRE(ship::PressProgressButton(sim, "maint"));
+  REQUIRE(ship::OpenTask(sim, "system", "energy", true));
+  REQUIRE(ship::PressSystemAction(sim, "energy"));
+  REQUIRE(ship::OpenTask(sim, "system", "shield", true));
+  REQUIRE(ship::PressSystemAction(sim, "shield"));
+  const auto* trip = sim.FindOngoing("travel");
+  REQUIRE(trip != nullptr);
+  CHECK(trip->state == "done");
+  REQUIRE(ship::OpenTask(sim, "room", "nav", true));
+  const auto beforeAck = sim.ActionCount();
+  REQUIRE(ship::PressNavAction(sim, "travel"));
+  CHECK(sim.ActionCount() == beforeAck);
+  CHECK(sim.Map().here == "tolme");
+  CHECK(sim.State().docked);
+  CHECK(sim.State().gameOver.empty());
+}
+
+TEST_CASE("powered work pauses without energy while other work and the action clock continue", "[ui][nav][logic-audit]") {
+  auto sim = Fresh();
+  sim.FindStat("energy")->value = 0;
+  sim.MutableState().engineCondition = 70;
+  REQUIRE(sim.AddOngoing("travel", "Crossing", 4, "travel", "tolme") != nullptr);
+  REQUIRE(sim.AddOngoing("scan", "Scanning", 4, "scan", "halvan") != nullptr);
+  REQUIRE(sim.AddOngoing("maint", "Maintenance", 4, "maint", "engine") != nullptr);
+  REQUIRE(ship::OpenTask(sim, "room", "nav", true));
+  const auto before = sim.ActionCount();
+  REQUIRE(ship::PressNavAction(sim, "stand-watch"));
+  CHECK(sim.ActionCount() == before + 1);
+  CHECK(sim.FindOngoing("travel")->left == 4);
+  CHECK(sim.FindOngoing("scan")->left == 4);
+  CHECK(sim.FindOngoing("maint")->left == 3);
+
+  REQUIRE(ship::OpenTask(sim, "system", "energy", true));
+  REQUIRE(ship::PressSystemAction(sim, "energy"));
+  CHECK(sim.ActionCount() == before + 2);
+  CHECK(sim.StatValue("energy") > 0);
+  CHECK(sim.FindOngoing("travel")->left == 3);
+  CHECK(sim.FindOngoing("scan")->left == 3);
+  CHECK(sim.FindOngoing("maint")->left == 2);
+}

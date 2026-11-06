@@ -87,6 +87,14 @@ float Theme::FontPxForStep(int step) {
   return kFontFloorPx + static_cast<float>(std::lround(0.05 * kFontFloorPx * clamped));
 }
 
+int Theme::HomeInfoLabelPx() const {
+  return static_cast<int>(std::lround(12.0f * FontPx() / kFontFloorPx));
+}
+
+int Theme::HomeInfoValuePx() const {
+  return static_cast<int>(std::lround(15.0f * FontPx() / kFontFloorPx));
+}
+
 float Theme::LineHeightForPx(float px) {
   // A 1.32 line box, rounded: 24 px at the floor, which is what keeps the
   // rows, the feed and the status bar from clipping as the steps grow.

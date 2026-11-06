@@ -745,6 +745,35 @@ TEST_CASE("home stat cells grow with the font and hold label above value",
   }
 }
 
+TEST_CASE("home info rail uses compact sizes that follow reading preferences", "[ui][idle][layout]") {
+  auto sim = Fresh();
+  ship::FxRng rng;
+  const auto layout = ship::ComputeLayout(1440.0f, 940.0f, 882.0f, 300.0f, true);
+  int previousLabel = 0, previousValue = 0;
+  for (int step : {0, 1, 2, 3}) {
+    auto theme = ship::Theme::ById("classic");
+    theme.fontStep = step;
+    const int label = theme.HomeInfoLabelPx(), value = theme.HomeInfoValuePx();
+    CHECK(label >= 12);
+    CHECK(value > label);
+    CHECK(label >= previousLabel);
+    CHECK(value >= previousValue);
+    const auto idle = ship::BuildIdleScreen(sim, layout, theme, false, rng);
+    REQUIRE_FALSE(idle.infos.empty());
+    CHECK(idle.infos.front().box.h >= 6 + label + 6 + value + 6);
+    CHECK(idle.feedBox.y > idle.infos.front().box.Bottom());
+    previousLabel = label;
+    previousValue = value;
+  }
+  auto standard = ship::Theme::ById("classic");
+  auto large = standard;
+  large.largeText = true;
+  CHECK(standard.HomeInfoLabelPx() == 12);
+  CHECK(standard.HomeInfoValuePx() == 15);
+  CHECK(large.HomeInfoLabelPx() > standard.HomeInfoLabelPx());
+  CHECK(large.HomeInfoValuePx() > standard.HomeInfoValuePx());
+}
+
 TEST_CASE("home nav and dock strips grow with the font and never overlap",
           "[ui][idle][layout]") {
   ship::Simulation sim = Fresh();

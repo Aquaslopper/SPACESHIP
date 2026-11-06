@@ -381,9 +381,19 @@ int main(int argc, char** argv) {
   ship::ui::ApplyPalette(theme);
 
   Texture2D titleTexture = LoadTitleTexture(assets);
+  std::array<Texture2D, 6> tutorialTextures{};
+  for (std::size_t i = 0; i < tutorialTextures.size(); ++i) {
+    const auto path = assets / "art" / "tutorial" / ("spaceship0" + std::to_string(i + 1) + ".png");
+    if (std::filesystem::exists(path)) {
+      tutorialTextures[i] = LoadTexture(path.string().c_str());
+      if (tutorialTextures[i].id != 0) { SetTextureFilter(tutorialTextures[i], TEXTURE_FILTER_BILINEAR); }
+    }
+    if (tutorialTextures[i].id == 0) { std::fprintf(stderr, "spaceship: tutorial card unavailable: %s\n", path.string().c_str()); }
+  }
   ship::ShellView shell;
   shell.SetFonts(fonts.body, fonts.bold, fonts.mono);
   shell.SetTitleTexture(&titleTexture);
+  for (std::size_t i = 0; i < tutorialTextures.size(); ++i) { shell.SetTutorialTexture(i, &tutorialTextures[i]); }
   shell.Configure(static_cast<float>(GetScreenWidth()),
                   static_cast<float>(GetScreenHeight()), theme);
 
@@ -406,6 +416,8 @@ int main(int argc, char** argv) {
   ship::PointerOwnership leftPointer, rightPointer;
   while (!WindowShouldClose() && !shell.QuitRequested()) {
     if (IsKeyPressed(KEY_ESCAPE)) { shell.Escape(sim); }
+    if (IsKeyPressed(KEY_LEFT)) { shell.PageTutorial(-1, GetTime() * 1000.0); }
+    if (IsKeyPressed(KEY_RIGHT)) { shell.PageTutorial(1, GetTime() * 1000.0); }
     BeginDrawing();
     // rlImGui's event processing and frame setup happen inside the active
     // raylib drawing frame, matching its documented render-loop contract.
@@ -481,6 +493,7 @@ int main(int argc, char** argv) {
   audio.Shutdown();
   rlImGuiShutdown();
   if (titleTexture.id != 0) { UnloadTexture(titleTexture); }
+  for (auto texture : tutorialTextures) { if (texture.id != 0) { UnloadTexture(texture); } }
   if (fonts.body.texture.id != 0) { UnloadFont(fonts.body); }
   if (fonts.bold.texture.id != 0 && fonts.bold.texture.id != fonts.body.texture.id) {
     UnloadFont(fonts.bold);

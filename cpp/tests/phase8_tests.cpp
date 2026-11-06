@@ -310,7 +310,7 @@ TEST_CASE("the menu's three slots read the same summaries the footer does",
   CHECK(Row(load.panelRows, "back") != nullptr);
 }
 
-TEST_CASE("settings and the guide are the same sheets the ship shows",
+TEST_CASE("settings and the illustrated guide are available from the menu",
           "[phase8][title]") {
   ship::Simulation sim = Fresh();
   const std::string dir = ScratchDir("title-settings");
@@ -343,9 +343,9 @@ TEST_CASE("settings and the guide are the same sheets the ship shows",
 
   const ship::TitleModel guide = ship::BuildTitleScreen(sim, true, ship::TitlePanel::Guide,
                                                         dir);
-  CHECK(guide.panelTitle == "Your first watch");
-  CHECK(guide.panelNote.find("Tolme Anchorage") != std::string::npos);
-  CHECK(guide.panelNote.find("Kestrel") != std::string::npos);
+  CHECK(guide.tutorialCards == 6);
+  CHECK(guide.tutorialCard == 0);
+  CHECK(guide.cardImagePath == "assets/art/tutorial/spaceship01.png");
 
   CHECK(ship::PressTitleAction(sim, "back", "", &fromVoyage, &panel, &slot, dir, &message));
   CHECK(panel == ship::TitlePanel::None);

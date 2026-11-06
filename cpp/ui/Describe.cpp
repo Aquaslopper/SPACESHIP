@@ -358,7 +358,7 @@ Description DescribeTarget(const Simulation& sim, const std::string& kind,
     if (id == "cargo") { RoomCargo(sim, t); }
     if (id == "science") { RoomScience(sim, t); }
     if (id == "quarters") {
-      t.acts = {{"Talk to crew", "free"}, {"Give orders", "1 action + work"}};
+      t.acts = {{"Talk to crew", "1 action - up to +5 morale"}, {"Give orders", "1 action + work"}};
     }
     return t;
   }

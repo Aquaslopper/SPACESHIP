@@ -63,6 +63,9 @@ CrewRecordModel BuildCrewRecord(const Simulation& sim, const std::string& crewId
 
   model.head.title = crew->name;
   model.head.sub = crew->role;
+  model.crewId = crewId;
+  model.conversation = BuildConversationRow(sim, crewId);
+  model.said = crew->said;
 
   NavPanel status;
   status.id = "crew-status";

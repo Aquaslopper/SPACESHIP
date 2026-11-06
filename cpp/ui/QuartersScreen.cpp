@@ -265,7 +265,7 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
   talk.Field("Figure", sim.FindOngoing("doc-" + hand.id) != nullptr
                            ? FirstName(hand.name) + " is in the medical bay"
                            : "Talk to " + FirstName(hand.name));
-  model.talkLabel = "Talk to " + FirstName(hand.name);
+  model.conversation = BuildConversationRow(sim, hand.id);
   model.said = hand.said;
   talk.Field("Said", hand.said.empty() ? "You have not asked them anything yet."
                                        : "\"" + hand.said + "\"");
@@ -323,14 +323,8 @@ bool PressQuartersActionRaw(Simulation& sim, const std::string& action,
   if (action == "order") { return sim.ToggleOrder(sim.State().crewSel, arg); }
   if (action == "commit") { return PressProgressButton(sim, "crew-assign"); }
   if (action == "talk") {
-    // FREE, and it hands out nothing but words.
-    for (CrewMember& crew : sim.MutableCrew()) {
-      if (crew.id != sim.State().crewSel) { continue; }
-      if (sim.FindOngoing("doc-" + crew.id) != nullptr) { return false; }
-      const std::string said = sim.AskCrew(crew);
-      sim.LogLine(crew.name + ": \"" + said + "\"");
-      return true;
-    }
+    const auto model = BuildQuartersScreen(sim);
+    return model.hasCrew && PressConversation(sim, model.selectedId);
   }
   return false;
 }
@@ -346,7 +340,7 @@ bool PressQuartersActionRaw(Simulation& sim, const std::string& action,
 //  or from this harness. Free reads spend nothing and therefore lock nothing.
 // ============================================================================
 bool PressQuartersAction(Simulation& sim, const std::string& action, const std::string& arg) {
-  // select/job/order/talk are free; commit already owns the progress lock.
+  // select/job/order are free; commit and conversation own their own locks.
   // Wrapping it again creates an invisible lock and can block acknowledgment.
   return PressQuartersActionRaw(sim, action, arg);
 }

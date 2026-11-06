@@ -171,10 +171,11 @@ class Simulation {
   double NavigatorFuelDiscount(const CrewMember& crew) const;
   // The scene the quarters draws for one hand: pose and props.
   std::string AirStageWord() const;
-  // NEED_LINES, and the quote cycle behind "Talk to <name>". Asking is free and
-  // spells out a different line each time.
+  // NEED_LINES and the quote cycle behind "Talk to <name>".
   std::string NeedLine(const std::string& needKey, int n, const std::string& jobLabel) const;
   std::string AskCrew(CrewMember& crew);
+  static constexpr double kConversationMorale = 5.0;
+  bool TalkToCrew(const std::string& crewId);  // one action, up to +5 morale
 
   // ---- Phase 1B commands ------------------------------------------------
   // Navigation (Navigation.cpp). Selection is free; only travel and scans cost.

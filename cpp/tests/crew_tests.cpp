@@ -412,13 +412,15 @@ TEST_CASE("the quarters and the record open from their own tabs", "[crew]") {
   CHECK(sim.State().crewSel == "suri");
   CHECK(sim.ActionCount() == before);
 
-  // Talking is free and hands out nothing but words.
+  // A conversation costs one action and lifts the selected hand's morale.
+  const double morale = Crew(sim, "suri").morale;
   REQUIRE(ship::PressQuartersAction(sim, "talk"));
   CHECK_FALSE(Crew(sim, "suri").said.empty());
-  CHECK(sim.ActionCount() == before);
+  CHECK(Crew(sim, "suri").morale == std::min(100.0, morale + 5.0));
+  CHECK(sim.ActionCount() == before + 1);
   CHECK(sim.FindOngoing("doc-suri") == nullptr);
 
-  // A crew tab is the read-only record.
+  // A crew tab offers free readings plus the same explicit conversation.
   REQUIRE(ship::OpenTask(sim, "crew", "jax", true));
   const ship::Tab* card = ship::FindTab(sim.State(), "crew:jax");
   REQUIRE(card != nullptr);
@@ -427,6 +429,9 @@ TEST_CASE("the quarters and the record open from their own tabs", "[crew]") {
   CHECK(record.left.size() == 4);
   CHECK(record.left[0].title == "Status");
   CHECK(record.left[3].title == "Employment");
+  REQUIRE(record.commands.size() == 1);
+  CHECK(record.commands.front().enabled);
+  CHECK(record.commands.front().cost == "1 action");
 }
 
 TEST_CASE("quarters commits only the displayed progress cooldown", "[crew][ui][cooldown]") {
@@ -468,4 +473,70 @@ TEST_CASE("quarters condition preserves actual vital widths and source good-bad 
   ship::BuildQuartersScreen(sim); ship::BuildCrewRecord(sim, "jax");
   CHECK(sim.ActionCount() == actions);
   CHECK(crew->saidN == said);
+}
+
+TEST_CASE("crew conversation gains morale for one action and shares a per-person cooldown", "[crew][conversation]") {
+  auto sim = Fresh();
+  REQUIRE(ship::OpenTask(sim, "room", "quarters", true));
+  REQUIRE(ship::PressQuartersAction(sim, "select", "suri"));
+  sim.FindCrew("suri")->morale = 40;
+  auto row = ship::BuildQuartersScreen(sim).conversation;
+  CHECK(row.enabled);
+  CHECK(row.label.find("1 action") != std::string::npos);
+  CHECK(row.label.find("+5 morale") != std::string::npos);
+  const auto start = sim.ActionCount();
+  REQUIRE(ship::PressQuartersAction(sim, "talk"));
+  CHECK(sim.ActionCount() == start + 1);
+  CHECK(sim.FindCrew("suri")->morale == 45);
+  CHECK_FALSE(sim.FindCrew("suri")->said.empty());
+  const auto key = ship::ConversationCooldownKey("suri");
+  CHECK(ship::CooldownRemaining(sim, key) == 5);
+  row = ship::BuildQuartersScreen(sim).conversation;
+  CHECK_FALSE(row.enabled);
+  CHECK(row.displayCost == "COOLDOWN 5");
+  CHECK_FALSE(ship::PressQuartersAction(sim, "talk"));
+  CHECK(sim.ActionCount() == start + 1);
+
+  // The same crew member cannot bypass the lock by opening their own tab.
+  REQUIRE(ship::OpenTask(sim, "crew", "suri", true));
+  CHECK_FALSE(ship::BuildCrewRecord(sim, "suri").conversation.enabled);
+  CHECK_FALSE(ship::PressConversation(sim, "suri"));
+  CHECK(sim.ActionCount() == start + 1);
+  // Each person has their own routine lock.
+  sim.FindCrew("jax")->morale = 98;
+  REQUIRE(ship::PressConversation(sim, "jax"));
+  CHECK(sim.FindCrew("jax")->morale == 100);
+  CHECK(ship::CooldownRemaining(sim, key) == 4);
+  CHECK(ship::CooldownRemaining(sim, ship::ConversationCooldownKey("jax")) == 5);
+
+  // Save/load preserves the morale and remaining action-count lock.
+  const auto saved = sim.SaveJson();
+  auto restored = Fresh();
+  std::string error;
+  REQUIRE(restored.LoadJson(saved, &error));
+  CHECK(restored.FindCrew("suri")->morale == 45);
+  CHECK(ship::CooldownRemaining(restored, key) == 4);
+  CHECK_FALSE(ship::PressConversation(restored, "suri"));
+  for (int i = 0; i < 4; ++i) { restored.PerformAction("Other work"); }
+  CHECK(ship::CooldownRemaining(restored, key) == 0);
+  REQUIRE(ship::PressConversation(restored, "suri"));
+  CHECK(restored.FindCrew("suri")->morale == 50);
+}
+
+TEST_CASE("conversation refuses unavailable crew and survives a loss during the action", "[crew][conversation]") {
+  auto sim = Fresh();
+  const auto start = sim.ActionCount();
+  CHECK_FALSE(ship::PressConversation(sim, "missing"));
+  REQUIRE(sim.AddOngoing("doc-suri", "In treatment", 2, "crewDoc", "suri") != nullptr);
+  CHECK_FALSE(ship::BuildConversationRow(sim, "suri").enabled);
+  CHECK_FALSE(ship::PressConversation(sim, "suri"));
+  CHECK(sim.ActionCount() == start);
+  sim.ClearOngoing("doc-suri");
+  sim.FindCrew("suri")->health = 1;
+  sim.MutableState().airHold = 0;
+  sim.MutableState().crewTick = 4; // foul-air damage on the next action
+  REQUIRE(ship::PressConversation(sim, "suri"));
+  CHECK(sim.ActionCount() == start + 1);
+  CHECK(sim.FindCrew("suri") == nullptr);
+  CHECK_FALSE(ship::PressConversation(sim, "suri"));
 }

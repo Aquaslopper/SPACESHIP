@@ -349,6 +349,22 @@ std::string Simulation::AskCrew(CrewMember& crew) {
   return crew.said;
 }
 
+bool Simulation::TalkToCrew(const std::string& crewId) {
+  if (!state_.gameOver.empty()) { return false; }
+  CrewMember* crew = FindCrew(crewId);
+  if (crew == nullptr || crew->health <= 0 || FindOngoing("doc-" + crewId) != nullptr) {
+    return false;
+  }
+  // Capture everything needed before the tick: crew may leave or die during
+  // the action. Like other committed changes, apply the morale before it ticks.
+  const std::string name = crew->name;
+  const std::string said = AskCrew(*crew);
+  crew->morale = std::min(100.0, crew->morale + kConversationMorale);
+  LogLine(name + ": \"" + said + "\"");
+  PerformAction("Spoke with " + name);
+  return true;
+}
+
 std::string Simulation::SimDriveOf(const CrewMember& crew) const { return SimDrive(crew); }
 std::string Simulation::SimAnchorOf(const CrewMember& crew) const { return SimAnchor(crew); }
 

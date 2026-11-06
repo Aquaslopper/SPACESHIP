@@ -115,6 +115,11 @@ struct CommandRowView {
 // A row the player can press, with the id the press path answers to. The
 // station, the stores, the fitted rooms, the Simulacron, the logbook and the
 // incident reports all speak this shape.
+// Conversation locks are per crew member, shared across quarters and records.
+std::string ConversationCooldownKey(const std::string& crewId);
+CommandRowView BuildConversationRow(const Simulation& sim, const std::string& crewId);
+bool PressConversation(Simulation& sim, const std::string& crewId);
+
 struct ActionRowView {
   std::string id;
   std::string label;
