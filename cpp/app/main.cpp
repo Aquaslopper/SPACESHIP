@@ -402,6 +402,16 @@ int main(int argc, char** argv) {
     return decoded ? 0 : 1;
   }
 
+  if (argc == 2 && std::string(argv[1]) == "--check-ship-art") {
+    const auto path = assets / "art" / "ships" / "wren-exterior.png";
+    Image image = LoadImage(path.string().c_str());
+    const bool decoded = image.data != nullptr && image.width > 0 && image.height > 0;
+    std::printf("Wren PNG decode: %s (%d x %d): %s\n",
+                decoded ? "PASS" : "FAIL", image.width, image.height, path.string().c_str());
+    if (image.data != nullptr) { UnloadImage(image); }
+    return decoded ? 0 : 1;
+  }
+
   // ---- catalogue ---------------------------------------------------------
 
   ship::Catalog catalog;
@@ -448,6 +458,15 @@ int main(int argc, char** argv) {
   ship::ui::ApplyPalette(theme);
 
   Texture2D titleTexture = LoadTitleTexture(assets);
+  Texture2D wrenExterior{};
+  const auto exteriorPath = assets / "art" / "ships" / "wren-exterior.png";
+  if (std::filesystem::exists(exteriorPath)) {
+    wrenExterior = LoadTexture(exteriorPath.string().c_str());
+    if (wrenExterior.id != 0) SetTextureFilter(wrenExterior, TEXTURE_FILTER_BILINEAR);
+  }
+  if (wrenExterior.id == 0) {
+    std::fprintf(stderr, "spaceship: Wren exterior unavailable; using deck plan\n");
+  }
   std::array<Texture2D, 6> tutorialTextures{};
   for (std::size_t i = 0; i < tutorialTextures.size(); ++i) {
     const auto path = assets / "art" / "tutorial" / ("spaceship0" + std::to_string(i + 1) + ".png");
@@ -460,6 +479,7 @@ int main(int argc, char** argv) {
   ship::ShellView shell;
   shell.SetFonts(fonts.body, fonts.bold, fonts.mono);
   shell.SetTitleTexture(&titleTexture);
+  shell.SetWrenExteriorTexture(&wrenExterior);
   for (std::size_t i = 0; i < tutorialTextures.size(); ++i) { shell.SetTutorialTexture(i, &tutorialTextures[i]); }
   shell.Configure(static_cast<float>(GetScreenWidth()),
                   static_cast<float>(GetScreenHeight()), theme);
@@ -577,6 +597,7 @@ int main(int argc, char** argv) {
   rlImGuiShutdown();
   display.Shutdown();
   if (titleTexture.id != 0) { UnloadTexture(titleTexture); }
+  if (wrenExterior.id != 0) { UnloadTexture(wrenExterior); }
   for (auto texture : tutorialTextures) { if (texture.id != 0) { UnloadTexture(texture); } }
   if (fonts.body.texture.id != 0) { UnloadFont(fonts.body); }
   if (fonts.bold.texture.id != 0 && fonts.bold.texture.id != fonts.body.texture.id) {

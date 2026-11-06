@@ -43,15 +43,37 @@ jobs:
           cp -r assets dist/Spaceship/
           cp README.md dist/Spaceship/
 
-      - name: Decode packaged title JPEG with the shipped raylib build
+      - name: Decode packaged title and ship artwork with the shipped raylib build
         shell: bash
         run: |
           set -euo pipefail
           cd "${RUNNER_TEMP}"
           "${GITHUB_WORKSPACE}/dist/Spaceship/spaceship.exe" --check-title-art
+          "${GITHUB_WORKSPACE}/dist/Spaceship/spaceship.exe" --check-ship-art
 
       - name: Upload Windows EXE artifact
         uses: actions/upload-artifact@v4
         with:
           name: Spaceship-Windows-x64
           path: dist/Spaceship/
+
+  test-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install graphics development packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libasound2-dev
+      - name: Configure and build client and tests
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel 4
+          cmake --build build --target spaceship
+      - name: Require input and drawing probes, then run regression suite
+        run: |
+          bash tools/check-gui-syntax.sh
+          bash tools/check-imgui-input.sh
+          bash tools/check-draw.sh
+          ctest --test-dir build --output-on-failure -j 4
+          node --test tests/*.test.cjs

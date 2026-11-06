@@ -53,6 +53,7 @@ class ShellView {
     monoFont_ = mono;
   }
   void SetTitleTexture(void* texture) { titleArt_ = texture; }
+  void SetWrenExteriorTexture(void* texture) { wrenExteriorArt_ = texture; }
   void SetDisplayAdjustmentAvailable(bool available) { displayAdjustmentAvailable_ = available; }
   void SetTutorialTexture(std::size_t index, void* texture) {
     if (index < tutorialArt_.size()) { tutorialArt_[index] = texture; }
@@ -104,6 +105,24 @@ class ShellView {
     std::string action;
     std::string arg;
   };
+
+  struct ExteriorCallout {
+    Area box;
+    Vector2 anchor{};
+    std::string id;
+    std::vector<std::string> lines;
+    bool left = false;
+  };
+  struct ExteriorLayout {
+    Area image;
+    Area toggle;
+    float height = 0;
+    float lineHeight = 0;
+    std::vector<ExteriorCallout> callouts;
+  };
+  bool HasWrenExterior(const Simulation& sim) const;
+  ExteriorLayout BuildExteriorLayout(const Simulation& sim, const Area& stage) const;
+  void PaintWrenExterior(const Simulation& sim);
 
   struct TabHit {
     std::string key;
@@ -169,6 +188,10 @@ class ShellView {
   IdleScreenModel idle_;
   Area idleStageBox_{};
   float idleDiagramScale_ = 1.0f;
+  void* wrenExteriorArt_ = nullptr;
+  bool exteriorView_ = true;
+  ExteriorLayout exterior_;
+  double frameTimeMs_ = 0.0;
 
   Description selection_;
   FloatingPanels floating_;

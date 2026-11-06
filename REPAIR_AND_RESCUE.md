@@ -1,5 +1,7 @@
 # Spaceship: Repair & Rescue
 
+> **Historical rescue document:** This records an earlier investigation and may contain superseded instructions or statuses. The owner has since approved visual redesign and specific gameplay changes. See [current rescue lessons](docs/RESCUE_NOTES.md) and follow the owner's current instructions.
+
 ## Mission
 
 Convert the original `Spaceship.hta` game into the native port **faithfully, 1:1**. The HTA is the behavioral and visual reference. The port is not a redesign, reimagining, simplification, or opportunity to replace unfamiliar behavior with a plausible alternative.

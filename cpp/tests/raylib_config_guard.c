@@ -13,6 +13,9 @@
 #if !SUPPORT_FILEFORMAT_JPG
 #error "The shipped title JPEG must be decodable"
 #endif
+#if !SUPPORT_FILEFORMAT_PNG
+#error "The supplied tutorial cards and Wren exterior must be decodable"
+#endif
 #if !SUPPORT_MODULE_RTEXTURES || !SUPPORT_MODULE_RTEXT || !SUPPORT_MODULE_RSHAPES
 #error "Required drawing modules disabled"
 #endif
