@@ -1,3 +1,5 @@
+Welcome to the spaceship, we continue our work on the C++ port, as always. The Historical spaceship.hta is only here to know the truth of the code, not to edit the truth.
+
 ## STRICT CONSTRAINTS:
 - Separate changes approved from changes agents made without approval, inherited comments, completion claims, constants, and test names: **suspect evidence requiring confirmation**.
 - Learn the relevant code and documentation before changing anything. Do not treat unverified assumptions as facts. For native-port work, read `docs/DEVELOPMENT.md` and `rescue/RESCUE_NOTES.md` first; inspect the specific code paths involved.
