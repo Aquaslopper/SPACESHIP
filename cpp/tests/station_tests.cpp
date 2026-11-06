@@ -656,7 +656,7 @@ TEST_CASE("three save slots save, load and refuse a corrupt file",
   const double actions = sim.ActionCount();
   std::string message;
   REQUIRE(ship::PressPopupAction(sim, "files", "save", "2", root, &message));
-  CHECK(message == "Saved to " + ship::Simulation::SlotFilename(2) + " beside the HTA.");
+  CHECK(message == "Saved to " + root + "/" + ship::Simulation::SlotFilename(2) + ".");
   CHECK(std::filesystem::exists(dir / ship::Simulation::SlotFilename(2)));
 
   const ship::PopupModel written = ship::BuildPopup(sim, "files", root);

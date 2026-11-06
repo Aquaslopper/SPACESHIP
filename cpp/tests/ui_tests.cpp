@@ -1146,7 +1146,7 @@ TEST_CASE("audio choices are available through settings and title without action
     CHECK(sim.State().options.audioLevel == std::stod(values[i]));
   }
   REQUIRE(settings.toggles.size() == 6);
-  CHECK(settings.toggles[0].help == "A quiet, synthesized shipboard theme. Audio begins after a click.");
+  CHECK(settings.toggles[0].help == "Play custom music from assets/audio/music, or the built-in shipboard theme.");
   CHECK(settings.toggles[4].heading == "Confirmations");
   CHECK(sim.ActionCount() == before);
 }

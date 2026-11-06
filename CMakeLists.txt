@@ -219,6 +219,7 @@ if(SPACESHIP_GUI)
 
   add_executable(spaceship
     cpp/app/main.cpp
+    cpp/audio/AudioDevice.cpp
     cpp/ui/Draw.cpp)
 
   target_link_libraries(spaceship PRIVATE spaceship_core spaceship_imgui raylib)
@@ -258,7 +259,14 @@ if(SPACESHIP_BUILD_TESTS)
     cpp/tests/station_tests.cpp)
   target_link_libraries(spaceship_tests PRIVATE spaceship_core Catch2::Catch2WithMain)
 
+  # Playback state-machine test with a tiny fake raylib audio device; it does
+  # not require a sound card and does not replace the real client build.
+  add_executable(spaceship_audio_tests cpp/tests/audio_device_tests.cpp cpp/audio/AudioDevice.cpp)
+  target_include_directories(spaceship_audio_tests PRIVATE cpp/tests/audio_stub)
+  target_link_libraries(spaceship_audio_tests PRIVATE spaceship_core Catch2::Catch2WithMain)
+
   include(Catch)
+  catch_discover_tests(spaceship_audio_tests WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
   catch_discover_tests(spaceship_tests
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 

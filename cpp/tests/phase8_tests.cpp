@@ -53,6 +53,36 @@ const ship::ActionRowView* Row(const std::vector<ship::ActionRowView>& rows,
 
 }  // namespace
 
+TEST_CASE("saving creates a missing nested save folder and reports impossible paths", "[phase8][save][filesystem]") {
+  namespace fs = std::filesystem;
+  const fs::path root = fs::path(ScratchDir("save-create"));
+  const fs::path destination = root / "missing" / "runtime" / "saves";
+  std::error_code ec;
+  fs::remove_all(root / "missing", ec);
+  ship::Simulation sim = Fresh();
+  const double actions = sim.ActionCount();
+  std::string error;
+  REQUIRE_FALSE(fs::exists(destination));
+  REQUIRE(sim.SaveSlot(1, destination.u8string(), &error));
+  REQUIRE(fs::is_regular_file(destination / "Spaceship_save.txt"));
+  ship::Simulation restored = Fresh();
+  REQUIRE(restored.LoadSlot(1, destination.u8string(), &error));
+  CHECK(restored.ActionCount() == actions);
+  REQUIRE(sim.SaveSlot(2, destination.u8string(), &error));
+  REQUIRE(restored.LoadSlot(2, destination.u8string(), &error));
+
+  const fs::path blocker = root / "not-a-folder";
+  { std::ofstream out(blocker); out << "keep me"; }
+  error.clear();
+  CHECK_FALSE(sim.SaveSlot(1, (blocker / "saves").u8string(), &error));
+  CHECK(error.find("could not create save folder") != std::string::npos);
+  CHECK(error.find("writable folder") != std::string::npos);
+  CHECK(fs::is_regular_file(blocker));
+  CHECK(sim.ActionCount() == actions);
+  fs::remove_all(root / "missing", ec);
+  fs::remove(blocker, ec);
+}
+
 // ---------------------------------------------------------------------------
 //  The handbook
 // ---------------------------------------------------------------------------

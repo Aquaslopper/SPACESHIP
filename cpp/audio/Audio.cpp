@@ -6,6 +6,7 @@
 #include "core/JsNumber.h"
 
 #include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <cmath>
 #include <functional>
@@ -280,12 +281,12 @@ const std::vector<std::string>& SfxFileNames(const std::string& kind) {
 namespace {
 
 bool HasMusicSuffix(const std::string& name) {
-  const auto ends = [&name](const char* suffix) {
-    const std::string tail(suffix);
-    return name.size() >= tail.size() &&
-           name.compare(name.size() - tail.size(), tail.size(), tail) == 0;
-  };
-  return ends(".ogg") || ends(".mp3") || ends(".wav");
+  const auto dot = name.find_last_of('.');
+  if (dot == std::string::npos) return false;
+  std::string extension = name.substr(dot);
+  std::transform(extension.begin(), extension.end(), extension.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  return extension == ".ogg" || extension == ".mp3" || extension == ".wav";
 }
 
 }  // namespace

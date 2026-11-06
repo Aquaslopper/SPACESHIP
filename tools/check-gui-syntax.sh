@@ -58,7 +58,7 @@ if [ -z "$found_raylib" ] || [ -z "$found_imgui" ] || [ -z "$found_rlimgui" ]; t
 fi
 
 set -e
-for unit in cpp/ui/Draw.cpp cpp/app/main.cpp; do
+for unit in cpp/ui/Draw.cpp cpp/audio/AudioDevice.cpp cpp/app/main.cpp; do
   "$CXX_BIN" -std=c++17 -fsyntax-only -Wall -Wextra -Wpedantic \
     -I"$ROOT/cpp" \
     -I"$found_raylib" -I"$found_imgui" -I"$found_rlimgui" -I"$found_rlimgui/extras" \

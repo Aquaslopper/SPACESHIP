@@ -173,7 +173,7 @@ PopupModel BuildPopup(const Simulation& sim, const std::string& key,
       options.hideCrewLabels});
   const char* headings[] = {"Ambient soundtrack", "Sound effects", "Decorative motion", "Reading text", "Confirmations", "Crew labels"};
   const char* help[] = {
-      "A quiet, synthesized shipboard theme. Audio begins after a click.",
+      "Play custom music from assets/audio/music, or the built-in shipboard theme.",
       "Soft console clicks, scan pings, drive cues and completion chimes.",
       "Pause map and crew drift, tab glows and action marks.",
       "Enlarge the main reading and action text.",
@@ -285,7 +285,7 @@ bool PressPopupAction(Simulation& sim, const std::string& key,
         return false;
       }
       if (message != nullptr) {
-        *message = "Saved to " + Simulation::SlotFilename(slot) + " beside the HTA.";
+        *message = "Saved to " + (directory == "." ? std::string() : directory + "/") + Simulation::SlotFilename(slot) + ".";
       }
       return true;
     }

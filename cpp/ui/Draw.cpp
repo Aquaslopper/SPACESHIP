@@ -1979,6 +1979,7 @@ void ShellView::PaintSettingsControls(Simulation& sim, const PopupModel& model) 
           ImGui::EndCombo();
         }
       }
+      if (!audioStatus_.empty()) { heading("Soundtrack"); text(audioStatus_); }
       heading("Display adjustment");
       text("Higher gamma darkens midtones; brightness adjusts the white level. Default is 1.00.");
       if (!displayAdjustmentAvailable_) { text("Display adjustment is unavailable; using the unadjusted display."); }

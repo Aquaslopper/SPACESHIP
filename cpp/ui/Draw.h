@@ -53,6 +53,7 @@ class ShellView {
     monoFont_ = mono;
   }
   void SetTitleTexture(void* texture) { titleArt_ = texture; }
+  void SetAudioStatus(std::string status) { audioStatus_ = std::move(status); }
   void SetWrenExteriorTexture(void* texture) { wrenExteriorArt_ = texture; }
   void SetDisplayAdjustmentAvailable(bool available) { displayAdjustmentAvailable_ = available; }
   void SetTutorialTexture(std::size_t index, void* texture) {
@@ -262,6 +263,7 @@ class ShellView {
 
   std::string popupKey_;
   std::string saveDir_ = "runtime/saves";
+  std::string audioStatus_;
   int popupCount_ = 0;
   std::string pendingConfirm_;
   std::string pendingAction_;

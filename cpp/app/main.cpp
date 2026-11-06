@@ -21,6 +21,7 @@
 #include "rlImGui.h"
 
 #include "audio/Audio.h"
+#include "audio/AudioDevice.h"
 #include "core/Simulation.h"
 #include "core/DisplaySettings.h"
 #include "data/Catalog.h"
@@ -57,7 +58,7 @@ std::filesystem::path FindAssetDir() {
   if (applicationDirectory != nullptr && *applicationDirectory != '\0') {
     const std::filesystem::path appDir(applicationDirectory);
     const std::filesystem::path besideExecutable = appDir / "assets";
-    if (selected.empty() && HasCatalog(besideExecutable)) { selected = besideExecutable; }
+    if (HasCatalog(besideExecutable)) { selected = besideExecutable; }
 
     // Save slots are relative to the working directory. Explorer may launch an
     // application with an unrelated current directory, so anchor runtime data
@@ -243,154 +244,24 @@ void main() {
   bool shaderReady_ = false;
 };
 
-// ============================================================================
-//  AudioDevice — the only place a sound becomes a device. Every buffer comes
-//  from audio:: (Section D-3's arithmetic); this class decides when to play it
-//  and what the ship's own options allow.
-// ============================================================================
-class AudioDevice {
- public:
-  // Phase 9: the player's own files win. Each cue looks for its file first and
-  // falls back to the synthesised buffer; the bed streams the first track in
-  // music/, or the built-in sequencer when the folder is empty.
-  bool Start(const std::string& assetsDir) {
-    InitAudioDevice();
-    if (!IsAudioDeviceReady()) { return false; }
-    ready_ = true;
-    external_ = audio::FindExternalAudio(assetsDir);
-    for (std::size_t i = 0; i < kCueCount; ++i) {
-      const auto found = external_.sfx.find(kKinds[i]);
-      if (found != external_.sfx.end()) {
-        cues_[i] = LoadSound(found->second.c_str());
-      }
-      if (cues_[i].frameCount == 0) {
-        cues_[i] = BuildSound(audio::RenderCue(kKinds[i]));
-      }
-    }
-    if (!external_.music.empty()) {
-      streamed_ = LoadMusicStream(external_.music.front().c_str());
-      if (streamed_.frameCount > 0) {
-        streamed_.looping = true;
-        tracks_ = external_.music;
-      } else {
-        tracks_.clear();
-      }
-    }
-    if (tracks_.empty()) { music_ = BuildSound(audio::RenderMusic()); }
-    return true;
-  }
-
-  // Which files were actually picked up, for the boot log.
-  const audio::ExternalAudio& External() const { return external_; }
-
-  void Shutdown() {
-    if (!ready_) { return; }
-    for (Sound& cue : cues_) {
-      if (cue.frameCount > 0) { UnloadSound(cue); }
-    }
-    if (music_.frameCount > 0) { UnloadSound(music_); }
-    if (streamed_.frameCount > 0) { UnloadMusicStream(streamed_); }
-    CloseAudioDevice();
-    ready_ = false;
-  }
-
-  // syncAudioOptions(): the three gains, and starting or stopping the bed.
-  void Configure(const Options& options) {
-    if (!ready_) { return; }
-    const audio::Gains gains = audio::GainsFor(options);
-    gains_ = gains;
-    for (Sound& cue : cues_) {
-      if (cue.frameCount > 0) {
-        SetSoundVolume(cue, static_cast<float>(gains.master * gains.effects));
-      }
-    }
-    const float musicVolume = static_cast<float>(gains.master * gains.music);
-    if (streamed_.frameCount > 0) {
-      SetMusicVolume(streamed_, musicVolume);
-      if (gains.musicOn) {
-        if (!IsMusicStreamPlaying(streamed_)) { PlayMusicStream(streamed_); }
-      } else if (IsMusicStreamPlaying(streamed_)) {
-        StopMusicStream(streamed_);
-      }
-    }
-    if (music_.frameCount > 0) {
-      SetSoundVolume(music_, musicVolume);
-      if (gains.musicOn) {
-        if (!IsSoundPlaying(music_)) { PlaySound(music_); }
-      } else if (IsSoundPlaying(music_)) {
-        StopSound(music_);
-      }
-    }
-  }
-
-  // One committed action: the detail's sentence picks the cue.
-  void Cue(const std::string& detail) {
-    if (!ready_ || !gains_.effectsOn) { return; }
-    const std::string kind = audio::CueKindFor(detail);
-    for (std::size_t i = 0; i < kCueCount; ++i) {
-      if (kind != kKinds[i]) { continue; }
-      if (cues_[i].frameCount > 0) { PlaySound(cues_[i]); }
-      return;
-    }
-  }
-
-  // The log is the ship's voice: every new line is a cue, in order.
-  void Tick(const Simulation& sim) {
-    if (!ready_) { return; }
-    if (!tracks_.empty() && streamed_.frameCount > 0 && IsMusicStreamPlaying(streamed_)) {
-      UpdateMusicStream(streamed_);
-      // Cycle: a finished track hands over to the next one in filename order.
-      if (streamed_.looping && GetMusicTimePlayed(streamed_) >=
-                                    GetMusicTimeLength(streamed_) - 0.05f) {
-        track_ = (track_ + 1) % tracks_.size();
-        StopMusicStream(streamed_);
-        UnloadMusicStream(streamed_);
-        streamed_ = LoadMusicStream(tracks_[track_].c_str());
-        streamed_.looping = true;
-        SetMusicVolume(streamed_, static_cast<float>(gains_.master * gains_.music));
-        PlayMusicStream(streamed_);
-      }
-    }
-    const std::vector<FeedLine>& log = sim.State().feed;
-    if (log.empty()) { return; }
-    if (logSeen_ == 0) {
-      logSeen_ = log.size();
-      return;
-    }
-    if (log.size() < logSeen_) { logSeen_ = log.size(); return; }  // a load
-    for (std::size_t i = logSeen_; i < log.size(); ++i) { Cue(log[i].text); }
-    logSeen_ = log.size();
-  }
-
- private:
-  static Sound BuildSound(const audio::Buffer& buffer) {
-    const std::vector<unsigned char> bytes = audio::ToWav(buffer);
-    Wave wave = LoadWaveFromMemory(".wav", bytes.data(), static_cast<int>(bytes.size()));
-    if (wave.frameCount == 0) { return Sound{}; }
-    Sound sound = LoadSoundFromWave(wave);
-    UnloadWave(wave);
-    return sound;
-  }
-
-  static constexpr std::size_t kCueCount = 4;
-  static constexpr const char* kKinds[kCueCount] = {"click", "ping", "thrust", "chime"};
-  bool ready_ = false;
-  audio::Gains gains_;
-  audio::ExternalAudio external_;
-  std::vector<std::string> tracks_;   // the player's music, in filename order
-  std::size_t track_ = 0;
-  Music streamed_{};                  // an external track, streamed
-  Sound cues_[4]{};
-  Sound music_{};
-  std::size_t logSeen_ = 0;
-};
-
 }  // namespace
 
 int main(int argc, char** argv) {
+  if (argc == 3 && std::string(argv[1]) == "--check-music-file") {
+    // Decodes with the same raylib codecs as music streams; no sound device or
+    // graphics context is required. Keep the argument relative to launch CWD.
+    Wave wave = LoadWave(argv[2]);
+    const bool decoded = wave.data != nullptr && wave.frameCount > 0;
+    std::printf("music decode: %s (%u frames): %s\n", decoded ? "PASS" : "FAIL", wave.frameCount, argv[2]);
+    if (wave.data != nullptr) UnloadWave(wave);
+    return decoded ? 0 : 1;
+  }
+
   // This CPU-only probe exercises the *linked raylib decoder*, not a separate
   // JPEG library or an existence check. Run it against the packaged executable
   // in CI before opening any window or initializing graphics/audio.
+  std::error_code cwdError;
+  const std::filesystem::path launchAssets = std::filesystem::current_path(cwdError) / "assets";
   const std::filesystem::path assets = FindAssetDir();
   if (argc == 2 && std::string(argv[1]) == "--check-title-art") {
     const auto path = assets / "art" / "title.jpg";
@@ -477,6 +348,10 @@ int main(int argc, char** argv) {
     if (tutorialTextures[i].id == 0) { std::fprintf(stderr, "spaceship: tutorial card unavailable: %s\n", path.string().c_str()); }
   }
   ship::ShellView shell;
+  const char* appDir = GetApplicationDirectory();
+  if (appDir != nullptr && *appDir != '\0') {
+    shell.SetSaveDir((std::filesystem::path(appDir) / "runtime" / "saves").u8string());
+  }
   shell.SetFonts(fonts.body, fonts.bold, fonts.mono);
   shell.SetTitleTexture(&titleTexture);
   shell.SetWrenExteriorTexture(&wrenExterior);
@@ -489,8 +364,8 @@ int main(int argc, char** argv) {
   shell.SetDisplayAdjustmentAvailable(display.Ready());
 
   // Sound is optional: a machine without a device keeps a silent, working ship.
-  AudioDevice audio;
-  const bool audioReady = audio.Start(assets.string());
+  audio::AudioDevice audio;
+  const bool audioReady = audio.Start(assets.string(), launchAssets.string());
   audio.Configure(sim.State().options);
   std::printf("audio: %zu music file(s), %zu sound file(s)\n",
               audio.External().music.size(), audio.External().sfx.size());
@@ -577,6 +452,7 @@ int main(int argc, char** argv) {
 
     audio.Configure(sim.State().options);
     audio.Tick(sim);
+    shell.SetAudioStatus(audio.Status());
 
     const bool adjusted = display.Ready() &&
         (ship::EffectiveDisplayGamma(sim.State().options.displayGamma) != 1.0 ||

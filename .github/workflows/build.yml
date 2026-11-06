@@ -50,6 +50,8 @@ jobs:
           cd "${RUNNER_TEMP}"
           "${GITHUB_WORKSPACE}/dist/Spaceship/spaceship.exe" --check-title-art
           "${GITHUB_WORKSPACE}/dist/Spaceship/spaceship.exe" --check-ship-art
+          python -c 'import wave; w=wave.open("01-quiet-drift.WAV", "wb"); w.setparams((1, 2, 22050, 0, "NONE", "not compressed")); w.writeframes(b"\x00\x00" * 2205); w.close()'
+          "${GITHUB_WORKSPACE}/dist/Spaceship/spaceship.exe" --check-music-file "01-quiet-drift.WAV"
 
       - name: Upload Windows EXE artifact
         uses: actions/upload-artifact@v4
@@ -64,12 +66,18 @@ jobs:
       - name: Install graphics development packages
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgl1-mesa-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libasound2-dev
+          sudo apt-get install -y libgl1-mesa-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libasound2-dev ffmpeg
       - name: Configure and build client and tests
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build --parallel 4
           cmake --build build --target spaceship
+          ffmpeg -v error -f lavfi -i sine=frequency=440:duration=0.2 "${RUNNER_TEMP}/01-test.wav"
+          ffmpeg -v error -i "${RUNNER_TEMP}/01-test.wav" -f mp3 "${RUNNER_TEMP}/02-test.MP3"
+          ffmpeg -v error -i "${RUNNER_TEMP}/01-test.wav" "${RUNNER_TEMP}/03-test.ogg"
+          build/spaceship --check-music-file "${RUNNER_TEMP}/01-test.wav"
+          build/spaceship --check-music-file "${RUNNER_TEMP}/02-test.MP3"
+          build/spaceship --check-music-file "${RUNNER_TEMP}/03-test.ogg"
       - name: Require input and drawing probes, then run regression suite
         run: |
           bash tools/check-gui-syntax.sh
