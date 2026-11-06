@@ -96,7 +96,8 @@ Simulation Simulation::NewVoyage(const Catalog& catalog) {
     const DeckPlan& plan = catalog.wren;
     for (const Room& room : plan.rooms) { sim.rooms_.push_back(room); }
     ShipDef ship;
-    ship.fields = {{"name", "SC Wren"}, {"berths", "6"}};
+    auto fields = catalog.shipFields.find("wren");
+    if (fields != catalog.shipFields.end()) { ship.fields = fields->second; }
     sim.ship_ = ship;
     for (const InfoDefinition& info : catalog.infoDefs) {
       sim.infos_.push_back(InfoRow{info.id, info.label, info.value});
@@ -379,7 +380,8 @@ bool Simulation::StartMaintenanceSelf() {
 
 bool Simulation::StartCookingSelf() {
   // startCook(e, "cook", "the commander"): refuses a full rack, refuses a
-  // second pot, commits at rate 1 - the commander is not a trained cook.
+  // second pot. Rate follows the assigned cook's jobAt, falling back to 1
+  // when nobody holds the kitchen job - matches Spaceship.hta roomMess().
   if (mess_.rack >= mess_.capacity) {
     LogLine("Cooking refused - the rack is already full.");
     return false;
@@ -389,8 +391,7 @@ bool Simulation::StartCookingSelf() {
   }
 
   const CrewMember* cook = Cook();
-  const double rate = 1.0;  // the commander's own rate, never the cook's
-  (void)cook;
+  const double rate = cook ? cook->jobAt : 1.0;
   const double cost = CrewCost(std::ceil((mess_.capacity - mess_.rack) / rate));
 
   cookClaim_ = true;
