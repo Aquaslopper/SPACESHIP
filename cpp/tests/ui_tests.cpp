@@ -134,6 +134,20 @@ TEST_CASE("the cockpit's fixed anchors", "[ui][layout]") {
   CHECK(layout.statusbar.Bottom() == 800.0f);
 }
 
+TEST_CASE("the Home control reserves measured text width and stays clickable", "[ui][layout]") {
+  const auto layout = ship::ComputeLayout(1280, 800, 742, 300, false, 92);
+  CHECK(layout.home.w == 92);
+  CHECK(layout.home.Right() == 1280);
+  CHECK(layout.controls.w == 148);
+  CHECK(layout.tabStrip.Right() == layout.controls.x);
+  CHECK(layout.scrollLeft.w == 28);
+  CHECK(layout.scrollRight.Right() == layout.home.x);
+  const auto tiny = ship::ComputeLayout(60, 800, 742, 300, false, 92);
+  CHECK(tiny.home.x >= 0);
+  CHECK(tiny.home.Right() == 60);
+  CHECK(tiny.tabStrip.w >= 0);
+}
+
 TEST_CASE("the feed takes what is left, inside 62..132", "[ui][layout]") {
   using ship::Metrics;
   // Nothing left over: the floor.

@@ -389,9 +389,9 @@ int main(int argc, char** argv) {
   std::printf("audio: %zu music file(s), %zu sound file(s)\n",
               audio.External().music.size(), audio.External().sfx.size());
 
-  // The reference opens on its title menu, with the voyage already begun.
-  if (voyageStarted) shell.HideTitle();
-  else shell.ShowTitle(false);
+  // Restore the voyage in memory, but always present the title screen. A
+  // restored voyage can be entered with RESUME, or replaced explicitly.
+  shell.ShowTitle(voyageStarted);
 
   // Phase 9: the borderless window follows Options, whichever way it changes.
   bool fullscreen = sim.State().options.fullscreen;

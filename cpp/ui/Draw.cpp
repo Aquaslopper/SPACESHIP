@@ -196,7 +196,8 @@ void ShellView::ResetContentScroll() { contentScroll_ = 0.0f; }
 void ShellView::Draw(Simulation& sim, double nowMs) {
   frameTimeMs_ = nowMs;
   const float contentH = height_ - Metrics::kContentTop - Metrics::kStatusH;
-  layout_ = ComputeLayout(width_, height_, contentH, others_, theme_.stageCompact);
+  const float homeWidth = ImGui::CalcTextSize("Home").x + 20.0f;
+  layout_ = ComputeLayout(width_, height_, contentH, others_, theme_.stageCompact, homeWidth);
 
   if (scrollTabKey_ != sim.State().activeTab) {
     scrollTabKey_ = sim.State().activeTab;
@@ -503,9 +504,12 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
   // Home and the two scroll arrows live in the reserved right-hand slot.
   draw->AddRectFilled(ImVec2(layout_.home.x, 0.0f),
                       ImVec2(layout_.home.Right(), Metrics::kTaskbarH), ToIm(p.panel3));
-  draw->AddText(ImVec2(layout_.home.x + 10.0f, 9.0f), ToIm(p.coffee), "Home");
-  draw->AddText(ImVec2(layout_.scrollLeft.x + 12.0f, 9.0f), ToIm(p.muted), "<");
-  draw->AddText(ImVec2(layout_.scrollRight.x + 12.0f, 9.0f), ToIm(p.muted), ">");
+  const float textY = std::max(0.0f, (Metrics::kTaskbarH - ImGui::GetFontSize()) * 0.5f);
+  draw->AddText(ImVec2(layout_.home.x + 10.0f, textY), ToIm(p.coffee), "Home");
+  const float leftW = ImGui::CalcTextSize("<").x;
+  const float rightW = ImGui::CalcTextSize(">").x;
+  draw->AddText(ImVec2(layout_.scrollLeft.x + (layout_.scrollLeft.w - leftW) * 0.5f, textY), ToIm(p.muted), "<");
+  draw->AddText(ImVec2(layout_.scrollRight.x + (layout_.scrollRight.w - rightW) * 0.5f, textY), ToIm(p.muted), ">");
   (void)tabScroll_;
 
   // ---- sidebar -----------------------------------------------------------

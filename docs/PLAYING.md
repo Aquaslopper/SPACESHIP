@@ -7,8 +7,8 @@ Extract the entire Windows package to a writable folder before running
 
 On a normal exit, the game writes a new dated snapshot in `runtime/saves/`.
 It does not overwrite the three manual save slots. At launch it loads the most
-recent valid dated snapshot or manual slot; if a newer file is damaged it tries
-older saves and warns you. A forced termination, crash, or power loss can still
+recent valid dated snapshot or manual slot, then shows the title screen. Choose
+RESUME to continue. If a newer file is damaged it tries older saves and warns you. A forced termination, crash, or power loss can still
 prevent an exit autosave. Keep backups of `runtime/saves/`.
 
 When updating to a new copy of the game, **copy your existing `runtime/saves/`

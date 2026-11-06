@@ -132,12 +132,46 @@ int main() {
     io.DisplaySize = ImVec2(1280, 720);
     io.DeltaTime = 1.0f / 60;
     ImFontConfig config; config.SizePixels = 18;
-    io.Fonts->AddFontDefault(&config);
+    ImFont* regularFont = io.Fonts->AddFontDefault(&config);
+    config.SizePixels = 23;
+    ImFont* largeFont = io.Fonts->AddFontDefault(&config);
     unsigned char* pixels; int w, h;
     io.Fonts->GetTexDataAsRGBA32(&pixels, &w, &h);
     auto sim = ship::Simulation::ReferenceVoyage(ship::Catalog::LoadFromAssets("assets"));
     ship::ShellView view;
     view.Configure(1280, 720, ship::Theme::ById("classic"));
+    // A restored save is offered on the title screen, not entered immediately.
+    {
+      auto restored = ship::Simulation::NewVoyage(sim.World());
+      restored.PerformAction("restored voyage fixture");
+      const double actions = restored.ActionCount();
+      ship::ShellView title;
+      title.Configure(1280, 720, ship::Theme::ById("classic"));
+      title.ShowTitle(true);
+      Frame(title, restored);
+      Require(title.TitleActive() && title.TitleFromVoyage(), "Restored voyage skipped the title screen");
+      const auto resume = FindText("RESUME");
+      title.Click(restored, resume.x + 4, resume.y + 4, ship::HitButton::Left, 0);
+      Require(!title.TitleActive() && restored.ActionCount() == actions, "Resume did not preserve the restored voyage");
+    }
+    // Measure the actual ImGui font rather than a fixed 48px Home slot. The
+    // rightmost part of the enlarged control must still route clicks to Home.
+    for (ImFont* font : {regularFont, largeFont}) {
+      io.FontDefault = font;
+      auto target = ship::Simulation::NewVoyage(sim.World());
+      ship::ShellView topbar;
+      topbar.Configure(1280, 720, ship::Theme::ById("classic"));
+      Require(ship::OpenTask(target, "nav", "main", true), "Could not open navigation fixture");
+      Frame(topbar, target);
+      const auto layout = topbar.LayoutNow();
+      Require(layout.home.w >= ImGui::CalcTextSize("Home").x + 20.0f - 0.1f,
+              "Home label exceeds its reserved control at this font size");
+      Require(layout.home.Right() == 1280.0f && layout.tabStrip.Right() <= layout.controls.x,
+              "Home control or tab strip overflows the window");
+      topbar.Click(target, layout.home.Right() - 4, layout.home.y + 10, ship::HitButton::Left, 0);
+      Require(target.State().activeTab == "home", "Right edge of Home is not clickable");
+    }
+    io.FontDefault = regularFont;
     // Chart controls use their painted bounds for all reading-size steps, and
     // topmost controls take priority over map bodies behind them.
     for (int step : {0, 3}) {
