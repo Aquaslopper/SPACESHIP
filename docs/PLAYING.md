@@ -29,7 +29,9 @@ mess hall and bridge; Navigation is available from the bridge and taskbar. Its
 hold carries 20 m³. At a space station, open the shipyard to install additional
 rooms for 500 shiplets each or buy other upgrades. Rooms you already own travel
 with you when buying the larger ship. Existing saves keep their facilities and
-cargo capacity.
+cargo capacity. The Wren exterior is visible from the start and shows callouts
+only for rooms you have installed. Use **Deck plan / crew** to see the crew
+diagram, and **Exterior view** to return to the ship.
 
 ## Your own music
 

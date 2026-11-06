@@ -309,9 +309,27 @@ int main() {
       starterView.Configure(1280, 1200, ship::Theme::ById("classic"));
       starterView.SetWrenExteriorTexture(&concept);
       Frame(starterView, starter);
-      Require(std::none_of(textureDraws.begin(), textureDraws.end(), [](const TextureCall& t) { return t.id == 77; }),
-              "Endgame exterior was shown on the starter ship");
+      Require(std::any_of(textureDraws.begin(), textureDraws.end(), [](const TextureCall& t) { return t.id == 77; }),
+              "The owner's Wren exterior disappeared from the starter ship");
       Require(starter.Rooms().size() == 6, "Starter has nonstandard rooms");
+      Require(std::none_of(texts.begin(), texts.end(), [](const TextCall& t) { return t.text == "Science Room"; }),
+              "Uninstalled room was shown as an exterior callout");
+      for (const auto& room : starter.Rooms()) {
+        Frame(starterView, starter);
+        const auto label = FindText(room.name);
+        starterView.Click(starter, label.x + 2, label.y + 2, ship::HitButton::Right, 0);
+        Require(ship::FindTab(starter.State(), "room:" + room.id) != nullptr,
+                "Starter room callout did not open its corresponding room");
+      }
+      starter.MutableMap().here = sim.World().ports.front().id;
+      starter.MutableState().docked = true;
+      starter.MutableState().shiplets = 1000;
+      Require(starter.BuyRoom("science"), "Could not install science room for exterior test");
+      Frame(starterView, starter);
+      const auto science = FindText("Science Room");
+      starterView.Click(starter, science.x + 2, science.y + 2, ship::HitButton::Right, 0);
+      Require(ship::FindTab(starter.State(), "room:science") != nullptr,
+              "Newly installed room did not gain a working exterior callout");
       auto artShip = ship::Simulation::ReferenceVoyage(sim.World());
       Require(ship::PressNavAction(artShip, "stand-watch"), "Could not start clock guard fixture");
       const auto lockKey = ship::ActionCooldownKey(artShip, "command:stand-watch-advance-ongoing-work:0");

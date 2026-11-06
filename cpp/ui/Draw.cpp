@@ -663,8 +663,8 @@ bool ShellView::HasWrenExterior(const Simulation& sim) const {
   const Texture2D* texture = static_cast<const Texture2D*>(wrenExteriorArt_);
   if (sim.State().shipClass != "wren" || texture == nullptr || texture->id == 0 ||
       texture->width <= 0 || texture->height <= 0) return false;
-  // The supplied exterior depicts the complete endgame fit, not a starter.
-  for (const Room& room : sim.World().wren.rooms) if (!sim.HasRoom(room.id)) return false;
+  // The owner's ship exterior remains visible throughout the voyage. The
+  // callouts are built from sim.Rooms(), so only installed rooms are usable.
   return true;
 }
 
