@@ -1,4 +1,5 @@
 ## STRICT CONSTRAINTS:
+- Separate changes approved from changes agents made without approval, inherited comments, completion claims, constants, and test names: **suspect evidence requiring confirmation**.
 - Learn the relevant code and documentation before changing anything. Do not treat unverified assumptions as facts. For native-port work, read `docs/DEVELOPMENT.md` and `rescue/RESCUE_NOTES.md` first; inspect the specific code paths involved.
 - `Spaceship.hta` is the behavioral reference unless the owner explicitly approves a change. Do not change gameplay rules or behavior unless the request specifically calls for it. If the intended behavior is unclear or conflicts with an owner instruction, stop and ask before coding.
 - Keep changes minimal and focused. Do not rewrite entire files, bundle refactors with features, or introduce dependencies or architectural changes without approval.
