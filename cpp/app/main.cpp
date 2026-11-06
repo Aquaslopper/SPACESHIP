@@ -22,6 +22,7 @@
 
 #include "audio/Audio.h"
 #include "core/Simulation.h"
+#include "core/DisplaySettings.h"
 #include "data/Catalog.h"
 #include "ui/Draw.h"
 #include "ui/PointerOwnership.h"
@@ -175,6 +176,72 @@ Texture2D LoadTitleTexture(const std::filesystem::path& assets) {
   std::fprintf(stderr, "spaceship: no usable title artwork\n");
   return Texture2D{};
 }
+
+// A neutral setting bypasses the render target entirely. The shader and
+// target cover the complete frame (including ImGui, title art and popups), so
+// the adjustment is a display preference rather than a different theme.
+class DisplayAdjustment {
+ public:
+  void Init(int width, int height) {
+    static const char* fragment = R"GLSL(#version 330
+in vec2 fragTexCoord;
+in vec4 fragColor;
+uniform sampler2D texture0;
+uniform vec4 colDiffuse;
+uniform float displayGamma;
+uniform float displayBrightness;
+out vec4 finalColor;
+void main() {
+  vec4 colour = texture(texture0, fragTexCoord) * colDiffuse * fragColor;
+  finalColor = vec4(clamp(pow(clamp(colour.rgb, 0.0, 1.0), vec3(displayGamma)) * displayBrightness, 0.0, 1.0), colour.a);
+}
+)GLSL";
+    shader_ = LoadShaderFromMemory(nullptr, fragment);
+    gammaLoc_ = GetShaderLocation(shader_, "displayGamma");
+    brightnessLoc_ = GetShaderLocation(shader_, "displayBrightness");
+    shaderReady_ = IsShaderValid(shader_) && gammaLoc_ >= 0 && brightnessLoc_ >= 0;
+    if (!shaderReady_) {
+      std::fprintf(stderr, "spaceship: display adjustment shader unavailable; using neutral display\n");
+      return;
+    }
+    Resize(width, height);
+  }
+  void Resize(int width, int height) {
+    if (!shaderReady_ || width < 1 || height < 1) return;
+    if (width == width_ && height == height_) return;
+    if (target_.id != 0) UnloadRenderTexture(target_);
+    target_ = LoadRenderTexture(width, height);
+    width_ = width; height_ = height;
+    if (!IsRenderTextureValid(target_)) {
+      std::fprintf(stderr, "spaceship: display adjustment render target unavailable\n");
+    }
+  }
+  bool Ready() const { return shaderReady_ && IsRenderTextureValid(target_); }
+  void Begin() const { BeginTextureMode(target_); }
+  void End(double gamma, double brightness) const {
+    EndTextureMode();
+    const float g = static_cast<float>(ship::DisplayGamma(gamma));
+    const float b = static_cast<float>(ship::DisplayBrightness(brightness));
+    SetShaderValue(shader_, gammaLoc_, &g, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(shader_, brightnessLoc_, &b, SHADER_UNIFORM_FLOAT);
+    BeginShaderMode(shader_);
+    DrawTexturePro(target_.texture,
+                   Rectangle{0, 0, static_cast<float>(width_), -static_cast<float>(height_)},
+                   Rectangle{0, 0, static_cast<float>(width_), static_cast<float>(height_)},
+                   Vector2{0, 0}, 0, WHITE);
+    EndShaderMode();
+  }
+  void Shutdown() {
+    if (target_.id != 0) UnloadRenderTexture(target_);
+    if (shader_.locs != nullptr) UnloadShader(shader_);
+  }
+ private:
+  Shader shader_{};
+  RenderTexture2D target_{};
+  int gammaLoc_ = -1, brightnessLoc_ = -1;
+  int width_ = 0, height_ = 0;
+  bool shaderReady_ = false;
+};
 
 // ============================================================================
 //  AudioDevice — the only place a sound becomes a device. Every buffer comes
@@ -397,6 +464,10 @@ int main(int argc, char** argv) {
   shell.Configure(static_cast<float>(GetScreenWidth()),
                   static_cast<float>(GetScreenHeight()), theme);
 
+  DisplayAdjustment display;
+  display.Init(GetScreenWidth(), GetScreenHeight());
+  shell.SetDisplayAdjustmentAvailable(display.Ready());
+
   // Sound is optional: a machine without a device keeps a silent, working ship.
   AudioDevice audio;
   const bool audioReady = audio.Start(assets.string());
@@ -418,6 +489,8 @@ int main(int argc, char** argv) {
     if (IsKeyPressed(KEY_ESCAPE)) { shell.Escape(sim); }
     if (IsKeyPressed(KEY_LEFT)) { shell.PageTutorial(-1, GetTime() * 1000.0); }
     if (IsKeyPressed(KEY_RIGHT)) { shell.PageTutorial(1, GetTime() * 1000.0); }
+    display.Resize(GetScreenWidth(), GetScreenHeight());
+    shell.SetDisplayAdjustmentAvailable(display.Ready());
     BeginDrawing();
     // rlImGui's event processing and frame setup happen inside the active
     // raylib drawing frame, matching its documented render-loop contract.
@@ -485,13 +558,24 @@ int main(int argc, char** argv) {
     audio.Configure(sim.State().options);
     audio.Tick(sim);
 
+    const bool adjusted = display.Ready() &&
+        (ship::DisplayGamma(sim.State().options.displayGamma) != 1.0 ||
+         ship::DisplayBrightness(sim.State().options.displayBrightness) != 1.0);
+    if (adjusted) {
+      display.Begin();
+      // The offscreen texture uses logical screen pixels even on Retina
+      // displays; rlImGui otherwise scissors as if it were the HiDPI window.
+      ImGui::GetIO().DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
+    }
     shell.Draw(sim, static_cast<double>(GetTime()) * 1000.0);
     rlImGuiEnd();
+    if (adjusted) display.End(sim.State().options.displayGamma, sim.State().options.displayBrightness);
     EndDrawing();
   }
 
   audio.Shutdown();
   rlImGuiShutdown();
+  display.Shutdown();
   if (titleTexture.id != 0) { UnloadTexture(titleTexture); }
   for (auto texture : tutorialTextures) { if (texture.id != 0) { UnloadTexture(texture); } }
   if (fonts.body.texture.id != 0) { UnloadFont(fonts.body); }

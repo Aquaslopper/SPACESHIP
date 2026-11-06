@@ -1318,7 +1318,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   navHits_.push_back(NavHit{zoomIn, "zoom-in", ""});
   navHits_.push_back(NavHit{zoomOut, "zoom-out", ""});
 
-  float layerY = box.y + 62.0f;
+  float layerY = zoomOut.Bottom() + 6.0f;
   for (const std::string& key : NavLayerOrder()) {
     const bool on = key == chart.layer;
     const std::string label = NavLayerLabel(key);
@@ -1838,6 +1838,24 @@ void ShellView::PaintSettingsControls(Simulation& sim, const PopupModel& model) 
           ImGui::EndCombo();
         }
       }
+      heading("Display adjustment");
+      text("Higher gamma darkens midtones; brightness adjusts the white level. Neutral is 1.00.");
+      if (!displayAdjustmentAvailable_) { text("Display adjustment is unavailable on this graphics device."); }
+      ImGui::BeginDisabled(!displayAdjustmentAvailable_);
+      float gamma = model.displayGamma;
+      float brightness = model.displayBrightness;
+      ImGui::SetNextItemWidth(-1);
+      if (ImGui::SliderFloat("##display-gamma", &gamma, 0.7f, 1.6f, "Gamma: %.2f")) {
+        action("display-gamma", std::to_string(gamma));
+      }
+      ImGui::SetNextItemWidth(-1);
+      if (ImGui::SliderFloat("##display-brightness", &brightness, 0.75f, 1.15f, "Brightness: %.2f")) {
+        action("display-brightness", std::to_string(brightness));
+      }
+      ImGui::EndDisabled();
+      if (displayAdjustmentAvailable_ && button("Reset display adjustment", "display-reset")) {
+        action("display-gamma", "1"); action("display-brightness", "1");
+      }
       for (const auto& toggle : model.toggles) {
         heading(toggle.heading); text(toggle.help);
         if (button(toggle.label, toggle.id)) { action("toggle", toggle.id); }
@@ -2208,7 +2226,7 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
   for (std::size_t i = 0; i < screen.panels.size(); ++i) {
     const std::size_t column = grouped ? static_cast<std::size_t>(screen.panelColumns[i]) : i;
     const float x = left + static_cast<float>(column) * (columnW + gap);
-    const float panelTop = columnY[column];
+    const float originalTop = columnY[column];
     const NavPanel& panel = screen.panels[i];
     const float noteH = MeasurePanelHeight(panel, columnW);
 
@@ -2221,6 +2239,18 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
         rowsH += m.height + (row.reading ? 0.0f : 3.0f);
       }
     }
+    // Keep the selected handbook article alongside the scrolling index. For
+    // a tall article, let it scroll until its bottom is visible before pinning
+    // it; never make the lower text unreachable. Its sticky offset must not
+    // grow the document's scroll extent or its click coordinates will drift.
+    const bool stickyWiki = panelsKind_ == ScreenKind::Wiki && panel.id == "wiki-article";
+    const float panelHeight = noteH + 6.0f + rowsH;
+    const float anchor = std::min(layout_.content.y + 8.0f,
+                                  layout_.content.Bottom() - 8.0f - panelHeight);
+    const float stickyShift = stickyWiki ? std::max(0.0f, contentScroll_ + anchor - originalTop) : 0.0f;
+    const float panelTop = originalTop + stickyShift;
+    const bool tracked = paintingContent_;
+    if (stickyWiki) { paintingContent_ = false; }
     if (grouped && rowsH > 0) {
       DrawRectangle(static_cast<int>(x), static_cast<int>(panelTop), static_cast<int>(columnW),
                     static_cast<int>(noteH + rowsH + 12), ToRay(p.panel));
@@ -2275,8 +2305,9 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
       }
     }
     if (grouped && rowsH > 0) { y += 6.0f; }
-    columnY[column] = y + gap;
-    panelsBottom = std::max(panelsBottom, y);
+    columnY[column] = y - stickyShift + gap;
+    panelsBottom = std::max(panelsBottom, y - stickyShift);
+    paintingContent_ = tracked;
   }
 
   contentPaintBottom_ = std::max(contentPaintBottom_, panelsBottom);
@@ -2803,15 +2834,19 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         pendingAction_ = hit.arg;
         return;
       }
+      const double actionsBefore = sim.ActionCount();
       const bool acted = PressPanelRow(sim, panelsKind_, hit.arg);
-      if (acted) { SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion); }
+      if (acted && (panelsKind_ != ScreenKind::Wiki || sim.ActionCount() > actionsBefore)) {
+        SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
+      }
       return;
     }
   }
 
   // The chart's own controls: bodies, the zoom pair, the layers, the actions.
   if (screenNav_) {
-    for (const NavHit& hit : navHits_) {
+    for (auto it = navHits_.rbegin(); it != navHits_.rend(); ++it) {
+      const NavHit& hit = *it;
       if (!hit.box.Contains(x, y + scrollY)) { continue; }
       if (PressNavAction(sim, hit.action, hit.arg) &&
           (hit.action == "travel" || hit.action == "scan")) {

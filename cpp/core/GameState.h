@@ -215,6 +215,8 @@ struct Options {
   bool soundEffects = true;
   bool music = true;
   double audioLevel = 0.4;
+  double displayGamma = 1.0;
+  double displayBrightness = 1.0;
   // Phase 9: typography floor and the four steps above it, plus the borderless
   // window. Both are free preferences, saved with the voyage like the rest.
   int fontStep = 0;        // 0..3 -> 18, 19, 20, 21 px

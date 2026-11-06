@@ -25,6 +25,7 @@
 
 #include "core/JsNumber.h"
 #include "core/Simulation.h"
+#include "core/DisplaySettings.h"
 
 namespace ship {
 
@@ -113,6 +114,8 @@ std::string Simulation::SaveJson() const {
                       {"soundEffects", state_.options.soundEffects},
                       {"music", state_.options.music},
                       {"audioLevel", Num(state_.options.audioLevel)},
+                      {"displayGamma", Num(DisplayGamma(state_.options.displayGamma))},
+                      {"displayBrightness", Num(DisplayBrightness(state_.options.displayBrightness))},
                       // Phase 9: the reading size and the window travel too.
                       {"fontStep", Num(static_cast<double>(state_.options.fontStep))},
                       {"fullscreen", state_.options.fullscreen}};
@@ -1062,6 +1065,8 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
       state_.options.soundEffects = GetBool(*it, "soundEffects", true);
       state_.options.music = GetBool(*it, "music", true);
       state_.options.audioLevel = GetNumber(*it, "audioLevel", 0.4);
+      state_.options.displayGamma = DisplayGamma(GetNumber(*it, "displayGamma", 1.0));
+      state_.options.displayBrightness = DisplayBrightness(GetNumber(*it, "displayBrightness", 1.0));
       const double step = GetNumber(*it, "fontStep", 0.0);
       state_.options.fontStep = step < 0 ? 0 : (step > 3 ? 3 : static_cast<int>(step));
       state_.options.fullscreen = GetBool(*it, "fullscreen", false);

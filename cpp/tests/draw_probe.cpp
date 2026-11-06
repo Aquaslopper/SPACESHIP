@@ -136,6 +136,94 @@ int main() {
     auto sim = ship::Simulation::NewVoyage(ship::Catalog::LoadFromAssets("assets"));
     ship::ShellView view;
     view.Configure(1280, 720, ship::Theme::ById("classic"));
+    // Chart controls use their painted bounds for all reading-size steps, and
+    // topmost controls take priority over map bodies behind them.
+    for (int step : {0, 3}) {
+      auto nav = ship::Simulation::NewVoyage(sim.World());
+      nav.MutableState().options.fontStep = step;
+      ship::ShellView mapView; mapView.Configure(1280, 720, ship::Theme::ById("classic"));
+      ship::OpenTask(nav, "nav", "main", true);
+      Frame(mapView, nav);
+      const auto minus = FindText("-");
+      const auto system = FindText("SYSTEM");
+      auto containing = [](const TextCall& t) {
+        auto it = std::find_if(rects.rbegin(), rects.rend(), [&](const RectCall& r) {
+          return r.order < t.order && t.x >= r.x && t.x < r.x + r.w &&
+                 t.y >= r.y && t.y + t.size <= r.y + r.h + 1;
+        });
+        Require(it != rects.rend(), "No control rectangle for map label");
+        return *it;
+      };
+      const auto minusBox = containing(minus);
+      const auto systemBox = containing(system);
+      Require(minusBox.y + minusBox.h < systemBox.y, "Map zoom and layer controls overlap");
+      const double zoom = nav.Map().zoom;
+      mapView.Click(nav, minusBox.x + minusBox.w / 2, minusBox.y + minusBox.h / 2, ship::HitButton::Left, 0);
+      Require(nav.Map().zoom < zoom, "Zoom-out hit missed its painted control");
+      Frame(mapView, nav);
+      const auto sector = FindText("SECTOR");
+      mapView.Click(nav, sector.x + 2, sector.y + 2, ship::HitButton::Left, 0);
+      Require(nav.Map().layer == "sector", "Map layer hit missed its painted control");
+    }
+
+    // Free handbook selection and reveal do not produce action feedback; the
+    // selected article stays in view as the index scrolls and its controls
+    // remain clickable at the translated position.
+    {
+      auto world = ship::Catalog::LoadFromAssets("assets");
+      world.wiki.clear();
+      world.wiki.push_back({"first", "GUIDE", "First entry", "A short handbook article.", "", "", false});
+      world.wiki.push_back({"spoiler", "GUIDE", "Test spoiler", "The hidden article.", "", "", true});
+      for (int i = 0; i < 35; ++i)
+        world.wiki.push_back({"entry" + std::to_string(i), "GUIDE", "Extra entry " + std::to_string(i), "More text.", "", "", false});
+      auto handbook = ship::Simulation::NewVoyage(world);
+      ship::ShellView reader; reader.Configure(1280, 720, ship::Theme::ById("classic"));
+      ship::OpenTask(handbook, "wiki", "main", true);
+      Frame(reader, handbook);
+      const auto pick = FindText("Test spoiler");
+      reader.Click(handbook, pick.x + 2, pick.y + 2, ship::HitButton::Left, 0);
+      Frame(reader, handbook);
+      FindText("Reveal the spoiler entry");
+      Require(std::none_of(rects.begin(), rects.end(), [](const RectCall& r) {
+        return r.color.r == 126 && r.color.g == 198 && r.color.b == 63 && r.w == 11 && r.h == 2;
+      }), "Free wiki selection displayed a positive action mark");
+      const auto content = reader.LayoutNow().content;
+      reader.Scroll(content.Right() - 10, content.y + 50, -20);
+      Frame(reader, handbook);
+      const auto pinned = FindText("Test spoiler");
+      // Index and article both contain the title; find the right-hand one.
+      const auto articleTitle = std::find_if(texts.begin(), texts.end(), [&](const TextCall& t) {
+        return t.text == "Test spoiler" && t.x > content.x + content.w / 2 && t.y >= content.y && t.y < content.Bottom();
+      });
+      (void)pinned;
+      Require(articleTitle != texts.end(), "Wiki article did not follow the index scroll");
+      const auto reveal = FindText("Reveal the spoiler entry");
+      Require(reveal.y >= content.y && reveal.y < content.Bottom(), "Sticky wiki control is not visible");
+      reader.Click(handbook, reveal.x + 2, reveal.y + 2, ship::HitButton::Left, 0);
+      Frame(reader, handbook);
+      FindText("The hidden article.");
+      Require(handbook.ActionCount() == 0, "Free wiki navigation spent an action");
+      Require(std::none_of(rects.begin(), rects.end(), [](const RectCall& r) {
+        return r.color.r == 126 && r.color.g == 198 && r.color.b == 63 && r.w == 11 && r.h == 2;
+      }), "Free wiki reveal displayed a positive action mark");
+
+      // A tall article scrolls through its bottom before the sticky position is
+      // reached, rather than trapping the end below the viewport.
+      world.wiki[0].text.clear();
+      for (int i = 0; i < 300; ++i) world.wiki[0].text += "Long article text continues. ";
+      world.wiki[0].text += "END-OF-ARTICLE";
+      auto longHandbook = ship::Simulation::NewVoyage(world);
+      ship::ShellView longReader; longReader.Configure(1280, 720, ship::Theme::ById("classic"));
+      ship::OpenTask(longHandbook, "wiki", "main", true);
+      Frame(longReader, longHandbook);
+      longReader.Scroll(content.Right() - 10, content.y + 50, -1000);
+      Frame(longReader, longHandbook);
+      const auto end = std::find_if(texts.begin(), texts.end(), [](const TextCall& t) {
+        return t.text.find("END-OF-ARTICLE") != std::string::npos;
+      });
+      Require(end != texts.end() && end->y >= content.y && end->y + end->size < content.Bottom(),
+              "Long wiki article bottom is unreachable");
+    }
     Require(sim.StageJob("bo", "maintenance"), "Could not stage source crew job");
     Require(sim.ToggleOrder("rell", "doc"), "Could not stage source order");
     ship::OpenTask(sim, "room", "quarters", true);

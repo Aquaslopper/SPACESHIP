@@ -8,6 +8,9 @@
 //  the soundtrack can be replaced with files. Each of those is held here.
 // ============================================================================
 #include <catch2/catch_test_macros.hpp>
+#include <nlohmann/json.hpp>
+#include <cmath>
+#include "core/DisplaySettings.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -164,6 +167,43 @@ TEST_CASE("the reading size and the window survive a save and a load",
   ship::Simulation floor = Fresh();
   REQUIRE(floor.LoadSlot(1, dir.string(), nullptr));
   CHECK(floor.State().options.fontStep == 0);
+}
+
+TEST_CASE("display adjustment is neutral by default, bounded and saved with the voyage", "[phase9][settings][display]") {
+  ship::Simulation sim = Fresh();
+  CHECK(sim.State().options.displayGamma == 1.0);
+  CHECK(sim.State().options.displayBrightness == 1.0);
+  CHECK(ship::AdjustDisplayChannel(0.4, 1.0, 1.0) == 0.4);
+  CHECK(ship::AdjustDisplayChannel(0.4, 1.3, 1.0) < 0.4);
+  CHECK(ship::AdjustDisplayChannel(1.0, 1.3, 0.8) == 0.8);
+  const double before = sim.ActionCount();
+  REQUIRE(ship::PressPopupAction(sim, "settings", "display-gamma", "1.35", "", nullptr));
+  REQUIRE(ship::PressPopupAction(sim, "settings", "display-brightness", "0.82", "", nullptr));
+  CHECK_FALSE(ship::PressPopupAction(sim, "settings", "display-gamma", "nan", "", nullptr));
+  CHECK_FALSE(ship::PressPopupAction(sim, "settings", "display-gamma", "1oops", "", nullptr));
+  CHECK(sim.ActionCount() == before);
+  CHECK(std::abs(ship::BuildPopup(sim, "settings").displayGamma - 1.35f) < 0.001);
+  ship::Simulation loaded = Fresh();
+  REQUIRE(loaded.LoadJson(sim.SaveJson(), nullptr));
+  CHECK(std::abs(loaded.State().options.displayGamma - 1.35) < 0.0001);
+  CHECK(std::abs(loaded.State().options.displayBrightness - 0.82) < 0.0001);
+
+  auto saved = nlohmann::json::parse(sim.SaveJson());
+  saved["state"]["options"].erase("displayGamma");
+  saved["state"]["options"].erase("displayBrightness");
+  REQUIRE(loaded.LoadJson(saved.dump(), nullptr));
+  CHECK(loaded.State().options.displayGamma == 1.0);
+  CHECK(loaded.State().options.displayBrightness == 1.0);
+  saved["state"]["options"]["displayGamma"] = 99;
+  saved["state"]["options"]["displayBrightness"] = -10;
+  REQUIRE(loaded.LoadJson(saved.dump(), nullptr));
+  CHECK(loaded.State().options.displayGamma == 1.6);
+  CHECK(loaded.State().options.displayBrightness == 0.75);
+  saved["state"]["options"]["displayGamma"] = "not a number";
+  saved["state"]["options"]["displayBrightness"] = nullptr;
+  REQUIRE(loaded.LoadJson(saved.dump(), nullptr));
+  CHECK(loaded.State().options.displayGamma == 1.0);
+  CHECK(loaded.State().options.displayBrightness == 1.0);
 }
 
 // ---------------------------------------------------------------------------

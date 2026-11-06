@@ -80,6 +80,8 @@ A native C++ client and headless simulation are present, but the port is **still
 
 `Spaceship.hta` is the behavioral and visual reference. Do not treat passing simulation tests as sign-off for the native UI.
 
+The native Settings screen also offers **Gamma** and **Brightness** sliders. Both default to 1.00 (unchanged): increasing gamma darkens midtones, while decreasing brightness lowers the white level. Reset returns both to neutral. These adjustments travel with the saved voyage, like the other preferences; the controls report if the graphics device cannot support them.
+
 ### Build
 
 ```sh

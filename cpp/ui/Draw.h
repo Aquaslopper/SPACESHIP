@@ -53,6 +53,7 @@ class ShellView {
     monoFont_ = mono;
   }
   void SetTitleTexture(void* texture) { titleArt_ = texture; }
+  void SetDisplayAdjustmentAvailable(bool available) { displayAdjustmentAvailable_ = available; }
   void SetTutorialTexture(std::size_t index, void* texture) {
     if (index < tutorialArt_.size()) { tutorialArt_[index] = texture; }
   }
@@ -256,6 +257,7 @@ class ShellView {
   TitleModel title_;
   std::vector<NavHit> titleHits_;
   void* titleArt_ = nullptr;
+  bool displayAdjustmentAvailable_ = true;
   std::array<void*, 6> tutorialArt_{};
   double tutorialTransitionMs_ = 0.0;
   int tutorialDirection_ = 1;
