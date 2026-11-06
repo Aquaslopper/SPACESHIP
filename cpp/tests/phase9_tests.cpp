@@ -169,12 +169,14 @@ TEST_CASE("the reading size and the window survive a save and a load",
   CHECK(floor.State().options.fontStep == 0);
 }
 
-TEST_CASE("display adjustment is neutral by default, bounded and saved with the voyage", "[phase9][settings][display]") {
+TEST_CASE("display adjustment uses the calibrated default and survives saves", "[phase9][settings][display]") {
   ship::Simulation sim = Fresh();
   CHECK(sim.State().options.displayGamma == 1.0);
   CHECK(sim.State().options.displayBrightness == 1.0);
-  CHECK(ship::AdjustDisplayChannel(0.4, 1.0, 1.0) == 0.4);
-  CHECK(ship::AdjustDisplayChannel(0.4, 1.3, 1.0) < 0.4);
+  CHECK(ship::EffectiveDisplayGamma(1.0) == 1.6);
+  CHECK(std::abs(ship::AdjustDisplayChannel(0.4, 1.0, 1.0) - std::pow(0.4, 1.6)) < 1e-12);
+  CHECK(ship::AdjustDisplayChannel(0.4, 1.3, 1.0) < ship::AdjustDisplayChannel(0.4, 1.0, 1.0));
+  CHECK(ship::AdjustDisplayChannel(0.4, 0.7, 1.0) > ship::AdjustDisplayChannel(0.4, 1.0, 1.0));
   CHECK(ship::AdjustDisplayChannel(1.0, 1.3, 0.8) == 0.8);
   const double before = sim.ActionCount();
   REQUIRE(ship::PressPopupAction(sim, "settings", "display-gamma", "1.35", "", nullptr));
@@ -204,6 +206,28 @@ TEST_CASE("display adjustment is neutral by default, bounded and saved with the 
   REQUIRE(loaded.LoadJson(saved.dump(), nullptr));
   CHECK(loaded.State().options.displayGamma == 1.0);
   CHECK(loaded.State().options.displayBrightness == 1.0);
+
+  // Pre-calibration saves store the old absolute exponent without a scale tag.
+  // A saved 1.60 retains its exact appearance and now reads 1.00 in the UI.
+  saved["state"]["options"].erase("displayGammaScale");
+  saved["state"]["options"]["displayGamma"] = 1.6;
+  REQUIRE(loaded.LoadJson(saved.dump(), nullptr));
+  CHECK(loaded.State().options.displayGamma == 1.0);
+  CHECK(ship::EffectiveDisplayGamma(loaded.State().options.displayGamma) == 1.6);
+  saved["state"]["options"]["displayGamma"] = 1.2;
+  REQUIRE(loaded.LoadJson(saved.dump(), nullptr));
+  CHECK(std::abs(ship::EffectiveDisplayGamma(loaded.State().options.displayGamma) - 1.2) < 1e-12);
+  ship::Simulation resaved = Fresh();
+  REQUIRE(resaved.LoadJson(loaded.SaveJson(), nullptr));
+  CHECK(std::abs(ship::EffectiveDisplayGamma(resaved.State().options.displayGamma) - 1.2) < 1e-12);
+  resaved.RestartVoyage();
+  CHECK(std::abs(ship::EffectiveDisplayGamma(resaved.State().options.displayGamma) - 1.2) < 1e-12);
+  saved["state"]["options"]["displayGamma"] = 0.7;
+  REQUIRE(loaded.LoadJson(saved.dump(), nullptr));
+  CHECK(std::abs(ship::EffectiveDisplayGamma(loaded.State().options.displayGamma) - 0.7) < 1e-12);
+  saved["state"]["options"]["displayGamma"] = 1.0;
+  REQUIRE(loaded.LoadJson(saved.dump(), nullptr));
+  CHECK(loaded.State().options.displayGamma == 1.0);
 }
 
 // ---------------------------------------------------------------------------

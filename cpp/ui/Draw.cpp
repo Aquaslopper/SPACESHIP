@@ -12,6 +12,7 @@
 //  cockpit would be the loudest possible lie about what this port is.
 // ============================================================================
 #include "ui/Draw.h"
+#include "core/DisplaySettings.h"
 #include "ui/First2000Styles.h"
 
 #include <algorithm>
@@ -1839,13 +1840,14 @@ void ShellView::PaintSettingsControls(Simulation& sim, const PopupModel& model) 
         }
       }
       heading("Display adjustment");
-      text("Higher gamma darkens midtones; brightness adjusts the white level. Neutral is 1.00.");
-      if (!displayAdjustmentAvailable_) { text("Display adjustment is unavailable on this graphics device."); }
+      text("Higher gamma darkens midtones; brightness adjusts the white level. Default is 1.00.");
+      if (!displayAdjustmentAvailable_) { text("Display adjustment is unavailable; using the unadjusted display."); }
       ImGui::BeginDisabled(!displayAdjustmentAvailable_);
       float gamma = model.displayGamma;
       float brightness = model.displayBrightness;
       ImGui::SetNextItemWidth(-1);
-      if (ImGui::SliderFloat("##display-gamma", &gamma, 0.7f, 1.6f, "Gamma: %.2f")) {
+      if (ImGui::SliderFloat("##display-gamma", &gamma, static_cast<float>(kDisplayGammaMin),
+                             static_cast<float>(kDisplayGammaMax), "Gamma: %.2f")) {
         action("display-gamma", std::to_string(gamma));
       }
       ImGui::SetNextItemWidth(-1);

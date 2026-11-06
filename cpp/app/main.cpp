@@ -177,9 +177,9 @@ Texture2D LoadTitleTexture(const std::filesystem::path& assets) {
   return Texture2D{};
 }
 
-// A neutral setting bypasses the render target entirely. The shader and
-// target cover the complete frame (including ImGui, title art and popups), so
-// the adjustment is a display preference rather than a different theme.
+// The calibrated default needs the shader. Only an identity transform can
+// bypass the render target. The shader and target cover the complete frame
+// (including ImGui, title art and popups), rather than changing the theme.
 class DisplayAdjustment {
  public:
   void Init(int width, int height) {
@@ -201,7 +201,7 @@ void main() {
     brightnessLoc_ = GetShaderLocation(shader_, "displayBrightness");
     shaderReady_ = IsShaderValid(shader_) && gammaLoc_ >= 0 && brightnessLoc_ >= 0;
     if (!shaderReady_) {
-      std::fprintf(stderr, "spaceship: display adjustment shader unavailable; using neutral display\n");
+      std::fprintf(stderr, "spaceship: display adjustment shader unavailable; using unadjusted display\n");
       return;
     }
     Resize(width, height);
@@ -220,7 +220,7 @@ void main() {
   void Begin() const { BeginTextureMode(target_); }
   void End(double gamma, double brightness) const {
     EndTextureMode();
-    const float g = static_cast<float>(ship::DisplayGamma(gamma));
+    const float g = static_cast<float>(ship::EffectiveDisplayGamma(gamma));
     const float b = static_cast<float>(ship::DisplayBrightness(brightness));
     SetShaderValue(shader_, gammaLoc_, &g, SHADER_UNIFORM_FLOAT);
     SetShaderValue(shader_, brightnessLoc_, &b, SHADER_UNIFORM_FLOAT);
@@ -559,7 +559,7 @@ int main(int argc, char** argv) {
     audio.Tick(sim);
 
     const bool adjusted = display.Ready() &&
-        (ship::DisplayGamma(sim.State().options.displayGamma) != 1.0 ||
+        (ship::EffectiveDisplayGamma(sim.State().options.displayGamma) != 1.0 ||
          ship::DisplayBrightness(sim.State().options.displayBrightness) != 1.0);
     if (adjusted) {
       display.Begin();
