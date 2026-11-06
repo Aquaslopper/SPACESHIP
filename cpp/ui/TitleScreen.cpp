@@ -12,19 +12,6 @@ namespace {
 
 std::string Num(double value) { return js::NumToString(value); }
 
-const char* kGuide =
-    "Start aboard a compact Wren courier. Every committed action advances the voyage; "
-    "reading, opening tabs and plotting targets are free.";
-
-const char* kGuideMore =
-    "Right-click Navigation and travel to Tolme Anchorage. Stand watch there to advance "
-    "work when needed. Seat three O2 canisters and start the filter bank. At a station, "
-    "use the Docked indicator to trade, accept work and visit the shipyard.";
-
-const char* kGuideShip =
-    "The larger Kestrel ship costs 4,000 shiplets. Your crew, cargo, equipment, tasks and "
-    "records transfer when you buy it. Open Wiki on the ship for the full handbook.";
-
 double Owned(const std::map<std::string, bool>& map) {
   double count = 0;
   for (const auto& entry : map) {
@@ -37,33 +24,18 @@ double Owned(const std::map<std::string, bool>& map) {
 
 const std::vector<TutorialCard>& TutorialCards() {
   static const std::vector<TutorialCard> cards = {
-      {"1. Morning coffee philosophy",
-       "The ship runs on one thing: the captain's attention. Six actions a day, "
-       "spent one click at a time. There is no pause button because the coffee "
-       "is the pause - read the room, decide, then commit.",
-       "Spend the action only when the decision is already made."},
-      {"2. The Free Harbor idle screen",
-       "Time stands still here. Left-click anything to inspect it; right-click a "
-       "tab to read its panel. Looking never costs an action, so look first - "
-       "the whole ship is free to browse while the clock is stopped.",
-       "Inspect on the left click, read on the right."},
-      {"3. The 1-click action clock",
-       "Every paid button spends exactly one action and then locks itself: "
-       "routine work for 5, ship systems for 10, anything off the hull for 15, "
-       "and irreversible commitments for 20. The lock counts down as other "
-       "actions resolve, so a locked button is a queue, not a ban.",
-       "One click, one action - then wait your turn."},
-      {"4. Start the O2 filters first",
-       "A fresh voyage has stale air and a cold rack. Filters first, then the "
-       "engine, then the mess - in that order the work overlaps and the crew "
-       "never idles. The task bar under each button shows what is running and "
-       "what is waiting.",
-       "Air, then motion, then food."},
-      {"5. Reading the sidebar",
-       "The side panel never shouts. A hairline under a number means a trend, a "
-       "dot in the margin means a task is running, and a faint row is a want "
-       "rather than a warning. If nothing is marked, nothing needs you.",
-       "Quiet sidebar, quiet watch."},
+      {"A simulation of decisions", "The ship moves when you commit an action, not with real time. Take your time to read and plan.",
+       "Planning is free.", "assets/art/tutorial/spaceship01.png"},
+      {"A quiet voyage", "The numbers and destination are examples. Your actual status is shown in the game. To begin, open Navigation and plot a course to Tolme Anchorage.",
+       "Observe before you decide.", "assets/art/tutorial/spaceship02.png"},
+      {"The idle screen", "Left-click the ship or its indicators to read about them; right-click to open their task windows. The illustrated layout is conceptual.",
+       "Exploring and opening tabs do not advance time.", "assets/art/tutorial/spaceship03.png"},
+      {"The action economy", "Not every click in a task window costs an action: only committed actions do. Later actions advance work, subject to power and other requirements.",
+       "The filter bank also grants work progress; completed crossings and scans need acknowledgement.", "assets/art/tutorial/spaceship04.png"},
+      {"Systems and indicators", "Actions advance survival systems as well as work. Seat three O2 canisters and start the filter bank to keep the air clean.",
+       "The image shows an illustrative cascade, not a fixed sequence.", "assets/art/tutorial/spaceship05.png"},
+      {"Your crew", "The artwork illustrates possible roles; the actual starting roster is in the game. Right-click a crew member to open their task tab.",
+       "Talking costs one action and raises that crew member's morale by up to 5 points.", "assets/art/tutorial/spaceship06.png"},
   };
   return cards;
 }
@@ -181,10 +153,7 @@ TitleModel BuildTitleScreen(const Simulation& sim, bool fromVoyage, TitlePanel p
       row.enabled = true;
       model.panelRows.push_back(row);
     }
-  } else if (panel == TitlePanel::Guide) {
-    model.panelTitle = "Your first watch";
-    model.panelNote = std::string(kGuide) + "\n\n" + kGuideMore + "\n\n" + kGuideShip;
-  } else if (panel == TitlePanel::Tutorial) {
+  } else if (panel == TitlePanel::Guide || panel == TitlePanel::Tutorial) {
     const std::vector<TutorialCard>& cards = TutorialCards();
     const int count = static_cast<int>(cards.size());
     const int card = tutorialCard < 0 ? 0 : (tutorialCard >= count ? count - 1 : tutorialCard);
@@ -195,6 +164,7 @@ TitleModel BuildTitleScreen(const Simulation& sim, bool fromVoyage, TitlePanel p
     model.cardTitle = cards[card].title;
     model.cardBody = cards[card].body;
     model.cardHabit = cards[card].habit;
+    model.cardImagePath = cards[card].imagePath;
     ActionRowView prev;
     prev.id = "card:prev";
     prev.label = "PREVIOUS CARD";
@@ -209,12 +179,6 @@ TitleModel BuildTitleScreen(const Simulation& sim, bool fromVoyage, TitlePanel p
     next.enabled = card + 1 < count;
     next.reading = card + 1 >= count;
     model.panelRows.push_back(next);
-    ActionRowView start;
-    start.id = "start-voyage";
-    start.label = "START A NEW VOYAGE";
-    start.cost = "free";
-    start.enabled = true;
-    model.panelRows.push_back(start);
   } else if (panel == TitlePanel::Quit) {
     model.panelTitle = "Leaving the game";
     model.panelNote = "Close this window to exit the preview.";

@@ -1,9 +1,8 @@
 // ============================================================================
 //  CrewRecord.h — the four-shelf personal record (Section I-1b).
 //  ---------------------------------------------------------------------------
-//  Opening a crew tab is read-only. Nothing here can spend an action or move a
-//  clock, and everything on it is read off the live record at paint time rather
-//  than cached on the tab, so a window left open never goes stale.
+//  Opening a crew tab is free. The live record includes an explicit paid
+//  conversation control; readings are rebuilt so they never go stale.
 //
 //  Four shelves, because they are four different questions: Status (how are
 //  they), Profile (who are they), Personality (what are they like) and
@@ -32,6 +31,9 @@ std::string GenderWord(const std::string& sex);
 struct CrewRecordModel {
   TaskHead head;
   std::vector<NavPanel> shelves;  // Status, Profile, Personality, Employment
+  std::string crewId;
+  CommandRowView conversation;
+  std::string said;
 };
 
 CrewRecordModel BuildCrewRecord(const Simulation& sim, const std::string& crewId);

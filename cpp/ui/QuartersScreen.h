@@ -2,8 +2,8 @@
 //  QuartersScreen.h — the order sheet (Section I-5).
 //  ---------------------------------------------------------------------------
 //  Looking at a crew member is free. Writing an order down is free. Changing
-//  your mind is free. NOTHING is spent until the whole sheet is handed out at
-//  the bottom of the screen: one mark, one feed line, one payment.
+//  your mind is free. Orders cost an action when the sheet is handed out;
+//  conversations are separate paid actions that improve morale.
 //
 //  The price is the point. An order's price is also how long it takes to carry
 //  out, so the bottom button counts the lot down as one bar, and nobody takes
@@ -56,7 +56,7 @@ struct QuartersScreenModel {
   bool closed = false;
   std::string sheetText;
   std::string bandNote;
-  std::string talkLabel;
+  CommandRowView conversation;
   std::string said;
   std::string payWages, payEvery, payNext, payPurse;
   CrewScene scene;
@@ -67,8 +67,7 @@ struct QuartersScreenModel {
 
 QuartersScreenModel BuildQuartersScreen(const Simulation& sim);
 
-// What a click in the quarters does. Selection, staging and talking are free;
-// "commit" is the one action the screen spends, and "talk" is free by design.
+// Selection and staging are free. Committing orders and talking each cost an action.
 bool PressQuartersAction(Simulation& sim, const std::string& action,
                          const std::string& arg = std::string());
 

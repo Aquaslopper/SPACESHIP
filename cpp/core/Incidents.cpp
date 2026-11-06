@@ -50,11 +50,12 @@ void Simulation::RemoveIncident(const std::string& id) {
     SimRemember("Connection",
                 SimCrewName(a) + " and " + SimCrewName(b) + " settled their dispute.", a, b);
   }
+  const bool hadIncident = found != nullptr;
   for (std::size_t i = events_.size(); i-- > 0;) {
     if (events_[i].id == id) { events_.erase(events_.begin() + static_cast<std::ptrdiff_t>(i)); }
   }
   ClearOngoing("incident-" + id);
-  if (found != nullptr) {
+  if (hadIncident) {
     state_.chronicle.incidents += 1;
     CheckCommendations();
   }
@@ -103,12 +104,9 @@ bool Simulation::RemedyIncident(const std::string& incidentId) {
   const std::string remedy = spec->remedy;
   const std::string id = incidentId;
   if (needsKit) { state_.repairKits -= 1; }
+  // commitChange() removes the report before the action advances the world.
+  RemoveIncident(id);
   PerformAction(remedy);
-  if (!state_.gameOver.empty()) { return true; }
-  // The report may have been cleared by the tick the action caused.
-  for (const Incident& incident : events_) {
-    if (incident.id == id) { RemoveIncident(id); break; }
-  }
   return true;
 }
 

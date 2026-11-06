@@ -32,9 +32,8 @@ bool Simulation::BroadcastLocal() {
 
   ClampStat("energy", -2);
   state_.sim.broadcasts[system->id] = true;
-  PerformAction("Local traffic report received");
-  if (!state_.gameOver.empty()) { return true; }
   if (!line.empty()) { SimRemember("World", name + ": " + line); }
+  PerformAction("Local traffic report received");
   return true;
 }
 

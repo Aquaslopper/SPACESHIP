@@ -51,6 +51,7 @@ struct StationScreenModel {
 };
 
 StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& portId);
+std::string StationActionCategory(const Simulation& sim, const std::string& action);
 
 // The press path. Every accepted command spends exactly one action through the
 // simulation's own economy calls.

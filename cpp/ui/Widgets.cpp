@@ -338,6 +338,36 @@ void BindCommandCooldown(const Simulation& sim, CommandRowView& row,
   }
 }
 
+std::string ConversationCooldownKey(const std::string& crewId) {
+  return "cd|crew-conversation|" + crewId;
+}
+
+CommandRowView BuildConversationRow(const Simulation& sim, const std::string& crewId) {
+  const CrewMember* crew = sim.FindCrew(crewId);
+  CommandRowView row;
+  if (crew == nullptr) { return row; }
+  const auto space = crew->name.find(' ');
+  row.label = "Talk to " + crew->name.substr(0, space) + " - 1 action, up to +" +
+              Num(Simulation::kConversationMorale) + " morale";
+  row.cost = row.displayCost = "1 action";
+  row.actionCost = true;
+  row.enabled = crew->health > 0 && sim.State().gameOver.empty() &&
+                sim.FindOngoing("doc-" + crewId) == nullptr;
+  row.live = row.enabled;
+  if (!row.enabled && sim.FindOngoing("doc-" + crewId) != nullptr) {
+    row.title = "Crew member is in the medical bay.";
+  }
+  BindCommandCooldown(sim, row, ConversationCooldownKey(crewId), "routine");
+  return row;
+}
+
+bool PressConversation(Simulation& sim, const std::string& crewId) {
+  const CommandRowView row = BuildConversationRow(sim, crewId);
+  if (!row.enabled) { return false; }
+  return CommitActionButton(sim, row.cooldownKey, row.category,
+                            [&]() { return sim.TalkToCrew(crewId); });
+}
+
 // ---------------------------------------------------------------------------
 //  Panels
 // ---------------------------------------------------------------------------
@@ -560,6 +590,7 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       const StationScreenModel station = BuildStationScreen(sim, tab.id);
       TaskScreenModel screen;
       screen.head = station.head;
+      screen.panelColumns = {0, 1, 1, 2, 2};
       for (const StationColumn& column : station.columns) {
         NavPanel panel;
         panel.id = "station-panel";
@@ -576,8 +607,9 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
           view.enabled = row.enabled;
           view.live = row.enabled;
           view.confirm = row.confirm;
+          view.reading = row.reading;
           BindCommandCooldown(sim, view, ActionCooldownKey(sim, "press:station:" + row.id + ":"),
-                              "routine");
+                              StationActionCategory(sim, row.id));
           rows.push_back(view);
           ids.push_back(row.id);
         }
@@ -635,7 +667,7 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         view.live = row.enabled;
         view.confirm = row.confirm;
         BindCommandCooldown(sim, view, ActionCooldownKey(sim, "press:room:" + row.id + ":"),
-                            ActionCooldownCategory(row.id + " "));
+                            RoomActionCategory(row.id));
         rows.push_back(view);
         ids.push_back(row.id);
       }
@@ -767,7 +799,7 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         view.live = row.enabled;
         view.confirm = row.confirm;
         BindCommandCooldown(sim, view, ActionCooldownKey(sim, "press:event:" + row.id + ":"),
-                            ActionCooldownCategory(row.id + " "));
+                            "systems");
         rows.push_back(view);
         ids.push_back(row.id);
       }
@@ -777,11 +809,12 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       return screen;
     }
     case ScreenKind::CrewRecord: {
-      // The record's four shelves are the whole window.
+      // Reading the record is free; its conversation is an explicit action.
       const CrewRecordModel record = BuildCrewRecord(sim, tab.id);
       TaskScreenModel screen;
       screen.head = record.head;
       screen.left = record.shelves;
+      if (!record.crewId.empty()) { screen.commands.push_back(record.conversation); }
       return screen;
     }
     case ScreenKind::Engine: return BuildEngineScreen(sim).screen;

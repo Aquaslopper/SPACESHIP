@@ -25,6 +25,7 @@
 
 #include "core/JsNumber.h"
 #include "core/Simulation.h"
+#include "core/DisplaySettings.h"
 
 namespace ship {
 
@@ -113,6 +114,9 @@ std::string Simulation::SaveJson() const {
                       {"soundEffects", state_.options.soundEffects},
                       {"music", state_.options.music},
                       {"audioLevel", Num(state_.options.audioLevel)},
+                      {"displayGamma", Num(DisplayGamma(state_.options.displayGamma))},
+                      {"displayGammaScale", "relative-1.6"},
+                      {"displayBrightness", Num(DisplayBrightness(state_.options.displayBrightness))},
                       // Phase 9: the reading size and the window travel too.
                       {"fontStep", Num(static_cast<double>(state_.options.fontStep))},
                       {"fullscreen", state_.options.fullscreen}};
@@ -1062,6 +1066,16 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
       state_.options.soundEffects = GetBool(*it, "soundEffects", true);
       state_.options.music = GetBool(*it, "music", true);
       state_.options.audioLevel = GetNumber(*it, "audioLevel", 0.4);
+      const double savedGamma = GetNumber(*it, "displayGamma", 1.0);
+      // Old saves used the shader exponent directly. Preserve deliberate
+      // non-default choices, while the old default adopts the new baseline.
+      if (GetString(*it, "displayGammaScale") == "relative-1.6" || savedGamma == 1.0) {
+        state_.options.displayGamma = DisplayGamma(savedGamma);
+      } else {
+        state_.options.displayGamma = DisplayGamma(
+            std::clamp(savedGamma, 0.7, 1.6) / kDisplayGammaBaseline);
+      }
+      state_.options.displayBrightness = DisplayBrightness(GetNumber(*it, "displayBrightness", 1.0));
       const double step = GetNumber(*it, "fontStep", 0.0);
       state_.options.fontStep = step < 0 ? 0 : (step > 3 ? 3 : static_cast<int>(step));
       state_.options.fullscreen = GetBool(*it, "fullscreen", false);

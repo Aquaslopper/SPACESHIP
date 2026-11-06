@@ -107,6 +107,7 @@ struct CommandRowView {
   bool live = false;        // a `live()` action, wired to something
   std::string confirm;      // asked first when the reader keeps confirmations on
   bool actionCost = true;
+  bool reading = false;     // non-interactive text interleaved with command rows
   bool coolingDown = false;
   double remaining = 0.0;
 };
@@ -114,6 +115,11 @@ struct CommandRowView {
 // A row the player can press, with the id the press path answers to. The
 // station, the stores, the fitted rooms, the Simulacron, the logbook and the
 // incident reports all speak this shape.
+// Conversation locks are per crew member, shared across quarters and records.
+std::string ConversationCooldownKey(const std::string& crewId);
+CommandRowView BuildConversationRow(const Simulation& sim, const std::string& crewId);
+bool PressConversation(Simulation& sim, const std::string& crewId);
+
 struct ActionRowView {
   std::string id;
   std::string label;
@@ -238,6 +244,8 @@ struct TaskScreenModel {
   // rows under a heading, not a stage with panels around it. The ids travel
   // beside the rows so a click can be dispatched without parsing a label.
   std::vector<NavPanel> panels;
+  // Optional column index per panel; repeated indices stack panels vertically.
+  std::vector<int> panelColumns;
   std::vector<std::vector<CommandRowView>> panelRows;
   std::vector<std::vector<std::string>> panelRowIds;
 };

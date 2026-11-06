@@ -1,15 +1,11 @@
 // ============================================================================
 //  Theme.cpp — five calm palettes.
 //  ---------------------------------------------------------------------------
-//  The reference has one light parchment theme (classic) and four dark themes
-//  (void, aurora, nebula, ember). The classic theme keeps the parchment palette;
-//  the four dark themes each author their own surface colours, borders, inks
-//  and accents, mirroring the HTA's theme-<id> CSS blocks. The ids are
-//  unchanged so old saves keep their choice; only the colours and the labels
-//  move.
+//  Classic keeps the HTA parchment roles. The other saved theme IDs use
+//  light, softly tinted surfaces by request rather than the HTA dark surfaces.
 //
-//  Every role is a literal from HTA lines 1–2000. Distinct CSS surfaces
-//  stay distinct; semantic red/green/amber are not replaced by the accent.
+//  Classic roles are read from the HTA; semantic red/green/amber stay
+//  distinct from the optional palette accents.
 // ============================================================================
 #include "ui/Theme.h"
 
@@ -57,121 +53,30 @@ Palette ClassicPalette() {
 }
 
 Palette PaletteForId(const std::string& id) {
-  // HTA 1301–1457: literal CSS roles. Never blend or darken authored colours.
+  // Classic is the unchanged HTA parchment. The user requested light versions
+  // of the other four choices; retain their IDs and accents for saved games.
   Palette p = ClassicPalette();
+  const char* surface = nullptr;
+  const char* raised = nullptr;
+  const char* border = nullptr;
+  const char* accent = nullptr;
   if (id == "void") {
-    p.panel = Hex("#152437");
-    p.panel2 = Hex("#1c2e42");
-    p.panel3 = Hex("#172638");
-    p.border = Hex("#2e465d");
-    p.borderDark = Hex("#41627c");
-    p.coffee = Hex("#65d7ed");
-    p.ink = Hex("#dce8f2");
-    p.muted = Hex("#9bb1c1");
-    p.content = Hex("#0b1320");
-    p.chrome = Hex("#101d2c");
-    p.hover = Hex("#263c52");
-    p.control = Hex("#1c2e42");
-    p.input = Hex("#0f1d2c");
-    p.tabInk = Hex("#a9bdca");
-    p.activeInk = Hex("#e5f2fb");
-    p.chart = Hex("#0e1a2b");
-    p.chartInk = Hex("#a9c5d5");
-    p.titleBackground = Hex("#0b1320");
-    p.titleDialog = Hex("#152437");
-    p.titleBorder = Hex("#65d7ed");
-    p.titleInk = Hex("#e5f2fb");
-    p.titleMenu = Hex("#101d2c");
-    p.titleMenuInk = Hex("#dce8f2");
-    p.titleMenuBorder = Hex("#41627c");
-    p.titleMenuHover = Hex("#263c52");
-    return p;
+    surface = "#f2f7f8"; raised = "#e7f0f2"; border = "#b8ced2"; accent = "#437b87";
+  } else if (id == "aurora") {
+    surface = "#f2f7f3"; raised = "#e7f0e9"; border = "#bbcec0"; accent = "#4a7965";
+  } else if (id == "nebula") {
+    surface = "#f7f3f8"; raised = "#eee8f2"; border = "#ccbed5"; accent = "#796487";
+  } else if (id == "ember") {
+    surface = "#faf5f0"; raised = "#f2e9df"; border = "#d6c2ac"; accent = "#956a4d";
   }
-  if (id == "aurora") {
-    p.panel = Hex("#162d2a");
-    p.panel2 = Hex("#1c3934");
-    p.panel3 = Hex("#18312e");
-    p.border = Hex("#345b51");
-    p.borderDark = Hex("#477466");
-    p.coffee = Hex("#7cddb4");
-    p.ink = Hex("#e2f1e9");
-    p.muted = Hex("#9fbdb0");
-    p.content = Hex("#0b1717");
-    p.chrome = Hex("#102221");
-    p.hover = Hex("#29463f");
-    p.control = Hex("#1c3934");
-    p.input = Hex("#102321");
-    p.tabInk = Hex("#b0c9be");
-    p.activeInk = Hex("#e8f6ee");
-    p.chart = Hex("#10201e");
-    p.chartInk = Hex("#b5d8c8");
-    p.titleBackground = Hex("#0b1717");
-    p.titleDialog = Hex("#162d2a");
-    p.titleBorder = Hex("#7cddb4");
-    p.titleInk = Hex("#e8f6ee");
-    p.titleMenu = Hex("#102221");
-    p.titleMenuInk = Hex("#e2f1e9");
-    p.titleMenuBorder = Hex("#477466");
-    p.titleMenuHover = Hex("#29463f");
-    return p;
+  if (surface != nullptr) {
+    p.panel = Hex(surface); p.panel2 = Hex(raised); p.panel3 = Hex(raised);
+    p.chrome = Hex(surface); p.hover = Hex(raised); p.control = Hex(surface);
+    p.border = Hex(border); p.borderDark = Hex(border);
+    p.coffee = Hex(accent); p.coffeeDark = Hex(accent); p.chartInk = Hex(accent);
+    p.chart = Hex(raised); p.titleDialog = Hex(surface); p.titleBorder = Hex(border);
   }
-  if (id == "nebula") {
-    p.panel = Hex("#281f3b");
-    p.panel2 = Hex("#332748");
-    p.panel3 = Hex("#2a2040");
-    p.border = Hex("#52436d");
-    p.borderDark = Hex("#665385");
-    p.coffee = Hex("#c8a3ff");
-    p.ink = Hex("#eee6f7");
-    p.muted = Hex("#c0b0cf");
-    p.content = Hex("#130f20");
-    p.chrome = Hex("#201831");
-    p.hover = Hex("#413256");
-    p.control = Hex("#332748");
-    p.input = Hex("#21182f");
-    p.tabInk = Hex("#c3b4d3");
-    p.activeInk = Hex("#f4eafd");
-    p.chart = Hex("#1a1429");
-    p.chartInk = Hex("#d2bce6");
-    p.titleBackground = Hex("#130f20");
-    p.titleDialog = Hex("#281f3b");
-    p.titleBorder = Hex("#c8a3ff");
-    p.titleInk = Hex("#f4eafd");
-    p.titleMenu = Hex("#201831");
-    p.titleMenuInk = Hex("#eee6f7");
-    p.titleMenuBorder = Hex("#665385");
-    p.titleMenuHover = Hex("#413256");
-    return p;
-  }
-  if (id == "ember") {
-    p.panel = Hex("#30231d");
-    p.panel2 = Hex("#3b2c23");
-    p.panel3 = Hex("#34261f");
-    p.border = Hex("#654a36");
-    p.borderDark = Hex("#835d42");
-    p.coffee = Hex("#ffba76");
-    p.ink = Hex("#f5e7d9");
-    p.muted = Hex("#c3a78f");
-    p.content = Hex("#1a1210");
-    p.chrome = Hex("#251b17");
-    p.hover = Hex("#493326");
-    p.control = Hex("#3b2c23");
-    p.input = Hex("#291d18");
-    p.tabInk = Hex("#d2b59a");
-    p.activeInk = Hex("#fff0df");
-    p.chart = Hex("#241915");
-    p.chartInk = Hex("#e2c3a5");
-    p.titleBackground = Hex("#1a1210");
-    p.titleDialog = Hex("#30231d");
-    p.titleBorder = Hex("#ffba76");
-    p.titleInk = Hex("#fff0df");
-    p.titleMenu = Hex("#251b17");
-    p.titleMenuInk = Hex("#f5e7d9");
-    p.titleMenuBorder = Hex("#835d42");
-    p.titleMenuHover = Hex("#493326");
-    return p;
-  }
-  return p;  // classic, including unknown ids
+  return p;
 }
 
 }  // namespace
@@ -180,6 +85,14 @@ float Theme::FontPxForStep(int step) {
   const int clamped = step < 0 ? 0 : (step > 3 ? 3 : step);
   // 18 px minimum, then +5% per optional reading-size step: 18..21 px.
   return kFontFloorPx + static_cast<float>(std::lround(0.05 * kFontFloorPx * clamped));
+}
+
+int Theme::HomeInfoLabelPx() const {
+  return static_cast<int>(std::lround(12.0f * FontPx() / kFontFloorPx));
+}
+
+int Theme::HomeInfoValuePx() const {
+  return static_cast<int>(std::lround(15.0f * FontPx() / kFontFloorPx));
 }
 
 float Theme::LineHeightForPx(float px) {

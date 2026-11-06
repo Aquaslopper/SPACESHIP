@@ -53,8 +53,7 @@ float InfoCellHeight(const Theme& theme) {
   const float pad = 6.0f;
   const float gap = 6.0f;
   const float bottomPad = 6.0f;
-  return pad + TextLineHeight(theme, 10) + gap + TextLineHeight(theme, 13) +
-         bottomPad;
+  return pad + theme.HomeInfoLabelPx() + gap + theme.HomeInfoValuePx() + bottomPad;
 }
 
 }  // namespace

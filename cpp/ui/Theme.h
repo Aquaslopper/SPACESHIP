@@ -1,10 +1,8 @@
 // ============================================================================
 //  Theme.h — the CSS roles, as data.
 //  ---------------------------------------------------------------------------
-//  The reference has one light parchment theme (classic) and four dark themes
-//  (void, aurora, nebula, ember) that re-tint every surface, not just the ink.
-//  The port mirrors that split: one authored light palette, four authored dark
-//  palettes, each with its own surface colours and ink.
+//  Classic follows the HTA parchment; the other theme IDs use light, softly
+//  tinted variants as requested, keeping existing save selections intact.
 //
 //  Everything here is presentation. No function in this file can advance the
 //  voyage, and nothing here is saved (the voyage saves the theme's NAME).
@@ -64,7 +62,7 @@ struct Theme {
   // Presentation flags that travel with the voyage's options.
   bool largeText = false;
   // Phase 9: the typography floor and its four steps. Step 0 is 18 px — the
-  // smallest the port ever draws — and each step adds 5% of the floor, rounded.
+  // general UI floor — and each step adds 5% of that floor, rounded.
   int fontStep = 0;
   bool hideCrewLabels = false;
   bool reducedMotion = false;
@@ -79,14 +77,16 @@ struct Theme {
   // "rgba(139,111,78,0.13)" as the stylesheet writes it, for the raster hairlines.
   std::string Ink(float alpha) const;
 
-  // Native readability floor requested for the port. No rendered label should
-  // fall below 18 px; the four settings steps may increase it further.
+  // General readability floor; the compact Home information rail has its own
+  // smaller, user-requested sizes and still follows the reading-size settings.
   static constexpr float kFontFloorPx = 18.0f;
   static float FontPxForStep(int step);
   static float LineHeightForPx(float px);
   float FontPx() const {
     return FontPxForStep(fontStep) + (largeText ? 2.0f : 0.0f);
   }
+  int HomeInfoLabelPx() const;
+  int HomeInfoValuePx() const;
   float BodySize() const { return FontPx(); }
   float LineHeight() const { return LineHeightForPx(FontPx()); }
 };

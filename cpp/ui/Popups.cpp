@@ -4,9 +4,12 @@
 #include "ui/Popups.h"
 
 #include "core/JsNumber.h"
+#include "core/DisplaySettings.h"
 #include "ui/Theme.h"
 
 #include <algorithm>
+#include <cmath>
+#include <exception>
 
 namespace ship {
 
@@ -149,6 +152,8 @@ PopupModel BuildPopup(const Simulation& sim, const std::string& key,
       "soundEffects", options.soundEffects ? "Sound effects: On" : "Sound effects: Off",
       options.soundEffects});
   model.audioLevel = js::NumToString(options.audioLevel);
+  model.displayGamma = static_cast<float>(DisplayGamma(options.displayGamma));
+  model.displayBrightness = static_cast<float>(DisplayBrightness(options.displayBrightness));
   model.audioChoices = {{"0.18", "Quiet"}, {"0.4", "Standard"},
                         {"0.65", "Loud"}, {"0.9", "Very loud"}};
   model.toggles.push_back(PopupToggle{
@@ -235,6 +240,16 @@ bool PressPopupAction(Simulation& sim, const std::string& key,
     if (action == "audio") {
       options.audioLevel = std::stod(arg);
       return true;
+    }
+    if (action == "display-gamma" || action == "display-brightness") {
+      try {
+        std::size_t parsed = 0;
+        const double value = std::stod(arg, &parsed);
+        if (parsed != arg.size() || !std::isfinite(value)) { return false; }
+        if (action == "display-gamma") { options.displayGamma = DisplayGamma(value); }
+        else { options.displayBrightness = DisplayBrightness(value); }
+        return true;
+      } catch (const std::exception&) { return false; }
     }
     if (action == "font") {
       // Free, and clamped to the four offered steps rather than trusted.

@@ -1,6 +1,6 @@
 // ============================================================================
 //  phase9_tests.cpp — anti-spam plumbing, the reading-size ladder, the
-//  borderless window, the five-card tutorial and the player's own audio.
+//  borderless window, the illustrated tutorial and the player's own audio.
 //  ---------------------------------------------------------------------------
 //  Phase 9's promise is that the port is *comfortable* to use: no paid button
 //  can be double-clicked, the smallest face is 18 px, the palettes are calm,
@@ -8,6 +8,9 @@
 //  the soundtrack can be replaced with files. Each of those is held here.
 // ============================================================================
 #include <catch2/catch_test_macros.hpp>
+#include <nlohmann/json.hpp>
+#include <cmath>
+#include "core/DisplaySettings.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -166,22 +169,82 @@ TEST_CASE("the reading size and the window survive a save and a load",
   CHECK(floor.State().options.fontStep == 0);
 }
 
+TEST_CASE("display adjustment uses the calibrated default and survives saves", "[phase9][settings][display]") {
+  ship::Simulation sim = Fresh();
+  CHECK(sim.State().options.displayGamma == 1.0);
+  CHECK(sim.State().options.displayBrightness == 1.0);
+  CHECK(ship::EffectiveDisplayGamma(1.0) == 1.6);
+  CHECK(std::abs(ship::AdjustDisplayChannel(0.4, 1.0, 1.0) - std::pow(0.4, 1.6)) < 1e-12);
+  CHECK(ship::AdjustDisplayChannel(0.4, 1.3, 1.0) < ship::AdjustDisplayChannel(0.4, 1.0, 1.0));
+  CHECK(ship::AdjustDisplayChannel(0.4, 0.7, 1.0) > ship::AdjustDisplayChannel(0.4, 1.0, 1.0));
+  CHECK(ship::AdjustDisplayChannel(1.0, 1.3, 0.8) == 0.8);
+  const double before = sim.ActionCount();
+  REQUIRE(ship::PressPopupAction(sim, "settings", "display-gamma", "1.35", "", nullptr));
+  REQUIRE(ship::PressPopupAction(sim, "settings", "display-brightness", "0.82", "", nullptr));
+  CHECK_FALSE(ship::PressPopupAction(sim, "settings", "display-gamma", "nan", "", nullptr));
+  CHECK_FALSE(ship::PressPopupAction(sim, "settings", "display-gamma", "1oops", "", nullptr));
+  CHECK(sim.ActionCount() == before);
+  CHECK(std::abs(ship::BuildPopup(sim, "settings").displayGamma - 1.35f) < 0.001);
+  ship::Simulation loaded = Fresh();
+  REQUIRE(loaded.LoadJson(sim.SaveJson(), nullptr));
+  CHECK(std::abs(loaded.State().options.displayGamma - 1.35) < 0.0001);
+  CHECK(std::abs(loaded.State().options.displayBrightness - 0.82) < 0.0001);
+
+  auto saved = nlohmann::json::parse(sim.SaveJson());
+  saved["state"]["options"].erase("displayGamma");
+  saved["state"]["options"].erase("displayBrightness");
+  REQUIRE(loaded.LoadJson(saved.dump(), nullptr));
+  CHECK(loaded.State().options.displayGamma == 1.0);
+  CHECK(loaded.State().options.displayBrightness == 1.0);
+  saved["state"]["options"]["displayGamma"] = 99;
+  saved["state"]["options"]["displayBrightness"] = -10;
+  REQUIRE(loaded.LoadJson(saved.dump(), nullptr));
+  CHECK(loaded.State().options.displayGamma == 1.6);
+  CHECK(loaded.State().options.displayBrightness == 0.75);
+  saved["state"]["options"]["displayGamma"] = "not a number";
+  saved["state"]["options"]["displayBrightness"] = nullptr;
+  REQUIRE(loaded.LoadJson(saved.dump(), nullptr));
+  CHECK(loaded.State().options.displayGamma == 1.0);
+  CHECK(loaded.State().options.displayBrightness == 1.0);
+
+  // Pre-calibration saves store the old absolute exponent without a scale tag.
+  // A saved 1.60 retains its exact appearance and now reads 1.00 in the UI.
+  saved["state"]["options"].erase("displayGammaScale");
+  saved["state"]["options"]["displayGamma"] = 1.6;
+  REQUIRE(loaded.LoadJson(saved.dump(), nullptr));
+  CHECK(loaded.State().options.displayGamma == 1.0);
+  CHECK(ship::EffectiveDisplayGamma(loaded.State().options.displayGamma) == 1.6);
+  saved["state"]["options"]["displayGamma"] = 1.2;
+  REQUIRE(loaded.LoadJson(saved.dump(), nullptr));
+  CHECK(std::abs(ship::EffectiveDisplayGamma(loaded.State().options.displayGamma) - 1.2) < 1e-12);
+  ship::Simulation resaved = Fresh();
+  REQUIRE(resaved.LoadJson(loaded.SaveJson(), nullptr));
+  CHECK(std::abs(ship::EffectiveDisplayGamma(resaved.State().options.displayGamma) - 1.2) < 1e-12);
+  resaved.RestartVoyage();
+  CHECK(std::abs(ship::EffectiveDisplayGamma(resaved.State().options.displayGamma) - 1.2) < 1e-12);
+  saved["state"]["options"]["displayGamma"] = 0.7;
+  REQUIRE(loaded.LoadJson(saved.dump(), nullptr));
+  CHECK(std::abs(ship::EffectiveDisplayGamma(loaded.State().options.displayGamma) - 0.7) < 1e-12);
+  saved["state"]["options"]["displayGamma"] = 1.0;
+  REQUIRE(loaded.LoadJson(saved.dump(), nullptr));
+  CHECK(loaded.State().options.displayGamma == 1.0);
+}
+
 // ---------------------------------------------------------------------------
-//  The tutorial: five cards, each one idea and one habit
+//  The tutorial: six illustrated cards and accurate gameplay captions
 // ---------------------------------------------------------------------------
-TEST_CASE("legacy tutorial remains callable without adding an HTA menu command", "[phase9][tutorial]") {
+TEST_CASE("how to play offers six illustrated cards without adding a menu command", "[phase9][tutorial]") {
   const std::vector<ship::TutorialCard>& cards = ship::TutorialCards();
-  REQUIRE(cards.size() == 5);
+  REQUIRE(cards.size() == 6);
   for (const ship::TutorialCard& card : cards) {
     CHECK_FALSE(card.title.empty());
-    CHECK(card.body.size() > 60);
+    CHECK_FALSE(card.body.empty());
+    CHECK(fs::exists(card.imagePath));
     CHECK_FALSE(card.habit.empty());
   }
-  CHECK(cards[0].title.find("Morning coffee") != std::string::npos);
-  CHECK(cards[1].title.find("Free Harbor") != std::string::npos);
-  CHECK(cards[2].title.find("1-click") != std::string::npos);
-  CHECK(cards[3].title.find("O2") != std::string::npos);
-  CHECK(cards[4].title.find("sidebar") != std::string::npos);
+  CHECK(cards[3].body.find("Not every click") != std::string::npos);
+  CHECK(cards[5].body.find("illustrates possible roles") != std::string::npos);
+  CHECK(cards[5].habit.find("costs one action") != std::string::npos);
 
   ship::Simulation sim = Fresh();
   bool fromVoyage = false;
@@ -189,8 +252,7 @@ TEST_CASE("legacy tutorial remains callable without adding an HTA menu command",
   int slot = 1;
   std::string message;
 
-  // The HTA has five commands and no TUTORIAL. Preserve the old module
-  // for compatibility without painting an invented sixth menu button.
+  // Keep the five menu commands; HOW TO PLAY owns the illustrated guide.
   const ship::TitleModel menu = ship::BuildTitleScreen(sim, false, panel, "");
   bool hasTutorial = false;
   for (const ship::ActionRowView& row : menu.actions) {
@@ -201,44 +263,39 @@ TEST_CASE("legacy tutorial remains callable without adding an HTA menu command",
     }
   }
   CHECK_FALSE(hasTutorial);
-  REQUIRE(ship::PressTitleAction(sim, "tutorial", "", &fromVoyage, &panel, &slot, "",
+  REQUIRE(ship::PressTitleAction(sim, "guide", "", &fromVoyage, &panel, &slot, "",
                                  &message));
-  CHECK(panel == ship::TitlePanel::Tutorial);
+  CHECK(panel == ship::TitlePanel::Guide);
 
-  // The first card is the coffee card, and it cannot go back any further.
+  // The first card is the introduction, and it cannot go back any further.
   const ship::TitleModel first = ship::BuildTitleScreen(sim, false, panel, "", 1, "", 0);
-  CHECK(first.tutorialCards == 5);
+  CHECK(first.tutorialCards == 6);
   CHECK(first.tutorialCard == 0);
   CHECK(first.cardTitle == cards[0].title);
   CHECK(first.cardHabit == cards[0].habit);
   CHECK(first.panelNote.find(cards[0].body) != std::string::npos);
   const ship::ActionRowView* prev = nullptr;
   const ship::ActionRowView* next = nullptr;
-  const ship::ActionRowView* start = nullptr;
   for (const ship::ActionRowView& row : first.panelRows) {
     if (row.id == "card:prev") { prev = &row; }
     if (row.id == "card:next") { next = &row; }
-    if (row.id == "start-voyage") { start = &row; }
   }
   REQUIRE(prev != nullptr);
   REQUIRE(next != nullptr);
-  REQUIRE(start != nullptr);
-  CHECK(start->enabled);
-  CHECK(start->label == "START A NEW VOYAGE");
   CHECK_FALSE(prev->enabled);
   CHECK(prev->reading);
   CHECK(next->enabled);
-  CHECK(next->label == "NEXT CARD (1 of 5)");
+  CHECK(next->label == "NEXT CARD (1 of 6)");
 
   // The last card has nowhere further to go, and a nonsense index is clamped.
-  const ship::TitleModel last = ship::BuildTitleScreen(sim, false, panel, "", 1, "", 4);
-  CHECK(last.tutorialCard == 4);
-  CHECK(last.cardTitle == cards[4].title);
+  const ship::TitleModel last = ship::BuildTitleScreen(sim, false, panel, "", 1, "", 5);
+  CHECK(last.tutorialCard == 5);
+  CHECK(last.cardTitle == cards[5].title);
   for (const ship::ActionRowView& row : last.panelRows) {
     if (row.id == "card:next") { CHECK_FALSE(row.enabled); }
   }
   const ship::TitleModel clamped = ship::BuildTitleScreen(sim, false, panel, "", 1, "", 99);
-  CHECK(clamped.tutorialCard == 4);
+  CHECK(clamped.tutorialCard == 5);
 
   // Paging is free and the cards never touch the voyage.
   const double actions = sim.ActionCount();

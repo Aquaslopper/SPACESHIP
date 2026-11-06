@@ -21,6 +21,8 @@ std::vector<ship::Area> scissors;
 float cameraY = 0;
 int drawOrder = 0;
 int textureCalls = 0;
+struct TextureCall { unsigned id; Rectangle dest; Color tint; };
+std::vector<TextureCall> textureDraws;
 void Require(bool ok, const char* message) {
   if (!ok) { throw std::runtime_error(message); }
 }
@@ -30,9 +32,20 @@ const TextCall& FindText(const std::string& value) {
   return *it;
 }
 void Frame(ship::ShellView& view, ship::Simulation& sim, double nowMs = 0) {
-  texts.clear(); rects.clear(); scissors.clear(); textureCalls = 0; drawOrder = 0;
+  texts.clear(); rects.clear(); scissors.clear(); textureDraws.clear(); textureCalls = 0; drawOrder = 0;
+  // ImGui 1.92 builds glyphs lazily at each new text size. This recording
+  // backend has no renderer to upload the rebuilt atlas automatically.
+  unsigned char* pixels; int w, h;
+  ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &w, &h);
   ImGui::NewFrame(); view.Draw(sim, nowMs); ImGui::Render();
-  for (const auto& text : texts) { Require(text.size >= 18, "Native text fell below 18px"); }
+  for (const auto& text : texts) {
+    if (text.size >= 18) continue;
+    const bool infoText = sim.State().activeTab == "home" && !text.text.empty() &&
+        std::any_of(sim.Infos().begin(), sim.Infos().end(), [&](const auto& info) {
+          return info.label.find(text.text) != std::string::npos || info.value.find(text.text) != std::string::npos;
+        });
+    Require(infoText && text.size >= 12, "Non-info native text fell below 18px");
+  }
 }
 void RequireMark(float x, float y) {
   Require(std::any_of(rects.begin(), rects.end(), [&](const auto& r) {
@@ -57,7 +70,7 @@ void RequireCenteredButtons(const ship::ShellView& view, const RectCall& band) {
   const auto p = view.CurrentTheme().palette;
   std::vector<RectCall> buttons;
   for (const auto& r : rects) {
-    if (r.y < band.y || r.y + r.h > band.y + band.h || r.w < 150 || r.h < 30) continue;
+    if (r.order <= band.order || r.y < band.y || r.y + r.h > band.y + band.h || r.w < 150 || r.h < 30) continue;
     const bool enabled = r.color.r == p.control.r && r.color.g == p.control.g && r.color.b == p.control.b;
     const bool disabled = r.color.r == p.panel3.r && r.color.g == p.panel3.g && r.color.b == p.panel3.b;
     if (enabled || disabled) buttons.push_back(r);
@@ -107,7 +120,7 @@ void DrawCircleLines(int, int, float, Color) {}
 void DrawLine(int, int, int, int, Color) {}
 void DrawLineEx(Vector2, Vector2, float, Color) {}
 void DrawRing(Vector2, float, float, float, float, int, Color) {}
-void DrawTexturePro(Texture2D, Rectangle, Rectangle, Vector2, float, Color) { ++textureCalls; }
+void DrawTexturePro(Texture2D texture, Rectangle, Rectangle dest, Vector2, float, Color color) { ++textureCalls; textureDraws.push_back({texture.id, dest, color}); }
 
 int main() {
   try {
@@ -123,6 +136,94 @@ int main() {
     auto sim = ship::Simulation::NewVoyage(ship::Catalog::LoadFromAssets("assets"));
     ship::ShellView view;
     view.Configure(1280, 720, ship::Theme::ById("classic"));
+    // Chart controls use their painted bounds for all reading-size steps, and
+    // topmost controls take priority over map bodies behind them.
+    for (int step : {0, 3}) {
+      auto nav = ship::Simulation::NewVoyage(sim.World());
+      nav.MutableState().options.fontStep = step;
+      ship::ShellView mapView; mapView.Configure(1280, 720, ship::Theme::ById("classic"));
+      ship::OpenTask(nav, "nav", "main", true);
+      Frame(mapView, nav);
+      const auto minus = FindText("-");
+      const auto system = FindText("SYSTEM");
+      auto containing = [](const TextCall& t) {
+        auto it = std::find_if(rects.rbegin(), rects.rend(), [&](const RectCall& r) {
+          return r.order < t.order && t.x >= r.x && t.x < r.x + r.w &&
+                 t.y >= r.y && t.y + t.size <= r.y + r.h + 1;
+        });
+        Require(it != rects.rend(), "No control rectangle for map label");
+        return *it;
+      };
+      const auto minusBox = containing(minus);
+      const auto systemBox = containing(system);
+      Require(minusBox.y + minusBox.h < systemBox.y, "Map zoom and layer controls overlap");
+      const double zoom = nav.Map().zoom;
+      mapView.Click(nav, minusBox.x + minusBox.w / 2, minusBox.y + minusBox.h / 2, ship::HitButton::Left, 0);
+      Require(nav.Map().zoom < zoom, "Zoom-out hit missed its painted control");
+      Frame(mapView, nav);
+      const auto sector = FindText("SECTOR");
+      mapView.Click(nav, sector.x + 2, sector.y + 2, ship::HitButton::Left, 0);
+      Require(nav.Map().layer == "sector", "Map layer hit missed its painted control");
+    }
+
+    // Free handbook selection and reveal do not produce action feedback; the
+    // selected article stays in view as the index scrolls and its controls
+    // remain clickable at the translated position.
+    {
+      auto world = ship::Catalog::LoadFromAssets("assets");
+      world.wiki.clear();
+      world.wiki.push_back({"first", "GUIDE", "First entry", "A short handbook article.", "", "", false});
+      world.wiki.push_back({"spoiler", "GUIDE", "Test spoiler", "The hidden article.", "", "", true});
+      for (int i = 0; i < 35; ++i)
+        world.wiki.push_back({"entry" + std::to_string(i), "GUIDE", "Extra entry " + std::to_string(i), "More text.", "", "", false});
+      auto handbook = ship::Simulation::NewVoyage(world);
+      ship::ShellView reader; reader.Configure(1280, 720, ship::Theme::ById("classic"));
+      ship::OpenTask(handbook, "wiki", "main", true);
+      Frame(reader, handbook);
+      const auto pick = FindText("Test spoiler");
+      reader.Click(handbook, pick.x + 2, pick.y + 2, ship::HitButton::Left, 0);
+      Frame(reader, handbook);
+      FindText("Reveal the spoiler entry");
+      Require(std::none_of(rects.begin(), rects.end(), [](const RectCall& r) {
+        return r.color.r == 126 && r.color.g == 198 && r.color.b == 63 && r.w == 11 && r.h == 2;
+      }), "Free wiki selection displayed a positive action mark");
+      const auto content = reader.LayoutNow().content;
+      reader.Scroll(content.Right() - 10, content.y + 50, -20);
+      Frame(reader, handbook);
+      const auto pinned = FindText("Test spoiler");
+      // Index and article both contain the title; find the right-hand one.
+      const auto articleTitle = std::find_if(texts.begin(), texts.end(), [&](const TextCall& t) {
+        return t.text == "Test spoiler" && t.x > content.x + content.w / 2 && t.y >= content.y && t.y < content.Bottom();
+      });
+      (void)pinned;
+      Require(articleTitle != texts.end(), "Wiki article did not follow the index scroll");
+      const auto reveal = FindText("Reveal the spoiler entry");
+      Require(reveal.y >= content.y && reveal.y < content.Bottom(), "Sticky wiki control is not visible");
+      reader.Click(handbook, reveal.x + 2, reveal.y + 2, ship::HitButton::Left, 0);
+      Frame(reader, handbook);
+      FindText("The hidden article.");
+      Require(handbook.ActionCount() == 0, "Free wiki navigation spent an action");
+      Require(std::none_of(rects.begin(), rects.end(), [](const RectCall& r) {
+        return r.color.r == 126 && r.color.g == 198 && r.color.b == 63 && r.w == 11 && r.h == 2;
+      }), "Free wiki reveal displayed a positive action mark");
+
+      // A tall article scrolls through its bottom before the sticky position is
+      // reached, rather than trapping the end below the viewport.
+      world.wiki[0].text.clear();
+      for (int i = 0; i < 300; ++i) world.wiki[0].text += "Long article text continues. ";
+      world.wiki[0].text += "END-OF-ARTICLE";
+      auto longHandbook = ship::Simulation::NewVoyage(world);
+      ship::ShellView longReader; longReader.Configure(1280, 720, ship::Theme::ById("classic"));
+      ship::OpenTask(longHandbook, "wiki", "main", true);
+      Frame(longReader, longHandbook);
+      longReader.Scroll(content.Right() - 10, content.y + 50, -1000);
+      Frame(longReader, longHandbook);
+      const auto end = std::find_if(texts.begin(), texts.end(), [](const TextCall& t) {
+        return t.text.find("END-OF-ARTICLE") != std::string::npos;
+      });
+      Require(end != texts.end() && end->y >= content.y && end->y + end->size < content.Bottom(),
+              "Long wiki article bottom is unreachable");
+    }
     Require(sim.StageJob("bo", "maintenance"), "Could not stage source crew job");
     Require(sim.ToggleOrder("rell", "doc"), "Could not stage source order");
     ship::OpenTask(sim, "room", "quarters", true);
@@ -196,6 +297,15 @@ int main() {
     sim.MutableState().shiplets = 10000;
     ship::OpenTask(sim, "station", "tolme", true);
     Frame(view, sim);
+    const auto salesHeading = FindText("Sell cargo and survey data");
+    const auto boardHeading = FindText("Mission board");
+    const auto yardHeading = FindText("Shipyard and crew");
+    const auto tavernHeading = FindText("Tavern and departure");
+    Require(std::abs(salesHeading.x - boardHeading.x) < 1 && boardHeading.y > salesHeading.y,
+            "Mission board is not stacked beneath sales in the middle column");
+    Require(std::abs(yardHeading.x - tavernHeading.x) < 1 && tavernHeading.y > yardHeading.y,
+            "Tavern is not stacked beneath the shipyard in the right column");
+    Require(yardHeading.x > boardHeading.x, "Station columns have the wrong order");
     const auto fuel = std::find_if(texts.begin(), texts.end(), [](const auto& t) {
       return t.text.find("Fuel cell") == 0;
     });
@@ -375,7 +485,7 @@ int main() {
       check.MutableState().docked = true;
       check.MutableMap().here = "tolme";
       check.MutableState().shiplets = 10000;
-      check.MutableState().options.confirmRisk = true;
+      check.MutableState().options.confirmRisk = false; // Ship purchase always confirms in the HTA.
       ship::ShellView shell;
       shell.Configure(1180, 720, ship::Theme::ById("classic"));
       ship::OpenTask(check, "station", "tolme", true);
@@ -429,6 +539,109 @@ int main() {
         return r.w == 11 && r.h == 2 && r.color.r == 126 && r.color.a > 0 && r.color.a < 255 && r.y < y - 1;
       }), "Positive click mark did not rise and fade");
       shell.ClosePopup();
+    }
+
+    // Both the crew record and quarters expose the same priced conversation;
+    // the real click path must tick once, raise morale, and respect the lock.
+    {
+      auto talkSim = ship::Simulation::NewVoyage(ship::Catalog::LoadFromAssets("assets"));
+      talkSim.FindCrew("suri")->morale = 40;
+      ship::ShellView conversation;
+      conversation.Configure(1280, 1600, ship::Theme::ById("classic"));
+      io.DisplaySize = ImVec2(1280, 1600);
+      ship::OpenTask(talkSim, "crew", "suri", true);
+      Frame(conversation, talkSim);
+      const auto button = FindText("Talk to Suri - 1 action, up to +5 morale");
+      const double before = talkSim.ActionCount();
+      conversation.Click(talkSim, button.x + 2, button.y + 2, ship::HitButton::Left, 0);
+      Require(talkSim.ActionCount() == before + 1 && talkSim.FindCrew("suri")->morale == 45,
+              "Crew record conversation did not spend one action and improve morale");
+      Frame(conversation, talkSim);
+      const auto locked = FindText("Talk to Suri - 1 action, up to +5 morale - COOLDOWN 5");
+      conversation.Click(talkSim, locked.x + 2, locked.y + 2, ship::HitButton::Left, 0);
+      Require(talkSim.ActionCount() == before + 1, "Locked crew record conversation was clickable");
+      ship::OpenTask(talkSim, "room", "quarters", true);
+      ship::PressQuartersAction(talkSim, "select", "suri");
+      Frame(conversation, talkSim);
+      const auto it = std::find_if(texts.begin(), texts.end(), [](const auto& text) {
+        return text.text.find("Talk to Suri") == 0;
+      });
+      Require(it != texts.end(), "Quarters conversation label did not paint");
+      Require(std::any_of(texts.begin(), texts.end(), [](const auto& text) {
+        return text.text.find("COOLDOWN 5") != std::string::npos;
+      }), "Quarters did not show the conversation cooldown");
+      const auto quarterLocked = *it;
+      conversation.Click(talkSim, quarterLocked.x + 2, quarterLocked.y + 2, ship::HitButton::Left, 0);
+      Require(talkSim.ActionCount() == before + 1, "Quarters bypassed the crew record conversation lock");
+    }
+    {
+      auto talkSim = ship::Simulation::NewVoyage(ship::Catalog::LoadFromAssets("assets"));
+      talkSim.FindCrew("suri")->morale = 40;
+      ship::ShellView conversation;
+      conversation.Configure(1280, 1600, ship::Theme::ById("classic"));
+      io.DisplaySize = ImVec2(1280, 1600);
+      ship::OpenTask(talkSim, "room", "quarters", true);
+      ship::PressQuartersAction(talkSim, "select", "suri");
+      Frame(conversation, talkSim);
+      const auto button = FindText("Talk to Suri - 1 action, up to +5 morale");
+      conversation.Click(talkSim, button.x + 2, button.y + 2, ship::HitButton::Left, 0);
+      Require(talkSim.ActionCount() == 1 && talkSim.FindCrew("suri")->morale == 45,
+              "Quarters conversation did not spend one action and improve morale");
+    }
+
+    // The Home painter must fill the pale warm CSS panels, not leave them on
+    // the white content background. Compact information text still scales and
+    // measured wraps must stay within their cards and above the feed.
+    for (const std::string themeId : {"classic", "void"}) {
+      for (int step : {0, 3}) {
+        auto audit = ship::Simulation::NewVoyage(ship::Catalog::LoadFromAssets("assets"));
+        auto& infos = const_cast<std::vector<ship::InfoRow>&>(audit.Infos());
+        infos.front().value = "A particularly long location name that must wrap inside this information card";
+        ship::Theme theme = ship::Theme::ById(themeId);
+        theme.fontStep = step;
+        ship::ShellView home;
+        home.Configure(1280, 1600, theme);
+        io.DisplaySize = ImVec2(1280, 1600);
+        Frame(home, audit);
+        ship::FxRng rng;
+        auto model = ship::BuildIdleScreen(audit, home.LayoutNow(), theme, false, rng);
+        const auto panel = theme.palette.panel;
+        auto filledAt = [&](float x, float y) -> const RectCall& {
+          const auto found = std::find_if(rects.begin(), rects.end(), [&](const auto& r) {
+            return std::abs(r.x - int(x)) < 1 && std::abs(r.y - int(y)) < 1 &&
+                   r.color.r == panel.r && r.color.g == panel.g && r.color.b == panel.b;
+          });
+          Require(found != rects.end(), "Home panel is missing its warm surface fill");
+          return *found;
+        };
+        filledAt(model.stats.front().box.x, model.stats.front().box.y);
+        filledAt(model.nav.box.x, model.nav.box.y);
+        for (const auto& info : model.infos) {
+          const auto& background = filledAt(info.box.x, info.box.y);
+          Require(background.h > model.infos.front().box.h, "Long info did not grow the rail");
+          const auto& label = FindText(info.label);
+          Require(label.size == theme.HomeInfoLabelPx(), "Info label ignored its compact font size");
+          Require(label.y >= background.y && label.y + label.size <= background.y + background.h,
+                  "Info label escaped its background");
+        }
+        const auto& firstPanel = filledAt(model.infos.front().box.x, model.infos.front().box.y);
+        int valueLines = 0;
+        for (const auto& line : texts) {
+          if (line.size != theme.HomeInfoValuePx() || line.text.empty() ||
+              infos.front().value.find(line.text) == std::string::npos ||
+              line.x < firstPanel.x || line.x >= firstPanel.x + firstPanel.w) continue;
+          ++valueLines;
+          Require(line.y >= firstPanel.y && line.y + line.size <= firstPanel.y + firstPanel.h,
+                  "Wrapped info escaped its background");
+          Require(line.x + MeasureTextEx({}, line.text.c_str(), line.size, 1).x <= firstPanel.x + firstPanel.w,
+                  "Wrapped info crossed into another card");
+        }
+        Require(valueLines > 1, "Long info value was not wrapped at the compact value size");
+        const auto& feedHead = FindText("Activity Feed");
+        Require(feedHead.y >= firstPanel.y + firstPanel.h, "Feed overlaps the expanded info rail");
+        Require(filledAt(model.feedBox.x, feedHead.y + feedHead.size + 2).w > 0,
+                "Feed has no warm background");
+      }
     }
 
     // Exercise the real pointer paths and animation, not only their models.
@@ -583,14 +796,63 @@ int main() {
       }), "Title renderer ignored the source dark-theme menu background");
     }
     view.SetTheme(ship::Theme::ById("classic"));
-    Frame(view, sim);
+    // HOW TO PLAY opens the six supplied cards, not the old text sheet.
+    std::array<Texture2D, 6> cards{};
+    for (std::size_t i = 0; i < cards.size(); ++i) {
+      cards[i].id = static_cast<unsigned>(20 + i); cards[i].width = 755; cards[i].height = 340;
+      view.SetTutorialTexture(i, &cards[i]);
+    }
+    Frame(view, sim, 1000);
+    const auto guideButton = FindText("HOW TO PLAY");
+    const auto actionsBeforeGuide = sim.ActionCount();
+    view.Click(sim, guideButton.x + 2, guideButton.y + 2, ship::HitButton::Left, 1000);
+    Frame(view, sim, 1100);
+    Require(view.Panel() == ship::TitlePanel::Guide && textureCalls == 1 && textureDraws[0].id == 20,
+            "How to Play did not open the first illustrated card");
+    Require(textureDraws[0].tint.a > 0 && textureDraws[0].tint.a < 255,
+            "Tutorial did not animate its entrance");
+    FindText("HOW TO PLAY   1 / 6");
+    for (int i = 1; i < 6; ++i) {
+      const auto next = FindText("NEXT");
+      const double now = 1100 + i * 500;
+      view.Click(sim, next.x + 2, next.y + 2, ship::HitButton::Left, now);
+      Frame(view, sim, now + 400);
+      Require(textureCalls == 1 && textureDraws[0].id == static_cast<unsigned>(20 + i),
+              "Next card did not show the expected illustration");
+    }
+    FindText("HOW TO PLAY   6 / 6");
+    const auto endNext = FindText("NEXT");
+    view.Click(sim, endNext.x + 2, endNext.y + 2, ship::HitButton::Left, 5000);
+    Frame(view, sim, 5000);
+    Require(textureDraws[0].id == 25, "Next wrapped past the last card");
+    view.PageTutorial(-1, 5100);
+    Frame(view, sim, 5500);
+    Require(textureDraws[0].id == 24, "Keyboard paging did not move back");
+    view.Escape(sim);
+    Frame(view, sim, 5600);
+    Require(view.Panel() == ship::TitlePanel::None && textureDraws[0].id == 1,
+            "Escape did not return to the main menu");
+    sim.MutableState().reducedMotion = true;
+    const auto guideAgain = FindText("HOW TO PLAY");
+    view.Click(sim, guideAgain.x + 2, guideAgain.y + 2, ship::HitButton::Left, 5700);
+    Frame(view, sim, 5700);
+    Require(textureDraws[0].id == 20 && textureDraws[0].tint.a == 255,
+            "Reduced motion did not skip the tutorial animation");
+    view.SetTutorialTexture(0, nullptr);
+    Frame(view, sim, 5800);
+    Require(textureCalls == 0, "Missing tutorial art unexpectedly drew a texture");
+    FindText("Illustration unavailable");
+    Require(sim.ActionCount() == actionsBeforeGuide, "Tutorial browsing advanced the voyage");
+    view.Escape(sim);
+    sim.MutableState().reducedMotion = false;
+    Frame(view, sim, 5900);
     const auto options = FindText("OPTIONS");
     view.Click(sim, options.x + 2, options.y + 2, ship::HitButton::Left, 0);
     Frame(view, sim);
     Require(view.Panel() == ship::TitlePanel::Settings && textureCalls == 1,
             "Options replaced the title image instead of opening a sheet over it");
     ImGui::DestroyContext();
-    std::cout << "PASS: real Draw.cpp scroll direction, windowed Assignments, Vessel input/clamp, green action/air fills, visible station cooldown, source health colours/live values, literal engine pipe, screen-space green click mark/glow after scrolling, pinned/centered measured action bands at 1180/1280, independent feed wheel/drag/wrap/clamp plus timestamp/reset, centered fixed machine/crew scenes with panel reflow, measured chart height and wide centering, preserved purchase confirmation, free-click feedback/rise/fade, four dark title menus, title art retained behind Options; source crew relocation/corridor drift, life-info routing, crew/event GONE rendering, map-label and moving-ring selection, active-tab glow/reduced-motion, new/existing background-tab reveal; all text >=18px\n";
+    std::cout << "PASS: real Draw.cpp scroll direction, windowed Assignments, Vessel input/clamp, green action/air fills, visible station cooldown, source health colours/live values, literal engine pipe, screen-space green click mark/glow after scrolling, pinned/centered measured action bands at 1180/1280, independent feed wheel/drag/wrap/clamp plus timestamp/reset, centered fixed machine/crew scenes with panel reflow, measured chart height and wide centering, preserved purchase confirmation, free-click feedback/rise/fade, four dark title menus, title art retained behind Options; source crew relocation/corridor drift, life-info routing, crew/event GONE rendering, map-label and moving-ring selection, active-tab glow/reduced-motion, new/existing background-tab reveal; general text >=18px; compact scaled Home info\n";
     return 0;
   } catch (const std::exception& error) {
     std::cerr << "draw probe: " << error.what() << '\n'; return 1;

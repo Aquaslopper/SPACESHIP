@@ -8,6 +8,8 @@
 // ============================================================================
 #pragma once
 
+#include <array>
+
 #include <string>
 #include <utility>
 #include <vector>
@@ -51,6 +53,11 @@ class ShellView {
     monoFont_ = mono;
   }
   void SetTitleTexture(void* texture) { titleArt_ = texture; }
+  void SetDisplayAdjustmentAvailable(bool available) { displayAdjustmentAvailable_ = available; }
+  void SetTutorialTexture(std::size_t index, void* texture) {
+    if (index < tutorialArt_.size()) { tutorialArt_[index] = texture; }
+  }
+  void PageTutorial(int direction, double nowMs);
   void SetOthersHeight(float others) { others_ = others; }
 
   void Draw(Simulation& sim, double nowMs);
@@ -131,7 +138,8 @@ class ShellView {
   void PaintPanelsScreen(Simulation& sim);
   void PaintPopup(Simulation& sim);
   void PaintHero(const Vignette& vignette, const Area& box);
-  void PaintTitle(Simulation& sim);
+  void PaintTitle(Simulation& sim, double nowMs);
+  void PaintTutorial(const Simulation& sim, double nowMs);
   void PaintSettingsControls(Simulation& sim, const PopupModel& model);
   void PaintLoss(Simulation& sim);
   void PaintWikiSearch(const Area& box);
@@ -249,6 +257,10 @@ class ShellView {
   TitleModel title_;
   std::vector<NavHit> titleHits_;
   void* titleArt_ = nullptr;
+  bool displayAdjustmentAvailable_ = true;
+  std::array<void*, 6> tutorialArt_{};
+  double tutorialTransitionMs_ = 0.0;
+  int tutorialDirection_ = 1;
 
   WikiView wiki_;
   char wikiQuery_[96] = {};

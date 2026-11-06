@@ -340,8 +340,8 @@ bool Simulation::HireCrew(const std::string& candidateId) {
   state_.hired[candidateId] = true;
   crew_.push_back(MakeCrew(candidate->crew));
   const std::string name = candidate->crew.name;
-  PerformAction(name + " joined the crew");
   SimRemember("Arrival", name + " joined the crew at " + HerePort()->name + ".", candidateId);
+  PerformAction(name + " joined the crew");
   return true;
 }
 

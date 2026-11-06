@@ -36,10 +36,10 @@ struct Metrics {
   static constexpr float kHomeW = 48.0f;        // Home's own slot inside it
   static constexpr float kSideTop = 36.0f;      // #sidepanel top
   static constexpr float kSideW = 165.0f;       // #sidepanel width
-  static constexpr float kSideBottom = 119.0f;  // #sidepanel bottom gap
+  static constexpr float kSideBottom = 97.0f;   // leave room for the pinned foot
   static constexpr float kFootH = 96.0f;        // #sidefoot height
-  static constexpr float kFootBottom = 23.0f;   // #sidefoot bottom offset
-  static constexpr float kStatusH = 22.0f;      // #statusbar height
+  static constexpr float kFootBottom = 1.0f;    // no bottom status bar
+  static constexpr float kStatusH = 0.0f;       // status bar removed by request
   static constexpr float kContentTop = 36.0f;
   static constexpr float kContentLeft = 166.0f;
   static constexpr float kFeedMin = 62.0f;      // FEED.min
