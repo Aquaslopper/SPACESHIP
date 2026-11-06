@@ -35,6 +35,16 @@
 - **Do not hide differences.** Do not silently omit content, truncate values, inert a
    control, change a cost, or shrink text to avoid overflow.
   
--**The native game is self-contained.** The C++ port works fully on its own.
+- **The native game is self-contained.** The C++ port works fully on its own.
+
+## Agent Comprehension Check (Q&A)
+
+**CRITICAL INSTRUCTION:** 
+At the beginning of a new session, after reading `AGENTS.md`, you must answer the following questions. 
+Do not write any code or perform any tasks until you have output the answers:
+
+1. Is it allowed to edit the spaceship.hta file?
+2. What happens when you assume the code without verification?
+3. Who is the owner of this game?
 
 
