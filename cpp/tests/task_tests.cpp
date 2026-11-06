@@ -29,7 +29,7 @@ ship::Catalog& World() {
   return catalog;
 }
 
-ship::Simulation Fresh() { return ship::Simulation::NewVoyage(World()); }
+ship::Simulation Fresh() { return ship::Simulation::ReferenceVoyage(World()); }
 
 const ship::NavPanel* Panel(const std::vector<ship::NavPanel>& panels,
                             const std::string& id) {
@@ -670,7 +670,7 @@ TEST_CASE("scan work uses catalogue cost and HTA sensor bonus rather than travel
   auto catalog = World();
   catalog.rules.scanCost = 9;
   for (const auto& target : {"halvan", "tolme"}) {
-    auto sim = ship::Simulation::NewVoyage(catalog);
+    auto sim = ship::Simulation::ReferenceVoyage(catalog);
     sim.MutableState().navTarget = target;
     sim.MutableState().sim.sensor = 1;
     REQUIRE(sim.StartScan());

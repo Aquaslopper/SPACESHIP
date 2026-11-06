@@ -24,7 +24,7 @@ ship::Catalog& World() {
   return catalog;
 }
 
-ship::Simulation Fresh() { return ship::Simulation::NewVoyage(World()); }
+ship::Simulation Fresh() { return ship::Simulation::ReferenceVoyage(World()); }
 
 // Put the ship at a port and open the station, which is what arrival does.
 void BerthAt(ship::Simulation& sim, const std::string& bodyId) {

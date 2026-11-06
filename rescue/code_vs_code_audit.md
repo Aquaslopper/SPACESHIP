@@ -2,7 +2,7 @@
 
 ## Authority and acceptance
 
-Read `traps_paid_for/Developer Note` and `REPAIR_AND_RESCUE.md` before this pass. Inherited comments, phase-completion claims and test counts are not specifications.
+Read `rescue/Developer Note` and `REPAIR_AND_RESCUE.md` before this pass. Inherited comments, phase-completion claims and test counts are not specifications.
 
 References: original `Spaceship.hta`, the supplied runtime montage `10_reference_HTA_version_truebuild.png`, and supplied concept images `spaceship01.png` through `spaceship05.png` and `spaceshipi06.png`. The pictures establish the action economy, idle/free observation, indicators, crew and parchment visual language. Do not replace executable source behavior with literal incidental example values in the concept illustrations.
 

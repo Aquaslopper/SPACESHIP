@@ -135,13 +135,13 @@ int main() {
     io.Fonts->AddFontDefault(&config);
     unsigned char* pixels; int w, h;
     io.Fonts->GetTexDataAsRGBA32(&pixels, &w, &h);
-    auto sim = ship::Simulation::NewVoyage(ship::Catalog::LoadFromAssets("assets"));
+    auto sim = ship::Simulation::ReferenceVoyage(ship::Catalog::LoadFromAssets("assets"));
     ship::ShellView view;
     view.Configure(1280, 720, ship::Theme::ById("classic"));
     // Chart controls use their painted bounds for all reading-size steps, and
     // topmost controls take priority over map bodies behind them.
     for (int step : {0, 3}) {
-      auto nav = ship::Simulation::NewVoyage(sim.World());
+      auto nav = ship::Simulation::ReferenceVoyage(sim.World());
       nav.MutableState().options.fontStep = step;
       ship::ShellView mapView; mapView.Configure(1280, 720, ship::Theme::ById("classic"));
       ship::OpenTask(nav, "nav", "main", true);
@@ -178,7 +178,7 @@ int main() {
       world.wiki.push_back({"spoiler", "GUIDE", "Test spoiler", "The hidden article.", "", "", true});
       for (int i = 0; i < 35; ++i)
         world.wiki.push_back({"entry" + std::to_string(i), "GUIDE", "Extra entry " + std::to_string(i), "More text.", "", "", false});
-      auto handbook = ship::Simulation::NewVoyage(world);
+      auto handbook = ship::Simulation::ReferenceVoyage(world);
       ship::ShellView reader; reader.Configure(1280, 720, ship::Theme::ById("classic"));
       ship::OpenTask(handbook, "wiki", "main", true);
       Frame(reader, handbook);
@@ -214,7 +214,7 @@ int main() {
       world.wiki[0].text.clear();
       for (int i = 0; i < 300; ++i) world.wiki[0].text += "Long article text continues. ";
       world.wiki[0].text += "END-OF-ARTICLE";
-      auto longHandbook = ship::Simulation::NewVoyage(world);
+      auto longHandbook = ship::Simulation::ReferenceVoyage(world);
       ship::ShellView longReader; longReader.Configure(1280, 720, ship::Theme::ById("classic"));
       ship::OpenTask(longHandbook, "wiki", "main", true);
       Frame(longReader, longHandbook);
@@ -231,7 +231,16 @@ int main() {
     // a lock; the original deck still exposes its actual crew indicators.
     {
       Texture2D concept{77, 1340, 420, 1, 7};
-      auto artShip = ship::Simulation::NewVoyage(sim.World());
+      auto starter = ship::Simulation::NewVoyage(sim.World());
+      ship::ShellView starterView;
+      io.DisplaySize = ImVec2(1280, 1200);
+      starterView.Configure(1280, 1200, ship::Theme::ById("classic"));
+      starterView.SetWrenExteriorTexture(&concept);
+      Frame(starterView, starter);
+      Require(std::none_of(textureDraws.begin(), textureDraws.end(), [](const TextureCall& t) { return t.id == 77; }),
+              "Endgame exterior was shown on the starter ship");
+      Require(starter.Rooms().size() == 6, "Starter has nonstandard rooms");
+      auto artShip = ship::Simulation::ReferenceVoyage(sim.World());
       Require(ship::PressNavAction(artShip, "stand-watch"), "Could not start clock guard fixture");
       const auto lockKey = ship::ActionCooldownKey(artShip, "command:stand-watch-advance-ongoing-work:0");
       const auto lock = ship::CooldownRemaining(artShip, lockKey);
@@ -303,7 +312,7 @@ int main() {
               "Wren concept was incorrectly used as the Kestrel hull");
 
       // On a short narrow window, a callout remains reachable after scrolling.
-      auto narrowShip = ship::Simulation::NewVoyage(sim.World());
+      auto narrowShip = ship::Simulation::ReferenceVoyage(sim.World());
       ship::ShellView narrow; io.DisplaySize = ImVec2(900, 500);
       ship::Theme large = ship::Theme::ById("classic"); large.fontStep = 3;
       narrow.Configure(900, 500, large); narrow.SetWrenExteriorTexture(&concept);
@@ -370,7 +379,7 @@ int main() {
     Frame(view, sim);
     view.Scroll(side.x + 30, side.y + 100, -100);
     Frame(view, sim);
-    sim = ship::Simulation::NewVoyage(sim.World());
+    sim = ship::Simulation::ReferenceVoyage(sim.World());
     Frame(view, sim);
     view.Click(sim, vessel->box.x + 5, vessel->box.y + 5, ship::HitButton::Left, 0);
     Require(sim.State().spOpen.at("vessel"), "Stale sidebar scroll hid Vessel after a new voyage");
@@ -446,7 +455,7 @@ int main() {
     // Bottom anchoring, measured wrapping, centered rows/labels, and free body scrolling.
     for (const int windowWidth : {1180, 1280}) {
       for (const auto& target : std::vector<std::pair<std::string, std::string>>{{"nav", "main"}, {"room", "engine"}, {"room", "o2"}}) {
-        auto check = ship::Simulation::NewVoyage(sim.World());
+        auto check = ship::Simulation::ReferenceVoyage(sim.World());
         ship::ShellView shell;
         shell.Configure(windowWidth, 720, ship::Theme::ById("classic"));
         ship::OpenTask(check, target.first, target.second, true);
@@ -468,7 +477,7 @@ int main() {
     for (const int width : {1180, 1280, 2200}) {
       for (const auto& target : std::vector<std::pair<std::string, ship::Area>>{
           {"engine", {0, 0, 650, 390}}, {"o2", {0, 0, 600, 360}}, {"mess", {0, 0, 600, 360}}}) {
-        auto check = ship::Simulation::NewVoyage(sim.World());
+        auto check = ship::Simulation::ReferenceVoyage(sim.World());
         ship::ShellView shell;
         shell.Configure(width, 720, ship::Theme::ById("classic"));
         ship::OpenTask(check, "room", target.first, true);
@@ -489,7 +498,7 @@ int main() {
       }
     }
     for (const int width : {1180, 1280, 2200}) {
-      auto check = ship::Simulation::NewVoyage(sim.World());
+      auto check = ship::Simulation::ReferenceVoyage(sim.World());
       ship::ShellView shell;
       shell.Configure(width, 720, ship::Theme::ById("classic"));
       ship::OpenTask(check, "room", "quarters", true);
@@ -506,7 +515,7 @@ int main() {
       float shortMapH = 0;
       for (const bool longScan : {false, true}) {
         if (longScan) for (auto& body : catalog.bodies) if (body.id == "kessler") body.scan.assign(60, "Measured scan row");
-        auto check = ship::Simulation::NewVoyage(catalog);
+        auto check = ship::Simulation::ReferenceVoyage(catalog);
         check.MutableState().navTarget = "kessler";
         check.MutableState().scanned["kessler"] = true;
         ship::ShellView shell;
@@ -526,7 +535,7 @@ int main() {
 
     // The feed owns its wheel/drag offset; the surrounding Home column must not move.
     {
-      auto check = ship::Simulation::NewVoyage(sim.World());
+      auto check = ship::Simulation::ReferenceVoyage(sim.World());
       check.MutableState().feed.clear();
       for (int i = 0; i < 120; ++i) check.MutableState().feed.push_back({"", "Feed-probe-" + std::to_string(i)});
       ship::ShellView shell;
@@ -579,7 +588,7 @@ int main() {
 
     // Confirmation is still required, cancel is free, and accepting dispatches the original purchase.
     {
-      auto check = ship::Simulation::NewVoyage(sim.World());
+      auto check = ship::Simulation::ReferenceVoyage(sim.World());
       check.MutableState().docked = true;
       check.MutableMap().here = "tolme";
       check.MutableState().shiplets = 10000;
@@ -619,7 +628,7 @@ int main() {
 
     // A positive FREE room click also gets feedback: it is not limited to spent actions.
     {
-      auto check = ship::Simulation::NewVoyage(sim.World());
+      auto check = ship::Simulation::ReferenceVoyage(sim.World());
       ship::ShellView shell;
       shell.Configure(1180, 720, ship::Theme::ById("classic"));
       Frame(shell, check);
@@ -642,7 +651,7 @@ int main() {
     // Both the crew record and quarters expose the same priced conversation;
     // the real click path must tick once, raise morale, and respect the lock.
     {
-      auto talkSim = ship::Simulation::NewVoyage(ship::Catalog::LoadFromAssets("assets"));
+      auto talkSim = ship::Simulation::ReferenceVoyage(ship::Catalog::LoadFromAssets("assets"));
       talkSim.FindCrew("suri")->morale = 40;
       ship::ShellView conversation;
       conversation.Configure(1280, 1600, ship::Theme::ById("classic"));
@@ -673,7 +682,7 @@ int main() {
       Require(talkSim.ActionCount() == before + 1, "Quarters bypassed the crew record conversation lock");
     }
     {
-      auto talkSim = ship::Simulation::NewVoyage(ship::Catalog::LoadFromAssets("assets"));
+      auto talkSim = ship::Simulation::ReferenceVoyage(ship::Catalog::LoadFromAssets("assets"));
       talkSim.FindCrew("suri")->morale = 40;
       ship::ShellView conversation;
       conversation.Configure(1280, 1600, ship::Theme::ById("classic"));
@@ -692,7 +701,7 @@ int main() {
     // measured wraps must stay within their cards and above the feed.
     for (const std::string themeId : {"classic", "void"}) {
       for (int step : {0, 3}) {
-        auto audit = ship::Simulation::NewVoyage(ship::Catalog::LoadFromAssets("assets"));
+        auto audit = ship::Simulation::ReferenceVoyage(ship::Catalog::LoadFromAssets("assets"));
         auto& infos = const_cast<std::vector<ship::InfoRow>&>(audit.Infos());
         infos.front().value = "A particularly long location name that must wrap inside this information card";
         ship::Theme theme = ship::Theme::ById(themeId);
@@ -744,7 +753,7 @@ int main() {
 
     // Exercise the real pointer paths and animation, not only their models.
     {
-      auto audit = ship::Simulation::NewVoyage(ship::Catalog::LoadFromAssets("assets"));
+      auto audit = ship::Simulation::ReferenceVoyage(ship::Catalog::LoadFromAssets("assets"));
       ship::ShellView cockpit;
       io.DisplaySize = ImVec2(1280, 1600);
       cockpit.Configure(1280, 1600, ship::Theme::ById("classic"));
@@ -835,7 +844,7 @@ int main() {
       Require(audit.ActionCount() == actions, "Selecting the ship ring advanced travel");
     }
     {
-      auto tabs = ship::Simulation::NewVoyage(ship::Catalog::LoadFromAssets("assets"));
+      auto tabs = ship::Simulation::ReferenceVoyage(ship::Catalog::LoadFromAssets("assets"));
       ship::ShellView cockpit;
       io.DisplaySize = ImVec2(1280, 720);
       cockpit.Configure(1280, 720, ship::Theme::ById("classic"));

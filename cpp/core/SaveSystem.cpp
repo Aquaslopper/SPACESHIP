@@ -1409,6 +1409,7 @@ bool Simulation::SaveToFile(const std::string& path, bool utf16le, std::string* 
   }
   const std::string bytes = utf16le ? Utf8ToUtf16Le(text, true) : text;
   file.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+  file.close();  // surface buffered write/close failures instead of claiming a save succeeded
   if (!file) {
     if (error != nullptr) { *error = "could not write " + path; }
     return false;

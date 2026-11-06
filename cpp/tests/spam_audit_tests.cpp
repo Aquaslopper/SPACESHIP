@@ -44,7 +44,7 @@ ship::Catalog& World() {
 // power, supplies, a berth at a port, an uncommitted salvage lot of each kind,
 // a signal on the wire, an incident on the board and memories to consolidate.
 ship::Simulation Rich() {
-  ship::Simulation sim = ship::Simulation::NewVoyage(World());
+  ship::Simulation sim = ship::Simulation::ReferenceVoyage(World());
   sim.MutableState().shiplets = 20000;
   sim.FindStat("energy")->value = 100;
   sim.FindStat("fuel")->value = 100;

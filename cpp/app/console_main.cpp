@@ -101,11 +101,14 @@ std::string RestOfLine(const std::string& line, const std::string& firstWord) {
 int main(int argc, char** argv) {
   std::string scriptPath;
   std::string assetsPath;
+  bool referenceFit = false;
   for (int i = 1; i < argc; ++i) {
-    if (std::strcmp(argv[i], "--assets") == 0 && i + 1 < argc) {
+    if (std::strcmp(argv[i], "--reference-fit") == 0) {
+      referenceFit = true;
+    } else if (std::strcmp(argv[i], "--assets") == 0 && i + 1 < argc) {
       assetsPath = argv[++i];
     } else if (std::strcmp(argv[i], "--help") == 0) {
-      std::printf("usage: spaceship_console [script] [--assets <dir>]\n");
+      std::printf("usage: spaceship_console [script] [--assets <dir>] [--reference-fit]\n");
       return 0;
     } else {
       scriptPath = argv[i];
@@ -132,7 +135,8 @@ int main(int argc, char** argv) {
     input = &file;
   }
 
-  ship::Simulation simulation = ship::Simulation::NewVoyage(catalog);
+  ship::Simulation simulation = referenceFit ? ship::Simulation::ReferenceVoyage(catalog)
+                                              : ship::Simulation::NewVoyage(catalog);
 
   std::string line;
   int lineNumber = 0;

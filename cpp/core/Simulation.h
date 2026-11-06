@@ -57,6 +57,9 @@ class Simulation {
   // A voyage in the state the reference reaches the moment its script has
   // finished loading: full stores, three canisters in the rack, three jobs.
   static Simulation NewVoyage(const Catalog& catalog);
+  // Historical fully fitted HTA state, for legacy-save and differential tests.
+  // The playable client always uses NewVoyage, never this reference fixture.
+  static Simulation ReferenceVoyage(const Catalog& catalog);
 
   // ---- the clock ---------------------------------------------------------
   // The only function that advances the world. Mirrors performAction(detail).
@@ -100,6 +103,10 @@ class Simulation {
   MapView& MutableMap() { return map_; }
   const std::map<std::string, LayerView>& Views() const { return views_; }
   const std::vector<Room>& Rooms() const { return rooms_; }
+  bool HasRoom(const std::string& id) const;
+  static bool StandardRoom(const std::string& id);
+  static constexpr double RoomPrice() { return 500; }
+  bool BuyRoom(const std::string& id);
   const ShipDef& Ship() const { return ship_; }
   const std::vector<InfoRow>& Infos() const { return infos_; }
   const Cargo& CargoStore() const { return cargo_; }
@@ -402,6 +409,7 @@ class Simulation {
 
   ShipDef ship_;
   std::vector<Room> rooms_;
+  bool referenceFit_ = false;  // explicit parity fixture; not a saved gameplay setting
   std::vector<InfoRow> infos_;
   Cargo cargo_;
   Mess mess_;

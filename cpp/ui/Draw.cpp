@@ -657,8 +657,11 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
 
 bool ShellView::HasWrenExterior(const Simulation& sim) const {
   const Texture2D* texture = static_cast<const Texture2D*>(wrenExteriorArt_);
-  return sim.State().shipClass == "wren" && texture != nullptr && texture->id != 0 &&
-         texture->width > 0 && texture->height > 0;
+  if (sim.State().shipClass != "wren" || texture == nullptr || texture->id == 0 ||
+      texture->width <= 0 || texture->height <= 0) return false;
+  // The supplied exterior depicts the complete endgame fit, not a starter.
+  for (const Room& room : sim.World().wren.rooms) if (!sim.HasRoom(room.id)) return false;
+  return true;
 }
 
 ShellView::ExteriorLayout ShellView::BuildExteriorLayout(const Simulation& sim, const Area& stage) const {
@@ -668,7 +671,7 @@ ShellView::ExteriorLayout ShellView::BuildExteriorLayout(const Simulation& sim, 
   const float buttonW = std::max(TextWidth("Deck plan / crew", textSize), TextWidth("Exterior view", textSize)) + 16.0f;
   out.toggle = {stage.x + 4.0f, stage.y + 3.0f, buttonW, out.lineHeight + 9.0f};
   const float sideW = std::max(100.0f, std::min(245.0f, stage.w * 0.235f));
-  std::vector<Room> rooms = ActivePlan(sim).rooms;
+  std::vector<Room> rooms = sim.Rooms();
   std::stable_sort(rooms.begin(), rooms.end(), [](const Room& a, const Room& b) {
     return a.box.x < b.box.x;
   });

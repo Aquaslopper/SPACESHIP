@@ -1,3 +1,4 @@
+# Uses --reference-fit for the original fully fitted HTA, not the new starter.
 # ============================================================================
 #  run-parity.cmake — one differential case: reference vs port.
 #  ---------------------------------------------------------------------------
@@ -41,7 +42,7 @@ if(NOT js_rc EQUAL 0)
 endif()
 
 execute_process(
-  COMMAND ${CONSOLE} ${script_copy}
+  COMMAND ${CONSOLE} --reference-fit ${script_copy}
   WORKING_DIRECTORY ${SOURCE_DIR}
   OUTPUT_VARIABLE cpp_out
   ERROR_VARIABLE cpp_err

@@ -87,7 +87,8 @@ WikiModel BuildWikiScreen(const Simulation& sim, const WikiView& view) {
     link.id = "link";
     link.label = selected->linkLabel;
     link.cost = "free";
-    link.enabled = true;
+    link.enabled = selected->link == "nav" || sim.HasRoom(selected->link);
+    if (!link.enabled) link.cost = "install room at a station";
     model.rows.push_back(link);
   }
   return model;

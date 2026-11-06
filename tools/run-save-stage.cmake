@@ -1,3 +1,4 @@
+# Uses --reference-fit for the original fully fitted HTA, not the new starter.
 # ============================================================================
 #  run-save-stage.cmake — one save stage, on its own.
 #  ---------------------------------------------------------------------------
@@ -44,7 +45,7 @@ endfunction()
 
 function(run_port script outvar)
   execute_process(
-    COMMAND ${CONSOLE} ${script}
+    COMMAND ${CONSOLE} --reference-fit ${script}
     WORKING_DIRECTORY ${SOURCE_DIR}
     OUTPUT_VARIABLE out
     ERROR_VARIABLE err

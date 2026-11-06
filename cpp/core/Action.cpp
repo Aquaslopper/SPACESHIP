@@ -94,7 +94,9 @@ Simulation Simulation::NewVoyage(const Catalog& catalog) {
   // ---- the hull the crew are standing in ---------------------------------
   {
     const DeckPlan& plan = catalog.wren;
-    for (const Room& room : plan.rooms) { sim.rooms_.push_back(room); }
+    for (const Room& room : plan.rooms) {
+      if (StandardRoom(room.id)) sim.rooms_.push_back(room);
+    }
     ShipDef ship;
     auto fields = catalog.shipFields.find("wren");
     if (fields != catalog.shipFields.end()) { ship.fields = fields->second; }
@@ -127,6 +129,9 @@ Simulation Simulation::NewVoyage(const Catalog& catalog) {
 
   // ---- the hold ----------------------------------------------------------
   for (const Good& good : catalog.startingCargo) {
+    // The original fully fitted ship held more than the new starter hold.
+    // A new voyage only receives whole lots that fit; existing saves keep all.
+    if (sim.CargoUsed() + good.vol > sim.cargo_.capacity) continue;
     GoodsLot lot;
     lot.id = good.id;
     lot.name = good.name;
@@ -200,13 +205,28 @@ Simulation Simulation::NewVoyage(const Catalog& catalog) {
   return sim;
 }
 
+Simulation Simulation::ReferenceVoyage(const Catalog& catalog) {
+  Simulation sim = NewVoyage(catalog);
+  sim.referenceFit_ = true;
+  sim.rooms_ = catalog.wren.rooms;
+  sim.cargo_.capacity = sim.ShipCargoCapacity("wren", 0);
+  sim.goods_.clear();
+  for (const Good& good : catalog.startingCargo) {
+    GoodsLot lot;
+    lot.id = good.id; lot.name = good.name; lot.kind = good.kind;
+    lot.vol = good.vol; lot.value = good.value; lot.risk = good.risk;
+    sim.goods_.push_back(lot);
+  }
+  return sim;
+}
+
 void Simulation::RestartVoyage() {
   // The reference re-applies its boot snapshot and then puts the preferences
   // back; a fresh intentional voyage is the same thing from the outside.
   const Options options = state_.options;
   const bool motion = state_.reducedMotion;
   const Catalog catalog = catalog_;
-  *this = Simulation::NewVoyage(catalog);
+  *this = referenceFit_ ? Simulation::ReferenceVoyage(catalog) : Simulation::NewVoyage(catalog);
   state_.options = options;
   state_.reducedMotion = motion;
 }

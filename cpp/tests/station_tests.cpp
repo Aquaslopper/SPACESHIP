@@ -34,7 +34,7 @@ ship::Catalog& World() {
 
 // A voyage docked at the first port, which is where every station test starts.
 ship::Simulation Docked() {
-  ship::Simulation sim = ship::Simulation::NewVoyage(World());
+  ship::Simulation sim = ship::Simulation::ReferenceVoyage(World());
   sim.MutableMap().here = World().ports.front().id;
   sim.MutableState().docked = true;
   return sim;
@@ -451,7 +451,7 @@ TEST_CASE("undocking leaves the station and costs one action", "[station]") {
 //  The stores
 // ---------------------------------------------------------------------------
 TEST_CASE("the cargo hold counts its lots and jettisons them", "[stores][cargo]") {
-  ship::Simulation sim = ship::Simulation::NewVoyage(World());
+  ship::Simulation sim = ship::Simulation::ReferenceVoyage(World());
   // An empty hold of the Wren's original size, so the numbers are the words.
   sim.MutableGoods().clear();
   sim.MutableCargo().capacity = 24;
@@ -488,7 +488,7 @@ TEST_CASE("the cargo hold counts its lots and jettisons them", "[stores][cargo]"
 }
 
 TEST_CASE("salvage is offered only mid-crossing", "[stores][salvage]") {
-  ship::Simulation sim = ship::Simulation::NewVoyage(World());
+  ship::Simulation sim = ship::Simulation::ReferenceVoyage(World());
   sim.MutableState().docked = false;
   ship::Task* travel = sim.AddOngoing("travel", "Under way", 40.0, "travel", "vega");
   REQUIRE(travel != nullptr);
@@ -520,7 +520,7 @@ TEST_CASE("salvage is offered only mid-crossing", "[stores][salvage]") {
 }
 
 TEST_CASE("the science room files and packages surveys", "[stores][science]") {
-  ship::Simulation sim = ship::Simulation::NewVoyage(World());
+  ship::Simulation sim = ship::Simulation::ReferenceVoyage(World());
   sim.MutableSurvey().clear();
   const ship::StoresScreenModel empty = ship::BuildStoresScreen(sim, "science");
   CHECK_FALSE(empty.cargo);
@@ -567,7 +567,7 @@ TEST_CASE("the foot's four keys open the four panels", "[popups]") {
   CHECK(ship::PopupTitle("files") == "Save / Load Game");
   CHECK(ship::PopupTitle("settings") == "Settings");
 
-  ship::Simulation sim = ship::Simulation::NewVoyage(World());
+  ship::Simulation sim = ship::Simulation::ReferenceVoyage(World());
   const ship::PopupModel manifest = ship::BuildPopup(sim, "manifest");
   REQUIRE(manifest.sections.size() == 2);
   CHECK(manifest.sections[0].title == "Crew");
@@ -595,7 +595,7 @@ TEST_CASE("the foot's four keys open the four panels", "[popups]") {
 }
 
 TEST_CASE("settings invert their own labels and change nothing else", "[popups][settings]") {
-  ship::Simulation sim = ship::Simulation::NewVoyage(World());
+  ship::Simulation sim = ship::Simulation::ReferenceVoyage(World());
   const ship::PopupModel before = ship::BuildPopup(sim, "settings");
   REQUIRE(before.toggles.size() == 6);
   CHECK(before.notice ==
@@ -641,7 +641,7 @@ TEST_CASE("three save slots save, load and refuse a corrupt file",
   Wipe(dir);
   const std::string root = dir.string();
 
-  ship::Simulation sim = ship::Simulation::NewVoyage(World());
+  ship::Simulation sim = ship::Simulation::ReferenceVoyage(World());
   const ship::PopupModel files = ship::BuildPopup(sim, "files", root);
   CHECK(files.notice ==
         "Three independent slots. Slot 1 uses the original save. Loading replaces the "

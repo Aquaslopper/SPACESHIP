@@ -37,7 +37,7 @@ ship::Catalog& World() {
   return catalog;
 }
 
-ship::Simulation Fresh() { return ship::Simulation::NewVoyage(World()); }
+ship::Simulation Fresh() { return ship::Simulation::ReferenceVoyage(World()); }
 
 const ship::DescribeRow* Row(const ship::Description& t, const std::string& key) {
   for (const ship::DescribeRow& row : t.rows) {

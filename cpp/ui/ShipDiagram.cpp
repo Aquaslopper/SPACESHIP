@@ -33,13 +33,13 @@ const DeckPlan& ActivePlan(const Simulation& sim) {
 const Room* CrewRoom(const Simulation& sim, const CrewMember& crew) {
   const Task* work = sim.CrewBusy(crew);
   if (work != nullptr && work->target == "social") {
-    return ActivePlan(sim).FindRoom("r13");
+    return sim.HasRoom("r13") ? ActivePlan(sim).FindRoom("r13") : nullptr;
   }
   if (sim.FindOngoing("doc-" + crew.id) != nullptr) {
-    return ActivePlan(sim).FindRoom("r1");
+    return sim.HasRoom("r1") ? ActivePlan(sim).FindRoom("r1") : nullptr;
   }
   if (crew.job.empty()) { return nullptr; }  // the corridor: the dole queue
-  return ActivePlan(sim).FindRoom(crew.room);
+  return sim.HasRoom(crew.room) ? ActivePlan(sim).FindRoom(crew.room) : nullptr;
 }
 
 namespace {
@@ -64,8 +64,8 @@ DiagramModel BuildDiagram(const Simulation& sim, const Area& stage,
 
   const DeckPlan& plan = ActivePlan(sim);
   out.hull = plan.hull;
-  out.rooms = plan.rooms;
-  for (const auto& room : plan.rooms) {
+  out.rooms = sim.Rooms();
+  for (const auto& room : sim.Rooms()) {
     const auto it = sim.World().roomScenes.find(room.id);
     out.roomAccents[room.id] = it == sim.World().roomScenes.end() ? "#8c6f4e" : it->second.accent;
   }

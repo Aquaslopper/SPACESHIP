@@ -42,6 +42,7 @@ jobs:
           cp build-win/spaceship.exe dist/Spaceship/
           cp -r assets dist/Spaceship/
           cp README.md dist/Spaceship/
+          cp docs/PLAYING.md dist/Spaceship/PLAYING.md
 
       - name: Decode packaged title and ship artwork with the shipped raylib build
         shell: bash

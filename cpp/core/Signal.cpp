@@ -19,6 +19,7 @@ const std::vector<std::string>& Simulation::WorldHistory(const std::string& regi
 }
 
 bool Simulation::BroadcastLocal() {
+  if (!HasRoom("r4")) return false;
   if (!state_.gameOver.empty()) { return false; }
   const Body* system = CurrentSystem();
   if (system == nullptr) { return false; }
@@ -38,6 +39,7 @@ bool Simulation::BroadcastLocal() {
 }
 
 bool Simulation::FinishSignal(const std::string& choice) {
+  if (!HasRoom("r3")) return false;
   if (!state_.gameOver.empty() || state_.sim.signal != "request") { return false; }
   if (choice != "preserved" && choice != "sold") { return false; }
   if (choice == "preserved") {

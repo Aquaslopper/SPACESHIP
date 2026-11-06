@@ -28,7 +28,7 @@ ship::Catalog& World() {
   return catalog;
 }
 
-ship::Simulation Fresh() { return ship::Simulation::NewVoyage(World()); }
+ship::Simulation Fresh() { return ship::Simulation::ReferenceVoyage(World()); }
 
 const ship::ActionRowView* RowWith(const std::vector<ship::ActionRowView>& rows,
                                    const std::string& id) {

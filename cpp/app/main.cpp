@@ -23,6 +23,7 @@
 #include "audio/Audio.h"
 #include "audio/AudioDevice.h"
 #include "core/Simulation.h"
+#include "core/AutoSave.h"
 #include "core/DisplaySettings.h"
 #include "data/Catalog.h"
 #include "ui/Draw.h"
@@ -30,7 +31,18 @@
 #include "ui/Palette.h"
 #include "ui/Theme.h"
 
+#ifdef _WIN32
+extern "C" __declspec(dllimport) int __stdcall MessageBoxA(void*, const char*, const char*, unsigned int);
+#endif
+
 namespace {
+
+void SaveWarning(const std::string& message) {
+  std::fprintf(stderr, "spaceship: %s\n", message.c_str());
+#ifdef _WIN32
+  MessageBoxA(nullptr, message.c_str(), "Spaceship save warning", 0x30u);
+#endif
+}
 
 using ship::FeedLine;
 using ship::Options;
@@ -303,6 +315,16 @@ int main(int argc, char** argv) {
 
   // ---- the voyage --------------------------------------------------------
   ship::Simulation sim = ship::Simulation::NewVoyage(catalog);
+  const char* appDir = GetApplicationDirectory();
+  const std::filesystem::path saveDir = appDir != nullptr && *appDir != '\0'
+      ? std::filesystem::path(appDir) / "runtime" / "saves"
+      : std::filesystem::path("runtime") / "saves";
+  std::string loadedPath, loadWarning;
+  const auto autoLoad = ship::LoadNewestSave(sim, saveDir.u8string(), &loadedPath, &loadWarning);
+  if (!loadWarning.empty()) SaveWarning(loadWarning +
+      (autoLoad == ship::AutoLoadResult::Loaded ? "\nAn older valid save was loaded instead." :
+       "\nYour files were not changed. You can start a new voyage or load a slot manually."));
+  bool voyageStarted = autoLoad == ship::AutoLoadResult::Loaded;
 
   // ---- window ------------------------------------------------------------
   SetTraceLogLevel(LOG_WARNING);
@@ -348,10 +370,7 @@ int main(int argc, char** argv) {
     if (tutorialTextures[i].id == 0) { std::fprintf(stderr, "spaceship: tutorial card unavailable: %s\n", path.string().c_str()); }
   }
   ship::ShellView shell;
-  const char* appDir = GetApplicationDirectory();
-  if (appDir != nullptr && *appDir != '\0') {
-    shell.SetSaveDir((std::filesystem::path(appDir) / "runtime" / "saves").u8string());
-  }
+  shell.SetSaveDir(saveDir.u8string());
   shell.SetFonts(fonts.body, fonts.bold, fonts.mono);
   shell.SetTitleTexture(&titleTexture);
   shell.SetWrenExteriorTexture(&wrenExterior);
@@ -371,7 +390,8 @@ int main(int argc, char** argv) {
               audio.External().music.size(), audio.External().sfx.size());
 
   // The reference opens on its title menu, with the voyage already begun.
-  shell.ShowTitle(false);
+  if (voyageStarted) shell.HideTitle();
+  else shell.ShowTitle(false);
 
   // Phase 9: the borderless window follows Options, whichever way it changes.
   bool fullscreen = sim.State().options.fullscreen;
@@ -464,11 +484,20 @@ int main(int argc, char** argv) {
       ImGui::GetIO().DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
     }
     shell.Draw(sim, static_cast<double>(GetTime()) * 1000.0);
+    if (!shell.TitleActive()) voyageStarted = true;
     rlImGuiEnd();
     if (adjusted) display.End(sim.State().options.displayGamma, sim.State().options.displayBrightness);
     EndDrawing();
   }
 
+  if (voyageStarted) {
+    std::string saved, error;
+    if (!ship::SaveDated(sim, saveDir.u8string(), &saved, &error)) {
+      SaveWarning("Autosave failed. Your earlier saves have not been changed.\n" + error);
+    } else {
+      std::printf("autosaved: %s\n", saved.c_str());
+    }
+  }
   audio.Shutdown();
   rlImGuiShutdown();
   display.Shutdown();

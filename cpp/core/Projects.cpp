@@ -46,6 +46,7 @@ std::string Simulation::ProjectBlock(const std::string& id) const {
     if (candidate.id == id) { project = &candidate; }
   }
   if (project == nullptr) { return "Unknown project."; }
+  if (!HasRoom(project->room)) return "Install the required room at a space station.";
 
   if (FindOngoing("project-" + id) != nullptr) { return "Already in progress."; }
   if (StatValue("energy") <= project->energy) {
@@ -182,6 +183,7 @@ bool Simulation::StartDream(const std::string& firstId, const std::string& secon
 }
 
 bool Simulation::StartMedical(const std::string& crewId) {
+  if (!HasRoom("r1")) return false;
   CrewMember* crew = FindCrew(crewId);
   if (crew == nullptr || crew->health >= 100 || CrewBusy(*crew) != nullptr) { return false; }
   if (state_.medkits <= 0 || StatValue("energy") <= 2 || !state_.gameOver.empty()) { return false; }
@@ -203,6 +205,7 @@ bool Simulation::StartMedical(const std::string& crewId) {
 }
 
 bool Simulation::StartSocial(const std::string& a, const std::string& b) {
+  if (!HasRoom("r13")) return false;
   CrewMember* one = FindCrew(a);
   CrewMember* two = FindCrew(b);
   if (one == nullptr || two == nullptr || a == b) { return false; }

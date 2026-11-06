@@ -72,6 +72,8 @@ bool RefreshTab(Simulation& sim, const std::string& key) {
 
 bool OpenTask(Simulation& sim, const std::string& kind, const std::string& id,
               bool focus) {
+  // Navigation is a standard task tab, including its legacy room:nav alias.
+  if (kind == "room" && id != "nav" && !sim.HasRoom(id)) return false;
   const std::string key = TaskKey(kind, id);
   GameState& state = sim.MutableState();
   if (FindTab(state, key) == nullptr) {

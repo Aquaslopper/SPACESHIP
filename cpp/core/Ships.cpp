@@ -16,6 +16,7 @@ namespace ship {
 
 double Simulation::ShipCargoCapacity(const std::string& kind, int level) const {
   const int index = std::max(0, std::min(2, level));
+  if (kind == "wren" && index == 0 && !referenceFit_) return 20;
   auto it = catalog_.cargoByClass.find(kind);
   if (it == catalog_.cargoByClass.end() || it->second.empty()) {
     const int values[3] = {kind == "wren" ? 40 : 60, kind == "wren" ? 60 : 90, kind == "wren" ? 90 : 120};
@@ -30,6 +31,28 @@ int Simulation::CargoRefitLevel() const {
     return it != state_.upgrades.end() && it->second;
   };
   return has("bay2") ? 2 : (has("bay") ? 1 : 0);
+}
+
+bool Simulation::StandardRoom(const std::string& id) {
+  return id == "engine" || id == "o2" || id == "quarters" || id == "mess" ||
+         id == "cargo" || id == "bridge";
+}
+
+bool Simulation::HasRoom(const std::string& id) const {
+  return std::any_of(rooms_.begin(), rooms_.end(), [&](const Room& room) { return room.id == id; });
+}
+
+bool Simulation::BuyRoom(const std::string& id) {
+  if (!state_.gameOver.empty() || !state_.docked || HerePort() == nullptr ||
+      state_.shiplets < RoomPrice() || StandardRoom(id) || HasRoom(id)) return false;
+  const DeckPlan& plan = state_.shipClass == "wren" ? catalog_.wren : catalog_.kestrel;
+  const Room* room = plan.FindRoom(id);
+  if (room == nullptr) return false;
+  const std::string name = room->name;
+  rooms_.push_back(*room);
+  state_.shiplets -= RoomPrice();
+  PerformAction("Installed " + name);
+  return true;
 }
 
 void Simulation::ApplyShipLayout() {

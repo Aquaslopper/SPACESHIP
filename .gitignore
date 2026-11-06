@@ -6,3 +6,5 @@
 /runtime/saves/*.json*
 runtime/saves/*.json
 runtime/saves/*.txt
+
+runtime/saves/*.txt.lock/

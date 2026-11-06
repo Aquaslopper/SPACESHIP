@@ -9,6 +9,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
@@ -18,6 +19,7 @@
 
 #include "audio/Audio.h"
 #include "core/Simulation.h"
+#include "core/AutoSave.h"
 #include "data/Catalog.h"
 #include "ui/Popups.h"
 #include "ui/Shell.h"
@@ -34,7 +36,7 @@ ship::Catalog& World() {
   return catalog;
 }
 
-ship::Simulation Fresh() { return ship::Simulation::NewVoyage(World()); }
+ship::Simulation Fresh() { return ship::Simulation::ReferenceVoyage(World()); }
 
 std::string ScratchDir(const std::string& name) {
   const std::filesystem::path dir =
@@ -750,4 +752,56 @@ TEST_CASE("the wave header is the reference's own 44 bytes", "[phase8][audio]") 
   CHECK(rate == 8000);
   CHECK(wav[22] == 1);   // mono
   CHECK(wav[34] == 16);  // bits per sample
+}
+
+TEST_CASE("dated autosaves never overwrite slots and autoload the newest valid save", "[phase8][save][autosave]") {
+  namespace fs = std::filesystem;
+  const fs::path root = fs::path(ScratchDir("dated-autosave"));
+  std::error_code ec; fs::remove_all(root, ec);
+  ship::Simulation sim = Fresh();
+  std::string file1, file2, error;
+  REQUIRE(ship::LoadNewestSave(sim, root.u8string(), nullptr, &error) == ship::AutoLoadResult::None);
+  REQUIRE(ship::SaveDated(sim, root.u8string(), &file1, &error));
+  REQUIRE(sim.SaveSlot(1, root.u8string(), &error));
+  sim.PerformAction("test later voyage");
+  REQUIRE(ship::SaveDated(sim, root.u8string(), &file2, &error));
+  CHECK(file1 != file2);
+  CHECK(fs::exists(fs::u8path(file1)));
+  CHECK(fs::exists(root / ship::Simulation::SlotFilename(1)));
+  fs::last_write_time(fs::u8path(file2), fs::file_time_type::clock::now() + std::chrono::seconds(5));
+  ship::Simulation loaded = Fresh();
+  std::string selected;
+  REQUIRE(ship::LoadNewestSave(loaded, root.u8string(), &selected, &error) == ship::AutoLoadResult::Loaded);
+  CHECK(selected == file2);
+  CHECK(loaded.ActionCount() == sim.ActionCount());
+  const fs::path broken = root / "Spaceship_2099-01-01_00-00-00.txt";
+  { std::ofstream out(broken); out << "not a save"; }
+  fs::last_write_time(broken, fs::file_time_type::clock::now() + std::chrono::seconds(10));
+  REQUIRE(ship::LoadNewestSave(loaded, root.u8string(), &selected, &error) == ship::AutoLoadResult::Loaded);
+  CHECK(selected == file2);
+  CHECK(error.find("Could not load") != std::string::npos);
+  CHECK(fs::exists(broken));
+  fs::remove_all(root, ec);
+}
+
+TEST_CASE("failed autoload keeps the live voyage and reports the unreadable file", "[phase8][save][autosave]") {
+  namespace fs = std::filesystem;
+  const fs::path root = fs::path(ScratchDir("broken-autosave"));
+  std::error_code ec; fs::remove_all(root, ec); fs::create_directories(root);
+  const auto broken = root / "Spaceship_2099-01-01_00-00-00.txt";
+  { std::ofstream out(broken); out << "broken"; }
+  auto sim = ship::Simulation::NewVoyage(World());
+  sim.PerformAction("keep this voyage");
+  const auto actions = sim.ActionCount();
+  std::string selected, warning;
+  CHECK(ship::LoadNewestSave(sim, root.u8string(), &selected, &warning) == ship::AutoLoadResult::Failed);
+  CHECK(selected.empty());
+  CHECK(warning.find(broken.u8string()) != std::string::npos);
+  CHECK(sim.ActionCount() == actions);
+  CHECK(fs::exists(broken));
+  const fs::path blocker = root / "not-a-folder";
+  { std::ofstream out(blocker); out << "keep"; }
+  CHECK_FALSE(ship::SaveDated(sim, (blocker / "saves").u8string(), nullptr, &warning));
+  CHECK(fs::is_regular_file(blocker));
+  fs::remove_all(root, ec);
 }
