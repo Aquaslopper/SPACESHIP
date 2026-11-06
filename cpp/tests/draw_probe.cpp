@@ -132,16 +132,50 @@ int main() {
     io.DisplaySize = ImVec2(1280, 720);
     io.DeltaTime = 1.0f / 60;
     ImFontConfig config; config.SizePixels = 18;
-    io.Fonts->AddFontDefault(&config);
+    ImFont* regularFont = io.Fonts->AddFontDefault(&config);
+    config.SizePixels = 23;
+    ImFont* largeFont = io.Fonts->AddFontDefault(&config);
     unsigned char* pixels; int w, h;
     io.Fonts->GetTexDataAsRGBA32(&pixels, &w, &h);
-    auto sim = ship::Simulation::NewVoyage(ship::Catalog::LoadFromAssets("assets"));
+    auto sim = ship::Simulation::ReferenceVoyage(ship::Catalog::LoadFromAssets("assets"));
     ship::ShellView view;
     view.Configure(1280, 720, ship::Theme::ById("classic"));
+    // A restored save is offered on the title screen, not entered immediately.
+    {
+      auto restored = ship::Simulation::NewVoyage(sim.World());
+      restored.PerformAction("restored voyage fixture");
+      const double actions = restored.ActionCount();
+      ship::ShellView title;
+      title.Configure(1280, 720, ship::Theme::ById("classic"));
+      title.ShowTitle(true);
+      Frame(title, restored);
+      Require(title.TitleActive() && title.TitleFromVoyage(), "Restored voyage skipped the title screen");
+      const auto resume = FindText("RESUME");
+      title.Click(restored, resume.x + 4, resume.y + 4, ship::HitButton::Left, 0);
+      Require(!title.TitleActive() && restored.ActionCount() == actions, "Resume did not preserve the restored voyage");
+    }
+    // Measure the actual ImGui font rather than a fixed 48px Home slot. The
+    // rightmost part of the enlarged control must still route clicks to Home.
+    for (ImFont* font : {regularFont, largeFont}) {
+      io.FontDefault = font;
+      auto target = ship::Simulation::NewVoyage(sim.World());
+      ship::ShellView topbar;
+      topbar.Configure(1280, 720, ship::Theme::ById("classic"));
+      Require(ship::OpenTask(target, "nav", "main", true), "Could not open navigation fixture");
+      Frame(topbar, target);
+      const auto layout = topbar.LayoutNow();
+      Require(layout.home.w >= ImGui::CalcTextSize("Home").x + 20.0f - 0.1f,
+              "Home label exceeds its reserved control at this font size");
+      Require(layout.home.Right() == 1280.0f && layout.tabStrip.Right() <= layout.controls.x,
+              "Home control or tab strip overflows the window");
+      topbar.Click(target, layout.home.Right() - 4, layout.home.y + 10, ship::HitButton::Left, 0);
+      Require(target.State().activeTab == "home", "Right edge of Home is not clickable");
+    }
+    io.FontDefault = regularFont;
     // Chart controls use their painted bounds for all reading-size steps, and
     // topmost controls take priority over map bodies behind them.
     for (int step : {0, 3}) {
-      auto nav = ship::Simulation::NewVoyage(sim.World());
+      auto nav = ship::Simulation::ReferenceVoyage(sim.World());
       nav.MutableState().options.fontStep = step;
       ship::ShellView mapView; mapView.Configure(1280, 720, ship::Theme::ById("classic"));
       ship::OpenTask(nav, "nav", "main", true);
@@ -178,7 +212,7 @@ int main() {
       world.wiki.push_back({"spoiler", "GUIDE", "Test spoiler", "The hidden article.", "", "", true});
       for (int i = 0; i < 35; ++i)
         world.wiki.push_back({"entry" + std::to_string(i), "GUIDE", "Extra entry " + std::to_string(i), "More text.", "", "", false});
-      auto handbook = ship::Simulation::NewVoyage(world);
+      auto handbook = ship::Simulation::ReferenceVoyage(world);
       ship::ShellView reader; reader.Configure(1280, 720, ship::Theme::ById("classic"));
       ship::OpenTask(handbook, "wiki", "main", true);
       Frame(reader, handbook);
@@ -214,7 +248,7 @@ int main() {
       world.wiki[0].text.clear();
       for (int i = 0; i < 300; ++i) world.wiki[0].text += "Long article text continues. ";
       world.wiki[0].text += "END-OF-ARTICLE";
-      auto longHandbook = ship::Simulation::NewVoyage(world);
+      auto longHandbook = ship::Simulation::ReferenceVoyage(world);
       ship::ShellView longReader; longReader.Configure(1280, 720, ship::Theme::ById("classic"));
       ship::OpenTask(longHandbook, "wiki", "main", true);
       Frame(longReader, longHandbook);
@@ -226,12 +260,77 @@ int main() {
       Require(end != texts.end() && end->y >= content.y && end->y + end->size < content.Bottom(),
               "Long wiki article bottom is unreachable");
     }
+    // The selected reading size must actually change the small labels around
+    // the exterior and the compact Home info cards, not merely the sidebar.
+    {
+      Texture2D concept{77, 1340, 420, 1, 7};
+      io.DisplaySize = ImVec2(1280, 1600);
+      for (bool largeText : {false, true}) {
+        int previousRoomSize = 0;
+        int previousInfoSize = 0;
+        for (int step = 0; step < 4; ++step) {
+          auto fitted = ship::Simulation::ReferenceVoyage(sim.World());
+          const auto before = fitted.ActionCount();
+          ship::Theme theme = ship::Theme::ById("classic");
+          theme.fontStep = step;
+          theme.largeText = largeText;
+          ship::ShellView home;
+          home.Configure(1280, 1600, theme);
+          home.SetWrenExteriorTexture(&concept);
+          Frame(home, fitted);
+          const auto room = FindText("Engine Room");
+          const auto info = FindText(fitted.Infos().front().label);
+          Require(room.size == theme.TextPx(10) && room.size > previousRoomSize,
+                  "Exterior room labels did not grow with reading size");
+          Require(info.size == theme.HomeInfoLabelPx() && info.size > previousInfoSize,
+                  "Compact Home labels did not grow with reading size");
+          Require(room.y >= home.LayoutNow().content.y &&
+                      room.y + room.size < home.LayoutNow().content.Bottom(),
+                  "Larger exterior room label escaped the visible area");
+          home.Click(fitted, room.x + 2, room.y + 2, ship::HitButton::Right, 0);
+          Require(ship::FindTab(fitted.State(), "room:engine") != nullptr,
+                  "Resized exterior label stopped opening its room");
+          Require(fitted.ActionCount() == before,
+                  "Changing reading size or inspecting a room spent an action");
+          previousRoomSize = static_cast<int>(room.size);
+          previousInfoSize = static_cast<int>(info.size);
+        }
+      }
+    }
+
     // Real Draw.cpp callouts route all Wren rooms to their existing handlers.
     // Cosmetic time, browsing and view switches must not advance the clock or
     // a lock; the original deck still exposes its actual crew indicators.
     {
       Texture2D concept{77, 1340, 420, 1, 7};
-      auto artShip = ship::Simulation::NewVoyage(sim.World());
+      auto starter = ship::Simulation::NewVoyage(sim.World());
+      ship::ShellView starterView;
+      io.DisplaySize = ImVec2(1280, 1200);
+      starterView.Configure(1280, 1200, ship::Theme::ById("classic"));
+      starterView.SetWrenExteriorTexture(&concept);
+      Frame(starterView, starter);
+      Require(std::any_of(textureDraws.begin(), textureDraws.end(), [](const TextureCall& t) { return t.id == 77; }),
+              "The owner's Wren exterior disappeared from the starter ship");
+      Require(starter.Rooms().size() == 6, "Starter has nonstandard rooms");
+      Require(std::none_of(texts.begin(), texts.end(), [](const TextCall& t) { return t.text == "Science Room"; }),
+              "Uninstalled room was shown as an exterior callout");
+      for (const auto& room : starter.Rooms()) {
+        Frame(starterView, starter);
+        const auto label = FindText(room.name);
+        starterView.Click(starter, label.x + 2, label.y + 2, ship::HitButton::Right, 0);
+        Require(ship::FindTab(starter.State(), "room:" + room.id) != nullptr,
+                "Starter room callout did not open its corresponding room");
+      }
+      starter.MutableMap().here = sim.World().ports.front().id;
+      starter.MutableState().docked = true;
+      starter.MutableState().shiplets = 1000;
+      Require(starter.BuyRoom("science"), "Could not install science room for exterior test");
+      Frame(starterView, starter);
+      const auto science = FindText("Science Room");
+      starterView.Click(starter, science.x + 2, science.y + 2, ship::HitButton::Right, 0);
+      Require(ship::FindTab(starter.State(), "room:science") != nullptr,
+              "Newly installed room did not gain a working exterior callout");
+      auto artShip = ship::Simulation::ReferenceVoyage(sim.World());
       Require(ship::PressNavAction(artShip, "stand-watch"), "Could not start clock guard fixture");
       const auto lockKey = ship::ActionCooldownKey(artShip, "command:stand-watch-advance-ongoing-work:0");
       const auto lock = ship::CooldownRemaining(artShip, lockKey);
@@ -303,7 +402,7 @@ int main() {
               "Wren concept was incorrectly used as the Kestrel hull");
 
       // On a short narrow window, a callout remains reachable after scrolling.
-      auto narrowShip = ship::Simulation::NewVoyage(sim.World());
+      auto narrowShip = ship::Simulation::ReferenceVoyage(sim.World());
       ship::ShellView narrow; io.DisplaySize = ImVec2(900, 500);
       ship::Theme large = ship::Theme::ById("classic"); large.fontStep = 3;
       narrow.Configure(900, 500, large); narrow.SetWrenExteriorTexture(&concept);
@@ -370,7 +469,7 @@ int main() {
     Frame(view, sim);
     view.Scroll(side.x + 30, side.y + 100, -100);
     Frame(view, sim);
-    sim = ship::Simulation::NewVoyage(sim.World());
+    sim = ship::Simulation::ReferenceVoyage(sim.World());
     Frame(view, sim);
     view.Click(sim, vessel->box.x + 5, vessel->box.y + 5, ship::HitButton::Left, 0);
     Require(sim.State().spOpen.at("vessel"), "Stale sidebar scroll hid Vessel after a new voyage");
@@ -446,7 +545,7 @@ int main() {
     // Bottom anchoring, measured wrapping, centered rows/labels, and free body scrolling.
     for (const int windowWidth : {1180, 1280}) {
       for (const auto& target : std::vector<std::pair<std::string, std::string>>{{"nav", "main"}, {"room", "engine"}, {"room", "o2"}}) {
-        auto check = ship::Simulation::NewVoyage(sim.World());
+        auto check = ship::Simulation::ReferenceVoyage(sim.World());
         ship::ShellView shell;
         shell.Configure(windowWidth, 720, ship::Theme::ById("classic"));
         ship::OpenTask(check, target.first, target.second, true);
@@ -468,7 +567,7 @@ int main() {
     for (const int width : {1180, 1280, 2200}) {
       for (const auto& target : std::vector<std::pair<std::string, ship::Area>>{
           {"engine", {0, 0, 650, 390}}, {"o2", {0, 0, 600, 360}}, {"mess", {0, 0, 600, 360}}}) {
-        auto check = ship::Simulation::NewVoyage(sim.World());
+        auto check = ship::Simulation::ReferenceVoyage(sim.World());
         ship::ShellView shell;
         shell.Configure(width, 720, ship::Theme::ById("classic"));
         ship::OpenTask(check, "room", target.first, true);
@@ -489,7 +588,7 @@ int main() {
       }
     }
     for (const int width : {1180, 1280, 2200}) {
-      auto check = ship::Simulation::NewVoyage(sim.World());
+      auto check = ship::Simulation::ReferenceVoyage(sim.World());
       ship::ShellView shell;
       shell.Configure(width, 720, ship::Theme::ById("classic"));
       ship::OpenTask(check, "room", "quarters", true);
@@ -506,7 +605,7 @@ int main() {
       float shortMapH = 0;
       for (const bool longScan : {false, true}) {
         if (longScan) for (auto& body : catalog.bodies) if (body.id == "kessler") body.scan.assign(60, "Measured scan row");
-        auto check = ship::Simulation::NewVoyage(catalog);
+        auto check = ship::Simulation::ReferenceVoyage(catalog);
         check.MutableState().navTarget = "kessler";
         check.MutableState().scanned["kessler"] = true;
         ship::ShellView shell;
@@ -526,7 +625,7 @@ int main() {
 
     // The feed owns its wheel/drag offset; the surrounding Home column must not move.
     {
-      auto check = ship::Simulation::NewVoyage(sim.World());
+      auto check = ship::Simulation::ReferenceVoyage(sim.World());
       check.MutableState().feed.clear();
       for (int i = 0; i < 120; ++i) check.MutableState().feed.push_back({"", "Feed-probe-" + std::to_string(i)});
       ship::ShellView shell;
@@ -579,7 +678,7 @@ int main() {
 
     // Confirmation is still required, cancel is free, and accepting dispatches the original purchase.
     {
-      auto check = ship::Simulation::NewVoyage(sim.World());
+      auto check = ship::Simulation::ReferenceVoyage(sim.World());
       check.MutableState().docked = true;
       check.MutableMap().here = "tolme";
       check.MutableState().shiplets = 10000;
@@ -619,7 +718,7 @@ int main() {
 
     // A positive FREE room click also gets feedback: it is not limited to spent actions.
     {
-      auto check = ship::Simulation::NewVoyage(sim.World());
+      auto check = ship::Simulation::ReferenceVoyage(sim.World());
       ship::ShellView shell;
       shell.Configure(1180, 720, ship::Theme::ById("classic"));
       Frame(shell, check);
@@ -642,7 +741,7 @@ int main() {
     // Both the crew record and quarters expose the same priced conversation;
     // the real click path must tick once, raise morale, and respect the lock.
     {
-      auto talkSim = ship::Simulation::NewVoyage(ship::Catalog::LoadFromAssets("assets"));
+      auto talkSim = ship::Simulation::ReferenceVoyage(ship::Catalog::LoadFromAssets("assets"));
       talkSim.FindCrew("suri")->morale = 40;
       ship::ShellView conversation;
       conversation.Configure(1280, 1600, ship::Theme::ById("classic"));
@@ -673,7 +772,7 @@ int main() {
       Require(talkSim.ActionCount() == before + 1, "Quarters bypassed the crew record conversation lock");
     }
     {
-      auto talkSim = ship::Simulation::NewVoyage(ship::Catalog::LoadFromAssets("assets"));
+      auto talkSim = ship::Simulation::ReferenceVoyage(ship::Catalog::LoadFromAssets("assets"));
       talkSim.FindCrew("suri")->morale = 40;
       ship::ShellView conversation;
       conversation.Configure(1280, 1600, ship::Theme::ById("classic"));
@@ -692,7 +791,7 @@ int main() {
     // measured wraps must stay within their cards and above the feed.
     for (const std::string themeId : {"classic", "void"}) {
       for (int step : {0, 3}) {
-        auto audit = ship::Simulation::NewVoyage(ship::Catalog::LoadFromAssets("assets"));
+        auto audit = ship::Simulation::ReferenceVoyage(ship::Catalog::LoadFromAssets("assets"));
         auto& infos = const_cast<std::vector<ship::InfoRow>&>(audit.Infos());
         infos.front().value = "A particularly long location name that must wrap inside this information card";
         ship::Theme theme = ship::Theme::ById(themeId);
@@ -744,7 +843,7 @@ int main() {
 
     // Exercise the real pointer paths and animation, not only their models.
     {
-      auto audit = ship::Simulation::NewVoyage(ship::Catalog::LoadFromAssets("assets"));
+      auto audit = ship::Simulation::ReferenceVoyage(ship::Catalog::LoadFromAssets("assets"));
       ship::ShellView cockpit;
       io.DisplaySize = ImVec2(1280, 1600);
       cockpit.Configure(1280, 1600, ship::Theme::ById("classic"));
@@ -835,7 +934,7 @@ int main() {
       Require(audit.ActionCount() == actions, "Selecting the ship ring advanced travel");
     }
     {
-      auto tabs = ship::Simulation::NewVoyage(ship::Catalog::LoadFromAssets("assets"));
+      auto tabs = ship::Simulation::ReferenceVoyage(ship::Catalog::LoadFromAssets("assets"));
       ship::ShellView cockpit;
       io.DisplaySize = ImVec2(1280, 720);
       cockpit.Configure(1280, 720, ship::Theme::ById("classic"));

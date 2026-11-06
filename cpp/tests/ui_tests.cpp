@@ -37,7 +37,7 @@ ship::Catalog& World() {
   return catalog;
 }
 
-ship::Simulation Fresh() { return ship::Simulation::NewVoyage(World()); }
+ship::Simulation Fresh() { return ship::Simulation::ReferenceVoyage(World()); }
 
 const ship::DescribeRow* Row(const ship::Description& t, const std::string& key) {
   for (const ship::DescribeRow& row : t.rows) {
@@ -132,6 +132,20 @@ TEST_CASE("the cockpit's fixed anchors", "[ui][layout]") {
 
   CHECK(layout.statusbar.h == 0.0f);
   CHECK(layout.statusbar.Bottom() == 800.0f);
+}
+
+TEST_CASE("the Home control reserves measured text width and stays clickable", "[ui][layout]") {
+  const auto layout = ship::ComputeLayout(1280, 800, 742, 300, false, 92);
+  CHECK(layout.home.w == 92);
+  CHECK(layout.home.Right() == 1280);
+  CHECK(layout.controls.w == 148);
+  CHECK(layout.tabStrip.Right() == layout.controls.x);
+  CHECK(layout.scrollLeft.w == 28);
+  CHECK(layout.scrollRight.Right() == layout.home.x);
+  const auto tiny = ship::ComputeLayout(60, 800, 742, 300, false, 92);
+  CHECK(tiny.home.x >= 0);
+  CHECK(tiny.home.Right() == 60);
+  CHECK(tiny.tabStrip.w >= 0);
 }
 
 TEST_CASE("the feed takes what is left, inside 62..132", "[ui][layout]") {
@@ -717,7 +731,7 @@ TEST_CASE("home stat cells grow with the font and hold label above value",
   const ship::ShellLayout layout =
       ship::ComputeLayout(1440.0f, 940.0f, 940.0f - 36.0f - 22.0f, 300.0f, true);
   auto typePx = [](int ref, float fontPx) {
-    return std::max(18.0f, std::round(ref * fontPx / 13.0f));
+    return std::max(fontPx, std::round(ref * fontPx / 13.0f));
   };
   float prevH = -1.0f;
   for (int step : {0, 2, 3}) {
@@ -781,7 +795,7 @@ TEST_CASE("home nav and dock strips grow with the font and never overlap",
   const ship::ShellLayout layout =
       ship::ComputeLayout(1440.0f, 940.0f, 940.0f - 36.0f - 22.0f, 300.0f, true);
   auto typePx = [](int ref, float fontPx) {
-    return std::max(18.0f, std::round(ref * fontPx / 13.0f));
+    return std::max(fontPx, std::round(ref * fontPx / 13.0f));
   };
   for (int step : {0, 2}) {
     ship::Theme theme = ship::Theme::ById("classic");
@@ -1003,32 +1017,28 @@ TEST_CASE("home stat cells carry their units (UI-007)", "[ui][idle][layout]") {
   CHECK(idle.stats.front().box.w >= 6.0f + 6.0f);
 }
 
-TEST_CASE("font step grows TypePx monotone and never below 18 px (UI-002)",
-          "[ui][theme][layout]") {
-  auto typePxFor = [](const ship::Theme& theme, int reference) {
-    return std::max(18, static_cast<int>(
-        std::lround(reference * (theme.FontPx() / 13.0))));
-  };
-  for (int step : {-2, -1, 0, 1, 2, 3, 4}) {
+TEST_CASE("reading size changes small labels and keeps the sidebar compact", "[ui][theme][layout]") {
+  int previous = 0;
+  for (int step = 0; step < 4; ++step) {
     ship::Theme theme = ship::Theme::ById("classic");
     theme.fontStep = step;
-    const float fontPx = ship::Theme::FontPxForStep(step);
-    const int ref10 = static_cast<int>(std::max(18.0,
-        std::round(10.0 * fontPx / 13.0)));
-    const int ref13 = static_cast<int>(std::max(18.0,
-        std::round(13.0 * fontPx / 13.0)));
-    CHECK(typePxFor(theme, 10) >= 18);
-    CHECK(typePxFor(theme, 13) >= 18);
-    CHECK(typePxFor(theme, 10) == ref10);
-    CHECK(typePxFor(theme, 13) == ref13);
+    CHECK(theme.TextPx(0) == 0);
+    for (int reference : {8, 9, 10, 11, 12, 13}) {
+      CHECK(theme.TextPx(reference) == 18 + step);
+    }
+    CHECK(theme.TextPx(10) > previous);
+    CHECK(theme.SidebarPx() == theme.FontPx() - 2);
+    CHECK(theme.SidebarPx() < theme.TextPx(10));
+    CHECK(theme.HomeInfoLabelPx() == 12 + step);
+    CHECK(theme.HomeInfoValuePx() == 15 + step);
+    previous = theme.TextPx(10);
   }
-  // Larger font steps never make text smaller (layouts grow, never shrink).
-  ship::Theme t0 = ship::Theme::ById("classic");
-  t0.fontStep = 0;
-  ship::Theme t3 = ship::Theme::ById("classic");
-  t3.fontStep = 3;
-  CHECK(typePxFor(t3, 13) >= typePxFor(t0, 13));
-  CHECK(typePxFor(t3, 20) >= typePxFor(t0, 20));
+  auto enlarged = ship::Theme::ById("classic");
+  enlarged.largeText = true;
+  CHECK(enlarged.TextPx(10) == 20);
+  CHECK(enlarged.SidebarPx() == 18);
+  CHECK(enlarged.HomeInfoLabelPx() == 14);
+  CHECK(enlarged.HomeInfoValuePx() == 17);
 }
 
 TEST_CASE("home diagram compact rooms carry names and tags in the model "

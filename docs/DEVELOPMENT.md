@@ -1,6 +1,6 @@
 # Development & reference guide
 
-> **Working on the native port?** Read the [rescue lessons](RESCUE_NOTES.md). `Spaceship.hta` remains the gameplay reference unless the owner explicitly changes a mechanic; the newer light palette and exterior ship art are intentional visual departures. Parity claims require source tracing and appropriate verification.
+> **Working on the native port?** Read the [rescue lessons](../rescue/RESCUE_NOTES.md). `Spaceship.hta` remains the gameplay reference unless the owner explicitly changes a mechanic; the newer light palette and exterior ship art are intentional visual departures. Parity claims require source tracing and appropriate verification.
 
 Run `Spaceship.hta` on Windows, or use the browser preview to try it. The title menu uses the supplied artwork and lets you start a voyage, load any of three slots, adjust options or read a quick guide. The game is action-driven: waiting, reading, opening tabs and choosing map targets are free. Starting work costs one action; work in progress advances as you spend actions elsewhere. Navigation also has a **Stand watch** command that spends one action to advance work and survival clocks without a direct item cost, useful when the hold is full; normal life-support and crew consumption still applies. Power-dependent projects, travel, scans and salvage pause if energy runs out.
 
@@ -226,3 +226,13 @@ with other state.
 The current game has working rooms, survival, trade, contracts, relationships, recurring incidents and one branching signal story. It is still a bounded simulation rather than every possibility in the broader manifesto: for example, it does not include a general-purpose AI dialogue/story generator.
 
 For dependency-free checks, run `node tests/galaxy.test.cjs`, `node tests/simulacron.test.cjs`, `node tests/progression.test.cjs`, and `node tests/ships.test.cjs` from this folder.
+
+## Current gameplay and reference tests
+
+The native game intentionally starts with six standard rooms and a 20 m³ Wren
+hold; optional rooms are purchased at stations. `NewVoyage` is the playable
+default. Older room/cargo tests and the HTA differential scripts explicitly use
+`ReferenceVoyage` / `--reference-fit` to test the historical fully fitted
+configuration; they do not assert that the new starter matches the HTA. The
+separate starter tests exercise the new rules and compatibility with old saves.
+See [playing instructions](PLAYING.md) for autosaves and installation updates.

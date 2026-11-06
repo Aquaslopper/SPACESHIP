@@ -20,7 +20,7 @@ ship::Catalog& World() {
   return catalog;
 }
 
-ship::Simulation Fresh() { return ship::Simulation::NewVoyage(World()); }
+ship::Simulation Fresh() { return ship::Simulation::ReferenceVoyage(World()); }
 
 bool FeedContains(const ship::Simulation& sim, const std::string& text) {
   for (const std::string& line : sim.FeedText()) {

@@ -32,7 +32,7 @@ double CountLots(const Simulation& sim, const std::string& kind) {
 }  // namespace
 
 bool RoomHasScreen(const Simulation& sim, const std::string& roomId) {
-  if (roomId == "bridge" || roomId == "simulacron") { return true; }
+  if ((roomId == "bridge" || roomId == "simulacron") && sim.HasRoom(roomId)) { return true; }
   for (const Room& room : sim.Rooms()) {
     if (room.id != roomId) { continue; }
     auto fit = sim.World().roomScenes.find(roomId);
@@ -320,6 +320,7 @@ bool PressRoomActionRaw(Simulation& sim, const std::string& action, const std::s
     return true;
   }
   if (action == "divert-shield") {
+    if (!sim.HasRoom("r6")) return false;
     if (sim.StatValue("shield") < 20 || sim.StatValue("energy") > 85) { return false; }
     sim.ClampStat("shield", -20);
     sim.ClampStat("energy", 15);
@@ -327,6 +328,7 @@ bool PressRoomActionRaw(Simulation& sim, const std::string& action, const std::s
     return true;
   }
   if (action == "divert-power") {
+    if (!sim.HasRoom("r7")) return false;
     if (sim.StatValue("energy") < 20 || sim.StatValue("shield") > 85) { return false; }
     sim.ClampStat("energy", -20);
     sim.ClampStat("shield", 15);

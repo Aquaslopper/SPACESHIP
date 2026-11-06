@@ -151,6 +151,7 @@ add_library(spaceship_core STATIC
   cpp/core/Projects.cpp
   cpp/core/Ships.cpp
   cpp/core/SaveSystem.cpp
+  cpp/core/AutoSave.cpp
   # The cockpit's arithmetic: theme, layout, tab routing, briefing text and the
   # cross-section. Pure data - no window, no graphics library - so CTest can hold
   # every rectangle and every sentence to the reference.
@@ -256,7 +257,8 @@ if(SPACESHIP_BUILD_TESTS)
     cpp/tests/task_tests.cpp
     cpp/tests/nav_tests.cpp
     cpp/tests/crew_tests.cpp
-    cpp/tests/station_tests.cpp)
+    cpp/tests/station_tests.cpp
+    cpp/tests/starter_tests.cpp)
   target_link_libraries(spaceship_tests PRIVATE spaceship_core Catch2::Catch2WithMain)
 
   # Playback state-machine test with a tiny fake raylib audio device; it does

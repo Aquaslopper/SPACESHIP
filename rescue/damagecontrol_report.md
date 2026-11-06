@@ -24,7 +24,7 @@
 
 ### Reproduction and evidence
 - Starting save/state and exact steps:
-- Evidence files (paths under `traps_paid_for/images/` or generated comparison output):
+- Evidence files (paths under `rescue/images/` or generated comparison output):
 - Observed in HTA:
 - Observed in native port:
 - Expected behavior and source location(s):
@@ -60,9 +60,9 @@
 - Scope: shared UI geometry, home/ship screen, sidebar, task panels, Navigation, and future HTA/native comparisons.
 
 ### Reproduction and evidence
-- Starting state and steps: inspect the user-provided captures preserved in `traps_paid_for/images/`. The `00` composite is split into the current ship/home, Engine Room, Mess Hall, and Navigation captures (`01`–`04`). Older port/reference captures are `05`–`08`; the empty startup capture is `09`.
+- Starting state and steps: inspect the user-provided captures preserved in `rescue/images/`. The `00` composite is split into the current ship/home, Engine Room, Mess Hall, and Navigation captures (`01`–`04`). Older port/reference captures are `05`–`08`; the empty startup capture is `09`.
 - Observed in native-port evidence: text collisions and cramped or obscured information remain visible in the supplied screenshots. The captures are snapshots and do not prove what the latest native build renders.
-- Original-game/reference evidence: the supplied ship/home and Navigation references are retained for comparison. Classifications of `b1`/`b2` and `s1`/`s2` were made from visible content, not metadata; see `traps_paid_for/README.md`.
+- Original-game/reference evidence: the supplied ship/home and Navigation references are retained for comparison. Classifications of `b1`/`b2` and `s1`/`s2` were made from visible content, not metadata; see `rescue/README.md`.
 - Reproducible capture procedure: `tools/compare-hta-port.ps1`; usage and limitations: `tools/compare-hta-port.md`.
 
 ### Findings
@@ -76,7 +76,7 @@
 
 ### Changes
 - `db1b423`: changed several task/navigation/crew/panel header layouts, sidebar row sizing, and Navigation controls. **Do not assume these resolve the supplied screenshots** until captured from that exact build and compared.
-- `120e97b`: added `traps_paid_for/README.md` and preserved/renamed the supplied captures.
+- `120e97b`: added `rescue/README.md` and preserved/renamed the supplied captures.
 - `f1a9c47`: added the interactive Windows capture harness and usage guide. It launches both applications and prompts the operator to reproduce the same checkpoint. It does not automate clicks, reset saves, or score parity.
 - No simulation-core change was made in these UI/audit/harness commits.
 
@@ -133,7 +133,7 @@
 
 ### Reproduction and evidence
 - Starting state: clean checkout of `c0e8eb7`; no save state involved (code tracing plus headless test runs).
-- Evidence files: existing captures in `traps_paid_for/images/` re-inspected; no new captures (no GUI runtime here).
+- Evidence files: existing captures in `rescue/images/` re-inspected; no new captures (no GUI runtime here).
 - Observed in HTA (source-confirmed): `Spaceship.hta:129-133` (`#content overflow:auto`), `814-822` (`#map max-width:1100px`), `885-905` (zoom/layer CSS), `1291-1292` (compact deck hides `.room-sys`/`.room-tag` but keeps `.room-name` at 10px), `1301-1404` (four full DARK theme palettes: void/aurora/nebula/ember), `10730-10736` (`THEMES` labels/inks), `11005-11013` (`validGameOptions` ignores unknown keys).
 - Observed in native port (source-confirmed): findings below, with current line numbers.
 - Expected behavior: `REPAIR_AND_RESCUE.md` rules 1-8; the only approved deviation is the 18 px typography floor (rule 5).
@@ -146,7 +146,7 @@
 - **Observed — new defect UI-006, compact ship diagram drops room names and glyphs:** `PaintDiagram` (`Draw.cpp`, room loop) paints names/tags only `if (!diagram.compact)`, and no room glyph is ever painted (a 3 px accent bar only). The HTA keeps room names in compact mode (`Spaceship.hta:1291-1292`) and paints per-room glyphs (`.room-glyph-*`, `Spaceship.hta:416-430+`). A new voyage starts on the Wren (`main.cpp:355` `stageCompact`), so the default home screen shows unnamed empty boxes — exactly `images/01_current_port_ship.png`. Source-confirmed parity defect, not a font-size issue.
 - **Observed — new defect PAR-003, Phase 9 palette redesign deviates from the reference:** `Theme.cpp` ("Phase 9 replaces them with five complete, low-frequency palettes") ships five light-paper palettes with invented labels ("Greenish Tea - matcha paper", "Dusty Blue - overcast slate", ...), while the HTA has one parchment theme plus four full dark themes (`Spaceship.hta:1301-1404`) with labels "Deep Space - cyan", "Aurora - mint", "Nebula - violet", "Ember - copper" (`10730-10736`). The exported `assets/data/content.json` carries the correct HTA labels/inks, but the native settings UI ignores them and uses hardcoded `Theme::Specs()` (`Popups.cpp:135`, `TitleScreen.cpp:159-164`). The `Theme.h:4-8` header comment ("the other four only re-tinted the chart ink ... the port keeps exactly that split") is factually wrong about the reference and contradicts `Theme.cpp`. Introduced in Phase 9 commit `11d68d1` (PR #7), i.e. inherited agent work, not an approved deviation. The 18 px floor is approved; the palette/label redesign is not covered by any approval in `REPAIR_AND_RESCUE.md`.
 - **Observed — sidebar stacking criteria disagree (detail under UI-002):** the model decides stacked values by character count (`Shell.cpp`, `row.key.size()+row.value.size() > maxChars`, `maxChars` from `lineHeight*0.5`), while painting decides by ImGui pixel measurement (`Draw.cpp:415-427`). The two criteria can disagree, so a row reserved as one line can be painted as two and overlap its neighbour. Runtime impact not yet captured.
-- **Observed — image index classifications are stale:** `images/06_reference_ship_capture.png` (upload `b2`) visibly shows the port's Navigation screen with the broken footer, not a reference ship/home capture; `images/08_reference_navigation_capture.png` (upload `s2`) is the genuine HTA. The user's correction key in `traps_paid_for/README.md` (`b1/b2 = BROKEN VERSION`, `s1/s2 = ORIGINAL HTA VERSION`) supersedes the audit's content-based classification. The table in that README was left untouched; read it together with the correction key.
+- **Observed — image index classifications are stale:** `images/06_reference_ship_capture.png` (upload `b2`) visibly shows the port's Navigation screen with the broken footer, not a reference ship/home capture; `images/08_reference_navigation_capture.png` (upload `s2`) is the genuine HTA. The user's correction key in `rescue/README.md` (`b1/b2 = BROKEN VERSION`, `s1/s2 = ORIGINAL HTA VERSION`) supersedes the audit's content-based classification. The table in that README was left untouched; read it together with the correction key.
 - **Hypothesis — the empty startup window (`images/09`) predates the current fallback:** current `PaintTitle` (`Draw.cpp:1424-1452`) explicitly paints a usable fallback menu when the title artwork is missing (added in `acddb22`), and missing Raylib fonts would still leave fallback rectangles visible. The capture shows no rectangles at all, so it likely shows a pre-fallback build or a different failure. Not reproducible here; needs a fresh capture from the current build.
 - **Observed — save compatibility is not broken by the extra options:** native saves add `fontStep`/`fullscreen` (`SaveSystem.cpp:116-118`); HTA `validGameOptions` ignores unknown keys, so HTA loads succeed but silently drop those preferences on re-save. Additive deviation, documented here; no HTA save is rejected.
 - **Unknown / not checked:** actual rendered output of the current build (no GUI runtime in this environment); whether the sidebar values missing in `images/01` persist in the current build (`f493a93` claims to restore them; the model contains the values, paint path not runtime-verified); all gameplay/visual parity beyond the automated scope below.
@@ -236,8 +236,8 @@
 - `cpp/ui/IdleScreen.cpp`: added `TextLineHeight`, `StatCellHeight`, `StripHeight`, `InfoCellHeight` helpers mirroring `ShellView::TypePx`; stat/nav/dock/info box heights now computed from text metrics at each typography step instead of fixed 62/50/42; dock strip y changed to `out.nav.box.Bottom() + 10.0f` (was hard-coded `navTop + 50.0f + 10.0f`).
 - `cpp/ui/Draw.cpp`: `PaintIdle` wrapped in a `Camera2D` offset by `-contentScroll_` so the whole home column scrolls with main-content scroll (matching HTA `#content`); stat/value/strip/right/info paint offsets now cumulative (label, then value one label height + gap below, then strip main/right stacked) so nothing overlaps at any typography step; `Draw()` computes `contentMaxScroll_ = max(0, feedBox.Bottom() - content.Bottom())` after `BuildIdleScreen`; `Click()` offsets the home-screen cursor by `+contentScroll_` so hit-testing matches the painted (scrolled) column and obscured content cannot be clicked.
 - `cpp/tests/ui_tests.cpp`: added 4 focused checks (stat growth/no-overlap, strip growth/no-overlap, dock y docked+undocked, narrow-viewport overflow).
-- `traps_paid_for/damagcontrol_index.md`: UI-001 → IN PROGRESS; added UI-007 (stat unit not painted).
-- `traps_paid_for/damagecontrol_report.md`: this entry.
+- `rescue/damagcontrol_index.md`: UI-001 → IN PROGRESS; added UI-007 (stat unit not painted).
+- `rescue/damagecontrol_report.md`: this entry.
 
 ### Deliberately not changed (scope)
 - `cell.unit` is **not** painted: it is present in the model (`Stat.unit`/`cell.unit`) but absent from `PaintIdle`. Recorded as open gap **UI-007**, not described as preserved.
@@ -265,7 +265,7 @@
 
 ### Reference and environment
 
-Opened and inspected `traps_paid_for/images/10_reference_HTA_version_truebuild.png` itself (the eight-view montage supplied by the user). Read the associated HTA builders, control wrappers and map handlers rather than treating old repair notes as specifications. GitHub `gh issue list --state open --limit 100 --json number,title` returned `[]`; UI-0XX entries here are repository-local tracking items, not currently open GitHub issues.
+Opened and inspected `rescue/images/10_reference_HTA_version_truebuild.png` itself (the eight-view montage supplied by the user). Read the associated HTA builders, control wrappers and map handlers rather than treating old repair notes as specifications. GitHub `gh issue list --state open --limit 100 --json number,title` returned `[]`; UI-0XX entries here are repository-local tracking items, not currently open GitHub issues.
 
 Environment: Linux, no `cmake` initially, no X11/OpenGL headers or Xvfb/xdotool. Installed CMake from PyPI into user-local tools; attempted installation of display/graphics packages but apt could not obtain the required packages. CMake consequently reports `client: OFF`. Downloaded the pinned raylib/ImGui/rlImGui sources into ignored `build/gui-headers` for syntax checking only. **Neither Windows HTA execution nor native graphical execution was possible. There are no new runtime screenshots and no real mouse-interaction results. The user's real-UI acceptance condition is outstanding.**
 

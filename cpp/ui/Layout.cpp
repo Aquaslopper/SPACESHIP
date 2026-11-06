@@ -40,17 +40,19 @@ Area StageRect(const Area& content, bool compactStage) {
 }
 
 ShellLayout ComputeLayout(float windowW, float windowH, float contentHeight,
-                          float others, bool compactStage) {
+                          float others, bool compactStage, float homeWidth) {
   ShellLayout out;
+  // Keep the arrows their original width and let the Home slot grow to fit
+  // the currently selected font. Narrow windows retain valid, bounded boxes.
+  const float homeW = std::min(std::max(0.0f, windowW), std::max(Metrics::kHomeW, homeWidth));
+  const float arrowW = std::min((Metrics::kControlsW - Metrics::kHomeW) / 2.0f,
+                                std::max(0.0f, (windowW - homeW) / 2.0f));
+  const float controlsW = homeW + 2.0f * arrowW;
 
   out.taskbar = Area{0.0f, 0.0f, windowW, Metrics::kTaskbarH};
-  out.controls = Area{windowW - Metrics::kControlsW, 0.0f, Metrics::kControlsW,
-                      Metrics::kTaskbarH};
-  out.tabStrip = Area{0.0f, 0.0f, std::max(0.0f, windowW - Metrics::kControlsW),
-                      Metrics::kTaskbarH};
-  out.home = Area{out.controls.Right() - Metrics::kHomeW, 0.0f, Metrics::kHomeW,
-                  Metrics::kTaskbarH};
-  const float arrowW = std::max(0.0f, (Metrics::kControlsW - Metrics::kHomeW) / 2.0f);
+  out.controls = Area{windowW - controlsW, 0.0f, controlsW, Metrics::kTaskbarH};
+  out.tabStrip = Area{0.0f, 0.0f, std::max(0.0f, windowW - controlsW), Metrics::kTaskbarH};
+  out.home = Area{out.controls.Right() - homeW, 0.0f, homeW, Metrics::kTaskbarH};
   out.scrollLeft = Area{out.controls.x, 0.0f, arrowW, Metrics::kTaskbarH};
   out.scrollRight = Area{out.controls.x + arrowW, 0.0f, arrowW, Metrics::kTaskbarH};
 

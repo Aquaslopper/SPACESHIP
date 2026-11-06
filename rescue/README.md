@@ -1,8 +1,8 @@
 # Traps paid for: port parity evidence
 
-> **Historical rescue document:** This records an earlier investigation and may contain superseded instructions or statuses. The owner has since approved visual redesign and specific gameplay changes. See [current rescue lessons](../docs/RESCUE_NOTES.md) and follow the owner's current instructions.
+> **Historical rescue document:** This records an earlier investigation and may contain superseded instructions or statuses. The owner has since approved visual redesign and specific gameplay changes. See [current rescue lessons](RESCUE_NOTES.md) and follow the owner's current instructions.
 
-This folder preserves the screenshots supplied in the report and records concrete port mismatches visible in them. For the strict 1:1 mission and a warning that inherited agent work may contain hallucinations or unsupported claims, see [`REPAIR_AND_RESCUE.md`](../REPAIR_AND_RESCUE.md); current open issues are indexed in [`damagcontrol_index.md`](damagcontrol_index.md).
+This folder preserves the screenshots supplied in the report and records concrete port mismatches visible in them. For the strict 1:1 mission and a warning that inherited agent work may contain hallucinations or unsupported claims, see [`REPAIR_AND_RESCUE.md`](REPAIR_AND_RESCUE.md); current open issues are indexed in [`damagcontrol_index.md`](damagcontrol_index.md).
 
 ## Image index
 

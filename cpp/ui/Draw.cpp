@@ -111,12 +111,7 @@ std::string TimeStamp(double actionCount) {
 
 }  // namespace
 
-int ShellView::TypePx(int reference) const {
-  return reference <= 0
-             ? reference
-             : std::max(18, static_cast<int>(
-                                std::lround(reference * (theme_.FontPx() / 13.0))));
-}
+int ShellView::TypePx(int reference) const { return theme_.TextPx(reference); }
 
 // The font used to paint text at `size`: bold once the 18 px floor is reached.
 // TextWidth/WrapText must measure with the same font Text paints with, or
@@ -196,7 +191,8 @@ void ShellView::ResetContentScroll() { contentScroll_ = 0.0f; }
 void ShellView::Draw(Simulation& sim, double nowMs) {
   frameTimeMs_ = nowMs;
   const float contentH = height_ - Metrics::kContentTop - Metrics::kStatusH;
-  layout_ = ComputeLayout(width_, height_, contentH, others_, theme_.stageCompact);
+  const float homeWidth = ImGui::CalcTextSize("Home").x + 20.0f;
+  layout_ = ComputeLayout(width_, height_, contentH, others_, theme_.stageCompact, homeWidth);
 
   if (scrollTabKey_ != sim.State().activeTab) {
     scrollTabKey_ = sim.State().activeTab;
@@ -503,21 +499,28 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
   // Home and the two scroll arrows live in the reserved right-hand slot.
   draw->AddRectFilled(ImVec2(layout_.home.x, 0.0f),
                       ImVec2(layout_.home.Right(), Metrics::kTaskbarH), ToIm(p.panel3));
-  draw->AddText(ImVec2(layout_.home.x + 10.0f, 9.0f), ToIm(p.coffee), "Home");
-  draw->AddText(ImVec2(layout_.scrollLeft.x + 12.0f, 9.0f), ToIm(p.muted), "<");
-  draw->AddText(ImVec2(layout_.scrollRight.x + 12.0f, 9.0f), ToIm(p.muted), ">");
+  const float textY = std::max(0.0f, (Metrics::kTaskbarH - ImGui::GetFontSize()) * 0.5f);
+  draw->AddText(ImVec2(layout_.home.x + 10.0f, textY), ToIm(p.coffee), "Home");
+  const float leftW = ImGui::CalcTextSize("<").x;
+  const float rightW = ImGui::CalcTextSize(">").x;
+  draw->AddText(ImVec2(layout_.scrollLeft.x + (layout_.scrollLeft.w - leftW) * 0.5f, textY), ToIm(p.muted), "<");
+  draw->AddText(ImVec2(layout_.scrollRight.x + (layout_.scrollRight.w - rightW) * 0.5f, textY), ToIm(p.muted), ">");
   (void)tabScroll_;
 
   // ---- sidebar -----------------------------------------------------------
+  // Sidebar text is compact enough for the narrow column, while tracking the
+  // same reading-size preference as the central labels and other controls.
+  ImGui::PushFont(nullptr, theme_.SidebarPx());
+  const float sidebarLine = Theme::LineHeightForPx(ImGui::GetFontSize());
   draw->AddRectFilled(ImVec2(layout_.sidepanel.x, layout_.sidepanel.y),
                       ImVec2(layout_.sidepanel.Right(), layout_.sidepanel.Bottom()),
                       ToIm(p.chrome));
 
   const auto measureSide = [&](const std::string& text, float width) {
     const float h = ImGui::CalcTextSize(text.c_str(), nullptr, false, width).y;
-    return std::max(1.0f, std::ceil(h / ImGui::GetFontSize())) * theme_.LineHeight();
+    return std::max(1.0f, std::ceil(h / ImGui::GetFontSize())) * sidebarLine;
   };
-  sideHits_ = SideHits(sim, layout_.sidepanel, layout_.sidefoot, theme_.LineHeight(),
+  sideHits_ = SideHits(sim, layout_.sidepanel, layout_.sidefoot, sidebarLine,
                        sideScroll_, &sideContentH_, measureSide);
   // A browser clamps scrollTop when a section folds or a new voyage replaces
   // its contents. Do the same here; an old offset must not erase Vessel and
@@ -526,7 +529,7 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
       std::max(0.0f, sideContentH_ - layout_.sidepanel.h));
   if (boundedSideScroll != sideScroll_) {
     sideScroll_ = boundedSideScroll;
-    sideHits_ = SideHits(sim, layout_.sidepanel, layout_.sidefoot, theme_.LineHeight(),
+    sideHits_ = SideHits(sim, layout_.sidepanel, layout_.sidefoot, sidebarLine,
                          sideScroll_, &sideContentH_, measureSide);
   }
   const std::vector<SideHit>& hits = sideHits_;
@@ -567,7 +570,7 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
     }
     if (hit.action == SideAction::OpenEvent) {
       wrapped(hit.text, box.y, box.w - 60, ToIm(p.ink));
-      const Area button{box.Right() - 52, box.y, 52, theme_.LineHeight() + 4};
+      const Area button{box.Right() - 52, box.y, 52, sidebarLine + 4};
       draw->AddRect(ImVec2(button.x, button.y), ImVec2(button.Right(), button.Bottom()), ToIm(p.borderDark));
       draw->AddText(ImVec2(button.x + 4, button.y + 2), ToIm(p.muted), "Open");
       continue;
@@ -649,6 +652,7 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
   }
   draw->AddText(ImVec2(8.0f, layout_.sidefoot.y + 68.0f), ToIm(p.muted),
                 "Spaceship Command");
+  ImGui::PopFont();
 
   ImGui::End();
   ImGui::PopStyleColor();
@@ -657,8 +661,11 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
 
 bool ShellView::HasWrenExterior(const Simulation& sim) const {
   const Texture2D* texture = static_cast<const Texture2D*>(wrenExteriorArt_);
-  return sim.State().shipClass == "wren" && texture != nullptr && texture->id != 0 &&
-         texture->width > 0 && texture->height > 0;
+  if (sim.State().shipClass != "wren" || texture == nullptr || texture->id == 0 ||
+      texture->width <= 0 || texture->height <= 0) return false;
+  // The owner's ship exterior remains visible throughout the voyage. The
+  // callouts are built from sim.Rooms(), so only installed rooms are usable.
+  return true;
 }
 
 ShellView::ExteriorLayout ShellView::BuildExteriorLayout(const Simulation& sim, const Area& stage) const {
@@ -668,7 +675,7 @@ ShellView::ExteriorLayout ShellView::BuildExteriorLayout(const Simulation& sim, 
   const float buttonW = std::max(TextWidth("Deck plan / crew", textSize), TextWidth("Exterior view", textSize)) + 16.0f;
   out.toggle = {stage.x + 4.0f, stage.y + 3.0f, buttonW, out.lineHeight + 9.0f};
   const float sideW = std::max(100.0f, std::min(245.0f, stage.w * 0.235f));
-  std::vector<Room> rooms = ActivePlan(sim).rooms;
+  std::vector<Room> rooms = sim.Rooms();
   std::stable_sort(rooms.begin(), rooms.end(), [](const Room& a, const Room& b) {
     return a.box.x < b.box.x;
   });

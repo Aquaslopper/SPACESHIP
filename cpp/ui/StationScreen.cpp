@@ -253,6 +253,24 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     yard.rows.push_back(row);
   }
 
+  {
+    StationRow heading;
+    heading.label = "Optional rooms - 500 sh each";
+    heading.reading = true;
+    yard.rows.push_back(heading);
+    const DeckPlan& plan = sim.State().shipClass == "wren" ? sim.World().wren : sim.World().kestrel;
+    for (const Room& room : plan.rooms) {
+      if (Simulation::StandardRoom(room.id) || sim.HasRoom(room.id)) continue;
+      StationRow row;
+      row.id = "room-buy:" + room.id;
+      row.label = "Install " + room.name + " - 500 sh";
+      row.cost = "1 action";
+      row.enabled = model.docked && purse >= Simulation::RoomPrice();
+      row.confirm = "Install " + room.name + " for 500 shiplets?";
+      yard.rows.push_back(row);
+    }
+  }
+
   for (const CandidateDefinition& candidate : sim.World().candidates) {
     if (!candidate.port.empty() && candidate.port != portId) { continue; }
     const std::string name = candidate.crew.name;
@@ -324,6 +342,7 @@ bool PressStationActionRaw(Simulation& sim, const std::string& action,
   if (action.compare(0, 5, "hire:") == 0) return sim.HireCrew(action.substr(5));
   if (action.compare(0, 8, "upgrade:") == 0) return sim.BuyUpgrade(action.substr(8));
   if (action == "ship-buy") return sim.BuyLargerShip();
+  if (action.compare(0, 9, "room-buy:") == 0) return sim.BuyRoom(action.substr(9));
   if (action.compare(0, 17, "commission-accept") == 0) {
     return sim.AcceptCommission(action.substr(18));
   }

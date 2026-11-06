@@ -1,6 +1,6 @@
 # Spaceship: Repair & Rescue
 
-> **Historical rescue document:** This records an earlier investigation and may contain superseded instructions or statuses. The owner has since approved visual redesign and specific gameplay changes. See [current rescue lessons](docs/RESCUE_NOTES.md) and follow the owner's current instructions.
+> **Historical rescue document:** This records an earlier investigation and may contain superseded instructions or statuses. The owner has since approved visual redesign and specific gameplay changes. See [current rescue lessons](RESCUE_NOTES.md) and follow the owner's current instructions.
 
 ## Mission
 
@@ -29,11 +29,11 @@ Before building on inherited work:
 - Read the test itself and its fixtures/scripts. Record precisely which actions, states, and outputs it covers; a passing selected trace does not prove full gameplay or UI parity.
 - Separate `source-confirmed`, `runtime-observed`, `test-covered (scope named)`, `inferred`, and `unverified` claims in the damage-control log.
 - Verify numeric constants, default values, string labels, geometry, costs, and state mutations against the source before changing or relying on them.
-- If a previous claim turns out to be unsupported or wrong, add a dated correction/follow-up to [`traps_paid_for/damagecontrol_report.md`](traps_paid_for/damagecontrol_report.md) and update [`traps_paid_for/damagcontrol_index.md`](traps_paid_for/damagcontrol_index.md) when it affects an open defect. Preserve the old log entry; correct it with evidence rather than silently erasing it.
+- If a previous claim turns out to be unsupported or wrong, add a dated correction/follow-up to [`rescue/damagecontrol_report.md`](damagecontrol_report.md) and update [`rescue/damagcontrol_index.md`](damagcontrol_index.md) when it affects an open defect. Preserve the old log entry; correct it with evidence rather than silently erasing it.
 
 ## Required repair loop
 
-For each defect, work in this order and record the result in [`traps_paid_for/damagecontrol_report.md`](traps_paid_for/damagecontrol_report.md). Keep the current short list in [`traps_paid_for/damagcontrol_index.md`](traps_paid_for/damagcontrol_index.md).
+For each defect, work in this order and record the result in [`rescue/damagecontrol_report.md`](damagecontrol_report.md). Keep the current short list in [`rescue/damagcontrol_index.md`](damagcontrol_index.md).
 
 1. **Name the defect.** Give it a stable ID, affected screen/system, user-visible symptom, and current status.
 2. **Reproduce both sides.** Start from a named save or reproducible state. Record the exact actions and result in the HTA and native port. Save baseline evidence before editing.
@@ -46,8 +46,8 @@ For each defect, work in this order and record the result in [`traps_paid_for/da
 
 ## Comparison tools and evidence
 
-- Use [`tools/compare-hta-port.md`](tools/compare-hta-port.md) and [`tools/compare-hta-port.ps1`](tools/compare-hta-port.ps1) for a human-guided Windows side-by-side capture. The script gathers screenshots and notes; it does not automate input or declare a pass.
-- Existing visual evidence and the known traps are in [`traps_paid_for/`](traps_paid_for/). Treat supplied screenshots as evidence for their captured state/build only, not as proof of the current build.
+- Use [`tools/compare-hta-port.md`](../tools/compare-hta-port.md) and [`tools/compare-hta-port.ps1`](../tools/compare-hta-port.ps1) for a human-guided Windows side-by-side capture. The script gathers screenshots and notes; it does not automate input or declare a pass.
+- Existing visual evidence and the known traps are in [`rescue/`](./). Treat supplied screenshots as evidence for their captured state/build only, not as proof of the current build.
 - Keep a test save or copy for investigations. Record its identity/state without committing private or user save data.
 - For each comparison, record the port commit/build, OS/runtime, window dimensions, display scaling, starting state, action sequence, expected result, observed result, screenshot paths, test commands, and anything not tested.
 - Compare values and state transitions as well as layout. When useful, add a focused automated parity/trace test so the behavior remains covered after the visual repair.

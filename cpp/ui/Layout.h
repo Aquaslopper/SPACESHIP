@@ -93,7 +93,8 @@ float GiveFeedHeight(float contentHeight, float others);
 float GiveMapHeight(float contentHeight, float others, float mapViewWidth);
 
 ShellLayout ComputeLayout(float windowW, float windowH, float contentHeight,
-                           float others, bool compactStage);
+                           float others, bool compactStage,
+                           float homeWidth = Metrics::kHomeW);
 
 // The stage is a fixed rectangle, centred in the content column. If the window
 // is narrower than the ship the ship keeps its size and the column scrolls -

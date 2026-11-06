@@ -199,6 +199,7 @@ bool Simulation::StartSalvage(int bay) {
 }
 
 bool Simulation::PackageSurvey(const std::string& recordId) {
+  if (!HasRoom("science")) return false;
   if (FindOngoing("pkg-" + recordId) != nullptr) { return false; }
   const SurveyRecord* record = nullptr;
   for (const SurveyRecord& candidate : survey_) {

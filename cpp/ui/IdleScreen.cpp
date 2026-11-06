@@ -21,12 +21,11 @@ float Share(int count) {
 }
 
 // The height one line of text needs at the reference size, mirroring
-// ShellView::TypePx exactly: an 18 px floor, then the size scales with the
-// theme's font px. Used so a container's box is never shorter than the text it
+// ShellView::TypePx exactly: the minimum and larger type both follow the
+// theme's selected font px. Used so a container's box is never shorter than the text it
 // paints, at any typography step.
 float TextLineHeight(const Theme& theme, int refSize) {
-  return static_cast<float>(
-      std::max(18, static_cast<int>(std::lround(refSize * theme.FontPx() / 13.0f))));
+  return static_cast<float>(theme.TextPx(refSize));
 }
 
 // Stat cell: pad + label + gap + value + bar zone (drawn at Bottom()-12) + pad.
