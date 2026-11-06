@@ -57,7 +57,7 @@ void RequireCenteredButtons(const ship::ShellView& view, const RectCall& band) {
   const auto p = view.CurrentTheme().palette;
   std::vector<RectCall> buttons;
   for (const auto& r : rects) {
-    if (r.y < band.y || r.y + r.h > band.y + band.h || r.w < 150 || r.h < 30) continue;
+    if (r.order <= band.order || r.y < band.y || r.y + r.h > band.y + band.h || r.w < 150 || r.h < 30) continue;
     const bool enabled = r.color.r == p.control.r && r.color.g == p.control.g && r.color.b == p.control.b;
     const bool disabled = r.color.r == p.panel3.r && r.color.g == p.panel3.g && r.color.b == p.panel3.b;
     if (enabled || disabled) buttons.push_back(r);
@@ -196,6 +196,15 @@ int main() {
     sim.MutableState().shiplets = 10000;
     ship::OpenTask(sim, "station", "tolme", true);
     Frame(view, sim);
+    const auto salesHeading = FindText("Sell cargo and survey data");
+    const auto boardHeading = FindText("Mission board");
+    const auto yardHeading = FindText("Shipyard and crew");
+    const auto tavernHeading = FindText("Tavern and departure");
+    Require(std::abs(salesHeading.x - boardHeading.x) < 1 && boardHeading.y > salesHeading.y,
+            "Mission board is not stacked beneath sales in the middle column");
+    Require(std::abs(yardHeading.x - tavernHeading.x) < 1 && tavernHeading.y > yardHeading.y,
+            "Tavern is not stacked beneath the shipyard in the right column");
+    Require(yardHeading.x > boardHeading.x, "Station columns have the wrong order");
     const auto fuel = std::find_if(texts.begin(), texts.end(), [](const auto& t) {
       return t.text.find("Fuel cell") == 0;
     });
@@ -375,7 +384,7 @@ int main() {
       check.MutableState().docked = true;
       check.MutableMap().here = "tolme";
       check.MutableState().shiplets = 10000;
-      check.MutableState().options.confirmRisk = true;
+      check.MutableState().options.confirmRisk = false; // Ship purchase always confirms in the HTA.
       ship::ShellView shell;
       shell.Configure(1180, 720, ship::Theme::ById("classic"));
       ship::OpenTask(check, "station", "tolme", true);

@@ -1,10 +1,8 @@
 // ============================================================================
 //  Theme.h — the CSS roles, as data.
 //  ---------------------------------------------------------------------------
-//  The reference has one light parchment theme (classic) and four dark themes
-//  (void, aurora, nebula, ember) that re-tint every surface, not just the ink.
-//  The port mirrors that split: one authored light palette, four authored dark
-//  palettes, each with its own surface colours and ink.
+//  Classic follows the HTA parchment; the other theme IDs use light, softly
+//  tinted variants as requested, keeping existing save selections intact.
 //
 //  Everything here is presentation. No function in this file can advance the
 //  voyage, and nothing here is saved (the voyage saves the theme's NAME).

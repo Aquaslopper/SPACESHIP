@@ -560,6 +560,7 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       const StationScreenModel station = BuildStationScreen(sim, tab.id);
       TaskScreenModel screen;
       screen.head = station.head;
+      screen.panelColumns = {0, 1, 1, 2, 2};
       for (const StationColumn& column : station.columns) {
         NavPanel panel;
         panel.id = "station-panel";
@@ -576,8 +577,9 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
           view.enabled = row.enabled;
           view.live = row.enabled;
           view.confirm = row.confirm;
+          view.reading = row.reading;
           BindCommandCooldown(sim, view, ActionCooldownKey(sim, "press:station:" + row.id + ":"),
-                              "routine");
+                              StationActionCategory(sim, row.id));
           rows.push_back(view);
           ids.push_back(row.id);
         }
@@ -635,7 +637,7 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         view.live = row.enabled;
         view.confirm = row.confirm;
         BindCommandCooldown(sim, view, ActionCooldownKey(sim, "press:room:" + row.id + ":"),
-                            ActionCooldownCategory(row.id + " "));
+                            RoomActionCategory(row.id));
         rows.push_back(view);
         ids.push_back(row.id);
       }
@@ -767,7 +769,7 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         view.live = row.enabled;
         view.confirm = row.confirm;
         BindCommandCooldown(sim, view, ActionCooldownKey(sim, "press:event:" + row.id + ":"),
-                            ActionCooldownCategory(row.id + " "));
+                            "systems");
         rows.push_back(view);
         ids.push_back(row.id);
       }

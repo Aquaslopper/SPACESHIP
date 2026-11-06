@@ -354,10 +354,18 @@ bool PressRoomActionRaw(Simulation& sim, const std::string& action, const std::s
 //  before another action resolves is refused, whether it comes from the window
 //  or from this harness. Free reads spend nothing and therefore lock nothing.
 // ============================================================================
+std::string RoomActionCategory(const std::string& action) {
+  if (action == "broadcast") { return "space"; }
+  if (action.compare(0, 7, "signal:") == 0) { return "critical"; }
+  if (action == "fuel-split" || action == "divert-shield" || action == "divert-power" ||
+      action.compare(0, 5, "meal:") == 0) { return "systems"; }
+  return ActionCooldownCategory(action);
+}
+
 bool PressRoomAction(Simulation& sim, const std::string& action, const std::string& arg) {
   return CommitActionButton(
       sim, ActionCooldownKey(sim, "press:room:" + action + ":" + arg),
-      ActionCooldownCategory(action + " " + arg),
+      RoomActionCategory(action),
       [&]() { return PressRoomActionRaw(sim, action, arg); });
 }
 

@@ -107,6 +107,7 @@ struct CommandRowView {
   bool live = false;        // a `live()` action, wired to something
   std::string confirm;      // asked first when the reader keeps confirmations on
   bool actionCost = true;
+  bool reading = false;     // non-interactive text interleaved with command rows
   bool coolingDown = false;
   double remaining = 0.0;
 };
@@ -238,6 +239,8 @@ struct TaskScreenModel {
   // rows under a heading, not a stage with panels around it. The ids travel
   // beside the rows so a click can be dispatched without parsing a label.
   std::vector<NavPanel> panels;
+  // Optional column index per panel; repeated indices stack panels vertically.
+  std::vector<int> panelColumns;
   std::vector<std::vector<CommandRowView>> panelRows;
   std::vector<std::vector<std::string>> panelRowIds;
 };

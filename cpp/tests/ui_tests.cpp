@@ -64,10 +64,10 @@ TEST_CASE("theme names and chart inks match the HTA THEMES table", "[ui][theme]"
     CHECK(specs[i].ink.g == inks[i].g);
     CHECK(specs[i].ink.b == inks[i].b);
   }
-  // Literal .panel backgrounds from theme-* CSS, not the old invented
-  // light-only palette requirement. This does not cover all derived roles.
-  const ship::Rgb panels[] = {{0xfa,0xf7,0xf2}, {0x15,0x24,0x37},
-      {0x16,0x2d,0x2a}, {0x28,0x1f,0x3b}, {0x30,0x23,0x1d}};
+  // Classic remains source parchment; alternatives are deliberately light
+  // by user request, while keeping their save-compatible identifiers.
+  const ship::Rgb panels[] = {{0xfa,0xf7,0xf2}, {0xf2,0xf7,0xf8},
+      {0xf2,0xf7,0xf3}, {0xf7,0xf3,0xf8}, {0xfa,0xf5,0xf0}};
   for (std::size_t i = 0; i < 5; ++i) {
     const auto palette = ship::Theme::ById(ids[i]).palette;
     CHECK(palette.panel.r == panels[i].r);
@@ -119,18 +119,18 @@ TEST_CASE("the cockpit's fixed anchors", "[ui][layout]") {
   CHECK(layout.sidepanel.x == 0.0f);
   CHECK(layout.sidepanel.y == 36.0f);
   CHECK(layout.sidepanel.w == 165.0f);
-  CHECK(layout.sidepanel.Bottom() == 800.0f - 119.0f);
+  CHECK(layout.sidepanel.Bottom() == 800.0f - 97.0f);
 
   CHECK(layout.sidefoot.x == 0.0f);
   CHECK(layout.sidefoot.w == 165.0f);
   CHECK(layout.sidefoot.h == 96.0f);
-  CHECK(layout.sidefoot.Bottom() == 800.0f - 23.0f);
+  CHECK(layout.sidefoot.Bottom() == 800.0f - 1.0f);
 
   CHECK(layout.content.x == 166.0f);
   CHECK(layout.content.y == 36.0f);
   CHECK(layout.content.w == 1280.0f - 166.0f);
 
-  CHECK(layout.statusbar.h == 22.0f);
+  CHECK(layout.statusbar.h == 0.0f);
   CHECK(layout.statusbar.Bottom() == 800.0f);
 }
 

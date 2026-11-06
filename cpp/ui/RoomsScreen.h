@@ -39,6 +39,8 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
 
 // The press path. Free verbs (opening the chart) return true and spend nothing;
 // committed ones spend exactly one action.
+std::string RoomActionCategory(const std::string& action);
+
 bool PressRoomAction(Simulation& sim, const std::string& action,
                      const std::string& arg = std::string());
 

@@ -31,7 +31,7 @@ function loadReference(htaPath) {
 
   const sandbox = {
     document: { getElementById: () => null, createElement: () => ({ style: {}, appendChild() {}, addEventListener() {} }) },
-    window: { location: { protocol: 'http:' }, localStorage: { setItem() {}, getItem() { return null; } } }
+    window: { confirm: () => true, location: { protocol: 'http:' }, localStorage: { setItem() {}, getItem() { return null; } } }
   };
   vm.createContext(sandbox);
   vm.runInContext(match[1], sandbox, { filename: 'Spaceship.hta' });
@@ -47,6 +47,7 @@ function loadReference(htaPath) {
       sandbox[name] = () => {};
     }
   }
+  sandbox.actionMark = () => {};
   sandbox.repaintCurrent = () => {};
   sandbox.repaintQueue = () => {};
   sandbox.setStatus = () => {};
@@ -643,8 +644,8 @@ function runCommand(g, line) {
     const member = JSON.parse(JSON.stringify(candidate));
     delete member.fee; delete member.port;
     g.CREW.push(member);
-    g.performAction(member.name + ' joined the crew');
     g.simRemember('Arrival', member.name + ' joined the crew at ' + port.name + '.', member.id);
+    g.performAction(member.name + ' joined the crew');
     return true;
   }
   if (command === 'upgrade' && parts.length >= 2) {
@@ -677,16 +678,7 @@ function runCommand(g, line) {
     return true;
   }
   if (command === 'shipyard') {
-    const S = g.STATE;
-    if (S.gameOver || !S.docked || !g.PORTS[g.MAP.here] || S.shipClass !== 'wren' ||
-        S.shiplets < g.LARGE_SHIP_PRICE) { return true; }
-    S.shiplets -= g.LARGE_SHIP_PRICE;
-    S.shipClass = 'kestrel';
-    g.SHIP = JSON.parse(JSON.stringify(g.LARGE_SHIP));
-    g.CARGO.capacity = Math.max(g.CARGO.capacity, g.shipCargoCapacity('kestrel', g.cargoRefitLevel()));
-    g.applyShipLayout();
-    g.performAction('Commissioned SC Tessellate');
-    g.simRemember('Work', 'The crew transferred from SC Wren to SC Tessellate at ' + g.PORTS[g.MAP.here].name + '.');
+    g.buyLargerShip(null);
     return true;
   }
   if (command === 'project' && parts.length >= 2) {
@@ -731,13 +723,7 @@ function runCommand(g, line) {
     return true;
   }
   if (command === 'broadcast') {
-    /* broadcastLocal() without the repaint. */
-    const sys = g.currentSystem(), history = g.WORLD_HISTORY[sys.region];
-    if (g.STATE.gameOver || g.STATE.sim.broadcasts[sys.id] || g.statValue('energy').value <= 2) { return true; }
-    g.clampStat('energy', -2);
-    g.STATE.sim.broadcasts[sys.id] = true;
-    g.performAction('Local traffic report received');
-    if (!g.STATE.gameOver) { g.simRemember('World', sys.name + ': ' + history[1]); }
+    g.broadcastLocal(null);
     return true;
   }
   if (command === 'signal' && parts.length >= 2) {
@@ -782,9 +768,10 @@ function runCommand(g, line) {
     const spec = g.incidentSpec(ev);
     const needsKit = typeof spec.requiresKit === 'boolean' ? spec.requiresKit : spec.kind !== 'Crew';
     if (!spec || g.STATE.gameOver || (needsKit && g.STATE.repairKits < 1)) { return true; }
-    if (needsKit) { g.STATE.repairKits--; }
-    g.performAction(spec.remedy);
-    if (!g.STATE.gameOver && g.findById(g.EVENTS, parts[1])) { g.removeIncident(parts[1]); }
+    g.commitChange(null, spec.remedy, () => {
+      if (needsKit) { g.STATE.repairKits--; }
+      g.removeIncident(parts[1]);
+    });
     return true;
   }
   if (command === 'assign' && parts.length >= 2) {

@@ -63,8 +63,8 @@ bool Simulation::BuyLargerShip() {
   cargo_.capacity = std::max(cargo_.capacity, ShipCargoCapacity("kestrel", CargoRefitLevel()));
   ApplyShipLayout();
 
-  PerformAction("Commissioned SC Tessellate");
   SimRemember("Work", "The crew transferred from SC Wren to SC Tessellate at " + portName + ".");
+  PerformAction("Commissioned SC Tessellate");
   return true;
 }
 

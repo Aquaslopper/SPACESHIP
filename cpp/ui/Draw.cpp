@@ -608,14 +608,6 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
   draw->AddText(ImVec2(8.0f, layout_.sidefoot.y + 68.0f), ToIm(p.muted),
                 "Spaceship Command");
 
-  // ---- status bar --------------------------------------------------------
-  draw->AddRectFilled(ImVec2(0.0f, layout_.statusbar.y),
-                      ImVec2(width_, layout_.statusbar.Bottom()), ToIm(theme_.id == "classic" ? p.panel2 : p.chrome));
-  draw->AddLine(ImVec2(0.0f, layout_.statusbar.y), ImVec2(width_, layout_.statusbar.y),
-                ToIm(p.border));
-  draw->AddText(ImVec2(8.0f, layout_.statusbar.y + 4.0f), ToIm(p.ink),
-                StatusText(sim).c_str());
-
   ImGui::End();
   ImGui::PopStyleColor();
   ImGui::PopStyleVar();
@@ -2012,44 +2004,107 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
     top += screen.hero.hero.h + 8.0f;
   }
   float panelsBottom = top;
-  const std::size_t count = screen.panels.empty() ? 1 : screen.panels.size();
+  const bool grouped = screen.panelColumns.size() == screen.panels.size() && !screen.panels.empty();
+  std::size_t count = screen.panels.empty() ? 1 : screen.panels.size();
+  if (grouped) {
+    count = 1;
+    for (int column : screen.panelColumns) {
+      count = std::max(count, static_cast<std::size_t>(column + 1));
+    }
+  }
   const float gap = 8.0f;
   const float columnW = (right - left - gap * static_cast<float>(count - 1)) /
                         static_cast<float>(count);
+  std::vector<float> columnY(count, top);
+  struct RowMetrics {
+    std::vector<std::string> lines;
+    std::string cost;
+    float badgeW = 0;
+    float height = 0;
+    bool inlineCost = false;
+  };
+  const auto measureRow = [&](const CommandRowView& row, float rowW) {
+    RowMetrics m;
+    m.cost = row.displayCost.empty() ? "free" : row.displayCost;
+    m.badgeW = TextWidth(m.cost.c_str(), TypePx(9)) + 12.0f;
+    m.inlineCost = grouped && !row.reading && rowW >= m.badgeW + 112.0f;
+    const float labelW = std::max(1.0f, rowW - 12.0f - (m.inlineCost ? m.badgeW + 8.0f : 0.0f));
+    m.lines = WrapText(row.label, labelW, TypePx(10), SelectFont(TypePx(10), false));
+    m.height = row.reading ? m.lines.size() * theme_.LineHeight() + 6.0f
+        : (m.lines.size() + (m.inlineCost ? 0 : 1)) * theme_.LineHeight() + 12.0f;
+    return m;
+  };
   for (std::size_t i = 0; i < screen.panels.size(); ++i) {
-    const float x = left + static_cast<float>(i) * (columnW + gap);
+    const std::size_t column = grouped ? static_cast<std::size_t>(screen.panelColumns[i]) : i;
+    const float x = left + static_cast<float>(column) * (columnW + gap);
+    const float panelTop = columnY[column];
     const NavPanel& panel = screen.panels[i];
     const float noteH = MeasurePanelHeight(panel, columnW);
-    PaintPanel(panel, Area{x, top, columnW, noteH});
 
-    float y = top + noteH + 6.0f;
+    // The station's panels contain their rows, as in the HTA, and the sales /
+    // board and shipyard / tavern panels stack in their shared columns.
+    float rowsH = 0;
+    if (i < screen.panelRows.size()) {
+      for (const CommandRowView& row : screen.panelRows[i]) {
+        const RowMetrics m = measureRow(row, columnW - (grouped ? 16.0f : 0.0f));
+        rowsH += m.height + (row.reading ? 0.0f : 3.0f);
+      }
+    }
+    if (grouped && rowsH > 0) {
+      DrawRectangle(static_cast<int>(x), static_cast<int>(panelTop), static_cast<int>(columnW),
+                    static_cast<int>(noteH + rowsH + 12), ToRay(p.panel));
+      DrawRectangleLines(static_cast<int>(x), static_cast<int>(panelTop), static_cast<int>(columnW),
+                         static_cast<int>(noteH + rowsH + 12), ToRay(p.border));
+    }
+    PaintPanel(panel, Area{x, panelTop, columnW, noteH});
+
+    float y = panelTop + noteH + 6.0f;
     if (i < screen.panelRows.size()) {
       for (std::size_t r = 0; r < screen.panelRows[i].size(); ++r) {
         const CommandRowView& row = screen.panelRows[i][r];
-        const auto labelLines = WrapText(row.label, columnW - 12.0f, TypePx(10), SelectFont(TypePx(10), false));
-        const float rowH = (labelLines.size() + 1) * theme_.LineHeight() + 12.0f;
-        const Area box{x, y, columnW, rowH};
+        const float inset = grouped ? 8.0f : 0.0f;
+        const float rowW = columnW - 2 * inset;
+        const RowMetrics m = measureRow(row, rowW);
+        if (row.reading) {
+          for (const auto& line : m.lines) {
+            Text(line.c_str(), static_cast<int>(x + inset + 6.0f), static_cast<int>(y), TypePx(10), ToRay(p.muted));
+            y += theme_.LineHeight();
+          }
+          y += 6.0f;
+          continue;
+        }
+        const float rowH = m.height;
+        const Area box{x + inset, y, rowW, rowH};
         DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
                       static_cast<int>(box.w), static_cast<int>(box.h),
-                      ToRay(row.enabled ? p.panel2 : p.panel3));
+                      ToRay(row.enabled ? (grouped ? p.control : p.panel2) : p.panel3));
         DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
                            static_cast<int>(box.w), static_cast<int>(box.h),
                            ToRay(row.enabled ? p.borderDark : p.border));
-        const std::string cost = row.displayCost.empty() ? std::string("free")
-                                                         : row.displayCost;
         float textTop = box.y + 6.0f;
-        for (const auto& line : labelLines) {
+        for (const auto& line : m.lines) {
           Text(line.c_str(), static_cast<int>(box.x + 6.0f), static_cast<int>(textTop), TypePx(10), ToRay(row.enabled ? p.ink : p.muted));
           textTop += theme_.LineHeight();
         }
-        Text(cost.c_str(), static_cast<int>(box.x + 6.0f), static_cast<int>(textTop), TypePx(9), ToRay(row.enabled ? p.coffee : p.muted));
-        if (row.enabled && i < screen.panelRowIds.size() &&
-            r < screen.panelRowIds[i].size()) {
+        if (m.inlineCost) {
+          const float badgeX = box.Right() - m.badgeW - 6.0f;
+          DrawRectangle(static_cast<int>(badgeX), static_cast<int>(box.y + 4.0f),
+                        static_cast<int>(m.badgeW), static_cast<int>(theme_.LineHeight()), ToRay(p.panel2));
+          DrawRectangleLines(static_cast<int>(badgeX), static_cast<int>(box.y + 4.0f),
+                             static_cast<int>(m.badgeW), static_cast<int>(theme_.LineHeight()), ToRay(p.border));
+          Text(m.cost.c_str(), static_cast<int>(badgeX + 6.0f), static_cast<int>(box.y + 6.0f),
+               TypePx(9), ToRay(row.enabled ? p.coffee : p.muted));
+        } else {
+          Text(m.cost.c_str(), static_cast<int>(box.x + 6.0f), static_cast<int>(textTop), TypePx(9), ToRay(row.enabled ? p.coffee : p.muted));
+        }
+        if (row.enabled && i < screen.panelRowIds.size() && r < screen.panelRowIds[i].size()) {
           navHits_.push_back(NavHit{box, "row", screen.panelRowIds[i][r]});
         }
         y += rowH + 3.0f;
       }
     }
+    if (grouped && rowsH > 0) { y += 6.0f; }
+    columnY[column] = y + gap;
     panelsBottom = std::max(panelsBottom, y);
   }
 
@@ -2553,7 +2608,9 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
           }
         }
       }
-      if (!question.empty() && sim.State().options.confirmRisk) {
+      // The ship purchase always asks; other risk prompts follow the option.
+      if (!question.empty() && (sim.State().options.confirmRisk ||
+                                (panelsKind_ == ScreenKind::Station && hit.arg == "ship-buy"))) {
         pendingConfirm_ = question;
         pendingAction_ = hit.arg;
         return;

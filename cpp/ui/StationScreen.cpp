@@ -77,7 +77,10 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
              sim.FindOngoing("project-food") == nullptr);
 
   for (const Good& good : sim.Market()) {
-    const double price = std::ceil(good.value * 1.0 * 1.2);
+    GoodsLot lot;
+    lot.value = good.value;
+    lot.kind = good.kind;
+    const double price = js::Ceil(sim.LotPrice(lot) * 1.2);
     StationRow row;
     row.id = "buy-good:" + good.id;
     row.label = "Buy " + good.name + " - " + Num(price) + " sh / " + Num(good.vol) + " m3";
@@ -136,6 +139,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     abandon.id = "commission-abandon";
     abandon.label = "Abandon commission and rotate offers";
     abandon.cost = "1 action";
+    abandon.confirm = "Abandon this commission? The reward will be lost.";
     abandon.enabled = true;
     board.rows.push_back(abandon);
   } else {
@@ -157,13 +161,16 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
       board.rows.push_back(row);
     }
   }
-  board.notes.push_back("Regular contracts");
+  { StationRow heading; heading.label = "Regular contracts"; heading.reading = true; board.rows.push_back(heading); }
   for (const Contract& contract : sim.World().contracts) {
     auto statusIt = sim.State().contracts.find(contract.id);
     const std::string status =
         statusIt == sim.State().contracts.end() ? "available" : statusIt->second;
-    board.notes.push_back(contract.title + ": " + contract.note + " Reward " +
-                          Num(contract.reward) + " sh. [" + status + "]");
+    StationRow description;
+    description.label = contract.title + ": " + contract.note + " Reward " +
+                        Num(contract.reward) + " sh. [" + status + "]";
+    description.reading = true;
+    board.rows.push_back(description);
     if (status == "available" || status == "failed") {
       const bool eligible =
           (contract.origin.empty() || contract.origin == sim.Map().here) &&
@@ -249,11 +256,13 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   for (const CandidateDefinition& candidate : sim.World().candidates) {
     if (!candidate.port.empty() && candidate.port != portId) { continue; }
     const std::string name = candidate.crew.name;
-    yard.notes.push_back(name + ": " + candidate.crew.traits + "; health " +
-                         Num(candidate.crew.health) + "%, " +
-                         (candidate.crew.skill.empty() ? std::string("untrained")
-                                                       : candidate.crew.skill) +
-                         ".");
+    StationRow description;
+    description.label = name + ": " + candidate.crew.traits + "; health " +
+                        Num(candidate.crew.health) + "%, " +
+                        (candidate.crew.skill.empty() ? std::string("untrained")
+                                                      : candidate.crew.skill) + ".";
+    description.reading = true;
+    yard.rows.push_back(description);
     StationRow row;
     row.id = "hire:" + candidate.crew.id;
     row.label = "Hire " + name + " - " + Num(candidate.fee) + " sh";
@@ -343,10 +352,26 @@ bool PressStationActionRaw(Simulation& sim, const std::string& action,
 //  before another action resolves is refused, whether it comes from the window
 //  or from this harness. Free reads spend nothing and therefore lock nothing.
 // ============================================================================
+std::string StationActionCategory(const Simulation& sim, const std::string& action) {
+  // commandRow chooses from the displayed label, except the larger-ship
+  // purchase which the HTA explicitly marks critical.
+  if (action == "ship-buy") { return "critical"; }
+  if (action.compare(0, 5, "sell:") == 0 || action.compare(0, 12, "sell-survey:") == 0) {
+    return "routine";  // HTA gives these rows an explicit routine category.
+  }
+  const StationScreenModel model = BuildStationScreen(sim, sim.Map().here);
+  for (const StationColumn& section : model.columns) {
+    for (const StationRow& row : section.rows) {
+      if (row.id == action) { return ActionCooldownCategory(row.label); }
+    }
+  }
+  return ActionCooldownCategory(action);
+}
+
 bool PressStationAction(Simulation& sim, const std::string& action, const std::string& arg) {
   return CommitActionButton(
       sim, ActionCooldownKey(sim, "press:station:" + action + ":" + arg),
-      "routine",  // user correction: a one-action station command locks for five actions
+      StationActionCategory(sim, action),
       [&]() { return PressStationActionRaw(sim, action, arg); });
 }
 

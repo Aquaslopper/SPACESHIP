@@ -474,3 +474,30 @@ TEST_CASE("rank is a name for how much of the log is filled", "[phase7][awards]"
   sim.MutableState().chronicle.claimed["berth"] = true;
   CHECK(sim.ReadyCommendations() == 13);
 }
+
+TEST_CASE("last-action remedies clear an incident before it can escalate", "[event][regression]") {
+  auto sim = Fresh();
+  const auto id = SomeReport(sim);
+  REQUIRE(id == "fracture-45");
+  while (CopyIncident(sim, id).left > 1) { REQUIRE(sim.StandWatch()); }
+  const auto hull = sim.StatValue("hull");
+  const auto kits = sim.State().repairKits;
+  const auto resolved = sim.State().chronicle.incidents;
+  REQUIRE(sim.RemedyIncident(id));
+  CHECK(sim.StatValue("hull") == hull);
+  CHECK(sim.State().repairKits == kits - 1);
+  CHECK(sim.State().chronicle.incidents == resolved + 1);
+  CHECK(CopyIncident(sim, id).id.empty());
+}
+
+TEST_CASE("traffic report memory is made before the world tick", "[sim][regression]") {
+  auto sim = Fresh();
+  const auto before = sim.ActionCount();
+  REQUIRE(sim.BroadcastLocal());
+  REQUIRE(sim.State().sim.memories.back().kind == "World");
+  CHECK(sim.State().sim.memories.back().at == before);
+  CHECK(sim.ActionCount() == before + 1);
+  CHECK(ship::RoomActionCategory("broadcast") == "space");
+  CHECK(ship::RoomActionCategory("fuel-split") == "systems");
+  CHECK(ship::RoomActionCategory("signal:sold") == "critical");
+}

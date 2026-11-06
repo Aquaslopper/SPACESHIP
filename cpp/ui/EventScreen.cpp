@@ -101,7 +101,7 @@ bool PressEventActionRaw(Simulation& sim, const std::string& action, const std::
 bool PressEventAction(Simulation& sim, const std::string& action, const std::string& arg) {
   return CommitActionButton(
       sim, ActionCooldownKey(sim, "press:event:" + action + ":" + arg),
-      ActionCooldownCategory(action + " " + arg),
+      "systems",  // HTA explicitly marks remedy as systems; assignment also classifies there.
       [&]() { return PressEventActionRaw(sim, action, arg); });
 }
 

@@ -92,7 +92,7 @@ void Wipe(const std::filesystem::path& dir) {
 // ---------------------------------------------------------------------------
 //  The station window
 // ---------------------------------------------------------------------------
-TEST_CASE("the station is five columns over the authored port", "[station]") {
+TEST_CASE("the station has five sections over the authored port", "[station]") {
   ship::Simulation sim = Docked();
   const std::string portId = World().ports.front().id;
   const ship::StationScreenModel model = ship::BuildStationScreen(sim, portId);
@@ -122,11 +122,12 @@ TEST_CASE("the station is five columns over the authored port", "[station]") {
   CHECK(model.columns[0].rows[3].label == "O2 canister - 25 sh");
   CHECK(model.columns[0].rows[4].label == "Six rations - 20 sh");
 
-  // Market cargo is priced at ceil(value * 1.2) and carries its volume.
+  // The visible price uses the port factor and matches the amount charged.
   for (const ship::Good& good : sim.Market()) {
     const ship::StationRow* row = Row(model.columns[0], "buy-good:" + good.id);
     REQUIRE(row != nullptr);
-    const double price = std::ceil(good.value * 1.2);
+    ship::GoodsLot lot; lot.value = good.value; lot.kind = good.kind;
+    const double price = std::ceil(sim.LotPrice(lot) * 1.2);
     CHECK(row->label == "Buy " + good.name + " - " + ship::js::NumToString(price) +
                             " sh / " + ship::js::NumToString(good.vol) + " m3");
   }
@@ -232,7 +233,8 @@ TEST_CASE("the mission board accepts, tracks and pays a contract", "[station][bo
 
   // Every contract has its status note, in the reference's words.
   bool sawFreight = false;
-  for (const std::string& note : board.columns[2].notes) {
+  for (const auto& row : board.columns[2].rows) {
+    const std::string& note = row.label;
     if (note.find("Tolme Anchorage") == std::string::npos) { continue; }
     sawFreight = true;
   }
@@ -348,8 +350,9 @@ TEST_CASE("hiring respects the berth limit and the purse", "[station][hire]") {
 
   // The hall lists each candidate in the panel's own words.
   bool described = false;
-  for (const std::string& note : model.columns[3].notes) {
-    if (note.find(candidate.crew.name) == 0) { described = true; }
+  for (const auto& entry : model.columns[3].rows) {
+    const std::string& note = entry.label;
+    if (entry.reading && note.find(candidate.crew.name) == 0) { described = true; }
   }
   CHECK(described);
 
@@ -728,4 +731,76 @@ TEST_CASE("the router sends the station, the hold and the lab to their windows",
   CHECK(ship::ScreenKindFor(lab) == ScreenKind::Science);
   const ship::TaskScreenModel science = ship::BuildTabScreen(sim, lab);
   CHECK(science.panels[0].title == "Survey records");
+}
+
+TEST_CASE("market labels and affordability use the actual local port price", "[station][market][regression]") {
+  ship::Simulation sim = Docked();
+  sim.MutableMap().here = "tolme";
+  sim.MutableCargo().capacity = 200;
+  sim.MutableState().shiplets = 350;
+  const auto before = ship::BuildStationScreen(sim, "tolme");
+  const auto* ore = Row(before.columns[0], "buy-good:ore");
+  REQUIRE(ore != nullptr);
+  CHECK(ore->label == "Buy Refined ore - 404 sh / 14 m3");
+  CHECK_FALSE(ore->enabled);
+  CHECK_FALSE(ship::PressStationAction(sim, "buy-good:ore"));
+  sim.MutableState().shiplets = 404;
+  const auto ready = ship::BuildStationScreen(sim, "tolme");
+  REQUIRE(Row(ready.columns[0], "buy-good:ore")->enabled);
+  REQUIRE(ship::PressStationAction(sim, "buy-good:ore"));
+  CHECK(sim.State().shiplets == 0);
+}
+
+TEST_CASE("station commands use HTA category tiers and matching visible locks", "[station][cooldown][regression]") {
+  ship::Simulation sim = Docked();
+  sim.MutableMap().here = "tolme";
+  sim.MutableState().shiplets = 9000;
+  REQUIRE(ship::OpenTask(sim, "station", "tolme", true));
+  CHECK(ship::StationActionCategory(sim, "buy-fuel") == "routine");
+  CHECK(ship::StationActionCategory(sim, "upgrade:bay") == "systems");
+  CHECK(ship::StationActionCategory(sim, "hull-service") == "systems");
+  CHECK(ship::StationActionCategory(sim, "undock") == "space");
+  CHECK(ship::StationActionCategory(sim, "ship-buy") == "critical");
+  CHECK(ship::StationActionCategory(sim, "sell:signal-core") == "routine");
+  REQUIRE(sim.AcceptCommission("salvage"));
+  CHECK(ship::StationActionCategory(sim, "commission-abandon") == "critical");
+  REQUIRE(ship::PressStationAction(sim, "upgrade:bay"));
+  const auto key = ship::ActionCooldownKey(sim, "press:station:upgrade:bay:");
+  CHECK(sim.State().actionCooldowns.at(key).category == "systems");
+  CHECK(sim.State().actionCooldowns.at(key).remaining == 10);
+  const auto screen = ship::BuildTabScreen(sim, *ship::FindTab(sim.State(), sim.State().activeTab));
+  REQUIRE(screen.panelColumns == std::vector<int>{0, 1, 1, 2, 2});
+  bool found = false;
+  for (std::size_t i = 0; i < screen.panelRowIds.size(); ++i) {
+    for (std::size_t j = 0; j < screen.panelRowIds[i].size(); ++j) {
+      if (screen.panelRowIds[i][j] == "upgrade:bay") {
+        found = true;
+        CHECK(screen.panelRows[i][j].remaining == 10);
+        CHECK(screen.panelRows[i][j].category == "systems");
+      }
+    }
+  }
+  CHECK(found);
+
+  auto other = Docked();
+  other.MutableMap().here = "tolme";
+  REQUIRE(ship::OpenTask(other, "station", "tolme", true));
+  const auto undockKey = ship::ActionCooldownKey(other, "press:station:undock:");
+  REQUIRE(ship::PressStationAction(other, "undock"));
+  CHECK(other.State().actionCooldowns.at(undockKey).category == "space");
+  CHECK(other.State().actionCooldowns.at(undockKey).remaining == 15);
+}
+
+TEST_CASE("hire and ship transfer memories precede their action tick", "[station][memory][regression]") {
+  auto sim = Docked();
+  sim.MutableMap().here = "tolme";
+  sim.MutableState().shiplets = 9000;
+  const double beforeHire = sim.ActionCount();
+  REQUIRE(sim.HireCrew("nemi"));
+  REQUIRE(sim.State().sim.memories.back().kind == "Arrival");
+  CHECK(sim.State().sim.memories.back().at == beforeHire);
+  const double beforeShip = sim.ActionCount();
+  REQUIRE(sim.BuyLargerShip());
+  REQUIRE(sim.State().sim.memories.back().kind == "Work");
+  CHECK(sim.State().sim.memories.back().at == beforeShip);
 }
