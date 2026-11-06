@@ -12,6 +12,7 @@ Welcome to the spaceship, we continue our work on the C++ port, as always. The H
 - Preserve historical investigation material under `rescue/`; do not edit or delete it unless explicitly requested.
 - Do not commit build output or temporary artifacts. Use the documented build and test commands, and report exactly which checks were run and any that could not be run.
 - Before finishing, state what changed, what was deliberately left untouched, and the checks run. A successful build or simulation test is not proof of visual or full gameplay parity.
+- **MANDATORY LOGGING:** Before ending the turn, you MUST read `logbook.md` and append a sequential, compressed entry (minimum 10 lines) strictly following the rules in its header.
 
 ------------
 
