@@ -129,9 +129,10 @@ Simulation Simulation::NewVoyage(const Catalog& catalog) {
 
   // ---- the hold ----------------------------------------------------------
   for (const Good& good : catalog.startingCargo) {
-    // The original fully fitted ship held more than the new starter hold.
-    // A new voyage only receives whole lots that fit; existing saves keep all.
-    if (sim.CargoUsed() + good.vol > sim.cargo_.capacity) continue;
+    // Leave room for two 3 m3 salvage lots on the opening crossing. The old
+    // starting cargo exceeds the smaller hold; existing saves are untouched.
+    constexpr double openingSalvageSpace = 6;
+    if (sim.CargoUsed() + good.vol > sim.cargo_.capacity - openingSalvageSpace) continue;
     GoodsLot lot;
     lot.id = good.id;
     lot.name = good.name;

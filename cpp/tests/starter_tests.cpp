@@ -8,6 +8,8 @@
 #include "ui/RoomsScreen.h"
 #include "ui/Shell.h"
 #include "ui/StationScreen.h"
+#include "ui/NavScreen.h"
+#include "ui/Widgets.h"
 
 namespace {
 ship::Catalog& World() {
@@ -28,7 +30,7 @@ TEST_CASE("a new voyage starts with only standard rooms and a usable 20 m3 hold"
   for (const auto& room : sim.Rooms()) actual.insert(room.id);
   CHECK(actual == expected);
   CHECK(sim.CargoStore().capacity == 20);
-  CHECK(sim.CargoUsed() <= sim.CargoStore().capacity);
+  CHECK(sim.CargoUsed() <= sim.CargoStore().capacity - 6);
   CHECK(sim.Goods().size() < World().startingCargo.size());
   CHECK(ship::OpenTask(sim, "nav", "main", true));
   CHECK(ship::OpenTask(sim, "room", "nav", true));
@@ -123,4 +125,41 @@ TEST_CASE("a starter ship keeps a purchased facility when transferring to a larg
   CHECK(restored.HasRoom("science"));
   CHECK_FALSE(restored.HasRoom("simulacron"));
   CHECK(restored.State().shipClass == "kestrel");
+}
+
+TEST_CASE("the starter can reach its first station through real controls", "[starter][journey]") {
+  auto sim = Starter();
+  REQUIRE(ship::OpenTask(sim, "nav", "main", true));
+  REQUIRE(ship::PressNavAction(sim, "select", "tolme"));
+  REQUIRE(ship::PressNavAction(sim, "travel"));
+  REQUIRE(ship::OpenTask(sim, "room", "o2", true));
+  for (int i = 0; i < 3; ++i) REQUIRE(ship::PressProgressButton(sim, "o2s" + std::to_string(i)));
+  REQUIRE(ship::OpenTask(sim, "nav", "main", true));
+  REQUIRE(ship::PressNavAction(sim, "stand-watch"));
+  REQUIRE(ship::OpenTask(sim, "room", "cargo", true));
+  for (int i = 0; i < 2; ++i) REQUIRE(ship::PressProgressButton(sim, "salvage-" + std::to_string(i)));
+  REQUIRE(sim.BankReady());
+  REQUIRE(ship::OpenTask(sim, "room", "o2", true));
+  REQUIRE(ship::PressProgressButton(sim, "o2-run"));
+  REQUIRE(ship::OpenTask(sim, "system", "fuel", true));
+  REQUIRE(ship::PressSystemAction(sim, "fuel"));
+  REQUIRE(ship::OpenTask(sim, "room", "engine", true));
+  REQUIRE(ship::PressProgressButton(sim, "maint"));
+  REQUIRE(ship::OpenTask(sim, "system", "energy", true));
+  REQUIRE(ship::PressSystemAction(sim, "energy"));
+  REQUIRE(ship::OpenTask(sim, "system", "shield", true));
+  REQUIRE(ship::PressSystemAction(sim, "shield"));
+  REQUIRE(sim.FindOngoing("travel") != nullptr);
+  CHECK(sim.FindOngoing("travel")->state == "done");
+  REQUIRE(ship::OpenTask(sim, "nav", "main", true));
+  REQUIRE(ship::PressNavAction(sim, "travel"));
+  CHECK(sim.Map().here == "tolme");
+  CHECK(sim.State().docked);
+  CHECK(sim.State().gameOver.empty());
+  REQUIRE(ship::OpenTask(sim, "station", sim.Map().here, true));
+  REQUIRE(ship::PressStationAction(sim, "sell:ore"));
+  REQUIRE(sim.State().shiplets >= 500);
+  REQUIRE(ship::PressStationAction(sim, "room-buy:science"));
+  CHECK(sim.HasRoom("science"));
+  CHECK(ship::OpenTask(sim, "room", "science", true));
 }
