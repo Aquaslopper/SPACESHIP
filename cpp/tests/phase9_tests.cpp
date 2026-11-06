@@ -363,6 +363,7 @@ TEST_CASE("the game finds the player's files and falls back to the synth",
   Write(dir / "audio" / "music" / "02-long-watch.ogg", "OggS");
   Write(dir / "audio" / "music" / "01-quiet-drift.mp3", "ID3");
   Write(dir / "audio" / "music" / "03-harbour.wav", "RIFF");
+  Write(dir / "audio" / "music" / "04-upper.MP3", "ID3");
   Write(dir / "audio" / "music" / "notes.txt", "not music");
 
   // Sound effects: the promised names, then the aliases.
@@ -373,10 +374,11 @@ TEST_CASE("the game finds the player's files and falls back to the synth",
 
   const ship::audio::ExternalAudio found =
       ship::audio::FindExternalAudio(dir.string());
-  REQUIRE(found.music.size() == 3);
+  REQUIRE(found.music.size() == 4);
   CHECK(found.music[0].find("01-quiet-drift.mp3") != std::string::npos);
   CHECK(found.music[1].find("02-long-watch.ogg") != std::string::npos);
   CHECK(found.music[2].find("03-harbour.wav") != std::string::npos);
+  CHECK(found.music[3].find("04-upper.MP3") != std::string::npos);
   for (const std::string& path : found.music) {
     CHECK(path.find("notes.txt") == std::string::npos);
   }

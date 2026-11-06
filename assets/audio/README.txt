@@ -18,10 +18,15 @@ Put any number of files in music/. Supported formats:
     .mp3
     .wav
 
-They are read in filename order and played one after another, so name them
-01-quiet-drift.ogg, 02-long-watch.ogg, ... to choose the running order. The
-music volume and the on/off switch in Options apply to them exactly as they do
-to the built-in bed.
+Put files in the assets/audio/music folder beside the game executable, then
+restart the game. The file must actually be a playable Vorbis OGG, MP3 or WAV;
+renaming another format does not convert it. Extensions may be uppercase.
+
+Files are played in filename order; 01-quiet-drift.ogg and 02-long-watch.ogg
+are examples, not required names. If a file cannot be decoded it is skipped.
+Settings shows the selected track or why the built-in music is being used. Turn
+on Ambient soundtrack and adjust the volume there. If you play from a ZIP,
+extract the game first.
 
 SFX
 ---
@@ -47,5 +52,5 @@ keep them under a second.
 WHAT WINS
 ---------
 A file in this folder always beats the synthesiser for that one sound. There is
-no configuration file and no restart needed beyond relaunching the game: the
-folder is scanned once at start-up.
+no configuration file. The folders are scanned once at start-up, so restart
+after adding or changing files.

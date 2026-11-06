@@ -1,5 +1,7 @@
 # Spaceship Recovery Plan — PROPOSAL, NOT ENACTED
 
+> **Historical rescue document:** This records an earlier investigation and may contain superseded instructions or statuses. The owner has since approved visual redesign and specific gameplay changes. See [current rescue lessons](docs/RESCUE_NOTES.md) and follow the owner's current instructions.
+
 Status: proposal for user approval. No game code, asset, or test behavior is changed by this document.
 Branch: `arena/523020b2-spaceship` at `c0e8eb7`.
 Date: 2026-11-05.

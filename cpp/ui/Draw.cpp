@@ -194,6 +194,7 @@ void ShellView::Configure(float width, float height, const Theme& theme) {
 void ShellView::ResetContentScroll() { contentScroll_ = 0.0f; }
 
 void ShellView::Draw(Simulation& sim, double nowMs) {
+  frameTimeMs_ = nowMs;
   const float contentH = height_ - Metrics::kContentTop - Metrics::kStatusH;
   layout_ = ComputeLayout(width_, height_, contentH, others_, theme_.stageCompact);
 
@@ -204,12 +205,32 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
     draggingChart_ = false;
   }
 
+  // Only Wren has supplied exterior artwork. The Kestrel and a missing asset
+  // keep the existing fully interactive deck plan, without invented hull art.
+  if (sim.State().activeTab == "home" && HasWrenExterior(sim)) {
+    if (exteriorView_) {
+      layout_.stage = {layout_.content.x + 8.0f, layout_.content.y,
+                       std::max(1.0f, layout_.content.w - 16.0f), 0.0f};
+      layout_.stage.h = BuildExteriorLayout(sim, layout_.stage).height;
+    } else {
+      layout_.stage.h += 40.0f; // reserve the view-switch row above the deck
+    }
+  }
+
   // Always build Home, including when reduced motion is enabled. Keep drift
   // state across frames and advance it at the reference cadence; rebuilding
   // random dots every frame caused teleporting and a blank reduced-motion view.
   if (sim.State().activeTab == "home") {
     FxRng seeded = rng_;
     idle_ = BuildIdleScreen(sim, layout_, theme_, theme_.hideCrewLabels, seeded);
+    if (HasWrenExterior(sim)) {
+      exterior_ = BuildExteriorLayout(sim, idle_.stageArea);
+      if (exteriorView_) {
+        idle_.stageNote = "Left-click a room to read it. Right-click opens its task window.";
+      } else {
+        idle_.diagram.stage.y += 40.0f;
+      }
+    }
     // Measure the actual proportional-font wraps before painting so long
     // location/life-support values grow the rail instead of overlapping Feed.
     if (!idle_.infos.empty()) {
@@ -634,6 +655,112 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
   ImGui::PopStyleVar();
 }
 
+bool ShellView::HasWrenExterior(const Simulation& sim) const {
+  const Texture2D* texture = static_cast<const Texture2D*>(wrenExteriorArt_);
+  return sim.State().shipClass == "wren" && texture != nullptr && texture->id != 0 &&
+         texture->width > 0 && texture->height > 0;
+}
+
+ShellView::ExteriorLayout ShellView::BuildExteriorLayout(const Simulation& sim, const Area& stage) const {
+  ExteriorLayout out;
+  const int textSize = TypePx(10);
+  out.lineHeight = std::max(static_cast<float>(textSize) + 3.0f, theme_.LineHeight());
+  const float buttonW = std::max(TextWidth("Deck plan / crew", textSize), TextWidth("Exterior view", textSize)) + 16.0f;
+  out.toggle = {stage.x + 4.0f, stage.y + 3.0f, buttonW, out.lineHeight + 9.0f};
+  const float sideW = std::max(100.0f, std::min(245.0f, stage.w * 0.235f));
+  std::vector<Room> rooms = ActivePlan(sim).rooms;
+  std::stable_sort(rooms.begin(), rooms.end(), [](const Room& a, const Room& b) {
+    return a.box.x < b.box.x;
+  });
+  // Keep the approximate fore/aft split, then order each side top-to-bottom
+  // so leader lines do not needlessly cross one another.
+  const auto middle = rooms.begin() + static_cast<std::ptrdiff_t>((rooms.size() + 1) / 2);
+  const auto byHeight = [](const Room& a, const Room& b) {
+    return a.box.y + a.box.h / 2.0 < b.box.y + b.box.h / 2.0;
+  };
+  std::stable_sort(rooms.begin(), middle, byHeight);
+  std::stable_sort(middle, rooms.end(), byHeight);
+  std::vector<std::vector<std::string>> labels;
+  std::size_t maxLines = 1;
+  for (const Room& room : rooms) {
+    labels.push_back(WrapText(room.name, std::max(1.0f, sideW - 16.0f), textSize, SelectFont(textSize, false)));
+    maxLines = std::max(maxLines, labels.back().size());
+  }
+  const float rowH = static_cast<float>(maxLines) * out.lineHeight + 10.0f;
+  const std::size_t rows = (rooms.size() + 1) / 2;
+  const float bodyH = std::max(280.0f, static_cast<float>(rows) * rowH);
+  const float bodyY = stage.y + out.lineHeight + 21.0f;
+  out.height = out.lineHeight + 21.0f + bodyH + 4.0f;
+  const Texture2D* texture = static_cast<const Texture2D*>(wrenExteriorArt_);
+  const float aspect = texture && texture->width > 0 ? static_cast<float>(texture->height) / texture->width : 420.0f / 1340.0f;
+  const float imageW = std::max(1.0f, stage.w - sideW * 2.0f - 32.0f);
+  const float imageH = std::min(imageW * aspect, bodyH * 0.75f);
+  const float fittedW = imageH / aspect;
+  out.image = {stage.x + (stage.w - fittedW) / 2.0f,
+               bodyY + (bodyH - imageH) / 2.0f, fittedW, imageH};
+  for (std::size_t i = 0; i < rooms.size(); ++i) {
+    const bool left = i < rows;
+    const std::size_t row = left ? i : i - rows;
+    ExteriorCallout item;
+    item.id = rooms[i].id;
+    item.lines = std::move(labels[i]);
+    item.left = left;
+    item.box = {left ? stage.x + 2.0f : stage.Right() - sideW - 2.0f,
+                bodyY + row * rowH, sideW, rowH - 4.0f};
+    // Conceptual anchor only: it ties a callout to the exterior visually and
+    // does not claim the supplied sketch is an engineering deck layout.
+    const float nx = std::clamp(static_cast<float>((rooms[i].box.x + rooms[i].box.w * 0.5) / 600.0), 0.0f, 1.0f);
+    const float ny = std::clamp(static_cast<float>((rooms[i].box.y + rooms[i].box.h * 0.5) / 365.0), 0.0f, 1.0f);
+    item.anchor = {out.image.x + out.image.w * (0.07f + 0.86f * nx),
+                   out.image.y + out.image.h * (0.30f + 0.42f * ny)};
+    out.callouts.push_back(std::move(item));
+  }
+  return out;
+}
+
+void ShellView::PaintWrenExterior(const Simulation& sim) {
+  const Texture2D* texture = static_cast<const Texture2D*>(wrenExteriorArt_);
+  const Palette& p = theme_.palette;
+  const Area image = exterior_.image;
+  DrawTexturePro(*texture, Rectangle{0, 0, static_cast<float>(texture->width), static_cast<float>(texture->height)},
+                 Rectangle{image.x, image.y, image.w, image.h}, Vector2{0, 0}, 0, WHITE);
+  const auto hovered = [&](const ExteriorCallout& item) {
+    return layout_.content.Contains(mouseX_, mouseY_) && item.box.Contains(mouseX_, mouseY_ + contentScroll_);
+  };
+  // Lines first and labels last: another room's leader can never paint over
+  // a label. The highlights are decorative; neither they nor hover tick time.
+  for (const ExteriorCallout& item : exterior_.callouts) {
+    const bool hover = hovered(item);
+    const Color line = ToRay(hover ? p.coffeeDark : p.borderDark);
+    const float edgeX = item.left ? item.box.Right() : item.box.x;
+    const float elbowX = item.left ? image.x - 8.0f : image.Right() + 8.0f;
+    const Vector2 from{edgeX, item.box.y + item.box.h * 0.5f};
+    const Vector2 elbow{elbowX, from.y};
+    DrawLineEx(from, elbow, 1.0f, line);
+    DrawLineEx(elbow, item.anchor, 1.0f, line);
+    DrawCircleV(item.anchor, hover ? 4.0f : 2.5f, line);
+  }
+  for (const ExteriorCallout& item : exterior_.callouts) {
+    const bool hover = hovered(item);
+    if (hover) {
+      const float pulse = sim.State().reducedMotion ? 0.20f :
+          0.15f + 0.05f * static_cast<float>(0.5 + 0.5 * std::sin(frameTimeMs_ / 650.0));
+      DrawEllipse(static_cast<int>(item.anchor.x), static_cast<int>(item.anchor.y),
+                  std::max(12.0f, image.w * 0.045f), std::max(8.0f, image.h * 0.09f),
+                  Fade(::Color{255, 224, 156, 255}, pulse));
+    }
+    DrawRectangle(static_cast<int>(item.box.x), static_cast<int>(item.box.y),
+                  static_cast<int>(item.box.w), static_cast<int>(item.box.h), ToRay(hover ? p.panel3 : p.panel));
+    DrawRectangleLines(static_cast<int>(item.box.x), static_cast<int>(item.box.y),
+                       static_cast<int>(item.box.w), static_cast<int>(item.box.h), ToRay(p.border));
+    float y = item.box.y + 4.0f;
+    for (const auto& lineText : item.lines) {
+      Text(lineText.c_str(), static_cast<int>(item.box.x + 8), static_cast<int>(y), TypePx(10), ToRay(p.ink));
+      y += exterior_.lineHeight;
+    }
+  }
+}
+
 void ShellView::PaintIdle(Simulation& sim) {
   const Theme& theme = theme_;
 
@@ -678,7 +805,20 @@ void ShellView::PaintIdle(Simulation& sim) {
                   4, HexColor(cell.colour, ToRay(theme.palette.coffee)));
   }
 
-  PaintDiagram(idle_.diagram, idle_.stageArea, idleDiagramScale_);
+  if (HasWrenExterior(sim) && exteriorView_) {
+    PaintWrenExterior(sim);
+  } else {
+    PaintDiagram(idle_.diagram, idle_.stageArea, idleDiagramScale_);
+  }
+  if (HasWrenExterior(sim)) {
+    const Area toggle = exterior_.toggle;
+    DrawRectangle(static_cast<int>(toggle.x), static_cast<int>(toggle.y),
+                  static_cast<int>(toggle.w), static_cast<int>(toggle.h), ToRay(theme.palette.panel2));
+    DrawRectangleLines(static_cast<int>(toggle.x), static_cast<int>(toggle.y),
+                       static_cast<int>(toggle.w), static_cast<int>(toggle.h), ToRay(theme.palette.borderDark));
+    Text(exteriorView_ ? "Deck plan / crew" : "Exterior view", static_cast<int>(toggle.x + 8),
+         static_cast<int>(toggle.y + 5), TypePx(10), ToRay(theme.palette.ink));
+  }
 
   Text(idle_.stageNote.c_str(), static_cast<int>(idle_.content.x + 8.0f),
            static_cast<int>(idle_.stageArea.Bottom() + 8.0f), TypePx(12) ,
@@ -1839,6 +1979,7 @@ void ShellView::PaintSettingsControls(Simulation& sim, const PopupModel& model) 
           ImGui::EndCombo();
         }
       }
+      if (!audioStatus_.empty()) { heading("Soundtrack"); text(audioStatus_); }
       heading("Display adjustment");
       text("Higher gamma darkens midtones; brightness adjusts the white level. Default is 1.00.");
       if (!displayAdjustmentAvailable_) { text("Display adjustment is unavailable; using the unadjusted display."); }
@@ -2878,10 +3019,25 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
     // cursor down by the same amount so a click lands on what is actually
     // painted, and never on content scrolled out of view.
     const float scrollY = contentScroll_;
-    // The stage is the only clickable illustration on Home.
-    if (idle_.stageArea.Contains(x, y + scrollY)) {
-      const float localX = x - idle_.stageArea.x;
-      const float localY = y + scrollY - idle_.stageArea.y;
+    // The view switch and room callouts are presentation only. They route to
+    // exactly the same room handlers as the original deck plan.
+    if (HasWrenExterior(sim) && exterior_.toggle.Contains(x, y + scrollY)) {
+      exteriorView_ = !exteriorView_;
+      return;
+    }
+    if (HasWrenExterior(sim) && exteriorView_) {
+      for (const ExteriorCallout& item : exterior_.callouts) {
+        if (!item.box.Contains(x, y + scrollY)) continue;
+        if (button == HitButton::Right) { OpenTask(sim, "room", item.id, false); }
+        else {
+          OpenBriefing(sim, "room", item.id);
+          SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
+        }
+        return;
+      }
+    } else if (idle_.stageArea.Contains(x, y + scrollY)) {
+      const float localX = x - idle_.diagram.stage.x;
+      const float localY = y + scrollY - idle_.diagram.stage.y;
       for (const DiagramCrew& crew : idle_.diagram.crew) {
         const Area hit{crew.dot.x - 6.0f, crew.dot.y - 6.0f, 27.0f, 27.0f};
         const Area labelHit{crew.label.x, crew.label.y,

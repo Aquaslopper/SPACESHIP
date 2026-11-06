@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <fstream>
+#include <filesystem>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -1384,10 +1385,26 @@ bool Simulation::LoadSlot(int slot, const std::string& directory, std::string* e
 }
 
 bool Simulation::SaveToFile(const std::string& path, bool utf16le, std::string* error) const {
+  const std::filesystem::path savePath = std::filesystem::u8path(path);
+  const std::filesystem::path parent = savePath.parent_path();
+  if (!parent.empty()) {
+    std::error_code ec;
+    std::filesystem::create_directories(parent, ec);
+    if (ec) {
+      if (error != nullptr) {
+        *error = "could not create save folder " + parent.u8string() + ": " + ec.message() +
+                 ". Extract the game to a writable folder and try again.";
+      }
+      return false;
+    }
+  }
   const std::string text = SaveJson();
-  std::ofstream file(path, std::ios::binary | std::ios::trunc);
+  std::ofstream file(savePath, std::ios::binary | std::ios::trunc);
   if (!file) {
-    if (error != nullptr) { *error = "could not open " + path; }
+    if (error != nullptr) {
+      *error = "could not open " + path +
+               ". Check folder permissions and extract the game before running it.";
+    }
     return false;
   }
   const std::string bytes = utf16le ? Utf8ToUtf16Le(text, true) : text;
@@ -1400,7 +1417,7 @@ bool Simulation::SaveToFile(const std::string& path, bool utf16le, std::string* 
 }
 
 bool Simulation::LoadFromFile(const std::string& path, std::string* error) {
-  std::ifstream file(path, std::ios::binary);
+  std::ifstream file(std::filesystem::u8path(path), std::ios::binary);
   if (!file) {
     if (error != nullptr) { *error = "No saved game found at " + path; }
     return false;

@@ -18,6 +18,8 @@ struct RectCall { float x, y, w, h; Color color; int order; };
 std::vector<TextCall> texts;
 std::vector<RectCall> rects;
 std::vector<ship::Area> scissors;
+struct EllipseCall { float x, y, rx, ry; Color color; };
+std::vector<EllipseCall> ellipses;
 float cameraY = 0;
 int drawOrder = 0;
 int textureCalls = 0;
@@ -32,7 +34,7 @@ const TextCall& FindText(const std::string& value) {
   return *it;
 }
 void Frame(ship::ShellView& view, ship::Simulation& sim, double nowMs = 0) {
-  texts.clear(); rects.clear(); scissors.clear(); textureDraws.clear(); textureCalls = 0; drawOrder = 0;
+  texts.clear(); rects.clear(); scissors.clear(); ellipses.clear(); textureDraws.clear(); textureCalls = 0; drawOrder = 0;
   // ImGui 1.92 builds glyphs lazily at each new text size. This recording
   // backend has no renderer to upload the rebuilt atlas automatically.
   unsigned char* pixels; int w, h;
@@ -113,7 +115,7 @@ void DrawRectangleLines(int, int, int, int, Color) {}
 void DrawRectangleLinesEx(Rectangle, float, Color) {}
 void DrawRectangleRounded(Rectangle, float, int, Color) {}
 void DrawRectangleRoundedLinesEx(Rectangle, float, int, float, Color) {}
-void DrawEllipse(int, int, float, float, Color) {}
+void DrawEllipse(int x, int y, float rx, float ry, Color c) { ellipses.push_back({float(x), y + cameraY, rx, ry, c}); }
 void DrawCircle(int, int, float, Color) {}
 void DrawCircleV(Vector2, float, Color) {}
 void DrawCircleLines(int, int, float, Color) {}
@@ -223,6 +225,102 @@ int main() {
       });
       Require(end != texts.end() && end->y >= content.y && end->y + end->size < content.Bottom(),
               "Long wiki article bottom is unreachable");
+    }
+    // Real Draw.cpp callouts route all Wren rooms to their existing handlers.
+    // Cosmetic time, browsing and view switches must not advance the clock or
+    // a lock; the original deck still exposes its actual crew indicators.
+    {
+      Texture2D concept{77, 1340, 420, 1, 7};
+      auto artShip = ship::Simulation::NewVoyage(sim.World());
+      Require(ship::PressNavAction(artShip, "stand-watch"), "Could not start clock guard fixture");
+      const auto lockKey = ship::ActionCooldownKey(artShip, "command:stand-watch-advance-ongoing-work:0");
+      const auto lock = ship::CooldownRemaining(artShip, lockKey);
+      Require(lock > 0, "Clock guard has no active lock");
+      const auto actions = artShip.ActionCount();
+      const auto wear = artShip.State().wearTick;
+      ship::ShellView hull;
+      io.DisplaySize = ImVec2(1280, 1200);
+      hull.Configure(1280, 1200, ship::Theme::ById("classic"));
+      hull.SetWrenExteriorTexture(&concept);
+      Frame(hull, artShip, 1000);
+      Require(std::any_of(textureDraws.begin(), textureDraws.end(), [](const TextureCall& t) { return t.id == 77; }),
+              "Wren exterior concept was not painted");
+      for (const auto& room : ship::ActivePlan(artShip).rooms) {
+        Frame(hull, artShip, 1200);
+        const auto label = FindText(room.name);
+        Require(label.y >= hull.LayoutNow().content.y && label.y + label.size < hull.LayoutNow().content.Bottom(),
+                "Wren callout is not visible in the tall fixture");
+        hull.Click(artShip, label.x + 2, label.y + 2, ship::HitButton::Right, 1200);
+        Require(ship::FindTab(artShip.State(), "room:" + room.id) != nullptr,
+                "Exterior callout did not open its corresponding room");
+      }
+      Frame(hull, artShip, 50000);
+      const auto engine = FindText("Engine Room");
+      hull.Move(engine.x + 2, engine.y + 2);
+      Frame(hull, artShip, 51000);
+      Require(!ellipses.empty(), "Hovering a room did not light its exterior anchor");
+      artShip.MutableState().reducedMotion = true;
+      Frame(hull, artShip, 52000);
+      const auto glow = ellipses.back().color.a;
+      Frame(hull, artShip, 100000);
+      Require(!ellipses.empty() && ellipses.back().color.a == glow,
+              "Reduced motion did not make the hover highlight static");
+      const auto deckToggle = FindText("Deck plan / crew");
+      hull.Click(artShip, deckToggle.x + 2, deckToggle.y + 2, ship::HitButton::Left, 100000);
+      auto* person = artShip.FindCrew("jax");
+      Require(person != nullptr, "No crew fixture");
+      person->colour = "#010203";
+      Frame(hull, artShip, 100100);
+      FindText("Exterior view");
+      Require(std::none_of(textureDraws.begin(), textureDraws.end(), [](const TextureCall& t) { return t.id == 77; }),
+              "Deck-plan switch did not restore the original diagram");
+      const auto dot = std::find_if(rects.begin(), rects.end(), [](const RectCall& r) {
+        return r.w == 15 && r.h == 15 && r.color.r == 1 && r.color.g == 2 && r.color.b == 3;
+      });
+      Require(dot != rects.end(), "Deck plan lost the crew indicator");
+      hull.Click(artShip, dot->x + 3, dot->y + 3, ship::HitButton::Right, 100100);
+      Require(ship::FindTab(artShip.State(), "crew:jax") != nullptr, "Crew dot stopped opening its record");
+      const auto exteriorToggle = FindText("Exterior view");
+      hull.Click(artShip, exteriorToggle.x + 2, exteriorToggle.y + 2, ship::HitButton::Left, 100200);
+      Frame(hull, artShip, 100300);
+      const auto label = FindText("Engine Room");
+      hull.Click(artShip, label.x + 2, label.y + 2, ship::HitButton::Left, 100300);
+      Require(hull.HasSelection() && hull.Selection().id == "engine", "Exterior left click did not open the room briefing");
+      Require(artShip.ActionCount() == actions && artShip.State().wearTick == wear &&
+              ship::CooldownRemaining(artShip, lockKey) == lock,
+              "Exterior browsing, view switching or wall time advanced the action clock");
+
+      // Missing art and a different ship class retain their deck plans.
+      ship::ShellView fallback; fallback.Configure(1280, 1200, ship::Theme::ById("classic"));
+      Frame(fallback, artShip);
+      Require(std::none_of(textureDraws.begin(), textureDraws.end(), [](const TextureCall& t) { return t.id == 77; }),
+              "Missing art did not fall back to the deck plan");
+      artShip.MutableState().shipClass = "kestrel";
+      ship::ShellView larger; larger.Configure(1280, 1200, ship::Theme::ById("classic"));
+      larger.SetWrenExteriorTexture(&concept);
+      Frame(larger, artShip);
+      Require(std::none_of(textureDraws.begin(), textureDraws.end(), [](const TextureCall& t) { return t.id == 77; }),
+              "Wren concept was incorrectly used as the Kestrel hull");
+
+      // On a short narrow window, a callout remains reachable after scrolling.
+      auto narrowShip = ship::Simulation::NewVoyage(sim.World());
+      ship::ShellView narrow; io.DisplaySize = ImVec2(900, 500);
+      ship::Theme large = ship::Theme::ById("classic"); large.fontStep = 3;
+      narrow.Configure(900, 500, large); narrow.SetWrenExteriorTexture(&concept);
+      Frame(narrow, narrowShip);
+      auto last = FindText("Recreation");
+      const auto c = narrow.LayoutNow().content;
+      if (last.y >= c.Bottom() - 30) {
+        narrow.Scroll(c.x + 8, c.y + 40, -(last.y - (c.y + 130)) / (40.0f * large.FontPx() / 13.0f));
+        Frame(narrow, narrowShip);
+        last = FindText("Recreation");
+      }
+      Require(last.y >= c.y && last.y + last.size < c.Bottom(), "Narrow-window callout cannot be scrolled into view");
+      narrow.Click(narrowShip, last.x + 2, last.y + 2, ship::HitButton::Right, 0);
+      Require(ship::FindTab(narrowShip.State(), "room:r13") != nullptr,
+              "Scrolled callout hit testing diverged from its drawing");
+      Require(narrowShip.ActionCount() == 0, "Scrolling and browsing a callout advanced time");
+      io.DisplaySize = ImVec2(1280, 720);
     }
     Require(sim.StageJob("bo", "maintenance"), "Could not stage source crew job");
     Require(sim.ToggleOrder("rell", "doc"), "Could not stage source order");

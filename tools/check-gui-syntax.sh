@@ -29,12 +29,14 @@ add_candidates() {
   [ -d "$base" ] || return 0
   [ -z "$found_raylib" ]   && [ -f "$base/raylib-6.0/src/raylib.h" ] && found_raylib="$base/raylib-6.0/src"
   [ -z "$found_raylib" ]   && [ -f "$base/src/raylib.h" ] && found_raylib="$base/src"
+  [ -z "$found_raylib" ]   && [ -f "$base/raylib-src/src/raylib.h" ] && found_raylib="$base/raylib-src/src"
   [ -z "$found_imgui" ]    && [ -f "$base/imgui-1.92.7/imgui.h" ] && found_imgui="$base/imgui-1.92.7"
   [ -z "$found_imgui" ]    && [ -f "$base/imgui/imgui.h" ] && found_imgui="$base/imgui"
   [ -z "$found_imgui" ]    && [ -f "$base/imgui-src/imgui.h" ] && found_imgui="$base/imgui-src"
   [ -z "$found_rlimgui" ]  && [ -f "$base/rlImGui-Raylib_6_0/rlImGui.h" ] && found_rlimgui="$base/rlImGui-Raylib_6_0"
   [ -z "$found_rlimgui" ]  && [ -f "$base/rlImGui/rlImGui.h" ] && found_rlimgui="$base/rlImGui"
   [ -z "$found_rlimgui" ]  && [ -f "$base/rlImGui-src/rlImGui.h" ] && found_rlimgui="$base/rlImGui-src"
+  [ -z "$found_rlimgui" ]  && [ -f "$base/rlimgui-src/rlImGui.h" ] && found_rlimgui="$base/rlimgui-src"
 }
 
 if [ -n "${SPACESHIP_GUI_INCLUDE:-}" ]; then
@@ -56,7 +58,7 @@ if [ -z "$found_raylib" ] || [ -z "$found_imgui" ] || [ -z "$found_rlimgui" ]; t
 fi
 
 set -e
-for unit in cpp/ui/Draw.cpp cpp/app/main.cpp; do
+for unit in cpp/ui/Draw.cpp cpp/audio/AudioDevice.cpp cpp/app/main.cpp; do
   "$CXX_BIN" -std=c++17 -fsyntax-only -Wall -Wextra -Wpedantic \
     -I"$ROOT/cpp" \
     -I"$found_raylib" -I"$found_imgui" -I"$found_rlimgui" -I"$found_rlimgui/extras" \
