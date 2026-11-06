@@ -260,6 +260,44 @@ int main() {
       Require(end != texts.end() && end->y >= content.y && end->y + end->size < content.Bottom(),
               "Long wiki article bottom is unreachable");
     }
+    // The selected reading size must actually change the small labels around
+    // the exterior and the compact Home info cards, not merely the sidebar.
+    {
+      Texture2D concept{77, 1340, 420, 1, 7};
+      io.DisplaySize = ImVec2(1280, 1600);
+      for (bool largeText : {false, true}) {
+        int previousRoomSize = 0;
+        int previousInfoSize = 0;
+        for (int step = 0; step < 4; ++step) {
+          auto fitted = ship::Simulation::ReferenceVoyage(sim.World());
+          const auto before = fitted.ActionCount();
+          ship::Theme theme = ship::Theme::ById("classic");
+          theme.fontStep = step;
+          theme.largeText = largeText;
+          ship::ShellView home;
+          home.Configure(1280, 1600, theme);
+          home.SetWrenExteriorTexture(&concept);
+          Frame(home, fitted);
+          const auto room = FindText("Engine Room");
+          const auto info = FindText(fitted.Infos().front().label);
+          Require(room.size == theme.TextPx(10) && room.size > previousRoomSize,
+                  "Exterior room labels did not grow with reading size");
+          Require(info.size == theme.HomeInfoLabelPx() && info.size > previousInfoSize,
+                  "Compact Home labels did not grow with reading size");
+          Require(room.y >= home.LayoutNow().content.y &&
+                      room.y + room.size < home.LayoutNow().content.Bottom(),
+                  "Larger exterior room label escaped the visible area");
+          home.Click(fitted, room.x + 2, room.y + 2, ship::HitButton::Right, 0);
+          Require(ship::FindTab(fitted.State(), "room:engine") != nullptr,
+                  "Resized exterior label stopped opening its room");
+          Require(fitted.ActionCount() == before,
+                  "Changing reading size or inspecting a room spent an action");
+          previousRoomSize = static_cast<int>(room.size);
+          previousInfoSize = static_cast<int>(info.size);
+        }
+      }
+    }
+
     // Real Draw.cpp callouts route all Wren rooms to their existing handlers.
     // Cosmetic time, browsing and view switches must not advance the clock or
     // a lock; the original deck still exposes its actual crew indicators.

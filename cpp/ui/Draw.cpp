@@ -111,12 +111,7 @@ std::string TimeStamp(double actionCount) {
 
 }  // namespace
 
-int ShellView::TypePx(int reference) const {
-  return reference <= 0
-             ? reference
-             : std::max(18, static_cast<int>(
-                                std::lround(reference * (theme_.FontPx() / 13.0))));
-}
+int ShellView::TypePx(int reference) const { return theme_.TextPx(reference); }
 
 // The font used to paint text at `size`: bold once the 18 px floor is reached.
 // TextWidth/WrapText must measure with the same font Text paints with, or
@@ -513,15 +508,19 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
   (void)tabScroll_;
 
   // ---- sidebar -----------------------------------------------------------
+  // Sidebar text is compact enough for the narrow column, while tracking the
+  // same reading-size preference as the central labels and other controls.
+  ImGui::PushFont(nullptr, theme_.SidebarPx());
+  const float sidebarLine = Theme::LineHeightForPx(ImGui::GetFontSize());
   draw->AddRectFilled(ImVec2(layout_.sidepanel.x, layout_.sidepanel.y),
                       ImVec2(layout_.sidepanel.Right(), layout_.sidepanel.Bottom()),
                       ToIm(p.chrome));
 
   const auto measureSide = [&](const std::string& text, float width) {
     const float h = ImGui::CalcTextSize(text.c_str(), nullptr, false, width).y;
-    return std::max(1.0f, std::ceil(h / ImGui::GetFontSize())) * theme_.LineHeight();
+    return std::max(1.0f, std::ceil(h / ImGui::GetFontSize())) * sidebarLine;
   };
-  sideHits_ = SideHits(sim, layout_.sidepanel, layout_.sidefoot, theme_.LineHeight(),
+  sideHits_ = SideHits(sim, layout_.sidepanel, layout_.sidefoot, sidebarLine,
                        sideScroll_, &sideContentH_, measureSide);
   // A browser clamps scrollTop when a section folds or a new voyage replaces
   // its contents. Do the same here; an old offset must not erase Vessel and
@@ -530,7 +529,7 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
       std::max(0.0f, sideContentH_ - layout_.sidepanel.h));
   if (boundedSideScroll != sideScroll_) {
     sideScroll_ = boundedSideScroll;
-    sideHits_ = SideHits(sim, layout_.sidepanel, layout_.sidefoot, theme_.LineHeight(),
+    sideHits_ = SideHits(sim, layout_.sidepanel, layout_.sidefoot, sidebarLine,
                          sideScroll_, &sideContentH_, measureSide);
   }
   const std::vector<SideHit>& hits = sideHits_;
@@ -571,7 +570,7 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
     }
     if (hit.action == SideAction::OpenEvent) {
       wrapped(hit.text, box.y, box.w - 60, ToIm(p.ink));
-      const Area button{box.Right() - 52, box.y, 52, theme_.LineHeight() + 4};
+      const Area button{box.Right() - 52, box.y, 52, sidebarLine + 4};
       draw->AddRect(ImVec2(button.x, button.y), ImVec2(button.Right(), button.Bottom()), ToIm(p.borderDark));
       draw->AddText(ImVec2(button.x + 4, button.y + 2), ToIm(p.muted), "Open");
       continue;
@@ -653,6 +652,7 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
   }
   draw->AddText(ImVec2(8.0f, layout_.sidefoot.y + 68.0f), ToIm(p.muted),
                 "Spaceship Command");
+  ImGui::PopFont();
 
   ImGui::End();
   ImGui::PopStyleColor();

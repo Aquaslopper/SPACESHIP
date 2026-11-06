@@ -9,6 +9,7 @@
 // ============================================================================
 #include "ui/Theme.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 
@@ -87,12 +88,20 @@ float Theme::FontPxForStep(int step) {
   return kFontFloorPx + static_cast<float>(std::lround(0.05 * kFontFloorPx * clamped));
 }
 
+int Theme::TextPx(int reference) const {
+  if (reference <= 0) return reference;
+  // The minimum must scale as well: a fixed 18px minimum made most small
+  // labels ignore every reading-size step and the larger-text toggle.
+  return std::max(static_cast<int>(std::lround(FontPx())),
+                  static_cast<int>(std::lround(reference * FontPx() / 13.0f)));
+}
+
 int Theme::HomeInfoLabelPx() const {
-  return static_cast<int>(std::lround(12.0f * FontPx() / kFontFloorPx));
+  return static_cast<int>(std::lround(FontPx())) - 6;
 }
 
 int Theme::HomeInfoValuePx() const {
-  return static_cast<int>(std::lround(15.0f * FontPx() / kFontFloorPx));
+  return static_cast<int>(std::lround(FontPx())) - 3;
 }
 
 float Theme::LineHeightForPx(float px) {

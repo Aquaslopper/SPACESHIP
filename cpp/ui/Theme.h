@@ -85,6 +85,11 @@ struct Theme {
   float FontPx() const {
     return FontPxForStep(fontStep) + (largeText ? 2.0f : 0.0f);
   }
+  // Source font sizes scale with the chosen reading size, including labels
+  // that previously got stuck at the fixed minimum.
+  int TextPx(int reference) const;
+  // The narrow sidebar is slightly more compact but follows the same setting.
+  float SidebarPx() const { return FontPx() - 2.0f; }
   int HomeInfoLabelPx() const;
   int HomeInfoValuePx() const;
   float BodySize() const { return FontPx(); }
