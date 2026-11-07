@@ -11,6 +11,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <map>
 #include <set>
@@ -735,11 +736,12 @@ TEST_CASE("the charted galaxy is grown once, deterministically, and every system
   ship::Simulation first = ship::Simulation::NewVoyage(authored);
   const ship::Catalog& grown = first.World();
 
-  // Every region is expanded, and nothing authored is lost.
-  CHECK(grown.regions.size() == authored.regions.size());
+  // Every region is expanded, outer galactic regions are added, and nothing authored is lost.
+  CHECK(grown.regions.size() ==
+        authored.regions.size() + static_cast<std::size_t>(ship::kNewGalaxies));
   CHECK(grown.systems.size() ==
         authored.systems.size() +
-            static_cast<std::size_t>(ship::kNewSystemsPerRegion) * authored.regions.size());
+            static_cast<std::size_t>(ship::kNewSystemsPerRegion) * grown.regions.size());
   CHECK(grown.bodies.size() > authored.bodies.size());
   CHECK(grown.ports.size() > authored.ports.size());
 
@@ -781,10 +783,7 @@ TEST_CASE("the charted galaxy is grown once, deterministically, and every system
     REQUIRE(entry != nullptr);
     CHECK(entry->type == "star");
     CHECK(grown.BodySystem(*entry) == system.id);
-    std::size_t local = 0;
-    for (const ship::Body& body : grown.bodies) {
-      if (grown.BodySystem(body) == system.id) { ++local; }
-    }
+    const std::size_t local = grown.BodiesInSystem(system.id).size();
     CHECK(local >= 2);
     bool linked = false;
     for (const ship::Lane& lane : grown.sectorLanes) {
@@ -823,20 +822,16 @@ TEST_CASE("the charted galaxy is grown once, deterministically, and every system
   const ship::Body* kesslerGrown = grown.FindSystem("sec-kessler");
   REQUIRE(kesslerAuthored != nullptr);
   REQUIRE(kesslerGrown != nullptr);
-  CHECK((kesslerGrown->x - kesslerAuthored->x) == 638.0);
-  CHECK((kesslerGrown->y - kesslerAuthored->y) == 278.0);
+  CHECK((kesslerGrown->x - kesslerAuthored->x) ==
+        (ship::kSectorBoardScale - 1.0) * 0.5 * authored.map.w);
+  CHECK((kesslerGrown->y - kesslerAuthored->y) ==
+        (ship::kSectorBoardScale - 1.0) * 0.5 * authored.map.h);
 
   // ---- every system is a system, not a diagram of one --------------------
-  // The reference gives a system five local bodies; the growth gives each one
-  // worlds of its own, on rings, so the local chart has something to show.
   std::size_t thinnest = 999;
   for (const ship::Body& system : grown.systems) {
-    std::size_t local = 0;
-    for (const ship::Body& body : grown.bodies) {
-      if (grown.BodySystem(body) == system.id) { ++local; }
-    }
+    const std::size_t local = grown.BodiesInSystem(system.id).size();
     thinnest = std::min(thinnest, local);
-    // ...and the summary says what the chart holds.
     bool claimed = false;
     for (const auto& detail : system.details) {
       if (detail.first == "Charted bodies" && detail.second == std::to_string(local)) {
@@ -849,8 +844,9 @@ TEST_CASE("the charted galaxy is grown once, deterministically, and every system
   CHECK(thinnest >= 15u);
 
   // ---- the galaxy scale has stars on it ----------------------------------
-  // Every system is placed inside its region's cluster, so the third layer is
-  // the same two hundred stars the other two layers draw.
+  const ship::MapGeometry& galaxyBoard = grown.layerBoards.at("galaxy");
+  CHECK(galaxyBoard.w == authored.map.w * ship::kGalaxyBoardScale);
+  CHECK(galaxyBoard.h == authored.map.h * ship::kGalaxyBoardScale);
   CHECK(grown.galaxyPositions.size() == grown.systems.size());
   {
     std::set<std::string> dots;
@@ -859,9 +855,9 @@ TEST_CASE("the charted galaxy is grown once, deterministically, and every system
       const auto it = grown.galaxyPositions.find(system.id);
       REQUIRE(it != grown.galaxyPositions.end());
       CHECK(it->second.first >= 0.0);
-      CHECK(it->second.first <= grown.map.w);
+      CHECK(it->second.first <= galaxyBoard.w);
       CHECK(it->second.second >= 0.0);
-      CHECK(it->second.second <= grown.map.h);
+      CHECK(it->second.second <= galaxyBoard.h);
       const std::string key = ship::js::NumToString(it->second.first) + "," +
                               ship::js::NumToString(it->second.second);
       if (!dots.insert(key).second) { clash = system.id; }
@@ -918,4 +914,142 @@ TEST_CASE("no filter hides a body, and a body out of sensor range is still on th
   CHECK(HasText(*Panel(far.screen.left, "nav-status"), "Out of sensor range"));
   CHECK(far.screen.progress.size() >= 1);
   CHECK(sim.ActionCount() == 0);
+}
+
+TEST_CASE("procedural galaxies carry histories, lanes, ports, and camera centering",
+          "[nav][chart][expansion]") {
+  ship::Simulation sim = Fresh();
+  const ship::Catalog& world = sim.World();
+
+  std::size_t genGalaxies = 0;
+  for (const ship::Body& region : world.regions) {
+    if (region.id.rfind("gal-gen-", 0) != 0) { continue; }
+    ++genGalaxies;
+    const auto& history = sim.WorldHistory(region.id);
+    CHECK(history.size() == 2u);
+    CHECK_FALSE(world.SystemsInRegion(region.id).empty());
+
+    bool hasGalaxyLane = false;
+    for (const ship::Lane& lane : world.galaxyLanes) {
+      if (lane.from == region.id || lane.to == region.id) { hasGalaxyLane = true; break; }
+    }
+    CHECK(hasGalaxyLane);
+  }
+  CHECK(genGalaxies == static_cast<std::size_t>(ship::kNewGalaxies));
+
+  // Selecting an outer procedural galaxy and viewing its sector centres the
+  // sector camera over its star cluster so those systems project near the middle.
+  sim.SetLayer("galaxy");
+  REQUIRE(sim.ViewSector("gal-gen-1"));
+  CHECK(sim.Map().layer == "sector");
+  const auto& indices = world.SystemsInRegion("gal-gen-1");
+  REQUIRE_FALSE(indices.empty());
+  const ship::Body& sampleSystem = world.systems[indices.front()];
+  const ship::NavPoint projected =
+      ship::NavProjectPanned(sim.Map(), sim.Views().at("sector"), sampleSystem.x, sampleSystem.y);
+  CHECK(projected.x >= 0.0);
+  CHECK(projected.x <= sim.Map().vw);
+  CHECK(projected.y >= 0.0);
+  CHECK(projected.y <= sim.Map().vh);
+}
+
+TEST_CASE("procedural map events fire on exploration, resolve cleanly, and round-trip saves",
+          "[nav][events][expansion]") {
+  ship::Simulation sim = Fresh();
+  const ship::Catalog& world = sim.World();
+
+  // Locate a procedural body tagged with a salvage cache and another with an
+  // ancient nav buoy so both scan discovery paths can be exercised directly.
+  const ship::Body* salvageBody = nullptr;
+  const ship::Body* buoyBody = nullptr;
+  const ship::Body* depotBody = nullptr;
+  for (const ship::Body& body : world.bodies) {
+    for (const auto& d : body.details) {
+      if (d.first != "Map feature") { continue; }
+      if (d.second == "Salvage cache" && salvageBody == nullptr) { salvageBody = &body; }
+      if (d.second == "Ancient nav buoy" && buoyBody == nullptr) { buoyBody = &body; }
+      if (d.second == "Fuel skimmer depot" && depotBody == nullptr) { depotBody = &body; }
+    }
+  }
+  REQUIRE(salvageBody != nullptr);
+  REQUIRE(buoyBody != nullptr);
+  REQUIRE(depotBody != nullptr);
+
+  // Move into the salvage body's system, select it, run a deep scan, and acknowledge.
+  const ship::Body* salvageSys = world.FindSystem(world.BodySystem(*salvageBody));
+  REQUIRE(salvageSys != nullptr);
+  sim.MutableMap().here = salvageSys->entry;
+  REQUIRE(sim.SelectTarget(salvageBody->id));
+  const std::size_t goodsBefore = sim.Goods().size();
+  REQUIRE(sim.StartScan());
+  while (sim.FindOngoing("scan") != nullptr && sim.FindOngoing("scan")->state != "done") {
+    REQUIRE(sim.StandWatch());
+  }
+  REQUIRE(sim.Acknowledge("scan"));
+  CHECK(sim.Goods().size() == goodsBefore + 1);
+
+  // Move into the nav buoy's system and scan the buoy: insight rises and local
+  // peer bodies are revealed.
+  const ship::Body* buoySys = world.FindSystem(world.BodySystem(*buoyBody));
+  REQUIRE(buoySys != nullptr);
+  sim.MutableMap().here = buoySys->entry;
+  const double insightBefore = sim.State().sim.insight;
+  REQUIRE(sim.SelectTarget(buoyBody->id));
+  REQUIRE(sim.StartScan());
+  while (sim.FindOngoing("scan") != nullptr && sim.FindOngoing("scan")->state != "done") {
+    REQUIRE(sim.StandWatch());
+  }
+  REQUIRE(sim.Acknowledge("scan"));
+  CHECK(sim.State().sim.insight >= insightBefore + 1.0);
+
+  // Arrive at an orbital fuel skimmer depot and confirm fuel cell recovery.
+  const ship::Body* depotSys = world.FindSystem(world.BodySystem(*depotBody));
+  REQUIRE(depotSys != nullptr);
+  sim.MutableMap().here = depotSys->entry;
+  sim.FindStat("fuel")->value = 60.0;
+  const double cellsBefore = sim.State().fuelCells;
+  REQUIRE(sim.SelectTarget(depotBody->id));
+  REQUIRE(sim.StartTravel());
+  while (sim.FindOngoing("travel") != nullptr && sim.FindOngoing("travel")->state != "done") {
+    sim.FindStat("energy")->value = 100.0;
+    sim.MutableLife().canisters = 6;
+    sim.MutableMess().rack = 10;
+    REQUIRE(sim.StandWatch());
+  }
+  REQUIRE(sim.Acknowledge("travel"));
+  CHECK(sim.State().fuelCells == cellsBefore + 1.0);
+
+  // Spawn a map-tied incident, verify save validation against the unexpanded
+  // authored catalogue, load it back, and resolve it with a repair kit.
+  REQUIRE(sim.SpawnMapIncident("map-ion-squall", "Entered charged filament."));
+  std::string why;
+  const std::string saved = sim.SaveJson();
+  INFO(why);
+  REQUIRE(ship::Simulation::ValidSave(saved, World(), &why));
+
+  ship::Simulation restored = Fresh();
+  REQUIRE(restored.LoadJson(saved, &why));
+  REQUIRE_FALSE(restored.Events().empty());
+  const std::string incId = restored.Events().back().id;
+  restored.MutableState().repairKits = 3;
+  REQUIRE(restored.RemedyIncident(incId));
+}
+
+TEST_CASE("huge procedural charts build within interactive frame budgets",
+          "[nav][perf][expansion]") {
+  ship::Simulation sim = Fresh();
+  const auto t0 = std::chrono::steady_clock::now();
+  for (const char* layer : {"system", "sector", "galaxy"}) {
+    sim.SetLayer(layer);
+    const ship::NavScreenModel screen = ship::BuildNavScreen(sim);
+    CHECK_FALSE(screen.chart.bodies.empty());
+    sim.ZoomMap(4);
+    const ship::NavChartView zoomed = ship::BuildNavChart(sim);
+    CHECK_FALSE(zoomed.bodies.empty());
+  }
+  const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                             std::chrono::steady_clock::now() - t0)
+                             .count();
+  INFO("6 full chart builds across all layers took " << elapsedMs << " ms");
+  CHECK(elapsedMs < 250);
 }

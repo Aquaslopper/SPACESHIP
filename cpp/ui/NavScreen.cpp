@@ -23,13 +23,6 @@ std::string Num(double value) { return js::NumToString(value); }
 
 std::string OneDecimal(double value) { return js::ToFixed(value, 1); }
 
-const Body* FindIn(const std::vector<Body>& list, const std::string& id) {
-  for (const Body& body : list) {
-    if (body.id == id) { return &body; }
-  }
-  return nullptr;
-}
-
 // seeded(seed) from the reference: the same seed draws the same sky forever.
 struct Seeded {
   double s = 0;
@@ -77,12 +70,14 @@ std::vector<const Body*> LayerBodies(const Simulation& sim) {
     return out;
   }
   if (layer == "system") {
-    const std::string sid = sim.CurrentSystemId();
-    for (const Body& body : catalog.bodies) {
-      if (catalog.BodySystem(body) == sid) { out.push_back(&body); }
+    const auto& indices = catalog.BodiesInSystem(sim.CurrentSystemId());
+    out.reserve(indices.size());
+    for (std::size_t idx : indices) {
+      if (idx < catalog.bodies.size()) { out.push_back(&catalog.bodies[idx]); }
     }
     return out;
   }
+  out.reserve(catalog.systems.size());
   for (const Body& body : catalog.systems) { out.push_back(&body); }
   return out;
 }
@@ -308,21 +303,37 @@ std::vector<NavDot> NavRouteDots(const Simulation& sim, double ax, double ay,
   const NavPoint a = NavProjectPanned(map, view, ax, ay);
   const NavPoint b = NavProjectPanned(map, view, bx, by);
 
+  // Skip faint lane segments whose bounding box lies completely outside the viewport.
+  if (faint && !selected) {
+    const double pad = 48.0;
+    const double minX = std::min(a.x, b.x);
+    const double maxX = std::max(a.x, b.x);
+    const double minY = std::min(a.y, b.y);
+    const double maxY = std::max(a.y, b.y);
+    if (maxX < -pad || minX > map.vw + pad || maxY < -pad || minY > map.vh + pad) {
+      return {};
+    }
+  }
+
   const double dx = b.x - a.x;
   const double dy = b.y - a.y;
   const double len = std::sqrt(dx * dx + dy * dy);
-  const double gap = selected ? 8 : (faint ? 15 : 11);
+  const double boardScale = std::max(1.0, map.vw / 638.0);
+  const double gap = (selected ? 8.0 : (faint ? 15.0 : 11.0)) * boardScale;
   double n = std::floor(len / gap);
   if (n > 90) { n = 90; }
 
   std::vector<NavDot> dots;
+  if (n > 1) { dots.reserve(static_cast<std::size_t>(n) - 1); }
+  const char* cls = selected ? "rdot rdot-sel" : (faint ? "rdot rdot-faint" : "rdot");
   for (int i = 1; i < static_cast<int>(n); ++i) {
     const double t = i / n;
-    NavDot dot;
-    dot.cls = selected ? "rdot rdot-sel" : (faint ? "rdot rdot-faint" : "rdot");
-    dot.x = js::Round(a.x + dx * t);
-    dot.y = js::Round(a.y + dy * t);
-    dots.push_back(dot);
+    const double px = js::Round(a.x + dx * t);
+    const double py = js::Round(a.y + dy * t);
+    if (faint && (px < -16.0 || px > map.vw + 16.0 || py < -16.0 || py > map.vh + 16.0)) {
+      continue;
+    }
+    dots.push_back(NavDot{px, py, cls});
   }
   return dots;
 }
@@ -406,63 +417,60 @@ NavChartView BuildNavChart(const Simulation& sim) {
                           target == body->id, false));
     }
   } else {
-    // Wide-layer lanes are authored context, fainter than the selected course.
-    const std::vector<Lane>& lanes =
-        chart.layer == "sector" ? sim.World().sectorLanes : sim.World().galaxyLanes;
-    const std::vector<Body>& list =
-        chart.layer == "sector" ? sim.World().systems : sim.World().regions;
+    const Catalog& world = sim.World();
+    const bool isSector = (chart.layer == "sector");
+    const std::vector<Lane>& lanes = isSector ? world.sectorLanes : world.galaxyLanes;
     for (const Lane& lane : lanes) {
-      const Body* a = FindIn(list, lane.from);
-      const Body* b = FindIn(list, lane.to);
+      const Body* a = isSector ? world.FindSystem(lane.from) : world.FindRegion(lane.from);
+      const Body* b = isSector ? world.FindSystem(lane.to) : world.FindRegion(lane.to);
       if (a == nullptr || b == nullptr) { continue; }
-      // The lane web is painted whole: a region that is not the one being read
-      // is still out there, and its lanes are how the chart shows it.
       append(NavRouteDots(sim, a->x, a->y, b->x, b->y, false, true));
     }
-    if (chart.layer == "sector") {
+    if (isSector) {
       const Body* home = sim.HomeBody();
-      const Body* targetBody = FindIn(sim.World().systems, target);
-      if (home != nullptr && targetBody != nullptr && targetBody->region == map.sector &&
-          targetBody->id != home->id) {
+      const Body* targetBody = world.FindSystem(target);
+      if (home != nullptr && targetBody != nullptr && targetBody->id != home->id) {
         append(NavRouteDots(sim, home->x, home->y, targetBody->x, targetBody->y,
                             true, false));
       }
     } else {
       const Task* trip = sim.FindOngoing("travel");
-      const Body* dest = trip == nullptr ? nullptr : FindIn(sim.World().systems, trip->target);
+      const Body* dest = trip == nullptr ? nullptr : world.FindSystem(trip->target);
       const Body* home = sim.HomeBody();
-      const Body* region = dest == nullptr ? nullptr : FindIn(sim.World().regions, dest->region);
-      if (home != nullptr && region != nullptr && home->id != region->id) {
+      const Body* region = dest == nullptr ? nullptr : world.FindRegion(dest->region);
+      const Body* selRegion = world.FindRegion(target);
+      if (home != nullptr && selRegion != nullptr && home->id != selRegion->id) {
+        append(NavRouteDots(sim, home->x, home->y, selRegion->x, selRegion->y, true, false));
+      } else if (home != nullptr && region != nullptr && home->id != region->id) {
         append(NavRouteDots(sim, home->x, home->y, region->x, region->y, true, false));
       }
     }
   }
 
   // --- clusters -----------------------------------------------------------
-  // The deep field. The reference drew it on the two wide scales only; the
-  // system chart had no sky behind it at all, which is half of why the map
-  // looked empty. Same seed and same projection, more stars, every scale.
   {
     double seed = 8721;
-    double count = 420;
-    if (chart.layer == "galaxy") { count = 900; }
+    int count = 420;
+    if (chart.layer == "galaxy") { count = 720; }
     if (chart.layer == "sector") {
-      count = 760 + static_cast<double>(sim.World().systems.size()) * 3.0;
+      count = 960;
       for (std::size_t i = 0; i < sim.World().regions.size(); ++i) {
         if (sim.World().regions[i].id == map.sector) {
           seed += static_cast<double>(i) + 1;
         }
       }
     }
+    chart.clusters.reserve(static_cast<std::size_t>(count) + 256);
     Seeded rnd(seed);
-    for (int i = 0; i < static_cast<int>(count); ++i) {
+    for (int i = 0; i < count; ++i) {
       const NavPoint point =
           NavProjectPanned(map, view, rnd() * map.w, rnd() * map.h);
-      NavDot dot;
-      dot.cls = std::string("cdot cdot-far") + (i % 17 == 0 ? " cdot-bright" : "");
-      dot.x = js::Round(point.x);
-      dot.y = js::Round(point.y);
-      chart.clusters.push_back(dot);
+      const double px = js::Round(point.x);
+      const double py = js::Round(point.y);
+      if (px < -24.0 || px > map.vw + 24.0 || py < -24.0 || py > map.vh + 24.0) { continue; }
+      chart.clusters.push_back(NavDot{
+          px, py,
+          i % 17 == 0 ? "cdot cdot-far cdot-bright" : "cdot cdot-far"});
     }
   }
   for (std::size_t i = 0; i < bodies.size(); ++i) {
@@ -474,11 +482,10 @@ NavChartView BuildNavChart(const Simulation& sim) {
       const double r = 16 + rnd() * 34;
       const NavPoint point = NavProjectPanned(
           map, view, body->x + std::cos(a) * r, body->y + std::sin(a) * r * 0.62);
-      NavDot dot;
-      dot.cls = "cdot";
-      dot.x = js::Round(point.x);
-      dot.y = js::Round(point.y);
-      chart.clusters.push_back(dot);
+      const double px = js::Round(point.x);
+      const double py = js::Round(point.y);
+      if (px < -24.0 || px > map.vw + 24.0 || py < -24.0 || py > map.vh + 24.0) { continue; }
+      chart.clusters.push_back(NavDot{px, py, "cdot"});
     }
   }
 
@@ -491,10 +498,10 @@ NavChartView BuildNavChart(const Simulation& sim) {
       at = TravelMarker(sim);
     } else {
       const Task* trip = sim.FindOngoing("travel");
-      const Body* dest = trip == nullptr ? nullptr : FindIn(sim.World().systems, trip->target);
+      const Body* dest = trip == nullptr ? nullptr : sim.World().FindSystem(trip->target);
       const Body* markerTarget = nullptr;
       if (chart.layer == "galaxy" && dest != nullptr) {
-        markerTarget = FindIn(sim.World().regions, dest->region);
+        markerTarget = sim.World().FindRegion(dest->region);
       } else {
         markerTarget = dest;
       }
@@ -515,7 +522,7 @@ NavChartView BuildNavChart(const Simulation& sim) {
     const Body* system = sim.CurrentSystem();
     where = std::string(system == nullptr ? "Kessler" : system->name) + " - System";
   } else if (chart.layer == "sector") {
-    const Body* region = FindIn(sim.World().regions, map.sector);
+    const Body* region = sim.World().FindRegion(map.sector);
     where = std::string(region == nullptr ? "Sector" : region->name) + " - Sector";
   } else {
     where = "Galaxy";
@@ -632,10 +639,8 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
     scan.Dim("No scan data.");
     distance.Dim("No route plotted.");
   } else if (target->type == "region") {
-    int sectorCount = 0;
-    for (const Body& body : sim.World().systems) {
-      if (body.region == target->id) { ++sectorCount; }
-    }
+    const int sectorCount =
+        static_cast<int>(sim.World().SystemsInRegion(target->id).size());
     name.Name(target->name);
     name.Sub("Galactic region");
     klass.Note(target->klass);

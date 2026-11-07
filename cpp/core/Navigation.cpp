@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <string>
 
 namespace ship {
@@ -25,6 +26,27 @@ std::string Plur(double n, const std::string& word) {
   return js::NumToString(n) + " " + word + (n == 1 ? "" : "s");
 }
 
+std::uint64_t MapEventHash(const std::string& key) {
+  std::uint64_t h = 0xcbf29ce484222325ULL;
+  for (const char c : key) {
+    h ^= static_cast<std::uint64_t>(static_cast<unsigned char>(c));
+    h *= 0x100000001b3ULL;
+  }
+  return h;
+}
+
+std::string DetailValue(const Body& body, const std::string& label) {
+  for (const auto& entry : body.details) {
+    if (entry.first == label) { return entry.second; }
+  }
+  return std::string();
+}
+
+bool IsProceduralId(const std::string& id) {
+  return id.rfind("sec-gen-", 0) == 0 || id.rfind("gal-gen-", 0) == 0 ||
+         id.rfind("gen-", 0) == 0;
+}
+
 }  // namespace
 
 // ---------------------------------------------------------------------------
@@ -32,18 +54,9 @@ std::string Plur(double n, const std::string& word) {
 // ---------------------------------------------------------------------------
 
 const Body* Simulation::FindBodyById(const std::string& id) const {
-  // ids are unique across every layer, so a lookup does not need to know which
-  // map the player is looking at.
-  for (const std::string& layer : catalog_.layerOrder) {
-    const std::vector<Body>* list = nullptr;
-    if (layer == "system") { list = &catalog_.bodies; }
-    if (layer == "sector") { list = &catalog_.systems; }
-    if (layer == "galaxy") { list = &catalog_.regions; }
-    if (list == nullptr) { continue; }
-    for (const Body& body : *list) {
-      if (body.id == id) { return &body; }
-    }
-  }
+  if (const Body* body = catalog_.FindBody(id)) { return body; }
+  if (const Body* system = catalog_.FindSystem(id)) { return system; }
+  if (const Body* region = catalog_.FindRegion(id)) { return region; }
   return nullptr;
 }
 
@@ -99,18 +112,19 @@ void Simulation::ApplyChartBoard() {
 std::vector<const Body*> Simulation::CurBodies() const {
   std::vector<const Body*> out;
   if (map_.layer == "galaxy") {
+    out.reserve(catalog_.regions.size());
     for (const Body& body : catalog_.regions) { out.push_back(&body); }
     return out;
   }
   if (map_.layer == "system") {
-    const std::string sid = CurrentSystemId();
-    for (const Body& body : catalog_.bodies) {
-      if (catalog_.BodySystem(body) == sid) { out.push_back(&body); }
+    const auto& indices = catalog_.BodiesInSystem(CurrentSystemId());
+    out.reserve(indices.size());
+    for (std::size_t idx : indices) {
+      if (idx < catalog_.bodies.size()) { out.push_back(&catalog_.bodies[idx]); }
     }
     return out;
   }
-  // Every charted system, not only the ones inside the region being read. A
-  // filter here is what made the galaxy look like seven dots.
+  out.reserve(catalog_.systems.size());
   for (const Body& body : catalog_.systems) { out.push_back(&body); }
   return out;
 }
@@ -145,28 +159,45 @@ bool Simulation::ZoomMap(int dir) {
 }
 
 void Simulation::PanMap(double dx, double dy) {
-  // The chart may be pulled half a screen out of place, no further, or it can
-  // be lost off the edge and look broken. Panning is free.
   LayerView& view = views_[map_.layer];
-  // The further in the chart is zoomed, the more of it lies outside the box: a
-  // half-viewport leash would pin the player to the middle of a 4x board.
-  const double limitX = js::Round(map_.vw * 0.5 * map_.zoom);
-  const double limitY = js::Round(map_.vh * 0.5 * map_.zoom);
+  const double spanX = std::max(map_.vw, map_.w);
+  const double spanY = std::max(map_.vh, map_.h);
+  const double limitX = js::Round(spanX * 0.5 * map_.zoom);
+  const double limitY = js::Round(spanY * 0.5 * map_.zoom);
   view.px = std::max(-limitX, std::min(limitX, view.px + dx));
   view.py = std::max(-limitY, std::min(limitY, view.py + dy));
 }
 
 bool Simulation::ViewSector(const std::string& regionId) {
-  if (FindBodyById(regionId) == nullptr) { return false; }
-  const Body* region = nullptr;
-  for (const Body& body : catalog_.regions) {
-    if (body.id == regionId) { region = &body; }
-  }
+  const Body* region = catalog_.FindRegion(regionId);
   if (region == nullptr) { return false; }
 
   const Body* system = CurrentSystem();
   map_.sector = regionId;
-  views_["sector"].sel = (system != nullptr && system->region == regionId) ? system->id : std::string();
+  LayerView& secView = views_["sector"];
+  secView.sel = (system != nullptr && system->region == regionId) ? system->id : std::string();
+
+  // Centre the sector camera over the chosen galactic region's star cluster so
+  // clicking any galaxy on Layer 3 frames its systems immediately.
+  const auto& sysIndices = catalog_.SystemsInRegion(regionId);
+  auto boardIt = catalog_.layerBoards.find("sector");
+  const MapGeometry& secBoard = boardIt == catalog_.layerBoards.end() ? catalog_.map : boardIt->second;
+  if (!sysIndices.empty()) {
+    double sumX = 0.0;
+    double sumY = 0.0;
+    for (std::size_t idx : sysIndices) {
+      sumX += catalog_.systems[idx].x;
+      sumY += catalog_.systems[idx].y;
+    }
+    const double meanX = sumX / static_cast<double>(sysIndices.size());
+    const double meanY = sumY / static_cast<double>(sysIndices.size());
+    const double z = secView.zoom > 0.0 ? secView.zoom : 1.0;
+    const double limX = js::Round(secBoard.w * 0.5 * z);
+    const double limY = js::Round(secBoard.h * 0.5 * z);
+    secView.px = std::clamp(js::Round((secBoard.cx - meanX) * z), -limX, limX);
+    secView.py = std::clamp(js::Round((secBoard.cy - meanY) * z), -limY, limY);
+  }
+
   SetLayer("sector");
   return true;
 }
@@ -190,23 +221,22 @@ CrewMember* Simulation::AssignedNavigator() {
 }
 
 Simulation::NavMetrics Simulation::MetricsFor(const Body& body) const {
-  const Body* here = FindBodyById(map_.here);
+  static const std::string kDefaultSystem = "sec-kessler";
+  const Body* here = catalog_.FindBody(map_.here);
+  const std::string& curSysId =
+      (here == nullptr || here->system.empty()) ? kDefaultSystem : here->system;
   double distance = 0;
 
   if (body.type == "system") {
-    const Body* origin = CurrentSystem();
+    const Body* origin = catalog_.FindSystem(curSysId);
     double px = 0;
     if (origin != nullptr && body.region == origin->region) {
       const double dx = body.x - origin->x;
       const double dy = body.y - origin->y;
       px = std::sqrt(dx * dx + dy * dy);
     } else if (origin != nullptr) {
-      const Body* fromRegion = nullptr;
-      const Body* toRegion = nullptr;
-      for (const Body& region : catalog_.regions) {
-        if (region.id == origin->region) { fromRegion = &region; }
-        if (region.id == body.region) { toRegion = &region; }
-      }
+      const Body* fromRegion = catalog_.FindRegion(origin->region);
+      const Body* toRegion = catalog_.FindRegion(body.region);
       double dx = 0;
       double dy = 0;
       if (fromRegion != nullptr && toRegion != nullptr) {
@@ -214,15 +244,20 @@ Simulation::NavMetrics Simulation::MetricsFor(const Body& body) const {
         dy = (toRegion->y - fromRegion->y) * 1.3;
       }
       px = std::sqrt(dx * dx + dy * dy) + 150;
+      if (px > 1050.0) {
+        const double excess = px - 1050.0;
+        px = 1050.0 + 1150.0 * (excess / (excess + 1400.0));
+      }
     }
     distance = std::max(6.0, js::Round(px / 24.0) + 5.0);
+    if (body.id == curSysId) { distance = 0; }
   } else {
     const double dx = body.x - (here == nullptr ? 0.0 : here->x);
     const double dy = body.y - (here == nullptr ? 0.0 : here->y);
     const double px = std::sqrt(dx * dx + dy * dy);
     distance = std::max(3.0, js::Round(px / map_.pxPerAction));
+    if (body.id == map_.here) { distance = 0; }
   }
-  if (AtTarget(body)) { distance = 0; }
 
   // The navigator reduces FUEL, never travel time: a busy navigator cannot plot
   // a more efficient course, and training raises the saving.
@@ -348,6 +383,7 @@ void Simulation::RevealScan(const std::string& bodyId) {
   }
 
   FileSurvey(*body);
+  ResolveMapScanEvents(*body, first);
   ContractProgress("scan", body->id);
   CommissionProgress("scan", body->id);
   CheckCommendations();
@@ -383,10 +419,9 @@ void Simulation::ChronicleVisit(const Body* system) {
 }
 
 void Simulation::ArriveAt(const std::string& bodyId) {
-  const Body* system = nullptr;
-  for (const Body& body : catalog_.systems) {
-    if (body.id == bodyId) { system = &body; }
-  }
+  const Body* prevSystem = CurrentSystem();
+  const std::string prevRegion = prevSystem == nullptr ? std::string() : prevSystem->region;
+  const Body* system = catalog_.FindSystem(bodyId);
 
   const std::string localId = system != nullptr ? system->entry : bodyId;
   const Body* body = FindBodyById(localId);
@@ -413,8 +448,153 @@ void Simulation::ArriveAt(const std::string& bodyId) {
           (state_.docked ? " - docked. Right-click the docked indicator to open the station" : "") + ".");
   SimRemember("Arrival", "The ship arrived at " + body->name + ".");
   ChronicleVisit(CurrentSystem());
+  ResolveMapArrivalEvents(*body, system, prevRegion);
   CommissionProgress("visit", body->id);
   CheckCommendations();
+}
+
+void Simulation::ResolveMapArrivalEvents(const Body& localBody, const Body* jumpedSystem,
+                                         const std::string& prevRegion) {
+  // 1. Interstellar jumps into procedural systems/galaxies can trigger regional
+  //    navigation hazards or relay telemetry bursts on first entry.
+  if (jumpedSystem != nullptr && IsProceduralId(jumpedSystem->id)) {
+    const std::string visitKey = "map-jump:" + jumpedSystem->id;
+    if (!state_.sim.observed[visitKey]) {
+      state_.sim.observed[visitKey] = true;
+      const Body* region = catalog_.FindRegion(jumpedSystem->region);
+      const std::string hazard = region == nullptr ? std::string() : DetailValue(*region, "Dominant hazard");
+      const std::string auth = region == nullptr ? std::string() : DetailValue(*region, "Authority");
+      const bool crossGalaxy = !prevRegion.empty() && prevRegion != jumpedSystem->region;
+      const std::uint64_t roll = MapEventHash(jumpedSystem->id) % 100ULL;
+
+      if (crossGalaxy && IsProceduralId(jumpedSystem->region)) {
+        const std::string galKey = "map-galaxy:" + jumpedSystem->region;
+        if (!state_.sim.observed[galKey]) {
+          state_.sim.observed[galKey] = true;
+          const std::string rname = region == nullptr ? jumpedSystem->region : region->name;
+          SimRemember("World", "Crossed into outer cluster " + rname + ".");
+          LogLine("Chart milestone: entered " + rname + ". Regional beacons logged.");
+        }
+      }
+
+      if (roll < (crossGalaxy ? 52ULL : 34ULL)) {
+        if (hazard == "Ion squalls") {
+          SpawnMapIncident("map-ion-squall",
+                           "Charged filaments in " + jumpedSystem->name + " wash across the hull.");
+        } else if (hazard == "Subspace shear") {
+          SpawnMapIncident("map-grav-shear",
+                           "Jump wake turbulence in " + jumpedSystem->name + " shakes the drive spine.");
+        } else if (hazard == "Cryo-dust plumes") {
+          SpawnMapIncident("map-cryo-spore",
+                           "Brine-ice plumes in " + jumpedSystem->name + " frost the outer seals.");
+        } else if (hazard == "Ghost telemetry") {
+          SpawnMapIncident("map-beacon-ghost",
+                           "Silicate veil echoes in " + jumpedSystem->name + " flood the comms bus.");
+        } else if (hazard == "Drifting hulks") {
+          SpawnMapIncident("map-derelict-ping",
+                           "Graveyard debris in " + jumpedSystem->name + " crosses the arrival cone.");
+        } else if (hazard == "Lane blockades" || auth == "None" || auth == "Free Captains") {
+          SpawnMapIncident("map-pirate-toll",
+                           "An unflagged picket sweeps the approach into " + jumpedSystem->name + ".");
+        }
+      } else if (roll >= 82ULL) {
+        // Calm survey beacon packet on arrival.
+        state_.sim.insight += 1;
+        LogLine("Arrival telemetry: an automated picket buoy in " + jumpedSystem->name +
+                " transmitted +1 Simulacron insight.");
+      }
+    }
+  }
+
+  // 2. Local arrival at a procedural anomaly/wreck/depot resolves proximity
+  //    encounters once per body.
+  const std::string feature = DetailValue(localBody, "Map feature");
+  if (feature.empty()) { return; }
+  const std::string arriveKey = "map-arr:" + localBody.id;
+  if (state_.sim.observed[arriveKey]) { return; }
+  state_.sim.observed[arriveKey] = true;
+
+  if (feature == "Fuel skimmer depot") {
+    ClampStat("fuel", 10.0);
+    state_.fuelCells += 1;
+    LogLine("Orbital skimmer at " + localBody.name +
+            " transferred +10% fuel and 1 condensed fuel cell.");
+    SimRemember("Discovery", "Recovered condensed fuel from an automated depot at " + localBody.name + ".");
+  } else if (feature == "Ion pocket") {
+    SpawnMapIncident("map-ion-squall",
+                     "Local magnetosphere pocket around " + localBody.name + " surged.");
+  } else if (feature == "Unstable hulk") {
+    state_.shiplets += 45;
+    LogLine("Recovered a 45-shiplet registry transponder from " + localBody.name + ".");
+    SpawnMapIncident("map-derelict-ping",
+                     "Breakaway plating from " + localBody.name + " drifted across the bow.");
+  }
+}
+
+void Simulation::ResolveMapScanEvents(const Body& body, bool firstScan) {
+  if (!firstScan) { return; }
+  const std::string feature = DetailValue(body, "Map feature");
+  if (feature.empty()) { return; }
+  const std::string scanKey = "map-scan:" + body.id;
+  if (state_.sim.observed[scanKey]) { return; }
+  state_.sim.observed[scanKey] = true;
+
+  if (feature == "Salvage cache") {
+    state_.lotSerial += 1;
+    if (CargoUsed() + 3.0 <= cargo_.capacity) {
+      GoodsLot lot;
+      lot.id = "salvage-map-" + std::to_string(static_cast<long long>(state_.lotSerial));
+      lot.name = "Recovered Salvage (" + body.name + ")";
+      lot.kind = "Salvage";
+      lot.vol = 3.0;
+      lot.value = 75.0;
+      lot.risk = false;
+      goods_.push_back(std::move(lot));
+      CommissionProgress("salvage", body.id);
+      LogLine("Map discovery at " + body.name + ": 3 m3 salvage cache winched into the hold.");
+    } else {
+      state_.repairKits += 1;
+      LogLine("Map discovery at " + body.name +
+              ": hold full, stripped 1 field repair kit from the cache.");
+    }
+    SimRemember("Discovery", "Recovered a charted salvage cache at " + body.name + ".");
+  } else if (feature == "Ancient nav buoy") {
+    state_.sim.insight += 1;
+    const auto& peers = catalog_.BodiesInSystem(catalog_.BodySystem(body));
+    int revealed = 0;
+    for (std::size_t idx : peers) {
+      if (revealed >= 2 || idx >= catalog_.bodies.size()) { break; }
+      const Body& peer = catalog_.bodies[idx];
+      if (peer.id == body.id || state_.scanned[peer.id]) { continue; }
+      state_.scanned[peer.id] = true;
+      FileSurvey(peer);
+      ++revealed;
+    }
+    LogLine("Ancient nav buoy at " + body.name + " unlocked " + std::to_string(revealed) +
+            " local telemetry chart" + (revealed == 1 ? "" : "s") + " and +1 insight.");
+    SimRemember("Discovery", "Decoded an ancient navigation buoy near " + body.name + ".");
+  } else if (feature == "Rich mineral seam") {
+    const std::string bonusId = "sv-seam-" + body.id;
+    bool exists = false;
+    for (const SurveyRecord& rec : survey_) {
+      if (rec.id == bonusId) { exists = true; break; }
+    }
+    if (!exists) {
+      SurveyRecord bonus;
+      bonus.id = bonusId;
+      bonus.name = body.name + " Core Assay";
+      bonus.src = "Anomaly scan";
+      bonus.value = 110.0;
+      bonus.state = "filed";
+      survey_.push_back(std::move(bonus));
+      LogLine("Rich mineral assay filed at " + body.name + " (worth 110 sh in Science).");
+    }
+  } else if (feature == "Ion pocket") {
+    state_.sim.insight += 1;
+    state_.sim.sensor = 1;
+    LogLine("Magnetospheric pocket at " + body.name +
+            " calibrated the sensor array (+1 insight, next scan -2 work).");
+  }
 }
 
 void Simulation::RefreshLocationInfo() {

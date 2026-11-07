@@ -24,6 +24,8 @@
 #include <string>
 #include <vector>
 
+#include "data/ChartExpansion.h"
+
 #include "core/JsNumber.h"
 #include "core/Simulation.h"
 #include "core/DisplaySettings.h"
@@ -439,11 +441,34 @@ std::string Simulation::SaveJson() const {
 // Validation
 // ---------------------------------------------------------------------------
 
-bool Simulation::ValidSave(const std::string& text, const Catalog& catalog, std::string* why) {
+bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, std::string* why) {
   auto fail = [why](const std::string& reason) {
     if (why != nullptr) { *why = reason; }
     return false;
   };
+
+  static std::string cachedKey;
+  static Catalog cachedExpanded;
+  Catalog adHocExpanded;
+  const Catalog* catalogPtr = &catalogIn;
+  if (!catalogIn.chartExpanded && !catalogIn.regions.empty() && !catalogIn.systems.empty()) {
+    const std::string key =
+        catalogIn.sourceSha256 + ":" + std::to_string(catalogIn.bodies.size()) + ":" +
+        std::to_string(catalogIn.systems.size()) + ":" + std::to_string(catalogIn.regions.size());
+    if (!catalogIn.sourceSha256.empty()) {
+      if (cachedKey != key) {
+        cachedExpanded = catalogIn;
+        ExpandChart(cachedExpanded);
+        cachedKey = key;
+      }
+      catalogPtr = &cachedExpanded;
+    } else {
+      adHocExpanded = catalogIn;
+      ExpandChart(adHocExpanded);
+      catalogPtr = &adHocExpanded;
+    }
+  }
+  const Catalog& catalog = *catalogPtr;
 
   Json d;
   try {

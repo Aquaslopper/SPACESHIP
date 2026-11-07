@@ -475,23 +475,47 @@ std::optional<Commission> Simulation::CommissionOffer(const std::string& kind) c
 
   if (kind != "salvage") {
     const Body* here = CurrentSystem();
+    const std::string curSysId = CurrentSystemId();
     std::vector<const Body*> all;
     std::vector<const Body*> local;
     std::vector<const Body*> fresh;
-    for (const Body& body : catalog_.bodies) {
-      const std::string systemId = catalog_.BodySystem(body);
-      const Body* system = nullptr;
-      for (const Body& candidate : catalog_.systems) {
-        if (candidate.id == systemId) { system = &candidate; }
+
+    if (kind == "visit") {
+      // Iterate ports directly rather than scanning every body in the galaxy.
+      all.reserve(catalog_.ports.size());
+      for (const Port& port : catalog_.ports) {
+        if (port.id == map_.here) { continue; }
+        const Body* body = catalog_.FindBody(port.id);
+        if (body == nullptr) { continue; }
+        const Body* system = catalog_.FindSystem(catalog_.BodySystem(*body));
+        if (system == nullptr) { continue; }
+        all.push_back(body);
+        if (here != nullptr && system->region == here->region) {
+          local.push_back(body);
+        }
       }
-      if (system == nullptr) { continue; }
-      if (kind == "visit" && (catalog_.FindPort(body.id) == nullptr || body.id == map_.here)) { continue; }
-      if (kind == "scan" && (system->id == CurrentSystemId() || body.type == "origin")) { continue; }
-      all.push_back(&body);
-      if (here != nullptr && system->region == here->region) {
-        local.push_back(&body);
-        if (kind == "scan" && (state_.scanned.count(body.id) == 0 || !state_.scanned.at(body.id))) {
-          fresh.push_back(&body);
+    } else {
+      // Scan regional systems first via the O(1) region/system index; only scan
+      // the full galaxy when the local region has no eligible targets.
+      if (here != nullptr) {
+        const auto& regSystems = catalog_.SystemsInRegion(here->region);
+        for (std::size_t sysIdx : regSystems) {
+          const Body& sys = catalog_.systems[sysIdx];
+          if (sys.id == curSysId) { continue; }
+          for (std::size_t bodyIdx : catalog_.BodiesInSystem(sys.id)) {
+            const Body& body = catalog_.bodies[bodyIdx];
+            if (body.type == "origin") { continue; }
+            local.push_back(&body);
+            auto sc = state_.scanned.find(body.id);
+            if (sc == state_.scanned.end() || !sc->second) { fresh.push_back(&body); }
+          }
+        }
+      }
+      if (fresh.empty() && local.empty()) {
+        for (const Body& body : catalog_.bodies) {
+          const std::string systemId = catalog_.BodySystem(body);
+          if (systemId == curSysId || body.type == "origin") { continue; }
+          if (catalog_.FindSystem(systemId) != nullptr) { all.push_back(&body); }
         }
       }
     }
@@ -505,10 +529,7 @@ std::optional<Commission> Simulation::CommissionOffer(const std::string& kind) c
         double best = 1e18;
         for (const Body* body : all) {
           if (std::find(local.begin(), local.end(), body) != local.end()) { continue; }
-          const Body* system = nullptr;
-          for (const Body& candidate : catalog_.systems) {
-            if (candidate.id == catalog_.BodySystem(*body)) { system = &candidate; }
-          }
+          const Body* system = catalog_.FindSystem(catalog_.BodySystem(*body));
           if (system == nullptr) { continue; }
           const Body* candidateRegion = FindBodyById(system->region);
           double distance = 1e18;
