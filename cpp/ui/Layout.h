@@ -32,14 +32,14 @@ struct Area {
 // runtime; the window may grow, these do not.
 struct Metrics {
   static constexpr float kTaskbarH = 35.0f;     // #taskbar height
-  static constexpr float kControlsW = 104.0f;   // right-hand scroll buttons + Home
-  static constexpr float kHomeW = 48.0f;        // Home's own slot inside it
+  static constexpr float kControlsW = 48.0f;    // right-hand tab-scroll arrows
+  static constexpr float kHomeW = 0.0f;         // Home is fixed at the left of the frame
   static constexpr float kSideTop = 36.0f;      // #sidepanel top
   static constexpr float kSideW = 165.0f;       // #sidepanel width
   static constexpr float kSideBottom = 97.0f;   // leave room for the pinned foot
   static constexpr float kFootH = 96.0f;        // #sidefoot height
   static constexpr float kFootBottom = 1.0f;    // no bottom status bar
-  static constexpr float kStatusH = 0.0f;       // status bar removed by request
+  static constexpr float kStatusH = 0.0f;       // no bottom status bar
   static constexpr float kContentTop = 36.0f;
   static constexpr float kContentLeft = 166.0f;
   static constexpr float kFeedMin = 62.0f;      // FEED.min

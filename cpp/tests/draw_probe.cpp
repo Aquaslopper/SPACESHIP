@@ -170,8 +170,8 @@ int main() {
       title.Click(restored, resume.x + 4, resume.y + 4, ship::HitButton::Left, 0);
       Require(!title.TitleActive() && restored.ActionCount() == actions, "Resume did not preserve the restored voyage");
     }
-    // Measure the actual ImGui font rather than a fixed 48px Home slot. The
-    // rightmost part of the enlarged control must still route clicks to Home.
+    // The ship identity is a fixed left-side home control, independent of the
+    // selected font; task tabs start to its right and remain separately clickable.
     for (ImFont* font : {regularFont, largeFont}) {
       io.FontDefault = font;
       auto target = ship::Simulation::NewVoyage(sim.World());
@@ -180,12 +180,13 @@ int main() {
       Require(ship::OpenTask(target, "nav", "main", true), "Could not open navigation fixture");
       Frame(topbar, target);
       const auto layout = topbar.LayoutNow();
-      Require(layout.home.w >= ImGui::CalcTextSize("Home").x + 20.0f - 0.1f,
-              "Home label exceeds its reserved control at this font size");
-      Require(layout.home.Right() == 1280.0f && layout.tabStrip.Right() <= layout.controls.x,
-              "Home control or tab strip overflows the window");
+      Require(layout.home.x == 0.0f && layout.home.w == ship::Metrics::kSideW,
+              "Ship home control is not fixed to the sidebar width");
+      Require(layout.tabStrip.x == ship::Metrics::kSideW &&
+                  layout.tabStrip.Right() <= layout.controls.x,
+              "Task tabs do not begin beside the fixed ship home control");
       topbar.Click(target, layout.home.Right() - 4, layout.home.y + 10, ship::HitButton::Left, 0);
-      Require(target.State().activeTab == "home", "Right edge of Home is not clickable");
+      Require(target.State().activeTab == "home", "Right edge of the ship home control is not clickable");
     }
     io.FontDefault = regularFont;
     // Chart controls use their painted bounds for all reading-size steps, and
@@ -326,7 +327,7 @@ int main() {
       starterView.SetWrenExteriorTexture(&concept);
       Frame(starterView, starter);
       Require(std::any_of(textureDraws.begin(), textureDraws.end(), [](const TextureCall& t) { return t.id == 77; }),
-              "The owner's Wren exterior disappeared from the starter ship");
+              "The Wren exterior disappeared from the starter ship");
       Require(starter.Rooms().size() == 6, "Starter has nonstandard rooms");
       Require(std::none_of(texts.begin(), texts.end(), [](const TextCall& t) { return t.text == "Science Room"; }),
               "Uninstalled room was shown as an exterior callout");
@@ -380,27 +381,33 @@ int main() {
       Frame(hull, artShip, 100000);
       Require(!ellipses.empty() && ellipses.back().color.a == glow,
               "Reduced motion did not make the hover highlight static");
-      const auto deckToggle = FindText("Deck plan / crew");
-      hull.Click(artShip, deckToggle.x + 2, deckToggle.y + 2, ship::HitButton::Left, 100000);
+      const Rectangle shipImage = textureDraws.back().dest;
+      hull.Click(artShip, shipImage.x + shipImage.width / 2,
+                 shipImage.y + shipImage.height / 2, ship::HitButton::Left, 100000);
       auto* person = artShip.FindCrew("jax");
       Require(person != nullptr, "No crew fixture");
       person->colour = "#010203";
       Frame(hull, artShip, 100100);
-      FindText("Exterior view");
+      Require(std::none_of(texts.begin(), texts.end(), [](const TextCall& t) {
+                return t.text == "Deck plan / crew" || t.text == "Exterior view";
+              }), "A separate ship-view button is still drawn");
       Require(std::none_of(textureDraws.begin(), textureDraws.end(), [](const TextureCall& t) { return t.id == 77; }),
-              "Deck-plan switch did not restore the original diagram");
+              "Clicking the ship did not open the deck plan");
       const auto dot = std::find_if(rects.begin(), rects.end(), [](const RectCall& r) {
         return r.w == 15 && r.h == 15 && r.color.r == 1 && r.color.g == 2 && r.color.b == 3;
       });
       Require(dot != rects.end(), "Deck plan lost the crew indicator");
       hull.Click(artShip, dot->x + 3, dot->y + 3, ship::HitButton::Right, 100100);
       Require(ship::FindTab(artShip.State(), "crew:jax") != nullptr, "Crew dot stopped opening its record");
-      const auto exteriorToggle = FindText("Exterior view");
-      hull.Click(artShip, exteriorToggle.x + 2, exteriorToggle.y + 2, ship::HitButton::Left, 100200);
-      Frame(hull, artShip, 100300);
+
+      ship::ShellView exteriorAgain;
+      exteriorAgain.Configure(1280, 1200, ship::Theme::ById("classic"));
+      exteriorAgain.SetWrenExteriorTexture(&concept);
+      Frame(exteriorAgain, artShip, 100300);
       const auto label = FindText("Engine Room");
-      hull.Click(artShip, label.x + 2, label.y + 2, ship::HitButton::Left, 100300);
-      Require(hull.HasSelection() && hull.Selection().id == "engine", "Exterior left click did not open the room briefing");
+      exteriorAgain.Click(artShip, label.x + 2, label.y + 2, ship::HitButton::Left, 100300);
+      Require(exteriorAgain.HasSelection() && exteriorAgain.Selection().id == "engine",
+              "Exterior left click did not open the room briefing");
       Require(artShip.ActionCount() == actions && artShip.State().wearTick == wear &&
               ship::CooldownRemaining(artShip, lockKey) == lock,
               "Exterior browsing, view switching or wall time advanced the action clock");
@@ -669,7 +676,7 @@ int main() {
         Require(std::abs(map->x + map->w / 2 - (middleLeft + middleRight) / 2) < 2, "Capped chart is not centered in its column");
         if (!longScan) shortMapH = map->h;
         else Require(map->h < shortMapH, "Wrapped scan panel did not affect measured chart height");
-        Require(check.Map().vw == 638 && check.Map().vh == 278, "Approved logical map viewport was changed");
+        Require(check.Map().vw == 638 && check.Map().vh == 278, "Configured logical map viewport was changed");
       }
     }
 
@@ -872,8 +879,16 @@ int main() {
           Require(found != rects.end(), "Home panel is missing its warm surface fill");
           return *found;
         };
+        Require(model.stats.front().box.h <= (step == 0 ? 64.0f : 74.0f),
+                "Ship-system gauge panels were not compacted");
         filledAt(model.stats.front().box.x, model.stats.front().box.y);
-        filledAt(model.nav.box.x, model.nav.box.y);
+        const auto& navTitle = FindText("Navigation");
+        const auto navSurface = std::find_if(rects.begin(), rects.end(), [&](const auto& r) {
+          return navTitle.x >= r.x && navTitle.x < r.x + r.w &&
+                 navTitle.y >= r.y && navTitle.y < r.y + r.h &&
+                 r.color.r == panel.r && r.color.g == panel.g && r.color.b == panel.b;
+        });
+        Require(navSurface != rects.end(), "Navigation panel is missing its warm surface fill");
         for (const auto& info : model.infos) {
           const auto& background = filledAt(info.box.x, info.box.y);
           Require(background.h > model.infos.front().box.h, "Long info did not grow the rail");
@@ -883,6 +898,13 @@ int main() {
                   "Info label escaped its background");
         }
         const auto& firstPanel = filledAt(model.infos.front().box.x, model.infos.front().box.y);
+        Require(navTitle.y >= firstPanel.y + firstPanel.h,
+                "Navigation was not moved below the three information panels");
+        const auto eventTitle = std::find_if(texts.begin(), texts.end(), [&](const auto& text) {
+          return text.text == "Events" && text.x >= home.LayoutNow().content.x;
+        });
+        Require(eventTitle != texts.end() && eventTitle->y >= firstPanel.y + firstPanel.h,
+                "Home event cards were not moved below the three information panels");
         int valueLines = 0;
         for (const auto& line : texts) {
           if (line.size != theme.HomeInfoValuePx() || line.text.empty() ||
@@ -897,8 +919,10 @@ int main() {
         Require(valueLines > 1, "Long info value was not wrapped at the compact value size");
         const auto& feedHead = FindText("Activity Feed");
         Require(feedHead.y >= firstPanel.y + firstPanel.h, "Feed overlaps the expanded info rail");
-        Require(filledAt(model.feedBox.x, feedHead.y + feedHead.size + 2).w > 0,
-                "Feed has no warm background");
+        const auto& feedSurface = filledAt(model.feedBox.x, feedHead.y + feedHead.size + 2);
+        Require(feedSurface.w > 0, "Feed has no warm background");
+        Require(std::abs(feedSurface.y + feedSurface.h - (home.LayoutNow().content.Bottom() - 8.0f)) < 2.0f,
+                "Activity feed does not reach the bottom of the content panel");
       }
     }
 
@@ -1060,14 +1084,15 @@ int main() {
       for (int i = 0; i < 18; ++i) ship::OpenTask(tabs, "crew", "missing" + std::to_string(i), false);
       Frame(cockpit, tabs, 5000);
       Require(tabs.State().activeTab == "home", "Background tab reveal stole focus");
-      cockpit.Click(tabs, cockpit.LayoutNow().tabStrip.w - 12, 12, ship::HitButton::Left, 5000);
+      cockpit.Click(tabs, cockpit.LayoutNow().tabStrip.Right() - 12, 12, ship::HitButton::Left, 5000);
       Require(ship::FindTab(tabs.State(), "crew:missing17") == nullptr,
               "New background tab was not revealed with its close target");
       ship::OpenTask(tabs, "crew", "missing0", false);
       Frame(cockpit, tabs, 6000);
       const auto* tab = ship::FindTab(tabs.State(), "crew:missing0");
       Require(tab != nullptr, "Existing background tab vanished");
-      const float closeX = ImGui::CalcTextSize((tab->kindLabel + "  " + tab->title).c_str()).x + 20;
+      const float closeX = cockpit.LayoutNow().tabStrip.x +
+          ImGui::CalcTextSize((tab->kindLabel + "  " + tab->title).c_str()).x + 20;
       cockpit.Click(tabs, closeX, 12, ship::HitButton::Left, 6000);
       Require(ship::FindTab(tabs.State(), "crew:missing0") == nullptr,
               "Repeated background open did not reveal its existing tab");

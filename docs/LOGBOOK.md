@@ -238,3 +238,22 @@ You must append a compressed summary of **every single reply and action you take
 - **Behaviour confirmed by the passing case:** docked at Tolme, Kessler selected, the travel button reads Idle (not Off), one press spends one action, clears `docked` and starts the crossing - the berth is no longer a cage.
 - **Checks still owed:** CI `test-linux` on PR #29 is the first real client build of this branch (no X11/OpenGL/display in this sandbox); the draw recorder here is the CPU painter, not a window.
 - **Untouched:** `Legacy code_Spaceship.txt`, `assets/`, `rescue/`, the three-column station layout, every cooldown rule outside this change, `AGENTS.md`.
+
+### Entry #017
+- **Timestamp:** 2026-11-07 23:22 UTC
+- **Task:** Tune the cockpit visuals to the supplied mockup: warmer mocha colors, fixed ship/home identity, smaller gauges, ship-click deck-plan access, fewer instructions, navigation/event cards below the info rail, and the feed at the bottom.
+- **Reference trace:** Read the legacy shell, status rail, home-screen build order, navigation strip, feed, and sidebar event list before changing the C++ presentation. The historical file was not edited.
+- **Palette (`Theme.cpp`):** Warmed the classic theme's panel, chrome, border, ink, and accent roles; changed the content surface from white to warm cream.
+- **Top bar/layout (`Layout.h/.cpp`, `Draw.cpp`):** Reserved the fixed left 165px slot for the ship identity, started task tabs to its right, and removed the right-hand Home slot while retaining the two tab-scroll arrows.
+- **Home control:** Draws `SHIP` plus the current vessel name in the fixed top-left slot; clicking that slot returns to Home regardless of the open task tabs.
+- **Status rail (`IdleScreen.cpp`, `Draw.cpp`):** Reduced gauge spacing and height while retaining the configured text-size floor and the original stat values/units.
+- **Ship access (`Draw.cpp`):** Removed the `Deck plan / crew` and `Exterior view` buttons; clicking the exterior ship image enters the deck view, and clicking an unused deck-stage area returns to the exterior view. Room callouts and crew interaction remain separate.
+- **Home content order:** Removed the ship-stage left/right-click instruction; placed the three information cards directly below the ship, with Navigation beneath the left card and live incident cards beneath the other two.
+- **Events:** Home event cards use current `sim.Events()` data and open the existing event task when clicked; the sidebar Events tree remains available.
+- **Activity feed:** The feed is the final Home panel and expands to the lower content edge with an 8px inset; longer information values shift the lower panels down before feed height is recalculated.
+- **Regression coverage (`draw_probe.cpp`):** Updated fixed-home and tab coordinates, tested clicking the ship instead of a removed view button, and asserted compact gauges, navigation/events placement, and the feed's bottom alignment.
+- **Checks:** `./build.sh --headless` completed; `ctest --test-dir build --output-on-failure` passed 125/125, including GUI syntax, ImGui input, and the native draw recorder after pinned headers were supplied from `/tmp/deps`.
+- **Additional UI check:** `tools/check-gui-syntax.sh` passed for Draw.cpp, AudioDevice.cpp, and main.cpp under `-Wall -Wextra -Wpedantic`; it reported one pre-existing unused `p` warning in `PaintTaskScreen`.
+- **Limits:** No windowed GUI was linked or launched, so this verifies the painter's recorded geometry/input, not an on-screen screenshot or full visual/gameplay parity.
+- **Untouched:** `Legacy code_Spaceship.txt`, `assets/`, `rescue/`, simulation behavior, and task/event rules. The headless `build/` output and downloaded GUI headers remain ignored/outside tracked source.
+- **Final rerun:** After the small-window tab-strip bound and updated visual assertions, `ctest --test-dir build --output-on-failure` again passed 125/125, including GUI syntax, ImGui input, and the native draw recorder.

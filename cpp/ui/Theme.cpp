@@ -2,7 +2,7 @@
 //  Theme.cpp — five calm palettes.
 //  ---------------------------------------------------------------------------
 //  Classic keeps the HTA parchment roles. The other saved theme IDs use
-//  light, softly tinted surfaces by request rather than the HTA dark surfaces.
+//  light, softly tinted surfaces rather than the HTA dark surfaces.
 //
 //  Classic roles are read from the HTA; semantic red/green/amber stay
 //  distinct from the optional palette accents.
@@ -35,17 +35,17 @@ Rgb Hex(const char* hex) {
 Palette ClassicPalette() {
   // Literal Section 1 CSS roles; do not derive one role from another.
   Palette p;
-  p.white = Hex("#ffffff"); p.panel = Hex("#faf7f2");
-  p.panel2 = Hex("#f4efe6"); p.panel3 = Hex("#efe8dc");
-  p.border = Hex("#e4dbcb"); p.borderDark = Hex("#cbb89c");
-  p.coffee = Hex("#8c6f4e"); p.coffeeDark = Hex("#6b5338");
-  p.coffeeLight = Hex("#b89b76"); p.ink = Hex("#3b3630");
-  p.muted = Hex("#8a7f72"); p.terracotta = Hex("#b05a42");
-  p.sage = Hex("#7f9161"); p.amber = Hex("#c08a3e");
+  p.white = Hex("#fffaf2"); p.panel = Hex("#f4e6d0");
+  p.panel2 = Hex("#ead5b5"); p.panel3 = Hex("#e3c9a3");
+  p.border = Hex("#cfad7d"); p.borderDark = Hex("#a97949");
+  p.coffee = Hex("#8c5f37"); p.coffeeDark = Hex("#684426");
+  p.coffeeLight = Hex("#b38a5e"); p.ink = Hex("#3b3025");
+  p.muted = Hex("#826e58"); p.terracotta = Hex("#a65337");
+  p.sage = Hex("#718052"); p.amber = Hex("#b77b32");
   p.titleBackground = Hex("#d8c4a6"); p.titleDialog = Hex("#f5ead8");
   p.titleBorder = Hex("#8e7757"); p.titleInk = Hex("#443528");
-  p.content = Hex("#ffffff"); p.chrome = Hex("#faf7f2");
-  p.hover = Hex("#f6efe3"); p.control = Hex("#ffffff"); p.input = Hex("#ffffff");
+  p.content = Hex("#fffaf2"); p.chrome = Hex("#f4e6d0");
+  p.hover = Hex("#f1dfc2"); p.control = Hex("#fffaf2"); p.input = Hex("#fffaf2");
   p.tabInk = Hex("#6b6157"); p.activeInk = Hex("#3b3630");
   p.chart = Hex("#ece2d1"); p.chartInk = Hex("#6b5338");
   p.titleMenu = Hex("#3f342b"); p.titleMenuInk = Hex("#f2e5cc");

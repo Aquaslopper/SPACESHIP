@@ -28,23 +28,22 @@ float TextLineHeight(const Theme& theme, int refSize) {
   return static_cast<float>(theme.TextPx(refSize));
 }
 
-// Stat cell: pad + label + gap + value + bar zone (drawn at Bottom()-12) + pad.
-// The value always ends above the bar; nothing overlaps.
+// Stat cell: compact padding around the label, value and short status bar.
+// The value ends above the bar; nothing overlaps.
 float StatCellHeight(const Theme& theme) {
-  const float pad = 6.0f;
-  const float gap = 6.0f;
-  const float bottomPad = 6.0f;
-  return pad + TextLineHeight(theme, 11) + gap + TextLineHeight(theme, 20) +
-         4.0f + TextLineHeight(theme, 10) + 12.0f + bottomPad;
+  const float pad = 4.0f;
+  const float gap = 1.0f;
+  const float label = TextLineHeight(theme, 11);
+  const float value = TextLineHeight(theme, 20);
+  return pad + label + gap + value + 4.0f + 4.0f + 4.0f;
 }
 
-// Strip (nav or dock): pad + label + gap + main + gap + right + pad.
+// Strip (nav or dock): pad + label + gap + main + pad.
 float StripHeight(const Theme& theme) {
   const float pad = 6.0f;
   const float gap = 6.0f;
   const float bottomPad = 6.0f;
-  return pad + TextLineHeight(theme, 11) + gap + TextLineHeight(theme, 13) +
-         gap + TextLineHeight(theme, 10) + bottomPad;
+  return pad + TextLineHeight(theme, 11) + gap + TextLineHeight(theme, 13) + bottomPad;
 }
 
 // Info rail cell: pad + label + gap + value + pad.
@@ -132,9 +131,6 @@ IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout
                                 float othersHeight, FxRng& rng) {
   IdleScreenModel out;
   out.content = layout.content;
-  out.stageNote =
-      "Left-click anything here to read what it is. "
-      "Right-click opens its task window.";
 
   const float inner = std::max(0.0f, layout.content.w - 16.0f);
   const float statH = StatCellHeight(theme);
@@ -145,31 +141,56 @@ IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout
   out.stageArea = layout.stage;
   out.stageArea.y = statsBottom + 8.0f;
 
-  const float noteTop = out.stageArea.Bottom() + 6.0f;
-  const float navTop = noteTop + 24.0f;
-  const float stripH = StripHeight(theme);
-  out.nav = NavStrip(sim, Area{layout.content.x + 8.0f, navTop, inner, stripH});
+  const float infoH = InfoCellHeight(theme);
+  const float infoY = out.stageArea.Bottom() + 14.0f;
+  out.infos = InfoRail(sim, Area{layout.content.x + 8.0f, infoY, inner, infoH});
+  const float infoBottom = out.infos.empty() ? infoY + infoH : out.infos.front().box.Bottom();
 
-  float after = out.nav.box.Bottom();
-  if (sim.State().docked) {
-    out.docked = true;
-    // The dock strip sits below the *actual* nav strip bottom, never at a
-    // hard-coded 50 px offset, so growing the nav strip cannot overlap it.
-    out.dock = DockStrip(sim, Area{layout.content.x + 8.0f, out.nav.box.Bottom() + 10.0f,
-                                   inner, stripH});
-    after = out.dock.box.Bottom();
+  const float stripH = StripHeight(theme);
+  const float leftColumnW = std::max(1.0f, inner / 3.0f - 4.0f);
+  const float leftX = layout.content.x + 8.0f;
+  const float lowerY = infoBottom + 10.0f;
+  out.nav = NavStrip(sim, Area{leftX, lowerY, leftColumnW, stripH});
+  out.nav.right.clear();
+
+  const float eventX = leftX + inner / 3.0f + 4.0f;
+  const float eventW = std::max(1.0f, layout.content.x + 8.0f + inner - eventX);
+  out.eventsBox = Area{eventX, lowerY, eventW, stripH};
+  for (const Incident& incident : sim.Events()) {
+    out.events.push_back({incident.id, incident.kind, {}});
+  }
+  const std::size_t rows = out.events.empty() ? 1 : (out.events.size() + 1) / 2;
+  out.eventsBox.h = static_cast<float>(rows) * stripH + static_cast<float>(rows - 1) * 8.0f;
+  if (out.events.empty()) {
+    out.events.push_back({"", "No active events.", out.eventsBox});
   } else {
-    out.dock.box = Area{layout.content.x + 8.0f, after, inner, 0.0f};
+    const float cardW = (eventW - 8.0f) / 2.0f;
+    for (std::size_t i = 0; i < out.events.size(); ++i) {
+      const std::size_t row = i / 2;
+      const std::size_t column = i % 2;
+      out.events[i].box = Area{eventX + static_cast<float>(column) * (cardW + 8.0f),
+                               lowerY + static_cast<float>(row) * (stripH + 8.0f),
+                               cardW, stripH};
+    }
   }
 
-  const float infoH = InfoCellHeight(theme);
-  out.infos = InfoRail(sim,
-                       Area{layout.content.x + 8.0f, after + 10.0f, inner, infoH});
-  const float infoBottom = out.infos.empty() ? after + 10.0f : out.infos.front().box.Bottom();
+  float after = std::max(out.nav.box.Bottom(), out.eventsBox.Bottom());
+  if (sim.State().docked) {
+    out.docked = true;
+    out.dock = DockStrip(sim, Area{leftX, out.nav.box.Bottom() + 8.0f, leftColumnW, stripH});
+    out.dock.right.clear();
+    after = std::max(after, out.dock.box.Bottom());
+  } else {
+    out.dock.box = Area{leftX, out.nav.box.Bottom(), leftColumnW, 0.0f};
+  }
 
-  // measure-and-give, now that everything above the feed has a height.
-  out.feedHeight = GiveFeedHeight(layout.content.h, othersHeight);
-  out.feedBox = Area{layout.content.x + 8.0f, infoBottom + 26.0f, inner, out.feedHeight};
+  // The activity feed is the final home panel and uses the remaining content
+  // height so its lower edge reaches the bottom of the viewport.
+  const float feedY = after + 20.0f;
+  const float bottomPad = 8.0f;
+  out.feedHeight = std::max(Metrics::kFeedMin, layout.content.Bottom() - feedY - bottomPad);
+  (void)othersHeight;
+  out.feedBox = Area{layout.content.x + 8.0f, feedY, inner, out.feedHeight};
 
   out.diagram = BuildDiagram(sim, out.stageArea, hideCrewLabels, rng);
   out.feed = FeedLinesNewestFirst(sim, 200);
@@ -179,11 +200,7 @@ IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout
 
 IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout,
                                 const Theme& theme, bool hideCrewLabels, FxRng& rng) {
-  auto out = BuildIdleScreen(sim, layout, theme, hideCrewLabels, 0, rng);
-  const float other = out.feedBox.y - layout.content.y;
-  out.feedHeight = GiveFeedHeight(layout.content.h, other);
-  out.feedBox.h = out.feedHeight;
-  return out;
+  return BuildIdleScreen(sim, layout, theme, hideCrewLabels, 0, rng);
 }
 
 }  // namespace ship

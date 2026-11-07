@@ -192,8 +192,7 @@ void ShellView::ResetContentScroll() { contentScroll_ = 0.0f; }
 void ShellView::Draw(Simulation& sim, double nowMs) {
   frameTimeMs_ = nowMs;
   const float contentH = height_ - Metrics::kContentTop - Metrics::kStatusH;
-  const float homeWidth = ImGui::CalcTextSize("Home").x + 20.0f;
-  layout_ = ComputeLayout(width_, height_, contentH, others_, theme_.stageCompact, homeWidth);
+  layout_ = ComputeLayout(width_, height_, contentH, others_, theme_.stageCompact);
 
   if (scrollTabKey_ != sim.State().activeTab) {
     scrollTabKey_ = sim.State().activeTab;
@@ -209,8 +208,6 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
       layout_.stage = {layout_.content.x + 8.0f, layout_.content.y,
                        std::max(1.0f, layout_.content.w - 16.0f), 0.0f};
       layout_.stage.h = BuildExteriorLayout(sim, layout_.stage).height;
-    } else {
-      layout_.stage.h += 40.0f; // reserve the view-switch row above the deck
     }
   }
 
@@ -222,11 +219,7 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
     idle_ = BuildIdleScreen(sim, layout_, theme_, theme_.hideCrewLabels, seeded);
     if (HasWrenExterior(sim)) {
       exterior_ = BuildExteriorLayout(sim, idle_.stageArea);
-      if (exteriorView_) {
-        idle_.stageNote = "Left-click a room to read it. Right-click opens its task window.";
-      } else {
-        idle_.diagram.stage.y += 40.0f;
-      }
+      // No tutorial copy or view-switch row is drawn above the ship.
     }
     // Measure the actual proportional-font wraps before painting so long
     // location/life-support values grow the rail instead of overlapping Feed.
@@ -244,8 +237,13 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
       }
       const float extra = needed - idle_.infos.front().box.h;
       for (auto& cell : idle_.infos) { cell.box.h = needed; }
+      idle_.nav.box.y += extra;
+      idle_.eventsBox.y += extra;
+      for (auto& event : idle_.events) { event.box.y += extra; }
+      if (idle_.docked) { idle_.dock.box.y += extra; }
       idle_.feedBox.y += extra;
-      idle_.feedHeight = GiveFeedHeight(layout_.content.h, idle_.feedBox.y - layout_.content.y);
+      idle_.feedHeight = std::max(Metrics::kFeedMin,
+                                  layout_.content.Bottom() - idle_.feedBox.y - 8.0f);
       idle_.feedBox.h = idle_.feedHeight;
     }
     rng_ = seeded;
@@ -436,7 +434,10 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
   draw->AddLine(ImVec2(0.0f, Metrics::kTaskbarH - 1.0f),
                 ImVec2(width_, Metrics::kTaskbarH - 1.0f), ToIm(p.borderDark));
 
-  const std::vector<TabView> tabs = TabBar(sim);
+  std::vector<TabView> tabs = TabBar(sim);
+  tabs.erase(std::remove_if(tabs.begin(), tabs.end(), [](const TabView& tab) {
+    return tab.home;
+  }), tabs.end());
   std::vector<float> tabWidths;
   float tabsWidth = 4.0f;
   for (const TabView& tab : tabs) {
@@ -467,8 +468,9 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
     else ++it;
   }
   tabHits_.clear();
-  draw->PushClipRect(ImVec2(0.0f, 0.0f), ImVec2(layout_.tabStrip.w, Metrics::kTaskbarH), true);
-  float x = 4.0f - tabScroll_;
+  draw->PushClipRect(ImVec2(layout_.tabStrip.x, 0.0f),
+                     ImVec2(layout_.tabStrip.Right(), Metrics::kTaskbarH), true);
+  float x = layout_.tabStrip.x + 4.0f - tabScroll_;
   for (std::size_t i = 0; i < tabs.size(); ++i) {
     const TabView& tab = tabs[i];
     const float w = tabWidths[i];
@@ -503,11 +505,19 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
   }
   draw->PopClipRect();
 
-  // Home and the two scroll arrows live in the reserved right-hand slot.
-  draw->AddRectFilled(ImVec2(layout_.home.x, 0.0f),
-                      ImVec2(layout_.home.Right(), Metrics::kTaskbarH), ToIm(p.panel3));
+  // The ship identity is a permanent home control in the fixed sidebar slot.
+  draw->AddRectFilled(ImVec2(layout_.home.x, layout_.home.y),
+                      ImVec2(layout_.home.Right(), layout_.home.Bottom()), ToIm(p.panel2));
+  draw->AddRect(ImVec2(layout_.home.x, layout_.home.y),
+                ImVec2(layout_.home.Right(), layout_.home.Bottom()), ToIm(p.borderDark));
+  draw->AddText(ImVec2(layout_.home.x + 8.0f, 9.0f), ToIm(p.coffee), "SHIP");
+  draw->AddText(ImVec2(layout_.home.x + 50.0f, 9.0f), ToIm(p.activeInk),
+                sim.Ship().Get("name").c_str());
+
+  // Only the tab-scroll arrows remain in the top-right control slot.
+  draw->AddRectFilled(ImVec2(layout_.controls.x, 0.0f),
+                      ImVec2(layout_.controls.Right(), Metrics::kTaskbarH), ToIm(p.panel2));
   const float textY = std::max(0.0f, (Metrics::kTaskbarH - ImGui::GetFontSize()) * 0.5f);
-  draw->AddText(ImVec2(layout_.home.x + 10.0f, textY), ToIm(p.coffee), "Home");
   const float leftW = ImGui::CalcTextSize("<").x;
   const float rightW = ImGui::CalcTextSize(">").x;
   draw->AddText(ImVec2(layout_.scrollLeft.x + (layout_.scrollLeft.w - leftW) * 0.5f, textY), ToIm(p.muted), "<");
@@ -670,8 +680,8 @@ bool ShellView::HasWrenExterior(const Simulation& sim) const {
   const Texture2D* texture = static_cast<const Texture2D*>(wrenExteriorArt_);
   if (sim.State().shipClass != "wren" || texture == nullptr || texture->id == 0 ||
       texture->width <= 0 || texture->height <= 0) return false;
-  // The owner's ship exterior remains visible throughout the voyage. The
-  // callouts are built from sim.Rooms(), so only installed rooms are usable.
+  // Wren exterior artwork remains visible throughout the voyage. The callouts
+  // are built from sim.Rooms(), so only installed rooms are usable.
   return true;
 }
 
@@ -679,8 +689,6 @@ ShellView::ExteriorLayout ShellView::BuildExteriorLayout(const Simulation& sim, 
   ExteriorLayout out;
   const int textSize = TypePx(10);
   out.lineHeight = std::max(static_cast<float>(textSize) + 3.0f, theme_.LineHeight());
-  const float buttonW = std::max(TextWidth("Deck plan / crew", textSize), TextWidth("Exterior view", textSize)) + 16.0f;
-  out.toggle = {stage.x + 4.0f, stage.y + 3.0f, buttonW, out.lineHeight + 9.0f};
   const float sideW = std::max(100.0f, std::min(245.0f, stage.w * 0.235f));
   std::vector<Room> rooms = sim.Rooms();
   std::stable_sort(rooms.begin(), rooms.end(), [](const Room& a, const Room& b) {
@@ -703,8 +711,8 @@ ShellView::ExteriorLayout ShellView::BuildExteriorLayout(const Simulation& sim, 
   const float rowH = static_cast<float>(maxLines) * out.lineHeight + 10.0f;
   const std::size_t rows = (rooms.size() + 1) / 2;
   const float bodyH = std::max(280.0f, static_cast<float>(rows) * rowH);
-  const float bodyY = stage.y + out.lineHeight + 21.0f;
-  out.height = out.lineHeight + 21.0f + bodyH + 4.0f;
+  const float bodyY = stage.y + 4.0f;
+  out.height = bodyH + 8.0f;
   const Texture2D* texture = static_cast<const Texture2D*>(wrenExteriorArt_);
   const float aspect = texture && texture->width > 0 ? static_cast<float>(texture->height) / texture->width : 420.0f / 1340.0f;
   const float imageW = std::max(1.0f, stage.w - sideW * 2.0f - 32.0f);
@@ -786,35 +794,31 @@ void ShellView::PaintIdle(Simulation& sim) {
     DrawRectangleLines(static_cast<int>(cell.box.x), static_cast<int>(cell.box.y),
                        static_cast<int>(cell.box.w), static_cast<int>(cell.box.h),
                        ToRay(theme.palette.border));
-    // The label sits at the top of the cell; the value starts one label height
-    // plus a gap below it, so the two never overlap at any typography step.
-    // The unit (e.g. "%", " air", " ration/action") is painted to the right of
-    // the value when it fits, matching the reference's inline stat-unit.
-    const float labelY = cell.box.y + 6.0f;
-    const float valueY =
-        cell.box.y + 6.0f + TypePx(11) + 6.0f;
+    // Tighter spacing makes the four gauges shallower without shrinking type.
+    const int labelSize = TypePx(11);
+    const int valueSize = TypePx(20);
+    const int unitSize = TypePx(10);
+    const float labelY = cell.box.y + 4.0f;
+    const float valueY = cell.box.y + 4.0f + labelSize + 1.0f;
     Text(cell.label.c_str(), static_cast<int>(cell.box.x + 6.0f),
-             static_cast<int>(labelY), TypePx(11) , ToRay(theme.palette.muted));
+         static_cast<int>(labelY), labelSize, ToRay(theme.palette.muted));
     Text(cell.value.c_str(), static_cast<int>(cell.box.x + 6.0f),
-         static_cast<int>(valueY), TypePx(20), ToRay(theme.palette.ink), true);
+         static_cast<int>(valueY), valueSize, ToRay(theme.palette.ink), true);
     if (!cell.unit.empty()) {
-      const float valueW = TextWidth(cell.value.c_str(), TypePx(20), true);
-      const float unitW = TextWidth(cell.unit.c_str(), TypePx(10), false);
+      const float valueW = TextWidth(cell.value.c_str(), valueSize, true);
+      const float unitW = TextWidth(cell.unit.c_str(), unitSize, false);
       const float unitX = cell.box.x + 6.0f + valueW + 4.0f;
       if (unitX + unitW <= cell.box.Right() - 6.0f) {
         Text(cell.unit.c_str(), static_cast<int>(unitX), static_cast<int>(valueY),
-             TypePx(10), ToRay(theme.palette.muted));
-      } else {
-        Text(cell.unit.c_str(), static_cast<int>(cell.box.x + 6.0f),
-             static_cast<int>(valueY + TypePx(20) + 4.0f), TypePx(10), ToRay(theme.palette.muted));
+             unitSize, ToRay(theme.palette.muted));
       }
     }
     const float bar = cell.box.w - 12.0f;
     DrawRectangle(static_cast<int>(cell.box.x + 6.0f),
-                  static_cast<int>(cell.box.Bottom() - 12.0f), static_cast<int>(bar), 4,
+                  static_cast<int>(cell.box.Bottom() - 8.0f), static_cast<int>(bar), 4,
                   ToRay(theme.palette.panel3));
     DrawRectangle(static_cast<int>(cell.box.x + 6.0f),
-                  static_cast<int>(cell.box.Bottom() - 12.0f),
+                  static_cast<int>(cell.box.Bottom() - 8.0f),
                   static_cast<int>(bar * std::max(0.0, std::min(100.0, cell.reading)) / 100.0),
                   4, HexColor(cell.colour, ToRay(theme.palette.coffee)));
   }
@@ -824,21 +828,7 @@ void ShellView::PaintIdle(Simulation& sim) {
   } else {
     PaintDiagram(idle_.diagram, idle_.stageArea, idleDiagramScale_);
   }
-  if (HasWrenExterior(sim)) {
-    const Area toggle = exterior_.toggle;
-    DrawRectangle(static_cast<int>(toggle.x), static_cast<int>(toggle.y),
-                  static_cast<int>(toggle.w), static_cast<int>(toggle.h), ToRay(theme.palette.panel2));
-    DrawRectangleLines(static_cast<int>(toggle.x), static_cast<int>(toggle.y),
-                       static_cast<int>(toggle.w), static_cast<int>(toggle.h), ToRay(theme.palette.borderDark));
-    Text(exteriorView_ ? "Deck plan / crew" : "Exterior view", static_cast<int>(toggle.x + 8),
-         static_cast<int>(toggle.y + 5), TypePx(10), ToRay(theme.palette.ink));
-  }
-
-  Text(idle_.stageNote.c_str(), static_cast<int>(idle_.content.x + 8.0f),
-           static_cast<int>(idle_.stageArea.Bottom() + 8.0f), TypePx(12) ,
-           ToRay(theme.palette.muted));
-
-  // ---- nav strip, dock strip, info rail ---------------------------------
+  // ---- info rail, navigation and dock strip -----------------------------
   auto paintStrip = [this, &theme](const Strip& strip) {
     DrawRectangle(static_cast<int>(strip.box.x), static_cast<int>(strip.box.y),
                   static_cast<int>(strip.box.w), static_cast<int>(strip.box.h),
@@ -848,16 +838,11 @@ void ShellView::PaintIdle(Simulation& sim) {
                        ToRay(theme.palette.border));
     const float mainY =
         strip.box.y + 6.0f + TypePx(11) + 6.0f;
-    const float rightY = mainY + TypePx(13) + 6.0f;
     Text(strip.label.c_str(), static_cast<int>(strip.box.x + 8.0f),
-             static_cast<int>(strip.box.y + 6.0f), TypePx(11) , ToRay(theme.palette.muted));
+         static_cast<int>(strip.box.y + 6.0f), TypePx(11), ToRay(theme.palette.muted));
     Text(strip.main.c_str(), static_cast<int>(strip.box.x + 8.0f),
-         static_cast<int>(mainY), TypePx(13) , ToRay(theme.palette.ink));
-    Text(strip.right.c_str(), static_cast<int>(strip.box.x + 8.0f),
-         static_cast<int>(rightY), TypePx(10), ToRay(theme.palette.muted), true);
+         static_cast<int>(mainY), TypePx(13), ToRay(theme.palette.ink));
   };
-  paintStrip(idle_.nav);
-  if (idle_.docked) { paintStrip(idle_.dock); }
 
   const int labelPx = theme.HomeInfoLabelPx();
   const int valuePx = theme.HomeInfoValuePx();
@@ -880,6 +865,25 @@ void ShellView::PaintIdle(Simulation& sim) {
       Text(line.c_str(), static_cast<int>(cell.box.x + 10.0f), static_cast<int>(y),
            valuePx, ToRay(theme.palette.ink));
       y += valuePx + 3.0f;
+    }
+  }
+  paintStrip(idle_.nav);
+  if (idle_.docked) { paintStrip(idle_.dock); }
+  for (const HomeEventCard& event : idle_.events) {
+    const Area& box = event.box;
+    DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                  static_cast<int>(box.w), static_cast<int>(box.h), ToRay(theme.palette.panel));
+    DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                       static_cast<int>(box.w), static_cast<int>(box.h), ToRay(theme.palette.border));
+    Text("Events", static_cast<int>(box.x + 8.0f), static_cast<int>(box.y + 6.0f),
+         TypePx(11), ToRay(theme.palette.muted));
+    const auto lines = WrapText(event.label, std::max(1.0f, box.w - 16.0f),
+                                TypePx(13), SelectFont(TypePx(13), false));
+    float eventY = box.y + 6.0f + TypePx(11) + 6.0f;
+    for (const std::string& line : lines) {
+      Text(line.c_str(), static_cast<int>(box.x + 8.0f), static_cast<int>(eventY),
+           TypePx(13), ToRay(theme.palette.ink));
+      eventY += TypePx(13) + 3.0f;
     }
   }
 
@@ -1390,7 +1394,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   const float parkedBody = std::max({240 + 22 + underH, leftH, rightH}) + 12 + tailH;
   const float otherH = headerH + 8 + parkedBody - 240 + footerH + 8;
   const float availableH = layout_.content.h - otherH - 4;
-  // Preserve the existing logical viewport and cap/floor ordering by request of an Agent who has no authority.
+  // Preserve the existing logical viewport and cap/floor ordering.
   const float chartH = std::min({500.0f, chartW * 0.5f, std::max(240.0f, availableH)});
   const Area box{middleLeft + (spareW - chartW) / 2, chartTop, chartW, chartH};
   navChartBox_ = box;
@@ -3415,10 +3419,6 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
     const float scrollY = contentScroll_;
     // The view switch and room callouts are presentation only. They route to
     // exactly the same room handlers as the original deck plan.
-    if (HasWrenExterior(sim) && exterior_.toggle.Contains(x, y + scrollY)) {
-      exteriorView_ = !exteriorView_;
-      return;
-    }
     if (HasWrenExterior(sim) && exteriorView_) {
       for (const ExteriorCallout& item : exterior_.callouts) {
         if (!item.box.Contains(x, y + scrollY)) continue;
@@ -3427,6 +3427,10 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
           OpenBriefing(sim, "room", item.id);
           SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
         }
+        return;
+      }
+      if (exterior_.image.Contains(x, y + scrollY)) {
+        exteriorView_ = false;
         return;
       }
     } else if (idle_.stageArea.Contains(x, y + scrollY)) {
@@ -3457,6 +3461,10 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
           SpawnMark(marks_, x, y, nowMs,
                     sim.State().reducedMotion);
         }
+        return;
+      }
+      if (HasWrenExterior(sim)) {
+        exteriorView_ = true;
         return;
       }
     }
@@ -3492,6 +3500,11 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
       } else {
         OpenBriefing(sim, "station", sim.Map().here);
       }
+      return;
+    }
+    for (const HomeEventCard& event : idle_.events) {
+      if (!event.box.Contains(x, y + scrollY)) { continue; }
+      if (!event.id.empty()) { OpenTask(sim, "event", event.id, false); }
       return;
     }
   }

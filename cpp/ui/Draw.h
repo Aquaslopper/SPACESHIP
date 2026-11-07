@@ -120,7 +120,6 @@ class ShellView {
   };
   struct ExteriorLayout {
     Area image;
-    Area toggle;
     float height = 0;
     float lineHeight = 0;
     std::vector<ExteriorCallout> callouts;

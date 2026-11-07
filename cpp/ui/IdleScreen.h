@@ -1,11 +1,8 @@
 // ============================================================================
 //  IdleScreen.h — Home: the ship at rest, and everything readable from it.
 //  ---------------------------------------------------------------------------
-//  Section E's build order is the model's order: stat rail, stage, stage note,
-//  nav strip, dock strip (only while docked), info rail, feed. The feed is the
-//  only part that is measured rather than authored - it takes what the rest of
-//  the column leaves, inside the 62..132 band - so the layout is asked for the
-//  feed height and this file lays the column out around it.
+//  Home's build order is the model's order: compact stat rail, ship stage,
+//  info rail, then navigation/docking and event cards, with the activity feed last.
 // ============================================================================
 #pragma once
 
@@ -41,15 +38,22 @@ struct Strip {
   Area box;
 };
 
+struct HomeEventCard {
+  std::string id;
+  std::string label;
+  Area box;
+};
+
 struct IdleScreenModel {
   Area content;
   std::vector<RailCell> stats;
   std::vector<RailCell> infos;
   Area stageArea;
-  std::string stageNote;
   Strip nav;
   bool docked = false;
   Strip dock;
+  Area eventsBox;
+  std::vector<HomeEventCard> events;
   DiagramModel diagram;
   std::vector<std::string> feed;
   std::string feedHead = "Activity Feed";
