@@ -85,4 +85,8 @@ jobs:
           bash tools/check-imgui-input.sh
           bash tools/check-draw.sh
           ctest --test-dir build --output-on-failure -j 4
-          node --test tests/*.test.cjs
+          # node --test tests/*.test.cjs is gone: all four files open
+          # ../Spaceship.hta as their reference truth and that file is no
+          # longer in the tree, so the command fails 4/4 with ENOENT on every
+          # branch. The .cjs files stay in the repo untouched -- restore the
+          # reference (or repoint the harness) and put this line back.
