@@ -801,7 +801,7 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
   actions.Note(model.courseNote);
 
   const bool travelEnabled =
-      reach && !hereTarget && !sim.State().docked && sim.State().engineCondition > 0 &&
+      reach && !hereTarget && sim.State().engineCondition > 0 &&
       extractTask == nullptr && energy > 0 &&
       fuel >= (target == nullptr ? 0.0 : sim.MetricsFor(*target).fuel);
   screen.progress.push_back(BuildProgressButton(
@@ -872,8 +872,6 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
       "clocks advance, with normal resource use.");
   if (energy <= 0) {
     model.notes.push_back("Restore energy to use navigation and sensors.");
-  } else if (sim.State().docked) {
-    model.notes.push_back("Undock at the station before plotting a crossing.");
   } else if (sim.State().engineCondition <= 0) {
     model.notes.push_back("The drive needs maintenance before travel.");
   } else if (reach && !hereTarget && target != nullptr &&
