@@ -269,20 +269,24 @@ struct SurveyRecord {
 };
 
 // ---------------------------------------------------------------------------
-// The chart's live view. The authored geometry lives in the catalogue; this is
-// where the ship is, which layer is on screen, and how each layer was left.
+// The chart's live view. The authored coordinate frame and interchange
+// viewport remain 638x278; w/h and cx/cy hold the active native layer's larger
+// world extent. coordinateScale converts authored body coordinates to that
+// extent for rendering only, leaving navigation costs in authored units.
 // ---------------------------------------------------------------------------
 struct MapView {
   std::string layer = "system";
   std::string here = "kessler";
   std::string sector = "gal-inner";
   double zoom = 1;
-  double cx = 319;
-  double cy = 139;
-  double w = 638;
-  double h = 278;
-  double vw = 638;
-  double vh = 278;
+  double cx = kExpandedMapWidth * 0.5;
+  double cy = kExpandedMapHeight * 0.5;
+  double w = kExpandedMapWidth;
+  double h = kExpandedMapHeight;
+  double vw = kChartCoordinateWidth;
+  double vh = kChartCoordinateHeight;
+  double coordinateScaleX = kExpandedMapScale;
+  double coordinateScaleY = kExpandedMapScale;
   double pxPerAction = 16;
   double lyPerAction = 0.42;
   double grid = 45;

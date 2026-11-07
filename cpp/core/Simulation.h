@@ -63,6 +63,8 @@ class Simulation {
 
   // ---- the clock ---------------------------------------------------------
   // The only function that advances the world. Mirrors performAction(detail).
+  // A committed map-contact action calls this exactly once; map selection,
+  // inspection, and other read-only navigation remain free.
   void PerformAction(const std::string& detail = std::string());
   // restartVoyage(): a fresh voyage in the state NewVoyage produces, with the
   // player's preferences carried across. Free - it is the new-voyage command,
@@ -322,6 +324,8 @@ class Simulation {
   double CleanerIntervalOf(const CrewMember& crew) const;
 
  private:
+  static Simulation BuildVoyage(const Catalog& catalog, bool generateSpaceMap);
+  void GenerateSpaceMap();
   void TickWorld();
 
   // Survival.cpp
@@ -369,6 +373,7 @@ class Simulation {
   double ChronicleValue(const std::string& metric) const;
 
   // Navigation.cpp
+  void ApplyLayerGeometry(const std::string& layer);
   void ArriveAt(const std::string& bodyId);
   void RefreshLocationInfo();
   void RevealScan(const std::string& bodyId);

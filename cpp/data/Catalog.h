@@ -36,14 +36,20 @@ class Catalog {
   // source tree during development. A packaged build can pass its own path.
   static const std::filesystem::path& DefaultAssetDir();
 
-  // Referential integrity, mirroring the assertions in tests/galaxy.test.cjs.
-  // An empty result means the catalogue is sound.
+  // Referential integrity for both reference data and native Phase 1 blueprints.
+  // An empty result means the catalogue is internally sound.
   std::vector<std::string> Validate() const;
 
   // ---- lookups -----------------------------------------------------------
   const Body* FindBody(const std::string& id) const;
   const Body* FindSystem(const std::string& id) const;
   const Body* FindRegion(const std::string& id) const;
+  const BodyProfileDef* FindSpaceBodyProfile(const std::string& id) const;
+  const LootTableDef* FindSpaceLootTable(const std::string& id) const;
+  const SpaceTaskDef* FindSpaceTask(const std::string& id) const;
+  const StationProfileDef* FindStationProfile(const std::string& id) const;
+  const ShipContactProfileDef* FindShipContactProfile(const std::string& id) const;
+  const Good* FindGood(const std::string& id) const;
 
   // Local bodies authored before systems existed belong to Kessler, exactly as
   // bodySystem() does in the reference.
@@ -53,8 +59,13 @@ class Catalog {
   std::string sourceSha256;
   long long sourceBytes = 0;
   Counts counts;
+  // NewVoyage adds a deterministic procedural expansion to its private copy.
+  // The source catalogue remains authored and ungenerated for reference tests.
+  bool spaceMapGenerated = false;
+  std::uint64_t spaceMapSeed = 0;
 
   MapGeometry map;
+  SpaceMapBlueprint spaceMap;  // native C++ generation blueprint; not exported from HTA
   DeckPlan wren;
   DeckPlan kestrel;
   // ROOM_SCENES, by room id. Authored, never computed.
@@ -79,7 +90,7 @@ class Catalog {
 
   std::vector<std::string> taskTypes;
   std::vector<std::string> layerOrder;               // system, sector, galaxy
-  std::map<std::string, double> surveyWorth;         // body type -> shiplets
+  std::map<std::string, double> surveyWorth;         // body type -> shiplets; generated:<type> overrides native bodies
   std::vector<CandidateDefinition> candidates;       // the hire pool
   std::map<std::string, std::map<std::string, std::string>> shipFields;  // by class
   std::map<std::string, std::vector<double>> cargoByClass;  // refit levels 0..2
@@ -132,5 +143,24 @@ class Catalog {
 
   const Port* FindPort(const std::string& id) const;
 };
+
+// Native-only task content is defined beside the incident/task logic.
+std::vector<SpaceTaskDef> NativeSpaceMapTaskBlueprints();
+
+// Stable generation primitives used by Phase 4. Kept pure so blueprints and
+// IDs can be tested without making or mutating a world.
+std::uint64_t SpaceMapRandomWord(std::uint64_t seed, const std::string& domain,
+                                std::uint64_t ordinal);
+std::optional<std::size_t> SpaceMapWeightedIndex(
+    std::uint64_t seed, const std::string& domain, std::uint64_t ordinal,
+    const std::vector<WeightedId>& options);
+std::string SpaceMapGeneratedId(std::uint32_t version, std::uint64_t seed,
+                                const std::string& category, std::uint64_t ordinal);
+std::string SpaceMapGeneratedName(std::uint64_t seed, std::uint64_t ordinal,
+                                  const SpaceMapNameRule& rule);
+
+// Empty lists are reserved for legacy authored ports and mean unrestricted.
+bool PortHasService(const Port& port, const std::string& service);
+bool PortOffersGood(const Port& port, const std::string& goodId);
 
 }  // namespace ship

@@ -256,8 +256,12 @@ NavPoint NavProject(const MapView& map, double wx, double wy) {
   NavPoint point;
   const double sw = map.w == 0 ? 1.0 : map.w;
   const double sh = map.h == 0 ? 1.0 : map.h;
-  point.x = (map.cx + (wx - map.cx) * map.zoom) * (map.vw / sw);
-  point.y = (map.cy + (wy - map.cy) * map.zoom) * (map.vh / sh);
+  const double scaleX = map.coordinateScaleX == 0 ? 1.0 : map.coordinateScaleX;
+  const double scaleY = map.coordinateScaleY == 0 ? 1.0 : map.coordinateScaleY;
+  const double worldX = wx * scaleX;
+  const double worldY = wy * scaleY;
+  point.x = (map.cx + (worldX - map.cx) * map.zoom) * (map.vw / sw);
+  point.y = (map.cy + (worldY - map.cy) * map.zoom) * (map.vh / sh);
   return point;
 }
 
@@ -422,9 +426,13 @@ NavChartView BuildNavChart(const Simulation& sim) {
       }
     }
     Seeded rnd(seed);
+    const double scaleX = map.coordinateScaleX == 0 ? 1.0 : map.coordinateScaleX;
+    const double scaleY = map.coordinateScaleY == 0 ? 1.0 : map.coordinateScaleY;
+    const double sourceW = map.w / scaleX;
+    const double sourceH = map.h / scaleY;
     for (int i = 0; i < static_cast<int>(count); ++i) {
       const NavPoint point =
-          NavProjectPanned(map, view, rnd() * map.w, rnd() * map.h);
+          NavProjectPanned(map, view, rnd() * sourceW, rnd() * sourceH);
       NavDot dot;
       dot.cls = std::string("cdot cdot-far") + (i % 17 == 0 ? " cdot-bright" : "");
       dot.x = js::Round(point.x);
@@ -505,15 +513,18 @@ NavFxFrame BuildNavFx(const Simulation& sim, double tick, bool reducedMotion) {
   // the same sky greys out in the same places every time.
   Seeded rnd(4242);
   const double t = reducedMotion ? 0.0 : tick;
+  const double scaleX = map.coordinateScaleX == 0 ? 1.0 : map.coordinateScaleX;
+  const double sourceW = map.w / scaleX;
+  const double sourceCx = map.cx / scaleX;
   for (int i = 0; i < 9; ++i) {
     NavFxRock rock;
-    rock.worldX = rnd() * map.w;
+    rock.worldX = rnd() * sourceW;
     rock.worldY = 96 + rnd() * 120;
     rock.vx = 0.10 + rnd() * 0.22;
     rock.size = 2 + static_cast<int>(std::floor(rnd() * 3));
     double x = rock.worldX + rock.vx * t;
     if (NavProject(map, x, rock.worldY).x > map.vw + 12) {
-      x = map.cx - (map.cx + 20) / map.zoom;
+      x = sourceCx - (sourceCx + 20) / map.zoom;
     }
     rock.at = NavProjectPanned(map, view, x, rock.worldY);
     frame.rocks.push_back(rock);

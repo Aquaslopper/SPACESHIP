@@ -1,18 +1,19 @@
 // ============================================================================
 //  Types.h — the authored catalogues, as plain data.
 //  ---------------------------------------------------------------------------
-//  Every struct here corresponds to a table in the reference edition
-//  (Spaceship.hta). They hold *content*: coordinates, names, prices, prose.
+//  Reference-mirroring structs hold authored content: coordinates, names,
+//  prices, prose, and state definitions. Native SpaceMap blueprint structs are
+//  explicitly C++-only and are not exported to the HTA-derived JSON assets.
 //  No behaviour lives in this header; the simulation reads these values and
-//  the renderer draws them, and neither may invent a field that the reference
-//  does not have.
+//  the renderer draws them.
 //
-//  Field names follow the JavaScript where the JavaScript name is already
-//  clear (id, name, x, y, w, h, klass), because a reviewer comparing the two
-//  editions should not have to translate twice.
+//  Reference-compatible field names follow the JavaScript where already clear
+//  (id, name, x, y, w, h, klass), so reviewers can compare the two editions.
 // ============================================================================
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <string>
@@ -22,8 +23,8 @@
 namespace ship {
 
 // ---------------------------------------------------------------------------
-// Geometry. Stage coordinates are pixels on a fixed board: the ship diagrams
-// are 1160x460 (large hull) or compact, the chart is a 638x278 world.
+// Geometry. Stage coordinates are pixels on fixed boards: the ship diagrams
+// are 1160x460 (large hull) or compact; chart-authored coordinates use 638x278.
 // ---------------------------------------------------------------------------
 struct Rect {
   double x = 0.0;
@@ -79,7 +80,10 @@ struct DeckPlan {
 // ---------------------------------------------------------------------------
 struct Body {
   std::string id;
-  std::string type;    // origin, star, station, planet, moon, belt, site, system, region
+  std::string type;    // origin, star, station, planet, moon, belt, site, system, region, debris, derelict
+  std::string tag;     // generated semantic tag; empty for legacy authored bodies
+  std::string taskId;  // native encounter/task blueprint selected for a generated body
+  std::string lootTable;  // native recovery table selected by its body profile
   std::string name;
   std::string klass;
   double x = 0.0;
@@ -126,6 +130,10 @@ struct Port {
   std::string name;
   std::string tip;
   std::map<std::string, double> prices;  // commodity kind -> multiplier
+  std::string stationTier;               // empty = legacy full station; mini | normal
+  std::vector<std::string> goodIds;       // empty = legacy full market
+  std::vector<std::string> services;      // empty = legacy full services
+  bool beta = false;                      // mini stations begin with limited beta services
 };
 
 struct Good {
@@ -135,6 +143,7 @@ struct Good {
   int vol = 0;
   double value = 0;
   bool risk = false;
+  bool miniStationEligible = false;
 };
 
 struct Contract {
@@ -150,11 +159,160 @@ struct Contract {
   bool recognizePrior = false;
 };
 
-// The chart's own drawing board. Distances are derived from these numbers and
-// never authored, so they must not be adjusted for the port's window size.
+// Native SpaceMap blueprints. These are definitions only; Phase 4 consumes
+// them to make a voyage-specific catalogue. They are not HTA-exported data.
+struct IncidentType;
+struct SurveyRecordDef;
+
+struct SpaceMapNameRule {
+  std::string category;
+  std::vector<std::string> prefixes;
+  std::vector<std::string> suffixes;
+};
+
+struct WeightedId {
+  std::string id;
+  std::uint32_t weight = 0;
+};
+
+struct BodyProfileDef {
+  std::string id;
+  std::string type;       // star, planet, moon, debris, derelict, site
+  std::string tag;        // semantic tag, independent of type and display text
+  std::string klass;
+  std::string subtype;
+  std::string nameRule;
+  std::string lootTable;
+  std::uint32_t weight = 0;
+  double moonChance = 0;  // planet profiles only, 0..1; at most one moon
+  std::vector<std::pair<std::string, std::string>> details;
+  std::vector<std::string> scan;
+  std::vector<std::string> scanLocked;
+};
+
+enum class LootKind { None, Shiplets, Cargo, Survey, FuelCell, RepairKit };
+
+struct LootEntryDef {
+  std::string id;
+  std::string text;
+  LootKind kind = LootKind::None;
+  std::uint32_t weight = 0;  // integer weight; table weights sum to 100
+  std::string goodId;         // Cargo only; maps to a Good kind for port pricing
+  std::string cargoName;
+  std::string surveyId;       // Survey only
+  int minAmount = 0;          // cargo count, shiplets, or survey payout range by kind
+  int maxAmount = 0;
+  double volume = 0;          // per cargo unit
+  double value = 0;           // per cargo unit; zero for non-cargo outcomes
+  bool risk = false;
+};
+
+struct LootTableDef {
+  std::string id;
+  std::vector<LootEntryDef> entries;
+  bool filterByEligibility = true;  // capacity/duplicate-survey filter before weighted draw
+};
+
+struct SpaceTaskDef {
+  std::string id;
+  std::string theme;  // engineering, life-support, crew, navigation, provisions
+  std::string title;
+  std::string discoveryText;
+  std::string workText;
+  std::string completionText;
+  std::string lootTable;
+  int startActions = 1;
+  int workActions = 1;
+  double energyCost = 0;
+  bool rewardOnAcknowledge = true;
+};
+
+struct StationProfileDef {
+  std::string id;
+  std::string tier;  // mini | normal
+  int minGoods = 0;
+  int maxGoods = 0;
+  std::vector<std::string> goodIds;
+  std::vector<std::string> services;
+  bool beta = false;
+};
+
+struct ShipContactActionDef {
+  std::string id;
+  std::string label;
+  std::string text;
+  int clockTicks = 1;
+};
+
+struct ShipContactProfileDef {
+  std::string id;
+  std::string type;
+  std::string tag;
+  std::string klass;
+  std::string nameRule;
+  std::uint32_t weight = 0;
+  int movementEveryActions = 0;  // 0 = stationary; otherwise committed actions
+  std::vector<ShipContactActionDef> actions;
+};
+
+struct SpaceMapRules {
+  std::uint32_t version = 1;
+  // Optional hard totals remain unset. Phase 4's default generator instead
+  // applies its documented one-mirror growth policy, never a 50x star-count guess.
+  std::optional<std::uint32_t> targetRegions;
+  std::optional<std::uint32_t> targetSystems;
+  std::optional<std::uint32_t> targetStarBodies;
+  std::optional<double> areaMultiplier;
+  double moonChance = 0.5;                 // per generated planet
+  int maxMoonsPerPlanet = 1;
+  int miniStationGoodsMax = 3;
+  int normalStationGoodsMax = 7;
+  int shipContactClickTicks = 1;
+};
+
+struct SpaceMapBlueprint {
+  SpaceMapRules rules;
+  std::vector<SpaceMapNameRule> names;
+  std::vector<BodyProfileDef> bodies;
+  std::vector<LootTableDef> lootTables;
+  std::vector<SpaceTaskDef> tasks;
+  std::vector<IncidentType> incidents;
+  std::vector<SurveyRecordDef> surveys;
+  std::vector<StationProfileDef> stations;
+  std::vector<ShipContactProfileDef> shipContacts;
+};
+
+// Authored chart coordinates stay on the reference board. Native C++ layers
+// receive a 50x linear extent while the logical viewport remains unchanged.
+constexpr double kChartCoordinateWidth = 638.0;
+constexpr double kChartCoordinateHeight = 278.0;
+constexpr double kExpandedMapScale = 50.0;
+constexpr double kExpandedMapWidth = kChartCoordinateWidth * kExpandedMapScale;
+constexpr double kExpandedMapHeight = kChartCoordinateHeight * kExpandedMapScale;
+
+struct MapLayerDimensions {
+  double w = 0;
+  double h = 0;
+};
+
 struct MapGeometry {
-  double w = 638, h = 278;
-  double cx = 319, cy = 139;
+  // Authored bodies and save files keep the reference coordinate frame.
+  double w = kChartCoordinateWidth, h = kChartCoordinateHeight;
+  double cx = kChartCoordinateWidth * 0.5, cy = kChartCoordinateHeight * 0.5;
+
+  // Each native layer has a 50x linear world extent relative to the C++ chart.
+  // Keep the values per layer so each scale can later be tuned independently;
+  // Phase 3 intentionally gives all three the same approved 50x bounds.
+  MapLayerDimensions system{kExpandedMapWidth, kExpandedMapHeight};
+  MapLayerDimensions sector{kExpandedMapWidth, kExpandedMapHeight};
+  MapLayerDimensions galaxy{kExpandedMapWidth, kExpandedMapHeight};
+
+  const MapLayerDimensions& DimensionsFor(const std::string& layer) const {
+    if (layer == "sector") { return sector; }
+    if (layer == "galaxy") { return galaxy; }
+    return system;
+  }
+
   double zoom = 1, zmin = 0.6, zmax = 2.0, zstep = 0.2;
   double grid = 45;
   double vpy = 0.35;
@@ -226,6 +384,9 @@ struct SurveyRecordDef {
   std::string id, name, src;
   double value = 0;
   std::string state;
+  std::string bodyType;  // source body type; empty for legacy records
+  std::string tag;       // survey-record category, not the source body's tag
+  std::string text;
 };
 
 struct IncidentType {
@@ -237,6 +398,14 @@ struct IncidentType {
   std::string id, kind, source, title, remedy;
   double first = 0;   // action of the first report
   double every = 0;   // actions between reports
+  // Map-only fields. Existing ship reports keep scope="ship" and their
+  // authored first/every schedule; map events are keyed to tags and weights.
+  std::string scope = "ship";  // ship | map
+  std::string trigger;          // schedule | enter-tag | scan-tag | contact-action
+  std::string targetTag;
+  std::string taskId;
+  std::string lootTable;
+  std::uint32_t spawnWeight = 0;
   // Whether the quick remedy costs a repair kit. Absent means "every report
   // except a crew dispute".
   std::optional<bool> requiresKit;

@@ -159,6 +159,39 @@ std::pair<std::string, std::string> Simulation::SimDisputePair() const {
   return pair;
 }
 
+std::vector<SpaceTaskDef> NativeSpaceMapTaskBlueprints() {
+  // These self-contained encounters borrow only the broad subject matter of
+  // existing ship rooms. Their prose, work costs, and payouts are native C++
+  // content; none of the reference-room task text is copied here.
+  return {
+      {"coil-relay", "engineering", "Thermal relay bypass",
+       "A cracked relay keeps a maintenance beacon alive on the edge of the debris.",
+       "Trace the cold line, bridge one safe conductor, and isolate the damaged coil.",
+       "The relay falls quiet. Any recoverable material is ready to secure.",
+       "debris-common", 1, 2, 1.0, true},
+      {"scrubber-vault", "life-support", "Scrubber sample check",
+       "A sealed canister bears a residue pattern that should not be vented unchecked.",
+       "Compare the residue against a clean-air sample, then seal the canister again.",
+       "The sample is stable enough to keep, and the compartment can be left undisturbed.",
+       "provisions", 1, 2, 0.0, true},
+      {"crew-roster", "crew", "Crew manifest recovery",
+       "A battered roster beacon repeats two names and an incomplete rendezvous code.",
+       "Reconcile the surviving timestamps and send a single confirmation pulse.",
+       "The beacon acknowledges the corrected record; its useful stores can be recovered.",
+       "provisions", 1, 1, 0.0, true},
+      {"dead-reckoning", "navigation", "Navigation fix",
+       "A local relay reports a position that conflicts with the visible star field.",
+       "Take a second bearing, reject the stale reference, and log the corrected fix.",
+       "The relay now agrees with the chart. The remaining signal is safe to catalogue.",
+       "world-find", 1, 2, 1.0, true},
+      {"ration-cache", "provisions", "Ration seal audit",
+       "An old locker still has pressure, but its supply labels no longer match the seals.",
+       "Check the lot marks, separate spoiled material, and preserve only sealed packets.",
+       "The inventory is reconciled; any clean provisions can be transferred aboard.",
+       "provisions", 1, 1, 0.0, true},
+  };
+}
+
 void Simulation::TickIncidents() {
   // ---- escalate what is already live ------------------------------------
   for (std::size_t i = events_.size(); i-- > 0;) {

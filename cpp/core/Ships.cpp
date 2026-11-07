@@ -43,8 +43,10 @@ bool Simulation::HasRoom(const std::string& id) const {
 }
 
 bool Simulation::BuyRoom(const std::string& id) {
-  if (!state_.gameOver.empty() || !state_.docked || HerePort() == nullptr ||
-      state_.shiplets < RoomPrice() || StandardRoom(id) || HasRoom(id)) return false;
+  const Port* port = HerePort();
+  if (!state_.gameOver.empty() || !state_.docked || port == nullptr ||
+      !PortHasService(*port, "upgrades") || state_.shiplets < RoomPrice() ||
+      StandardRoom(id) || HasRoom(id)) return false;
   const DeckPlan& plan = state_.shipClass == "wren" ? catalog_.wren : catalog_.kestrel;
   const Room* room = plan.FindRoom(id);
   if (room == nullptr) return false;
@@ -76,7 +78,8 @@ bool Simulation::BuyLargerShip() {
   const double price = 4000;
   if (!state_.gameOver.empty() || !state_.docked) { return false; }
   const Port* port = HerePort();
-  if (port == nullptr || state_.shipClass != "wren" || state_.shiplets < price) { return false; }
+  if (port == nullptr || !PortHasService(*port, "upgrades") ||
+      state_.shipClass != "wren" || state_.shiplets < price) { return false; }
 
   const std::string portName = port->name;
   state_.shiplets -= price;

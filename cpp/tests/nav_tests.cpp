@@ -10,7 +10,9 @@
 // ============================================================================
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cmath>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -75,6 +77,26 @@ bool HasCommand(const ship::TaskScreenModel& screen, const std::string& label) {
   return false;
 }
 
+bool GraphConnected(const std::set<std::string>& nodes,
+                    const std::vector<ship::Lane>& lanes) {
+  if (nodes.size() < 2) { return true; }
+  std::set<std::string> reached{*nodes.begin()};
+  std::vector<std::string> frontier{*nodes.begin()};
+  for (std::size_t next = 0; next < frontier.size(); ++next) {
+    const std::string current = frontier[next];
+    for (const ship::Lane& lane : lanes) {
+      std::string neighbor;
+      if (lane.from == current) { neighbor = lane.to; }
+      else if (lane.to == current) { neighbor = lane.from; }
+      if (!neighbor.empty() && nodes.count(neighbor) != 0 &&
+          reached.insert(neighbor).second) {
+        frontier.push_back(neighbor);
+      }
+    }
+  }
+  return reached == nodes;
+}
+
 }  // namespace
 
 // ---------------------------------------------------------------------------
@@ -84,13 +106,13 @@ TEST_CASE("the chart projects through the reference's mapX and mapY", "[nav]") {
   ship::Simulation sim = Fresh();
   const ship::MapView& map = sim.Map();
 
-  // The authored world and the live box agree at zoom 1, so projection is the
-  // identity: the dot lands exactly on its coordinate.
+  // Authored coordinates scale into the expanded world and back onto the
+  // unchanged logical viewport, so the dot still lands on its chart coordinate.
   ship::NavPoint kessler = ship::NavProject(map, 210, 150);
   CHECK(kessler.x == 210);
   CHECK(kessler.y == 150);
 
-  // Zoom about the centre of the world (319, 139), then stretch onto the box.
+  // Zoom about the projected centre of the world (319, 139), then stretch onto the box.
   ship::MapView twice = map;
   twice.zoom = 2;
   const ship::NavPoint zoomed = ship::NavProject(twice, 210, 150);
@@ -111,6 +133,278 @@ TEST_CASE("the chart projects through the reference's mapX and mapY", "[nav]") {
   const ship::NavPoint panned = ship::NavProjectPanned(map, view, 210, 150);
   CHECK(panned.x == 250);
   CHECK(panned.y == 138);
+}
+
+TEST_CASE("50x layer dimensions preserve rendering and reachable navigation",
+          "[nav][dimensions]") {
+  ship::Simulation sim = Fresh();
+  const ship::Body* vance = World().FindSystem("sec-vance");
+  REQUIRE(vance != nullptr);
+  const double reachableDistance = sim.MetricsFor(*vance).dist;
+  REQUIRE(reachableDistance > 0);
+  REQUIRE(reachableDistance <= 100);
+
+  const std::vector<std::pair<std::string, std::string>> layers = {
+      {"system", "kessler"}, {"sector", "sec-kessler"}, {"galaxy", "gal-inner"}};
+  for (const auto& layer : layers) {
+    if (sim.Map().layer != layer.first) { sim.SetLayer(layer.first); }
+    const ship::MapLayerDimensions& dimensions = World().map.DimensionsFor(layer.first);
+    CHECK(sim.Map().w == dimensions.w);
+    CHECK(sim.Map().h == dimensions.h);
+    CHECK(sim.Map().cx == dimensions.w * 0.5);
+    CHECK(sim.Map().cy == dimensions.h * 0.5);
+    CHECK(sim.Map().coordinateScaleX == ship::kExpandedMapScale);
+    CHECK(sim.Map().coordinateScaleY == ship::kExpandedMapScale);
+    CHECK(sim.Map().w > 1100);
+    CHECK(sim.Map().h > 500);
+    CHECK(sim.Map().vw == 638);
+    CHECK(sim.Map().vh == 278);
+
+    const ship::NavChartView chart = ship::BuildNavChart(sim);
+    REQUIRE(chart.layer == layer.first);
+    REQUIRE_FALSE(chart.bodies.empty());
+    const ship::NavBodyView* sample = Body(chart, layer.second);
+    REQUIRE(sample != nullptr);
+    CHECK(sample->at.x == sample->worldX);
+    CHECK(sample->at.y == sample->worldY);
+    for (const ship::NavBodyView& body : chart.bodies) {
+      CHECK(std::isfinite(body.at.x));
+      CHECK(std::isfinite(body.at.y));
+      CHECK(body.at.x >= 0);
+      CHECK(body.at.x <= sim.Map().vw);
+      CHECK(body.at.y >= 0);
+      CHECK(body.at.y <= sim.Map().vh);
+    }
+    CHECK(sim.MetricsFor(*vance).dist == reachableDistance);
+  }
+
+  // A selected sector lane remains drawable and its destination stays in range.
+  sim.SetLayer("sector");
+  REQUIRE(sim.SelectTarget("sec-vance"));
+  const ship::NavChartView sector = ship::BuildNavChart(sim);
+  CHECK_FALSE(sector.routes.empty());
+  bool selectedCourse = false;
+  for (const ship::NavDot& dot : sector.routes) {
+    if (dot.cls == "rdot rdot-sel") { selectedCourse = true; }
+  }
+  CHECK(selectedCourse);
+  CHECK(sim.MetricsFor(*vance).dist == reachableDistance);
+}
+
+TEST_CASE("NewVoyage generates a deterministic, connected native SpaceMap",
+          "[nav][spacemap][generation]") {
+  ship::Catalog& authored = World();
+  ship::Simulation sim = ship::Simulation::NewVoyage(authored);
+  ship::Simulation twin = ship::Simulation::NewVoyage(authored);
+  const ship::Catalog& generated = sim.World();
+  const ship::Catalog& repeated = twin.World();
+
+  CHECK_FALSE(authored.spaceMapGenerated);
+  CHECK(generated.spaceMapGenerated);
+  CHECK(generated.spaceMapSeed != 0);
+  CHECK(generated.spaceMapSeed == repeated.spaceMapSeed);
+  CHECK(generated.regions.size() == authored.regions.size() * 2);
+  CHECK(generated.systems.size() == authored.systems.size() * 51);  // authored + 50 generated per system
+  CHECK(generated.ports.size() > authored.ports.size());
+  CHECK(generated.contracts.size() > authored.contracts.size());
+
+  const auto generatedId = [](const std::string& id) {
+    return id.rfind("gen-v", 0) == 0;
+  };
+  const auto generatedRegionCount = std::count_if(
+      generated.regions.begin(), generated.regions.end(),
+      [&generatedId](const ship::Body& body) { return generatedId(body.id); });
+  const auto generatedSystemCount = std::count_if(
+      generated.systems.begin(), generated.systems.end(),
+      [&generatedId](const ship::Body& body) { return generatedId(body.id); });
+  const auto generatedStarCount = std::count_if(
+      generated.bodies.begin(), generated.bodies.end(),
+      [&generatedId](const ship::Body& body) {
+        return generatedId(body.id) && body.type == "star";
+      });
+  CHECK(generatedRegionCount == authored.regions.size());
+  CHECK(generatedSystemCount == authored.systems.size() * 50);
+  CHECK(generatedStarCount == authored.systems.size() * 50);
+  REQUIRE(generated.regions.back().id == repeated.regions.back().id);
+  CHECK(generated.regions.back().x == repeated.regions.back().x);
+  CHECK(generated.regions.back().y == repeated.regions.back().y);
+  CHECK(generated.bodies.back().id == repeated.bodies.back().id);
+  CHECK(generated.bodies.back().name == repeated.bodies.back().name);
+  CHECK(generated.ports.back().goodIds == repeated.ports.back().goodIds);
+  CHECK(generated.ports.back().prices == repeated.ports.back().prices);
+  CHECK(generated.contracts.back().id == repeated.contracts.back().id);
+  CHECK(generated.contracts.back().target == repeated.contracts.back().target);
+
+  std::set<std::string> generatedTypes;
+  std::set<std::string> generatedStationTiers;
+  std::set<std::string> generatedGoals;
+  std::set<std::string> generatedTaskIds;
+  for (const ship::Body& body : generated.bodies) {
+    if (!generatedId(body.id)) { continue; }
+    generatedTypes.insert(body.type);
+    if (!body.taskId.empty()) { generatedTaskIds.insert(body.taskId); }
+  }
+  for (const ship::Port& port : generated.ports) {
+    if (generatedId(port.id)) { generatedStationTiers.insert(port.stationTier); }
+  }
+  for (const ship::Contract& contract : generated.contracts) {
+    if (generatedId(contract.id)) { generatedGoals.insert(contract.goal); }
+  }
+  CHECK(generatedTypes.count("star") == 1);
+  CHECK(generatedTypes.count("planet") == 1);
+  CHECK(generatedTypes.count("moon") == 1);
+  CHECK(generatedTypes.count("debris") == 1);
+  CHECK(generatedTypes.count("derelict") == 1);
+  CHECK(generatedTypes.count("site") == 1);
+  CHECK(generatedTypes.count("station") == 1);
+  CHECK(generatedTypes.count("ship") == 1);
+  CHECK(generatedStationTiers.count("mini") == 1);
+  CHECK(generatedStationTiers.count("normal") == 1);
+  CHECK(generatedGoals.count("visit") == 1);
+  CHECK(generatedGoals.count("scan") == 1);
+  CHECK(generatedGoals.count("freight") == 1);
+  CHECK(generatedGoals.count("passenger") == 1);
+  for (const ship::SpaceTaskDef& task : authored.spaceMap.tasks) {
+    CHECK(generatedTaskIds.count(task.id) == 1);
+  }
+  CHECK(generated.surveyWorth.count("generated:planet") == 1);
+  CHECK(generated.surveyWorth.count("generated:debris") == 1);
+  CHECK(generated.surveyWorth.count("generated:ship") == 1);
+  for (const ship::IncidentType& incident : authored.spaceMap.incidents) {
+    const auto found = std::find_if(generated.incidentTypes.begin(),
+        generated.incidentTypes.end(), [&incident](const ship::IncidentType& type) {
+          return type.id == incident.id;
+        });
+    REQUIRE(found != generated.incidentTypes.end());
+    CHECK(found->every == 0);  // map-tag incidents are not recurring ship reports
+    if (incident.trigger == "enter-tag" || incident.trigger == "scan-tag") {
+      const auto taggedBody = std::find_if(generated.bodies.begin(), generated.bodies.end(),
+          [&generatedId, &incident](const ship::Body& body) {
+            return generatedId(body.id) && body.tag == incident.targetTag;
+          });
+      CHECK(taggedBody != generated.bodies.end());
+    }
+  }
+
+  const std::vector<std::string> validation = generated.Validate();
+  CHECK(validation.empty());
+
+  std::set<std::string> regionIds;
+  for (const ship::Body& region : generated.regions) { regionIds.insert(region.id); }
+  CHECK(GraphConnected(regionIds, generated.galaxyLanes));
+  for (const ship::Body& region : generated.regions) {
+    std::set<std::string> systemsInRegion;
+    for (const ship::Body& system : generated.systems) {
+      if (system.region == region.id) { systemsInRegion.insert(system.id); }
+    }
+    REQUIRE_FALSE(systemsInRegion.empty());
+    CHECK(GraphConnected(systemsInRegion, generated.sectorLanes));
+  }
+
+  for (const ship::Body& system : generated.systems) {
+    REQUIRE(sim.InRange(system));
+    const ship::Simulation::NavMetrics metrics = sim.MetricsFor(system);
+    CHECK(metrics.dist <= 100);
+    CHECK(metrics.fuel <= sim.StatValue("fuel"));
+  }
+
+  // The chart view-model consumes the generated catalogue at all three scales.
+  sim.SetLayer("galaxy");
+  const ship::NavChartView galaxy = ship::BuildNavChart(sim);
+  CHECK(galaxy.bodies.size() == generated.regions.size());
+  CHECK_FALSE(galaxy.routes.empty());
+
+  const ship::Body& generatedRegion = generated.regions[authored.regions.size()];
+  REQUIRE(sim.ViewSector(generatedRegion.id));
+  const ship::NavChartView sector = ship::BuildNavChart(sim);
+  std::size_t expectedSectorBodies = 0;
+  for (const ship::Body& system : generated.systems) {
+    if (system.region == generatedRegion.id) { ++expectedSectorBodies; }
+  }
+  CHECK(sector.bodies.size() == expectedSectorBodies);
+  CHECK_FALSE(sector.routes.empty());
+
+  const auto generatedSystem = std::find_if(generated.systems.begin(),
+      generated.systems.end(), [&generatedId](const ship::Body& body) {
+        return generatedId(body.id);
+      });
+  REQUIRE(generatedSystem != generated.systems.end());
+  sim.MutableMap().here = generatedSystem->entry;
+  sim.SetLayer("system");
+  const ship::NavChartView local = ship::BuildNavChart(sim);
+  REQUIRE(Body(local, generatedSystem->entry) != nullptr);
+  CHECK(local.bodies.size() >= 8);
+  CHECK_FALSE(local.routes.empty());
+  for (const ship::NavBodyView& body : local.bodies) {
+    CHECK(std::isfinite(body.at.x));
+    CHECK(std::isfinite(body.at.y));
+    CHECK(body.at.x >= 0);
+    CHECK(body.at.x <= sim.Map().vw);
+    CHECK(body.at.y >= 0);
+    CHECK(body.at.y <= sim.Map().vh);
+  }
+
+  const auto generatedPlanet = std::find_if(generated.bodies.begin(),
+      generated.bodies.end(), [&generatedId, &generatedSystem](const ship::Body& body) {
+        return generatedId(body.id) && body.system == generatedSystem->id &&
+               body.type == "planet";
+      });
+  REQUIRE(generatedPlanet != generated.bodies.end());
+  REQUIRE(sim.SelectTarget(generatedPlanet->id));
+  REQUIRE(sim.StartScan());
+  for (int i = 0; i < 8; ++i) {
+    const ship::Task* scan = sim.FindOngoing("scan");
+    if (scan != nullptr && scan->state == "done") { break; }
+    sim.PerformAction("generated chart scan");
+  }
+  REQUIRE(sim.FindOngoing("scan") != nullptr);
+  REQUIRE(sim.FindOngoing("scan")->state == "done");
+  REQUIRE(sim.Acknowledge("scan"));
+  const auto survey = std::find_if(sim.Survey().begin(), sim.Survey().end(),
+      [&generatedPlanet](const ship::SurveyRecord& record) {
+        return record.id == "sv-" + generatedPlanet->id;
+      });
+  REQUIRE(survey != sim.Survey().end());
+  CHECK(survey->value == generated.surveyWorth.at("generated:planet"));
+
+  // Exercise the actual voyage action path, then prove the seed recreates IDs
+  // needed to restore an in-progress generated-system crossing.
+  ship::Simulation playable = ship::Simulation::NewVoyage(authored);
+  const auto destination = std::find_if(playable.World().systems.begin(),
+      playable.World().systems.end(), [&generatedId](const ship::Body& body) {
+        return generatedId(body.id);
+      });
+  REQUIRE(destination != playable.World().systems.end());
+  REQUIRE(playable.ViewSector(destination->region));
+  REQUIRE(playable.SelectTarget(destination->id));
+  REQUIRE(playable.StartTravel());
+  CHECK(playable.ActionCount() == 1);
+  REQUIRE(playable.FindOngoing("travel") != nullptr);
+  CHECK(playable.FindOngoing("travel")->target == destination->id);
+  CHECK(playable.State().gameOver.empty());
+
+  ship::Simulation contractVoyage = ship::Simulation::NewVoyage(authored);
+  const auto generatedFreight = std::find_if(
+      contractVoyage.World().contracts.begin(), contractVoyage.World().contracts.end(),
+      [&generatedId](const ship::Contract& contract) {
+        return generatedId(contract.id) && contract.goal == "freight";
+      });
+  REQUIRE(generatedFreight != contractVoyage.World().contracts.end());
+  contractVoyage.MutableMap().here = generatedFreight->origin;
+  contractVoyage.MutableState().docked = true;
+  REQUIRE(contractVoyage.AcceptContract(generatedFreight->id));
+  CHECK(contractVoyage.CargoUsed() <= contractVoyage.CargoStore().capacity);
+
+  ship::Simulation restored = ship::Simulation::NewVoyage(authored);
+  std::string error;
+  REQUIRE(restored.LoadJson(playable.SaveJson(), &error));
+  REQUIRE(restored.FindOngoing("travel") != nullptr);
+  CHECK(restored.FindOngoing("travel")->target == destination->id);
+
+  // ReferenceVoyage remains the unexpanded historical test fixture.
+  ship::Simulation reference = ship::Simulation::ReferenceVoyage(authored);
+  CHECK_FALSE(reference.World().spaceMapGenerated);
+  CHECK(reference.World().regions.size() == authored.regions.size());
 }
 
 TEST_CASE("the zoom ladder is clamped to a tenth and to its ends", "[nav]") {

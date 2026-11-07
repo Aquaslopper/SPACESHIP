@@ -69,8 +69,8 @@ struct NavPoint {
   double y = 0;
 };
 
-// mapX / mapY: zoom about the centre of the world, then stretch the world onto
-// the live size of the map box.
+// Authored reference coordinates are scaled into the active layer's larger
+// world, then zoomed about its centre and projected onto the logical viewport.
 NavPoint NavProject(const MapView& map, double wx, double wy);
 
 // The same, with the layer's pan applied: what the player actually sees.

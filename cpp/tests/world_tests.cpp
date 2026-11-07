@@ -429,6 +429,29 @@ TEST_CASE("a save round-trips, and impossible voyages are refused", "[world][sav
   REQUIRE(live.SaveJson() == before);
 }
 
+TEST_CASE("expanded layer geometry keeps save interchange reference-sized",
+          "[world][save][dimensions]") {
+  ship::Simulation sim = Fresh();
+  sim.SetLayer("galaxy");
+  REQUIRE(sim.Map().w == 31900);
+  REQUIRE(sim.Map().h == 13900);
+
+  const nlohmann::json saved = nlohmann::json::parse(sim.SaveJson());
+  CHECK(saved["map"]["w"] == 638);
+  CHECK(saved["map"]["h"] == 278);
+  CHECK(saved["map"]["cx"] == 319);
+  CHECK(saved["map"]["cy"] == 139);
+
+  ship::Simulation restored = Fresh();
+  std::string why;
+  REQUIRE(restored.LoadJson(saved.dump(), &why));
+  CHECK(restored.Map().layer == "galaxy");
+  CHECK(restored.Map().w == 31900);
+  CHECK(restored.Map().h == 13900);
+  CHECK(restored.Map().coordinateScaleX == ship::kExpandedMapScale);
+  CHECK(restored.Map().coordinateScaleY == ship::kExpandedMapScale);
+}
+
 TEST_CASE("an old save without a sector is migrated, not rejected", "[world][save]") {
   ship::Simulation sim = Fresh();
   nlohmann::json snapshot = nlohmann::json::parse(sim.SaveJson());

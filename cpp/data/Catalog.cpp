@@ -32,6 +32,23 @@ std::string Text(const Json& object, const char* key, const std::string& where,
   return it->dump();
 }
 
+std::vector<std::string> StringArray(const Json& object, const char* key,
+                                     const std::string& where) {
+  auto it = object.find(key);
+  if (it == object.end() || it->is_null()) { return {}; }
+  if (!it->is_array()) {
+    throw CatalogError(where + ": field '" + key + "' is not an array");
+  }
+  std::vector<std::string> result;
+  for (const Json& item : *it) {
+    if (!item.is_string()) {
+      throw CatalogError(where + ": field '" + key + "' contains a non-string value");
+    }
+    result.push_back(item.get<std::string>());
+  }
+  return result;
+}
+
 double Number(const Json& object, const char* key, const std::string& where, double fallback = 0.0) {
   auto it = object.find(key);
   if (it == object.end() || it->is_null()) { return fallback; }
@@ -135,6 +152,9 @@ Body ReadBody(const Json& object, const std::string& where) {
   Body b;
   b.id = Text(object, "id", where);
   b.type = Text(object, "type", where);
+  b.tag = Text(object, "tag", where);
+  b.taskId = Text(object, "taskId", where);
+  b.lootTable = Text(object, "lootTable", where);
   b.name = Text(object, "name", where);
   b.klass = Text(object, "klass", where);
   b.x = Number(object, "x", where);
@@ -163,6 +183,296 @@ Body ReadBody(const Json& object, const std::string& where) {
     }
   }
   return b;
+}
+
+BodyProfileDef MakeBodyProfile(const std::string& id, const std::string& type,
+                               const std::string& tag, const std::string& klass,
+                               const std::string& subtype, const std::string& nameRule,
+                               const std::string& lootTable, std::uint32_t weight) {
+  BodyProfileDef profile;
+  profile.id = id;
+  profile.type = type;
+  profile.tag = tag;
+  profile.klass = klass;
+  profile.subtype = subtype;
+  profile.nameRule = nameRule;
+  profile.lootTable = lootTable;
+  profile.weight = weight;
+  return profile;
+}
+
+LootEntryDef MakeLootEntry(const std::string& id, const std::string& text,
+                           LootKind kind, std::uint32_t weight,
+                           int minAmount = 0, int maxAmount = 0,
+                           const std::string& goodId = "",
+                           const std::string& cargoName = "",
+                           const std::string& surveyId = "",
+                           double volume = 0.0, double value = 0.0) {
+  LootEntryDef entry;
+  entry.id = id;
+  entry.text = text;
+  entry.kind = kind;
+  entry.weight = weight;
+  entry.minAmount = minAmount;
+  entry.maxAmount = maxAmount;
+  entry.goodId = goodId;
+  entry.cargoName = cargoName;
+  entry.surveyId = surveyId;
+  entry.volume = volume;
+  entry.value = value;
+  return entry;
+}
+
+SpaceMapBlueprint MakeNativeSpaceMapBlueprint() {
+  SpaceMapBlueprint blueprint;
+  blueprint.rules.version = 1;
+  // Phase 4 consumes these profiles with a stable one-mirror growth policy;
+  // the optional hard totals remain unset and independent of the 50x map bounds.
+  blueprint.rules.moonChance = 0.5;
+  blueprint.rules.miniStationGoodsMax = 3;
+  blueprint.rules.normalStationGoodsMax = 7;
+  blueprint.rules.shipContactClickTicks = 1;
+
+  blueprint.names = {
+      {"region", {"Aster", "Boreal", "Cinder", "Distant", "Eidolon", "Fallow", "Harrow", "Indigo"},
+       {"Reach", "Shoal", "Rim", "Expanse", "Drift", "Halo", "Field", "Bend"}},
+      {"system", {"Aster", "Bastion", "Cinder", "Dawn", "Eidolon", "Fallow", "Gossamer", "Hallow", "Indigo", "Juniper", "Kestrel", "Lattice"},
+       {"Crown", "Gate", "Passage", "Run", "Spur", "Haven", "Sound", "Crossing", "Anchor", "Drift", "Reach", "Yard"}},
+      {"star", {"Amber", "Blue", "Copper", "Distant", "Ivory", "Pale", "Quiet", "White"},
+       {"Beacon", "Ember", "Flare", "Lantern", "Point", "Signal", "Torch", "Wick"}},
+      {"planet", {"Aster", "Bastion", "Cinder", "Dawn", "Eidolon", "Fallow", "Gossamer", "Hallow", "Indigo", "Juniper", "Kestrel", "Lattice"},
+       {"I", "II", "III", "IV", "V", "Mare", "Arc", "Shore", "Vale", "Cairn", "Hearth", "Rill"}},
+      {"moon", {"Moth", "Nacre", "Orrery", "Peregrine", "Quietus", "Rill", "Sable", "Tern", "Umbra", "Vesper", "Wisp", "Yarrow"},
+       {"Deep", "Near", "Far", "Minor", "Hollow", "Ring", "Cove", "Rest"}},
+      {"debris", {"Broken", "Cold", "Feral", "Lost", "Silent", "Spare", "Tattered", "Unmoored"},
+       {"Array", "Cache", "Field", "Flotilla", "Grave", "Scatter", "Wake", "Yard"}},
+      {"station", {"Far", "Hearth", "Long", "Quiet", "Vesper", "West", "Wren", "Yellow"},
+       {"Depot", "Relay", "Haven", "Exchange", "Drydock", "Platform", "Terminus", "Market"}},
+      {"ship", {"Wayward", "Argent", "Tern", "Moth", "Kite", "Sable", "Echo", "Pilgrim"},
+       {"Courier", "Lark", "Artery", "Pioneer", "Wanderer", "Runner", "Surveyor", "Tender"}},
+  };
+
+  BodyProfileDef profile = MakeBodyProfile("star-primary", "star", "star.primary",
+      "Primary star", "stellar", "star", "", 100);
+  profile.details = {{"Spectrum", "Variable"}, {"Chart status", "Generated"}};
+  profile.scan = {"Stellar output is stable enough for local navigation."};
+  profile.scanLocked = {"A closer pass would resolve the outer corona."};
+  blueprint.bodies.push_back(profile);
+
+  profile = MakeBodyProfile("planet-rock", "planet", "world.rocky", "Rocky world",
+      "rocky", "planet", "world-find", 25);
+  profile.moonChance = 0.5;
+  profile.details = {{"Surface", "Exposed silicate terrain"}, {"Orbit", "Inner system"}};
+  profile.scan = {"The surface carries broad mineral bands.", "No stable biosignature is confirmed."};
+  profile.scanLocked = {"A high-resolution pass may expose shallow deposits."};
+  blueprint.bodies.push_back(profile);
+
+  profile = MakeBodyProfile("planet-ice", "planet", "world.icy", "Ice world",
+      "icy", "planet", "world-find", 25);
+  profile.moonChance = 0.5;
+  profile.details = {{"Surface", "Water ice and fractured crust"}, {"Orbit", "Outer system"}};
+  profile.scan = {"Long fissures interrupt the frozen surface.", "Subsurface pockets remain unverified."};
+  profile.scanLocked = {"Thermal mapping could distinguish brine from empty cavities."};
+  blueprint.bodies.push_back(profile);
+
+  profile = MakeBodyProfile("planet-ocean", "planet", "world.ocean", "Ocean world",
+      "ocean", "planet", "world-find", 25);
+  profile.moonChance = 0.5;
+  profile.details = {{"Surface", "Continuous liquid coverage"}, {"Orbit", "Temperate band"}};
+  profile.scan = {"Cloud breaks reveal strong tidal currents.", "Surface chemistry is only partly resolved."};
+  profile.scanLocked = {"A narrow atmospheric window may reveal trace life."};
+  blueprint.bodies.push_back(profile);
+
+  profile = MakeBodyProfile("planet-gas", "planet", "world.gas", "Gas giant",
+      "gas", "planet", "world-find", 25);
+  profile.moonChance = 0.5;
+  profile.details = {{"Atmosphere", "Hydrogen and helium"}, {"Orbit", "Outer system"}};
+  profile.scan = {"Layered cloud bands encircle the upper atmosphere."};
+  profile.scanLocked = {"The deep weather bands exceed safe survey depth."};
+  blueprint.bodies.push_back(profile);
+
+  profile = MakeBodyProfile("moon-natural", "moon", "satellite.natural",
+      "Natural satellite", "natural", "moon", "world-find", 100);
+  profile.details = {{"Origin", "Attached to a generated planet"}};
+  profile.scan = {"The moon follows its parent world on a stable orbit."};
+  profile.scanLocked = {"A closer orbital pass is required to map the far side."};
+  blueprint.bodies.push_back(profile);
+
+  profile = MakeBodyProfile("debris-ore", "debris", "debris.ore",
+      "Ore-bearing debris", "ore", "debris", "debris-common", 45);
+  profile.details = {{"Composition", "Metal-rich fragments"}, {"Motion", "Slow drift"}};
+  profile.scan = {"The fragments contain recoverable industrial metals."};
+  profile.scanLocked = {"A careful pass could separate clean ore from hull fragments."};
+  blueprint.bodies.push_back(profile);
+
+  profile = MakeBodyProfile("debris-wreck", "debris", "debris.wreck",
+      "Wreckage field", "wreckage", "debris", "debris-common", 55);
+  profile.details = {{"Composition", "Mixed alloy and composite"}, {"Motion", "Irregular"}};
+  profile.scan = {"The debris is consistent with a failed cargo convoy."};
+  profile.scanLocked = {"Several sealed compartments remain difficult to resolve."};
+  blueprint.bodies.push_back(profile);
+
+  profile = MakeBodyProfile("debris-relay", "derelict", "site.derelict",
+      "Derelict structure", "derelict", "debris", "debris-common", 100);
+  profile.details = {{"Power", "Intermittent"}, {"Access", "Outer hull only"}};
+  profile.scan = {"A narrow-band beacon repeats from inside the hull."};
+  profile.scanLocked = {"The internal layout is inaccessible without a safe approach."};
+  blueprint.bodies.push_back(profile);
+
+  profile = MakeBodyProfile("signal-site", "site", "site.signal",
+      "Anomalous signal site", "signal", "debris", "world-find", 100);
+  profile.details = {{"Signal", "Repeating, low power"}};
+  profile.scan = {"The pulse is regular but does not match local traffic."};
+  profile.scanLocked = {"A second listening pass could recover the full message."};
+  blueprint.bodies.push_back(profile);
+
+  LootTableDef table;
+  table.id = "debris-common";
+  table.entries = {
+      MakeLootEntry("shiplets", "A compact cache of loose shiplets is recoverable.",
+                    LootKind::Shiplets, 25, 20, 60),
+      MakeLootEntry("ore-concentrate", "Ore concentrate can be secured as cargo.",
+                    LootKind::Cargo, 20, 1, 2, "ore", "Ore concentrate", "", 2, 45),
+      MakeLootEntry("drive-parts", "Salvageable drive components are still intact.",
+                    LootKind::Cargo, 15, 1, 2, "parts", "Drive components", "", 1, 75),
+      MakeLootEntry("water-ice", "A sealed water-ice canister survives the impact.",
+                    LootKind::Cargo, 10, 1, 2, "water", "Water-ice canister", "", 1, 24),
+      MakeLootEntry("medical-pack", "An unopened medical pack is found in the wreckage.",
+                    LootKind::Cargo, 10, 1, 1, "medicine", "Medical pack", "", 1, 44),
+      MakeLootEntry("old-relic", "A small pre-chart relic is safe to bring aboard.",
+                    LootKind::Cargo, 10, 1, 1, "relics", "Pre-chart relic", "", 1, 90),
+      MakeLootEntry("survey-fragment", "A fragment of an older survey record is recovered.",
+                    LootKind::Survey, 5, 35, 75, "", "", "debris-fragment"),
+      MakeLootEntry("empty-field", "Nothing suitable for recovery remains.",
+                    LootKind::None, 5),
+  };
+  blueprint.lootTables.push_back(table);
+
+  table = LootTableDef{};
+  table.id = "provisions";
+  table.entries = {
+      MakeLootEntry("small-purse", "A modest shiplet reserve is tucked in a service locker.",
+                    LootKind::Shiplets, 35, 10, 40),
+      MakeLootEntry("greens", "A chilled packet of greens remains fresh.",
+                    LootKind::Cargo, 25, 1, 2, "greens", "Chilled greens", "", 1, 30),
+      MakeLootEntry("water", "A sealed water ration can be reused.",
+                    LootKind::Cargo, 20, 1, 2, "water", "Water ration", "", 1, 20),
+      MakeLootEntry("medicine", "A medical pouch is still within date.",
+                    LootKind::Cargo, 10, 1, 1, "medicine", "Medical pouch", "", 1, 40),
+      MakeLootEntry("empty-locker", "The locker is empty, but its seal is intact.",
+                    LootKind::None, 10),
+  };
+  blueprint.lootTables.push_back(table);
+
+  table = LootTableDef{};
+  table.id = "world-find";
+  table.entries = {
+      MakeLootEntry("field-notes", "A short environmental survey is worth filing.",
+                    LootKind::Survey, 45, 20, 65, "", "", "world-notes"),
+      MakeLootEntry("trace-relic", "A trace relic is embedded in the surface material.",
+                    LootKind::Cargo, 15, 1, 1, "relics", "Trace relic", "", 1, 65),
+      MakeLootEntry("shiplets", "A small emergency cache is recoverable.",
+                    LootKind::Shiplets, 20, 10, 30),
+      MakeLootEntry("no-reward", "The survey yields no recoverable material.",
+                    LootKind::None, 20),
+  };
+  blueprint.lootTables.push_back(table);
+
+  blueprint.surveys = {
+      {"debris-fragment", "Debris field fragment", "Generated debris", 35, "unfiled",
+       "debris", "survey.debris", "A partial composition record from a wreckage field."},
+      {"world-notes", "World environment notes", "Generated world", 20, "unfiled",
+       "planet", "survey.world", "A concise environmental record suitable for a later comparison."},
+      {"traffic-record", "Traffic pattern record", "Generated contact", 50, "unfiled",
+       "ship", "survey.traffic", "A timestamped record of a ship crossing the local system."},
+  };
+
+  blueprint.tasks = NativeSpaceMapTaskBlueprints();
+
+  IncidentType incident;
+  incident.id = "map-debris-recovery";
+  incident.kind = "survey";
+  incident.source = "generated debris";
+  incident.title = "A salvageable signal persists";
+  incident.remedy = "Inspect the debris field and secure any safe material.";
+  incident.scope = "map";
+  incident.trigger = "enter-tag";
+  incident.targetTag = "debris.wreck";
+  incident.taskId = "coil-relay";
+  incident.lootTable = "debris-common";
+  incident.spawnWeight = 100;
+  blueprint.incidents.push_back(incident);
+
+  incident = IncidentType{};
+  incident.id = "map-world-anomaly";
+  incident.kind = "survey";
+  incident.source = "generated world";
+  incident.title = "A surface reading needs a second pass";
+  incident.remedy = "Resolve the local readings before filing the report.";
+  incident.scope = "map";
+  incident.trigger = "scan-tag";
+  incident.targetTag = "world.ocean";
+  incident.taskId = "dead-reckoning";
+  incident.lootTable = "world-find";
+  incident.spawnWeight = 60;
+  blueprint.incidents.push_back(incident);
+
+  blueprint.stations = {
+      {"mini", "mini", 2, 3, {"ore", "parts", "water"}, {"trade", "refuel"}, true},
+      {"normal", "normal", 4, 7,
+       {"ore", "parts", "greens", "amps", "water", "medicine", "relics"},
+       {"trade", "refuel", "resupply", "repair", "upgrades", "hire", "contracts"}, false},
+  };
+
+  ShipContactProfileDef contact;
+  contact.id = "trader";
+  contact.type = "ship";
+  contact.tag = "ship.trader";
+  contact.klass = "Independent courier";
+  contact.nameRule = "ship";
+  contact.weight = 50;
+  contact.movementEveryActions = 2;
+  contact.actions = {{"hail", "Hail", "Exchange a short identification burst.", 1},
+                     {"trade", "Trade", "Offer one available cargo good for exchange.", 1}};
+  blueprint.shipContacts.push_back(contact);
+
+  contact = ShipContactProfileDef{};
+  contact.id = "distress";
+  contact.type = "ship";
+  contact.tag = "ship.distress";
+  contact.klass = "Disabled vessel";
+  contact.nameRule = "ship";
+  contact.weight = 20;
+  contact.movementEveryActions = 0;
+  contact.actions = {{"hail", "Hail", "Attempt a narrow-band response.", 1},
+                     {"assist", "Assist", "Commit supplies to a rescue attempt.", 1}};
+  blueprint.shipContacts.push_back(contact);
+
+  contact = ShipContactProfileDef{};
+  contact.id = "patrol";
+  contact.type = "ship";
+  contact.tag = "ship.patrol";
+  contact.klass = "Survey patrol";
+  contact.nameRule = "ship";
+  contact.weight = 15;
+  contact.movementEveryActions = 3;
+  contact.actions = {{"hail", "Hail", "Exchange a short identification burst.", 1},
+                     {"report", "Report", "Transmit a brief navigation report.", 1}};
+  blueprint.shipContacts.push_back(contact);
+
+  contact = ShipContactProfileDef{};
+  contact.id = "salvager";
+  contact.type = "ship";
+  contact.tag = "ship.salvager";
+  contact.klass = "Salvage tender";
+  contact.nameRule = "ship";
+  contact.weight = 15;
+  contact.movementEveryActions = 2;
+  contact.actions = {{"hail", "Hail", "Exchange a short identification burst.", 1},
+                     {"trade", "Trade", "Offer one available cargo good for exchange.", 1}};
+  blueprint.shipContacts.push_back(contact);
+
+  return blueprint;
 }
 
 }  // namespace
@@ -270,6 +580,10 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     port.id = it.key();
     port.name = Text(it.value(), "name", "chart.json/ports/" + port.id);
     port.tip = Text(it.value(), "tip", "chart.json/ports/" + port.id);
+    port.stationTier = Text(it.value(), "stationTier", "chart.json/ports/" + port.id);
+    port.goodIds = StringArray(it.value(), "goods", "chart.json/ports/" + port.id);
+    port.services = StringArray(it.value(), "services", "chart.json/ports/" + port.id);
+    port.beta = Flag(it.value(), "betaState");
     if (auto prices = it.value().find("prices"); prices != it.value().end() && prices->is_object()) {
       for (auto p = prices->begin(); p != prices->end(); ++p) {
         port.prices[p.key()] = p.value().get<double>();
@@ -286,7 +600,13 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     g.vol = static_cast<int>(Number(good, "vol", "chart.json/market"));
     g.value = Number(good, "value", "chart.json/market");
     g.risk = Flag(good, "risk");
+    g.miniStationEligible = Flag(good, "miniStationEligible");
     catalog.goods.push_back(g);
+  }
+  for (Good& good : catalog.goods) {
+    good.miniStationEligible = good.miniStationEligible ||
+        good.id == "ore" || good.id == "parts" || good.id == "greens" ||
+        good.id == "water" || good.id == "medicine";
   }
 
   // ---- progression -------------------------------------------------------
@@ -314,6 +634,12 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     type.remedy = Text(incident, "remedy", "incidents");
     type.first = Number(incident, "first", "incidents");
     type.every = Number(incident, "every", "incidents");
+    type.scope = Text(incident, "scope", "incidents", "ship");
+    type.trigger = Text(incident, "trigger", "incidents", "schedule");
+    type.targetTag = Text(incident, "targetTag", "incidents");
+    type.taskId = Text(incident, "taskId", "incidents");
+    type.lootTable = Text(incident, "lootTable", "incidents");
+    type.spawnWeight = static_cast<std::uint32_t>(Number(incident, "spawnWeight", "incidents"));
     if (incident.contains("requiresKit") && incident["requiresKit"].is_boolean()) {
       type.requiresKit = incident["requiresKit"].get<bool>();
     }
@@ -531,6 +857,9 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     def.src = Text(record, "src", "survival.json/survey");
     def.value = Number(record, "value", "survival.json/survey");
     def.state = Text(record, "state", "survival.json/survey");
+    def.bodyType = Text(record, "bodyType", "survival.json/survey");
+    def.tag = Text(record, "tag", "survival.json/survey");
+    def.text = Text(record, "text", "survival.json/survey");
     catalog.startingSurvey.push_back(def);
   }
   for (const Json& info : Field(survival, "infos", "survival.json")) {
@@ -583,6 +912,9 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     catalog.rules.scanCost = Number(survival, "scanCost", "survival.json", 5);
   }
 
+  // Native C++ blueprint is deliberately separate from HTA-generated assets.
+  catalog.spaceMap = MakeNativeSpaceMapBlueprint();
+
   // ---- totals ------------------------------------------------------------
   catalog.counts.regions = static_cast<int>(catalog.regions.size());
   catalog.counts.systems = static_cast<int>(catalog.systems.size());
@@ -609,9 +941,59 @@ const Body* Catalog::FindRegion(const std::string& id) const {
   return nullptr;
 }
 
+const BodyProfileDef* Catalog::FindSpaceBodyProfile(const std::string& id) const {
+  for (const BodyProfileDef& profile : spaceMap.bodies) {
+    if (profile.id == id) { return &profile; }
+  }
+  return nullptr;
+}
+
+const LootTableDef* Catalog::FindSpaceLootTable(const std::string& id) const {
+  for (const LootTableDef& table : spaceMap.lootTables) {
+    if (table.id == id) { return &table; }
+  }
+  return nullptr;
+}
+
+const SpaceTaskDef* Catalog::FindSpaceTask(const std::string& id) const {
+  for (const SpaceTaskDef& task : spaceMap.tasks) {
+    if (task.id == id) { return &task; }
+  }
+  return nullptr;
+}
+
+const StationProfileDef* Catalog::FindStationProfile(const std::string& id) const {
+  for (const StationProfileDef& profile : spaceMap.stations) {
+    if (profile.id == id) { return &profile; }
+  }
+  return nullptr;
+}
+
+const ShipContactProfileDef* Catalog::FindShipContactProfile(const std::string& id) const {
+  for (const ShipContactProfileDef& profile : spaceMap.shipContacts) {
+    if (profile.id == id) { return &profile; }
+  }
+  return nullptr;
+}
+
+const Good* Catalog::FindGood(const std::string& id) const {
+  for (const Good& good : goods) { if (good.id == id) { return &good; } }
+  return nullptr;
+}
+
 const Port* Catalog::FindPort(const std::string& id) const {
   for (const Port& p : ports) { if (p.id == id) { return &p; } }
   return nullptr;
+}
+
+bool PortHasService(const Port& port, const std::string& service) {
+  return port.services.empty() ||
+         std::find(port.services.begin(), port.services.end(), service) != port.services.end();
+}
+
+bool PortOffersGood(const Port& port, const std::string& goodId) {
+  return port.goodIds.empty() ||
+         std::find(port.goodIds.begin(), port.goodIds.end(), goodId) != port.goodIds.end();
 }
 
 std::string Catalog::BodySystem(const Body& body) const {
@@ -621,12 +1003,29 @@ std::string Catalog::BodySystem(const Body& body) const {
 std::vector<std::string> Catalog::Validate() const {
   std::vector<std::string> problems;
 
+  // ---- expanded native chart bounds -------------------------------------
+  for (const auto& layer : {std::pair<const char*, const MapLayerDimensions*>("system", &map.system),
+                            std::pair<const char*, const MapLayerDimensions*>("sector", &map.sector),
+                            std::pair<const char*, const MapLayerDimensions*>("galaxy", &map.galaxy)}) {
+    const MapLayerDimensions& dimensions = *layer.second;
+    if (dimensions.w <= 1100 || dimensions.h <= 500) {
+      problems.push_back(std::string(layer.first) + " map bounds must exceed the HTA 1100x500 ceiling");
+    }
+    if (dimensions.w != map.w * kExpandedMapScale ||
+        dimensions.h != map.h * kExpandedMapScale) {
+      problems.push_back(std::string(layer.first) + " map bounds must be 50x the C++ chart dimensions");
+    }
+  }
+
   // ---- unique identifiers across all three layers ------------------------
   {
     std::set<std::string> seen;
     for (const std::vector<Body>* layer : {&regions, &systems, &bodies}) {
       for (const Body& b : *layer) {
         if (b.id.empty()) { problems.push_back("a chart body has an empty id"); continue; }
+        if (!spaceMapGenerated && b.id.rfind("gen-", 0) == 0) {
+          problems.push_back("authored chart id uses the reserved generated prefix: " + b.id);
+        }
         if (!seen.insert(b.id).second) { problems.push_back("duplicate chart id: " + b.id); }
       }
     }
@@ -639,6 +1038,12 @@ std::vector<std::string> Catalog::Validate() const {
         std::ostringstream out;
         out << b.id << " is off the chart board (" << b.x << "," << b.y << ")";
         problems.push_back(out.str());
+      }
+      if (!b.taskId.empty() && FindSpaceTask(b.taskId) == nullptr) {
+        problems.push_back(b.id + " references unknown native task '" + b.taskId + "'");
+      }
+      if (!b.lootTable.empty() && FindSpaceLootTable(b.lootTable) == nullptr) {
+        problems.push_back(b.id + " references unknown native loot table '" + b.lootTable + "'");
       }
     }
   }
@@ -715,6 +1120,281 @@ std::vector<std::string> Catalog::Validate() const {
     if (plan->rooms.size() != 21) {
       problems.push_back(std::string(name) + " deck plan has " +
                          std::to_string(plan->rooms.size()) + " rooms, expected 21");
+    }
+  }
+
+  // ---- optional per-port limits; empty fields preserve authored legacy ports
+  for (const Port& port : ports) {
+    if (!port.stationTier.empty() && port.stationTier != "mini" &&
+        port.stationTier != "normal") {
+      problems.push_back("port '" + port.id + "' has unknown station tier '" +
+                          port.stationTier + "'");
+    }
+    const std::size_t limit = port.stationTier == "mini" ? 3u : 7u;
+    const std::size_t minimum = port.stationTier == "mini" ? 2u
+                                : port.stationTier == "normal" ? 4u : 0u;
+    if (port.goodIds.size() > limit ||
+        (!port.stationTier.empty() && port.goodIds.size() < minimum)) {
+      problems.push_back("port '" + port.id + "' exceeds or misses its good limit");
+    }
+    std::set<std::string> portGoods;
+    for (const std::string& id : port.goodIds) {
+      if (!portGoods.insert(id).second) {
+        problems.push_back("port '" + port.id + "' repeats good '" + id + "'");
+      }
+      const Good* good = FindGood(id);
+      if (good == nullptr) {
+        problems.push_back("port '" + port.id + "' offers unknown good '" + id + "'");
+      } else if (port.stationTier == "mini" && !good->miniStationEligible) {
+        problems.push_back("mini port '" + port.id + "' offers ineligible good '" + id + "'");
+      }
+    }
+    if (port.stationTier == "mini" && !port.beta) {
+      problems.push_back("mini port '" + port.id + "' must be marked beta");
+    }
+    if (port.stationTier == "normal" && port.beta) {
+      problems.push_back("normal port '" + port.id + "' cannot be beta");
+    }
+    const std::set<std::string> validServices = {
+        "trade", "refuel", "resupply", "repair", "upgrades", "hire", "contracts"};
+    std::set<std::string> portServices;
+    for (const std::string& service : port.services) {
+      if (validServices.count(service) == 0 || !portServices.insert(service).second) {
+        problems.push_back("port '" + port.id + "' has an unknown or duplicate service");
+      }
+    }
+    if (port.stationTier == "mini" &&
+        (port.services.size() != 2 || portServices.count("trade") == 0 ||
+         portServices.count("refuel") == 0)) {
+      problems.push_back("mini port '" + port.id + "' must offer only trade and refuel");
+    }
+    if (port.stationTier == "normal") {
+      const std::set<std::string> fullServices = {
+          "trade", "refuel", "resupply", "repair", "upgrades", "hire", "contracts"};
+      if (portServices != fullServices) {
+        problems.push_back("normal port '" + port.id + "' must offer the seven normal services");
+      }
+    }
+  }
+
+  // ---- native map blueprint ---------------------------------------------
+  const auto hasNameRule = [&](const std::string& category) {
+    for (const SpaceMapNameRule& rule : spaceMap.names) {
+      if (rule.category == category) { return true; }
+    }
+    return false;
+  };
+  std::set<std::string> nameCategories;
+  for (const SpaceMapNameRule& rule : spaceMap.names) {
+    if (rule.category.empty() || !nameCategories.insert(rule.category).second) {
+      problems.push_back("native map has an empty or duplicate name category");
+    }
+    if (rule.prefixes.empty() || rule.suffixes.empty()) {
+      problems.push_back("native name rule '" + rule.category + "' has no choices");
+    }
+  }
+  if (spaceMap.rules.version == 0) {
+    problems.push_back("native map blueprint version must be positive");
+  }
+  if (spaceMap.rules.moonChance < 0 || spaceMap.rules.moonChance > 1 ||
+      spaceMap.rules.maxMoonsPerPlanet != 1) {
+    problems.push_back("native moon attachment rule must be a valid chance and max one moon");
+  }
+  if (spaceMap.rules.miniStationGoodsMax != 3 ||
+      spaceMap.rules.normalStationGoodsMax != 7) {
+    problems.push_back("native station good limits must remain mini=3, normal=7");
+  }
+  if (spaceMap.rules.shipContactClickTicks != 1) {
+    problems.push_back("a committed ship-contact click must tick exactly once");
+  }
+
+  std::set<std::string> profileIds;
+  std::set<std::string> bodyTags;
+  std::map<std::string, std::uint64_t> profileWeights;
+  for (const BodyProfileDef& profile : spaceMap.bodies) {
+    if (profile.id.empty() || !profileIds.insert(profile.id).second) {
+      problems.push_back("native body profiles have an empty or duplicate id");
+    }
+    if (profile.tag.empty() || !bodyTags.insert(profile.tag).second) {
+      problems.push_back("native body profiles have an empty or duplicate tag");
+    }
+    if (profile.type.empty() || profile.tag.empty() || profile.klass.empty()) {
+      problems.push_back("native body profile '" + profile.id + "' lacks type, tag, or class");
+    }
+    if (!hasNameRule(profile.nameRule)) {
+      problems.push_back("native body profile '" + profile.id + "' has no name rule");
+    }
+    if (!profile.lootTable.empty() && FindSpaceLootTable(profile.lootTable) == nullptr) {
+      problems.push_back("native body profile '" + profile.id + "' has unknown loot table");
+    }
+    if (profile.scan.empty() || profile.scanLocked.empty() || profile.details.empty()) {
+      problems.push_back("native body profile '" + profile.id + "' has incomplete survey text");
+    }
+    if (profile.moonChance < 0 || profile.moonChance > 1) {
+      problems.push_back("native body profile '" + profile.id + "' has invalid moon chance");
+    }
+    if (profile.weight > 0) { profileWeights[profile.type] += profile.weight; }
+  }
+  for (const auto& entry : profileWeights) {
+    if (entry.second != 100) {
+      problems.push_back("native body type '" + entry.first + "' weights do not sum to 100");
+    }
+  }
+
+  std::set<std::string> surveyIds;
+  for (const SurveyRecordDef& survey : spaceMap.surveys) {
+    if (survey.id.empty() || !surveyIds.insert(survey.id).second) {
+      problems.push_back("native surveys have an empty or duplicate id");
+    }
+    if (survey.value < 0 || survey.bodyType.empty() || survey.tag.empty() || survey.text.empty()) {
+      problems.push_back("native survey '" + survey.id + "' has incomplete metadata");
+    }
+  }
+
+  std::set<std::string> lootTableIds;
+  for (const LootTableDef& table : spaceMap.lootTables) {
+    if (table.id.empty() || !lootTableIds.insert(table.id).second) {
+      problems.push_back("native loot tables have an empty or duplicate id");
+    }
+    if (!table.filterByEligibility) {
+      problems.push_back("native loot table '" + table.id + "' must filter ineligible rewards");
+    }
+    std::set<std::string> entryIds;
+    std::uint64_t totalWeight = 0;
+    for (const LootEntryDef& entry : table.entries) {
+      if (entry.id.empty() || !entryIds.insert(entry.id).second || entry.weight == 0) {
+        problems.push_back("native loot table '" + table.id + "' has an invalid entry");
+      }
+      totalWeight += entry.weight;
+      if (entry.minAmount < 0 || entry.maxAmount < entry.minAmount) {
+        problems.push_back("native loot entry '" + entry.id + "' has invalid amount bounds");
+      }
+      if (entry.kind == LootKind::Cargo) {
+        if (FindGood(entry.goodId) == nullptr || entry.cargoName.empty() ||
+            entry.minAmount < 1 || entry.volume <= 0 || entry.value <= 0) {
+          problems.push_back("native cargo loot '" + entry.id + "' is incomplete");
+        }
+      } else if (entry.kind == LootKind::Survey &&
+                 (entry.surveyId.empty() || surveyIds.count(entry.surveyId) == 0)) {
+        problems.push_back("native survey loot '" + entry.id + "' has unknown survey");
+      }
+    }
+    if (table.entries.empty() || totalWeight != 100) {
+      problems.push_back("native loot table '" + table.id + "' weights must sum to 100");
+    }
+  }
+
+  std::set<std::string> taskIds;
+  for (const SpaceTaskDef& task : spaceMap.tasks) {
+    if (task.id.empty() || !taskIds.insert(task.id).second) {
+      problems.push_back("native tasks have an empty or duplicate id");
+    }
+    if (task.theme.empty() || task.title.empty() || task.discoveryText.empty() ||
+        task.workText.empty() || task.completionText.empty()) {
+      problems.push_back("native task '" + task.id + "' has incomplete text");
+    }
+    if (task.startActions < 1 || task.workActions < 1 || task.energyCost < 0) {
+      problems.push_back("native task '" + task.id + "' has invalid action or energy cost");
+    }
+    if (!task.lootTable.empty() && FindSpaceLootTable(task.lootTable) == nullptr) {
+      problems.push_back("native task '" + task.id + "' has unknown loot table");
+    }
+  }
+
+  std::set<std::string> incidentIds;
+  for (const IncidentType& incident : spaceMap.incidents) {
+    if (incident.id.empty() || !incidentIds.insert(incident.id).second) {
+      problems.push_back("native map incidents have an empty or duplicate id");
+    }
+    if (incident.scope != "map" ||
+        (incident.trigger != "enter-tag" && incident.trigger != "scan-tag" &&
+         incident.trigger != "contact-action")) {
+      problems.push_back("native map incident '" + incident.id + "' has invalid scope or trigger");
+    }
+    if (incident.targetTag.empty() || incident.spawnWeight == 0 || incident.spawnWeight > 100) {
+      problems.push_back("native map incident '" + incident.id + "' has invalid tag or weight");
+    }
+    if ((incident.trigger == "enter-tag" || incident.trigger == "scan-tag") &&
+        bodyTags.count(incident.targetTag) == 0) {
+      problems.push_back("native map incident '" + incident.id + "' targets an unknown body tag");
+    }
+    if (!incident.taskId.empty() && taskIds.count(incident.taskId) == 0) {
+      problems.push_back("native map incident '" + incident.id + "' has unknown task");
+    }
+    if (!incident.lootTable.empty() && FindSpaceLootTable(incident.lootTable) == nullptr) {
+      problems.push_back("native map incident '" + incident.id + "' has unknown loot table");
+    }
+  }
+
+  std::set<std::string> stationIds;
+  for (const StationProfileDef& station : spaceMap.stations) {
+    if (station.id.empty() || !stationIds.insert(station.id).second) {
+      problems.push_back("native station profiles have an empty or duplicate id");
+    }
+    const bool mini = station.tier == "mini";
+    const int maxGoods = mini ? spaceMap.rules.miniStationGoodsMax
+                              : spaceMap.rules.normalStationGoodsMax;
+    if ((!mini && station.tier != "normal") || station.minGoods < 1 ||
+        station.maxGoods < station.minGoods || station.maxGoods > maxGoods ||
+        static_cast<int>(station.goodIds.size()) < station.minGoods ||
+        static_cast<int>(station.goodIds.size()) > maxGoods) {
+      problems.push_back("native station profile '" + station.id + "' has invalid good limits");
+    }
+    if (station.beta != mini) {
+      problems.push_back("native station profile '" + station.id + "' has invalid beta state");
+    }
+    std::set<std::string> goodsForStation;
+    for (const std::string& id : station.goodIds) {
+      const Good* good = FindGood(id);
+      if (good == nullptr || !goodsForStation.insert(id).second) {
+        problems.push_back("native station profile '" + station.id + "' has unknown or duplicate good");
+      } else if (mini && !good->miniStationEligible) {
+        problems.push_back("native mini station uses an ineligible good '" + id + "'");
+      }
+    }
+    const std::set<std::string> stationServices(station.services.begin(), station.services.end());
+    const std::set<std::string> miniServices = {"trade", "refuel"};
+    const std::set<std::string> fullServices = {
+        "trade", "refuel", "resupply", "repair", "upgrades", "hire", "contracts"};
+    if (stationServices.size() != station.services.size() ||
+        (mini && stationServices != miniServices) ||
+        (station.tier == "normal" && stationServices != fullServices)) {
+      problems.push_back("native station profile '" + station.id + "' has invalid services");
+    }
+  }
+
+  std::set<std::string> contactIds;
+  std::set<std::string> contactTags;
+  std::uint64_t contactWeight = 0;
+  for (const ShipContactProfileDef& contact : spaceMap.shipContacts) {
+    if (contact.id.empty() || !contactIds.insert(contact.id).second) {
+      problems.push_back("native ship contacts have an empty or duplicate id");
+    }
+    if (contact.tag.empty() || !contactTags.insert(contact.tag).second) {
+      problems.push_back("native ship contacts have an empty or duplicate tag");
+    }
+    contactWeight += contact.weight;
+    if (contact.type != "ship" || contact.tag.empty() || contact.klass.empty() ||
+        !hasNameRule(contact.nameRule) || contact.weight == 0 ||
+        contact.movementEveryActions < 0 || contact.actions.empty()) {
+      problems.push_back("native ship contact '" + contact.id + "' is incomplete");
+    }
+    std::set<std::string> actions;
+    for (const ShipContactActionDef& action : contact.actions) {
+      if (action.id.empty() || !actions.insert(action.id).second ||
+          action.label.empty() || action.text.empty() ||
+          action.clockTicks != spaceMap.rules.shipContactClickTicks) {
+        problems.push_back("native ship contact '" + contact.id + "' has invalid action clock data");
+      }
+    }
+  }
+  if (!spaceMap.shipContacts.empty() && contactWeight != 100) {
+    problems.push_back("native ship contact profile weights must sum to 100");
+  }
+  for (const IncidentType& incident : spaceMap.incidents) {
+    if (incident.trigger == "contact-action" &&
+        contactTags.count(incident.targetTag) == 0) {
+      problems.push_back("native map incident '" + incident.id + "' targets an unknown ship tag");
     }
   }
 

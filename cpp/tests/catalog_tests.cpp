@@ -101,6 +101,18 @@ TEST_CASE("the chart board and its derived constants are unchanged",
   CHECK(c.map.lyPerAction == 0.42);
   CHECK(c.map.zmin == 0.6);
   CHECK(c.map.zmax == 2.0);
+
+  // Native C++ layers use the clarified 50x linear expansion; the source chart
+  // and save interchange frame above remain the original authored dimensions.
+  for (const std::string& layer : {"system", "sector", "galaxy"}) {
+    const ship::MapLayerDimensions& dimensions = c.map.DimensionsFor(layer);
+    CHECK(dimensions.w == 31900.0);
+    CHECK(dimensions.h == 13900.0);
+    CHECK(dimensions.w > 1100.0);
+    CHECK(dimensions.h > 500.0);
+    CHECK(dimensions.w == c.map.w * ship::kExpandedMapScale);
+    CHECK(dimensions.h == c.map.h * ship::kExpandedMapScale);
+  }
 }
 
 TEST_CASE("both deck plans describe the same rooms in their own coordinates",
@@ -184,6 +196,89 @@ TEST_CASE("a missing catalogue fails loudly instead of loading empty",
   CHECK_THROWS_AS(
       ship::Catalog::LoadFromAssets("/nonexistent/spaceship/assets"),
       ship::CatalogError);
+}
+
+TEST_CASE("the native SpaceMap blueprint defines Phase 1 without guessing the 50x target",
+          "[catalog][spacemap]") {
+  const ship::Catalog& c = Reference();
+  const ship::SpaceMapBlueprint& blueprint = c.spaceMap;
+
+  CHECK(blueprint.rules.version == 1u);
+  CHECK_FALSE(blueprint.rules.targetRegions.has_value());
+  CHECK_FALSE(blueprint.rules.targetSystems.has_value());
+  CHECK_FALSE(blueprint.rules.targetStarBodies.has_value());
+  CHECK_FALSE(blueprint.rules.areaMultiplier.has_value());
+  CHECK(blueprint.rules.moonChance == 0.5);
+  CHECK(blueprint.rules.maxMoonsPerPlanet == 1);
+
+  const ship::BodyProfileDef* rocky = c.FindSpaceBodyProfile("planet-rock");
+  REQUIRE(rocky != nullptr);
+  CHECK(rocky->type == "planet");
+  CHECK(rocky->tag == "world.rocky");
+  CHECK(rocky->klass == "Rocky world");
+  CHECK(rocky->moonChance == 0.5);
+  CHECK_FALSE(rocky->details.empty());
+  CHECK_FALSE(rocky->scan.empty());
+  CHECK_FALSE(rocky->scanLocked.empty());
+
+  for (const ship::LootTableDef& table : blueprint.lootTables) {
+    CHECK(table.filterByEligibility);
+    std::uint32_t total = 0;
+    for (const ship::LootEntryDef& entry : table.entries) { total += entry.weight; }
+    INFO("loot table " << table.id);
+    CHECK(total == 100u);
+  }
+  CHECK(c.FindSpaceTask("coil-relay") != nullptr);
+  CHECK(c.FindSpaceTask("scrubber-vault") != nullptr);
+  CHECK(c.FindSpaceTask("crew-roster") != nullptr);
+  CHECK(c.FindSpaceTask("dead-reckoning") != nullptr);
+  CHECK(c.FindSpaceTask("ration-cache") != nullptr);
+
+  const ship::StationProfileDef* mini = c.FindStationProfile("mini");
+  const ship::StationProfileDef* normal = c.FindStationProfile("normal");
+  REQUIRE(mini != nullptr);
+  REQUIRE(normal != nullptr);
+  CHECK(mini->beta);
+  CHECK(mini->maxGoods == 3);
+  CHECK(mini->goodIds.size() == 3u);
+  CHECK(mini->services.size() == 2u);
+  CHECK_FALSE(normal->beta);
+  CHECK(normal->maxGoods == 7);
+  CHECK(normal->goodIds.size() == 7u);
+
+  for (const ship::ShipContactProfileDef& contact : blueprint.shipContacts) {
+    for (const ship::ShipContactActionDef& action : contact.actions) {
+      CHECK(action.clockTicks == 1);
+    }
+  }
+}
+
+TEST_CASE("native map IDs, names, and weighted picks are stable",
+          "[catalog][spacemap]") {
+  const ship::Catalog& c = Reference();
+  const ship::SpaceMapNameRule* systemNames = nullptr;
+  for (const ship::SpaceMapNameRule& rule : c.spaceMap.names) {
+    if (rule.category == "system") { systemNames = &rule; }
+  }
+  REQUIRE(systemNames != nullptr);
+
+  CHECK(ship::SpaceMapGeneratedId(1, 42, "system", 7) ==
+        ship::SpaceMapGeneratedId(1, 42, "system", 7));
+  CHECK(ship::SpaceMapGeneratedId(1, 42, "system", 7) !=
+        ship::SpaceMapGeneratedId(1, 42, "planet", 7));
+  CHECK(ship::SpaceMapGeneratedName(42, 7, *systemNames) ==
+        ship::SpaceMapGeneratedName(42, 7, *systemNames));
+  CHECK(ship::SpaceMapGeneratedName(42, 7, *systemNames) !=
+        ship::SpaceMapGeneratedName(42, 8, *systemNames));
+
+  const std::vector<ship::WeightedId> choices = {{"a", 1}, {"b", 3}};
+  const auto first = ship::SpaceMapWeightedIndex(42, "planet-profile", 0, choices);
+  const auto repeat = ship::SpaceMapWeightedIndex(42, "planet-profile", 0, choices);
+  REQUIRE(first.has_value());
+  REQUIRE(repeat.has_value());
+  CHECK(*first == *repeat);
+  CHECK(*first < choices.size());
+  CHECK_FALSE(ship::SpaceMapWeightedIndex(42, "empty", 0, {}).has_value());
 }
 
 TEST_CASE("the catalogue records the reference edition it came from",

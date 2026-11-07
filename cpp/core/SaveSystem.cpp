@@ -388,10 +388,13 @@ std::string Simulation::SaveJson() const {
   root["survey"] = survey;
 
   Json map = Json::object();
-  map["w"] = Num(map_.w);
-  map["h"] = Num(map_.h);
-  map["cx"] = Num(map_.cx);
-  map["cy"] = Num(map_.cy);
+  // Save interchange geometry in the authored 638x278 coordinate frame. The
+  // active C++ layer extent is reconstructed from `layer` when this save loads,
+  // keeping the HTA save schema and its chart projection unchanged.
+  map["w"] = Num(catalog_.map.w);
+  map["h"] = Num(catalog_.map.h);
+  map["cx"] = Num(catalog_.map.cx);
+  map["cy"] = Num(catalog_.map.cy);
   map["vw"] = Num(map_.vw);
   map["vh"] = Num(map_.vh);
   map["zoom"] = Num(map_.zoom);
@@ -1237,6 +1240,7 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     map_.zstep = GetNumber(map, "zstep", 0.2);
     map_.here = GetString(map, "here", "kessler");
     map_.layer = GetString(map, "layer", "system");
+    ApplyLayerGeometry(map_.layer);
     map_.sector = GetString(map, "sector");
     map_.grid = GetNumber(map, "grid", 45);
     map_.vpy = GetNumber(map, "vpy", 0.35);

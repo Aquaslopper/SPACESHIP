@@ -59,6 +59,10 @@ CrewMember MakeCrew(const CrewDefinition& def) {
 }
 
 Simulation Simulation::NewVoyage(const Catalog& catalog) {
+  return BuildVoyage(catalog, true);
+}
+
+Simulation Simulation::BuildVoyage(const Catalog& catalog, bool generateSpaceMap) {
   Simulation sim;
   sim.catalog_ = catalog;
   sim.rules_ = catalog.rules;
@@ -125,6 +129,7 @@ Simulation Simulation::NewVoyage(const Catalog& catalog) {
   sim.map_.rungPow = geometry.rungPow;
   sim.map_.pxPerAction = geometry.pxPerAction;
   sim.map_.lyPerAction = geometry.lyPerAction;
+  sim.ApplyLayerGeometry("system");
   for (const std::string& layer : catalog.layerOrder) { sim.views_[layer] = LayerView(); }
 
   // ---- the hold ----------------------------------------------------------
@@ -203,11 +208,12 @@ Simulation Simulation::NewVoyage(const Catalog& catalog) {
   first.processed = false;
   state.sim.memories.push_back(first);
 
+  if (generateSpaceMap) { sim.GenerateSpaceMap(); }
   return sim;
 }
 
 Simulation Simulation::ReferenceVoyage(const Catalog& catalog) {
-  Simulation sim = NewVoyage(catalog);
+  Simulation sim = BuildVoyage(catalog, false);
   sim.referenceFit_ = true;
   sim.rooms_ = catalog.wren.rooms;
   sim.cargo_.capacity = sim.ShipCargoCapacity("wren", 0);

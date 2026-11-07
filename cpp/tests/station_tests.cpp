@@ -791,6 +791,46 @@ TEST_CASE("station commands use HTA category tiers and matching visible locks", 
   CHECK(other.State().actionCooldowns.at(undockKey).remaining == 15);
 }
 
+TEST_CASE("mini beta stations limit goods, services, and committed economy actions",
+          "[station][spacemap]") {
+  ship::Catalog catalog = World();
+  bool configured = false;
+  for (ship::Port& port : catalog.ports) {
+    if (port.id != "tolme") { continue; }
+    port.stationTier = "mini";
+    port.goodIds = {"ore", "parts", "water"};
+    port.services = {"trade", "refuel"};
+    port.beta = true;
+    configured = true;
+  }
+  REQUIRE(configured);
+
+  ship::Simulation sim = ship::Simulation::ReferenceVoyage(catalog);
+  sim.MutableMap().here = "tolme";
+  sim.MutableState().docked = true;
+  sim.MutableState().shiplets = 2000;
+  sim.MutableCargo().capacity = 200;
+
+  const double before = sim.ActionCount();
+  CHECK_FALSE(sim.BuyGood("amps"));
+  CHECK(sim.ActionCount() == before);
+  REQUIRE(sim.BuyGood("ore"));
+  CHECK(sim.ActionCount() == before + 1);
+
+  const double beforeFuel = sim.ActionCount();
+  REQUIRE(sim.BuySupply("fuel-cell"));
+  CHECK(sim.ActionCount() == beforeFuel + 1);
+  CHECK_FALSE(sim.BuySupply("repair-kit"));
+  CHECK_FALSE(sim.BuySupply("rations"));
+  CHECK_FALSE(sim.AcceptContract("freight"));
+  CHECK_FALSE(sim.AcceptCommission("salvage"));
+  CHECK_FALSE(sim.HireCrew("nemi"));
+  CHECK_FALSE(sim.BuyUpgrade("hull"));
+  CHECK_FALSE(sim.BuyRoom("science"));
+  sim.MutableState().shiplets = 10000;
+  CHECK_FALSE(sim.BuyLargerShip());
+}
+
 TEST_CASE("hire and ship transfer memories precede their action tick", "[station][memory][regression]") {
   auto sim = Docked();
   sim.MutableMap().here = "tolme";

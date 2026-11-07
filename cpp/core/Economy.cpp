@@ -23,6 +23,7 @@ bool Truthy(const std::map<std::string, bool>& map, const std::string& key) {
   auto it = map.find(key);
   return it != map.end() && it->second;
 }
+
 }  // namespace
 
 const Port* Simulation::HerePort() const { return catalog_.FindPort(map_.here); }
@@ -64,34 +65,37 @@ double Simulation::CargoReserved() const {
 bool Simulation::BuySupply(const std::string& id) {
   struct Supply { const char* id; double price; double* counter; };
   // Five fixed-price stores: fuel cell, repair kit, medkit, O2 canister, rations.
-  if (state_.gameOver.empty() == false || !state_.docked || HerePort() == nullptr) { return false; }
+  const Port* port = HerePort();
+  if (state_.gameOver.empty() == false || !state_.docked || port == nullptr) { return false; }
 
-  if (id == "fuel-cell" && state_.shiplets >= 45) {
+  if (id == "fuel-cell" && PortHasService(*port, "refuel") && state_.shiplets >= 45) {
     state_.shiplets -= 45;
     state_.fuelCells += 1;
     PerformAction("Fuel cell purchased");
     return true;
   }
-  if (id == "repair-kit" && state_.shiplets >= 70) {
+  if (id == "repair-kit" && PortHasService(*port, "repair") && state_.shiplets >= 70) {
     state_.shiplets -= 70;
     state_.repairKits += 1;
     PerformAction("Repair kit purchased");
     return true;
   }
-  if (id == "medkit" && state_.shiplets >= 50) {
+  if (id == "medkit" && PortHasService(*port, "resupply") && state_.shiplets >= 50) {
     state_.shiplets -= 50;
     state_.medkits += 1;
     PerformAction("Medkit purchased");
     return true;
   }
-  if (id == "canister" && state_.shiplets >= 25 && life_.canisters < life_.capacity &&
+  if (id == "canister" && PortHasService(*port, "resupply") && state_.shiplets >= 25 &&
+      life_.canisters < life_.capacity &&
       FindOngoing("project-oxygen") == nullptr) {
     state_.shiplets -= 25;
     life_.canisters += 1;
     PerformAction("O2 canister purchased");
     return true;
   }
-  if (id == "rations" && state_.shiplets >= 20 && mess_.rack <= mess_.capacity - 6 &&
+  if (id == "rations" && PortHasService(*port, "resupply") && state_.shiplets >= 20 &&
+      mess_.rack <= mess_.capacity - 6 &&
       FindOngoing("project-food") == nullptr) {
     state_.shiplets -= 20;
     mess_.rack += 6;
@@ -102,12 +106,13 @@ bool Simulation::BuySupply(const std::string& id) {
 }
 
 bool Simulation::BuyGood(const std::string& goodId) {
-  if (!state_.gameOver.empty() || !state_.docked || HerePort() == nullptr) { return false; }
-
-  const Good* good = nullptr;
-  for (const Good& candidate : catalog_.goods) {
-    if (candidate.id == goodId) { good = &candidate; }
+  const Port* port = HerePort();
+  if (!state_.gameOver.empty() || !state_.docked || port == nullptr ||
+      !PortHasService(*port, "trade") || !PortOffersGood(*port, goodId)) {
+    return false;
   }
+
+  const Good* good = catalog_.FindGood(goodId);
   if (good == nullptr) { return false; }
 
   GoodsLot probe;
@@ -132,7 +137,11 @@ bool Simulation::BuyGood(const std::string& goodId) {
 }
 
 bool Simulation::SellGood(const std::string& lotId) {
-  if (!state_.gameOver.empty() || !state_.docked || HerePort() == nullptr) { return false; }
+  const Port* port = HerePort();
+  if (!state_.gameOver.empty() || !state_.docked || port == nullptr ||
+      !PortHasService(*port, "trade")) {
+    return false;
+  }
 
   for (std::size_t index = 0; index < goods_.size(); ++index) {
     if (goods_[index].id != lotId) { continue; }
@@ -148,7 +157,11 @@ bool Simulation::SellGood(const std::string& lotId) {
 }
 
 bool Simulation::SellSurvey(const std::string& recordId) {
-  if (!state_.gameOver.empty() || !state_.docked || HerePort() == nullptr) { return false; }
+  const Port* port = HerePort();
+  if (!state_.gameOver.empty() || !state_.docked || port == nullptr ||
+      !PortHasService(*port, "trade")) {
+    return false;
+  }
   if (FindOngoing("pkg-" + recordId) != nullptr) { return false; }
 
   for (std::size_t index = 0; index < survey_.size(); ++index) {
@@ -255,7 +268,11 @@ void Simulation::ContractProgress(const std::string& goal, const std::string& ta
 }
 
 bool Simulation::AcceptContract(const std::string& contractId) {
-  if (!state_.gameOver.empty() || !state_.docked) { return false; }
+  const Port* port = HerePort();
+  if (!state_.gameOver.empty() || !state_.docked || port == nullptr ||
+      !PortHasService(*port, "contracts")) {
+    return false;
+  }
 
   const Contract* contract = nullptr;
   for (const Contract& candidate : catalog_.contracts) {
@@ -304,7 +321,11 @@ bool Simulation::AcceptContract(const std::string& contractId) {
 }
 
 bool Simulation::CollectContract(const std::string& contractId) {
-  if (!state_.gameOver.empty() || !state_.docked) { return false; }
+  const Port* port = HerePort();
+  if (!state_.gameOver.empty() || !state_.docked || port == nullptr ||
+      !PortHasService(*port, "contracts")) {
+    return false;
+  }
   auto state = state_.contracts.find(contractId);
   if (state == state_.contracts.end() || state->second != "ready") { return false; }
 
@@ -325,7 +346,11 @@ bool Simulation::CollectContract(const std::string& contractId) {
 // ---------------------------------------------------------------------------
 
 bool Simulation::HireCrew(const std::string& candidateId) {
-  if (!state_.gameOver.empty() || !state_.docked || HerePort() == nullptr) { return false; }
+  const Port* port = HerePort();
+  if (!state_.gameOver.empty() || !state_.docked || port == nullptr ||
+      !PortHasService(*port, "hire")) {
+    return false;
+  }
   if (Truthy(state_.hired, candidateId)) { return false; }
 
   const CandidateDefinition* candidate = nullptr;
@@ -347,7 +372,12 @@ bool Simulation::HireCrew(const std::string& candidateId) {
 }
 
 bool Simulation::BuyUpgrade(const std::string& upgradeId) {
-  if (!state_.gameOver.empty() || !state_.docked || HerePort() == nullptr) { return false; }
+  const Port* port = HerePort();
+  const std::string service = upgradeId == "hull" ? "repair" : "upgrades";
+  if (!state_.gameOver.empty() || !state_.docked || port == nullptr ||
+      !PortHasService(*port, service)) {
+    return false;
+  }
 
   const std::string className = state_.shipClass;
   if (upgradeId == "bay" && !Truthy(state_.upgrades, "bay") && state_.shiplets >= 500) {
@@ -538,8 +568,9 @@ std::optional<Commission> Simulation::CommissionOffer(const std::string& kind) c
 }
 
 bool Simulation::AcceptCommission(const std::string& kind) {
+  const Port* port = HerePort();
   if (!state_.gameOver.empty() || state_.commissions.active.has_value()) { return false; }
-  if (!state_.docked || HerePort() == nullptr) { return false; }
+  if (!state_.docked || port == nullptr || !PortHasService(*port, "contracts")) { return false; }
   const std::optional<Commission> offer = CommissionOffer(kind);
   if (!offer.has_value()) { return false; }
   state_.commissions.active = *offer;
@@ -548,7 +579,11 @@ bool Simulation::AcceptCommission(const std::string& kind) {
 }
 
 bool Simulation::CollectCommission() {
-  if (!state_.commissions.active.has_value() || !state_.docked || HerePort() == nullptr) { return false; }
+  const Port* port = HerePort();
+  if (!state_.commissions.active.has_value() || !state_.docked || port == nullptr ||
+      !PortHasService(*port, "contracts")) {
+    return false;
+  }
   if (state_.gameOver.empty() == false) { return false; }
   const Commission commission = *state_.commissions.active;
   if (commission.progress < CommissionGoal(commission.kind)) { return false; }
@@ -562,7 +597,11 @@ bool Simulation::CollectCommission() {
 }
 
 bool Simulation::AbandonCommission() {
-  if (!state_.commissions.active.has_value() || !state_.docked || HerePort() == nullptr) { return false; }
+  const Port* port = HerePort();
+  if (!state_.commissions.active.has_value() || !state_.docked || port == nullptr ||
+      !PortHasService(*port, "contracts")) {
+    return false;
+  }
   if (!state_.gameOver.empty()) { return false; }
   state_.commissions.serial += 1;
   state_.commissions.active.reset();
