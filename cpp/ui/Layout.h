@@ -44,12 +44,14 @@ struct Metrics {
   static constexpr float kContentLeft = 166.0f;
   static constexpr float kFeedMin = 62.0f;      // FEED.min
   static constexpr float kFeedMax = 132.0f;     // FEED.max
+  static constexpr float kHomeFeedMax = 152.0f; // Home feed ceiling from the compact layout
   static constexpr float kIndH = 104.0f;        // IND.h
   static constexpr float kIndGap = 5.0f;        // IND.gap
   static constexpr float kStageW = 1160.0f;     // STAGE.ship
   static constexpr float kStageH = 460.0f;
   static constexpr float kStageCompactW = 600.0f;
   static constexpr float kStageCompactH = 365.0f;
+  static constexpr float kHomeStageMinH = 410.0f;
   static constexpr float kMapH = 500.0f;        // STAGE.map ceiling
   static constexpr float kMapParkH = 240.0f;    // layoutNav() parks here
   static constexpr float kTabH = 27.0f;         // .tab height

@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <iterator>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -900,11 +901,12 @@ int main() {
         const auto& firstPanel = filledAt(model.infos.front().box.x, model.infos.front().box.y);
         Require(navTitle.y >= firstPanel.y + firstPanel.h,
                 "Navigation was not moved below the three information panels");
-        const auto eventTitle = std::find_if(texts.begin(), texts.end(), [&](const auto& text) {
+        std::vector<TextCall> eventTitles;
+        std::copy_if(texts.begin(), texts.end(), std::back_inserter(eventTitles), [&](const auto& text) {
           return text.text == "Events" && text.x >= home.LayoutNow().content.x;
         });
-        Require(eventTitle != texts.end() && eventTitle->y >= firstPanel.y + firstPanel.h,
-                "Home event cards were not moved below the three information panels");
+        Require(eventTitles.size() >= 2 && eventTitles.front().y >= firstPanel.y + firstPanel.h,
+                "Two home event cards were not placed below the three information panels");
         int valueLines = 0;
         for (const auto& line : texts) {
           if (line.size != theme.HomeInfoValuePx() || line.text.empty() ||
@@ -921,6 +923,8 @@ int main() {
         Require(feedHead.y >= firstPanel.y + firstPanel.h, "Feed overlaps the expanded info rail");
         const auto& feedSurface = filledAt(model.feedBox.x, feedHead.y + feedHead.size + 2);
         Require(feedSurface.w > 0, "Feed has no warm background");
+        Require(feedSurface.h <= ship::Metrics::kHomeFeedMax + 1.0f,
+                "Home activity feed grows too far up the screen");
         Require(std::abs(feedSurface.y + feedSurface.h - (home.LayoutNow().content.Bottom() - 8.0f)) < 2.0f,
                 "Activity feed does not reach the bottom of the content panel");
       }

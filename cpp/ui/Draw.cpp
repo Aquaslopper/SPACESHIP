@@ -206,7 +206,8 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   if (sim.State().activeTab == "home" && HasWrenExterior(sim)) {
     if (exteriorView_) {
       layout_.stage = {layout_.content.x + 8.0f, layout_.content.y,
-                       std::max(1.0f, layout_.content.w - 16.0f), 0.0f};
+                       std::max(1.0f, layout_.content.w - 16.0f),
+                       Metrics::kHomeStageMinH};
       layout_.stage.h = BuildExteriorLayout(sim, layout_.stage).height;
     }
   }
@@ -241,9 +242,13 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
       idle_.eventsBox.y += extra;
       for (auto& event : idle_.events) { event.box.y += extra; }
       if (idle_.docked) { idle_.dock.box.y += extra; }
-      idle_.feedBox.y += extra;
-      idle_.feedHeight = std::max(Metrics::kFeedMin,
-                                  layout_.content.Bottom() - idle_.feedBox.y - 8.0f);
+      const float lowerBottom = std::max({idle_.nav.box.Bottom(), idle_.eventsBox.Bottom(),
+                                          idle_.docked ? idle_.dock.box.Bottom() : 0.0f});
+      const float feedStart = lowerBottom + 20.0f;
+      const float available = layout_.content.Bottom() - feedStart - 8.0f;
+      idle_.feedHeight = std::clamp(available, Metrics::kFeedMin, Metrics::kHomeFeedMax);
+      idle_.feedBox.y = std::max(feedStart,
+                                 layout_.content.Bottom() - 8.0f - idle_.feedHeight);
       idle_.feedBox.h = idle_.feedHeight;
     }
     rng_ = seeded;
@@ -710,25 +715,31 @@ ShellView::ExteriorLayout ShellView::BuildExteriorLayout(const Simulation& sim, 
   }
   const float rowH = static_cast<float>(maxLines) * out.lineHeight + 10.0f;
   const std::size_t rows = (rooms.size() + 1) / 2;
-  const float bodyH = std::max(280.0f, static_cast<float>(rows) * rowH);
-  const float bodyY = stage.y + 4.0f;
-  out.height = bodyH + 8.0f;
+  float bodyH = std::max(Metrics::kHomeStageMinH, stage.h);
+  if (rows > 3) {
+    bodyH = std::max(bodyH, (rowH + 8.0f) * static_cast<float>(rows - 1) / 0.69f);
+  }
+  const float bodyY = stage.y;
+  out.height = bodyH;
   const Texture2D* texture = static_cast<const Texture2D*>(wrenExteriorArt_);
   const float aspect = texture && texture->width > 0 ? static_cast<float>(texture->height) / texture->width : 420.0f / 1340.0f;
   const float imageW = std::max(1.0f, stage.w - sideW * 2.0f - 32.0f);
   const float imageH = std::min(imageW * aspect, bodyH * 0.75f);
   const float fittedW = imageH / aspect;
   out.image = {stage.x + (stage.w - fittedW) / 2.0f,
-               bodyY + (bodyH - imageH) / 2.0f, fittedW, imageH};
+               bodyY + bodyH * 0.40f - imageH / 2.0f, fittedW, imageH};
   for (std::size_t i = 0; i < rooms.size(); ++i) {
     const bool left = i < rows;
     const std::size_t row = left ? i : i - rows;
+    const float rowT = rows > 1 ? static_cast<float>(row) / static_cast<float>(rows - 1) : 0.0f;
+    const float rowFraction = rows == 3 ? 1.11f * rowT - 0.42f * rowT * rowT
+                                        : 0.69f * rowT;
     ExteriorCallout item;
     item.id = rooms[i].id;
     item.lines = std::move(labels[i]);
     item.left = left;
     item.box = {left ? stage.x + 2.0f : stage.Right() - sideW - 2.0f,
-                bodyY + row * rowH, sideW, rowH - 4.0f};
+                bodyY + bodyH * rowFraction, sideW, rowH - 4.0f};
     // Conceptual anchor only: it ties a callout to the exterior visually and
     // does not claim the supplied sketch is an engineering deck layout.
     const float nx = std::clamp(static_cast<float>((rooms[i].box.x + rooms[i].box.w * 0.5) / 600.0), 0.0f, 1.0f);

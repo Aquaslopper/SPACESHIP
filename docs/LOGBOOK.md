@@ -270,3 +270,16 @@ You must append a compressed summary of **every single reply and action you take
 - **PR description update:** `gh pr edit` hit the repository's classic-project GraphQL deprecation error; updated the description successfully with `gh api` PATCH.
 - **Visual verification limit:** No windowed GUI was launched; the native draw recorder checks recorded drawing and input, not a rendered screenshot.
 - **Untouched:** `Legacy code_Spaceship.txt`, `assets/`, `rescue/`, and simulation rules.
+
+### Entry #019
+- **Timestamp:** 2026-11-07 23:49 UTC
+- **Task:** Refine the Home screen against the latest side-by-side screenshots: center the Wren in a taller stage, spread room callouts around it, keep the feed compact at the bottom, and show two event cards.
+- **Screenshot reading:** The desired composition uses callouts at the upper/middle/lower ship positions, info panels around y=666 in the supplied 970px capture, two separate event slots, and an approximately 152px feed panel at the bottom.
+- **Stage (`Layout.h`, `IdleScreen.cpp`, `Draw.cpp`):** Added a 410px Home stage minimum, moved its top below the compact gauges, and centered the exterior ship image at 40% of the stage height.
+- **Callouts (`Draw.cpp`):** For the standard three rows, placed labels at normalized stage offsets 0, 0.45, and 0.69 on both sides. When more rooms require additional rows, the exterior stage grows to keep the labels from colliding.
+- **Event cards (`IdleScreen.cpp`):** Keep two separate columns beneath the second and third info cards. Fill them with live incidents, or independent "No active events." cards when slots are empty; additional incidents wrap to more rows.
+- **Feed (`Layout.h`, `IdleScreen.cpp`, `Draw.cpp`):** Anchor the feed 8px from the content bottom and cap its Home height at 152px (without changing the general feed-height helper).
+- **Regression coverage (`draw_probe.cpp`):** Check two distinct event headings, the feed height ceiling and bottom anchor, and exterior callout interactions after the stage reflow.
+- **Checks:** Rebuilt the headless core; `tools/check-draw.sh` passed; final `ctest --test-dir build --output-on-failure` passed 125/125 including GUI syntax, ImGui input, and native draw recorder.
+- **Limit:** No windowed GUI was launched; the capture layout is checked with the CPU painter/input recorder, not a fresh screenshot.
+- **Untouched:** `Legacy code_Spaceship.txt`, `assets/`, `rescue/`, and gameplay logic. The changes are follow-up work for the existing open PR #30.

@@ -3,6 +3,7 @@
 // ============================================================================
 #include "ui/IdleScreen.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include "core/JsNumber.h"
@@ -139,7 +140,8 @@ IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout
       out.stats.empty() ? layout.content.y + 4.0f + statH : out.stats.front().box.Bottom();
 
   out.stageArea = layout.stage;
-  out.stageArea.y = statsBottom + 8.0f;
+  out.stageArea.y = statsBottom + 108.0f;
+  out.stageArea.h = std::max(out.stageArea.h, Metrics::kHomeStageMinH);
 
   const float infoH = InfoCellHeight(theme);
   const float infoY = out.stageArea.Bottom() + 14.0f;
@@ -159,19 +161,16 @@ IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout
   for (const Incident& incident : sim.Events()) {
     out.events.push_back({incident.id, incident.kind, {}});
   }
-  const std::size_t rows = out.events.empty() ? 1 : (out.events.size() + 1) / 2;
+  while (out.events.size() < 2) { out.events.push_back({"", "No active events.", {}}); }
+  const std::size_t rows = (out.events.size() + 1) / 2;
   out.eventsBox.h = static_cast<float>(rows) * stripH + static_cast<float>(rows - 1) * 8.0f;
-  if (out.events.empty()) {
-    out.events.push_back({"", "No active events.", out.eventsBox});
-  } else {
-    const float cardW = (eventW - 8.0f) / 2.0f;
-    for (std::size_t i = 0; i < out.events.size(); ++i) {
-      const std::size_t row = i / 2;
-      const std::size_t column = i % 2;
-      out.events[i].box = Area{eventX + static_cast<float>(column) * (cardW + 8.0f),
-                               lowerY + static_cast<float>(row) * (stripH + 8.0f),
-                               cardW, stripH};
-    }
+  const float cardW = (eventW - 8.0f) / 2.0f;
+  for (std::size_t i = 0; i < out.events.size(); ++i) {
+    const std::size_t row = i / 2;
+    const std::size_t column = i % 2;
+    out.events[i].box = Area{eventX + static_cast<float>(column) * (cardW + 8.0f),
+                             lowerY + static_cast<float>(row) * (stripH + 8.0f),
+                             cardW, stripH};
   }
 
   float after = std::max(out.nav.box.Bottom(), out.eventsBox.Bottom());
@@ -186,9 +185,12 @@ IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout
 
   // The activity feed is the final home panel and uses the remaining content
   // height so its lower edge reaches the bottom of the viewport.
-  const float feedY = after + 20.0f;
+  const float feedStart = after + 20.0f;
   const float bottomPad = 8.0f;
-  out.feedHeight = std::max(Metrics::kFeedMin, layout.content.Bottom() - feedY - bottomPad);
+  const float available = layout.content.Bottom() - feedStart - bottomPad;
+  out.feedHeight = std::clamp(available, Metrics::kFeedMin, Metrics::kHomeFeedMax);
+  const float feedY = std::max(feedStart,
+                               layout.content.Bottom() - bottomPad - out.feedHeight);
   (void)othersHeight;
   out.feedBox = Area{layout.content.x + 8.0f, feedY, inner, out.feedHeight};
 
