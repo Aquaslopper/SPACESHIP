@@ -48,7 +48,7 @@ constexpr int kNewSystemsPerRegion = 22;
 // their own instead of crowding into each other at the edited scale. The
 // authored systems are translated, never scaled, so every authored distance -
 // and every crossing that has to pay for it - is unchanged.
-constexpr double kSectorBoardScale = 3.0;
+constexpr double kSectorBoardScale = 6.0;
 
 // The zoom ladder the grown chart is read with. The authored ladder is
 // 0.6..2.0 in steps of 0.2 - eight steps, which on a board three times the
@@ -57,7 +57,7 @@ constexpr double kSectorBoardScale = 3.0;
 // widened here rather than in the export, so the Phase 0 data gate still sees
 // the reference's numbers.
 constexpr double kZoomMin = 0.3;
-constexpr double kZoomMax = 4.0;
+constexpr double kZoomMax = 8.0;
 constexpr double kZoomStep = 0.2;
 
 // The local chart keeps a shorter ladder. Its bodies sit on rings out to 200
