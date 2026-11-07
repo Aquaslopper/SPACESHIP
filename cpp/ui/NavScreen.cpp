@@ -72,6 +72,17 @@ std::vector<const Body*> LayerBodies(const Simulation& sim) {
   return out;
 }
 
+// The layer's authored array, in catalogue order and unfiltered. The
+// reference's cluster pass reads this, not curBodies() - see the note in
+// BuildNavChart where the clusters are scattered.
+const std::vector<Body>& LayerArray(const Simulation& sim) {
+  const Catalog& catalog = sim.World();
+  const std::string layer = BodyLayer(sim);
+  if (layer == "galaxy") { return catalog.regions; }
+  if (layer == "system") { return catalog.bodies; }
+  return catalog.systems;
+}
+
 double BodySize(const Body& body) {
   double size = 16;
   if (body.type == "station") { size = 18; }
@@ -432,15 +443,24 @@ NavChartView BuildNavChart(const Simulation& sim) {
       chart.clusters.push_back(dot);
     }
   }
-  for (std::size_t i = 0; i < bodies.size(); ++i) {
-    const Body* body = bodies[i];
-    if (body->cluster == 0) { continue; }
+  // drawClusters() in the reference walks lay.bodies, NOT curBodies(): a body
+  // keeps its cosmetic stars even when the layer's filter hides the body
+  // itself, and the scatter is seeded from the index into that array, so the
+  // sky does not shift when the selection changes. In the shipped chart both
+  // readings agree - only the 7 regions carry a cluster, and on the galaxy
+  // layer the filter returns the array untouched - so this is invisible today.
+  // It stops being invisible the moment a generated body carries one, which
+  // is exactly what the procedural chart will do, so follow the reference here.
+  const std::vector<Body>& layer = LayerArray(sim);
+  for (std::size_t i = 0; i < layer.size(); ++i) {
+    const Body& body = layer[i];
+    if (body.cluster == 0) { continue; }
     Seeded rnd(static_cast<double>(i) + 7);
-    for (int j = 0; j < body->cluster; ++j) {
+    for (int j = 0; j < body.cluster; ++j) {
       const double a = rnd() * 6.283;
       const double r = 16 + rnd() * 34;
       const NavPoint point = NavProjectPanned(
-          map, view, body->x + std::cos(a) * r, body->y + std::sin(a) * r * 0.62);
+          map, view, body.x + std::cos(a) * r, body.y + std::sin(a) * r * 0.62);
       NavDot dot;
       dot.cls = "cdot";
       dot.x = js::Round(point.x);

@@ -676,3 +676,51 @@ TEST_CASE("powered work pauses without energy while other work and the action cl
   CHECK(sim.FindOngoing("scan")->left == 3);
   CHECK(sim.FindOngoing("maint")->left == 2);
 }
+
+TEST_CASE("a cluster scatters stars for a body the layer filter hides as the reference does"
+          "[nav][chart]") {
+  // drawClusters() reads lay.bodies, not curBodies(), so a body keeps its
+  // cosmetic stars even when the layer's filter hides the body itself - and
+  // the scatter is seeded from the index into that array, so it does not move
+  // when the selection changes. vance-star belongs to another system, so the
+  // shipped chart can never show this; give it a cluster and prove the stars
+  // are painted anyway.
+  ship::Catalog& catalog = World();
+  ship::Body* far = nullptr;
+  for (ship::Body& body : catalog.bodies) {
+    if (body.id == "vance-star") { far = &body; }
+  }
+  REQUIRE(far != nullptr);
+  REQUIRE(catalog.BodySystem(*far) != "sec-kessler");
+
+  const int saved = far->cluster;
+  far->cluster = 3;
+  far->x = 300;
+  far->y = 120;
+  {
+    ship::Simulation sim = ship::Simulation::ReferenceVoyage(catalog);
+    sim.SetLayer("system");
+    const ship::NavChartView chart = ship::BuildNavChart(sim);
+
+    // Three stars, all scattered around the hidden body, none of them the
+    // body itself (the filter still keeps it off the chart).
+    CHECK(chart.clusters.size() == 3u);
+    bool clustered = chart.clusters.size() == 3u;
+    for (const ship::NavDot& dot : chart.clusters) {
+      if (std::abs(dot.x - far->x) > 52.0 || std::abs(dot.y - far->y) > 52.0) { clustered = false; }
+    }
+    CHECK(clustered);
+    for (const ship::NavBodyView& shown : chart.bodies) {
+      CHECK(shown.id != "vance-star");
+    }
+
+    // Same index, same seed, same sky: rebuilding must not shuffle it.
+    const ship::NavChartView again = ship::BuildNavChart(sim);
+    bool stable = again.clusters.size() == chart.clusters.size();
+    for (std::size_t i = 0; stable && i < again.clusters.size(); ++i) {
+      stable = again.clusters[i].x == chart.clusters[i].x && again.clusters[i].y == chart.clusters[i].y;
+    }
+    CHECK(stable);
+  }
+  far->cluster = saved;
+}
