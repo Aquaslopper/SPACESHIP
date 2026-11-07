@@ -72,33 +72,33 @@ bool Simulation::BuySupply(const std::string& id) {
   if (id == "fuel-cell" && state_.shiplets >= 45) {
     state_.shiplets -= 45;
     state_.fuelCells += 1;
-    PerformAction("Fuel cell purchased");
+    FreeCommit("Fuel cell purchased");
     return true;
   }
   if (id == "repair-kit" && state_.shiplets >= 70) {
     state_.shiplets -= 70;
     state_.repairKits += 1;
-    PerformAction("Repair kit purchased");
+    FreeCommit("Repair kit purchased");
     return true;
   }
   if (id == "medkit" && state_.shiplets >= 50) {
     state_.shiplets -= 50;
     state_.medkits += 1;
-    PerformAction("Medkit purchased");
+    FreeCommit("Medkit purchased");
     return true;
   }
   if (id == "canister" && state_.shiplets >= 25 && life_.canisters < life_.capacity &&
       FindOngoing("project-oxygen") == nullptr) {
     state_.shiplets -= 25;
     life_.canisters += 1;
-    PerformAction("O2 canister purchased");
+    FreeCommit("O2 canister purchased");
     return true;
   }
   if (id == "rations" && state_.shiplets >= 20 && mess_.rack <= mess_.capacity - 6 &&
       FindOngoing("project-food") == nullptr) {
     state_.shiplets -= 20;
     mess_.rack += 6;
-    PerformAction("Rations purchased");
+    FreeCommit("Rations purchased");
     return true;
   }
   return false;
@@ -130,7 +130,7 @@ bool Simulation::BuyGood(const std::string& goodId) {
   GoodsLot lot = probe;
   lot.id = "lot-" + js::NumToString(state_.lotSerial);
   goods_.push_back(lot);
-  PerformAction("Bought " + good->name);
+  FreeCommit("Bought " + good->name);
   return true;
 }
 
@@ -345,7 +345,23 @@ bool Simulation::HireCrew(const std::string& candidateId) {
   crew_.push_back(MakeCrew(candidate->crew));
   const std::string name = candidate->crew.name;
   SimRemember("Arrival", name + " joined the crew at " + HerePort()->name + ".", candidateId);
-  PerformAction(name + " joined the crew");
+  FreeCommit(name + " joined the crew");
+  return true;
+}
+
+std::string Simulation::PatronName(const std::string& patronId) const {
+  if (patronId == "trader") { return "the trader"; }
+  for (const CandidateDefinition& entry : catalog_.candidates) {
+    if (entry.crew.id == patronId) { return entry.crew.name; }
+  }
+  return patronId;
+}
+
+bool Simulation::TalkToPatron(const std::string& patronId) {
+  if (!state_.gameOver.empty() || !state_.docked || HerePort() == nullptr) { return false; }
+  if (Truthy(state_.talked, patronId)) { return false; }
+  state_.talked[patronId] = true;
+  PerformAction("Spoke with " + PatronName(patronId) + " in the station bar");
   return true;
 }
 
@@ -358,7 +374,7 @@ bool Simulation::BuyUpgrade(const std::string& upgradeId) {
     state_.shiplets -= 500;
     state_.upgrades["bay"] = true;
     cargo_.capacity = std::max(cargo_.capacity, capacity);
-    PerformAction("Cargo hold expanded");
+    FreeCommit("Cargo hold expanded");
     return true;
   }
   if (upgradeId == "bay2" && Truthy(state_.upgrades, "bay") && !Truthy(state_.upgrades, "bay2") &&
@@ -367,27 +383,27 @@ bool Simulation::BuyUpgrade(const std::string& upgradeId) {
     state_.shiplets -= 900;
     state_.upgrades["bay2"] = true;
     cargo_.capacity = std::max(cargo_.capacity, capacity);
-    PerformAction("Cargo hold enlarged again");
+    FreeCommit("Cargo hold enlarged again");
     return true;
   }
   if (upgradeId == "drive" && !Truthy(state_.upgrades, "drive") && state_.shiplets >= 900) {
     state_.shiplets -= 900;
     state_.upgrades["drive"] = true;
-    PerformAction("Efficient drive fitted");
+    FreeCommit("Efficient drive fitted");
     return true;
   }
   if (upgradeId == "rack" && !Truthy(state_.upgrades, "rack") && state_.shiplets >= 400) {
     state_.shiplets -= 400;
     state_.upgrades["rack"] = true;
     life_.capacity = 15;
-    PerformAction("O2 rack expanded");
+    FreeCommit("O2 rack expanded");
     return true;
   }
   if (upgradeId == "scanner" && !Truthy(state_.upgrades, "scanner") && state_.shiplets >= 600) {
     state_.shiplets -= 600;
     state_.upgrades["scanner"] = true;
     scanCost_ = 3;
-    PerformAction("Sensors upgraded");
+    FreeCommit("Sensors upgraded");
     return true;
   }
   if (upgradeId == "scanner2" && Truthy(state_.upgrades, "scanner") &&
@@ -395,13 +411,13 @@ bool Simulation::BuyUpgrade(const std::string& upgradeId) {
     state_.shiplets -= 1100;
     state_.upgrades["scanner2"] = true;
     scanCost_ = 2;
-    PerformAction("Deep-array sensors fitted");
+    FreeCommit("Deep-array sensors fitted");
     return true;
   }
   if (upgradeId == "hull" && StatValue("hull") < 100 && state_.shiplets >= 120) {
     state_.shiplets -= 120;
     ClampStat("hull", 50);
-    PerformAction("Station repaired the hull");
+    FreeCommit("Station repaired the hull");
     return true;
   }
   return false;

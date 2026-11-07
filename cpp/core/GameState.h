@@ -392,6 +392,9 @@ struct GameState {
   std::vector<Passenger> passengers;
   std::map<std::string, bool> upgrades;
   std::map<std::string, bool> hired;
+  // The station bar keeps its own tally: a patron spoken to once is not
+  // spoken to again, exactly as a hired hand is not hired again.
+  std::map<std::string, bool> talked;
   std::string gameOver;
 
   std::vector<FeedLine> feed;

@@ -100,7 +100,8 @@ TEST_CASE("the station has five sections over the authored port", "[station]") {
   CHECK(model.head.kind == "STATION");
   CHECK(model.head.title == World().ports.front().name);
   CHECK(model.head.sub ==
-        "Browse freely. Each transaction, contract or departure costs one action.");
+        "Pick a card, pick an item, then commit. Supplies, the yard and hires cost "
+        "shiplets only; selling, contracts and the bar cost one action.");
   CHECK(model.portId == portId);
   CHECK(model.docked);
   REQUIRE(model.columns.size() == 5);
@@ -109,7 +110,14 @@ TEST_CASE("the station has five sections over the authored port", "[station]") {
   CHECK(model.columns[1].title == "Sell cargo and survey data");
   CHECK(model.columns[2].title == "Mission board");
   CHECK(model.columns[3].title == "Shipyard and crew");
-  CHECK(model.columns[4].title == "Tavern and departure");
+  CHECK(model.columns[4].title == "Tavern / Bar");
+  CHECK(model.columns[0].id == "market");
+  CHECK(model.columns[1].id == "sales");
+  CHECK(model.columns[2].id == "board");
+  CHECK(model.columns[3].id == "yard");
+  CHECK(model.columns[4].id == "tavern");
+  // The Market card carries the purse, as the layout asks.
+  CHECK(model.columns[0].badge == "purse " + ship::js::NumToString(sim.State().shiplets) + " sh");
 
   // The market's own sentence, and its five fixed-price stores in order.
   REQUIRE_FALSE(model.columns[0].notes.empty());
@@ -146,10 +154,100 @@ TEST_CASE("the station has five sections over the authored port", "[station]") {
   const ship::StationRow* undock = Row(model.columns[4], "undock");
   REQUIRE(undock != nullptr);
   CHECK(undock->label == "Undock");
+  CHECK(undock->cost == "1 action");
+  CHECK(undock->commit == "Undock");
   CHECK(undock->enabled);
+  // The bar seats the people the reference already puts at this station.
+  const ship::StationRow* trader = Row(model.columns[4], "talk:trader");
+  REQUIRE(trader != nullptr);
+  CHECK(trader->commit == "Talk");
+  CHECK(trader->cost == "1 action");
+  CHECK_FALSE(trader->free);
+  CHECK(trader->enabled);
 }
 
-TEST_CASE("a purchase in the market costs one action and the price",
+TEST_CASE("the station walks card, item and inspector, and the walk is free",
+          "[station][layout]") {
+  ship::Simulation sim = Docked();
+  const ship::StationScreenModel model = ship::BuildStationScreen(sim, sim.Map().here);
+
+  // Nothing picked yet: the first card with items opens, and its first item.
+  ship::StationSelection fresh;
+  ship::NormalizeStationSelection(model, fresh);
+  CHECK(fresh.category == "market");
+  CHECK(fresh.item == "buy-fuel");
+  // The model itself resolves its own selection the same way.
+  CHECK(model.selection.category == fresh.category);
+  CHECK(model.selection.item == fresh.item);
+
+  const ship::StationColumn* market = ship::FindStationCategory(model, "market");
+  REQUIRE(market != nullptr);
+  CHECK(market->title == model.columns[0].title);
+  const ship::StationRow* fuel = ship::FindStationItem(model, "market", "buy-fuel");
+  REQUIRE(fuel != nullptr);
+  CHECK(fuel->commit == "Buy - 45 sh");
+  CHECK_FALSE(fuel->details.empty());
+
+  // A stored selection that no longer exists falls back, it never dangles.
+  ship::StationSelection stale{"yard", "hire:nobody"};
+  ship::NormalizeStationSelection(model, stale);
+  CHECK(stale.category == "yard");
+  CHECK_FALSE(stale.item.empty());
+  CHECK(ship::FindStationItem(model, stale.category, stale.item) != nullptr);
+
+  ship::StationSelection gone{"not-a-card", "buy-fuel"};
+  ship::NormalizeStationSelection(model, gone);
+  CHECK(gone.category == "market");
+
+  // The renderer's three columns: cards, the open card's items, the inspector.
+  REQUIRE(ship::OpenTask(sim, "station", sim.Map().here, true));
+  ship::StationSelection view;
+  const ship::TaskScreenModel screen =
+      ship::BuildTabScreen(sim, *ship::FindTab(sim.State(), sim.State().activeTab),
+                           ship::WikiView(), &view);
+  REQUIRE(screen.panels.size() == 3);
+  CHECK(screen.panelColumns == std::vector<int>{0, 1, 2});
+  REQUIRE(screen.panelRows.size() == 3);
+  REQUIRE(screen.panelRowIds.size() == 3);
+  CHECK(screen.panelRowIds[0].size() == 5);
+  CHECK(screen.panelRows[0][0].plain);
+  CHECK(screen.panelRows[0][0].hideCost);
+  CHECK(screen.panelRowIds[0][0] == "station-cat:market");
+  CHECK(screen.panelRowIds[0][4] == "station-cat:tavern");
+  CHECK(screen.panelRows[0][0].selected);
+  CHECK_FALSE(screen.panelRows[0][1].selected);
+  CHECK(screen.panelRowIds[1][0] == "station-item:buy-fuel");
+  CHECK(screen.panelRows[1][0].selected);
+  CHECK(screen.panelRowIds[2] == std::vector<std::string>{"buy-fuel"});
+  CHECK(screen.panelRows[2][0].label == "Buy - 45 sh");
+  CHECK(screen.panelRows[2][0].cost == "0 actions");
+  CHECK(screen.panelRows[2][0].hideCost);   // one simple button, no badge
+  CHECK(screen.panelRows[2][0].enabled);
+  CHECK(view.category == "market");
+
+  // Opening another card moves the middle column and re-picks its first item.
+  view.category = "tavern";
+  view.item.clear();
+  const ship::TaskScreenModel bar =
+      ship::BuildTabScreen(sim, *ship::FindTab(sim.State(), sim.State().activeTab),
+                           ship::WikiView(), &view);
+  CHECK(view.item == "talk:trader");
+  CHECK(bar.panelRowIds[1][0] == "station-item:talk:trader");
+  CHECK(bar.panelRowIds[2] == std::vector<std::string>{"talk:trader"});
+  CHECK(bar.panelRows[2][0].label == "Talk");
+  CHECK(bar.panelRows[2][0].cost == "1 action");
+  CHECK(bar.panelRows[2][0].hideCost);
+
+  // Reading a screen never moves the clock.
+  const double actions = sim.ActionCount();
+  for (int read = 0; read < 8; ++read) {
+    ship::BuildTabScreen(sim, *ship::FindTab(sim.State(), sim.State().activeTab),
+                         ship::WikiView(), &view);
+  }
+  CHECK(sim.ActionCount() == actions);
+}
+
+TEST_CASE("a purchase in the market costs the price and no action",
           "[station][market]") {
   ship::Simulation sim = Docked();
   const double actions = sim.ActionCount();
@@ -159,11 +257,20 @@ TEST_CASE("a purchase in the market costs one action and the price",
   REQUIRE(ship::PressStationAction(sim, "buy-fuel"));
   CHECK(sim.State().fuelCells == cells + 1);
   CHECK(sim.State().shiplets == purse - 45);
-  CHECK(sim.ActionCount() == actions + 1);
+  // Money only: the clock does not move and no lock is started.
+  CHECK(sim.ActionCount() == actions);
+  CHECK(sim.State().actionCooldowns.empty());
+
+  // ... so the counter stays open for as long as the purse does.
+  REQUIRE(ship::PressStationAction(sim, "buy-fuel"));
+  CHECK(sim.State().fuelCells == cells + 2);
+  CHECK(sim.State().shiplets == purse - 90);
+  CHECK(sim.ActionCount() == actions);
+  CHECK(ship::BuildStationScreen(sim, sim.Map().here).columns[0].rows[0].cost == "0 actions");
 
   const double kits = sim.State().repairKits;
   REQUIRE(ship::PressStationAction(sim, "buy-repair"));
-  CHECK(sim.State().shiplets == purse - 45 - 70);
+  CHECK(sim.State().shiplets == purse - 90 - 70);
   CHECK(sim.State().repairKits == kits + 1);
 
   const double medkits = sim.State().medkits;
@@ -231,19 +338,32 @@ TEST_CASE("the mission board accepts, tracks and pays a contract", "[station][bo
   const double purse = sim.State().shiplets;
   const ship::StationScreenModel board = ship::BuildStationScreen(sim, "tolme");
 
-  // Every contract has its status note, in the reference's words.
-  bool sawFreight = false;
-  for (const auto& row : board.columns[2].rows) {
-    const std::string& note = row.label;
-    if (note.find("Tolme Anchorage") == std::string::npos) { continue; }
-    sawFreight = true;
+  // The middle column names the contracts; their own words, status and reward
+  // are what the inspector on the right shows for the picked one.
+  const ship::Contract* freightDef = nullptr;
+  for (const ship::Contract& entry : World().contracts) {
+    if (entry.id == "freight") { freightDef = &entry; }
   }
-  CHECK(sawFreight);
-
+  REQUIRE(freightDef != nullptr);
   const ship::StationRow* accept = Row(board.columns[2], "contract-accept:freight");
   REQUIRE(accept != nullptr);
   CHECK(accept->enabled);
   CHECK(accept->cost == "1 action");
+  bool sawNote = false, sawReward = false, sawStatus = false;
+  for (const std::string& line : accept->details) {
+    if (line.find(freightDef->note) != std::string::npos) { sawNote = true; }
+    if (line.find(ship::js::NumToString(freightDef->reward) + " sh") != std::string::npos) {
+      sawReward = true;
+    }
+    if (line.find("Status: available") != std::string::npos) { sawStatus = true; }
+  }
+  CHECK(sawNote);
+  CHECK(sawReward);
+  CHECK(sawStatus);
+  // ... and the middle column no longer repeats them.
+  for (const auto& row : board.columns[2].rows) {
+    CHECK(row.label.find(freightDef->note) == std::string::npos);
+  }
 
   const double usedBefore = sim.CargoUsed();
   REQUIRE(ship::PressStationAction(sim, "contract-accept:freight"));
@@ -252,9 +372,17 @@ TEST_CASE("the mission board accepts, tracks and pays a contract", "[station][bo
   CHECK(sim.Goods().back().contractId == "freight");
   CHECK(sim.CargoUsed() == usedBefore + 8);
 
-  // Accepted work leaves the board and appears as a note only.
+  // Accepted work stays on the board as an item, but its button is greyed out
+  // and cannot be pressed again.
   const ship::StationScreenModel accepted = ship::BuildStationScreen(sim, "tolme");
-  CHECK_FALSE(HasRowStarting(accepted.columns[2], "contract-accept:freight"));
+  const ship::StationRow* taken = Row(accepted.columns[2], "contract-accept:freight");
+  REQUIRE(taken != nullptr);
+  CHECK_FALSE(taken->enabled);
+  CHECK(taken->done);
+  CHECK(taken->cost == "done");
+  CHECK(taken->commit == "Accepted");
+  CHECK_FALSE(ship::PressStationAction(sim, "contract-accept:freight"));
+  CHECK(sim.ActionCount() == actions + 1);
 
   // Ready work can be collected: the reward lands and the state says complete.
   sim.MutableState().contracts["freight"] = "ready";
@@ -348,13 +476,12 @@ TEST_CASE("hiring respects the berth limit and the purse", "[station][hire]") {
                          ship::js::NumToString(candidate.fee) + " sh");
   CHECK(row->enabled);
 
-  // The hall lists each candidate in the panel's own words.
-  bool described = false;
-  for (const auto& entry : model.columns[3].rows) {
-    const std::string& note = entry.label;
-    if (entry.reading && note.find(candidate.crew.name) == 0) { described = true; }
-  }
-  CHECK(described);
+  // The inspector carries the candidate's own words: traits, health and skill.
+  REQUIRE_FALSE(row->details.empty());
+  CHECK(row->details[0].find(candidate.crew.name + ": " + candidate.crew.traits) == 0);
+  CHECK(row->commit == "Hire - " + ship::js::NumToString(candidate.fee) + " sh");
+  CHECK(row->cost == "0 actions");
+  CHECK(row->free);
 
   const std::size_t crew = sim.Crew().size();
   const double purse = sim.State().shiplets;
@@ -362,11 +489,13 @@ TEST_CASE("hiring respects the berth limit and the purse", "[station][hire]") {
   REQUIRE(ship::PressStationAction(sim, id));
   CHECK(sim.Crew().size() == crew + 1);
   CHECK(sim.State().shiplets == purse - candidate.fee);
-  CHECK(sim.ActionCount() == actions + 1);
+  CHECK(sim.ActionCount() == actions);   // shiplets only
 
   // Nobody is hired twice, and a full ship stops hiring.
   const ship::StationScreenModel after = ship::BuildStationScreen(sim, sim.Map().here);
   CHECK_FALSE(Row(after.columns[3], id)->enabled);
+  CHECK(Row(after.columns[3], id)->done);
+  CHECK(Row(after.columns[3], id)->commit == "Hired");
   CHECK_FALSE(ship::PressStationAction(sim, id));
 
   ship::Simulation full = Docked();
@@ -387,12 +516,13 @@ TEST_CASE("the yard stages refits, the Kestrel and a hull service", "[station][y
   const ship::StationScreenModel model =
       ship::BuildStationScreen(sim, sim.Map().here);
 
-  // The Wren's own notice, verbatim.
-  REQUIRE_FALSE(model.columns[3].notes.empty());
-  CHECK(model.columns[3].notes[0].find(
+  // The Wren's own notice, verbatim, under the card's own rule.
+  REQUIRE(model.columns[3].notes.size() >= 2);
+  CHECK(model.columns[3].notes[0].find("Shiplets only: no action is spent") == 0);
+  CHECK(model.columns[3].notes[1].find(
             "Your compact Wren: " +
             ship::js::NumToString(sim.CargoStore().capacity) + " m3 cargo, 6 berths.") == 0);
-  CHECK(model.columns[3].notes[0].find("SC Tessellate") != std::string::npos);
+  CHECK(model.columns[3].notes[1].find("SC Tessellate") != std::string::npos);
 
   const ship::StationRow* shipRow = Row(model.columns[3], "ship-buy");
   REQUIRE(shipRow != nullptr);
@@ -401,16 +531,20 @@ TEST_CASE("the yard stages refits, the Kestrel and a hull service", "[station][y
         "Buy SC Tessellate for 4,000 shiplets? The crew, cargo, equipment, refits, "
         "tasks and voyage records transfer. This purchase is permanent.");
 
-  // A refit is one action, and the hold really grows.
+  // A refit costs shiplets only, and the hold really grows.
   const double capacity = sim.CargoStore().capacity;
   const double bayOne = sim.ShipCargoCapacity(sim.State().shipClass, 1);
+  const double refitActions = sim.ActionCount();
   REQUIRE(ship::PressStationAction(sim, "upgrade:bay"));
   CHECK(sim.CargoStore().capacity == std::max(capacity, bayOne));
   CHECK(sim.State().upgrades.at("bay"));
+  CHECK(sim.ActionCount() == refitActions);
 
-  // The second bay is staged behind the first.
+  // The first bay is owned, so it greys out; the second is staged behind it.
   const ship::StationScreenModel staged = ship::BuildStationScreen(sim, sim.Map().here);
   CHECK_FALSE(Row(staged.columns[3], "upgrade:bay")->enabled);
+  CHECK(Row(staged.columns[3], "upgrade:bay")->done);
+  CHECK(Row(staged.columns[3], "upgrade:bay")->commit == "Owned");
   CHECK(Row(staged.columns[3], "upgrade:bay2")->enabled);
 
   // A hull service is a flat 120 sh for half the missing structure.
@@ -421,6 +555,9 @@ TEST_CASE("the yard stages refits, the Kestrel and a hull service", "[station][y
   CHECK(sim.StatValue("hull") == std::min(100.0, hull + 50));
   CHECK(sim.State().shiplets == 9000 - 500 - 120);
   CHECK_FALSE(ship::PressStationAction(sim, "hull-service"));  // nothing missing
+  CHECK(Row(ship::BuildStationScreen(sim, sim.Map().here).columns[3], "hull-service")
+            ->details.back()
+            .find("already whole") != std::string::npos);
 
   // Trading up: the class, the deck plan and the berths all change.
   sim.MutableState().shiplets = 4200;
@@ -431,8 +568,12 @@ TEST_CASE("the yard stages refits, the Kestrel and a hull service", "[station][y
   CHECK(sim.Ship().Berths() == 14);
   CHECK(sim.State().shiplets == 200);
   const ship::StationScreenModel kestrel = ship::BuildStationScreen(sim, sim.Map().here);
-  CHECK(kestrel.columns[3].notes[0].find("Your Kestrel-series ship:") == 0);
-  CHECK_FALSE(HasRowStarting(kestrel.columns[3], "ship-buy"));
+  CHECK(kestrel.columns[3].notes[1].find("Your Kestrel-series ship:") == 0);
+  const ship::StationRow* owned = Row(kestrel.columns[3], "ship-buy");
+  REQUIRE(owned != nullptr);
+  CHECK_FALSE(owned->enabled);
+  CHECK(owned->done);
+  CHECK(owned->commit == "Owned");
   CHECK_FALSE(ship::PressStationAction(sim, "ship-buy"));
 }
 
@@ -710,12 +851,17 @@ TEST_CASE("the router sends the station, the hold and the lab to their windows",
   CHECK(ship::ScreenKindFor(stationTab) == ScreenKind::Station);
   const ship::TaskScreenModel station = ship::BuildTabScreen(sim, stationTab);
   CHECK(station.head.kind == "STATION");
-  CHECK(station.panels.size() == 5);
-  CHECK(station.panelRows.size() == 5);
-  CHECK(station.panelRowIds.size() == 5);
-  CHECK(station.panels[0].title.find("Market - purse") == 0);
+  CHECK(station.panels.size() == 3);
+  CHECK(station.panelRows.size() == 3);
+  CHECK(station.panelRowIds.size() == 3);
+  CHECK(station.panelColumns == std::vector<int>{0, 1, 2});
+  CHECK(station.panels[0].title == World().ports.front().name);
+  CHECK(station.panels[1].title.find("Market - purse") == 0);
+  CHECK(station.panels[2].title == "Inspector and commit");
   CHECK_FALSE(station.panelRows[0].empty());
-  CHECK(station.panelRowIds[0][0] == "buy-fuel");
+  CHECK(station.panelRowIds[0][0] == "station-cat:market");
+  CHECK(station.panelRowIds[1][0] == "station-item:buy-fuel");
+  CHECK(station.panelRowIds[2][0] == "buy-fuel");
 
   const ship::Tab cargo{"room:cargo", "cargo", "room", "Cargo Hold", "ROOM", ""};
   CHECK(ship::ScreenKindFor(cargo) == ScreenKind::Cargo);
@@ -751,7 +897,8 @@ TEST_CASE("market labels and affordability use the actual local port price", "[s
   CHECK(sim.State().shiplets == 0);
 }
 
-TEST_CASE("station commands use HTA category tiers and matching visible locks", "[station][cooldown][regression]") {
+TEST_CASE("the station starts no cooldown: state, not a lock, stops a second press",
+          "[station][cooldown][regression]") {
   ship::Simulation sim = Docked();
   sim.MutableMap().here = "tolme";
   sim.MutableState().shiplets = 9000;
@@ -764,31 +911,98 @@ TEST_CASE("station commands use HTA category tiers and matching visible locks", 
   CHECK(ship::StationActionCategory(sim, "sell:signal-core") == "routine");
   REQUIRE(sim.AcceptCommission("salvage"));
   CHECK(ship::StationActionCategory(sim, "commission-abandon") == "critical");
+  // The refit is bought, and nothing is locked: no action was spent either.
+  const double refitActions = sim.ActionCount();
   REQUIRE(ship::PressStationAction(sim, "upgrade:bay"));
-  const auto key = ship::ActionCooldownKey(sim, "press:station:upgrade:bay:");
-  CHECK(sim.State().actionCooldowns.at(key).category == "systems");
-  CHECK(sim.State().actionCooldowns.at(key).remaining == 10);
+  CHECK(sim.ActionCount() == refitActions);
+  CHECK(sim.State().actionCooldowns.empty());
+
   const auto screen = ship::BuildTabScreen(sim, *ship::FindTab(sim.State(), sim.State().activeTab));
-  REQUIRE(screen.panelColumns == std::vector<int>{0, 1, 1, 2, 2});
+  REQUIRE(screen.panelColumns == std::vector<int>{0, 1, 2});
   bool found = false;
   for (std::size_t i = 0; i < screen.panelRowIds.size(); ++i) {
     for (std::size_t j = 0; j < screen.panelRowIds[i].size(); ++j) {
+      if (screen.panelRowIds[i][j].find("station-") == 0) {
+        // A card or an item: free to press, and never carrying a countdown.
+        CHECK(screen.panelRows[i][j].remaining == 0);
+        CHECK(screen.panelRows[i][j].enabled);
+      }
       if (screen.panelRowIds[i][j] == "upgrade:bay") {
         found = true;
-        CHECK(screen.panelRows[i][j].remaining == 10);
-        CHECK(screen.panelRows[i][j].category == "systems");
+        CHECK(screen.panelRows[i][j].remaining == 0);
+        CHECK(screen.panelRows[i][j].displayCost == "done");
+        CHECK_FALSE(screen.panelRows[i][j].enabled);
       }
     }
   }
-  CHECK(found);
+  CHECK_FALSE(found);  // the owned refit is not the picked item any more
 
+  // An action-costing departure is stopped by the berth it left, not a lock.
   auto other = Docked();
   other.MutableMap().here = "tolme";
   REQUIRE(ship::OpenTask(other, "station", "tolme", true));
-  const auto undockKey = ship::ActionCooldownKey(other, "press:station:undock:");
+  const double beforeUndock = other.ActionCount();
   REQUIRE(ship::PressStationAction(other, "undock"));
-  CHECK(other.State().actionCooldowns.at(undockKey).category == "space");
-  CHECK(other.State().actionCooldowns.at(undockKey).remaining == 15);
+  CHECK(other.ActionCount() == beforeUndock + 1);
+  CHECK(other.State().actionCooldowns.empty());
+  CHECK_FALSE(ship::PressStationAction(other, "undock"));
+  CHECK(other.ActionCount() == beforeUndock + 1);
+}
+
+TEST_CASE("the bar takes one action per person, and only once", "[station][tavern]") {
+  ship::Simulation sim = Docked();
+  const ship::StationScreenModel model = ship::BuildStationScreen(sim, sim.Map().here);
+  const ship::StationRow* trader = Row(model.columns[4], "talk:trader");
+  REQUIRE(trader != nullptr);
+  CHECK(trader->enabled);
+  CHECK(trader->commit == "Talk");
+  // Before the first word the tip is not given away on the inspector.
+  for (const std::string& line : trader->details) {
+    CHECK(line.find(model.tip) == std::string::npos);
+  }
+
+  const double actions = sim.ActionCount();
+  REQUIRE(ship::PressStationAction(sim, "talk:trader"));
+  CHECK(sim.ActionCount() == actions + 1);
+  CHECK(sim.State().talked.at("trader"));
+  CHECK(sim.State().actionCooldowns.empty());
+
+  const ship::StationScreenModel after = ship::BuildStationScreen(sim, sim.Map().here);
+  const ship::StationRow* spoken = Row(after.columns[4], "talk:trader");
+  REQUIRE(spoken != nullptr);
+  CHECK_FALSE(spoken->enabled);
+  CHECK(spoken->done);
+  CHECK(spoken->cost == "done");
+  CHECK(spoken->commit == "Spoken to");
+  bool sawTip = false;
+  for (const std::string& line : spoken->details) {
+    if (line.find(after.tip) != std::string::npos) { sawTip = true; }
+  }
+  CHECK(sawTip);
+  CHECK_FALSE(spoken->details.empty());
+  CHECK_FALSE(ship::PressStationAction(sim, "talk:trader"));
+  CHECK(sim.ActionCount() == actions + 1);
+
+  // A candidate waiting at this station is at the bar too, and only once.
+  const ship::CandidateDefinition& person = World().candidates.front();
+  const std::string id = "talk:" + person.crew.id;
+  REQUIRE(Row(after.columns[4], id) != nullptr);
+  REQUIRE(ship::PressStationAction(sim, id));
+  CHECK(sim.ActionCount() == actions + 2);
+  const ship::StationScreenModel quiet = ship::BuildStationScreen(sim, sim.Map().here);
+  CHECK_FALSE(Row(quiet.columns[4], id)->enabled);
+  CHECK(Row(quiet.columns[4], id)->done);
+  CHECK_FALSE(ship::PressStationAction(sim, id));
+  CHECK(sim.ActionCount() == actions + 2);
+
+  // The tally travels with the voyage.
+  std::string error;
+  ship::Simulation restored = Docked();
+  REQUIRE(restored.LoadJson(sim.SaveJson(), &error));
+  CHECK(restored.State().talked.at("trader"));
+  const ship::StationScreenModel reloaded =
+      ship::BuildStationScreen(restored, restored.Map().here);
+  CHECK_FALSE(Row(reloaded.columns[4], "talk:trader")->enabled);
 }
 
 TEST_CASE("hire and ship transfer memories precede their action tick", "[station][memory][regression]") {

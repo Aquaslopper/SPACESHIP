@@ -1,5 +1,17 @@
 // ============================================================================
-//  StationScreen.cpp — market, mission board, yard, hiring hall and tavern.
+//  StationScreen.cpp — the port window: cards, items, inspector, commits.
+//  ---------------------------------------------------------------------------
+//  The five categories are the reference's five panels, in its order. What
+//  changed is how they are walked and what a commitment costs:
+//
+//    left      five cards. Free to open. The open one is marked.
+//    middle    only what the open card holds. Free to pick.
+//    right     everything about the one picked item, and its single button.
+//
+//    Market, Shipyard and crew   shiplets only, 0 actions, no cooldown.
+//    Cargo and surveys           pays shiplets, 1 action, the lot then goes.
+//    Mission board               1 action, the button greys once accepted.
+//    Tavern / Bar                1 action per person, once, then it greys.
 // ============================================================================
 #include "ui/StationScreen.h"
 
@@ -27,9 +39,124 @@ const double kBayTwo = 900;
 const double kDrive = 900;
 const double kRack = 400;
 const double kScanner = 600;
+const double kScannerTwo = 1100;
 const double kHullService = 120;
+const double kLargeShip = 4000;
 
-const char* kUndock = "Undock";
+const char* kFree = "0 actions";
+const char* kOneAction = "1 action";
+const char* kDone = "done";
+
+bool Talked(const Simulation& sim, const std::string& patronId) {
+  const auto& talked = sim.State().talked;
+  auto it = talked.find(patronId);
+  return it != talked.end() && it->second;
+}
+
+bool Owned(const Simulation& sim, const std::string& upgradeId) {
+  const auto& upgrades = sim.State().upgrades;
+  auto it = upgrades.find(upgradeId);
+  return it != upgrades.end() && it->second;
+}
+
+bool Hired(const Simulation& sim, const std::string& candidateId) {
+  const auto& hired = sim.State().hired;
+  auto it = hired.find(candidateId);
+  return it != hired.end() && it->second;
+}
+
+std::string ContractStatus(const Simulation& sim, const std::string& contractId) {
+  const auto& contracts = sim.State().contracts;
+  auto it = contracts.find(contractId);
+  return it == contracts.end() ? std::string("available") : it->second;
+}
+
+// The region this station sits in, for the two authored lines the bar repeats.
+std::vector<std::string> LocalRumors(const Simulation& sim, const std::string& portId) {
+  std::string regionId;
+  const Body* portBody = sim.FindBodyById(portId);
+  if (portBody != nullptr) {
+    const std::string systemId =
+        portBody->system.empty() ? sim.World().BodySystem(*portBody) : portBody->system;
+    const Body* system = sim.FindBodyById(systemId);
+    if (system != nullptr) { regionId = system->region; }
+  }
+  if (regionId.empty()) { regionId = sim.CurrentSystemId(); }
+  const auto& history = sim.World().worldHistory;
+  auto it = history.find(regionId);
+  if (it == history.end()) { return {}; }
+  return it->second;
+}
+
+std::string RegionName(const Simulation& sim, const std::string& portId) {
+  const Body* portBody = sim.FindBodyById(portId);
+  if (portBody == nullptr) { return std::string(); }
+  const std::string systemId =
+      portBody->system.empty() ? sim.World().BodySystem(*portBody) : portBody->system;
+  const Body* system = sim.FindBodyById(systemId);
+  if (system == nullptr) { return std::string(); }
+  const Body* region = sim.FindBodyById(system->region);
+  return region == nullptr ? system->region : region->name;
+}
+
+double GoodBuyPrice(const Simulation& sim, const Good& good) {
+  GoodsLot probe;
+  probe.value = good.value;
+  probe.kind = good.kind;
+  return js::Ceil(sim.LotPrice(probe) * 1.2);
+}
+
+double GoodSellPrice(const Simulation& sim, const Good& good) {
+  GoodsLot probe;
+  probe.value = good.value;
+  probe.kind = good.kind;
+  return sim.LotPrice(probe);
+}
+
+// The trader's tip: the port's own authored line, then what this counter pays
+// best and worst for, read straight off the price basket in play.
+std::vector<std::string> TraderSpeech(const Simulation& sim, const std::string& tip) {
+  std::vector<std::string> said;
+  if (!tip.empty()) { said.push_back("The trader says: " + tip); }
+  const Good* best = nullptr;
+  const Good* worst = nullptr;
+  for (const Good& good : sim.Market()) {
+    if (best == nullptr || GoodSellPrice(sim, good) > GoodSellPrice(sim, *best)) { best = &good; }
+    if (worst == nullptr || GoodBuyPrice(sim, good) < GoodBuyPrice(sim, *worst)) { worst = &good; }
+  }
+  if (best != nullptr) {
+    said.push_back("Trade tip: this port pays " + Num(GoodSellPrice(sim, *best)) + " sh for " +
+                   best->name + " (" + best->kind + ").");
+  }
+  if (worst != nullptr && worst != best) {
+    said.push_back("Trade tip: " + worst->name + " goes in for " +
+                   Num(GoodBuyPrice(sim, *worst)) + " sh here, the cheapest on the board.");
+  }
+  for (const std::string& rumor : LocalRumors(sim, sim.Map().here)) {
+    said.push_back("Heard at the bar: " + rumor);
+  }
+  return said;
+}
+
+// What a candidate says when spoken to: their own authored fields, then the
+// two lines the region was written with. Nothing here is composed.
+std::vector<std::string> PatronSpeech(const Simulation& sim, const CandidateDefinition& person) {
+  const CrewDefinition& crew = person.crew;
+  std::vector<std::string> said;
+  if (!crew.traits.empty()) { said.push_back(crew.name + " on themselves: " + crew.traits + "."); }
+  if (!crew.skill.empty() || !crew.role.empty()) {
+    said.push_back(crew.name + " on their trade: " + (crew.skill.empty() ? std::string("Untrained") : crew.skill) +
+                   ", " + crew.role + ".");
+  }
+  if (!crew.hobby.empty()) { said.push_back("Off watch: " + crew.hobby + "."); }
+  if (!crew.homeworld.empty()) { said.push_back("From: " + crew.homeworld + "."); }
+  for (const std::string& rumor : LocalRumors(sim, sim.Map().here)) {
+    said.push_back(crew.name + " repeats a rumor: " + rumor);
+  }
+  const std::string region = RegionName(sim, sim.Map().here);
+  if (!region.empty()) { said.push_back("They are waiting out " + region + "'s next berth."); }
+  return said;
+}
 
 }  // namespace
 
@@ -43,7 +170,8 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   model.head.kind = "STATION";
   model.head.title = model.portName;
   model.head.sub =
-      "Browse freely. Each transaction, contract or departure costs one action.";
+      "Pick a card, pick an item, then commit. Supplies, the yard and hires cost "
+      "shiplets only; selling, contracts and the bar cost one action.";
 
   const double purse = sim.State().shiplets;
   const double used = sim.CargoUsed();
@@ -53,45 +181,95 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   model.holdLine = Num(used) + " of " + Num(capacity) + " m3 used; " + Num(reserved) +
                    " m3 reserved.";
 
-  // ---- the market --------------------------------------------------------
+  std::string tip = port == nullptr ? std::string() : port->tip;
+  if (tip.empty()) {
+    tip = model.portName == "Tolme Anchorage"
+              ? "A trader says the Coldwell Relay pays well for produce, but sells ore cheaply."
+              : "A trader says Tolme's market pays well for refined ore.";
+  }
+  model.tip = tip;
+
+  // ---- 1. the market ------------------------------------------------------
   StationColumn market;
-  market.title = model.purseLine;
+  market.id = "market";
+  market.title = "Market - purse " + Num(purse) + " sh";
+  market.badge = "purse " + Num(purse) + " sh";
   market.notes.push_back("Buy supplies and cargo. A different port may pay a different price.");
+  market.notes.push_back("Shiplets only: no action is spent and nothing is locked.");
+
   const auto supply = [&market, purse](const std::string& id, const std::string& label,
-                                       double price, bool extra) {
+                                       const std::string& what, double price, bool extra,
+                                       const std::vector<std::string>& extraDetails) {
     StationRow row;
     row.id = id;
     row.label = label;
-    row.cost = "1 action";
+    row.cost = kFree;
+    row.free = true;
+    row.commit = "Buy - " + Num(price) + " sh";
     row.enabled = purse >= price && extra;
+    row.details.push_back(what);
+    row.details.push_back("Price: " + Num(price) + " sh at every port.");
+    row.details.push_back("Purse: " + Num(purse) + " sh.");
+    for (const std::string& line : extraDetails) { row.details.push_back(line); }
+    if (!row.enabled) {
+      row.details.push_back(purse < price ? "Not affordable: the purse is short."
+                                          : "Not available: the ship cannot take another.");
+    }
     market.rows.push_back(row);
   };
-  supply("buy-fuel", "Fuel cell - 45 sh", kFuelCell, true);
-  supply("buy-repair", "Repair kit - 70 sh", kRepairKit, true);
-  supply("buy-medkit", "Medkit - 50 sh", kMedkit, true);
-  supply("buy-canister", "O2 canister - 25 sh", kCanister,
+
+  supply("buy-fuel", "Fuel cell - 45 sh", "One fuel cell for the drive.", kFuelCell, true,
+         {"Rack: " + Num(sim.State().fuelCells) + " fuel cells aboard."});
+  supply("buy-repair", "Repair kit - 70 sh", "One repair kit for the machines.", kRepairKit, true,
+         {"Rack: " + Num(sim.State().repairKits) + " repair kits aboard."});
+  supply("buy-medkit", "Medkit - 50 sh", "One medkit for the medical bay.", kMedkit, true,
+         {"Rack: " + Num(sim.State().medkits) + " medkits aboard."});
+  supply("buy-canister", "O2 canister - 25 sh", "One O2 canister for the filter rack.", kCanister,
          sim.Life().canisters < sim.Life().capacity &&
-             sim.FindOngoing("project-oxygen") == nullptr);
-  supply("buy-rations", "Six rations - 20 sh", kRations,
+             sim.FindOngoing("project-oxygen") == nullptr,
+         {"Rack: " + Num(sim.Life().canisters) + " of " + Num(sim.Life().capacity) +
+              " canisters.",
+          "The Recyclers' oxygen project blocks this while it runs."});
+  supply("buy-rations", "Six rations - 20 sh", "Six rations for the galley rack.", kRations,
          sim.MessRack() <= sim.MessCapacity() - 6 &&
-             sim.FindOngoing("project-food") == nullptr);
+             sim.FindOngoing("project-food") == nullptr,
+         {"Rack: " + Num(sim.MessRack()) + " of " + Num(sim.MessCapacity()) + " rations.",
+          "The galley's food project blocks this while it runs."});
 
   for (const Good& good : sim.Market()) {
-    GoodsLot lot;
-    lot.value = good.value;
-    lot.kind = good.kind;
-    const double price = js::Ceil(sim.LotPrice(lot) * 1.2);
+    const double price = GoodBuyPrice(sim, good);
+    const double sell = GoodSellPrice(sim, good);
+    const bool space = used + reserved + good.vol <= capacity;
     StationRow row;
     row.id = "buy-good:" + good.id;
     row.label = "Buy " + good.name + " - " + Num(price) + " sh / " + Num(good.vol) + " m3";
-    row.cost = "1 action";
-    row.enabled = purse >= price && used + reserved + good.vol <= capacity;
+    row.cost = kFree;
+    row.free = true;
+    row.commit = "Buy - " + Num(price) + " sh";
+    row.enabled = purse >= price && space;
+    row.details.push_back("Trade good: " + good.name + " (" + good.kind + ").");
+    row.details.push_back("Volume: " + Num(good.vol) + " m3 per lot.");
+    row.details.push_back("This port sells it in for " + Num(price) + " sh and would pay " +
+                          Num(sell) + " sh for it.");
+    row.details.push_back("Carried to another port it may pay more or less.");
+    row.details.push_back("Hold: " + Num(used) + " of " + Num(capacity) + " m3 used, " +
+                          Num(reserved) + " m3 reserved; this lot needs " + Num(good.vol) + " m3.");
+    row.details.push_back("Purse: " + Num(purse) + " sh.");
+    if (good.risk) { row.details.push_back("Flagged: this cargo draws attention."); }
+    if (!row.enabled) {
+      row.details.push_back(!space ? "No room in the hold for another lot."
+                                   : "Not affordable at this price.");
+    }
     market.rows.push_back(row);
   }
 
-  // ---- sales -------------------------------------------------------------
+  // ---- 2. sell cargo and survey data --------------------------------------
   StationColumn sales;
+  sales.id = "sales";
   sales.title = "Sell cargo and survey data";
+  sales.badge = Num(sim.Goods().size()) + " lots, " + Num(sim.Survey().size()) + " surveys";
+  sales.notes.push_back("Everything aboard that a counter will take.");
+  sales.notes.push_back("Selling pays shiplets and costs one action; the lot is then gone.");
   if (sim.Goods().empty() && sim.Survey().empty()) {
     sales.notes.push_back("Nothing to sell.");
   }
@@ -100,29 +278,46 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
       sales.notes.push_back(lot.name + " - contract cargo, not for sale.");
       continue;
     }
+    const double price = sim.LotPrice(lot);
     StationRow row;
     row.id = "sell:" + lot.id;
-    row.label = "Sell " + lot.name + " - " + Num(sim.LotPrice(lot)) + " sh";
-    row.cost = "1 action";
-    row.enabled = true;
+    row.label = "Sell " + lot.name + " - " + Num(price) + " sh";
+    row.cost = kOneAction;
+    row.commit = "Sell - " + Num(price) + " sh";
+    row.enabled = model.docked;
+    row.details.push_back("Cargo lot aboard: " + lot.name + " (" + lot.kind + ").");
+    row.details.push_back("Volume: " + Num(lot.vol) + " m3, freed on sale.");
+    row.details.push_back("This port pays " + Num(price) + " sh for it now.");
+    row.details.push_back("Costs one action. The lot leaves the hold and cannot be sold twice.");
     sales.rows.push_back(row);
   }
   for (const SurveyRecord& record : sim.Survey()) {
+    const bool packaging = sim.FindOngoing("pkg-" + record.id) != nullptr;
     StationRow row;
     row.id = "sell-survey:" + record.id;
     row.label = "Sell survey: " + record.name + " - " + Num(record.value) + " sh";
-    row.cost = "1 action";
-    row.enabled = sim.FindOngoing("pkg-" + record.id) == nullptr;
+    row.cost = kOneAction;
+    row.commit = "Sell - " + Num(record.value) + " sh";
+    row.enabled = model.docked && !packaging;
+    row.details.push_back("Survey data: " + record.name + ".");
+    if (!record.src.empty()) { row.details.push_back("Taken from: " + record.src + "."); }
+    if (!record.state.empty()) { row.details.push_back("State: " + record.state + "."); }
+    row.details.push_back("This port pays " + Num(record.value) + " sh for the record.");
+    row.details.push_back(packaging
+                              ? "The Science Room is packaging this record; it cannot be sold yet."
+                              : "Costs one action. The record is sold and leaves the ship.");
     sales.rows.push_back(row);
   }
 
-  // ---- the mission board -------------------------------------------------
+  // ---- 3. the mission board -----------------------------------------------
   StationColumn board;
+  board.id = "board";
   board.title = "Mission board";
-
-  // The repeatable commissions come first, exactly as the reference orders the
-  // panel: heading, then either the live commission or the three offers.
+  board.badge = sim.State().commissions.active.has_value() ? "one commission running"
+                                                           : "commissions open";
   board.notes.push_back("Repeatable commissions");
+  board.notes.push_back("Accepting or collecting work costs one action; the button greys "
+                        "the moment the mission is taken.");
   if (sim.State().commissions.active.has_value()) {
     const Commission& active = *sim.State().commissions.active;
     const double goal = CommissionGoal(active.kind);
@@ -132,15 +327,26 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     StationRow collect;
     collect.id = "commission-collect";
     collect.label = "Collect commission - " + Num(active.reward) + " sh";
-    collect.cost = "1 action";
+    collect.cost = kOneAction;
+    collect.commit = "Collect - " + Num(active.reward) + " sh";
     collect.enabled = active.progress >= goal;
+    collect.details.push_back(CommissionDescription(sim, active) + ".");
+    collect.details.push_back("Progress: " + Num(active.progress) + " of " + Num(goal) + ".");
+    collect.details.push_back("Payment: " + Num(active.reward) + " sh into the purse.");
+    collect.details.push_back(collect.enabled
+                                  ? "Costs one action. The offer rotates afterwards."
+                                  : "The objective is not met yet; nothing to collect.");
     board.rows.push_back(collect);
     StationRow abandon;
     abandon.id = "commission-abandon";
     abandon.label = "Abandon commission and rotate offers";
-    abandon.cost = "1 action";
+    abandon.cost = kOneAction;
+    abandon.commit = "Abandon and rotate";
     abandon.confirm = "Abandon this commission? The reward will be lost.";
     abandon.enabled = true;
+    abandon.details.push_back("Give up the running commission and draw three fresh offers.");
+    abandon.details.push_back("The " + Num(active.reward) + " sh reward is lost.");
+    abandon.details.push_back("Costs one action.");
     board.rows.push_back(abandon);
   } else {
     board.notes.push_back(
@@ -156,48 +362,77 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
       row.id = "commission-accept:" + kind;
       row.label = "Accept: " + CommissionDescription(sim, *offer) + " - " +
                   Num(offer->reward) + " sh";
-      row.cost = "1 action";
+      row.cost = kOneAction;
+      row.commit = "Accept";
       row.enabled = true;
+      row.details.push_back("Repeatable commission: " + CommissionDescription(sim, *offer) + ".");
+      row.details.push_back("Objective: " + kind + ", " + Num(CommissionGoal(kind)) +
+                            " to complete.");
+      row.details.push_back("Payment: " + Num(offer->reward) + " sh at any station.");
+      row.details.push_back("Costs one action, and the board closes to other offers until it "
+                            "is collected or abandoned.");
       board.rows.push_back(row);
     }
   }
   { StationRow heading; heading.label = "Regular contracts"; heading.reading = true; board.rows.push_back(heading); }
   for (const Contract& contract : sim.World().contracts) {
-    auto statusIt = sim.State().contracts.find(contract.id);
-    const std::string status =
-        statusIt == sim.State().contracts.end() ? "available" : statusIt->second;
-    StationRow description;
-    description.label = contract.title + ": " + contract.note + " Reward " +
-                        Num(contract.reward) + " sh. [" + status + "]";
-    description.reading = true;
-    board.rows.push_back(description);
+    const std::string status = ContractStatus(sim, contract.id);
+    const bool eligible =
+        (contract.origin.empty() || contract.origin == sim.Map().here) &&
+        (contract.vol == 0 || used + reserved + contract.vol <= capacity) &&
+        (contract.goal != "passenger" ||
+         static_cast<double>(sim.Crew().size() + sim.Passengers().size()) <
+             sim.Ship().Berths());
+
+    StationRow row;
+    row.details.push_back("Contract: " + contract.title + ".");
+    row.details.push_back(contract.note);
+    row.details.push_back("Objective: " + contract.goal +
+                          (contract.target.empty() ? std::string() : " - " + contract.target) + ".");
+    if (contract.vol > 0) {
+      row.details.push_back("Freight: " + (contract.cargo.empty() ? std::string("consignment")
+                                                                  : contract.cargo) +
+                            ", " + Num(contract.vol) + " m3 of the hold, reserved while it runs.");
+    }
+    if (!contract.origin.empty()) { row.details.push_back("Offered only at: " + contract.origin + "."); }
+    row.details.push_back("Reward: " + Num(contract.reward) + " sh, collected at a station.");
+    row.details.push_back("Status: " + status + ".");
+
     if (status == "available" || status == "failed") {
-      const bool eligible =
-          (contract.origin.empty() || contract.origin == sim.Map().here) &&
-          (contract.vol == 0 ||
-           used + reserved + contract.vol <= capacity) &&
-          (contract.goal != "passenger" ||
-           static_cast<double>(sim.Crew().size() + sim.Passengers().size()) <
-               sim.Ship().Berths());
-      StationRow row;
       row.id = "contract-accept:" + contract.id;
       row.label = "Accept " + contract.title;
-      row.cost = "1 action";
+      row.cost = kOneAction;
+      row.commit = "Accept";
       row.enabled = eligible;
-      board.rows.push_back(row);
+      row.details.push_back(eligible ? "Costs one action; the button greys once it is taken."
+                                     : "Not eligible from this berth: origin, hold space or berths.");
     } else if (status == "ready") {
-      StationRow row;
       row.id = "contract-collect:" + contract.id;
       row.label = "Collect " + contract.title + " - " + Num(contract.reward) + " sh";
-      row.cost = "1 action";
+      row.cost = kOneAction;
+      row.commit = "Collect - " + Num(contract.reward) + " sh";
       row.enabled = true;
-      board.rows.push_back(row);
+      row.details.push_back("Costs one action; the reward goes into the purse.");
+    } else {
+      row.id = "contract-accept:" + contract.id;
+      row.label = "Accept " + contract.title;
+      row.cost = kDone;
+      row.commit = status == "complete" ? "Completed" : "Accepted";
+      row.enabled = false;
+      row.done = true;
+      row.details.push_back(status == "complete" ? "Already paid out; it cannot be taken again."
+                                                 : "Already taken; it cannot be accepted again.");
     }
+    board.rows.push_back(row);
   }
 
-  // ---- the yard ----------------------------------------------------------
+  // ---- 4. the shipyard and crew -------------------------------------------
   StationColumn yard;
+  yard.id = "yard";
   yard.title = "Shipyard and crew";
+  yard.badge = Num(purse) + " sh, hull " + Num(sim.StatValue("hull")) + "%";
+  yard.notes.push_back("Shiplets only: no action is spent and nothing is locked. A one-time "
+                       "refit, room or hire greys out once it is owned.");
   if (sim.State().shipClass == "wren") {
     yard.notes.push_back(
         "Your compact Wren: " + Num(capacity) + " m3 cargo, 6 berths. Trade up to the "
@@ -209,49 +444,106 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     StationRow ship;
     ship.id = "ship-buy";
     ship.label = "Buy larger ship SC Tessellate - 4,000 sh";
-    ship.cost = "1 action";
-    ship.enabled = purse >= 4000;
+    ship.cost = kFree;
+    ship.free = true;
+    ship.commit = "Buy - 4,000 sh";
+    ship.enabled = purse >= kLargeShip;
     ship.confirm =
         "Buy SC Tessellate for 4,000 shiplets? The crew, cargo, equipment, refits, tasks "
         "and voyage records transfer. This purchase is permanent.";
+    ship.details.push_back("Kestrel-series SC Tessellate: " +
+                           Num(sim.ShipCargoCapacity("kestrel", sim.CargoRefitLevel())) +
+                           " m3 with your refits, 14 berths, a larger deck plan.");
+    ship.details.push_back("Price: " + Num(kLargeShip) + " sh. Purse: " + Num(purse) + " sh.");
+    ship.details.push_back("Crew, cargo, active work, equipment, refits, condition and every "
+                           "voyage record transfer.");
+    ship.details.push_back("Permanent, and it costs no action: shiplets only.");
+    if (!ship.enabled) { ship.details.push_back("Not affordable from this purse."); }
     yard.rows.push_back(ship);
   } else {
     yard.notes.push_back("Your Kestrel-series ship: " + Num(capacity) + " m3 cargo, " +
                          Num(sim.Ship().Berths()) + " berths.");
+    StationRow ship;
+    ship.id = "ship-buy";
+    ship.label = "Buy larger ship SC Tessellate - 4,000 sh";
+    ship.cost = kDone;
+    ship.commit = "Owned";
+    ship.enabled = false;
+    ship.done = true;
+    ship.details.push_back("You are already flying the Kestrel-series SC Tessellate.");
+    ship.details.push_back("Hull: " + Num(capacity) + " m3 cargo, " + Num(sim.Ship().Berths()) +
+                           " berths.");
+    yard.rows.push_back(ship);
   }
 
   const double bay1 = sim.ShipCargoCapacity(sim.State().shipClass, 1);
   const double bay2 = sim.ShipCargoCapacity(sim.State().shipClass, 2);
   const auto upgrade = [&yard, purse](const std::string& id, const std::string& label,
-                                      double price, bool available) {
+                                      const std::string& what, double price, bool available,
+                                      bool ownedAlready) {
     StationRow row;
     row.id = "upgrade:" + id;
     row.label = label;
-    row.cost = "1 action";
-    row.enabled = available && purse >= price;
+    row.details.push_back(what);
+    row.details.push_back("Price: " + Num(price) + " sh. Purse: " + Num(purse) + " sh.");
+    if (ownedAlready) {
+      row.cost = kDone;
+      row.commit = "Owned";
+      row.enabled = false;
+      row.done = true;
+      row.details.push_back("Already fitted; it cannot be bought again.");
+    } else {
+      row.cost = kFree;
+      row.free = true;
+      row.commit = id == "scanner2" ? "Buy - 1,100 sh"
+                                    : "Buy - " + Num(price) + " sh";
+      row.enabled = available && purse >= price;
+      row.details.push_back("Shiplets only: no action, no cooldown.");
+      if (!row.enabled) {
+        row.details.push_back(available ? "Not affordable from this purse."
+                                        : "Not available yet: an earlier refit is required.");
+      }
+    }
     yard.rows.push_back(row);
   };
-  const auto hasUpgrade = [&sim](const std::string& id) {
-    auto it = sim.State().upgrades.find(id);
-    return it != sim.State().upgrades.end() && it->second;
-  };
-  upgrade("bay", "Expand cargo hold to " + Num(bay1) + " m3 - 500 sh", kBayOne,
-          !hasUpgrade("bay"));
-  upgrade("bay2", "Expand cargo hold to " + Num(bay2) + " m3 - 900 sh", kBayTwo,
-          hasUpgrade("bay") && !hasUpgrade("bay2"));
-  upgrade("drive", "Fit efficient drive: fuel use -20% - 900 sh", kDrive,
-          !hasUpgrade("drive"));
-  upgrade("rack", "Expand O2 rack to 15 - 400 sh", kRack, !hasUpgrade("rack"));
-  upgrade("scanner", "Upgrade sensors: scans take 3 + regional lock - 600 sh", kScanner,
-          !hasUpgrade("scanner"));
+  upgrade("bay", "Expand cargo hold to " + Num(bay1) + " m3 - 500 sh",
+          "Cargo refit 1: the hold grows to " + Num(bay1) + " m3.", kBayOne, true,
+          Owned(sim, "bay"));
+  upgrade("bay2", "Expand cargo hold to " + Num(bay2) + " m3 - 900 sh",
+          "Cargo refit 2: the hold grows to " + Num(bay2) + " m3. Needs refit 1 first.", kBayTwo,
+          Owned(sim, "bay"), Owned(sim, "bay2"));
+  upgrade("drive", "Fit efficient drive: fuel use -20% - 900 sh",
+          "Efficient drive: every crossing burns a fifth less fuel.", kDrive, true,
+          Owned(sim, "drive"));
+  upgrade("rack", "Expand O2 rack to 15 - 400 sh",
+          "O2 rack expansion: the canister rack holds 15.", kRack, true, Owned(sim, "rack"));
+  upgrade("scanner", "Upgrade sensors: scans take 3 + regional lock - 600 sh",
+          "Sensor upgrade: a scan costs 3 actions and the first locked entry opens, with "
+          "deep scans inside this region.",
+          kScanner, true, Owned(sim, "scanner"));
   upgrade("scanner2", "Fit deep-array sensors: full unlock + deep-region scans - 1,100 sh",
-          1100.0, hasUpgrade("scanner") && !hasUpgrade("scanner2"));
+          "Deep array: every locked survey entry opens, deep scans reach any region, and "
+          "survey data is worth a quarter more. Needs the sensor upgrade first.",
+          kScannerTwo, Owned(sim, "scanner"), Owned(sim, "scanner2"));
   {
+    const double hull = sim.StatValue("hull");
     StationRow row;
     row.id = "hull-service";
     row.label = "Station hull service (+50%) - 120 sh";
-    row.cost = "1 action";
-    row.enabled = sim.StatValue("hull") < 100 && purse >= kHullService;
+    row.cost = kFree;
+    row.free = true;
+    row.commit = "Buy service - " + Num(kHullService) + " sh";
+    row.enabled = hull < 100 && purse >= kHullService;
+    row.details.push_back("The yard patches the hull for half again its condition.");
+    row.details.push_back("Hull now: " + Num(hull) + "%. After service: " +
+                          Num(std::min(100.0, hull + 50.0)) + "%.");
+    row.details.push_back("Price: " + Num(kHullService) + " sh. Purse: " + Num(purse) + " sh.");
+    row.details.push_back("Repeatable while the hull is short and the purse allows it; it "
+                          "costs no action.");
+    if (!row.enabled) {
+      row.details.push_back(hull >= 100 ? "The hull is already whole; there is nothing to patch."
+                                        : "Not affordable from this purse.");
+    }
     yard.rows.push_back(row);
   }
 
@@ -266,59 +558,182 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
       StationRow row;
       row.id = "room-buy:" + room.id;
       row.label = "Install " + room.name + " - 500 sh";
-      row.cost = "1 action";
+      row.cost = kFree;
+      row.free = true;
+      row.commit = "Install - " + Num(Simulation::RoomPrice()) + " sh";
       row.enabled = model.docked && purse >= Simulation::RoomPrice();
       row.confirm = "Install " + room.name + " for 500 shiplets?";
+      row.details.push_back("Optional room: " + room.name + ".");
+      if (!room.tag.empty()) { row.details.push_back("Fitted as: " + room.tag + "."); }
+      row.details.push_back("Price: " + Num(Simulation::RoomPrice()) +
+                            " sh, added to the deck plan of the ship you are flying.");
+      row.details.push_back("Purse: " + Num(purse) + " sh. Shiplets only: no action.");
+      if (!row.enabled) { row.details.push_back("Needs a dock at this station and the price."); }
       yard.rows.push_back(row);
     }
   }
 
+  {
+    StationRow heading;
+    heading.label = "Hiring hall";
+    heading.reading = true;
+    yard.rows.push_back(heading);
+  }
   for (const CandidateDefinition& candidate : sim.World().candidates) {
     if (!candidate.port.empty() && candidate.port != portId) { continue; }
-    const std::string name = candidate.crew.name;
-    StationRow description;
-    description.label = name + ": " + candidate.crew.traits + "; health " +
-                        Num(candidate.crew.health) + "%, " +
-                        (candidate.crew.skill.empty() ? std::string("untrained")
-                                                      : candidate.crew.skill) + ".";
-    description.reading = true;
-    yard.rows.push_back(description);
+    const CrewDefinition& person = candidate.crew;
+    const std::string name = person.name;
+    const bool already = Hired(sim, person.id);
+    const bool berth = static_cast<double>(sim.Crew().size() + sim.Passengers().size()) <
+                       sim.Ship().Berths();
     StationRow row;
-    row.id = "hire:" + candidate.crew.id;
+    row.id = "hire:" + person.id;
     row.label = "Hire " + name + " - " + Num(candidate.fee) + " sh";
-    row.cost = "1 action";
-    const bool already = sim.State().hired.count(candidate.crew.id) != 0 &&
-                         sim.State().hired.at(candidate.crew.id);
-    row.enabled = !already &&
-                  static_cast<double>(sim.Crew().size() + sim.Passengers().size()) <
-                      sim.Ship().Berths() &&
-                  purse >= candidate.fee;
+    row.details.push_back(name + ": " + person.traits + "; health " + Num(person.health) + "%, " +
+                          (person.skill.empty() ? std::string("untrained") : person.skill) + ".");
+    row.details.push_back("Role: " + person.role + ". Fee: " + Num(candidate.fee) + " sh.");
+    row.details.push_back("Berths: " + Num(sim.Crew().size() + sim.Passengers().size()) +
+                          " of " + Num(sim.Ship().Berths()) + " filled.");
+    if (already) {
+      row.cost = kDone;
+      row.commit = "Hired";
+      row.enabled = false;
+      row.done = true;
+      row.details.push_back("Already signed aboard; the fee is not asked twice.");
+    } else {
+      row.cost = kFree;
+      row.free = true;
+      row.commit = "Hire - " + Num(candidate.fee) + " sh";
+      row.enabled = berth && purse >= candidate.fee;
+      row.details.push_back("Shiplets only: no action, no cooldown.");
+      if (!row.enabled) {
+        row.details.push_back(berth ? "Not affordable from this purse."
+                                    : "No berth free for another hand.");
+      }
+    }
     yard.rows.push_back(row);
   }
 
-  // ---- the tavern --------------------------------------------------------
+  // ---- 5. the tavern / bar -------------------------------------------------
   StationColumn tavern;
-  tavern.title = "Tavern and departure";
-  std::string tip = port == nullptr ? std::string() : port->tip;
-  if (tip.empty()) {
-    tip = model.portName == "Tolme Anchorage"
-              ? "A trader says the Coldwell Relay pays well for produce, but sells ore cheaply."
-              : "A trader says Tolme's market pays well for refined ore.";
-  }
-  model.tip = tip;
+  tavern.id = "tavern";
+  tavern.title = "Tavern / Bar";
+  tavern.badge = "the people at this station";
   tavern.notes.push_back(tip);
   tavern.notes.push_back("Station training only finishes while docked.");
+  tavern.notes.push_back("Talking costs one action, once per person; the button greys after "
+                         "the first word.");
+  {
+    const bool said = Talked(sim, "trader");
+    StationRow row;
+    row.id = "talk:trader";
+    row.label = "The trader at the bar";
+    row.commit = said ? "Spoken to" : "Talk";
+    row.cost = said ? kDone : kOneAction;
+    row.done = said;
+    row.enabled = !said && model.docked;
+    row.details.push_back("A dealer who works this berth and talks to anyone who buys a round.");
+    if (said) {
+      for (const std::string& line : TraderSpeech(sim, tip)) { row.details.push_back(line); }
+    } else {
+      row.details.push_back("Talking costs one action and reveals their trade tip and what the "
+                            "bar is saying about this region.");
+    }
+    tavern.rows.push_back(row);
+  }
+  for (const CandidateDefinition& candidate : sim.World().candidates) {
+    if (!candidate.port.empty() && candidate.port != portId) { continue; }
+    if (Hired(sim, candidate.crew.id)) { continue; }  // aboard now, not at the bar
+    const CrewDefinition& person = candidate.crew;
+    const bool said = Talked(sim, person.id);
+    StationRow row;
+    row.id = "talk:" + person.id;
+    row.label = person.name + " - " + person.role;
+    row.commit = said ? "Spoken to" : "Talk";
+    row.cost = said ? kDone : kOneAction;
+    row.done = said;
+    row.enabled = !said && model.docked;
+    row.details.push_back(person.name + ": " + person.traits + "; health " +
+                          Num(person.health) + "%, " +
+                          (person.skill.empty() ? std::string("untrained") : person.skill) + ".");
+    row.details.push_back("Waiting at this station; the hiring hall asks " +
+                          Num(candidate.fee) + " sh for them.");
+    if (said) {
+      for (const std::string& line : PatronSpeech(sim, candidate)) { row.details.push_back(line); }
+    } else {
+      row.details.push_back("Talking costs one action and reveals what they say about "
+                            "themselves and the rumor they are repeating.");
+    }
+    tavern.rows.push_back(row);
+  }
   {
     StationRow row;
     row.id = "undock";
-    row.label = kUndock;
-    row.cost = "1 action";
+    row.label = "Undock";
+    row.cost = kOneAction;
+    row.commit = "Undock";
     row.enabled = model.docked;
+    row.details.push_back("Leave the berth and stand off " + model.portName + ".");
+    row.details.push_back(model.docked ? "Docked here now; the station's counters close behind you."
+                                       : "Not docked at this station.");
+    row.details.push_back("Costs one action, as every departure does.");
     tavern.rows.push_back(row);
   }
 
   model.columns = {market, sales, board, yard, tavern};
+  NormalizeStationSelection(model, model.selection);
   return model;
+}
+
+// ---------------------------------------------------------------------------
+//  The selection
+// ---------------------------------------------------------------------------
+const StationColumn* FindStationCategory(const StationScreenModel& model,
+                                         const std::string& categoryId) {
+  for (const StationColumn& column : model.columns) {
+    if (column.id == categoryId) { return &column; }
+  }
+  return nullptr;
+}
+
+const StationRow* FindStationItem(const StationScreenModel& model,
+                                  const std::string& categoryId,
+                                  const std::string& itemId) {
+  const StationColumn* column = FindStationCategory(model, categoryId);
+  if (column == nullptr || itemId.empty()) { return nullptr; }
+  for (const StationRow& row : column->rows) {
+    if (row.id == itemId) { return &row; }
+  }
+  return nullptr;
+}
+
+void NormalizeStationSelection(const StationScreenModel& model, StationSelection& selection) {
+  if (model.columns.empty()) { selection.category.clear(); selection.item.clear(); return; }
+
+  const StationColumn* column = FindStationCategory(model, selection.category);
+  if (column == nullptr) {
+    // Nothing picked yet, or a card that is not on this station: open the first
+    // card that actually holds something to pick.
+    column = &model.columns.front();
+    for (const StationColumn& candidate : model.columns) {
+      bool hasItem = false;
+      for (const StationRow& row : candidate.rows) {
+        if (!row.reading && !row.id.empty()) { hasItem = true; break; }
+      }
+      if (hasItem) { column = &candidate; break; }
+    }
+    selection.category = column->id;
+    selection.item.clear();
+  }
+
+  if (FindStationItem(model, selection.category, selection.item) == nullptr) {
+    selection.item.clear();
+    for (const StationRow& row : column->rows) {
+      if (row.reading || row.id.empty()) { continue; }
+      selection.item = row.id;
+      break;
+    }
+  }
 }
 
 namespace {
@@ -352,12 +767,13 @@ bool PressStationActionRaw(Simulation& sim, const std::string& action,
   if (action == "commission-abandon") return sim.AbandonCommission();
   if (action == "hull-service") {
     if (sim.State().gameOver.size() != 0 || !sim.State().docked) return false;
-    if (sim.StatValue("hull") >= 100 || sim.State().shiplets < 120) return false;
-    sim.MutableState().shiplets -= 120;
+    if (sim.StatValue("hull") >= 100 || sim.State().shiplets < kHullService) return false;
+    sim.MutableState().shiplets -= kHullService;
     sim.ClampStat("hull", 50);
-    sim.PerformAction("Station repaired the hull");
+    sim.FreeCommit("Station repaired the hull");
     return true;
   }
+  if (action.compare(0, 5, "talk:") == 0) return sim.TalkToPatron(action.substr(5));
   if (action == "undock") return sim.Undock();
   (void)arg;
   return false;
@@ -366,12 +782,13 @@ bool PressStationActionRaw(Simulation& sim, const std::string& action,
 }  // namespace
 
 // ============================================================================
-//  The press, with the anti-spam lock around it (Phase 9).
+//  The press.
 //  ---------------------------------------------------------------------------
-//  One control is one control. The first press spends the action and starts the
-//  tier's lock in ACTION_COOLDOWN_RULES; a second press of the same button
-//  before another action resolves is refused, whether it comes from the window
-//  or from this harness. Free reads spend nothing and therefore lock nothing.
+//  This window starts no cooldown. The money-only counter refuses a press the
+//  moment the purse or the hold refuses it, and every row that does cost an
+//  action changes the state that makes a second press impossible: the lot is
+//  gone, the contract is taken, the patron has been spoken to, the berth is
+//  left. Nothing here can be pressed twice for one effect.
 // ============================================================================
 std::string StationActionCategory(const Simulation& sim, const std::string& action) {
   // commandRow chooses from the displayed label, except the larger-ship
@@ -390,10 +807,7 @@ std::string StationActionCategory(const Simulation& sim, const std::string& acti
 }
 
 bool PressStationAction(Simulation& sim, const std::string& action, const std::string& arg) {
-  return CommitActionButton(
-      sim, ActionCooldownKey(sim, "press:station:" + action + ":" + arg),
-      StationActionCategory(sim, action),
-      [&]() { return PressStationActionRaw(sim, action, arg); });
+  return PressStationActionRaw(sim, action, arg);
 }
 
 }  // namespace ship

@@ -107,6 +107,10 @@ class ShellView {
     std::string arg;
   };
 
+  // The station's own session view: which card is open and which item is
+  // picked. Choosing costs nothing, so it is kept here and not in the voyage.
+  StationSelection stationSelection_;
+
   struct ExteriorCallout {
     Area box;
     Vector2 anchor{};

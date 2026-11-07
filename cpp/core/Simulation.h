@@ -72,6 +72,11 @@ class Simulation {
   // A burst of work that is NOT an action: the filter bank's reward.
   void ProAction(double n);
 
+  // A transaction that is NOT an action either: the station's money-only
+  // counter. It moves shiplets and goods, writes its feed line, and leaves the
+  // clock, the world tick and every countdown exactly where they were.
+  void FreeCommit(const std::string& detail = std::string());
+
   // ---- commands that exist in Phase 1A -----------------------------------
   bool StartCanisterInstall(int slot);  // the player carries a canister over
   bool StartFilterBank();               // the player throws the switch
@@ -218,6 +223,10 @@ class Simulation {
   bool BuyGood(const std::string& goodId);
   bool SellGood(const std::string& lotId);
   bool SellSurvey(const std::string& recordId);
+  // The station bar: one action, once per patron, and the words they say are a
+  // read-out of the data they were authored with (see StationScreen.cpp).
+  bool TalkToPatron(const std::string& patronId);
+  std::string PatronName(const std::string& patronId) const;
   bool Jettison(const std::string& lotId);
   bool StartSalvage(int bay);
   bool PackageSurvey(const std::string& recordId);

@@ -510,30 +510,64 @@ int main() {
     sim.MutableState().shiplets = 10000;
     ship::OpenTask(sim, "station", "tolme", true);
     Frame(view, sim);
-    const auto salesHeading = FindText("Sell cargo and survey data");
-    const auto boardHeading = FindText("Mission board");
-    const auto yardHeading = FindText("Shipyard and crew");
-    const auto tavernHeading = FindText("Tavern and departure");
-    Require(std::abs(salesHeading.x - boardHeading.x) < 1 && boardHeading.y > salesHeading.y,
-            "Mission board is not stacked beneath sales in the middle column");
-    Require(std::abs(yardHeading.x - tavernHeading.x) < 1 && tavernHeading.y > yardHeading.y,
-            "Tavern is not stacked beneath the shipyard in the right column");
-    Require(yardHeading.x > boardHeading.x, "Station columns have the wrong order");
-    const auto fuel = std::find_if(texts.begin(), texts.end(), [](const auto& t) {
-      return t.text.find("Fuel cell") == 0;
-    });
-    Require(fuel != texts.end(), "Station purchase label not painted");
-    const auto point = *fuel;
+    // Three columns walked in one direction: five cards on the left, the open
+    // card's items in the middle, and the inspector with its one commit button
+    // on the right. Cards and items are free; the market's commit is money only.
+    const auto startsWith = [](const char* prefix, const char* missing) {
+      const auto it = std::find_if(texts.begin(), texts.end(), [&](const auto& t) {
+        return t.text.find(prefix) == 0;
+      });
+      Require(it != texts.end(), missing);
+      return *it;
+    };
+    const auto marketCard = startsWith("Market - purse", "the Market card did not paint");
+    const auto salesCard = startsWith("Sell cargo and survey data", "the sales card did not paint");
+    const auto boardCard = startsWith("Mission board", "the mission board card did not paint");
+    const auto yardCard = startsWith("Shipyard and crew", "the shipyard card did not paint");
+    const auto tavernCard = startsWith("Tavern / Bar", "the tavern card did not paint");
+    Require(std::abs(salesCard.x - marketCard.x) < 1 && std::abs(boardCard.x - marketCard.x) < 1 &&
+            std::abs(yardCard.x - marketCard.x) < 1 && std::abs(tavernCard.x - marketCard.x) < 1,
+            "The five station cards are not in one column");
+    Require(salesCard.y > marketCard.y && boardCard.y > salesCard.y && yardCard.y > boardCard.y &&
+            tavernCard.y > yardCard.y,
+            "The station cards are not stacked in their own order");
+    const auto fuel = startsWith("Fuel cell", "the market items did not paint");
+    Require(fuel.x > marketCard.x, "The market's items are not in the middle column");
+    const auto commit = startsWith("Buy - 45 sh", "the inspector commit button did not paint");
+    Require(commit.x > fuel.x, "The inspector's commit button is not in the right column");
     const double beforeBuy = sim.ActionCount();
-    view.Click(sim, point.x + 2, point.y + 2, ship::HitButton::Left, 0);
+    const double cellsBefore = sim.State().fuelCells;
+    view.Click(sim, yardCard.x + 2, yardCard.y + 2, ship::HitButton::Left, 0);
     Frame(view, sim);
-    Require(sim.ActionCount() == beforeBuy + 1, "Native station click failed to buy");
-    FindText("COOLDOWN 5");
+    Require(sim.ActionCount() == beforeBuy, "Opening a station card spent an action");
+    Require(startsWith("Buy larger ship", "the yard items did not open").x > marketCard.x, "The yard's items did not open");
+    view.Click(sim, marketCard.x + 2, marketCard.y + 2, ship::HitButton::Left, 0);
+    Frame(view, sim);
+    Require(sim.ActionCount() == beforeBuy, "Returning to the market card spent an action");
+    const auto fuelItem = startsWith("Fuel cell", "the market items did not paint");
+    view.Click(sim, fuelItem.x + 2, fuelItem.y + 2, ship::HitButton::Left, 0);
+    Frame(view, sim);
+    Require(sim.ActionCount() == beforeBuy, "Picking a station item spent an action");
+    const auto buyNow = startsWith("Buy - 45 sh", "the inspector commit button did not paint");
+    view.Click(sim, buyNow.x + 2, buyNow.y + 2, ship::HitButton::Left, 0);
+    Frame(view, sim);
+    Require(sim.ActionCount() == beforeBuy, "A market purchase spent an action");
+    Require(sim.State().fuelCells == cellsBefore + 1, "Native station click failed to buy");
+    const auto buyAgain = startsWith("Buy - 45 sh", "the inspector commit button did not paint");
+    view.Click(sim, buyAgain.x + 2, buyAgain.y + 2, ship::HitButton::Left, 0);
+    Frame(view, sim);
+    Require(sim.State().fuelCells == cellsBefore + 2 && sim.ActionCount() == beforeBuy,
+            "The money-only counter closed after one purchase");
+    // A station row that does cost an action still marks the clock in HTA green.
+    view.Click(sim, salesCard.x + 2, salesCard.y + 2, ship::HitButton::Left, 0);
+    Frame(view, sim);
+    const auto sellCommit = startsWith("Sell - ", "the sales commit button did not paint");
+    view.Click(sim, sellCommit.x + 2, sellCommit.y + 2, ship::HitButton::Left, 0);
+    Frame(view, sim);
+    Require(sim.ActionCount() == beforeBuy + 1, "Selling a lot did not spend one action");
     Require(std::any_of(rects.begin(), rects.end(), [](const auto& r) {
       return r.color.r == 126 && r.color.g == 198 && r.color.b == 63 && r.w == 11 && r.h == 2;
     }), "HTA 654–659 action mark is not the green 11 by 2 bar");
-    view.Click(sim, point.x + 2, point.y + 2, ship::HitButton::Left, 0);
-    Require(sim.ActionCount() == beforeBuy + 1, "Locked station row remained clickable");
 
     sim.FindCrew("jax")->health = 25;
     sim.FindCrew("jax")->morale = 55;
@@ -704,13 +738,24 @@ int main() {
       ship::OpenTask(check, "station", "tolme", true);
       const auto actions = check.ActionCount();
       const auto locatePurchase = [&]() {
+        // The yard card opens the middle column, the item opens the inspector,
+        // and the inspector's own button is what the confirmation hangs off.
         for (int i = 0; i < 100; ++i) {
           Frame(shell, check);
+          const auto card = std::find_if(texts.begin(), texts.end(), [](const auto& t) {
+            return t.text.find("Shipyard") == 0; });
+          Require(card != texts.end(), "Shipyard card is missing");
+          const float cardX = card->x, cardY = card->y;   // texts refill every frame
+          shell.Click(check, cardX + 2, cardY + 2, ship::HitButton::Left, 0);
+          Frame(shell, check);
           const auto c = shell.LayoutNow().content;
-          const auto it = std::find_if(texts.begin(), texts.end(), [](const auto& t) { return t.text.find("Buy larger ship") == 0; });
-          Require(it != texts.end(), "Permanent ship purchase is missing");
-          if (it->y >= c.y + 20 && it->y < c.Bottom() - 180) return *it;
-          shell.Scroll(c.x + 20, c.y + 20, it->y >= c.Bottom() - 180 ? -1 : 1);
+          // Opening the card picks its first item, the larger ship, so the
+          // inspector's own button is what the confirmation hangs off.
+          const auto commit = std::find_if(texts.begin(), texts.end(), [&](const auto& t) {
+            return t.text.find("Buy - 4,000 sh") == 0 && t.x > cardX; });
+          Require(commit != texts.end(), "Ship purchase commit button is missing");
+          if (commit->y >= c.y + 20 && commit->y < c.Bottom() - 180) return *commit;
+          shell.Scroll(c.x + 20, c.y + 20, commit->y >= c.Bottom() - 180 ? -1 : 1);
         }
         throw std::runtime_error("Could not scroll to permanent ship purchase");
       };
@@ -727,7 +772,7 @@ int main() {
       Frame(shell, check);
       const auto yes = FindText("Yes, do it");
       shell.Click(check, yes.x + 2, yes.y + 2, ship::HitButton::Left, 0);
-      Require(check.ActionCount() == actions + 1 && check.State().shipClass == "kestrel", "Pinned confirmation lost the original purchase dispatcher");
+      Require(check.ActionCount() == actions && check.State().shipClass == "kestrel", "Pinned confirmation lost the original purchase dispatcher");
       Frame(shell, check);
       RequireMark(yes.x + 2, yes.y + 2);
     }
@@ -1103,7 +1148,7 @@ int main() {
     Require(view.Panel() == ship::TitlePanel::Settings && textureCalls == 1,
             "Options replaced the title image instead of opening a sheet over it");
     ImGui::DestroyContext();
-    std::cout << "PASS: real Draw.cpp scroll direction, windowed Assignments, Vessel input/clamp, green action/air fills, visible station cooldown, source health colours/live values, literal engine pipe, screen-space green click mark/glow after scrolling, pinned/centered measured action bands at 1180/1280, independent feed wheel/drag/wrap/clamp plus timestamp/reset, centered fixed machine/crew scenes with panel reflow, measured chart height and wide centering, preserved purchase confirmation, free-click feedback/rise/fade, four dark title menus, title art retained behind Options; source crew relocation/corridor drift, life-info routing, crew/event GONE rendering, map-label and moving-ring selection, active-tab glow/reduced-motion, new/existing background-tab reveal; general text >=18px; compact scaled Home info\n";
+    std::cout << "PASS: real Draw.cpp scroll direction, windowed Assignments, Vessel input/clamp, green action/air fills, station card/item/inspector walk with money-only purchases, source health colours/live values, literal engine pipe, screen-space green click mark/glow after scrolling, pinned/centered measured action bands at 1180/1280, independent feed wheel/drag/wrap/clamp plus timestamp/reset, centered fixed machine/crew scenes with panel reflow, measured chart height and wide centering, preserved purchase confirmation, free-click feedback/rise/fade, four dark title menus, title art retained behind Options; source crew relocation/corridor drift, life-info routing, crew/event GONE rendering, map-label and moving-ring selection, active-tab glow/reduced-motion, new/existing background-tab reveal; general text >=18px; compact scaled Home info\n";
     return 0;
   } catch (const std::exception& error) {
     std::cerr << "draw probe: " << error.what() << '\n'; return 1;

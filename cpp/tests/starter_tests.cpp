@@ -74,10 +74,11 @@ TEST_CASE("every optional room can be bought exactly once at a station", "[start
     CHECK(offered);
     auto sim = initial;
     const auto money = sim.State().shiplets;
+    const auto actions = sim.ActionCount();
     REQUIRE(ship::PressStationAction(sim, "room-buy:" + room.id));
     CHECK(sim.HasRoom(room.id));
     CHECK(sim.State().shiplets == money - 500);
-    CHECK(sim.ActionCount() == 1);
+    CHECK(sim.ActionCount() == actions);   // the yard trades in shiplets alone
     CHECK_FALSE(sim.BuyRoom(room.id));
     CHECK(ship::OpenTask(sim, "room", room.id, true));
     std::string error;

@@ -491,7 +491,7 @@ ScreenKind ScreenKindFor(const Tab& tab) {
 }
 
 TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
-                               const WikiView& wiki) {
+                               const WikiView& wiki, StationSelection* station) {
   if (!DescribeTargetExists(sim, tab.kind, tab.id)) {
     return BuildDescribedScreen(sim, DescribeTarget(sim, tab.kind, tab.id));
   }
@@ -588,35 +588,101 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       return screen;
     }
     case ScreenKind::Station: {
-      const StationScreenModel station = BuildStationScreen(sim, tab.id);
+      // Three columns walked in one direction. Nothing here binds a cooldown:
+      // the station's own state is what stops a second press.
+      StationSelection picked;
+      if (station != nullptr) { picked = *station; }
+      const StationScreenModel model = BuildStationScreen(sim, tab.id);
+      NormalizeStationSelection(model, picked);
+      if (station != nullptr) { *station = picked; }
+
       TaskScreenModel screen;
-      screen.head = station.head;
-      screen.panelColumns = {0, 1, 1, 2, 2};
-      for (const StationColumn& column : station.columns) {
-        NavPanel panel;
-        panel.id = "station-panel";
-        panel.title = column.title;
-        for (const std::string& note : column.notes) { panel.Dim(note); }
-        screen.panels.push_back(panel);
-        std::vector<CommandRowView> rows;
-        std::vector<std::string> ids;
-        for (const StationRow& row : column.rows) {
+      screen.head = model.head;
+      screen.panelColumns = {0, 1, 2};
+
+      // ---- left: the five category cards, free to open --------------------
+      NavPanel cards;
+      cards.id = "station-cards";
+      cards.title = model.portName;
+      cards.Dim("Choose a card, then an item, then commit. Reading and choosing are free.");
+      cards.Dim(model.holdLine);
+      screen.panels.push_back(cards);
+      std::vector<CommandRowView> cardRows;
+      std::vector<std::string> cardIds;
+      for (const StationColumn& column : model.columns) {
+        CommandRowView view;
+        view.label = column.title;
+        view.title = column.badge;
+        view.enabled = true;
+        view.live = true;
+        view.plain = true;       // the cards are list lines, not buttons
+        view.hideCost = true;    // and they carry no badge: choosing is free
+        view.selected = column.id == picked.category;
+        cardRows.push_back(view);
+        cardIds.push_back("station-cat:" + column.id);
+      }
+      screen.panelRows.push_back(cardRows);
+      screen.panelRowIds.push_back(cardIds);
+
+      // ---- middle: only what the open card holds, free to pick ------------
+      const StationColumn* open = FindStationCategory(model, picked.category);
+      NavPanel items;
+      items.id = "station-items";
+      items.title = open == nullptr ? model.portName : open->title;
+      if (open != nullptr) {
+        if (!open->badge.empty()) { items.Dim(open->badge); }
+        for (const std::string& note : open->notes) { items.Dim(note); }
+      }
+      screen.panels.push_back(items);
+      std::vector<CommandRowView> itemRows;
+      std::vector<std::string> itemIds;
+      if (open != nullptr) {
+        for (const StationRow& row : open->rows) {
           CommandRowView view;
           view.label = row.label;
-          view.cost = row.cost;
-          view.displayCost = row.cost.empty() ? "1 action" : row.cost;
-          view.enabled = row.enabled;
-          view.live = row.enabled;
-          view.confirm = row.confirm;
           view.reading = row.reading;
-          BindCommandCooldown(sim, view, ActionCooldownKey(sim, "press:station:" + row.id + ":"),
-                              StationActionCategory(sim, row.id));
-          rows.push_back(view);
-          ids.push_back(row.id);
+          view.enabled = !row.reading;   // picking is free, even for a greyed commit
+          view.live = row.enabled;       // a greyed commit reads muted in the list
+          view.plain = !row.reading;     // list lines, not buttons
+          view.hideCost = true;          // the cost lives in the inspector, not here
+          view.selected = !row.reading && row.id == picked.item;
+          itemRows.push_back(view);
+          itemIds.push_back(row.reading ? std::string() : "station-item:" + row.id);
         }
-        screen.panelRows.push_back(rows);
-        screen.panelRowIds.push_back(ids);
       }
+      screen.panelRows.push_back(itemRows);
+      screen.panelRowIds.push_back(itemIds);
+
+      // ---- right: the inspector, and the one commit button ----------------
+      const StationRow* item =
+          open == nullptr ? nullptr : FindStationItem(model, picked.category, picked.item);
+      NavPanel inspector;
+      inspector.id = "station-inspector";
+      inspector.title = item == nullptr ? "Inspector" : "Inspector and commit";
+      if (item == nullptr) {
+        inspector.Dim("Pick an item in the middle column to read it and commit.");
+      } else {
+        inspector.Field("Item", item->label);
+        inspector.Field("Cost", item->free ? "Shiplets only" : "One action");
+        for (const std::string& line : item->details) { inspector.Note(line); }
+      }
+      screen.panels.push_back(inspector);
+      std::vector<CommandRowView> commitRows;
+      std::vector<std::string> commitIds;
+      if (item != nullptr) {
+        CommandRowView view;
+        view.label = item->commit.empty() ? item->label : item->commit;
+        view.cost = item->cost;
+        view.hideCost = true;            // one simple button, no badge
+        view.title = item->label;
+        view.confirm = item->confirm;
+        view.enabled = item->enabled;
+        view.live = item->enabled;
+        commitRows.push_back(view);
+        commitIds.push_back(item->id);
+      }
+      screen.panelRows.push_back(commitRows);
+      screen.panelRowIds.push_back(commitIds);
       return screen;
     }
     case ScreenKind::Cargo:

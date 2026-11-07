@@ -108,8 +108,11 @@ struct CommandRowView {
   std::string confirm;      // asked first when the reader keeps confirmations on
   bool actionCost = true;
   bool reading = false;     // non-interactive text interleaved with command rows
+  bool selected = false;    // the station's open card / picked item: marked, not pressed
   bool coolingDown = false;
   double remaining = 0.0;
+  bool plain = false;     // a list line, not a button: no box, no border
+  bool hideCost = false;  // no cost badge at all: the button is just a button
 };
 
 // A row the player can press, with the id the press path answers to. The
@@ -285,8 +288,14 @@ bool PressInfoAction(Simulation& sim, const std::string& target);
 
 // The handbook needs its session view (the search text and the selection), so
 // the builder takes it as an argument rather than reaching into the shell.
+// The station needs its own session view for the same reason: which card is
+// open and which item is picked. It is a pointer because the builder writes
+// the normalised selection back (an item that has just been sold cannot stay
+// picked); callers that only read a screen leave it null and get the default.
+struct StationSelection;  // ui/StationScreen.h
 TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
-                               const WikiView& wiki = WikiView());
+                               const WikiView& wiki = WikiView(),
+                               StationSelection* station = nullptr);
 
 Vignette BuildVignette(const Simulation& sim, const std::string& roomId);
 

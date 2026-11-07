@@ -127,6 +127,8 @@ std::vector<Probe> StationProbes() {
   for (const ship::StationColumn& column : model.columns) {
     for (const ship::StationRow& row : column.rows) {
       if (!row.enabled || row.reading) { continue; }
+      // The station's money-only counter: no action, so nothing to lock.
+      if (row.free) { continue; }
       if (!ship::IsActionCost(row.cost, !row.cost.empty())) { continue; }
       Probe probe;
       probe.screen = "Station " + column.title;
@@ -449,7 +451,8 @@ TEST_CASE("a running task's button is inert until it is acknowledged", "[phase9]
   CHECK(sim.ActionCount() == actions);
 }
 
-TEST_CASE("station purchases display the same five-action lock that dispatch enforces", "[audit][station][cooldown]") {
+TEST_CASE("station purchases are money only: no action, no lock, the counter stays open",
+          "[audit][station][cooldown]") {
   auto sim = Rich();
   REQUIRE(ship::OpenTask(sim, "station", "tolme", true));
   const auto fuelRow = [&]() {
@@ -463,25 +466,42 @@ TEST_CASE("station purchases display the same five-action lock that dispatch enf
     return ship::CommandRowView{};
   };
   REQUIRE(fuelRow().enabled);
+  CHECK(fuelRow().cost == "0 actions");
+  CHECK(fuelRow().hideCost);
+  CHECK(fuelRow().remaining == 0);
   const auto before = sim.ActionCount();
+  const auto cells = sim.State().fuelCells;
   REQUIRE(ship::PressStationAction(sim, "buy-fuel"));
+  CHECK(sim.ActionCount() == before);            // no action spent
+  CHECK(sim.State().fuelCells == cells + 1);
+  CHECK(sim.State().actionCooldowns.empty());    // no lock started
+  CHECK(fuelRow().enabled);                      // the counter is still open
+  // Rebuilding/reading a screen must never tick the action clock.
+  for (int read = 0; read < 12; ++read) { CHECK(fuelRow().remaining == 0); }
+  const char* others[] = {"buy-repair", "buy-medkit", "buy-canister", "buy-rations"};
+  for (int i = 0; i < 4; ++i) {
+    REQUIRE(ship::PressStationAction(sim, others[i]));
+    CHECK(sim.ActionCount() == before);
+    CHECK(sim.State().actionCooldowns.empty());
+    CHECK(fuelRow().enabled);
+    REQUIRE(ship::PressStationAction(sim, "buy-fuel"));
+  }
+  CHECK(sim.State().fuelCells == cells + 5);
+  CHECK(sim.ActionCount() == before);
+
+  // A station row that does cost an action is stopped by the state it changed:
+  // the lot is gone, so the second press has nothing to sell and spends nothing.
+  const auto purse = sim.State().shiplets;
+  REQUIRE(ship::PressStationAction(sim, "sell:lot-audit-1"));
   CHECK(sim.ActionCount() == before + 1);
-  CHECK(fuelRow().remaining == 5);
-  CHECK(fuelRow().displayCost == "COOLDOWN 5");
+  CHECK(sim.State().shiplets > purse);
+  CHECK(sim.State().actionCooldowns.empty());
+  CHECK_FALSE(ship::PressStationAction(sim, "sell:lot-audit-1"));
+  CHECK(sim.ActionCount() == before + 1);
+
+  // The purse is what closes the market, and it closes it without a lock.
+  sim.MutableState().shiplets = 10;
   CHECK_FALSE(fuelRow().enabled);
   CHECK_FALSE(ship::PressStationAction(sim, "buy-fuel"));
   CHECK(sim.ActionCount() == before + 1);
-  // Rebuilding/reading a screen must never tick the action clock.
-  for (int read = 0; read < 12; ++read) { CHECK(fuelRow().remaining == 5); }
-  const char* others[] = {"buy-repair", "buy-medkit", "buy-canister", "buy-rations", "sell:ore"};
-  for (int i = 0; i < 5; ++i) {
-    REQUIRE(ship::PressStationAction(sim, others[i]));
-    CHECK(fuelRow().remaining == 4 - i);
-    CHECK(fuelRow().coolingDown == (i < 4));
-    CHECK(fuelRow().enabled == (i == 4));
-    if (i < 4) { CHECK_FALSE(ship::PressStationAction(sim, "buy-fuel")); }
-  }
-  REQUIRE(ship::PressStationAction(sim, "buy-fuel"));
-  CHECK(fuelRow().displayCost == "COOLDOWN 5");
-  CHECK(sim.ActionCount() == before + 7);
 }

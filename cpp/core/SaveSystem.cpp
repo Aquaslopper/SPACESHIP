@@ -279,6 +279,10 @@ std::string Simulation::SaveJson() const {
   for (const auto& entry : state_.hired) { hired[entry.first] = entry.second; }
   s["hired"] = hired;
 
+  Json talked = Json::object();
+  for (const auto& entry : state_.talked) { talked[entry.first] = entry.second; }
+  s["talked"] = talked;
+
   s["gameOver"] = state_.gameOver;
   root["state"] = s;
 
@@ -1066,6 +1070,12 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     readBoolMap(s.at("pendingOrders"), &state_.pendingOrders);
     readBoolMap(s.at("upgrades"), &state_.upgrades);
     readBoolMap(s.at("hired"), &state_.hired);
+    // Optional: a save written before the station bar existed has no tally,
+    // and an absent tally simply means nobody has been spoken to yet.
+    state_.talked.clear();
+    if (auto talkedIt = s.find("talked"); talkedIt != s.end()) {
+      readBoolMap(*talkedIt, &state_.talked);
+    }
     readBoolMap(s.at("spOpen"), &state_.spOpen);
     readBoolMap(s.at("freshTabs"), &state_.freshTabs);
 
