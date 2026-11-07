@@ -4,8 +4,6 @@ Welcome to the spaceship, we continue our work on the C++ port, as always. The H
 - Separate changes approved from changes agents made without approval, inherited comments, completion claims, constants, and test names: **suspect evidence requiring confirmation**.
 - Keep changes minimal and focused.
 - Do not change existing tests merely to make them pass. Add or update relevant tests when a code change warrants it, and preserve the intent of the existing regression and parity checks.
-- Treat `tests/parity/` scripts as behavioral evidence.
-- Do not hand-edit generated catalogue data in `assets/data/`. When reference content changes, use the documented `node tools/export-data.cjs` workflow and verify it with `node tools/export-data.cjs --check`.
 - Do not modify or replace authored artwork under `assets/` unless the request specifically authorizes it. Follow the documented asset-generation workflows where applicable.
 - Preserve historical LEGACY CODE investigation material under `rescue/`; do not edit or delete it unless explicitly requested.
 - Do not commit build output or temporary artifacts. Use the documented build and test commands, and report exactly which checks were run and any that could not be run.
