@@ -312,6 +312,8 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
     if (taskTabKey_ != sim.State().activeTab) {
       pendingConfirm_.clear();
       pendingAction_.clear();
+      // Another window is being described: the station's walk starts over.
+      stationSelection_ = StationSelection();
     }
     taskTabKey_ = sim.State().activeTab;
     const Tab* activeTab = FindTab(sim.State(), taskTabKey_);
@@ -320,7 +322,7 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
       taskScreen_ = navScreen_.screen;
       PaintNavScreen(sim);
     } else {
-      taskScreen_ = BuildTabScreen(sim, *activeTab, wiki_);
+      taskScreen_ = BuildTabScreen(sim, *activeTab, wiki_, &stationSelection_);
       if (screenQuarters_) {
         quarters_ = BuildQuartersScreen(sim);
         PaintQuartersScreen(sim);
@@ -2157,7 +2159,23 @@ bool ShellView::PressPanelRow(Simulation& sim, ScreenKind kind, const std::strin
   switch (kind) {
     case ScreenKind::System: return PressSystemAction(sim, id);
     case ScreenKind::Info: return PressInfoAction(sim, id);
-    case ScreenKind::Station: return PressStationAction(sim, id, "");
+    case ScreenKind::Station: {
+      // The first two columns only choose; the third column commits. Choosing
+      // costs nothing, so it neither spends an action nor locks a control.
+      if (id.compare(0, 12, "station-cat:") == 0) {
+        const std::string card = id.substr(12);
+        if (stationSelection_.category != card) {
+          stationSelection_.category = card;
+          stationSelection_.item.clear();
+        }
+        return true;
+      }
+      if (id.compare(0, 13, "station-item:") == 0) {
+        stationSelection_.item = id.substr(13);
+        return true;
+      }
+      return PressStationAction(sim, id, "");
+    }
     case ScreenKind::Cargo:
     case ScreenKind::Science: return PressStoresAction(sim, id, "");
     case ScreenKind::Room: return PressRoomAction(sim, id, "");
@@ -2763,10 +2781,19 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
         const Area box{x + inset, y, rowW, rowH};
         DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
                       static_cast<int>(box.w), static_cast<int>(box.h),
-                      ToRay(row.enabled ? (grouped ? p.control : p.panel2) : p.panel3));
+                      ToRay(row.selected ? p.panel3
+                                         : (row.enabled ? (grouped ? p.control : p.panel2)
+                                                        : p.panel3)));
         DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
                            static_cast<int>(box.w), static_cast<int>(box.h),
-                           ToRay(row.enabled ? p.borderDark : p.border));
+                           ToRay(row.selected ? p.coffeeLight
+                                              : (row.enabled ? p.borderDark : p.border)));
+        if (row.selected) {
+          // The open card and the picked item are marked with a coffee bar down
+          // their left edge, so the walk card -> item -> inspector is visible.
+          DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y), 3,
+                        static_cast<int>(box.h), ToRay(p.coffee));
+        }
         float textTop = box.y + 6.0f;
         for (const auto& line : m.lines) {
           Text(line.c_str(), static_cast<int>(box.x + 6.0f), static_cast<int>(textTop), TypePx(10), ToRay(row.enabled ? p.ink : p.muted));

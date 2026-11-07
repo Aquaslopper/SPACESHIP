@@ -241,6 +241,16 @@ void Simulation::PerformAction(const std::string& detail) {
   if (state_.gameOver.empty()) { CheckCommendations(); }
 }
 
+void Simulation::FreeCommit(const std::string& detail) {
+  // The counter, the yard and the hiring hall trade in shiplets alone: nothing
+  // here advances the clock, so nothing here wears the engine, feeds the crew,
+  // moves a task or starts a countdown. A commendation a purchase earns is
+  // still handed over on the spot, as PerformAction would.
+  if (!state_.gameOver.empty()) { return; }
+  if (!detail.empty()) { LogLine(detail + "."); }
+  CheckCommendations();
+}
+
 void Simulation::TickWorld() {
   // The order below is normative; see the header comment.
   WearEngine();

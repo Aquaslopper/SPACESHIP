@@ -51,7 +51,7 @@ bool Simulation::BuyRoom(const std::string& id) {
   const std::string name = room->name;
   rooms_.push_back(*room);
   state_.shiplets -= RoomPrice();
-  PerformAction("Installed " + name);
+  FreeCommit("Installed " + name);
   return true;
 }
 
@@ -87,7 +87,7 @@ bool Simulation::BuyLargerShip() {
   ApplyShipLayout();
 
   SimRemember("Work", "The crew transferred from SC Wren to SC Tessellate at " + portName + ".");
-  PerformAction("Commissioned SC Tessellate");
+  FreeCommit("Commissioned SC Tessellate");
   return true;
 }
 

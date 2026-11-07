@@ -1,13 +1,25 @@
 // ============================================================================
 //  StationScreen.h — the port window (Section M).
 //  ---------------------------------------------------------------------------
-//  "Browse freely. Each transaction, contract or departure costs one action."
-//  Looking at a market row, reading a contract or sizing up a hire costs
-//  nothing; every command row is one action, and the row's own enabled flag is
-//  the whole rule (purse, hold, berths, a dock that is still there).
+//  Three columns, walked in one direction: a category card on the left, the
+//  things that category holds in the middle, and everything about the one thing
+//  the reader picked — plus its single commit button — on the right.
 //
-//  Same three columns as the reference: buy on the left, sell and the mission
-//  board in the middle, the yard, the hiring hall and the tavern on the right.
+//  Reading and choosing are free. Committing is not one rule but two:
+//
+//    Market, Shipyard and crew   shiplets only. No action, no cooldown. The
+//                                button stays live while the purse and the
+//                                hold/rack allow it, and greys out when they
+//                                do not, or once a one-time thing is owned.
+//    Cargo and survey data       pays shiplets, costs one action. The lot is
+//                                gone afterwards, so the row cannot repeat.
+//    Mission board               starts the mission, costs one action. The
+//                                button greys out the moment it is accepted.
+//    Tavern / Bar                talking costs one action, once per person;
+//                                the button greys out after the first word.
+//
+//  Nothing on this window carries an action cooldown: the state the commit
+//  itself changes is what stops a second press, not a lock on the button.
 // ============================================================================
 #pragma once
 
@@ -21,22 +33,38 @@
 
 namespace ship {
 
-// One row in a station column: a command, or a piece of plain reading.
+// One row in the middle column: a thing the reader can pick, or plain reading.
 struct StationRow {
   std::string id;        // the press id: "buy-fuel", "sell:<lot>", "contract:<id>"
-  std::string label;
-  std::string cost;      // "1 action", "free", "done"
+  std::string label;     // the middle-column item, price included
+  std::string cost;      // "0 actions", "1 action", "done"
   std::string note;      // the small line under a contract or a hire
   std::string confirm;   // the question asked first when confirmations are on
-  bool enabled = false;
-  bool reading = false;  // a note, not a button
+  bool enabled = false;  // the commit button on the right is live
+  bool reading = false;  // a note, not an item: nothing to pick, nothing to press
   bool live = false;
+
+  // ---- the far-right inspector ------------------------------------------
+  std::string commit;                 // the one button's own label
+  std::vector<std::string> details;   // everything known about this one item
+  bool free = false;    // shiplets only: no action is spent, no lock is started
+  bool done = false;    // owned, hired, sold, accepted or already spoken to
 };
 
+// One category card on the left, and the items it opens in the middle.
 struct StationColumn {
+  std::string id;      // "market", "sales", "board", "yard", "tavern"
   std::string title;
+  std::string badge;   // the card's own second line: the purse, the tally
   std::vector<std::string> notes;
   std::vector<StationRow> rows;
+};
+
+// Which card is open and which item is picked. The renderer owns it: choosing
+// costs nothing and is not part of the voyage, so it is not saved.
+struct StationSelection {
+  std::string category;
+  std::string item;
 };
 
 struct StationScreenModel {
@@ -44,18 +72,35 @@ struct StationScreenModel {
   std::string portId;
   std::string portName;
   std::string tip;
-  std::vector<StationColumn> columns;  // Market | Sales + Board | Yard + Crew + Tavern
+  std::vector<StationColumn> columns;  // Market | Sales | Board | Yard | Tavern
   std::string purseLine;
   std::string holdLine;
   bool docked = false;
+
+  // The selection as this frame resolves it, after normalisation: an item that
+  // has been sold or a card that no longer exists cannot stay picked.
+  StationSelection selection;
 };
 
 StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& portId);
-std::string StationActionCategory(const Simulation& sim, const std::string& action);
 
-// The press path. Every accepted command spends exactly one action through the
-// simulation's own economy calls.
+// Clamps a stored selection to what the model actually offers, and picks the
+// first item of the first card when nothing (or nothing valid) is picked yet.
+void NormalizeStationSelection(const StationScreenModel& model, StationSelection& selection);
+
+const StationColumn* FindStationCategory(const StationScreenModel& model,
+                                         const std::string& categoryId);
+const StationRow* FindStationItem(const StationScreenModel& model,
+                                  const std::string& categoryId,
+                                  const std::string& itemId);
+
+// The press path. Money-only rows spend shiplets and nothing else; the rows
+// that cost an action spend exactly one, through the simulation's own calls.
 bool PressStationAction(Simulation& sim, const std::string& action,
                         const std::string& arg = std::string());
+
+// What the rule table would have chosen for this row, kept for the audit that
+// reads the station's labels; the station itself starts no cooldown.
+std::string StationActionCategory(const Simulation& sim, const std::string& action);
 
 }  // namespace ship
