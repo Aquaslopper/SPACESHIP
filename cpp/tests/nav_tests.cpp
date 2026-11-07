@@ -518,6 +518,32 @@ TEST_CASE("Navigation opens from the taskbar and routes to the chart", "[nav]") 
 // ---------------------------------------------------------------------------
 //  The gate: a whole voyage, driven through the screen's own press path
 // ---------------------------------------------------------------------------
+TEST_CASE("a docked ship plots and starts its crossing without undocking first",
+          "[nav][travel]") {
+  ship::Simulation sim = Fresh();
+  REQUIRE(ship::PressNavAction(sim, "select", "tolme"));
+  REQUIRE(ship::PressNavAction(sim, "travel"));       // the crossing to the port
+  while (sim.FindOngoing("travel")->state == "running") {
+    sim.MutableLife().canisters = 6;
+    sim.MutableMess().rack = 10;
+    REQUIRE(sim.StandWatch());
+  }
+  REQUIRE(sim.Acknowledge("travel"));
+  REQUIRE(sim.Dock());
+  CHECK(sim.State().docked);
+  // The owner's rule: the berth is never a cage. Selecting the way back and
+  // committing leaves the berth inside the same departure.
+  REQUIRE(ship::PressNavAction(sim, "select", "kessler"));
+  const ship::NavScreenModel plotted = ship::BuildNavScreen(sim);
+  REQUIRE(Button(plotted.screen, "travel") != nullptr);
+  CHECK(Button(plotted.screen, "travel")->state == ship::ButtonState::Idle);
+  const double actions = sim.ActionCount();
+  REQUIRE(ship::PressNavAction(sim, "travel"));
+  CHECK_FALSE(sim.State().docked);
+  CHECK(sim.ActionCount() == actions + 1);   // one departure, one action
+  CHECK(sim.FindOngoing("travel") != nullptr);
+}
+
 TEST_CASE("a voyage crosses, docks and scans through the navigation screen",
           "[nav][opening]") {
   ship::Simulation sim = Fresh();

@@ -456,7 +456,19 @@ bool Simulation::StartTravel() {
   const Body* body = FindBodyById(*state_.navTarget);
   if (body == nullptr || !InRange(*body) || AtTarget(*body)) { return false; }
   if (FindOngoing("travel") != nullptr || FindOngoing("extract") != nullptr) { return false; }
-  if (state_.docked || state_.engineCondition <= 0 || StatValue("energy") <= 0) { return false; }
+  if (state_.engineCondition <= 0 || StatValue("energy") <= 0) { return false; }
+  // Docking never blocks a crossing. A ship that plots a jump from a berth
+  // leaves the berth as part of the same departure: no second action, no
+  // refusal, the location readout follows.
+  if (state_.docked) {
+    const Port* port = HerePort();
+    state_.docked = false;
+    if (port != nullptr) {
+      for (InfoRow& row : infos_) {
+        if (row.id == "location") { row.value = port->name + " - undocked"; }
+      }
+    }
+  }
 
   const NavMetrics metrics = MetricsFor(*body);
   if (StatValue("fuel") < metrics.fuel) { return false; }
