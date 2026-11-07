@@ -666,19 +666,6 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     }
     tavern.rows.push_back(row);
   }
-  {
-    StationRow row;
-    row.id = "undock";
-    row.label = "Undock";
-    row.cost = kOneAction;
-    row.commit = "Undock";
-    row.enabled = model.docked;
-    row.details.push_back("Leave the berth and stand off " + model.portName + ".");
-    row.details.push_back(model.docked ? "Docked here now; the station's counters close behind you."
-                                       : "Not docked at this station.");
-    row.details.push_back("Costs one action, as every departure does.");
-    tavern.rows.push_back(row);
-  }
 
   model.columns = {market, sales, board, yard, tavern};
   NormalizeStationSelection(model, model.selection);
@@ -774,7 +761,6 @@ bool PressStationActionRaw(Simulation& sim, const std::string& action,
     return true;
   }
   if (action.compare(0, 5, "talk:") == 0) return sim.TalkToPatron(action.substr(5));
-  if (action == "undock") return sim.Undock();
   (void)arg;
   return false;
 }
