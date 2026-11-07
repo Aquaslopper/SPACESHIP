@@ -10,12 +10,17 @@
 // ============================================================================
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cmath>
+#include <map>
+#include <set>
 #include <string>
 #include <vector>
 
 #include "core/Simulation.h"
 #include "data/Catalog.h"
+#include "core/JsNumber.h"
+#include "data/ChartExpansion.h"
 #include "ui/NavScreen.h"
 #include "ui/Shell.h"
 #include "ui/Widgets.h"
@@ -192,9 +197,13 @@ TEST_CASE("three layers, each remembering its own view", "[nav]") {
   ship::Simulation sim = Fresh();
   CHECK(sim.Map().layer == "system");
 
+  std::size_t kesslerBodies = 0;
+  for (const ship::Body& body : sim.World().bodies) {
+    if (sim.World().BodySystem(body) == sim.CurrentSystemId()) { ++kesslerBodies; }
+  }
   const ship::NavChartView system = ship::BuildNavChart(sim);
   CHECK(system.layer == "system");
-  CHECK(system.bodies.size() == 8);
+  CHECK(system.bodies.size() == kesslerBodies);
   CHECK(system.scaleText == "Kessler System - System - zoom x1.0");
 
   // Looking is free, and a layer keeps its own selection.
@@ -222,7 +231,11 @@ TEST_CASE("every body is drawn at its own size, with its label on the right side
           "[nav]") {
   ship::Simulation sim = Fresh();
   const ship::NavChartView chart = ship::BuildNavChart(sim);
-  REQUIRE(chart.bodies.size() == 8);
+  std::size_t localBodies = 0;
+  for (const ship::Body& body : sim.World().bodies) {
+    if (sim.World().BodySystem(body) == sim.CurrentSystemId()) { ++localBodies; }
+  }
+  REQUIRE(chart.bodies.size() == localBodies);
 
   const ship::NavBodyView* origin = Body(chart, "kessler");
   REQUIRE(origin != nullptr);
@@ -255,9 +268,12 @@ TEST_CASE("every body is drawn at its own size, with its label on the right side
   CHECK(station->labelY == 199);
 
   // System and region sizes, on their own scales.
+  // The sector chart holds every charted system: no region filter, no sensor
+  // filter. A filter here is what hid most of the galaxy behind a button.
   sim.SetLayer("sector");
   const ship::NavChartView sector = ship::BuildNavChart(sim);
-  CHECK(sector.bodies.size() == 8);
+  CHECK(sector.bodies.size() == sim.World().systems.size());
+  CHECK(sector.bodies.size() > 150u);
   const ship::NavBodyView* kesslerSystem = Body(sector, "sec-kessler");
   REQUIRE(kesslerSystem != nullptr);
   CHECK(kesslerSystem->size == 18);
@@ -266,10 +282,15 @@ TEST_CASE("every body is drawn at its own size, with its label on the right side
 
   sim.SetLayer("galaxy");
   const ship::NavChartView galaxy = ship::BuildNavChart(sim);
-  CHECK(galaxy.bodies.size() == 7);
+  // Seven regions, and every star inside them: the third scale draws the same
+  // systems the other two do, at their galaxy positions.
+  CHECK(galaxy.bodies.size() == sim.World().regions.size() + sim.World().systems.size());
   const ship::NavBodyView* core = Body(galaxy, "gal-core");
   REQUIRE(core != nullptr);
   CHECK(core->size == 22);
+  const ship::NavBodyView* starInGalaxy = Body(galaxy, "sec-vance");
+  REQUIRE(starInGalaxy != nullptr);
+  CHECK(starInGalaxy->size == 10);  // one point of light, not a system-sized orb
   CHECK(core->classes == "mapdot mapdot-region");
   CHECK(galaxy.scaleText == "Galaxy - zoom x1.0");
 }
@@ -386,8 +407,14 @@ TEST_CASE("a reachable target reads out distance, transit and cost", "[nav]") {
   REQUIRE(sim.SelectTarget("gal-inner"));
   const ship::NavScreenModel region = ship::BuildNavScreen(sim);
   CHECK(HasText(*Panel(region.screen.left, "nav-status"), "Current region"));
+  // Inner Rim keeps its authored eight and gains the generated systems of its
+  // own region, so the count is read off the voyage's chart rather than fixed.
+  std::size_t innerSystems = 0;
+  for (const ship::Body& system : sim.World().systems) {
+    if (system.region == "gal-inner") { ++innerSystems; }
+  }
   CHECK(Line(*Panel(region.screen.under, "nav-details"), "Systems")->value ==
-        "8 navigable");
+        std::to_string(innerSystems) + " navigable");
   CHECK(HasCommand(region.screen, "View Inner Rim sector chart"));
 }
 
@@ -675,4 +702,204 @@ TEST_CASE("powered work pauses without energy while other work and the action cl
   CHECK(sim.FindOngoing("travel")->left == 3);
   CHECK(sim.FindOngoing("scan")->left == 3);
   CHECK(sim.FindOngoing("maint")->left == 2);
+}
+
+// ---------------------------------------------------------------------------
+//  The grown chart
+//  ---------------------------------------------------------------------------
+//  Owner report, 2026-11-07: "the nav screen and the planets are fake - I want
+//  to see them and not let a filter hide them; more stars and more systems."
+//  The authored catalogue packs 48 systems into seven shared positions (41 of
+//  them stacked six deep), and both the sector and the galaxy scale filtered
+//  their bodies by region. These cases hold the grown chart to what it promises.
+TEST_CASE("the charted galaxy is grown once, deterministically, and every system owns its dot",
+          "[nav][chart][expansion]") {
+  const ship::Catalog& authored = World();
+
+  ship::Simulation first = ship::Simulation::NewVoyage(authored);
+  const ship::Catalog& grown = first.World();
+
+  // Every region is expanded, and nothing authored is lost.
+  CHECK(grown.regions.size() == authored.regions.size());
+  CHECK(grown.systems.size() ==
+        authored.systems.size() +
+            static_cast<std::size_t>(ship::kNewSystemsPerRegion) * authored.regions.size());
+  CHECK(grown.bodies.size() > authored.bodies.size());
+  CHECK(grown.ports.size() > authored.ports.size());
+
+  // The authored rows survive byte for byte by id and name...
+  for (const ship::Body& body : authored.bodies) {
+    const ship::Body* kept = grown.FindBody(body.id);
+    REQUIRE(kept != nullptr);
+    CHECK(kept->name == body.name);
+    CHECK(kept->type == body.type);
+  }
+
+  // ...and the reference hangs together after the growth.
+  CHECK(grown.Validate().empty());
+
+  // The bug this replaces: six systems on one dot, five of them unreachable by
+  // the mouse. No two systems may share a position now.
+  {
+    std::map<std::string, std::string> dots;  // "x,y" -> the system that owns it
+    std::string clash;
+    for (const ship::Body& system : grown.systems) {
+      const std::string key = ship::js::NumToString(system.x) + "," + ship::js::NumToString(system.y);
+      auto it = dots.find(key);
+      if (it != dots.end()) { clash = it->second + " and " + system.id; break; }
+      dots[key] = system.id;
+    }
+    INFO(clash);
+    CHECK(clash.empty());
+  }
+
+  // A generated system is a real destination: its own star, at least two local
+  // bodies, a lane to a neighbour in its own region.
+  std::size_t generated = 0;
+  for (const ship::Body& system : grown.systems) {
+    if (system.id.rfind("sec-gen-", 0) != 0) { continue; }
+    ++generated;
+    CHECK(grown.FindRegion(system.region) != nullptr);
+    REQUIRE_FALSE(system.entry.empty());
+    const ship::Body* entry = grown.FindBody(system.entry);
+    REQUIRE(entry != nullptr);
+    CHECK(entry->type == "star");
+    CHECK(grown.BodySystem(*entry) == system.id);
+    std::size_t local = 0;
+    for (const ship::Body& body : grown.bodies) {
+      if (grown.BodySystem(body) == system.id) { ++local; }
+    }
+    CHECK(local >= 2);
+    bool linked = false;
+    for (const ship::Lane& lane : grown.sectorLanes) {
+      if (lane.from != system.id && lane.to != system.id) { continue; }
+      const std::string other = lane.from == system.id ? lane.to : lane.from;
+      const ship::Body* peer = grown.FindSystem(other);
+      if (peer != nullptr && peer->region == system.region) { linked = true; }
+    }
+    CHECK(linked);
+  }
+  CHECK(generated > 0u);
+
+  // Deterministic: a second voyage grows the same sky, and growing a grown
+  // catalogue is a no-op (a restart must not multiply the galaxy).
+  ship::Simulation second = ship::Simulation::NewVoyage(authored);
+  REQUIRE(second.World().systems.size() == grown.systems.size());
+  REQUIRE(second.World().bodies.size() == grown.bodies.size());
+  for (std::size_t i = 0; i < grown.systems.size(); ++i) {
+    CHECK(second.World().systems[i].id == grown.systems[i].id);
+    CHECK(second.World().systems[i].x == grown.systems[i].x);
+    CHECK(second.World().systems[i].y == grown.systems[i].y);
+  }
+  ship::Simulation again = ship::Simulation::NewVoyage(first.World());
+  CHECK(again.World().systems.size() == grown.systems.size());
+  CHECK(again.World().bodies.size() == grown.bodies.size());
+
+  // The system chart keeps the reference's board; the sector chart is the wide
+  // one the galaxy is laid out on, and the authored crossings still cost the
+  // same because the authored systems only moved.
+  CHECK(first.Map().w == 638);
+  CHECK(first.Map().h == 278);
+  first.SetLayer("sector");
+  CHECK(first.Map().w > 638);
+  CHECK(first.Map().h > 278);
+  const ship::Body* kesslerAuthored = authored.FindSystem("sec-kessler");
+  const ship::Body* kesslerGrown = grown.FindSystem("sec-kessler");
+  REQUIRE(kesslerAuthored != nullptr);
+  REQUIRE(kesslerGrown != nullptr);
+  CHECK((kesslerGrown->x - kesslerAuthored->x) == 638.0);
+  CHECK((kesslerGrown->y - kesslerAuthored->y) == 278.0);
+
+  // ---- every system is a system, not a diagram of one --------------------
+  // The reference gives a system five local bodies; the growth gives each one
+  // worlds of its own, on rings, so the local chart has something to show.
+  std::size_t thinnest = 999;
+  for (const ship::Body& system : grown.systems) {
+    std::size_t local = 0;
+    for (const ship::Body& body : grown.bodies) {
+      if (grown.BodySystem(body) == system.id) { ++local; }
+    }
+    thinnest = std::min(thinnest, local);
+    // ...and the summary says what the chart holds.
+    bool claimed = false;
+    for (const auto& detail : system.details) {
+      if (detail.first == "Charted bodies" && detail.second == std::to_string(local)) {
+        claimed = true;
+      }
+    }
+    INFO(system.id);
+    CHECK(claimed);
+  }
+  CHECK(thinnest >= 15u);
+
+  // ---- the galaxy scale has stars on it ----------------------------------
+  // Every system is placed inside its region's cluster, so the third layer is
+  // the same two hundred stars the other two layers draw.
+  CHECK(grown.galaxyPositions.size() == grown.systems.size());
+  {
+    std::set<std::string> dots;
+    std::string clash;
+    for (const ship::Body& system : grown.systems) {
+      const auto it = grown.galaxyPositions.find(system.id);
+      REQUIRE(it != grown.galaxyPositions.end());
+      CHECK(it->second.first >= 0.0);
+      CHECK(it->second.first <= grown.map.w);
+      CHECK(it->second.second >= 0.0);
+      CHECK(it->second.second <= grown.map.h);
+      const std::string key = ship::js::NumToString(it->second.first) + "," +
+                              ship::js::NumToString(it->second.second);
+      if (!dots.insert(key).second) { clash = system.id; }
+    }
+    INFO(clash);
+    CHECK(clash.empty());
+  }
+}
+
+TEST_CASE("no filter hides a body, and a body out of sensor range is still on the chart",
+          "[nav][chart][expansion]") {
+  ship::Simulation sim = Fresh();
+  const ship::Catalog& world = sim.World();
+
+  // The system scale shows every local body of the system the ship is in - the
+  // ones it cannot scan included.
+  std::size_t local = 0;
+  for (const ship::Body& body : world.bodies) {
+    if (world.BodySystem(body) == sim.CurrentSystemId()) { ++local; }
+  }
+  const ship::NavChartView system = ship::BuildNavChart(sim);
+  CHECK(system.bodies.size() == local);
+  std::size_t systemOutOfRange = 0;
+  for (const ship::NavBodyView& body : system.bodies) {
+    if (!body.inRange) { ++systemOutOfRange; }
+  }
+  CHECK(systemOutOfRange == 0u);  // this scale is the ship's own system
+
+  // The sector scale shows the whole galaxy: every system, in every region,
+  // with its own position - not the seven of the region being read.
+  sim.SetLayer("sector");
+  const ship::NavChartView sector = ship::BuildNavChart(sim);
+  CHECK(sector.bodies.size() == world.systems.size());
+  std::size_t regions = 0;
+  std::vector<std::string> seenRegions;
+  for (const ship::NavBodyView& body : sector.bodies) {
+    if (std::find(seenRegions.begin(), seenRegions.end(), body.region) == seenRegions.end()) {
+      seenRegions.push_back(body.region);
+    }
+  }
+  regions = seenRegions.size();
+  CHECK(regions == world.regions.size());
+  // ...and there is sky behind it, on every scale.
+  CHECK(sector.clusters.size() > 500u);
+
+  // A local body in another system is on the system chart of *that* system, and
+  // answers "out of sensor range" when asked from here - visible, still refused
+  // its numbers.
+  sim.SetLayer("system");
+  const ship::NavChartView home = ship::BuildNavChart(sim);
+  for (const ship::NavBodyView& body : home.bodies) { CHECK(body.id != "vance-star"); }
+  REQUIRE(sim.SelectTarget("vance-star"));
+  const ship::NavScreenModel far = ship::BuildNavScreen(sim);
+  CHECK(HasText(*Panel(far.screen.left, "nav-status"), "Out of sensor range"));
+  CHECK(far.screen.progress.size() >= 1);
+  CHECK(sim.ActionCount() == 0);
 }

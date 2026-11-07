@@ -13,6 +13,7 @@
 #pragma once
 
 #include <filesystem>
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -55,6 +56,24 @@ class Catalog {
   Counts counts;
 
   MapGeometry map;
+
+  // The board each scale is drawn on. The system chart keeps the reference's
+  // 638x278 board exactly; ChartExpansion() widens the sector board so every
+  // system can own a position instead of six of them sharing one dot. A layer
+  // with no entry here is drawn on `map`.
+  std::map<std::string, MapGeometry> layerBoards;
+
+  // Set by ExpandChart(). The chart is grown once per catalogue, so a voyage
+  // started from an already-grown catalogue (or restarted from its own copy)
+  // does not grow a second galaxy.
+  bool chartExpanded = false;
+
+  // Where each system sits on the galaxy board (ChartExpansion::PlaceGalaxyDots).
+  // A system has one position, in its own region's cluster; the galaxy scale
+  // reads this, the sector scale reads Body::x/y. Empty until the chart is
+  // grown, and a system missing here is simply not drawn on the galaxy scale.
+  std::map<std::string, std::pair<double, double>> galaxyPositions;
+
   DeckPlan wren;
   DeckPlan kestrel;
   // ROOM_SCENES, by room id. Authored, never computed.
@@ -76,6 +95,18 @@ class Catalog {
   std::vector<Port> ports;
   std::vector<Good> goods;
   std::vector<Contract> contracts;
+
+  // The reference builds the chart from these tables rather than shipping the
+  // result (see data/GalaxyGen.h). They are authored data, exported as-is:
+  //   portPrices  PORT_PRICES: trade profile -> commodity kind -> multiplier
+  //   portHints   PORT_HINTS: trade profile -> the line appended to a port's tip
+  //   orbitalWorlds / orbitalPlanetNames / orbitalMoonNames: the local-chart
+  //               pass's four profiles and its two name tables, in order.
+  std::map<std::string, std::map<std::string, double>> portPrices;
+  std::map<std::string, std::string> portHints;
+  std::vector<OrbitalWorld> orbitalWorlds;
+  std::vector<std::string> orbitalPlanetNames;
+  std::vector<std::string> orbitalMoonNames;
 
   std::vector<std::string> taskTypes;
   std::vector<std::string> layerOrder;               // system, sector, galaxy

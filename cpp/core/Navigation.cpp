@@ -66,14 +66,34 @@ bool Simulation::AtTarget(const Body& body) const {
 }
 
 const Body* Simulation::HomeBody() const {
-  // Position at the current map scale, not the region being browsed.
+  // Position at the current map scale, not the region being browsed. The
+  // sector chart paints every system, so the ship's own system is always on it
+  // whether or not it belongs to the region being read.
   const Body* system = CurrentSystem();
   if (map_.layer == "system") { return FindBodyById(map_.here); }
-  if (map_.layer == "sector") {
-    if (system != nullptr && system->region == map_.sector) { return system; }
-    return nullptr;
-  }
+  if (map_.layer == "sector") { return system; }
   return system == nullptr ? nullptr : FindBodyById(system->region);
+}
+
+void Simulation::ApplyChartBoard() {
+  const MapGeometry& authored = catalog_.map;
+  auto it = catalog_.layerBoards.find(map_.layer);
+  const MapGeometry& board = it == catalog_.layerBoards.end() ? authored : it->second;
+  map_.w = board.w;
+  map_.h = board.h;
+  map_.cx = board.cx;
+  map_.cy = board.cy;
+  map_.vw = board.w;
+  map_.vh = board.h;
+  map_.zmin = board.zmin;
+  map_.zmax = board.zmax;
+  map_.zstep = board.zstep;
+  map_.grid = board.grid;
+  map_.vpy = board.vpy;
+  map_.rungs = board.rungs;
+  map_.rungPow = board.rungPow;
+  map_.pxPerAction = board.pxPerAction;
+  map_.lyPerAction = board.lyPerAction;
 }
 
 std::vector<const Body*> Simulation::CurBodies() const {
@@ -89,9 +109,9 @@ std::vector<const Body*> Simulation::CurBodies() const {
     }
     return out;
   }
-  for (const Body& body : catalog_.systems) {
-    if (body.region == map_.sector) { out.push_back(&body); }
-  }
+  // Every charted system, not only the ones inside the region being read. A
+  // filter here is what made the galaxy look like seven dots.
+  for (const Body& body : catalog_.systems) { out.push_back(&body); }
   return out;
 }
 
@@ -106,6 +126,7 @@ void Simulation::SetLayer(const std::string& key) {
   old.sel = state_.navTarget.value_or(std::string());
 
   map_.layer = key;
+  ApplyChartBoard();
   LayerView& fresh = views_[key];
   map_.zoom = fresh.zoom;
   state_.navTarget = fresh.sel.empty() ? std::optional<std::string>() : std::optional<std::string>(fresh.sel);

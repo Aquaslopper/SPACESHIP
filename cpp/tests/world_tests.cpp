@@ -97,9 +97,9 @@ TEST_CASE("the chart is complete and consistent", "[world]") {
 
 TEST_CASE("every system is reachable on a full tank", "[world]") {
   ship::Simulation sim = Fresh();
-  for (const ship::Body& from : World().systems) {
+  for (const ship::Body& from : sim.World().systems) {
     sim.MutableMap().here = from.entry;
-    for (const ship::Body& to : World().systems) {
+    for (const ship::Body& to : sim.World().systems) {
       const double distance = sim.MetricsFor(to).dist;
       if (from.id == to.id) {
         REQUIRE(distance == 0);
@@ -116,7 +116,7 @@ TEST_CASE("a jump costs fuel and an action, and arrival waits for a click", "[wo
   sim.MutableMap().layer = "sector";
   REQUIRE(sim.SelectTarget("sec-vance"));
 
-  const ship::Body* vance = World().FindSystem("sec-vance");
+  const ship::Body* vance = sim.World().FindSystem("sec-vance");
   REQUIRE(vance != nullptr);
   const double distance = sim.MetricsFor(*vance).dist;
   const double fuel = sim.StatValue("fuel");
@@ -142,7 +142,7 @@ TEST_CASE("a jump costs fuel and an action, and arrival waits for a click", "[wo
 
 TEST_CASE("the efficient drive saves fuel and no travel time", "[world]") {
   ship::Simulation sim = Fresh();
-  const ship::Body* destination = World().FindSystem("sec-vance");
+  const ship::Body* destination = sim.World().FindSystem("sec-vance");
   REQUIRE(destination != nullptr);
   const ship::Simulation::NavMetrics normal = sim.MetricsFor(*destination);
 
@@ -156,7 +156,7 @@ TEST_CASE("the efficient drive saves fuel and no travel time", "[world]") {
 
 TEST_CASE("a navigator saves fuel and never time, and only when free", "[world]") {
   ship::Simulation sim = Fresh();
-  const ship::Body* destination = World().FindSystem("sec-vance");
+  const ship::Body* destination = sim.World().FindSystem("sec-vance");
   REQUIRE(destination != nullptr);
   const double plain = sim.MetricsFor(*destination).fuel;
 
@@ -250,7 +250,9 @@ TEST_CASE("commissions are deterministic and never point at the current port", "
   REQUIRE(commission.reward == 450);
   REQUIRE(commission.origin == "tolme");
   REQUIRE(commission.target != "tolme");
-  REQUIRE(World().FindPort(commission.target) != nullptr);
+  // The port the commission names is on the voyage's chart, which is the grown
+  // one; the authored catalogue alone no longer knows every station.
+  REQUIRE(sim.World().FindPort(commission.target) != nullptr);
 
   // Delivering on it completes the objective, and it pays once.
   sim.CommissionProgress("visit", commission.target);

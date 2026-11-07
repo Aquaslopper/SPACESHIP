@@ -248,6 +248,13 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
   catalog.map.pxPerAction = Number(map, "pxPerAction", "chart.json/map", 16);
   catalog.map.lyPerAction = Number(map, "lyPerAction", "chart.json/map", 0.42);
 
+  // Every scale is drawn on the authored board until ExpandChart() widens the
+  // sector one. Keeping the entry here means a catalogue that is never expanded
+  // still answers for all three layers.
+  for (const std::string& layer : catalog.layerOrder) {
+    catalog.layerBoards[layer] = catalog.map;
+  }
+
   for (const Json& region : Field(chart, "galaxyBodies", "chart.json")) {
     catalog.regions.push_back(ReadBody(region, "chart.json/galaxyBodies"));
   }
@@ -278,8 +285,38 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     catalog.ports.push_back(port);
   }
 
-  for (const Json& good : Field(chart, "market", "chart.json")) {
-    Good g;
+  // ---- the tables the generator reads ------------------------------------
+  // BUILD reads these before it builds anything (see data/GalaxyGen.h):
+  // PORT_PRICES, PORT_HINTS, ORBITAL_WORLDS and the two name tables. They are
+  // authored, so they stay data; only the chart is computed from them.
+  const Json& prices = Field(chart, "portPrices", "chart.json");
+  for (auto it = prices.begin(); it != prices.end(); ++it) {
+    if (!it.value().is_object()) { continue; }
+    for (auto p = it.value().begin(); p != it.value().end(); ++p) {
+      catalog.portPrices[it.key()][p.key()] = p.value().get<double>();
+    }
+  }
+  const Json& hints = Field(chart, "portHints", "chart.json");
+  for (auto it = hints.begin(); it != hints.end(); ++it) {
+    catalog.portHints[it.key()] = it.value().get<std::string>();
+  }
+  for (const Json& world : Field(chart, "orbitalWorlds", "chart.json")) {
+    OrbitalWorld profile;
+    profile.id = Text(world, "id", "chart.json/orbitalWorlds");
+    profile.label = Text(world, "label", "chart.json/orbitalWorlds");
+    profile.atmosphere = Text(world, "atmo", "chart.json/orbitalWorlds");
+    profile.scan = Text(world, "scan", "chart.json/orbitalWorlds");
+    profile.locked = Text(world, "locked", "chart.json/orbitalWorlds");
+    catalog.orbitalWorlds.push_back(std::move(profile));
+  }
+  for (const Json& name : Field(chart, "orbitalPlanetNames", "chart.json")) {
+    catalog.orbitalPlanetNames.push_back(name.get<std::string>());
+  }
+  for (const Json& name : Field(chart, "orbitalMoonNames", "chart.json")) {
+    catalog.orbitalMoonNames.push_back(name.get<std::string>());
+  }
+
+  for (const Json& good : Field(chart, "market", "chart.json")) {    Good g;
     g.id = Text(good, "id", "chart.json/market");
     g.name = Text(good, "name", "chart.json/market");
     g.kind = Text(good, "kind", "chart.json/market");
@@ -632,16 +669,25 @@ std::vector<std::string> Catalog::Validate() const {
     }
   }
 
-  // ---- every body sits on the drawing board ------------------------------
-  for (const std::vector<Body>* layer : {&regions, &systems, &bodies}) {
-    for (const Body& b : *layer) {
-      if (b.x < 0 || b.x > map.w || b.y < 0 || b.y > map.h) {
-        std::ostringstream out;
-        out << b.id << " is off the chart board (" << b.x << "," << b.y << ")";
-        problems.push_back(out.str());
-      }
+  // ---- every body sits on the drawing board of its own scale --------------
+  // The layers share one coordinate space per scale, not one space overall:
+  // the system chart is the reference's 638x278 board, while the sector board
+  // is the wider one ExpandChart() lays the galaxy out on.
+  const auto boardFor = [this](const std::string& layer) -> const MapGeometry& {
+    auto it = layerBoards.find(layer);
+    return it == layerBoards.end() ? map : it->second;
+  };
+  const auto inBoard = [](const Body& b, const MapGeometry& board,
+                          std::vector<std::string>& problems, const char* scale) {
+    if (b.x < 0 || b.x > board.w || b.y < 0 || b.y > board.h) {
+      std::ostringstream out;
+      out << b.id << " is off the " << scale << " chart board (" << b.x << "," << b.y << ")";
+      problems.push_back(out.str());
     }
-  }
+  };
+  for (const Body& b : regions) { inBoard(b, boardFor("galaxy"), problems, "galaxy"); }
+  for (const Body& b : systems) { inBoard(b, boardFor("sector"), problems, "sector"); }
+  for (const Body& b : bodies) { inBoard(b, boardFor("system"), problems, "system"); }
 
   // ---- systems: known region, and a local entry body ---------------------
   for (const Body& system : systems) {

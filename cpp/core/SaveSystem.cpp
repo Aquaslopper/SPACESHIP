@@ -1260,6 +1260,10 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
       }
       views_[layer] = view;
     }
+    // The board is a property of the catalogue, not of the file: a save written
+    // before the sector chart widened still loads onto the board the chart is
+    // drawn on now. ApplyChartBoard() leaves the saved zoom alone.
+    ApplyChartBoard();
 
     events_.clear();
     for (const Json& event : d.at("events")) {
