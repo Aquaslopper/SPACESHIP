@@ -63,4 +63,5 @@ Do not write any code or perform any tasks until you have output the answers:
 2. What happens when you assume the code without verification?
 3. Who is the owner of this game?
 4. The rescue files are available for historical context, explain why.
+5. Explain the problem with "commentary in code" and agents form arena.ai?
 
