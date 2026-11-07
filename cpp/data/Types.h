@@ -257,8 +257,8 @@ struct ShipContactProfileDef {
 
 struct SpaceMapRules {
   std::uint32_t version = 1;
-  // Optional hard totals remain unset. Phase 4's default generator instead
-  // applies its documented one-mirror growth policy, never a 50x star-count guess.
+  // Optional hard totals remain unset. Phase 4 applies the deterministic
+  // population policy in Navigation.cpp; it is separate from layer dimensions.
   std::optional<std::uint32_t> targetRegions;
   std::optional<std::uint32_t> targetSystems;
   std::optional<std::uint32_t> targetStarBodies;
