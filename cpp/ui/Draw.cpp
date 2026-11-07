@@ -2717,9 +2717,10 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
   };
   const auto measureRow = [&](const CommandRowView& row, float rowW) {
     RowMetrics m;
-    m.cost = row.displayCost.empty() ? "free" : row.displayCost;
-    m.badgeW = TextWidth(m.cost.c_str(), TypePx(9)) + 12.0f;
-    m.inlineCost = grouped && !row.reading && rowW >= m.badgeW + 112.0f;
+    m.cost = row.hideCost ? std::string()
+                          : (row.displayCost.empty() ? "free" : row.displayCost);
+    m.badgeW = m.cost.empty() ? 0.0f : TextWidth(m.cost.c_str(), TypePx(9)) + 12.0f;
+    m.inlineCost = grouped && !row.reading && (m.cost.empty() || rowW >= m.badgeW + 112.0f);
     const float labelW = std::max(1.0f, rowW - 12.0f - (m.inlineCost ? m.badgeW + 8.0f : 0.0f));
     m.lines = WrapText(row.label, labelW, TypePx(10), SelectFont(TypePx(10), false));
     m.height = row.reading ? m.lines.size() * theme_.LineHeight() + 6.0f
@@ -2779,6 +2780,27 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
         }
         const float rowH = m.height;
         const Area box{x + inset, y, rowW, rowH};
+        if (row.plain) {
+          // A list line, not a button: nothing behind it except the mark of the
+          // open card or the picked item, so the walk stays visible.
+          if (row.selected) {
+            DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                          static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel3));
+            DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y), 3,
+                          static_cast<int>(box.h), ToRay(p.coffee));
+          }
+          float lineTop = box.y + 6.0f;
+          for (const auto& line : m.lines) {
+            Text(line.c_str(), static_cast<int>(box.x + 8.0f), static_cast<int>(lineTop),
+                 TypePx(10), ToRay(row.live ? p.ink : p.muted));
+            lineTop += theme_.LineHeight();
+          }
+          if (row.enabled && i < screen.panelRowIds.size() && r < screen.panelRowIds[i].size()) {
+            navHits_.push_back(NavHit{box, "row", screen.panelRowIds[i][r]});
+          }
+          y += rowH + 3.0f;
+          continue;
+        }
         DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
                       static_cast<int>(box.w), static_cast<int>(box.h),
                       ToRay(row.selected ? p.panel3
@@ -2800,14 +2822,17 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
           textTop += theme_.LineHeight();
         }
         if (m.inlineCost) {
-          const float badgeX = box.Right() - m.badgeW - 6.0f;
-          DrawRectangle(static_cast<int>(badgeX), static_cast<int>(box.y + 4.0f),
-                        static_cast<int>(m.badgeW), static_cast<int>(theme_.LineHeight()), ToRay(p.panel2));
-          DrawRectangleLines(static_cast<int>(badgeX), static_cast<int>(box.y + 4.0f),
-                             static_cast<int>(m.badgeW), static_cast<int>(theme_.LineHeight()), ToRay(p.border));
-          Text(m.cost.c_str(), static_cast<int>(badgeX + 6.0f), static_cast<int>(box.y + 6.0f),
-               TypePx(9), ToRay(row.enabled ? p.coffee : p.muted));
-        } else {
+          if (!m.cost.empty()) {
+            // A row that asked for no badge gets none: the button is just a button.
+            const float badgeX = box.Right() - m.badgeW - 6.0f;
+            DrawRectangle(static_cast<int>(badgeX), static_cast<int>(box.y + 4.0f),
+                          static_cast<int>(m.badgeW), static_cast<int>(theme_.LineHeight()), ToRay(p.panel2));
+            DrawRectangleLines(static_cast<int>(badgeX), static_cast<int>(box.y + 4.0f),
+                               static_cast<int>(m.badgeW), static_cast<int>(theme_.LineHeight()), ToRay(p.border));
+            Text(m.cost.c_str(), static_cast<int>(badgeX + 6.0f), static_cast<int>(box.y + 6.0f),
+                 TypePx(9), ToRay(row.enabled ? p.coffee : p.muted));
+          }
+        } else if (!m.cost.empty()) {
           Text(m.cost.c_str(), static_cast<int>(box.x + 6.0f), static_cast<int>(textTop), TypePx(9), ToRay(row.enabled ? p.coffee : p.muted));
         }
         if (row.enabled && i < screen.panelRowIds.size() && r < screen.panelRowIds[i].size()) {

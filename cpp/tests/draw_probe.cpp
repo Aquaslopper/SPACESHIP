@@ -513,47 +513,47 @@ int main() {
     // Three columns walked in one direction: five cards on the left, the open
     // card's items in the middle, and the inspector with its one commit button
     // on the right. Cards and items are free; the market's commit is money only.
-    const auto startsWith = [](const char* prefix) {
+    const auto startsWith = [](const char* prefix, const char* missing) {
       const auto it = std::find_if(texts.begin(), texts.end(), [&](const auto& t) {
         return t.text.find(prefix) == 0;
       });
-      Require(it != texts.end(), std::string("Station text missing: ") + prefix);
+      Require(it != texts.end(), missing);
       return *it;
     };
-    const auto marketCard = startsWith("Market - purse");
-    const auto salesCard = startsWith("Sell cargo and survey data");
-    const auto boardCard = startsWith("Mission board");
-    const auto yardCard = startsWith("Shipyard and crew");
-    const auto tavernCard = startsWith("Tavern / Bar");
+    const auto marketCard = startsWith("Market - purse", "the Market card did not paint");
+    const auto salesCard = startsWith("Sell cargo and survey data", "the sales card did not paint");
+    const auto boardCard = startsWith("Mission board", "the mission board card did not paint");
+    const auto yardCard = startsWith("Shipyard and crew", "the shipyard card did not paint");
+    const auto tavernCard = startsWith("Tavern / Bar", "the tavern card did not paint");
     Require(std::abs(salesCard.x - marketCard.x) < 1 && std::abs(boardCard.x - marketCard.x) < 1 &&
             std::abs(yardCard.x - marketCard.x) < 1 && std::abs(tavernCard.x - marketCard.x) < 1,
             "The five station cards are not in one column");
     Require(salesCard.y > marketCard.y && boardCard.y > salesCard.y && yardCard.y > boardCard.y &&
             tavernCard.y > yardCard.y,
             "The station cards are not stacked in their own order");
-    const auto fuel = startsWith("Fuel cell");
+    const auto fuel = startsWith("Fuel cell", "the market items did not paint");
     Require(fuel.x > marketCard.x, "The market's items are not in the middle column");
-    const auto commit = startsWith("Buy - 45 sh");
+    const auto commit = startsWith("Buy - 45 sh", "the inspector commit button did not paint");
     Require(commit.x > fuel.x, "The inspector's commit button is not in the right column");
     const double beforeBuy = sim.ActionCount();
     const double cellsBefore = sim.State().fuelCells;
     view.Click(sim, yardCard.x + 2, yardCard.y + 2, ship::HitButton::Left, 0);
     Frame(view, sim);
     Require(sim.ActionCount() == beforeBuy, "Opening a station card spent an action");
-    Require(startsWith("Buy larger ship").x > marketCard.x, "The yard's items did not open");
+    Require(startsWith("Buy larger ship", "the yard items did not open").x > marketCard.x, "The yard's items did not open");
     view.Click(sim, marketCard.x + 2, marketCard.y + 2, ship::HitButton::Left, 0);
     Frame(view, sim);
     Require(sim.ActionCount() == beforeBuy, "Returning to the market card spent an action");
-    const auto fuelItem = startsWith("Fuel cell");
+    const auto fuelItem = startsWith("Fuel cell", "the market items did not paint");
     view.Click(sim, fuelItem.x + 2, fuelItem.y + 2, ship::HitButton::Left, 0);
     Frame(view, sim);
     Require(sim.ActionCount() == beforeBuy, "Picking a station item spent an action");
-    const auto buyNow = startsWith("Buy - 45 sh");
+    const auto buyNow = startsWith("Buy - 45 sh", "the inspector commit button did not paint");
     view.Click(sim, buyNow.x + 2, buyNow.y + 2, ship::HitButton::Left, 0);
     Frame(view, sim);
     Require(sim.ActionCount() == beforeBuy, "A market purchase spent an action");
     Require(sim.State().fuelCells == cellsBefore + 1, "Native station click failed to buy");
-    const auto buyAgain = startsWith("Buy - 45 sh");
+    const auto buyAgain = startsWith("Buy - 45 sh", "the inspector commit button did not paint");
     view.Click(sim, buyAgain.x + 2, buyAgain.y + 2, ship::HitButton::Left, 0);
     Frame(view, sim);
     Require(sim.State().fuelCells == cellsBefore + 2 && sim.ActionCount() == beforeBuy,
@@ -561,7 +561,7 @@ int main() {
     // A station row that does cost an action still marks the clock in HTA green.
     view.Click(sim, salesCard.x + 2, salesCard.y + 2, ship::HitButton::Left, 0);
     Frame(view, sim);
-    const auto sellCommit = startsWith("Sell - ");
+    const auto sellCommit = startsWith("Sell - ", "the sales commit button did not paint");
     view.Click(sim, sellCommit.x + 2, sellCommit.y + 2, ship::HitButton::Left, 0);
     Frame(view, sim);
     Require(sim.ActionCount() == beforeBuy + 1, "Selling a lot did not spend one action");
@@ -743,18 +743,16 @@ int main() {
         for (int i = 0; i < 100; ++i) {
           Frame(shell, check);
           const auto card = std::find_if(texts.begin(), texts.end(), [](const auto& t) {
-            return t.text.find("Shipyard and crew") == 0; });
+            return t.text.find("Shipyard") == 0; });
           Require(card != texts.end(), "Shipyard card is missing");
-          shell.Click(check, card->x + 2, card->y + 2, ship::HitButton::Left, 0);
-          Frame(shell, check);
-          const auto item = std::find_if(texts.begin(), texts.end(), [](const auto& t) {
-            return t.text.find("Buy larger ship") == 0; });
-          Require(item != texts.end(), "Permanent ship purchase is missing");
-          shell.Click(check, item->x + 2, item->y + 2, ship::HitButton::Left, 0);
+          const float cardX = card->x, cardY = card->y;   // texts refill every frame
+          shell.Click(check, cardX + 2, cardY + 2, ship::HitButton::Left, 0);
           Frame(shell, check);
           const auto c = shell.LayoutNow().content;
-          const auto commit = std::find_if(texts.begin(), texts.end(), [](const auto& t) {
-            return t.text.find("Buy - 4,000 sh") == 0; });
+          // Opening the card picks its first item, the larger ship, so the
+          // inspector's own button is what the confirmation hangs off.
+          const auto commit = std::find_if(texts.begin(), texts.end(), [&](const auto& t) {
+            return t.text.find("Buy - 4,000 sh") == 0 && t.x > cardX; });
           Require(commit != texts.end(), "Ship purchase commit button is missing");
           if (commit->y >= c.y + 20 && commit->y < c.Bottom() - 180) return *commit;
           shell.Scroll(c.x + 20, c.y + 20, commit->y >= c.Bottom() - 180 ? -1 : 1);

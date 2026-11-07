@@ -612,11 +612,11 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       for (const StationColumn& column : model.columns) {
         CommandRowView view;
         view.label = column.title;
-        view.cost = "free";
-        view.displayCost = "free";
         view.title = column.badge;
         view.enabled = true;
         view.live = true;
+        view.plain = true;       // the cards are list lines, not buttons
+        view.hideCost = true;    // and they carry no badge: choosing is free
         view.selected = column.id == picked.category;
         cardRows.push_back(view);
         cardIds.push_back("station-cat:" + column.id);
@@ -640,11 +640,11 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         for (const StationRow& row : open->rows) {
           CommandRowView view;
           view.label = row.label;
-          view.cost = row.cost;
-          view.displayCost = row.cost.empty() ? "free" : row.cost;
           view.reading = row.reading;
           view.enabled = !row.reading;   // picking is free, even for a greyed commit
-          view.live = !row.reading;
+          view.live = row.enabled;       // a greyed commit reads muted in the list
+          view.plain = !row.reading;     // list lines, not buttons
+          view.hideCost = true;          // the cost lives in the inspector, not here
           view.selected = !row.reading && row.id == picked.item;
           itemRows.push_back(view);
           itemIds.push_back(row.reading ? std::string() : "station-item:" + row.id);
@@ -663,7 +663,7 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         inspector.Dim("Pick an item in the middle column to read it and commit.");
       } else {
         inspector.Field("Item", item->label);
-        inspector.Field("Cost", item->free ? "shiplets only - 0 actions" : item->cost);
+        inspector.Field("Cost", item->free ? "Shiplets only" : "One action");
         for (const std::string& line : item->details) { inspector.Note(line); }
       }
       screen.panels.push_back(inspector);
@@ -673,7 +673,7 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         CommandRowView view;
         view.label = item->commit.empty() ? item->label : item->commit;
         view.cost = item->cost;
-        view.displayCost = item->cost;
+        view.hideCost = true;            // one simple button, no badge
         view.title = item->label;
         view.confirm = item->confirm;
         view.enabled = item->enabled;

@@ -377,12 +377,6 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   { StationRow heading; heading.label = "Regular contracts"; heading.reading = true; board.rows.push_back(heading); }
   for (const Contract& contract : sim.World().contracts) {
     const std::string status = ContractStatus(sim, contract.id);
-    StationRow description;
-    description.label = contract.title + ": " + contract.note + " Reward " +
-                        Num(contract.reward) + " sh. [" + status + "]";
-    description.reading = true;
-    board.rows.push_back(description);
-
     const bool eligible =
         (contract.origin.empty() || contract.origin == sim.Map().here) &&
         (contract.vol == 0 || used + reserved + contract.vol <= capacity) &&
@@ -452,7 +446,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     ship.label = "Buy larger ship SC Tessellate - 4,000 sh";
     ship.cost = kFree;
     ship.free = true;
-    ship.commit = "Buy - " + Num(kLargeShip) + " sh";
+    ship.commit = "Buy - 4,000 sh";
     ship.enabled = purse >= kLargeShip;
     ship.confirm =
         "Buy SC Tessellate for 4,000 shiplets? The crew, cargo, equipment, refits, tasks "
@@ -501,7 +495,8 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     } else {
       row.cost = kFree;
       row.free = true;
-      row.commit = "Buy - " + Num(price) + " sh";
+      row.commit = id == "scanner2" ? "Buy - 1,100 sh"
+                                    : "Buy - " + Num(price) + " sh";
       row.enabled = available && purse >= price;
       row.details.push_back("Shiplets only: no action, no cooldown.");
       if (!row.enabled) {

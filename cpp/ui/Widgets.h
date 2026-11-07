@@ -111,6 +111,8 @@ struct CommandRowView {
   bool selected = false;    // the station's open card / picked item: marked, not pressed
   bool coolingDown = false;
   double remaining = 0.0;
+  bool plain = false;     // a list line, not a button: no box, no border
+  bool hideCost = false;  // no cost badge at all: the button is just a button
 };
 
 // A row the player can press, with the id the press path answers to. The

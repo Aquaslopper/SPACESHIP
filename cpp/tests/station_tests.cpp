@@ -210,6 +210,8 @@ TEST_CASE("the station walks card, item and inspector, and the walk is free",
   REQUIRE(screen.panelRows.size() == 3);
   REQUIRE(screen.panelRowIds.size() == 3);
   CHECK(screen.panelRowIds[0].size() == 5);
+  CHECK(screen.panelRows[0][0].plain);
+  CHECK(screen.panelRows[0][0].hideCost);
   CHECK(screen.panelRowIds[0][0] == "station-cat:market");
   CHECK(screen.panelRowIds[0][4] == "station-cat:tavern");
   CHECK(screen.panelRows[0][0].selected);
@@ -218,7 +220,8 @@ TEST_CASE("the station walks card, item and inspector, and the walk is free",
   CHECK(screen.panelRows[1][0].selected);
   CHECK(screen.panelRowIds[2] == std::vector<std::string>{"buy-fuel"});
   CHECK(screen.panelRows[2][0].label == "Buy - 45 sh");
-  CHECK(screen.panelRows[2][0].displayCost == "0 actions");
+  CHECK(screen.panelRows[2][0].cost == "0 actions");
+  CHECK(screen.panelRows[2][0].hideCost);   // one simple button, no badge
   CHECK(screen.panelRows[2][0].enabled);
   CHECK(view.category == "market");
 
@@ -232,7 +235,8 @@ TEST_CASE("the station walks card, item and inspector, and the walk is free",
   CHECK(bar.panelRowIds[1][0] == "station-item:talk:trader");
   CHECK(bar.panelRowIds[2] == std::vector<std::string>{"talk:trader"});
   CHECK(bar.panelRows[2][0].label == "Talk");
-  CHECK(bar.panelRows[2][0].displayCost == "1 action");
+  CHECK(bar.panelRows[2][0].cost == "1 action");
+  CHECK(bar.panelRows[2][0].hideCost);
 
   // Reading a screen never moves the clock.
   const double actions = sim.ActionCount();
@@ -334,19 +338,32 @@ TEST_CASE("the mission board accepts, tracks and pays a contract", "[station][bo
   const double purse = sim.State().shiplets;
   const ship::StationScreenModel board = ship::BuildStationScreen(sim, "tolme");
 
-  // Every contract has its status note, in the reference's words.
-  bool sawFreight = false;
-  for (const auto& row : board.columns[2].rows) {
-    const std::string& note = row.label;
-    if (note.find("Tolme Anchorage") == std::string::npos) { continue; }
-    sawFreight = true;
+  // The middle column names the contracts; their own words, status and reward
+  // are what the inspector on the right shows for the picked one.
+  const ship::Contract* freightDef = nullptr;
+  for (const ship::Contract& entry : World().contracts) {
+    if (entry.id == "freight") { freightDef = &entry; }
   }
-  CHECK(sawFreight);
-
+  REQUIRE(freightDef != nullptr);
   const ship::StationRow* accept = Row(board.columns[2], "contract-accept:freight");
   REQUIRE(accept != nullptr);
   CHECK(accept->enabled);
   CHECK(accept->cost == "1 action");
+  bool sawNote = false, sawReward = false, sawStatus = false;
+  for (const std::string& line : accept->details) {
+    if (line.find(freightDef->note) != std::string::npos) { sawNote = true; }
+    if (line.find(ship::js::NumToString(freightDef->reward) + " sh") != std::string::npos) {
+      sawReward = true;
+    }
+    if (line.find("Status: available") != std::string::npos) { sawStatus = true; }
+  }
+  CHECK(sawNote);
+  CHECK(sawReward);
+  CHECK(sawStatus);
+  // ... and the middle column no longer repeats them.
+  for (const auto& row : board.columns[2].rows) {
+    CHECK(row.label.find(freightDef->note) == std::string::npos);
+  }
 
   const double usedBefore = sim.CargoUsed();
   REQUIRE(ship::PressStationAction(sim, "contract-accept:freight"));
