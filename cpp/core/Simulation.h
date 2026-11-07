@@ -115,6 +115,16 @@ class Simulation {
   const std::vector<SurveyRecord>& Survey() const { return survey_; }
   std::vector<SurveyRecord>& MutableSurvey() { return survey_; }
   double ScanCost() const { return scanCost_; }
+  int SensorTier() const;
+  bool CanScan(const Body& body) const;
+  double EffectiveScanCost(const Body& body) const;
+  bool CanExtractBody(const Body& body) const;
+  int ExtractionMaxPasses(const Body& body) const;
+  int ExtractionPassesUsed(const Body& body) const;
+  double ExtractionReserveVol(const Body& body) const;
+  double ExtractionWorkCost(const Body& body) const;
+  std::string ExtractionActionLabel(const Body& body) const;
+  std::string ExtractionDoneLabel(const Body& body) const;
   bool InRange(const Body& body) const;
   bool AtTarget(const Body& body) const;
   std::string CurrentSystemId() const;
@@ -189,6 +199,7 @@ class Simulation {
   bool SelectTarget(const std::string& bodyId);
   bool StartTravel();                       // startTravel()
   bool StartScan();                         // startScan()
+  bool StartExtraction();                   // surface ore, moon regolith, debris & wreck salvage
   bool StandWatch();                        // standWatch()
   bool Acknowledge(const std::string& taskId);  // the finished button
   void SetLayer(const std::string& key);    // free: looking never costs
@@ -376,6 +387,7 @@ class Simulation {
   void ResolveMapScanEvents(const Body& body, bool firstScan);
   void RefreshLocationInfo();
   void RevealScan(const std::string& bodyId);
+  void FinishExtraction(const std::string& bodyId, double reservedVol);
   void FileSurvey(const Body& body);
   void ChronicleVisit(const Body* system);
   std::vector<const Body*> CurBodies() const;

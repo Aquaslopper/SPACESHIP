@@ -1327,7 +1327,11 @@ void ShellView::EnsureNavScreen(const Simulation& sim) {
   key.energy = sim.StatValue("energy");
   key.drive = sim.State().engineCondition;
   key.sensor = sim.State().sim.sensor ? 1 : 0;
+  key.sensorTier = sim.SensorTier();
   key.scanCost = sim.ScanCost();
+  key.observedCount = sim.State().sim.observed.size();
+  key.cargoUsed = sim.CargoUsed();
+  key.cargoCap = sim.CargoStore().capacity;
 
   std::size_t taskSig = sim.State().ongoing.size();
   for (const Task& task : sim.State().ongoing) {
@@ -1453,6 +1457,80 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     DrawRectangle(static_cast<int>(px), static_cast<int>(py), 2, 2, ink);
   }
 
+  // Sector territory contours & region map on Layer 2 ("sector").
+  struct SectorTerritory {
+    std::string id;
+    std::string name;
+    float cx = 0.0f;
+    float cy = 0.0f;
+    float rx = 0.0f;
+    float ry = 0.0f;
+    ::Color tint{};
+    bool active = false;
+  };
+  std::vector<SectorTerritory> sectorTerritories;
+  std::unordered_map<std::string, ::Color> systemSectorTint;
+  if (chart.layer == "sector") {
+    static constexpr ::Color kSectorPalette[6] = {
+        ::Color{146, 98, 42, 255},   // ochre-amber
+        ::Color{62, 108, 142, 255},  // slate-cobalt
+        ::Color{74, 122, 84, 255},   // sage-jade
+        ::Color{154, 78, 68, 255},   // terracotta-rose
+        ::Color{110, 84, 138, 255},  // plum-indigo
+        ::Color{56, 124, 118, 255},  // deep-teal
+    };
+    struct BoundsAcc {
+      float minX = 1e9f, maxX = -1e9f, minY = 1e9f, maxY = -1e9f;
+      int count = 0;
+    };
+    std::unordered_map<std::string, BoundsAcc> boundsByRegion;
+    boundsByRegion.reserve(sim.World().regions.size() * 2);
+    for (const NavBodyView& body : chart.bodies) {
+      if (body.region.empty()) { continue; }
+      const float bx = box.x + static_cast<float>(body.at.x) * sx;
+      const float by = box.y + static_cast<float>(body.at.y) * sy;
+      BoundsAcc& acc = boundsByRegion[body.region];
+      acc.minX = std::min(acc.minX, bx);
+      acc.maxX = std::max(acc.maxX, bx);
+      acc.minY = std::min(acc.minY, by);
+      acc.maxY = std::max(acc.maxY, by);
+      ++acc.count;
+    }
+    const Body* curSys = sim.CurrentSystem();
+    const std::string shipRegion = curSys == nullptr ? std::string() : curSys->region;
+    sectorTerritories.reserve(sim.World().regions.size());
+    for (std::size_t ri = 0; ri < sim.World().regions.size(); ++ri) {
+      const Body& reg = sim.World().regions[ri];
+      auto it = boundsByRegion.find(reg.id);
+      if (it == boundsByRegion.end() || it->second.count == 0) { continue; }
+      const ::Color tint = kSectorPalette[ri % 6];
+      const BoundsAcc& acc = it->second;
+      const float pad = std::clamp(18.0f * static_cast<float>(sim.Map().zoom * 0.55), 14.0f, 44.0f);
+      SectorTerritory terr;
+      terr.id = reg.id;
+      terr.name = reg.name;
+      terr.cx = 0.5f * (acc.minX + acc.maxX);
+      terr.cy = 0.5f * (acc.minY + acc.maxY);
+      terr.rx = std::max(26.0f, 0.5f * (acc.maxX - acc.minX) + pad);
+      terr.ry = std::max(20.0f, 0.5f * (acc.maxY - acc.minY) + pad * 0.85f);
+      terr.tint = tint;
+      terr.active = (reg.id == sim.Map().sector || reg.id == shipRegion);
+      if (terr.cx + terr.rx >= box.x && terr.cx - terr.rx <= box.Right() &&
+          terr.cy + terr.ry >= box.y && terr.cy - terr.ry <= box.Bottom()) {
+        DrawEllipse(static_cast<int>(terr.cx), static_cast<int>(terr.cy),
+                    terr.rx, terr.ry, Fade(tint, terr.active ? 0.12f : 0.06f));
+        DrawEllipseLines(static_cast<int>(terr.cx), static_cast<int>(terr.cy),
+                         terr.rx, terr.ry, Fade(tint, terr.active ? 0.56f : 0.28f));
+      }
+      sectorTerritories.push_back(std::move(terr));
+      for (std::size_t sysIdx : sim.World().SystemsInRegion(reg.id)) {
+        if (sysIdx < sim.World().systems.size()) {
+          systemSectorTint.emplace(sim.World().systems[sysIdx].id, tint);
+        }
+      }
+    }
+  }
+
   // Lane web on sector and galaxy layers with hash lookup and frustum culling.
   if (chart.layer == "sector" || chart.layer == "galaxy") {
     std::unordered_map<std::string, NavPoint> screenAt;
@@ -1476,17 +1554,29 @@ void ShellView::PaintNavScreen(Simulation& sim) {
       }
       const bool lit = lane.from == homeId || lane.to == homeId || lane.from == targetId ||
                        lane.to == targetId;
-      DrawLineEx(from, to, lit ? 1.0f : 0.35f,
-                 lit ? Fade(ToRay(p.coffee), 0.62f) : Fade(ToRay(p.coffee), 0.26f));
+      ::Color laneColor = lit ? Fade(ToRay(p.coffee), 0.68f) : Fade(ToRay(p.coffee), 0.26f);
+      float laneWidth = lit ? 1.15f : 0.45f;
+      if (chart.layer == "sector" && !lit) {
+        const auto ta = systemSectorTint.find(lane.from);
+        const auto tb = systemSectorTint.find(lane.to);
+        if (ta != systemSectorTint.end() && tb != systemSectorTint.end()) {
+          const bool sameSector =
+              ta->second.r == tb->second.r && ta->second.g == tb->second.g && ta->second.b == tb->second.b;
+          laneColor = sameSector ? Fade(ta->second, 0.36f) : Fade(ToRay(p.amber), 0.34f);
+          laneWidth = sameSector ? 0.65f : 0.85f;
+        }
+      }
+      DrawLineEx(from, to, laneWidth, laneColor);
     }
   }
 
+  const ::Color kPlayerBeaconRed{220, 38, 38, 255};
   if (chart.hasMarker) {
     const float px = box.x + static_cast<float>(chart.marker.x) * sx;
     const float py = box.y + static_cast<float>(chart.marker.y) * sy;
     if (px >= clipMinX && px <= clipMaxX && py >= clipMinY && py <= clipMaxY) {
-      DrawCircleLines(static_cast<int>(px), static_cast<int>(py),
-                      std::max(6.0f, 13.0f * bodyScale), ToRay(p.sage));
+      const float markerR = std::max(10.0f, 13.5f * bodyScale);
+      DrawCircleV(Vector2{px, py}, markerR + 4.5f, Fade(kPlayerBeaconRed, 0.18f));
     }
   }
 
@@ -1545,7 +1635,58 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     DrawCircleLinesV(Vector2{cx, cy}, drawn + 5.5f, Fade(ToRay(p.terracotta), 0.45f));
   }
 
-  // --- labels (only visible, label-eligible bodies) -----------------------
+  // Top-pass vivid red player position reticle so dense star clusters never hide the ship.
+  if (chart.hasMarker) {
+    const float px = box.x + static_cast<float>(chart.marker.x) * sx;
+    const float py = box.y + static_cast<float>(chart.marker.y) * sy;
+    if (px >= clipMinX && px <= clipMaxX && py >= clipMinY && py <= clipMaxY) {
+      const float markerR = std::max(10.0f, 13.5f * bodyScale);
+      DrawCircleLinesV(Vector2{px, py}, markerR, kPlayerBeaconRed);
+      DrawCircleLinesV(Vector2{px, py}, markerR + 1.6f, Fade(kPlayerBeaconRed, 0.82f));
+      const float tickIn = markerR + 1.5f;
+      const float tickOut = markerR + 5.5f;
+      DrawLineEx(Vector2{px - tickOut, py}, Vector2{px - tickIn, py}, 1.8f, kPlayerBeaconRed);
+      DrawLineEx(Vector2{px + tickIn, py}, Vector2{px + tickOut, py}, 1.8f, kPlayerBeaconRed);
+      DrawLineEx(Vector2{px, py - tickOut}, Vector2{px, py - tickIn}, 1.8f, kPlayerBeaconRed);
+      DrawLineEx(Vector2{px, py + tickIn}, Vector2{px, py + tickOut}, 1.8f, kPlayerBeaconRed);
+      if (chart.layer != "system" || sim.FindOngoing("travel") != nullptr) {
+        DrawCircleV(Vector2{px, py}, 2.6f, kPlayerBeaconRed);
+      }
+    }
+  }
+
+  // --- labels (sector headers first on Layer 2, then visible body labels) --
+  std::vector<Area> takenLabels;
+  if (chart.layer == "sector") {
+    const int hdrSize = TypePx(9);
+    const float hdrH = theme_.LineHeight() + 2.0f;
+    for (const SectorTerritory& terr : sectorTerritories) {
+      const float textW = TextWidth(terr.name.c_str(), hdrSize);
+      const float pillW = textW + 10.0f;
+      const float pillX = std::clamp(terr.cx - pillW * 0.5f, box.x + 4.0f, box.Right() - pillW - 36.0f);
+      const float pillY = std::clamp(terr.cy - terr.ry + 4.0f, box.y + 4.0f, box.Bottom() - hdrH - 4.0f);
+      if (terr.cx + terr.rx < box.x + 20.0f || terr.cx - terr.rx > box.Right() - 20.0f ||
+          terr.cy + terr.ry < box.y + 20.0f || terr.cy - terr.ry > box.Bottom() - 20.0f) {
+        continue;
+      }
+      const Area pill{pillX, pillY, pillW, hdrH};
+      bool overlaps = false;
+      for (const Area& taken : takenLabels) {
+        if (ChartRectsOverlap(pill, taken)) { overlaps = true; break; }
+      }
+      if (overlaps) { continue; }
+      DrawRectangle(static_cast<int>(pill.x), static_cast<int>(pill.y),
+                    static_cast<int>(pill.w), static_cast<int>(pill.h),
+                    Fade(ToRay(p.panel), terr.active ? 0.90f : 0.78f));
+      DrawRectangleLines(static_cast<int>(pill.x), static_cast<int>(pill.y),
+                         static_cast<int>(pill.w), static_cast<int>(pill.h),
+                         Fade(terr.tint, terr.active ? 0.85f : 0.52f));
+      Text(terr.name.c_str(), static_cast<int>(pill.x + 5.0f), static_cast<int>(pill.y + 1.0f),
+           hdrSize, terr.active ? ToRay(p.ink) : terr.tint);
+      takenLabels.push_back(pill);
+    }
+  }
+
   std::vector<const NavBodyView*> labelled;
   labelled.reserve(ordered.size());
   for (const NavBodyView* body : ordered) {
@@ -1569,11 +1710,12 @@ void ShellView::PaintNavScreen(Simulation& sim) {
                      if (da != db) { return da < db; }
                      return a->id < b->id;
                    });
+  const std::size_t sectorZoomBudget = static_cast<std::size_t>(
+      std::clamp(26.0 + (sim.Map().zoom - 1.0) * 8.0, 22.0, 96.0));
   const std::size_t labelBudget =
-      chart.layer == "sector" ? 28u : (chart.layer == "galaxy" ? 24u : 48u);
+      chart.layer == "sector" ? sectorZoomBudget : (chart.layer == "galaxy" ? 24u : 48u);
   std::size_t labelsPainted = 0;
-  std::vector<Area> takenLabels;
-  takenLabels.reserve(labelBudget);
+  takenLabels.reserve(takenLabels.size() + labelBudget);
   for (const NavBodyView* body : labelled) {
     if (labelsPainted >= labelBudget) { break; }
     const float labelX = box.x + static_cast<float>(body->labelX) * sx;
@@ -1628,7 +1770,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   if (chart.hasMarker && sim.HomeBody() != nullptr) {
     const float px = box.x + static_cast<float>(chart.marker.x) * sx;
     const float py = box.y + static_cast<float>(chart.marker.y) * sy;
-    const float r = 13.0f * bodyScale;
+    const float r = std::max(10.0f, 13.5f * bodyScale);
     navHits_.push_back(NavHit{Area{std::max(box.x, px - r), std::max(box.y, py - r),
         std::max(0.0f, std::min(box.Right(), px + r) - std::max(box.x, px - r)),
         std::max(0.0f, std::min(box.Bottom(), py + r) - std::max(box.y, py - r))}, "select", sim.HomeBody()->id});

@@ -269,7 +269,11 @@ class ShellView {
     double energy = -1.0;
     double drive = -1.0;
     int sensor = -1;
+    int sensorTier = -1;
     double scanCost = -1.0;
+    std::size_t observedCount = 0;
+    double cargoUsed = -1.0;
+    double cargoCap = -1.0;
     std::size_t crewSig = 0;
 
     bool operator==(const NavCacheKey& o) const {
@@ -279,7 +283,10 @@ class ShellView {
              docked == o.docked && reducedMotion == o.reducedMotion &&
              scannedCount == o.scannedCount && ongoingSig == o.ongoingSig &&
              fuel == o.fuel && energy == o.energy && drive == o.drive &&
-             sensor == o.sensor && scanCost == o.scanCost && crewSig == o.crewSig;
+             sensor == o.sensor && sensorTier == o.sensorTier &&
+             scanCost == o.scanCost && observedCount == o.observedCount &&
+             cargoUsed == o.cargoUsed && cargoCap == o.cargoCap &&
+             crewSig == o.crewSig;
     }
   };
 

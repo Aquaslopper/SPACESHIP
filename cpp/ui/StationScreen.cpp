@@ -242,8 +242,10 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   upgrade("drive", "Fit efficient drive: fuel use -20% - 900 sh", kDrive,
           !hasUpgrade("drive"));
   upgrade("rack", "Expand O2 rack to 15 - 400 sh", kRack, !hasUpgrade("rack"));
-  upgrade("scanner", "Upgrade sensors: scans take 3 - 600 sh", kScanner,
+  upgrade("scanner", "Upgrade sensors: scans take 3 + regional lock - 600 sh", kScanner,
           !hasUpgrade("scanner"));
+  upgrade("scanner2", "Fit deep-array sensors: full unlock + deep-region scans - 1,100 sh",
+          1100.0, hasUpgrade("scanner") && !hasUpgrade("scanner2"));
   {
     StationRow row;
     row.id = "hull-service";

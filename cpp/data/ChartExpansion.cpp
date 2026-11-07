@@ -1008,6 +1008,10 @@ void ExpandChart(Catalog& catalog) {
   PlaceGalaxyDots(catalog);
   EntangleGalaxy(catalog);
   RegisterMapIncidents(catalog);
+  if (std::find(catalog.taskTypes.begin(), catalog.taskTypes.end(), "extract") ==
+      catalog.taskTypes.end()) {
+    catalog.taskTypes.push_back("extract");
+  }
 
   catalog.counts.regions = static_cast<int>(catalog.regions.size());
   catalog.counts.systems = static_cast<int>(catalog.systems.size());

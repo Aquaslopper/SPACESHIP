@@ -38,7 +38,7 @@ constexpr double kGalaxyBoardScale = 4.0;
 
 // Zoom ladder for the wide sector and galaxy boards.
 constexpr double kZoomMin = 0.3;
-constexpr double kZoomMax = 4.0;
+constexpr double kZoomMax = 10.0;
 constexpr double kZoomStep = 0.2;
 
 // Zoom ladder for the local system chart.

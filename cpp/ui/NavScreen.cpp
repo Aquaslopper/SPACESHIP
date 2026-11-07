@@ -141,7 +141,7 @@ double SimScanCost(const Simulation& sim) {
 // run AND the player has gone back to read it.
 std::vector<PanelLine> ScanReadout(const Simulation& sim, const Body& body) {
   std::vector<PanelLine> lines;
-  if (!sim.InRange(body)) {
+  if (!sim.CanScan(body)) {
     lines.push_back(PanelLine{PanelLine::Kind::Dim, "", NavOutOfRange(), "", 0.0});
     return lines;
   }
@@ -163,8 +163,44 @@ std::vector<PanelLine> ScanReadout(const Simulation& sim, const Body& body) {
   for (const std::string& line : body.scan) {
     lines.push_back(PanelLine{PanelLine::Kind::Note, "", line, "", 0.0});
   }
-  for (const std::string& line : body.scanLocked) {
-    lines.push_back(PanelLine{PanelLine::Kind::Dim, "", line + " - sensors insufficient", "", 0.0});
+  const int tier = sim.SensorTier();
+  for (std::size_t i = 0; i < body.scanLocked.size(); ++i) {
+    const std::string& line = body.scanLocked[i];
+    if (tier >= 2 || (tier == 1 && i == 0)) {
+      lines.push_back(PanelLine{PanelLine::Kind::Note, "",
+                                line + (tier >= 2 ? " - deep-array verified"
+                                                  : " - upgraded sensor lock"),
+                                "", 0.0});
+    } else {
+      lines.push_back(PanelLine{PanelLine::Kind::Dim, "",
+                                line + (tier == 1 ? " - deep-array sensors required"
+                                                  : " - sensors insufficient"),
+                                "", 0.0});
+    }
+  }
+  if (body.type == "system") {
+    const auto& localIdx = sim.World().BodiesInSystem(body.id);
+    int ports = 0;
+    int deposits = 0;
+    for (std::size_t idx : localIdx) {
+      if (idx >= sim.World().bodies.size()) { continue; }
+      const Body& local = sim.World().bodies[idx];
+      if (sim.World().FindPort(local.id) != nullptr) { ++ports; }
+      if (sim.CanExtractBody(local)) { ++deposits; }
+    }
+    lines.push_back(PanelLine{
+        PanelLine::Kind::Note, "",
+        "Remote survey: " + Num(localIdx.size()) + " charted bodies, " +
+            Num(ports) + (ports == 1 ? " port, " : " ports, ") +
+            Num(deposits) + " extractable deposits.",
+        "", 0.0});
+  } else if (body.type == "region") {
+    const auto& sysIdx = sim.World().SystemsInRegion(body.id);
+    lines.push_back(PanelLine{
+        PanelLine::Kind::Note, "",
+        "Deep-region cluster telemetry: " + Num(sysIdx.size()) +
+            " navigable star systems catalogued.",
+        "", 0.0});
   }
   return lines;
 }
@@ -630,6 +666,17 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
 
   const Task* running = sim.FindOngoing("travel");
   const Task* scanTask = sim.FindOngoing("scan");
+  const Task* extractTask = sim.FindOngoing("extract");
+
+  const auto appendDepositsField = [&sim](NavPanel& panel, const Body& body) {
+    if (!sim.CanExtractBody(body)) { return; }
+    const int used = sim.ExtractionPassesUsed(body);
+    const int maxPasses = sim.ExtractionMaxPasses(body);
+    panel.Field("Deposits",
+                used >= maxPasses
+                    ? std::string("Depleted")
+                    : Num(maxPasses - used) + " / " + Num(maxPasses) + " passes available");
+  };
 
   if (target == nullptr) {
     name.Dim("No target selected");
@@ -648,20 +695,30 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
                                                                  : "Chart available");
     for (const auto& field : target->details) { details.Field(field.first, field.second); }
     details.Field("Systems", Num(sectorCount) + " navigable");
-    scan.Note("Open the sector chart to choose a system. Local bodies can be scanned "
-              "after arrival.");
+    if (sim.CanScan(*target)) {
+      scan.lines = ScanReadout(sim, *target);
+    } else {
+      scan.Note("Open the sector chart to choose a system. Local bodies can be scanned "
+                "after arrival.");
+    }
     distance.Note("Select a system on the sector chart to plot a jump.");
   } else if (!sim.InRange(*target)) {
-    // Looking is always free, even across a galaxy. What the player gets for
-    // free is the chart entry - a name and a classification.
     name.Name(target->name);
     name.Sub(std::string("Long range contact - ") + NavLayerName(map.layer) + " chart");
     klass.Note(target->klass);
-    status.Note(sim.AtTarget(*target) || target->id == map.here ? "Current position"
-                                                                : "Out of sensor range");
-    details.Dim(NavOutOfRange());
-    scan.Dim(NavOutOfRange());
-    distance.Dim(NavOutOfRange());
+    if (sim.CanScan(*target)) {
+      status.Note("Long-range sensor lock");
+      for (const auto& field : target->details) { details.Field(field.first, field.second); }
+      appendDepositsField(details, *target);
+      scan.lines = ScanReadout(sim, *target);
+      distance.Note("Jump to its parent system before plotting local approach.");
+    } else {
+      status.Note(sim.AtTarget(*target) || target->id == map.here ? "Current position"
+                                                                  : "Out of sensor range");
+      details.Dim(NavOutOfRange());
+      scan.Dim(NavOutOfRange());
+      distance.Dim(NavOutOfRange());
+    }
   } else {
     const Simulation::NavMetrics metrics = sim.MetricsFor(*target);
     name.Name(target->name);
@@ -679,12 +736,14 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
     details.Field("Origin", target->type == "system"
                                ? (system == nullptr ? hereName : system->name)
                                : hereName);
+    appendDepositsField(details, *target);
 
-    scan.Note(target->type == "system"
-                  ? "Jump to this system, then use the System chart to scan its stars "
-                    "and other destinations."
-                  : std::string());
-    if (target->type != "system") { scan.lines = ScanReadout(sim, *target); }
+    if (target->type == "system" && !sim.CanScan(*target)) {
+      scan.Note("Jump to this system, then use the System chart to scan its stars "
+                "and other destinations.");
+    } else {
+      scan.lines = ScanReadout(sim, *target);
+    }
 
     if (sim.AtTarget(*target)) {
       distance.Dim("You are already here.");
@@ -711,6 +770,7 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
 
   // --- the action band ----------------------------------------------------
   const bool reach = target != nullptr && sim.InRange(*target);
+  const bool canScanTarget = target != nullptr && sim.CanScan(*target);
   const bool hereTarget = target != nullptr && sim.AtTarget(*target);
   const double energy = sim.StatValue("energy");
   const double fuel = sim.StatValue("fuel");
@@ -725,7 +785,9 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
   } else if (target != nullptr && !reach) {
     model.courseNote = target->type == "region"
                            ? "Open this sector chart to plot a jump."
-                           : "This contact is outside the local sensor range.";
+                           : (canScanTarget
+                                  ? "Long-range sensor lock acquired. Jump to parent system to visit."
+                                  : "This contact is outside the local sensor range.");
   } else {
     model.courseNote = "Plot a course by selecting a destination.";
   }
@@ -738,7 +800,8 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
 
   const bool travelEnabled =
       reach && !hereTarget && !sim.State().docked && sim.State().engineCondition > 0 &&
-      energy > 0 && fuel >= (target == nullptr ? 0.0 : sim.MetricsFor(*target).fuel);
+      extractTask == nullptr && energy > 0 &&
+      fuel >= (target == nullptr ? 0.0 : sim.MetricsFor(*target).fuel);
   screen.progress.push_back(BuildProgressButton(
       sim, "travel", target != nullptr && target->type == "system" ? "Start Jump"
                                                                   : "Start Travel",
@@ -751,10 +814,38 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
     screen.progress.push_back(
         BuildProgressButton(sim, "scan-busy", "Sensors busy", false, "Scan Complete", "space"));
   } else {
+    const bool remoteScan = target != nullptr &&
+                            (!reach || target->type == "system" || target->type == "region");
     screen.progress.push_back(BuildProgressButton(
-        sim, "scan", "Run Deep Scan",
-        reach && target != nullptr && target->type != "system" && energy > 0,
+        sim, "scan", remoteScan ? "Run Long-Range Scan" : "Run Deep Scan",
+        canScanTarget && energy > 0,
         "Scan Complete", "space"));
+  }
+
+  const bool showExtract =
+      (target != nullptr && sim.CanExtractBody(*target)) || extractTask != nullptr;
+  if (showExtract) {
+    if (extractTask != nullptr && target != nullptr && extractTask->target != target->id) {
+      screen.progress.push_back(BuildProgressButton(
+          sim, "extract-busy", "Extraction rig busy", false, "Haul Yield", "space"));
+    } else {
+      const Body* extBody =
+          (extractTask != nullptr) ? sim.FindBodyById(extractTask->target) : target;
+      const std::string idleLabel =
+          extBody != nullptr ? sim.ExtractionActionLabel(*extBody) : "Extract resources";
+      const std::string doneLabel =
+          extBody != nullptr ? sim.ExtractionDoneLabel(*extBody) : "Haul Yield";
+      const double needVol = extBody != nullptr ? sim.ExtractionReserveVol(*extBody) : 0.0;
+      const bool holdFits =
+          needVol <= 0.0 ||
+          (sim.CargoUsed() + sim.CargoReserved() + needVol <= sim.CargoStore().capacity);
+      const bool extractEnabled =
+          target != nullptr && sim.CanExtractBody(*target) && hereTarget &&
+          !sim.State().docked && running == nullptr && energy > 0 && holdFits &&
+          sim.ExtractionPassesUsed(*target) < sim.ExtractionMaxPasses(*target);
+      screen.progress.push_back(BuildProgressButton(
+          sim, "extract", idleLabel, extractEnabled, doneLabel, "space"));
+    }
   }
 
   if (target != nullptr && target->type == "region") {
@@ -811,6 +902,7 @@ namespace {
 bool PressNavActionRaw(Simulation& sim, const std::string& action, const std::string& arg) {
   if (action == "travel") { return PressProgressButton(sim, "travel"); }
   if (action == "scan") { return PressProgressButton(sim, "scan"); }
+  if (action == "extract") { return PressProgressButton(sim, "extract"); }
   if (action == "stand-watch") { return sim.StandWatch(); }
   if (action == "dock") { return sim.Dock(); }
   if (action == "view-sector") { return sim.ViewSector(arg); }
@@ -846,7 +938,7 @@ bool PressNavAction(Simulation& sim, const std::string& action, const std::strin
   // Progress controls acknowledge before consulting cooldowns (HTA
   // onProgressClick). Do not add a second lock around that dispatcher.
   const auto screen = BuildNavScreen(sim).screen;
-  if (action == "travel" || action == "scan") {
+  if (action == "travel" || action == "scan" || action == "extract") {
     for (const auto& button : screen.progress) {
       if (button.taskId == action) { return PressProgressButton(sim, button); }
     }

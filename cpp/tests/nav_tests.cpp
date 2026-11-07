@@ -24,6 +24,7 @@
 #include "data/ChartExpansion.h"
 #include "ui/NavScreen.h"
 #include "ui/Shell.h"
+#include "ui/StationScreen.h"
 #include "ui/Widgets.h"
 
 namespace {
@@ -125,12 +126,10 @@ TEST_CASE("the zoom ladder is clamped to a tenth and to its ends", "[nav]") {
   CHECK(ship::NavZoomStep(1.9, 1, 0.6, 2.0, 0.2) == 2.0);
   CHECK(ship::NavZoomStep(0.7, -1, 0.6, 2.0, 0.2) == 0.6);
 
-  // The grown chart reads on a wider ladder than the authored 0.6..2.0: a
-  // three-times board needs both more magnification and a wider view, on the
-  // two wide scales. The local chart keeps a shorter one, because at four times
-  // its own ring layout the visible window falls into the middle of the board.
+  // The 3828x1668 wide sector and galaxy boards span 24 clusters and zoom up
+  // to 10.0x so individual sectors open cleanly without label overlap.
   CHECK(ship::kZoomMin == 0.3);
-  CHECK(ship::kZoomMax == 4.0);
+  CHECK(ship::kZoomMax == 10.0);
 
   ship::Simulation sim = Fresh();
   CHECK(sim.Map().zmin == ship::kSystemZoomMin);
@@ -144,7 +143,7 @@ TEST_CASE("the zoom ladder is clamped to a tenth and to its ends", "[nav]") {
   sim.SetLayer("sector");
   CHECK(sim.Map().zmin == ship::kZoomMin);
   CHECK(sim.Map().zmax == ship::kZoomMax);
-  for (int i = 0; i < 40; ++i) { sim.ZoomMap(1); }
+  for (int i = 0; i < 60; ++i) { sim.ZoomMap(1); }
   CHECK(sim.Map().zoom == ship::kZoomMax);
 
   // Free: looking never costs an action.
@@ -1052,4 +1051,279 @@ TEST_CASE("huge procedural charts build within interactive frame budgets",
                              .count();
   INFO("6 full chart builds across all layers took " << elapsedMs << " ms");
   CHECK(elapsedMs < 250);
+}
+
+TEST_CASE("staged sensor upgrades unlock scanLocked tiers and deep-region scanning",
+          "[nav][sensors][expansion]") {
+  ship::Simulation sim = Fresh();
+  sim.MutableState().shiplets = 5000;
+
+  // Park and dock at the first authored port to inspect Shipyard staging first.
+  REQUIRE_FALSE(sim.World().ports.empty());
+  sim.MutableMap().here = sim.World().ports.front().id;
+  sim.MutableState().docked = false;
+  REQUIRE(sim.Dock());
+  REQUIRE(sim.State().docked);
+
+  const auto yardBefore = ship::BuildStationScreen(sim, sim.Map().here).columns[3];
+  auto findYardRow = [](const ship::StationColumn& col, const std::string& id) -> const ship::StationRow* {
+    for (const auto& r : col.rows) {
+      if (r.id == id) { return &r; }
+    }
+    return nullptr;
+  };
+  REQUIRE(findYardRow(yardBefore, "upgrade:scanner") != nullptr);
+  REQUIRE(findYardRow(yardBefore, "upgrade:scanner2") != nullptr);
+  CHECK(findYardRow(yardBefore, "upgrade:scanner")->enabled);
+  CHECK_FALSE(findYardRow(yardBefore, "upgrade:scanner2")->enabled);
+
+  // Pick a local body with scanLocked entries in Kessler, a same-region system,
+  // and a deep-region outer-galaxy system.
+  std::string localWithLocked;
+  for (std::size_t idx : sim.World().BodiesInSystem("sec-kessler")) {
+    const ship::Body& b = sim.World().bodies[idx];
+    if (b.scanLocked.size() >= 2) { localWithLocked = b.id; break; }
+  }
+  if (localWithLocked.empty()) {
+    for (std::size_t idx : sim.World().BodiesInSystem("sec-kessler")) {
+      const ship::Body& b = sim.World().bodies[idx];
+      if (!b.scanLocked.empty()) { localWithLocked = b.id; break; }
+    }
+  }
+  REQUIRE_FALSE(localWithLocked.empty());
+
+  std::string outerSysId;
+  std::string outerRegId;
+  for (const ship::Body& sys : sim.World().systems) {
+    if (sys.region != "gal-inner") {
+      outerSysId = sys.id;
+      outerRegId = sys.region;
+      break;
+    }
+  }
+  REQUIRE_FALSE(outerSysId.empty());
+
+  // Tier 0: local scan leaves scanLocked marked "sensors insufficient", and
+  // neither systems nor cross-system contacts can be scanned.
+  CHECK(sim.SensorTier() == 0);
+  CHECK_FALSE(sim.CanScan(*sim.FindBodyById("sec-vance")));
+  CHECK_FALSE(sim.CanScan(*sim.FindBodyById("vance-star")));
+  CHECK_FALSE(sim.CanScan(*sim.FindBodyById(outerSysId)));
+
+  sim.MutableState().scanned[localWithLocked] = true;
+  REQUIRE(sim.SelectTarget(localWithLocked));
+  {
+    const auto nav0 = ship::BuildNavScreen(sim);
+    bool sawInsufficient = false;
+    for (const auto& line : nav0.screen.right[0].lines) {
+      if (line.value.find("sensors insufficient") != std::string::npos) {
+        sawInsufficient = true;
+      }
+    }
+    CHECK(sawInsufficient);
+  }
+
+  // Buy Tier 1 ("scanner"): scanCost drops to 3, first scanLocked entry unlocks,
+  // and same-region systems/bodies become scannable while outer galaxies stay locked.
+  REQUIRE(sim.BuyUpgrade("scanner"));
+  CHECK(sim.SensorTier() == 1);
+  CHECK(sim.ScanCost() == 3.0);
+  CHECK(sim.CanScan(*sim.FindBodyById("sec-vance")));
+  CHECK(sim.CanScan(*sim.FindBodyById("vance-star")));
+  CHECK_FALSE(sim.CanScan(*sim.FindBodyById(outerSysId)));
+  CHECK_FALSE(sim.CanScan(*sim.FindBodyById(outerRegId)));
+
+  {
+    const auto yardMid = ship::BuildStationScreen(sim, sim.Map().here).columns[3];
+    CHECK_FALSE(findYardRow(yardMid, "upgrade:scanner")->enabled);
+    CHECK(findYardRow(yardMid, "upgrade:scanner2")->enabled);
+
+    const auto nav1 = ship::BuildNavScreen(sim);
+    bool sawTier1Unlock = false;
+    for (const auto& line : nav1.screen.right[0].lines) {
+      if (line.value.find("upgraded sensor lock") != std::string::npos) {
+        sawTier1Unlock = true;
+      }
+    }
+    CHECK(sawTier1Unlock);
+  }
+
+  // Run a remote regional scan on sec-vance from Kessler!
+  REQUIRE(sim.SelectTarget("sec-vance"));
+  REQUIRE(sim.StartScan());
+  while (sim.FindOngoing("scan")->state != "done") {
+    sim.MutableLife().canisters = 6;
+    sim.MutableMess().rack = 10;
+    REQUIRE(sim.StandWatch());
+  }
+  REQUIRE(sim.Acknowledge("scan"));
+  CHECK(sim.State().scanned.at("sec-vance"));
+
+  // Buy Tier 2 ("scanner2"): scanCost drops to 2, ALL scanLocked entries unlock,
+  // and deep-region systems & outer-galaxy clusters can be scanned remotely + saved mid-scan.
+  REQUIRE(sim.BuyUpgrade("scanner2"));
+  CHECK(sim.SensorTier() == 2);
+  CHECK(sim.ScanCost() == 2.0);
+  CHECK(sim.CanScan(*sim.FindBodyById(outerSysId)));
+  CHECK(sim.CanScan(*sim.FindBodyById(outerRegId)));
+
+  REQUIRE(sim.SelectTarget(localWithLocked));
+  {
+    const auto nav2 = ship::BuildNavScreen(sim);
+    for (const auto& line : nav2.screen.right[0].lines) {
+      CHECK(line.value.find("sensors insufficient") == std::string::npos);
+      CHECK(line.value.find("deep-array sensors required") == std::string::npos);
+    }
+  }
+
+  // Start a deep-region scan on an outer galaxy cluster and round-trip save/load mid-scan.
+  REQUIRE(sim.SelectTarget(outerRegId));
+  REQUIRE(sim.StartScan());
+  std::string why;
+  const std::string saved = sim.SaveJson();
+  INFO(why);
+  REQUIRE(ship::Simulation::ValidSave(saved, World(), &why));
+  ship::Simulation restored = Fresh();
+  REQUIRE(restored.LoadJson(saved, &why));
+  while (restored.FindOngoing("scan")->state != "done") {
+    restored.MutableLife().canisters = 6;
+    restored.MutableMess().rack = 10;
+    REQUIRE(restored.StandWatch());
+  }
+  const std::size_t surveysBefore = restored.Survey().size();
+  REQUIRE(restored.Acknowledge("scan"));
+  CHECK(restored.State().scanned.at(outerRegId));
+  REQUIRE(restored.Survey().size() == surveysBefore + 1);
+  CHECK(restored.Survey().back().value >= 180.0);  // 145 * 1.25 deep-array bonus
+}
+
+TEST_CASE("planet ore extraction, moon mining, gas skimming, and debris looting work end-to-end",
+          "[nav][extract][expansion]") {
+  ship::Simulation sim = Fresh();
+  sim.MutableState().docked = false;
+
+  // Find a rocky planet, a moon, a gas giant, a belt, and a wreck/anomaly site.
+  const ship::Body* rockyPlanet = nullptr;
+  const ship::Body* moonBody = nullptr;
+  const ship::Body* gasPlanet = nullptr;
+  const ship::Body* beltBody = nullptr;
+  const ship::Body* siteBody = nullptr;
+
+  for (const ship::Body& b : sim.World().bodies) {
+    if (sim.World().FindPort(b.id) != nullptr) { continue; }
+    const bool isGas = b.subtype == "gas" || b.klass.find("Gas") != std::string::npos ||
+                       b.klass.find("gas") != std::string::npos;
+    const bool isIce = b.subtype == "ice" || b.subtype == "ocean" ||
+                       b.klass.find("Ice") != std::string::npos ||
+                       b.klass.find("ice") != std::string::npos;
+    if (b.type == "planet" && !isGas && !isIce && rockyPlanet == nullptr) { rockyPlanet = &b; }
+    if (b.type == "moon" && moonBody == nullptr) { moonBody = &b; }
+    if (b.type == "planet" && isGas && gasPlanet == nullptr) { gasPlanet = &b; }
+    if (b.type == "belt" && beltBody == nullptr) { beltBody = &b; }
+    if (b.type == "site" && siteBody == nullptr) { siteBody = &b; }
+  }
+  REQUIRE(rockyPlanet != nullptr);
+  REQUIRE(moonBody != nullptr);
+  REQUIRE(gasPlanet != nullptr);
+  REQUIRE(beltBody != nullptr);
+  REQUIRE(siteBody != nullptr);
+
+  auto tickUntilDone = [](ship::Simulation& s, const std::string& id) {
+    while (s.FindOngoing(id) != nullptr && s.FindOngoing(id)->state != "done") {
+      s.FindStat("energy")->value = 100.0;
+      s.FindStat("hull")->value = 100.0;
+      s.MutableState().filterLife = 100.0;
+      s.MutableState().airHold = 20.0;
+      s.MutableLife().canisters = 6;
+      s.MutableMess().rack = 10;
+      REQUIRE(s.StandWatch());
+    }
+  };
+
+  auto parkAt = [&](const ship::Body& target) {
+    sim.FindStat("energy")->value = 100.0;
+    sim.FindStat("hull")->value = 100.0;
+    sim.MutableState().filterLife = 100.0;
+    sim.MutableState().airHold = 20.0;
+    sim.MutableMap().here = target.id;
+    sim.MutableState().docked = false;
+    REQUIRE(sim.SelectTarget(target.id));
+  };
+
+  // 1. Rocky planet ore extraction: reserves 4 m3 while running/done, blocks
+  //    travel while deployed, survives SaveJson/LoadJson, and depletes after 2 passes
+  //    until scanning unlocks the 3rd deep-vein pass!
+  sim.MutableGoods().clear();
+  parkAt(*rockyPlanet);
+  CHECK(sim.ExtractionMaxPasses(*rockyPlanet) == 2);
+  CHECK(sim.ExtractionActionLabel(*rockyPlanet) == "Extract planetary ore");
+  const double usedBefore = sim.CargoUsed();
+  REQUIRE(ship::PressNavAction(sim, "extract"));
+  REQUIRE(sim.FindOngoing("extract") != nullptr);
+  CHECK(sim.CargoReserved() == 4.0);
+  CHECK_FALSE(sim.StartTravel());  // cannot jump away with surface drills deployed
+
+  std::string why;
+  const std::string savedMidExtract = sim.SaveJson();
+  INFO(why);
+  REQUIRE(ship::Simulation::ValidSave(savedMidExtract, World(), &why));
+  REQUIRE(sim.LoadJson(savedMidExtract, &why));
+  CHECK(sim.CargoReserved() == 4.0);
+
+  tickUntilDone(sim, "extract");
+  CHECK(sim.CargoReserved() == 4.0);  // still reserved while waiting to haul aboard
+  REQUIRE(ship::PressNavAction(sim, "extract"));  // acknowledges & hauls ore aboard
+  CHECK(sim.FindOngoing("extract") == nullptr);
+  CHECK(sim.CargoUsed() > usedBefore);
+  CHECK(sim.ExtractionPassesUsed(*rockyPlanet) == 1);
+
+  // Run pass 2 to hit base depletion (2 / 2), then scan to unlock pass 3!
+  sim.MutableState().actionCooldowns.clear();
+  REQUIRE(sim.StartExtraction());
+  tickUntilDone(sim, "extract");
+  REQUIRE(sim.Acknowledge("extract"));
+  CHECK(sim.ExtractionPassesUsed(*rockyPlanet) == 2);
+  CHECK_FALSE(sim.StartExtraction());  // depleted at 2 / 2
+
+  sim.MutableState().scanned[rockyPlanet->id] = true;
+  CHECK(sim.ExtractionMaxPasses(*rockyPlanet) == 3);
+  REQUIRE(sim.StartExtraction());
+  tickUntilDone(sim, "extract");
+  REQUIRE(sim.Acknowledge("extract"));
+  CHECK(sim.ExtractionPassesUsed(*rockyPlanet) == 3);
+  CHECK_FALSE(sim.StartExtraction());  // fully depleted at 3 / 3
+
+  // 2. Gas giant atmospheric skimming needs 0 m3 cargo hold and condenses fuel + cells.
+  sim.MutableGoods().clear();
+  parkAt(*gasPlanet);
+  sim.FindStat("fuel")->value = 40.0;
+  const double cells0 = sim.State().fuelCells;
+  REQUIRE(sim.StartExtraction());
+  CHECK(sim.CargoReserved() == 0.0);
+  tickUntilDone(sim, "extract");
+  REQUIRE(sim.Acknowledge("extract"));
+  CHECK(sim.StatValue("fuel") > 40.0);
+  CHECK(sim.State().fuelCells >= cells0 + 1.0);
+
+  // 3. Moon mining & Debris/Site looting produce cargo lots and can trigger live hazards.
+  parkAt(*moonBody);
+  const std::size_t lotsBeforeMoon = sim.Goods().size();
+  REQUIRE(sim.StartExtraction());
+  tickUntilDone(sim, "extract");
+  REQUIRE(sim.Acknowledge("extract"));
+  CHECK(sim.Goods().size() == lotsBeforeMoon + 1);
+
+  parkAt(*beltBody);
+  const std::size_t lotsBeforeBelt = sim.Goods().size();
+  REQUIRE(sim.StartExtraction());
+  tickUntilDone(sim, "extract");
+  REQUIRE(sim.Acknowledge("extract"));
+  CHECK(sim.Goods().size() == lotsBeforeBelt + 1);
+  CHECK(sim.Goods().back().kind == "Salvage");
+
+  parkAt(*siteBody);
+  REQUIRE(sim.StartExtraction());
+  tickUntilDone(sim, "extract");
+  REQUIRE(sim.Acknowledge("extract"));
+  CHECK(sim.ExtractionPassesUsed(*siteBody) == 1);
 }

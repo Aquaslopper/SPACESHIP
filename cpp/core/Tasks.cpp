@@ -203,6 +203,7 @@ double Simulation::AdvanceTasks(double n) {
     if (task == nullptr || task->state != "running") { continue; }
 
     const bool needsPower = task->type == "scan" || task->type == "salvage" ||
+                            task->type == "extract" ||
                             (task->type == "shipProject" && task->target != "social");
     const bool needsDrive = task->type == "travel";
     if (needsDrive && (state_.engineCondition <= 0 || StatValue("energy") <= 0)) { continue; }

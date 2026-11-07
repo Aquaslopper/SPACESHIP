@@ -73,6 +73,127 @@ bool Simulation::InRange(const Body& body) const {
   return catalog_.BodySystem(body) == CurrentSystemId();
 }
 
+int Simulation::SensorTier() const {
+  auto has = [this](const char* key) {
+    auto it = state_.upgrades.find(key);
+    return it != state_.upgrades.end() && it->second;
+  };
+  if (has("scanner2")) { return 2; }
+  if (has("scanner")) { return 1; }
+  return 0;
+}
+
+bool Simulation::CanScan(const Body& body) const {
+  const int tier = SensorTier();
+  const std::string curSysId = CurrentSystemId();
+  if (body.type != "region" && body.type != "system" && catalog_.BodySystem(body) == curSysId) {
+    return true;
+  }
+  if (tier <= 0) { return false; }
+
+  const Body* curSys = CurrentSystem();
+  const std::string curRegion = curSys == nullptr ? std::string() : curSys->region;
+  if (tier == 1) {
+    if (body.type == "region") { return false; }
+    if (body.type == "system") { return !curRegion.empty() && body.region == curRegion; }
+    const Body* ownerSys = catalog_.FindSystem(catalog_.BodySystem(body));
+    return ownerSys != nullptr && !curRegion.empty() && ownerSys->region == curRegion;
+  }
+  // Tier 2 deep-array sensors reach systems, regions, and charted bodies across outer sectors.
+  return true;
+}
+
+double Simulation::EffectiveScanCost(const Body& body) const {
+  const double base = std::max(1.0, scanCost_ - (state_.sim.sensor ? 2.0 : 0.0));
+  const std::string curSysId = CurrentSystemId();
+  if (body.type != "region" && body.type != "system" && catalog_.BodySystem(body) == curSysId) {
+    return base;
+  }
+  const Body* curSys = CurrentSystem();
+  const std::string curRegion = curSys == nullptr ? std::string() : curSys->region;
+  std::string targetRegion = body.region;
+  if (body.type == "region") {
+    targetRegion = body.id;
+  } else if (body.type != "system") {
+    const Body* ownerSys = catalog_.FindSystem(catalog_.BodySystem(body));
+    if (ownerSys != nullptr) { targetRegion = ownerSys->region; }
+  }
+  if (!curRegion.empty() && targetRegion == curRegion && body.type != "region") {
+    return base + 1.0;
+  }
+  return base + 2.0;
+}
+
+namespace {
+
+bool IsGasBody(const Body& body) {
+  return body.type == "planet" &&
+         (body.subtype == "gas" || body.klass.find("Gas") != std::string::npos ||
+          body.klass.find("gas") != std::string::npos);
+}
+
+bool IsVolatileIceBody(const Body& body) {
+  return body.subtype == "ice" || body.subtype == "ocean" ||
+         body.klass.find("Ice") != std::string::npos ||
+         body.klass.find("ice") != std::string::npos ||
+         body.klass.find("Ocean") != std::string::npos;
+}
+
+}  // namespace
+
+bool Simulation::CanExtractBody(const Body& body) const {
+  return body.type == "planet" || body.type == "moon" ||
+         body.type == "belt" || body.type == "site";
+}
+
+int Simulation::ExtractionMaxPasses(const Body& body) const {
+  if (!CanExtractBody(body)) { return 0; }
+  const auto scannedIt = state_.scanned.find(body.id);
+  const bool scanned = scannedIt != state_.scanned.end() && scannedIt->second;
+  return (scanned || SensorTier() >= 1) ? 3 : 2;
+}
+
+int Simulation::ExtractionPassesUsed(const Body& body) const {
+  int used = 0;
+  for (int i = 1; i <= 3; ++i) {
+    const std::string key = "extract-" + std::to_string(i) + ":" + body.id;
+    auto it = state_.sim.observed.find(key);
+    if (it != state_.sim.observed.end() && it->second) { ++used; }
+  }
+  return used;
+}
+
+double Simulation::ExtractionReserveVol(const Body& body) const {
+  if (!CanExtractBody(body) || IsGasBody(body)) { return 0.0; }
+  if (body.type == "belt" || body.type == "site") { return 3.0; }
+  return 4.0;
+}
+
+double Simulation::ExtractionWorkCost(const Body& body) const {
+  if (IsGasBody(body) || body.type == "belt") { return 2.0; }
+  return 3.0;
+}
+
+std::string Simulation::ExtractionActionLabel(const Body& body) const {
+  if (IsGasBody(body)) { return "Skim upper atmosphere"; }
+  if (body.type == "planet") {
+    return IsVolatileIceBody(body) ? "Harvest volatile ice" : "Extract planetary ore";
+  }
+  if (body.type == "moon") {
+    return IsVolatileIceBody(body) ? "Mine lunar ice & ore" : "Mine lunar regolith";
+  }
+  if (body.type == "belt") { return "Loot debris field"; }
+  return "Loot derelict site";
+}
+
+std::string Simulation::ExtractionDoneLabel(const Body& body) const {
+  if (IsGasBody(body)) { return "Condense Skimmed Fuel"; }
+  if (body.type == "belt") { return "Haul Debris Salvage"; }
+  if (body.type == "site") { return "Haul Site Loot"; }
+  if (body.type == "moon") { return "Haul Lunar Yield"; }
+  return "Haul Planetary Ore";
+}
+
 bool Simulation::AtTarget(const Body& body) const {
   if (body.type == "system") { return body.id == CurrentSystemId(); }
   return body.id == map_.here;
@@ -299,7 +420,7 @@ bool Simulation::StartTravel() {
   if (!state_.navTarget.has_value()) { return false; }
   const Body* body = FindBodyById(*state_.navTarget);
   if (body == nullptr || !InRange(*body) || AtTarget(*body)) { return false; }
-  if (FindOngoing("travel") != nullptr) { return false; }
+  if (FindOngoing("travel") != nullptr || FindOngoing("extract") != nullptr) { return false; }
   if (state_.docked || state_.engineCondition <= 0 || StatValue("energy") <= 0) { return false; }
 
   const NavMetrics metrics = MetricsFor(*body);
@@ -319,16 +440,43 @@ bool Simulation::StartTravel() {
 bool Simulation::StartScan() {
   if (!state_.navTarget.has_value()) { return false; }
   const Body* body = FindBodyById(*state_.navTarget);
-  if (body == nullptr || !InRange(*body) || body->type == "system") { return false; }
+  if (body == nullptr || !CanScan(*body)) { return false; }
   if (FindOngoing("scan") != nullptr || StatValue("energy") <= 0) { return false; }
 
   // Same ordering rule as a crossing: the initiating action first.
-  const double cost = std::max(1.0, scanCost_ - (state_.sim.sensor ? 2.0 : 0.0));
+  const double cost = EffectiveScanCost(*body);
   state_.sim.sensor = 0;
-  PerformAction("Deep scan started - " + body->name);
+  const bool remote = body->type == "system" || body->type == "region" ||
+                      catalog_.BodySystem(*body) != CurrentSystemId();
+  PerformAction((remote ? "Long-range scan started - " : "Deep scan started - ") + body->name);
   if (!state_.gameOver.empty()) { return true; }
 
-  AddOngoing("scan", "Deep scan - " + body->name, cost, "scan", body->id);
+  AddOngoing("scan", (remote ? "Long-range scan - " : "Deep scan - ") + body->name,
+             cost, "scan", body->id);
+  return true;
+}
+
+bool Simulation::StartExtraction() {
+  if (!state_.gameOver.empty() || !state_.navTarget.has_value()) { return false; }
+  const Body* body = FindBodyById(*state_.navTarget);
+  if (body == nullptr || !CanExtractBody(*body) || !AtTarget(*body)) { return false; }
+  if (state_.docked || StatValue("energy") <= 0) { return false; }
+  if (FindOngoing("extract") != nullptr || FindOngoing("travel") != nullptr) { return false; }
+  if (ExtractionPassesUsed(*body) >= ExtractionMaxPasses(*body)) { return false; }
+
+  const double reserveVol = ExtractionReserveVol(*body);
+  if (reserveVol > 0.0 && CargoUsed() + CargoReserved() + reserveVol > cargo_.capacity) {
+    return false;
+  }
+
+  const std::string actionText = ExtractionActionLabel(*body);
+  const double workCost = ExtractionWorkCost(*body);
+  PerformAction(actionText + " - " + body->name);
+  if (!state_.gameOver.empty()) { return true; }
+
+  Task* task = AddOngoing("extract", actionText + " - " + body->name,
+                          workCost, "extract", body->id);
+  if (task != nullptr) { task->vol = reserveVol; }
   return true;
 }
 
@@ -346,10 +494,15 @@ bool Simulation::Acknowledge(const std::string& taskId) {
   // crossing is still on the books, exactly as the reference does it.
   const std::string type = task->type;
   const std::string target = task->target;
+  const double reservedVol = task->vol;
 
   bool handled = false;
   if (type == "travel" && !target.empty()) { ArriveAt(target); handled = true; }
   else if (type == "scan") { RevealScan(target); handled = true; }
+  else if (type == "extract" && !target.empty()) {
+    FinishExtraction(target, reservedVol);
+    handled = true;
+  }
 
   ClearOngoing(taskId);
   LogLine("Process acknowledged and cleared.");
@@ -388,6 +541,32 @@ void Simulation::RevealScan(const std::string& bodyId) {
   CommissionProgress("scan", body->id);
   CheckCommendations();
 
+  if (body->type == "system") {
+    const auto& localIdx = catalog_.BodiesInSystem(body->id);
+    int ports = 0;
+    int deposits = 0;
+    for (std::size_t idx : localIdx) {
+      if (idx >= catalog_.bodies.size()) { continue; }
+      const Body& local = catalog_.bodies[idx];
+      if (catalog_.FindPort(local.id) != nullptr) { ++ports; }
+      if (CanExtractBody(local)) { ++deposits; }
+    }
+    LogLine("Remote system survey filed: " + body->name + " (" +
+            std::to_string(localIdx.size()) + " charted bodies, " +
+            std::to_string(ports) + " port" + (ports == 1 ? "" : "s") + ", " +
+            std::to_string(deposits) + " extractable deposit" + (deposits == 1 ? "" : "s") + ").");
+    return;
+  }
+  if (body->type == "region") {
+    const auto& sysIdx = catalog_.SystemsInRegion(body->id);
+    if (first) {
+      SimRemember("World", "Deep-array telemetry mapped cluster " + body->name + ".");
+    }
+    LogLine("Deep-region cluster survey filed: " + body->name + " (" +
+            std::to_string(sysIdx.size()) + " star systems catalogued in Science).");
+    return;
+  }
+
   if (catalog_.BodySystem(*body) == CurrentSystemId()) {
     views_["system"].sel = body->id;
     if (map_.layer == "system") { state_.navTarget = body->id; }
@@ -400,16 +579,155 @@ void Simulation::FileSurvey(const Body& body) {
     if (record.id == "sv-" + body.id) { return; }  // already held
   }
   double worth = 60;
-  auto it = catalog_.surveyWorth.find(body.type);
-  if (it != catalog_.surveyWorth.end()) { worth = it->second; }
+  if (body.type == "system") {
+    worth = 95;
+  } else if (body.type == "region") {
+    worth = 145;
+  } else {
+    auto it = catalog_.surveyWorth.find(body.type);
+    if (it != catalog_.surveyWorth.end()) { worth = it->second; }
+  }
+  if (SensorTier() >= 2) {
+    worth = js::Ceil(worth * 1.25);
+  }
 
   SurveyRecord record;
   record.id = "sv-" + body.id;
   record.name = body.name;
-  record.src = "Deep scan";
+  record.src = (body.type == "system" || body.type == "region") ? "Long-range scan" : "Deep scan";
   record.value = worth;
   record.state = "filed";
   survey_.push_back(record);
+}
+
+void Simulation::FinishExtraction(const std::string& bodyId, double reservedVol) {
+  const Body* body = catalog_.FindBody(bodyId);
+  if (body == nullptr || !CanExtractBody(*body)) { return; }
+
+  const int pass = std::min(3, ExtractionPassesUsed(*body) + 1);
+  state_.sim.observed["extract-" + std::to_string(pass) + ":" + body->id] = true;
+
+  const std::uint64_t h = MapEventHash(body->id + "#extract#" + std::to_string(pass));
+  const bool jackpot = (pass == 3) || ((h % 5ULL) == 0ULL);
+  const double freeHold = std::max(0.0, cargo_.capacity - (CargoUsed() + (CargoReserved() - reservedVol)));
+
+  auto addLot = [&](const std::string& name, const std::string& kind,
+                    double vol, double val, bool risk) -> bool {
+    if (vol > freeHold + 1e-6) { return false; }
+    state_.lotSerial += 1;
+    GoodsLot lot;
+    lot.id = "ext-" + std::to_string(static_cast<long long>(state_.lotSerial));
+    lot.name = name;
+    lot.kind = kind;
+    lot.vol = vol;
+    lot.value = val;
+    lot.risk = risk;
+    goods_.push_back(std::move(lot));
+    return true;
+  };
+
+  if (IsGasBody(*body)) {
+    ClampStat("fuel", jackpot ? 20.0 : 14.0);
+    state_.fuelCells += jackpot ? 2 : 1;
+    if (jackpot) {
+      state_.shiplets += 35;
+      LogLine("Atmospheric skim at " + body->name +
+              " hit a helium-3 band: +20% fuel, +2 fuel cells, and +35 sh condensate.");
+      SimRemember("Discovery", "Skimmed a rich helium-3 pocket at " + body->name + ".");
+    } else {
+      LogLine("Atmospheric skim at " + body->name +
+              " condensed +14% drive fuel and 1 fuel cell.");
+    }
+  } else if (body->type == "belt") {
+    const double val = 85.0 + static_cast<double>(h % 31ULL);
+    if (addLot("Belt Salvage (" + body->name + ")", "Salvage", 3.0, val, false)) {
+      CommissionProgress("salvage", body->id);
+      LogLine("Debris field haul at " + body->name + ": 3 m3 salvage stowed in the hold.");
+    }
+    if (jackpot) {
+      state_.repairKits += 1;
+      state_.shiplets += 40;
+      LogLine("Debris jackpot at " + body->name +
+              ": stripped 1 intact repair kit and 40 sh in transponder cores.");
+      SimRemember("Discovery", "Cracked an intact hull section inside " + body->name + ".");
+    }
+  } else if (body->type == "site") {
+    const std::uint64_t pick = (h + static_cast<std::uint64_t>(pass)) % 4ULL;
+    if (pick == 0ULL) {
+      if (addLot("Derelict Salvage (" + body->name + ")", "Salvage", 3.0, 96.0, false)) {
+        CommissionProgress("salvage", body->id);
+      }
+      state_.repairKits += 1;
+      LogLine("Derelict cut at " + body->name +
+              ": recovered 3 m3 hull salvage and 1 field repair kit.");
+    } else if (pick == 1ULL) {
+      addLot("Recovered Components (" + body->name + ")", "Components", 2.0, 150.0, false);
+      LogLine("Derelict salvage at " + body->name +
+              ": extracted 2 m3 intact shipboard components.");
+    } else if (pick == 2ULL) {
+      addLot("Sealed Relic Cask (" + body->name + ")", "Relics", 2.0, 195.0, false);
+      state_.sim.insight += 1;
+      LogLine("Vault breach at " + body->name +
+              ": stowed 2 m3 pre-collapse relics and logged +1 insight.");
+      SimRemember("Discovery", "Opened a sealed vault inside " + body->name + ".");
+    } else {
+      addLot("Unregistered Strongbox (" + body->name + ")", "Unregistered", 2.0, 210.0, true);
+      state_.shiplets += 55;
+      LogLine("Wreck locker at " + body->name +
+              ": recovered +55 sh chits and 2 m3 unregistered cargo.");
+    }
+  } else if (IsVolatileIceBody(*body)) {
+    if (jackpot) {
+      addLot("Subglacial Relic Core (" + body->name + ")", "Relics", 2.0, 185.0, false);
+      mess_.rack = std::min(mess_.capacity, mess_.rack + 2.0);
+      LogLine("Deep ice core at " + body->name +
+              ": recovered 2 m3 subglacial relics and +2 purified water/ration stores.");
+      SimRemember("Discovery", "Extracted a preserved subglacial core on " + body->name + ".");
+    } else {
+      const double val = 70.0 + static_cast<double>(h % 25ULL);
+      addLot("Cryo-Volatile Ice (" + body->name + ")", "Water", 4.0, val, false);
+      LogLine("Volatile harvest at " + body->name + ": 4 m3 cryo-ice stowed in the hold.");
+    }
+  } else {
+    // Rocky, terrestrial, lava planet or moon regolith extraction.
+    const std::string tag = body->type == "moon" ? "Lunar Regolith Ore" : "Planetary Ore";
+    if (jackpot) {
+      addLot("Rare-Earth Seam (" + body->name + ")", "Components", 3.0, 160.0, false);
+      if (body->type == "moon") { state_.fuelCells += 1; }
+      LogLine("Rich vein tapped on " + body->name +
+              ": refined 3 m3 rare-earth components" +
+              (body->type == "moon" ? " and 1 He-3 fuel cell." : "."));
+      SimRemember("Discovery", "Tapped a rich rare-earth motherlode on " + body->name + ".");
+    } else {
+      const double val = (body->type == "moon" ? 84.0 : 80.0) + static_cast<double>(h % 26ULL);
+      addLot(tag + " (" + body->name + ")", "Bulk metal", 4.0, val, false);
+      LogLine("Surface extraction on " + body->name + ": 4 m3 " + tag + " winched into the hold.");
+    }
+  }
+
+  // Dynamic extraction hazard roll (~24% base, elevated on deep passes or unstable hulks).
+  const std::uint64_t hazardRoll = (h >> 8U) % 100ULL;
+  const std::string feature = DetailValue(*body, "Map feature");
+  const std::uint64_t threshold =
+      (feature == "Unstable hulk") ? 55ULL : (pass >= 2 ? 70ULL : 80ULL);
+  if (hazardRoll >= threshold) {
+    const Body* sys = catalog_.FindSystem(catalog_.BodySystem(*body));
+    const Body* reg = sys == nullptr ? nullptr : catalog_.FindRegion(sys->region);
+    const std::string auth = reg == nullptr ? std::string() : DetailValue(*reg, "Authority");
+    if ((auth == "None" || auth == "Free Captains") && hazardRoll >= 90ULL) {
+      SpawnMapIncident("map-pirate-toll",
+                       "Mining signature at " + body->name + " drew an armed claim-jumper.");
+    } else if (body->type == "belt" || body->type == "site") {
+      SpawnMapIncident("map-derelict-ping",
+                       "Cutting charges at " + body->name + " kicked spall across the hull.");
+    } else if (IsVolatileIceBody(*body)) {
+      SpawnMapIncident("map-cryo-spore",
+                       "Thermal drills on " + body->name + " vented a pressurized brine plume.");
+    } else {
+      SpawnMapIncident("map-ion-squall",
+                       "Magnetic dust shear over " + body->name + " surged through the array.");
+    }
+  }
 }
 
 void Simulation::ChronicleVisit(const Body* system) {

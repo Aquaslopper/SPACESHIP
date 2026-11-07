@@ -770,11 +770,18 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
       if (!found) { return fail("a crossing to a body that does not exist"); }
     }
     if (type == "scan") {
-      bool found = false;
-      for (const Body& body : catalog.bodies) {
-        if (body.id == target) { found = true; }
+      if (catalog.FindBody(target) == nullptr && catalog.FindSystem(target) == nullptr &&
+          catalog.FindRegion(target) == nullptr) {
+        return fail("a scan of a body that does not exist");
       }
-      if (!found) { return fail("a scan of a body that does not exist"); }
+    }
+    if (type == "extract") {
+      if (catalog.FindBody(target) == nullptr) {
+        return fail("an extraction on a body that does not exist");
+      }
+      const double vol = GetNumber(task, "vol");
+      if (vol < 0) { return fail("an extraction with negative volume"); }
+      if (taskState == "running" || taskState == "done") { held += vol; }
     }
     if (type == "o2slot") {
       const Json* slot = At(task, "slot");

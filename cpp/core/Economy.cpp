@@ -49,10 +49,13 @@ double Simulation::CargoUsed() const {
 }
 
 double Simulation::CargoReserved() const {
-  // Salvage in flight has already been promised the space it will take.
+  // Salvage and surface extraction in flight have already been promised the space they will take.
   double reserved = 0;
   for (const Task& task : state_.ongoing) {
     if (task.type == "salvage" && task.state == "running") { reserved += task.vol; }
+    if (task.type == "extract" && (task.state == "running" || task.state == "done")) {
+      reserved += task.vol;
+    }
   }
   return reserved;
 }
@@ -385,6 +388,14 @@ bool Simulation::BuyUpgrade(const std::string& upgradeId) {
     state_.upgrades["scanner"] = true;
     scanCost_ = 3;
     PerformAction("Sensors upgraded");
+    return true;
+  }
+  if (upgradeId == "scanner2" && Truthy(state_.upgrades, "scanner") &&
+      !Truthy(state_.upgrades, "scanner2") && state_.shiplets >= 1100) {
+    state_.shiplets -= 1100;
+    state_.upgrades["scanner2"] = true;
+    scanCost_ = 2;
+    PerformAction("Deep-array sensors fitted");
     return true;
   }
   if (upgradeId == "hull" && StatValue("hull") < 100 && state_.shiplets >= 120) {
