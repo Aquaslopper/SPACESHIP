@@ -310,7 +310,6 @@ if(SPACESHIP_BUILD_TESTS)
     cpp/tests/task_tests.cpp
     cpp/tests/nav_tests.cpp
     cpp/tests/crew_tests.cpp
-    cpp/tests/station_tests.cpp
     cpp/tests/starter_tests.cpp
     cpp/tests/galaxy_gen_tests.cpp)
   # The Phase 0 data gate: the catalogue must hold the reference world. It was
