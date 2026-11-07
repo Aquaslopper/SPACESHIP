@@ -20,6 +20,10 @@ std::vector<RectCall> rects;
 std::vector<ship::Area> scissors;
 struct EllipseCall { float x, y, rx, ry; Color color; };
 std::vector<EllipseCall> ellipses;
+// Circles are recorded so a chart body can be shown to be a painted sphere
+// rather than a flat dot: the chart's whole vocabulary is drawn with them.
+struct CircleCall { float x, y, r; Color color; bool filled; };
+std::vector<CircleCall> circles;
 float cameraY = 0;
 int drawOrder = 0;
 int textureCalls = 0;
@@ -34,7 +38,7 @@ const TextCall& FindText(const std::string& value) {
   return *it;
 }
 void Frame(ship::ShellView& view, ship::Simulation& sim, double nowMs = 0) {
-  texts.clear(); rects.clear(); scissors.clear(); ellipses.clear(); textureDraws.clear(); textureCalls = 0; drawOrder = 0;
+  texts.clear(); rects.clear(); scissors.clear(); ellipses.clear(); circles.clear(); textureDraws.clear(); textureCalls = 0; drawOrder = 0;
   // ImGui 1.92 builds glyphs lazily at each new text size. This recording
   // backend has no renderer to upload the rebuilt atlas automatically.
   unsigned char* pixels; int w, h;
@@ -116,9 +120,21 @@ void DrawRectangleLinesEx(Rectangle, float, Color) {}
 void DrawRectangleRounded(Rectangle, float, int, Color) {}
 void DrawRectangleRoundedLinesEx(Rectangle, float, int, float, Color) {}
 void DrawEllipse(int x, int y, float rx, float ry, Color c) { ellipses.push_back({float(x), y + cameraY, rx, ry, c}); }
+void DrawEllipseLines(int x, int y, float rx, float ry, Color c) { ellipses.push_back({float(x), y + cameraY, rx, ry, c}); }
 void DrawCircle(int, int, float, Color) {}
-void DrawCircleV(Vector2, float, Color) {}
+void DrawCircleV(Vector2 center, float radius, Color color) {
+  circles.push_back({center.x, center.y + cameraY, radius, color, true});
+}
 void DrawCircleLines(int, int, float, Color) {}
+void DrawCircleLinesV(Vector2 center, float radius, Color color) {
+  circles.push_back({center.x, center.y + cameraY, radius, color, false});
+}
+void DrawCircleGradient(Vector2 center, float radius, Color inner, Color) {
+  circles.push_back({center.x, center.y + cameraY, radius, inner, true});
+}
+void DrawCircleSector(Vector2 center, float radius, float, float, int, Color color) {
+  circles.push_back({center.x, center.y + cameraY, radius, color, true});
+}
 void DrawLine(int, int, int, int, Color) {}
 void DrawLineEx(Vector2, Vector2, float, Color) {}
 void DrawRing(Vector2, float, float, float, float, int, Color) {}
@@ -910,6 +926,28 @@ int main() {
         return r.w > 200 && r.h > 100 && r.color.r == c.r && r.color.g == c.g && r.color.b == c.b;
       });
       Require(mapBox != rects.end(), "No painted map for label fixture");
+      // The chart draws bodies as themselves, not as dots: a planet is a lit
+      // disc with a shadowed hemisphere, a gas giant carries its ring, and a
+      // star bleeds light. Recorded here so the art cannot silently regress to
+      // "one filled circle per name".
+      std::vector<CircleCall> chartCircles;
+      for (const auto& circle : circles) {
+        if (circle.x < mapBox->x || circle.x > mapBox->x + mapBox->w) continue;
+        if (circle.y < mapBox->y || circle.y > mapBox->y + mapBox->h) continue;
+        chartCircles.push_back(circle);
+      }
+      Require(chartCircles.size() >= 30, "Chart bodies were not painted as spheres");
+      Require(std::any_of(chartCircles.begin(), chartCircles.end(),
+                          [](const CircleCall& c) { return c.filled && c.r >= 2.5f; }),
+              "No chart body was drawn as a disc");
+      Require(std::any_of(chartCircles.begin(), chartCircles.end(),
+                          [](const CircleCall& c) { return c.color.a < 255 && c.r >= 6.0f; }),
+              "No chart star painted a corona");
+      Require(std::any_of(ellipses.begin(), ellipses.end(), [&](const EllipseCall& e) {
+                return e.x >= mapBox->x && e.x <= mapBox->x + mapBox->w && e.y >= mapBox->y &&
+                       e.y <= mapBox->y + mapBox->h && e.rx > e.ry * 2.0f && e.ry >= 1.0f;
+              }),
+              "A gas giant's ring was not painted");
       cockpit.Click(audit, mapBox->x + labelBody->labelX * mapBox->w / audit.Map().vw + 20,
                      mapBox->y + labelBody->labelY * mapBox->h / audit.Map().vh + 3,
                      ship::HitButton::Left, 972000);

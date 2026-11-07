@@ -191,6 +191,7 @@ target_include_directories(spaceship_json INTERFACE
 # ---------------------------------------------------------------------------
 add_library(spaceship_core STATIC
   cpp/data/Catalog.cpp
+  cpp/data/ChartExpansion.cpp
   cpp/core/JsNumber.cpp
   cpp/core/Action.cpp
   cpp/core/Survival.cpp

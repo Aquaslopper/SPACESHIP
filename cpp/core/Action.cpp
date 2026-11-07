@@ -11,6 +11,8 @@
 // ============================================================================
 #include "core/Simulation.h"
 
+#include "data/ChartExpansion.h"
+
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -61,6 +63,10 @@ CrewMember MakeCrew(const CrewDefinition& def) {
 Simulation Simulation::NewVoyage(const Catalog& catalog) {
   Simulation sim;
   sim.catalog_ = catalog;
+  // Grow the charted galaxy before anything reads the chart. The authored
+  // catalogue is never touched: this works on the voyage's own copy, and a
+  // catalogue that has already been grown is left exactly as it is.
+  ExpandChart(sim.catalog_);
   sim.rules_ = catalog.rules;
   sim.scanCost_ = catalog.rules.scanCost;
 
@@ -108,23 +114,8 @@ Simulation Simulation::NewVoyage(const Catalog& catalog) {
 
   // ---- the chart ---------------------------------------------------------
   sim.map_ = MapView();
-  const MapGeometry& geometry = catalog.map;
-  sim.map_.w = geometry.w;
-  sim.map_.h = geometry.h;
-  sim.map_.cx = geometry.cx;
-  sim.map_.cy = geometry.cy;
-  sim.map_.vw = geometry.w;
-  sim.map_.vh = geometry.h;
-  sim.map_.zoom = geometry.zoom;
-  sim.map_.zmin = geometry.zmin;
-  sim.map_.zmax = geometry.zmax;
-  sim.map_.zstep = geometry.zstep;
-  sim.map_.grid = geometry.grid;
-  sim.map_.vpy = geometry.vpy;
-  sim.map_.rungs = geometry.rungs;
-  sim.map_.rungPow = geometry.rungPow;
-  sim.map_.pxPerAction = geometry.pxPerAction;
-  sim.map_.lyPerAction = geometry.lyPerAction;
+  sim.map_.zoom = sim.catalog_.map.zoom;
+  sim.ApplyChartBoard();
   for (const std::string& layer : catalog.layerOrder) { sim.views_[layer] = LayerView(); }
 
   // ---- the hold ----------------------------------------------------------

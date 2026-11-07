@@ -375,6 +375,9 @@ class Simulation {
   void FileSurvey(const Body& body);
   void ChronicleVisit(const Body* system);
   std::vector<const Body*> CurBodies() const;
+  // Puts the live MapView on the board its scale is drawn on. The system chart
+  // keeps the reference's 638x278 board; the sector chart is the wide one.
+  void ApplyChartBoard();
 
   // Economy.cpp
   const Port* HerePort() const;

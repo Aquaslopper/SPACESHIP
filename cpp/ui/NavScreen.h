@@ -93,6 +93,7 @@ struct NavBodyView {
   std::string type;     // origin/star/planet/moon/station/belt/site/system/region
   std::string subtype;  // gas/ice/ocean/rock, planets only
   std::string klass;
+  std::string region;   // systems and regions only; the browsed sector is read from Map()
 
   double worldX = 0;
   double worldY = 0;

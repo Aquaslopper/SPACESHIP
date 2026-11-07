@@ -51,6 +51,16 @@ const LayerView& ViewOf(const Simulation& sim) {
 }
 
 // curBodies(), as pointers so the panels can ask each body its own questions.
+//
+// Every body of the scale is here - nothing is held back by a region or a
+// sensor filter. The sector chart used to show only the systems of the region
+// being read, which is seven of forty-eight; with the galaxy generated, that
+// filter would hide a hundred and fifty stars behind a button. What a body can
+// be *used for* is a separate question, and InRange() still answers it.
+//
+// The system chart is the one place a filter is not a filter: every system's
+// local bodies live in one coordinate space, so "this system's bodies" is the
+// only set that is spatially meaningful at that scale.
 std::vector<const Body*> LayerBodies(const Simulation& sim) {
   std::vector<const Body*> out;
   const Catalog& catalog = sim.World();
@@ -66,9 +76,7 @@ std::vector<const Body*> LayerBodies(const Simulation& sim) {
     }
     return out;
   }
-  for (const Body& body : catalog.systems) {
-    if (body.region == sim.Map().sector) { out.push_back(&body); }
-  }
+  for (const Body& body : catalog.systems) { out.push_back(&body); }
   return out;
 }
 
@@ -335,6 +343,7 @@ NavChartView BuildNavChart(const Simulation& sim) {
     bodyView.type = body->type;
     bodyView.subtype = body->subtype;
     bodyView.klass = body->klass;
+    bodyView.region = body->region;
     bodyView.worldX = body->x;
     bodyView.worldY = body->y;
     bodyView.at = NavProjectPanned(map, view, body->x, body->y);
@@ -384,11 +393,9 @@ NavChartView BuildNavChart(const Simulation& sim) {
     for (const Lane& lane : lanes) {
       const Body* a = FindIn(list, lane.from);
       const Body* b = FindIn(list, lane.to);
-      if (a == nullptr || b == nullptr || a == nullptr) { continue; }
-      if (chart.layer == "sector" &&
-          (a->region != map.sector || b->region != map.sector)) {
-        continue;
-      }
+      if (a == nullptr || b == nullptr) { continue; }
+      // The lane web is painted whole: a region that is not the one being read
+      // is still out there, and its lanes are how the chart shows it.
       append(NavRouteDots(sim, a->x, a->y, b->x, b->y, false, true));
     }
     if (chart.layer == "sector") {
@@ -411,10 +418,15 @@ NavChartView BuildNavChart(const Simulation& sim) {
   }
 
   // --- clusters -----------------------------------------------------------
-  if (chart.layer == "galaxy" || chart.layer == "sector") {
+  // The deep field. The reference drew it on the two wide scales only; the
+  // system chart had no sky behind it at all, which is half of why the map
+  // looked empty. Same seed and same projection, more stars, every scale.
+  {
     double seed = 8721;
-    const double count = chart.layer == "galaxy" ? 260 : 108;
+    double count = 420;
+    if (chart.layer == "galaxy") { count = 900; }
     if (chart.layer == "sector") {
+      count = 760 + static_cast<double>(sim.World().systems.size()) * 3.0;
       for (std::size_t i = 0; i < sim.World().regions.size(); ++i) {
         if (sim.World().regions[i].id == map.sector) {
           seed += static_cast<double>(i) + 1;

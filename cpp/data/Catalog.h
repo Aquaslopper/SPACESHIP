@@ -55,6 +55,18 @@ class Catalog {
   Counts counts;
 
   MapGeometry map;
+
+  // The board each scale is drawn on. The system chart keeps the reference's
+  // 638x278 board exactly; ChartExpansion() widens the sector board so every
+  // system can own a position instead of six of them sharing one dot. A layer
+  // with no entry here is drawn on `map`.
+  std::map<std::string, MapGeometry> layerBoards;
+
+  // Set by ExpandChart(). The chart is grown once per catalogue, so a voyage
+  // started from an already-grown catalogue (or restarted from its own copy)
+  // does not grow a second galaxy.
+  bool chartExpanded = false;
+
   DeckPlan wren;
   DeckPlan kestrel;
   // ROOM_SCENES, by room id. Authored, never computed.

@@ -1296,6 +1296,11 @@ void ShellView::PaintTaskScreen(Simulation& sim) {
   (void)sim;
 }
 
+// The chart's celestial bodies: stars, worlds, moons, stations and dust.
+namespace {
+#include "ChartArt.inc"
+}  // namespace
+
 void ShellView::PaintNavScreen(Simulation& sim) {
   navHits_.clear();
   const Palette& p = theme_.palette;
@@ -1369,12 +1374,20 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     DrawLineEx(Vector2{x1, y1}, Vector2{x2, y2}, 1.0f, Fade(ToRay(p.ink), 0.13f));
   }
 
+  // The deep field. One pixel per star was invisible at every scale wider than
+  // the authored board; the points now keep a size the screen can show, and the
+  // brighter ones carry a little light so the sky has depth.
+  const float starPx = std::clamp(sx, 1.0f, 2.0f);
   for (const NavDot& dot : chart.clusters) {
     const float px = box.x + static_cast<float>(dot.x) * sx;
     const float py = box.y + static_cast<float>(dot.y) * sy;
-    DrawRectangle(static_cast<int>(px), static_cast<int>(py), 1, 1,
-                  ToRay(dot.cls.find("bright") != std::string::npos ? p.coffee
-                                                                  : p.muted));
+    if (dot.cls.find("bright") != std::string::npos) {
+      DrawCircleV(Vector2{px, py}, starPx + 1.7f, Fade(ToRay(p.amber), 0.22f));
+      DrawCircleV(Vector2{px, py}, std::max(1.0f, starPx * 0.8f), ToRay(p.coffee));
+    } else {
+      const int size = static_cast<int>(std::ceil(starPx * 0.75f));
+      DrawRectangle(static_cast<int>(px), static_cast<int>(py), size, size, ToRay(p.muted));
+    }
   }
   for (const NavDot& dot : chart.routes) {
     const float px = box.x + static_cast<float>(dot.x) * sx;
@@ -1396,41 +1409,134 @@ void ShellView::PaintNavScreen(Simulation& sim) {
                     ToRay(p.sage));
   }
 
-  for (const NavBodyView& body : chart.bodies) {
-    const float cx = box.x + static_cast<float>(body.at.x) * sx;
-    const float cy = box.y + static_cast<float>(body.at.y) * sy;
-    const float radius = static_cast<float>(body.size) * 0.42f * bodyScale;
-    Color fill = ToRay(p.coffee);
-    if (body.type == "station") { fill = ToRay(p.coffeeLight); }
-    if (body.type == "star") { fill = ToRay(p.ink); }
-    if (body.type == "region") { fill = ToRay(p.panel3); }
-    if (body.type == "origin") { fill = ToRay(p.sage); }
-    DrawCircleV(Vector2{cx, cy}, radius, fill);
-    if (body.selected) {
-      DrawCircleLines(static_cast<int>(cx), static_cast<int>(cy), radius + 3.0f,
-                      ToRay(p.terracotta));
+  // --- the bodies themselves ----------------------------------------------
+  // Nothing is hidden and nothing is filtered: every body of the scale is
+  // drawn as what it is, dimmed only when the sensors cannot reach it.
+  std::vector<const NavBodyView*> ordered;
+  ordered.reserve(chart.bodies.size());
+  for (const NavBodyView& body : chart.bodies) { ordered.push_back(&body); }
+  std::stable_sort(ordered.begin(), ordered.end(),
+                   [](const NavBodyView* a, const NavBodyView* b) {
+                     return ChartPaintRank(ChartLookOf(*a)) < ChartPaintRank(ChartLookOf(*b));
+                   });
+
+  for (const NavBodyView* body : ordered) {
+    const float cx = box.x + static_cast<float>(body->at.x) * sx;
+    const float cy = box.y + static_cast<float>(body->at.y) * sy;
+    const float radius = static_cast<float>(body->size) * 0.42f * bodyScale;
+    const ChartLook look = ChartLookOf(*body);
+    // Sensors and the browsed sector are emphasis, never a filter: a body the
+    // ship cannot reach, or a system in a region it is not reading, is still
+    // drawn - just a shade quieter than the ones the chart is about.
+    float alpha = body->inRange || body->here ? 1.0f : 0.78f;
+    if (chart.layer == "sector" && !body->region.empty() && !sim.Map().sector.empty() &&
+        body->region != sim.Map().sector) {
+      alpha = std::min(alpha, 0.86f);
     }
-    const int labelX =
-        static_cast<int>(box.x + static_cast<float>(body.labelX) * sx);
-    const float labelW = 92.0f * sx;
-    const auto labelLines = WrapText(body.name, labelW, TypePx(9), SelectFont(TypePx(9), false));
-    const float labelY = box.y + static_cast<float>(body.labelY) * sy;
+    PaintChartBody(*body, cx, cy, radius, bodyScale, p, alpha);
+
+    // Every body is clickable at every scale, label or no label.
+    const float reach = std::max(radius, ChartMinimumRadius(look, bodyScale)) + 4.0f;
+    navHits_.push_back(NavHit{Area{cx - reach, cy - reach, reach * 2.0f, reach * 2.0f},
+                              "select", body->id});
+  }
+
+  // The selection ring is a second pass, so a nearby star cannot paint over it.
+  for (const NavBodyView* body : ordered) {
+    if (!body->selected) { continue; }
+    const float cx = box.x + static_cast<float>(body->at.x) * sx;
+    const float cy = box.y + static_cast<float>(body->at.y) * sy;
+    const float radius = static_cast<float>(body->size) * 0.42f * bodyScale;
+    const float drawn = std::max(radius, ChartMinimumRadius(ChartLookOf(*body), bodyScale));
+    DrawCircleLinesV(Vector2{cx, cy}, drawn + 3.5f, ToRay(p.terracotta));
+    DrawCircleLinesV(Vector2{cx, cy}, drawn + 5.5f, Fade(ToRay(p.terracotta), 0.45f));
+  }
+
+  // --- the labels ----------------------------------------------------------
+  // Two hundred systems on one chart cannot all be named at once without the
+  // names hiding the chart. A label is placed where it can be read: the
+  // selected body first, then the ship's own, then what is in sensor range,
+  // then the stars and regions, then everything else. A name that would land on
+  // another name is dropped for this frame - the body is still drawn, still
+  // clickable, and named as soon as the chart has room for it.
+  std::vector<const NavBodyView*> labelled = ordered;
+  const NavPoint labelAnchor = chart.hasMarker ? chart.marker : NavPoint{0.0, 0.0};
+  const std::string browsed = sim.Map().sector;
+  std::stable_sort(labelled.begin(), labelled.end(),
+                   [&labelAnchor, &browsed](const NavBodyView* a, const NavBodyView* b) {
+                     const int pa = ChartLabelPriority(*a);
+                     const int pb = ChartLabelPriority(*b);
+                     if (pa != pb) { return pa < pb; }
+                     // Inside the region on screen comes before the rest.
+                     const bool ain = !browsed.empty() && a->region == browsed;
+                     const bool bin = !browsed.empty() && b->region == browsed;
+                     if (ain != bin) { return ain; }
+                     const double da = (a->at.x - labelAnchor.x) * (a->at.x - labelAnchor.x) +
+                                       (a->at.y - labelAnchor.y) * (a->at.y - labelAnchor.y);
+                     const double db = (b->at.x - labelAnchor.x) * (b->at.x - labelAnchor.x) +
+                                       (b->at.y - labelAnchor.y) * (b->at.y - labelAnchor.y);
+                     if (da != db) { return da < db; }
+                     return a->id < b->id;
+                   });
+  // A wide chart carries two hundred names; naming all of them at once would
+  // bury the chart they belong to. The budget keeps the nearest and the most
+  // relevant readable, and every other body is still drawn and still clickable.
+  const std::size_t labelBudget =
+      chart.layer == "sector" ? 26u : (chart.layer == "galaxy" ? 16u : 48u);
+  std::size_t labelsPainted = 0;
+  std::vector<Area> takenLabels;
+  takenLabels.reserve(labelled.size());
+  for (const NavBodyView* body : labelled) {
+    const float labelX = box.x + static_cast<float>(body->labelX) * sx;
+    // Wrap by whole words even when the scale is wide: a name split down the
+    // middle ("Beaco / n") is not a label anybody can read, so the box grows to
+    // the longest word before it is allowed to break a line.
+    float longestWord = 0.0f;
+    {
+      std::string word;
+      for (const char c : body->name + " ") {
+        if (c == ' ') {
+          if (!word.empty()) {
+            longestWord = std::max(longestWord, TextWidth(word.c_str(), TypePx(9)));
+            word.clear();
+          }
+        } else {
+          word.push_back(c);
+        }
+      }
+    }
+    const float labelW = std::max(92.0f * sx, longestWord + 6.0f);
+    const auto labelLines =
+        WrapText(body->name, labelW, TypePx(9), SelectFont(TypePx(9), false));
+    const float labelY = box.y + static_cast<float>(body->labelY) * sy;
+    const float textHeight =
+        theme_.LineHeight() * static_cast<float>(labelLines.size());
+    if (labelsPainted >= labelBudget) { break; }
+    // A label is only painted where the whole of it fits: half a name hanging
+    // over the panels is not a label, it is clutter.
+    const Area rect{labelX, labelY, labelW, textHeight};
+    if (rect.x < box.x || rect.y < box.y || rect.Right() > box.Right() ||
+        rect.Bottom() > box.Bottom()) {
+      continue;
+    }
+    bool clashes = false;
+    for (const Area& taken : takenLabels) {
+      if (ChartRectsOverlap(rect, taken)) { clashes = true; break; }
+    }
+    if (clashes) { continue; }
+    takenLabels.push_back(rect);
+    ++labelsPainted;
+
     float textY = labelY;
+    const ::Color ink = body->selected ? ToRay(p.ink)
+                                       : (body->scanned ? ToRay(p.ink) : ToRay(p.muted));
     for (const auto& line : labelLines) {
-      const float textX = body.labelRight ? labelX + labelW - TextWidth(line.c_str(), TypePx(9)) : labelX;
-      Text(line.c_str(), static_cast<int>(textX), static_cast<int>(textY), TypePx(9),
-           ToRay(body.scanned ? p.ink : p.muted));
+      const float textX =
+          body->labelRight ? labelX + labelW - TextWidth(line.c_str(), TypePx(9)) : labelX;
+      Text(line.c_str(), static_cast<int>(textX), static_cast<int>(textY), TypePx(9), ink);
       textY += theme_.LineHeight();
     }
-    const float hitLeft = std::max(box.x, static_cast<float>(labelX));
-    const float hitTop = std::max(box.y, labelY);
-    const float hitRight = std::min(box.Right(), labelX + labelW);
-    const float hitBottom = std::min(box.Bottom(), textY);
-    if (hitRight > hitLeft && hitBottom > hitTop)
-      navHits_.push_back(NavHit{Area{hitLeft, hitTop, hitRight - hitLeft, hitBottom - hitTop}, "select", body.id});
-    navHits_.push_back(NavHit{Area{cx - radius - 4.0f, cy - radius - 4.0f,
-                                   radius * 2.0f + 8.0f, radius * 2.0f + 8.0f},
-                              "select", body.id});
+    navHits_.push_back(NavHit{rect, "select", body->id});
   }
   if (chart.hasMarker && sim.HomeBody() != nullptr) {
     const float px = box.x + static_cast<float>(chart.marker.x) * sx;
