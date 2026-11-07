@@ -62,3 +62,15 @@ You must append a compressed summary of **every single reply and action you take
 - Job log endpoints (gh run view --log-failed, /actions/jobs/ID/logs) are unreachable from this sandbox -- they redirect off the allowlisted hosts; the owner's pasted log tail was used for the JS failure detail instead.
 - Posted PR comment #issuecomment-6700716679 with the CI reading, the pre-existing-failure proof and the proposed follow-up (repoint the .cjs harness or skip node --test while the reference is absent) explicitly left for owner approval.
 - Untouched this reply: cpp/**, assets/**, rescue/**, tests/**, AGENTS.md.
+
+### Entry #004
+- **Timestamp:** 2026-11-07 02:08 UTC
+- **Task:** owner recognised the CI step references files that no longer exist and said they should remove that line. One line removed, nothing else.
+- Scanned every path referenced by CMakeLists.txt, build.sh, .github/workflows/build.yml, AGENTS.md, README.md, tools/*.sh for files absent from the tree; most hits are runtime-constructed probe paths (false positives), four are real.
+- Real dangling reference 1: ../Spaceship.hta, read by all four tests/*.test.cjs. Not tracked (git ls-files | grep -c 'hta$' = 0); only rescue/images/10_reference_HTA_version_truebuild.png still names it. Cause of the 4/4 ENOENT CI failure, locally reproduced at node v22.22.3.
+- Real dangling reference 2: "Legacy code_Spaceship.txt", named by AGENTS.md rule 2 as the source of truth to trace before inventing behaviour, and by the CMakeLists.txt header -- the file is not in the tree.
+- Real dangling reference 3: tools/export-data.cjs, the catalogue export-and-check workflow AGENTS.md mandates; deleted on main (commit "Delete tools/export-data.cjs").
+- Real dangling reference 4: tests/parity/*.script -- all 22 scripts remain, but their runner (tools/run-save-parity.cmake, tools/run-save-stage.cmake) was deleted on main, so no consumer in the repo executes them any more.
+- Change: .github/workflows/build.yml test-linux final step -- dropped node --test tests/*.test.cjs, with a comment in the step recording why and what to do to bring it back. The .cjs files, tests/parity/, AGENTS.md and cpp/** were NOT touched: retiring a CI invocation is reversible, deleting the harness or editing the reference material is the owner's call.
+- Verification: YAML parses (pyyaml), jobs and step counts intact; committed aa04177 and pushed; run 42327389530 conclusion SUCCESS -- build-windows 9/9 steps and test-linux 7/7 steps, including "Configure and build client and tests" (client built and linked on a real Ubuntu runner under -DSPACESHIP_BUILD_GUI=ON with -DSPACESHIP_REQUIRE_GUI=ON) and "Require input and drawing probes, then run regression suite" (three probe scripts + ctest with the newly wired catalog_tests.cpp).
+- First CI green on this repo since the deletions began; main's last six pushes all ended in failure.
