@@ -256,7 +256,6 @@ bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
                               if (taskId == "maint") { return sim.StartMaintenanceSelf(); }
                               if (taskId == "cook") { return sim.StartCookingSelf(); }
                               if (taskId == "travel") { return sim.StartTravel(); }
-                              if (taskId == "undock") { return sim.Undock(); }
                               if (taskId == "scan") { return sim.StartScan(); }
                               if (taskId == "extract") { return sim.StartExtraction(); }
                               if (taskId == "crew-assign") { return sim.CommitOrders(); }
@@ -684,12 +683,6 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       }
       screen.panelRows.push_back(commitRows);
       screen.panelRowIds.push_back(commitIds);
-      // Departure is never buried in a card: while docked, the band under the
-      // three columns carries the one-click Undock.
-      if (model.docked) {
-        screen.progress.push_back(
-            BuildProgressButton(sim, "undock", "Undock", true, "Undocked", "space"));
-      }
       return screen;
     }
     case ScreenKind::Cargo:
