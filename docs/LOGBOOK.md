@@ -257,3 +257,16 @@ You must append a compressed summary of **every single reply and action you take
 - **Limits:** No windowed GUI was linked or launched, so this verifies the painter's recorded geometry/input, not an on-screen screenshot or full visual/gameplay parity.
 - **Untouched:** `Legacy code_Spaceship.txt`, `assets/`, `rescue/`, simulation behavior, and task/event rules. The headless `build/` output and downloaded GUI headers remain ignored/outside tracked source.
 - **Final rerun:** After the small-window tab-strip bound and updated visual assertions, `ctest --test-dir build --output-on-failure` again passed 125/125, including GUI syntax, ImGui input, and the native draw recorder.
+
+### Entry #018
+- **Timestamp:** 2026-11-07 23:27 UTC
+- **Task:** Create a pull request for the Home cockpit visual tuning.
+- **Branch:** `arena/cb265de8-spaceship`, pushed to `origin`; no branch switch or rename.
+- **Commit:** `94490bb` — `Tune the home cockpit layout and mocha palette`.
+- **Pull request:** #30, `arena/cb265de8-spaceship` to `main`, open at https://github.com/Aquaslopper/SPACESHIP/pull/30.
+- **PR title:** `Tune the home cockpit layout and mocha palette`.
+- **PR contents:** Summary of the mocha palette, fixed ship home control, compact gauges, click-to-switch ship view, home content order, and bottom-anchored feed.
+- **PR verification notes:** Headless build and final 125/125 CTest result, including GUI syntax, ImGui input, and native draw recorder.
+- **PR description update:** `gh pr edit` hit the repository's classic-project GraphQL deprecation error; updated the description successfully with `gh api` PATCH.
+- **Visual verification limit:** No windowed GUI was launched; the native draw recorder checks recorded drawing and input, not a rendered screenshot.
+- **Untouched:** `Legacy code_Spaceship.txt`, `assets/`, `rescue/`, and simulation rules.
