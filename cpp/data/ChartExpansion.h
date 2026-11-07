@@ -50,6 +50,23 @@ constexpr int kNewSystemsPerRegion = 22;
 // and every crossing that has to pay for it - is unchanged.
 constexpr double kSectorBoardScale = 3.0;
 
+// The zoom ladder the grown chart is read with. The authored ladder is
+// 0.6..2.0 in steps of 0.2 - eight steps, which on a board three times the
+// authored width is not enough either way: 2x cannot separate the systems of a
+// 66-pixel cluster, and 0.6x cannot show the whole sector. The ladder is
+// widened here rather than in the export, so the Phase 0 data gate still sees
+// the reference's numbers.
+constexpr double kZoomMin = 0.3;
+constexpr double kZoomMax = 4.0;
+constexpr double kZoomStep = 0.2;
+
+// The local chart keeps a shorter ladder. Its bodies sit on rings out to 200
+// pixels, so at four times magnification the visible window is 80 pixels wide
+// and lands in the hole at the middle of the system - an empty chart. The wide
+// scales are the ones that needed the extra reach.
+constexpr double kSystemZoomMin = 0.6;
+constexpr double kSystemZoomMax = 2.5;
+
 // Grows the charted galaxy. Safe to call on any loaded catalogue, any number of
 // times; only the first call does anything.
 void ExpandChart(Catalog& catalog);
@@ -70,5 +87,11 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem);
 // Deterministic, and stored on the catalogue (Catalog::galaxyPositions) because
 // three places ask for it: the chart, the ship's marker and the tests.
 void PlaceGalaxyDots(Catalog& catalog);
+
+// Joins neighbouring regions on the galaxy board until every region has three
+// lanes of its own. The authored galaxy carries nine links between seven
+// regions, so the web reads as a chain; three lines per region make it read as
+// a map.
+void EntangleGalaxy(Catalog& catalog);
 
 }  // namespace ship

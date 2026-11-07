@@ -124,11 +124,27 @@ TEST_CASE("the zoom ladder is clamped to a tenth and to its ends", "[nav]") {
   CHECK(ship::NavZoomStep(1.9, 1, 0.6, 2.0, 0.2) == 2.0);
   CHECK(ship::NavZoomStep(0.7, -1, 0.6, 2.0, 0.2) == 0.6);
 
+  // The grown chart reads on a wider ladder than the authored 0.6..2.0: a
+  // three-times board needs both more magnification and a wider view, on the
+  // two wide scales. The local chart keeps a shorter one, because at four times
+  // its own ring layout the visible window falls into the middle of the board.
+  CHECK(ship::kZoomMin == 0.3);
+  CHECK(ship::kZoomMax == 4.0);
+
   ship::Simulation sim = Fresh();
-  for (int i = 0; i < 12; ++i) { sim.ZoomMap(1); }
-  CHECK(sim.Map().zoom == 2.0);
-  for (int i = 0; i < 20; ++i) { sim.ZoomMap(-1); }
-  CHECK(sim.Map().zoom == 0.6);
+  CHECK(sim.Map().zmin == ship::kSystemZoomMin);
+  CHECK(sim.Map().zmax == ship::kSystemZoomMax);
+  for (int i = 0; i < 30; ++i) { sim.ZoomMap(1); }
+  CHECK(sim.Map().zoom == ship::kSystemZoomMax);
+  for (int i = 0; i < 40; ++i) { sim.ZoomMap(-1); }
+  CHECK(sim.Map().zoom == ship::kSystemZoomMin);
+
+  // The sector and galaxy scales go all the way out and all the way in.
+  sim.SetLayer("sector");
+  CHECK(sim.Map().zmin == ship::kZoomMin);
+  CHECK(sim.Map().zmax == ship::kZoomMax);
+  for (int i = 0; i < 40; ++i) { sim.ZoomMap(1); }
+  CHECK(sim.Map().zoom == ship::kZoomMax);
 
   // Free: looking never costs an action.
   CHECK(sim.ActionCount() == 0);

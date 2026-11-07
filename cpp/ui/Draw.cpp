@@ -1421,8 +1421,10 @@ void ShellView::PaintNavScreen(Simulation& sim) {
                          box.y + static_cast<float>(a->second.y) * sy};
       const Vector2 to{box.x + static_cast<float>(b->second.x) * sx,
                        box.y + static_cast<float>(b->second.y) * sy};
-      DrawLineEx(from, to, lit ? 1.6f : 1.0f,
-                 lit ? Fade(ToRay(p.coffee), 0.7f) : Fade(ToRay(p.coffee), 0.34f));
+      // Hairlines, not cables: the web should be legible without becoming the
+      // loudest thing on the chart.
+      DrawLineEx(from, to, lit ? 1.2f : 0.7f,
+                 lit ? Fade(ToRay(p.coffee), 0.62f) : Fade(ToRay(p.coffee), 0.26f));
     }
   }
 

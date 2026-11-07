@@ -148,8 +148,10 @@ void Simulation::PanMap(double dx, double dy) {
   // The chart may be pulled half a screen out of place, no further, or it can
   // be lost off the edge and look broken. Panning is free.
   LayerView& view = views_[map_.layer];
-  const double limitX = js::Round(map_.vw * 0.5);
-  const double limitY = js::Round(map_.vh * 0.5);
+  // The further in the chart is zoomed, the more of it lies outside the box: a
+  // half-viewport leash would pin the player to the middle of a 4x board.
+  const double limitX = js::Round(map_.vw * 0.5 * map_.zoom);
+  const double limitY = js::Round(map_.vh * 0.5 * map_.zoom);
   view.px = std::max(-limitX, std::min(limitX, view.px + dx));
   view.py = std::max(-limitY, std::min(limitY, view.py + dy));
 }

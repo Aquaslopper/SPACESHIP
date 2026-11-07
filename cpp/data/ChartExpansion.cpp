@@ -398,6 +398,36 @@ void PlaceGalaxyDots(Catalog& catalog) {
   }
 }
 
+void EntangleGalaxy(Catalog& catalog) {
+  if (catalog.regions.size() < 2) { return; }
+  const auto linked = [&catalog](const std::string& a, const std::string& b) {
+    for (const Lane& lane : catalog.galaxyLanes) {
+      if ((lane.from == a && lane.to == b) || (lane.from == b && lane.to == a)) { return true; }
+    }
+    return false;
+  };
+  for (const Body& region : catalog.regions) {
+    std::size_t degree = 0;
+    for (const Lane& lane : catalog.galaxyLanes) {
+      if (lane.from == region.id || lane.to == region.id) { ++degree; }
+    }
+    std::vector<std::pair<double, std::string>> neighbours;
+    for (const Body& other : catalog.regions) {
+      if (other.id == region.id) { continue; }
+      const double dx = other.x - region.x;
+      const double dy = other.y - region.y;
+      neighbours.emplace_back(std::sqrt(dx * dx + dy * dy), other.id);
+    }
+    std::sort(neighbours.begin(), neighbours.end());
+    for (const auto& near : neighbours) {
+      if (degree >= 3) { break; }
+      if (linked(region.id, near.second)) { continue; }
+      catalog.galaxyLanes.push_back(Lane{region.id, near.second});
+      ++degree;
+    }
+  }
+}
+
 void ExpandChart(Catalog& catalog) {
   if (catalog.chartExpanded) { return; }
   catalog.chartExpanded = true;
@@ -464,6 +494,16 @@ void ExpandChart(Catalog& catalog) {
   catalog.layerBoards["system"] = catalog.map;
   catalog.layerBoards["sector"] = sector;
   catalog.layerBoards["galaxy"] = catalog.map;
+  // One ladder for all three scales: the same gesture should mean the same
+  // thing whichever chart is open.
+  for (auto& entry : catalog.layerBoards) {
+    entry.second.zmin = kZoomMin;
+    entry.second.zmax = kZoomMax;
+    entry.second.zstep = kZoomStep;
+  }
+  // The local chart is read at its own range - see kSystemZoomMin.
+  catalog.layerBoards["system"].zmin = kSystemZoomMin;
+  catalog.layerBoards["system"].zmax = kSystemZoomMax;
 
   // ---- 4. new rows, one region at a time ----------------------------------
   std::set<std::string> systemNames;
@@ -568,7 +608,7 @@ void ExpandChart(Catalog& catalog) {
       // Three neighbours, not two: a web with more than one way out of a
       // system is what makes the sector read as a network rather than a
       // necklace. Still same-region only, exactly like the authored lanes.
-      const std::size_t links = std::min<std::size_t>(3, neighbours.size());
+    const std::size_t links = std::min<std::size_t>(4, neighbours.size());
       for (std::size_t i = 0; i < links; ++i) {
         const std::string& other = neighbours[i].second;
         bool exists = false;
@@ -596,6 +636,7 @@ void ExpandChart(Catalog& catalog) {
   // its region's cluster, so the third layer shows the two hundred stars the
   // other two layers are drawing rather than seven named circles.
   PlaceGalaxyDots(catalog);
+  EntangleGalaxy(catalog);
 
   // ---- 7. the totals the client prints on load ----------------------------
   catalog.counts.regions = static_cast<int>(catalog.regions.size());
