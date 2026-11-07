@@ -524,13 +524,11 @@ TEST_CASE("a docked ship plots and starts its crossing without undocking first",
   REQUIRE(ship::PressNavAction(sim, "select", "tolme"));
   REQUIRE(ship::PressNavAction(sim, "travel"));       // the crossing to the port
   while (sim.FindOngoing("travel")->state == "running") {
-    sim.MutableLife().canisters = 6;
-    sim.MutableMess().rack = 10;
-    REQUIRE(sim.StandWatch());
+    sim.PerformAction("Stood watch");   // the same action, taken elsewhere
   }
-  REQUIRE(sim.Acknowledge("travel"));
-  REQUIRE(sim.Dock());
-  CHECK(sim.State().docked);
+  REQUIRE(ship::PressProgressButton(sim, "travel"));  // acknowledge: the ship arrives
+  CHECK(sim.Map().here == "tolme");
+  CHECK(sim.State().docked);   // arriving at a port berths the ship
   // The owner's rule: the berth is never a cage. Selecting the way back and
   // committing leaves the berth inside the same departure.
   REQUIRE(ship::PressNavAction(sim, "select", "kessler"));

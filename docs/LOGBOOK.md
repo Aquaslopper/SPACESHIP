@@ -228,3 +228,13 @@ You must append a compressed summary of **every single reply and action you take
 - **Checks run in this sandbox:** none completed. The sandbox was recreated mid-turn with no `build/` and no cmake; cmake 4.4.4 was reinstalled and the configure+build+ctest chain was started but aborted by the turn limit before it finished. The patch is therefore compiled-but-unverified here.
 - **Checks that must run before this is trusted:** headless `cmake --build` + `ctest` (the new nav case plus the existing dock/undock and opening-voyage cases), and CI's `test-linux` for the client and the draw probe.
 - **Untouched:** `Legacy code_Spaceship.txt`, `assets/`, `rescue/`, the station's three-column layout from PR #28, every cooldown rule, `AGENTS.md`.
+
+### Entry #016
+- **Timestamp:** 2026-11-07 21:05 UTC
+- **Task:** open the PR for the no-block ruling (PR #29) and close the verification gap the previous turn left open.
+- **PR:** #29 from `arena/17e54f92-spaceship` to `main`: StartTravel without the docked gate, navigator button/note un-gated, pinned one-click Undock in the station band, new nav regression case.
+- **Verification completed this reply:** fresh headless configure (cmake 4.4.4 + ninja), `cmake --build build` clean, `ctest` **146/146 passed**, and `tools/check-draw.sh` (native draw recorder, CPU-only) run against the pinned raylib 6.0 / imgui 1.92.7 / rlImGui sources vendored to /tmp/deps and linked into build/gui-headers: PASS, including the station card/item/inspector walk and the pinned action bands now that the docked station carries an Undock button.
+- **Test fix found by the run:** the new nav case called `sim.Dock()` after arriving at Tolme, but arriving at a port already berths the ship (`docked` true on arrival, as starter_tests rely on), so `Dock()` correctly refused a second berth. The case now asserts the arrival berth instead of forcing one; the ruling itself was never at fault.
+- **Behaviour confirmed by the passing case:** docked at Tolme, Kessler selected, the travel button reads Idle (not Off), one press spends one action, clears `docked` and starts the crossing - the berth is no longer a cage.
+- **Checks still owed:** CI `test-linux` on PR #29 is the first real client build of this branch (no X11/OpenGL/display in this sandbox); the draw recorder here is the CPU painter, not a window.
+- **Untouched:** `Legacy code_Spaceship.txt`, `assets/`, `rescue/`, the three-column station layout, every cooldown rule outside this change, `AGENTS.md`.
