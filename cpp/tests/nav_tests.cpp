@@ -724,3 +724,38 @@ TEST_CASE("a cluster scatters stars for a body the layer filter hides as the ref
   }
   far->cluster = saved;
 }
+
+TEST_CASE("every star in the layer is painted, not only the reachable ones" "[nav][chart]") {
+  // Painting is wider than reach on purpose: the chart shows the whole authored
+  // layer, while the reference's own rules still decide what can be travelled
+  // to or scanned. A star out of range selects and says so; it is not a
+  // destination the pilot can burn fuel toward.
+  ship::Catalog& catalog = World();
+  ship::Simulation sim = ship::Simulation::ReferenceVoyage(catalog);
+
+  sim.SetLayer("system");
+  const ship::NavChartView sky = ship::BuildNavChart(sim);
+  CHECK(sky.bodies.size() == catalog.bodies.size());
+  bool farStarPainted = false;
+  for (const ship::NavBodyView& body : sky.bodies) {
+    if (body.id == "vance-star") { farStarPainted = true; }
+  }
+  CHECK(farStarPainted);  // vance-star belongs to another system entirely
+
+  sim.SetLayer("sector");
+  const ship::NavChartView wide = ship::BuildNavChart(sim);
+  CHECK(wide.bodies.size() == catalog.systems.size());
+
+  sim.SetLayer("system");
+  const ship::NavChartView again = ship::BuildNavChart(sim);
+  std::size_t paintable = 0;
+  for (const ship::Body& body : catalog.bodies) {
+    if (catalog.BodySystem(body) == sim.CurrentSystemId()) { paintable += 1; }
+  }
+  std::size_t reachable = 0;
+  for (const ship::NavBodyView& body : again.bodies) {
+    if (body.inRange) { reachable += 1; }
+  }
+  CHECK(reachable == paintable);
+  CHECK(reachable < again.bodies.size());
+}

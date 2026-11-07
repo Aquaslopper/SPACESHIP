@@ -164,3 +164,15 @@ You must append a compressed summary of **every single reply and action you take
 - Not done, deliberately, pending the owner's choice: widening curBodies/LayerBodies so every body is painted, or giving the system layer a far field. Either would make the stars visible but is a departure from the reference's own filter, and would then be what the parity tests encode, so it needs an explicit owner decision rather than a silent fix.
 - The parity-preserving route offered instead: generate clusters for chart rows (the reference's own mechanism at HTA 2166 "cluster:n scatters cosmetic stars around it"), which fills the sky through a path the HTA already uses; and note that decorative dots cannot be scanned or travelled to, so "see them" and "learn about them" are two different asks.
 - Untouched: assets/** (chart.json and manifest.json byte-identical), all other tests, cpp/core/**, rescue/**, AGENTS.md.
+
+### Entry #011
+- **Timestamp:** 2026-11-07 03:05 UTC
+- **Task:** owner ordered the stars made visible, and stated the governing rule: the owner decides what the game is. Implemented; no further parity argument attached.
+- cpp/ui/NavScreen.cpp BuildNavChart(): the painted set is now the layer's whole authored array (new local `sky` built from LayerArray(sim)) instead of the filtered LayerBodies(sim). System layer paints all 243 bodies, sector layer all 48 systems, galaxy unchanged at 7 regions.
+- Left filtered on purpose: `bodies` (LayerBodies) still drives the system-layer route dots, so courses radiate to reachable bodies only and the chart does not web over with dotted lines to 238 stars.
+- Left untouched: InRange(), AtTarget(), MetricsFor(), StartTravel, StartScan, the map filter used by the simulation, every constant in assets/data, and every existing test. A far star selects and answers with the reference's own out-of-range line; it is not a destination.
+- cpp/tests/nav_tests.cpp: new case "every star in the layer is painted, not only the reachable ones" [nav][chart] asserting sky == catalog size at both layers, that vance-star (another system) is painted, and that the inRange count still equals the reference's local-destination count and is strictly smaller than the painted count.
+- Consequence to expect in CI, and intended: ui.native-draw-recorder's "nav screen draws all four body classes" counts dots from chart.bodies and was written against the filtered chart, so the counts move. The recorder is an existing test; it was not edited here, so the delta is visible in the diff and the owner decides whether to retune it.
+- Verification possible without a build sandbox: g++ -fsyntax-only on cpp/ui/NavScreen.cpp (core lib, no raylib include needed); the full ctest and the GUI link are run by CI on push. Local sandbox had been reset (no cmake, no build dir, no _deps), so no local ctest was run for this change.
+- Not claimed: that this restores HTA behaviour. It does not; it is an authorised change to it, recorded as such in the code comment.
+- Untouched: assets/**, cpp/core/**, all other tests, rescue/**, AGENTS.md.

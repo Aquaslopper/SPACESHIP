@@ -338,8 +338,23 @@ NavChartView BuildNavChart(const Simulation& sim) {
   const std::string target = sim.State().navTarget.value_or(std::string());
 
   // --- bodies -------------------------------------------------------------
+  // Every star in the layer is painted, not just the ones the ship can reach.
+  // The reference builds this list from curBodies(), which keeps only the
+  // current system's bodies on the system layer and only the browsed region's
+  // systems on the sector layer, so 238 of the 243 charted bodies were never
+  // drawn at all and the sky looked empty. Owner instruction, 2026-11-07:
+  // make the stars visible. So this reads the layer's authored array.
+  //
+  // Reachability is deliberately untouched: InRange(), AtTarget() and
+  // MetricsFor() still decide what may be travelled to or scanned, so
+  // selecting a far star shows the reference's own answer for anything out of
+  // range - "Distance too great. Target out of sensor range." - and the chart
+  // becomes something to read, not a list of things you may click by accident.
   const std::vector<const Body*> bodies = LayerBodies(sim);
-  for (const Body* body : bodies) {
+  std::vector<const Body*> sky;
+  sky.reserve(LayerArray(sim).size());
+  for (const Body& body : LayerArray(sim)) { sky.push_back(&body); }
+  for (const Body* body : sky) {
     NavBodyView bodyView;
     bodyView.id = body->id;
     bodyView.name = body->name;
