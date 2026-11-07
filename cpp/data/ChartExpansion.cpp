@@ -1,23 +1,35 @@
 // ============================================================================
-//  ChartExpansion.cpp — fills the wider board with stars, worlds and lanes.
+//  ChartExpansion.cpp — the wider board, and the rows that fill it.
 //  ---------------------------------------------------------------------------
-//  Everything here is data construction: no clock, no state, no renderer. The
-//  rules are the ones the authored chart already follows - a system owns a star
-//  and a handful of local destinations, a station may keep a port, a lane joins
-//  two systems of one region - so a generated system behaves exactly like an
-//  authored one and the rest of the port never has to know the difference.
+//  Expansion is two things, and only the second one is new.
+//
+//  First, the chart the reference would have built. The authored catalogue packs
+//  forty-eight systems onto a 638x278 board, and forty-one of them share one of
+//  seven dots, so a sector chart that draws the whole galaxy paints six systems
+//  on top of each other and only the last one can be clicked. The board doubles
+//  and the systems move to its middle, which preserves every distance, so an
+//  authored crossing costs what it always cost.
+//
+//  Second, more sky. Every region gains rows of its own, and those rows go
+//  through the same BuildGalaxyFromRows()/ExpandLocalCharts() the authored
+//  forty-seven do, so a generated system has the reference's three local bodies
+//  plus its outer world and moon, the reference's klass strings, detail rows,
+//  scans and - for a row that names a trade profile - the profile's prices and
+//  hint. Nothing about a generated system is a special case for the rest of the
+//  port: the only thing that differs is where the row came from.
 // ============================================================================
 #include "data/ChartExpansion.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <cstdio>
 #include <map>
 #include <set>
 #include <string>
 #include <utility>
 #include <vector>
+
+#include "data/GalaxyGen.h"
 
 namespace ship {
 
@@ -53,153 +65,65 @@ const T& Pick(const std::vector<T>& values, Rng& rng) {
 // one: a generated system called "Vance Cluster" would be a lie about the map.
 const std::vector<std::string>& Adjectives() {
   static const std::vector<std::string> words = {
-      "Ashen",  "Brine",  "Cinder",  "Dolorous", "Ember",  "Fallow",  "Gilded",
-      "Harrow", "Iron",   "Jetsam",  "Keening",  "Lantern","Marrow",  "Nacre",
-      "Obsidian","Pale",  "Quiet",   "Rime",     "Salt",   "Tallow",  "Umber",
-      "Vellum", "Wandering", "Yarrow", "Zinc",   "Amber",  "Basalt",  "Cobalt",
-      "Drift",  "Elder",  "Fen",     "Glass",    "Hollow", "Ivory",   "Jasper"};
+      "Ashen",   "Brine",   "Cinder",  "Dolorous", "Ember",   "Fallow",  "Gilded",
+      "Harrow",  "Iron",    "Jetsam",  "Keening",  "Lantern", "Marrow",  "Nacre",
+      "Obsidian","Pale",    "Quiet",   "Rime",     "Salt",    "Tallow",  "Umber",
+      "Vellum",  "Wandering","Yarrow", "Zinc",     "Amber",   "Basalt",  "Cobalt",
+      "Drift",   "Elder",   "Fen",     "Glass",    "Hollow",  "Ivory",   "Jasper"};
   return words;
 }
 
 const std::vector<std::string>& Nouns() {
   static const std::vector<std::string> words = {
-      "Anchorage", "Bastion", "Beacon",   "Crossing", "Deep",     "Drift",
-      "Fold",      "Gate",    "Haven",    "Hollow",   "Ladder",   "Ledge",
-      "March",     "Narrows", "Orchard",  "Passage",  "Quay",     "Reach",
-      "Rookery",   "Shallows","Shelf",    "Span",     "Spur",     "Strand",
-      "Threshold", "Verge",   "Wake",     "Watch",    "Weir",     "Yard",
-      "Field",     "Run",     "Tier",     "Bight",    "Sound"};
+      "Anchorage", "Bastion",  "Beacon",   "Crossing", "Deep",   "Drift",  "Fold",
+      "Gate",      "Haven",    "Hollow",   "Ladder",   "Ledge",  "March",  "Narrows",
+      "Orchard",   "Passage",  "Quay",     "Reach",    "Rookery","Shallows","Shelf",
+      "Span",      "Spur",     "Strand",   "Threshold","Verge",  "Wake",   "Watch",
+      "Weir",      "Yard"};
   return words;
 }
 
 const std::vector<std::string>& WorldStems() {
   static const std::vector<std::string> words = {
-      "Alder",  "Bracken", "Cinder", "Dove",   "Elm",    "Fen",   "Gorse",
-      "Hazel",  "Ivory",   "Juniper","Kelp",   "Larch",  "Moss",  "Nettle",
-      "Onyx",   "Pine",    "Quill",  "Reed",   "Slate",  "Thistle","Umber",
-      "Vane",   "Willow",  "Yew",    "Zephyr", "Bell",   "Crane", "Dune",
-      "Ember",  "Frost",   "Gale",   "Hollow"};
+      "Anvil", "Beryl", "Cinder", "Dolmen", "Ember", "Fathom", "Garnet", "Harrow",
+      "Ilex",  "Jasper","Kelvin", "Lumen",  "Mica",  "Nimbus", "Onyx",   "Pyre",
+      "Quill", "Rime",  "Slate",  "Tarn",   "Umber", "Vane",   "Wick",   "Yarrow"};
   return words;
 }
 
 const std::vector<std::string>& WorldSuffixes() {
-  static const std::vector<std::string> words = {"",     " Minor", " Major", " Deep",
-                                                 " Rise", " Vale",  " Reach", " Hollow"};
-  return words;
-}
-
-const std::vector<std::string>& MoonStems() {
-  static const std::vector<std::string> words = {
-      "Rill", "Tarn", "Kest", "Bril", "Corr", "Dunn", "Fenn", "Galt",
-      "Hask", "Ivor", "Joss", "Kel",  "Lune", "Mere", "Nell", "Orr",
-      "Pell", "Quen", "Rook", "Sable","Tor",  "Vell", "Wick", "Yarrow"};
-  return words;
-}
-
-const std::vector<std::string>& PortKinds() {
-  static const std::vector<std::string> words = {"Anchorage", "Exchange", "Depot",
-                                                 "Yard",      "Wharf",    "Relay",
-                                                 "Station"};
+  static const std::vector<std::string> words = {"Prime", "Minor", "Major", "Reach", "Deep", "Hollow"};
   return words;
 }
 
 const std::vector<std::string>& StarSuffixes() {
-  static const std::vector<std::string> words = {"A", "B", "C", "Major", "Minor", "Prime"};
+  static const std::vector<std::string> words = {"A", "B", "C", "Prima", "Major", "Minor"};
   return words;
 }
 
-// A name that is not yet on the chart. The chart tolerates repeated words - two
-// systems may both be a "Reach" - but never a repeated name.
+// One sentence, in the register the authored observations use. It is the scan
+// text of all three bodies the row creates, exactly as row[9] is in the
+// reference.
+const std::vector<std::string>& Observations() {
+  static const std::vector<std::string> lines = {
+      "Traffic is thin and the beacons are old, but the lane is open.",
+      "A survey drone still circles here, years after its ship left.",
+      "The approach is quiet; the dock lights answer on the second hail.",
+      "Dust from a broken moon drifts across the inner lanes.",
+      "Long-range telemetry is patchy this far out.",
+      "The star is steady and the local charts agree with it.",
+      "Cargo tags from three different regions float in the wake.",
+      "A relay pings the same six digits at every pass.",
+      "The outer markers have been replaced recently. Nobody logs by whom.",
+      "Ice boils off the inner rocks and brightens the whole approach."};
+  return lines;
+}
+
 std::string UniqueName(const std::string& wanted, std::set<std::string>& used) {
-  if (used.insert(wanted).second) { return wanted; }
-  for (int n = 2; n < 400; ++n) {
-    std::string candidate = wanted + " " + std::to_string(n);
-    if (used.insert(candidate).second) { return candidate; }
-  }
-  return wanted;
-}
-
-std::string Two(double value) {
-  char buffer[32];
-  std::snprintf(buffer, sizeof(buffer), "%.2f", value);
-  return buffer;
-}
-
-std::string One(double value) {
-  char buffer[32];
-  std::snprintf(buffer, sizeof(buffer), "%.1f", value);
-  return buffer;
-}
-
-const std::map<std::string, std::string>& SubtypeKlass() {
-  static const std::map<std::string, std::string> table = {
-      {"gas", "Gas giant - banded cloud deck"},
-      {"ice", "Ice world - frozen outer orbit"},
-      {"ocean", "Ocean world - liquid surface"},
-      {"rock", "Rocky world - thin regolith"}};
-  return table;
-}
-
-std::string SubtypeAtmosphere(const std::string& subtype) {
-  if (subtype == "gas") { return "Dense hydrogen, violent bands"; }
-  if (subtype == "ice") { return "Thin methane haze"; }
-  if (subtype == "ocean") { return "Nitrogen and oxygen, breathable"; }
-  return "Trace carbon dioxide";
-}
-
-std::string SubtypeBand(const std::string& subtype) {
-  if (subtype == "gas") { return "Inner system"; }
-  if (subtype == "ice") { return "Outer system"; }
-  if (subtype == "ocean") { return "Habitable band"; }
-  return "Middle system";
-}
-
-const std::vector<std::string>& StarScans() {
-  static const std::vector<std::string> lines = {
-      "Stellar output has been charted across the local volume.",
-      "A steady coronagraph return. Nothing unusual in the photosphere.",
-      "The star sits alone in a thin dust lane.",
-      "A hot, quiet primary with no companion on the plates.",
-      "Spectral lines are clean; the plates need no correction."};
-  return lines;
-}
-
-const std::vector<std::string>& WorldScans() {
-  static const std::vector<std::string> lines = {
-      "The surface reads as surveyed, and nothing on it is moving.",
-      "Long-range imaging resolves weather over the terminator.",
-      "A shallow gravity well makes the approach cheap in fuel.",
-      "The orbit is stable and the local debris is sparse.",
-      "Faint thermal scars suggest an old impact basin.",
-      "The charted orbit is clear of the main traffic lane."};
-  return lines;
-}
-
-const std::vector<std::string>& StationScans() {
-  static const std::vector<std::string> lines = {
-      "A working dock answers on the approach channel.",
-      "Traffic is light; the berths are open.",
-      "The station keeps a signal lamp lit for the lane.",
-      "Cargo handling runs on a slow, stubborn schedule."};
-  return lines;
-}
-
-std::vector<std::pair<std::string, std::string>> WorldDetails(const std::string& systemName,
-                                                              const std::string& regionName,
-                                                              const std::string& subtype,
-                                                              Rng& rng) {
-  std::vector<std::pair<std::string, std::string>> details;
-  details.emplace_back("System", systemName);
-  details.emplace_back("Region", regionName);
-  details.emplace_back("Age", One(rng.Range(0.4, 6.5)) + " billion years");
-  details.emplace_back("Atmosphere", SubtypeAtmosphere(subtype));
-  details.emplace_back("Day length", std::to_string(rng.Below(40) + 6) + " h " +
-                                         std::to_string(rng.Below(60)) + " m");
-  details.emplace_back("Gravity", Two(rng.Range(0.18, 1.9)) + " g");
-  const std::string sign = subtype == "ice" ? "-" : "+";
-  details.emplace_back("Mean temp", sign + std::to_string(rng.Below(200) + 15) + " C");
-  details.emplace_back("Orbital band", SubtypeBand(subtype));
-  return details;
+  std::string name = wanted;
+  for (int n = 2; used.count(name) != 0; ++n) { name = wanted + " " + std::to_string(n); }
+  used.insert(name);
+  return name;
 }
 
 // Free space on a board, so no two systems share a dot. A grid keeps this
@@ -254,10 +178,20 @@ void ExpandChart(Catalog& catalog) {
   catalog.chartExpanded = true;
   if (catalog.regions.empty() || catalog.systems.empty()) { return; }
 
+  // ---- 1. the chart the reference builds, rebuilt from its rows ------------
+  // The export in assets/data/chart.json is the reference's output, not its
+  // input. Stripping the rebuildable part and running the two passes again
+  // means a voyage always flies the galaxy the current generator describes;
+  // galaxy_gen_tests.cpp proves the two agree field for field, so this is a
+  // change of authorship, not of content.
+  StripGeneratedChart(catalog);
+  BuildGalaxyFromRows(AuthoredStarCatalog(), 0, catalog, /*linkHubs=*/true);
+  ExpandLocalCharts(catalog, 0);
+
   const double authoredW = catalog.map.w;
   const double authoredH = catalog.map.h;
 
-  // ---- 1. a bigger sector board, with the authored systems at its centre ----
+  // ---- 2. a bigger sector board, with the authored systems at its centre ----
   // Translation only: every authored distance is preserved, so every authored
   // crossing and every jump still costs what it cost before.
   MapGeometry sector = catalog.map;
@@ -272,7 +206,7 @@ void ExpandChart(Catalog& catalog) {
     system.y += dy;
   }
 
-  // ---- 1b. unstack the systems that were authored on one dot -------------
+  // ---- 3. unstack the systems that were authored on one dot ---------------
   // The authored board holds only seven distinct system positions for its 48
   // systems: six of them share each dot, so five of every six are invisible and
   // unclickable however the chart is drawn. They are separated here, not
@@ -306,26 +240,16 @@ void ExpandChart(Catalog& catalog) {
   catalog.layerBoards["sector"] = sector;
   catalog.layerBoards["galaxy"] = catalog.map;
 
-  // ---- 2. names already in the sky ----------------------------------------
+  // ---- 4. new rows, one region at a time ----------------------------------
   std::set<std::string> systemNames;
   for (const Body& system : catalog.systems) { systemNames.insert(system.name); }
-  std::set<std::string> bodyNames;
-  for (const Body& body : catalog.bodies) { bodyNames.insert(body.name); }
 
-  // The authored port profiles are the only priced baskets on the chart, so a
-  // generated station trades the same goods rather than inventing a market.
-  // Copied, not pointed at: this function appends ports, and an append can move
-  // the vector out from under any pointer taken before it.
-  struct Basket {
-    std::map<std::string, double> prices;
-    std::string tip;
-  };
-  std::vector<Basket> pricedPorts;
-  for (const Port& port : catalog.ports) {
-    if (!port.prices.empty()) { pricedPorts.push_back(Basket{port.prices, port.tip}); }
-  }
+  // Every trade profile a port can have, taken from the authored price table so
+  // a generated port trades the reference's baskets rather than an invented one.
+  std::vector<std::string> profiles;
+  for (const auto& entry : catalog.portPrices) { profiles.push_back(entry.first); }
+  std::sort(profiles.begin(), profiles.end());
 
-  // ---- 3. the space already taken ----------------------------------------
   std::vector<std::pair<double, double>> placed;
   placed.reserve(catalog.systems.size() + static_cast<std::size_t>(kNewSystemsPerRegion) *
                                               catalog.regions.size());
@@ -336,12 +260,13 @@ void ExpandChart(Catalog& catalog) {
   const double spacing = 44.0;
   Spacer spacer(spacing, placed);
 
-  int serial = 0;
-  for (std::size_t regionIndex = 0; regionIndex < catalog.regions.size(); ++regionIndex) {
-    const Body& region = catalog.regions[regionIndex];
-    for (int n = 0; n < kNewSystemsPerRegion; ++n) {
-      ++serial;
+  const std::size_t baseIndex = AuthoredStarCatalog().size();
+  std::vector<StarRow> rows;
+  rows.reserve(static_cast<std::size_t>(kNewSystemsPerRegion) * catalog.regions.size());
 
+  int serial = 0;
+  for (const Body& region : catalog.regions) {
+    for (int n = 0; n < kNewSystemsPerRegion; ++n) {
       // A position of its own. If the board cannot take another system at the
       // wide spacing, close in by two pixels at a time rather than stack one.
       double x = 0;
@@ -363,209 +288,45 @@ void ExpandChart(Catalog& catalog) {
       }
       if (!found) { continue; }  // a full board is a full board, not a stack
 
-      const std::string systemId = "sec-gen-" + std::to_string(serial);
+      ++serial;
       const std::string systemName =
           UniqueName(Pick(Adjectives(), rng) + " " + Pick(Nouns(), rng), systemNames);
-      const std::string starId = "gen-" + std::to_string(serial) + "-star";
-
-      // ---- the system itself ---------------------------------------------
-      Body system;
-      system.id = systemId;
-      system.type = "system";
-      system.name = systemName;
-      system.x = x;
-      system.y = y;
-      system.region = region.id;
-      system.entry = starId;
-      const std::vector<std::string> traffic = {"Quiet", "Moderate", "Heavy", "Negligible"};
-      const std::string trafficWord = Pick(traffic, rng);
-      system.klass = std::string(rng.Next() < 0.5 ? "Single star - " : "Binary pair - ") + trafficWord;
-      system.details.emplace_back("Traffic", trafficWord);
-      system.details.emplace_back("Region", region.name);
-
-      // ---- the star -------------------------------------------------------
-      Body star;
-      star.id = starId;
-      star.type = "star";
-      star.name = UniqueName(systemName + " " + Pick(StarSuffixes(), rng), bodyNames);
-      star.system = systemId;
-      star.klass = "Charted star";
-      {
-        const double angle = rng.Range(0.0, 6.283);
-        const double radius = rng.Range(40.0, 88.0);
-        star.x = std::clamp(catalog.map.cx + std::cos(angle) * radius, 20.0, authoredW - 20.0);
-        star.y = std::clamp(catalog.map.cy + std::sin(angle) * radius * 0.62, 20.0,
-                            authoredH - 20.0);
-      }
-      star.details.emplace_back("System", systemName);
-      star.details.emplace_back("Region", region.name);
-      star.scan.push_back(Pick(StarScans(), rng));
-      star.scan.push_back("Stellar output has been charted.");
-      star.scanLocked.push_back("Detailed spectral survey");
-
-      catalog.bodies.push_back(star);
-      std::vector<std::pair<double, double>> localPlaced = {{star.x, star.y}};
-
-      int localBodies = 1;
-      const auto freeLocal = [&](double wantX, double wantY, double minGap,
-                                 std::pair<double, double>& out) {
-        for (int attempt = 0; attempt < 24; ++attempt) {
-          bool clear = true;
-          for (const auto& other : localPlaced) {
-            const double ddx = other.first - wantX;
-            const double ddy = other.second - wantY;
-            if (ddx * ddx + ddy * ddy < minGap * minGap) { clear = false; break; }
-          }
-          if (clear) {
-            out = {wantX, wantY};
-            return true;
-          }
-          wantX = std::clamp(wantX + rng.Range(-16.0, 16.0), 20.0, authoredW - 20.0);
-          wantY = std::clamp(wantY + rng.Range(-16.0, 16.0), 20.0, authoredH - 20.0);
-        }
-        return false;
-      };
-
-      // ---- worlds, a moon, a station, sometimes a belt or a site -----------
-      const std::vector<std::string> subtypes = {"rock", "ocean", "ice", "gas"};
-      const int worlds = 2 + rng.Below(2);  // two or three
-      for (int w = 0; w < worlds; ++w) {
-        const std::string subtype = subtypes[static_cast<std::size_t>((serial + w) % 4)];
-        Body world;
-        world.id = "gen-" + std::to_string(serial) + "-w" + std::to_string(w + 1);
-        world.type = "planet";
-        world.subtype = subtype;
-        world.system = systemId;
-        world.name = UniqueName(Pick(WorldStems(), rng) + Pick(WorldSuffixes(), rng), bodyNames);
-        world.klass = SubtypeKlass().at(subtype);
-        const double angle = rng.Range(0.0, 6.283);
-        const double radius = rng.Range(112.0, 236.0);
-        std::pair<double, double> at{0, 0};
-        const double wantX = std::clamp(catalog.map.cx + std::cos(angle) * radius, 20.0,
-                                        authoredW - 20.0);
-        const double wantY = std::clamp(catalog.map.cy + std::sin(angle) * radius * 0.45, 20.0,
-                                        authoredH - 20.0);
-        if (!freeLocal(wantX, wantY, 34.0, at)) { continue; }
-        world.x = at.first;
-        world.y = at.second;
-        localPlaced.push_back(at);
-        world.details = WorldDetails(systemName, region.name, subtype, rng);
-        world.scan.push_back(Pick(WorldScans(), rng));
-        world.scan.push_back("This world is charted beyond the system's primary traffic lane.");
-        world.scanLocked.push_back("Subsurface survey");
-        world.scanLocked.push_back("High-resolution orbital survey");
-        catalog.bodies.push_back(world);
-        ++localBodies;
-
-        // One moon, orbiting the first world that got placed.
-        if (w == 0) {
-          Body moon;
-          moon.id = "gen-" + std::to_string(serial) + "-moon";
-          moon.type = "moon";
-          moon.system = systemId;
-          moon.name = UniqueName(Pick(MoonStems(), rng) + " " + world.name, bodyNames);
-          moon.klass = "Natural satellite - stable orbit";
-          std::pair<double, double> moonAt{0, 0};
-          const double moonAngle = rng.Range(0.0, 6.283);
-          if (freeLocal(std::clamp(world.x + std::cos(moonAngle) * 16.0, 20.0, authoredW - 20.0),
-                        std::clamp(world.y + std::sin(moonAngle) * 16.0, 20.0, authoredH - 20.0),
-                        12.0, moonAt)) {
-            moon.x = moonAt.first;
-            moon.y = moonAt.second;
-            localPlaced.push_back(moonAt);
-            moon.details.emplace_back("System", systemName);
-            moon.details.emplace_back("Region", region.name);
-            moon.details.emplace_back("Satellite of", world.name);
-            moon.details.emplace_back("Surface", "Heavily cratered");
-            moon.scan.push_back("A natural satellite follows a stable orbit.");
-            moon.scan.push_back("The surface is heavily cratered.");
-            moon.scanLocked.push_back("Subsurface structure");
-            catalog.bodies.push_back(moon);
-            ++localBodies;
-          }
-        }
-      }
-
-      // A station, and for three in four of them a port that trades.
-      if (rng.Next() < 0.72) {
-        Body station;
-        station.id = "gen-" + std::to_string(serial) + "-port";
-        station.type = "station";
-        station.system = systemId;
-        station.name = UniqueName(Pick(Nouns(), rng) + " " + Pick(PortKinds(), rng), bodyNames);
-        station.klass = "Working station";
-        std::pair<double, double> at{0, 0};
-        const double angle = rng.Range(0.0, 6.283);
-        const double wantX = std::clamp(catalog.map.cx + std::cos(angle) * rng.Range(96.0, 210.0),
-                                        20.0, authoredW - 20.0);
-        const double wantY = std::clamp(catalog.map.cy + std::sin(angle) * rng.Range(50.0, 100.0),
-                                        20.0, authoredH - 20.0);
-        if (freeLocal(wantX, wantY, 26.0, at)) {
-          station.x = at.first;
-          station.y = at.second;
-          localPlaced.push_back(at);
-          station.details.emplace_back("System", systemName);
-          station.details.emplace_back("Region", region.name);
-          station.details.emplace_back("Berths", std::to_string(rng.Below(24) + 2));
-          station.scan.push_back(Pick(StationScans(), rng));
-          station.scanLocked.push_back("Station manifest");
-          catalog.bodies.push_back(station);
-          ++localBodies;
-
-          if (!pricedPorts.empty() && rng.Next() < 0.75) {
-            const Basket& basket = pricedPorts[static_cast<std::size_t>(serial) %
-                                               pricedPorts.size()];
-            Port port;
-            port.id = station.id;
-            port.name = station.name;
-            port.prices = basket.prices;
-            port.tip = "A frontier dock on the " + region.name + " lane. " + basket.tip;
-            catalog.ports.push_back(port);
-          }
-        }
-      }
-
-      // A belt or a site, for texture.
-      if (rng.Next() < 0.42) {
-        const bool beltWanted = rng.Next() < 0.5;
-        Body feature;
-        feature.id = "gen-" + std::to_string(serial) + (beltWanted ? "-belt" : "-site");
-        feature.type = beltWanted ? "belt" : "site";
-        feature.system = systemId;
-        feature.name = UniqueName(beltWanted
-                                      ? Pick(WorldStems(), rng) + " Belt"
-                                      : Pick(Adjectives(), rng) + " " + Pick(Nouns(), rng),
-                                  bodyNames);
-        feature.klass = beltWanted ? "Debris belt" : "Chart anomaly - unclaimed";
-        std::pair<double, double> at{0, 0};
-        const double angle = rng.Range(0.0, 6.283);
-        if (freeLocal(std::clamp(catalog.map.cx + std::cos(angle) * rng.Range(150.0, 250.0), 20.0,
-                                 authoredW - 20.0),
-                      std::clamp(catalog.map.cy + std::sin(angle) * rng.Range(70.0, 110.0), 20.0,
-                                 authoredH - 20.0),
-                      22.0, at)) {
-          feature.x = at.first;
-          feature.y = at.second;
-          localPlaced.push_back(at);
-          feature.details.emplace_back("System", systemName);
-          feature.details.emplace_back("Region", region.name);
-          feature.scan.push_back(beltWanted ? "Loose material is spread across the plotted belt."
-                                            : "A dull return, well off the traffic lane.");
-          feature.scanLocked.push_back("Ore density mapping");
-          catalog.bodies.push_back(feature);
-          ++localBodies;
-        }
-      }
-
-      system.details.insert(system.details.begin(),
-                            {"Charted bodies", std::to_string(localBodies)});
-      catalog.systems.push_back(system);
+      const std::string starName = systemName + " " + Pick(StarSuffixes(), rng);
+      const bool belt = rng.Next() < 0.22;
+      const std::string worldName =
+          belt ? Pick(WorldStems(), rng) + " Belt"
+               : Pick(WorldStems(), rng) + " " + Pick(WorldSuffixes(), rng);
+      const std::string landmarkName = Pick(Adjectives(), rng) + " " + Pick(Nouns(), rng);
+      // Roughly three rows in five keep a port, which is the authored chart's
+      // own mix.
+      const std::string profile = (!profiles.empty() && rng.Next() < 0.6)
+                                      ? Pick(profiles, rng)
+                                      : std::string();
+      StarRow row;
+      row.system = "sec-gen-" + std::to_string(serial);
+      row.region = region.id;
+      row.name = systemName;
+      row.x = x;
+      row.y = y;
+      row.star = starName;
+      row.world = worldName;
+      row.landmark = landmarkName;
+      row.profile = profile;
+      row.note = Pick(Observations(), rng);
+      rows.push_back(row);
       placed.emplace_back(x, y);
       spacer.Add(x, y);
     }
   }
 
-  // ---- 4. lanes: each new system joins its two nearest neighbours ----------
+  // The same two passes as the authored rows. The local-chart pass starts at
+  // the first new system so its index - and with it the profile and the two
+  // name tables - carries on from where the authored chart stopped.
+  const std::size_t firstNewSystem = catalog.systems.size();
+  BuildGalaxyFromRows(rows, baseIndex, catalog, /*linkHubs=*/false);
+  ExpandLocalCharts(catalog, firstNewSystem);
+
+  // ---- 5. lanes: each new system joins its two nearest neighbours ----------
   // Same region only, exactly like the authored sectorLinks; a lane that
   // crossed regions would be rejected by Catalog::Validate().
   {
@@ -595,7 +356,7 @@ void ExpandChart(Catalog& catalog) {
     }
   }
 
-  // ---- 5. the totals the client prints on load ----------------------------
+  // ---- 6. the totals the client prints on load ----------------------------
   catalog.counts.regions = static_cast<int>(catalog.regions.size());
   catalog.counts.systems = static_cast<int>(catalog.systems.size());
   catalog.counts.bodies = static_cast<int>(catalog.bodies.size());

@@ -121,6 +121,16 @@ struct Lane {
   std::string to;
 };
 
+// ORBITAL_WORLDS: the four kinds of outer world the local-chart pass adds, in
+// the reference's order, because the pass picks one by system index.
+struct OrbitalWorld {
+  std::string id;           // gas / ice / ocean / rock
+  std::string label;        // "Outer gas giant"
+  std::string atmosphere;   // "Hydrogen / helium"
+  std::string scan;         // first scan line
+  std::string locked;       // first locked scan line
+};
+
 struct Port {
   std::string id;
   std::string name;

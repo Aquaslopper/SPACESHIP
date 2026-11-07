@@ -89,6 +89,18 @@ class Catalog {
   std::vector<Good> goods;
   std::vector<Contract> contracts;
 
+  // The reference builds the chart from these tables rather than shipping the
+  // result (see data/GalaxyGen.h). They are authored data, exported as-is:
+  //   portPrices  PORT_PRICES: trade profile -> commodity kind -> multiplier
+  //   portHints   PORT_HINTS: trade profile -> the line appended to a port's tip
+  //   orbitalWorlds / orbitalPlanetNames / orbitalMoonNames: the local-chart
+  //               pass's four profiles and its two name tables, in order.
+  std::map<std::string, std::map<std::string, double>> portPrices;
+  std::map<std::string, std::string> portHints;
+  std::vector<OrbitalWorld> orbitalWorlds;
+  std::vector<std::string> orbitalPlanetNames;
+  std::vector<std::string> orbitalMoonNames;
+
   std::vector<std::string> taskTypes;
   std::vector<std::string> layerOrder;               // system, sector, galaxy
   std::map<std::string, double> surveyWorth;         // body type -> shiplets

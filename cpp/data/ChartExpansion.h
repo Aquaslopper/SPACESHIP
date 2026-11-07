@@ -10,12 +10,19 @@
 //
 //  ExpandChart() fixes the board and fills it in, before a voyage begins:
 //
+//    * the chart the reference builds is rebuilt from its rows through
+//      data/GalaxyGen.h - the export in assets/data/chart.json is the
+//      reference's output, and galaxy_gen_tests.cpp proves the ported passes
+//      reproduce it field for field.
 //    * the sector board grows to twice the authored width and height, and the
 //      authored systems move to its middle. A translation preserves every
 //      distance, so an authored crossing costs exactly what it always cost.
-//    * every region gains generated systems, each with its own star, worlds,
-//      a moon, often a station and a port, and sometimes a belt or a site.
-//    * each generated system is joined to its two nearest neighbours in its own
+//    * every region gains rows of its own. Each row goes through the same two
+//      passes as an authored one, so its system has a star, a world or belt, a
+//      landmark (a station with a priced port when the row names a profile), an
+//      outer world and a moon - five local bodies, the reference's klass
+//      strings and its detail rows.
+//    * each new system is joined to its two nearest neighbours in its own
 //      region, so nothing is stranded.
 //
 //  The generator is deterministic: one seed, one sky, every load and every
@@ -32,7 +39,7 @@
 
 namespace ship {
 
-// How many systems the expansion adds per region. Seven regions, so the charted
+// How many rows the expansion drafts per region. Seven regions, so the charted
 // galaxy goes from 48 systems to 48 + 7 * kNewSystemsPerRegion.
 constexpr int kNewSystemsPerRegion = 22;
 

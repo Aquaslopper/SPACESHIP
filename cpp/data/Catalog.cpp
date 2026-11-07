@@ -285,8 +285,38 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     catalog.ports.push_back(port);
   }
 
-  for (const Json& good : Field(chart, "market", "chart.json")) {
-    Good g;
+  // ---- the tables the generator reads ------------------------------------
+  // BUILD reads these before it builds anything (see data/GalaxyGen.h):
+  // PORT_PRICES, PORT_HINTS, ORBITAL_WORLDS and the two name tables. They are
+  // authored, so they stay data; only the chart is computed from them.
+  const Json& prices = Field(chart, "portPrices", "chart.json");
+  for (auto it = prices.begin(); it != prices.end(); ++it) {
+    if (!it.value().is_object()) { continue; }
+    for (auto p = it.value().begin(); p != it.value().end(); ++p) {
+      catalog.portPrices[it.key()][p.key()] = p.value().get<double>();
+    }
+  }
+  const Json& hints = Field(chart, "portHints", "chart.json");
+  for (auto it = hints.begin(); it != hints.end(); ++it) {
+    catalog.portHints[it.key()] = it.value().get<std::string>();
+  }
+  for (const Json& world : Field(chart, "orbitalWorlds", "chart.json")) {
+    OrbitalWorld profile;
+    profile.id = Text(world, "id", "chart.json/orbitalWorlds");
+    profile.label = Text(world, "label", "chart.json/orbitalWorlds");
+    profile.atmosphere = Text(world, "atmo", "chart.json/orbitalWorlds");
+    profile.scan = Text(world, "scan", "chart.json/orbitalWorlds");
+    profile.locked = Text(world, "locked", "chart.json/orbitalWorlds");
+    catalog.orbitalWorlds.push_back(std::move(profile));
+  }
+  for (const Json& name : Field(chart, "orbitalPlanetNames", "chart.json")) {
+    catalog.orbitalPlanetNames.push_back(name.get<std::string>());
+  }
+  for (const Json& name : Field(chart, "orbitalMoonNames", "chart.json")) {
+    catalog.orbitalMoonNames.push_back(name.get<std::string>());
+  }
+
+  for (const Json& good : Field(chart, "market", "chart.json")) {    Good g;
     g.id = Text(good, "id", "chart.json/market");
     g.name = Text(good, "name", "chart.json/market");
     g.kind = Text(good, "kind", "chart.json/market");
