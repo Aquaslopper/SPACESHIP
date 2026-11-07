@@ -12,10 +12,12 @@
 // ============================================================================
 #pragma once
 
+#include <cstddef>
 #include <filesystem>
 #include <map>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "core/Constants.h"
@@ -45,6 +47,9 @@ class Catalog {
   const Body* FindBody(const std::string& id) const;
   const Body* FindSystem(const std::string& id) const;
   const Body* FindRegion(const std::string& id) const;
+  const std::vector<std::size_t>& BodiesInSystem(const std::string& systemId) const;
+  const std::vector<std::size_t>& SystemsInRegion(const std::string& regionId) const;
+  void RebuildIndex() const;
 
   // Local bodies authored before systems existed belong to Kessler, exactly as
   // bodySystem() does in the reference.
@@ -162,6 +167,26 @@ class Catalog {
   Rules rules;
 
   const Port* FindPort(const std::string& id) const;
+
+ private:
+  void EnsureIndex() const;
+
+  struct LookupCache {
+    std::size_t bodyCount = 0;
+    std::size_t systemCount = 0;
+    std::size_t regionCount = 0;
+    std::size_t portCount = 0;
+    std::string firstBodyId;
+    std::string lastBodyId;
+    std::unordered_map<std::string, std::size_t> bodyById;
+    std::unordered_map<std::string, std::size_t> systemById;
+    std::unordered_map<std::string, std::size_t> regionById;
+    std::unordered_map<std::string, std::size_t> portById;
+    std::unordered_map<std::string, std::vector<std::size_t>> bodiesBySystem;
+    std::unordered_map<std::string, std::vector<std::size_t>> systemsByRegion;
+    bool ready = false;
+  };
+  mutable LookupCache index_;
 };
 
 }  // namespace ship

@@ -257,6 +257,7 @@ bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
                               if (taskId == "cook") { return sim.StartCookingSelf(); }
                               if (taskId == "travel") { return sim.StartTravel(); }
                               if (taskId == "scan") { return sim.StartScan(); }
+                              if (taskId == "extract") { return sim.StartExtraction(); }
                               if (taskId == "crew-assign") { return sim.CommitOrders(); }
                               // Phase 7: projects, the medical bay, the shared meal
                               // and the incident work all live behind this one

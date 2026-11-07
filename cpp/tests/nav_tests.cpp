@@ -11,6 +11,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <map>
 #include <set>
@@ -23,6 +24,7 @@
 #include "data/ChartExpansion.h"
 #include "ui/NavScreen.h"
 #include "ui/Shell.h"
+#include "ui/StationScreen.h"
 #include "ui/Widgets.h"
 
 namespace {
@@ -124,12 +126,10 @@ TEST_CASE("the zoom ladder is clamped to a tenth and to its ends", "[nav]") {
   CHECK(ship::NavZoomStep(1.9, 1, 0.6, 2.0, 0.2) == 2.0);
   CHECK(ship::NavZoomStep(0.7, -1, 0.6, 2.0, 0.2) == 0.6);
 
-  // The grown chart reads on a wider ladder than the authored 0.6..2.0: a
-  // three-times board needs both more magnification and a wider view, on the
-  // two wide scales. The local chart keeps a shorter one, because at four times
-  // its own ring layout the visible window falls into the middle of the board.
+  // The 3828x1668 wide sector and galaxy boards span 24 clusters and zoom up
+  // to 10.0x so individual sectors open cleanly without label overlap.
   CHECK(ship::kZoomMin == 0.3);
-  CHECK(ship::kZoomMax == 4.0);
+  CHECK(ship::kZoomMax == 10.0);
 
   ship::Simulation sim = Fresh();
   CHECK(sim.Map().zmin == ship::kSystemZoomMin);
@@ -143,7 +143,7 @@ TEST_CASE("the zoom ladder is clamped to a tenth and to its ends", "[nav]") {
   sim.SetLayer("sector");
   CHECK(sim.Map().zmin == ship::kZoomMin);
   CHECK(sim.Map().zmax == ship::kZoomMax);
-  for (int i = 0; i < 40; ++i) { sim.ZoomMap(1); }
+  for (int i = 0; i < 60; ++i) { sim.ZoomMap(1); }
   CHECK(sim.Map().zoom == ship::kZoomMax);
 
   // Free: looking never costs an action.
@@ -735,11 +735,12 @@ TEST_CASE("the charted galaxy is grown once, deterministically, and every system
   ship::Simulation first = ship::Simulation::NewVoyage(authored);
   const ship::Catalog& grown = first.World();
 
-  // Every region is expanded, and nothing authored is lost.
-  CHECK(grown.regions.size() == authored.regions.size());
+  // Every region is expanded, outer galactic regions are added, and nothing authored is lost.
+  CHECK(grown.regions.size() ==
+        authored.regions.size() + static_cast<std::size_t>(ship::kNewGalaxies));
   CHECK(grown.systems.size() ==
         authored.systems.size() +
-            static_cast<std::size_t>(ship::kNewSystemsPerRegion) * authored.regions.size());
+            static_cast<std::size_t>(ship::kNewSystemsPerRegion) * grown.regions.size());
   CHECK(grown.bodies.size() > authored.bodies.size());
   CHECK(grown.ports.size() > authored.ports.size());
 
@@ -781,10 +782,7 @@ TEST_CASE("the charted galaxy is grown once, deterministically, and every system
     REQUIRE(entry != nullptr);
     CHECK(entry->type == "star");
     CHECK(grown.BodySystem(*entry) == system.id);
-    std::size_t local = 0;
-    for (const ship::Body& body : grown.bodies) {
-      if (grown.BodySystem(body) == system.id) { ++local; }
-    }
+    const std::size_t local = grown.BodiesInSystem(system.id).size();
     CHECK(local >= 2);
     bool linked = false;
     for (const ship::Lane& lane : grown.sectorLanes) {
@@ -823,20 +821,16 @@ TEST_CASE("the charted galaxy is grown once, deterministically, and every system
   const ship::Body* kesslerGrown = grown.FindSystem("sec-kessler");
   REQUIRE(kesslerAuthored != nullptr);
   REQUIRE(kesslerGrown != nullptr);
-  CHECK((kesslerGrown->x - kesslerAuthored->x) == 638.0);
-  CHECK((kesslerGrown->y - kesslerAuthored->y) == 278.0);
+  CHECK((kesslerGrown->x - kesslerAuthored->x) ==
+        (ship::kSectorBoardScale - 1.0) * 0.5 * authored.map.w);
+  CHECK((kesslerGrown->y - kesslerAuthored->y) ==
+        (ship::kSectorBoardScale - 1.0) * 0.5 * authored.map.h);
 
   // ---- every system is a system, not a diagram of one --------------------
-  // The reference gives a system five local bodies; the growth gives each one
-  // worlds of its own, on rings, so the local chart has something to show.
   std::size_t thinnest = 999;
   for (const ship::Body& system : grown.systems) {
-    std::size_t local = 0;
-    for (const ship::Body& body : grown.bodies) {
-      if (grown.BodySystem(body) == system.id) { ++local; }
-    }
+    const std::size_t local = grown.BodiesInSystem(system.id).size();
     thinnest = std::min(thinnest, local);
-    // ...and the summary says what the chart holds.
     bool claimed = false;
     for (const auto& detail : system.details) {
       if (detail.first == "Charted bodies" && detail.second == std::to_string(local)) {
@@ -849,8 +843,9 @@ TEST_CASE("the charted galaxy is grown once, deterministically, and every system
   CHECK(thinnest >= 15u);
 
   // ---- the galaxy scale has stars on it ----------------------------------
-  // Every system is placed inside its region's cluster, so the third layer is
-  // the same two hundred stars the other two layers draw.
+  const ship::MapGeometry& galaxyBoard = grown.layerBoards.at("galaxy");
+  CHECK(galaxyBoard.w == authored.map.w * ship::kGalaxyBoardScale);
+  CHECK(galaxyBoard.h == authored.map.h * ship::kGalaxyBoardScale);
   CHECK(grown.galaxyPositions.size() == grown.systems.size());
   {
     std::set<std::string> dots;
@@ -859,9 +854,9 @@ TEST_CASE("the charted galaxy is grown once, deterministically, and every system
       const auto it = grown.galaxyPositions.find(system.id);
       REQUIRE(it != grown.galaxyPositions.end());
       CHECK(it->second.first >= 0.0);
-      CHECK(it->second.first <= grown.map.w);
+      CHECK(it->second.first <= galaxyBoard.w);
       CHECK(it->second.second >= 0.0);
-      CHECK(it->second.second <= grown.map.h);
+      CHECK(it->second.second <= galaxyBoard.h);
       const std::string key = ship::js::NumToString(it->second.first) + "," +
                               ship::js::NumToString(it->second.second);
       if (!dots.insert(key).second) { clash = system.id; }
@@ -918,4 +913,433 @@ TEST_CASE("no filter hides a body, and a body out of sensor range is still on th
   CHECK(HasText(*Panel(far.screen.left, "nav-status"), "Out of sensor range"));
   CHECK(far.screen.progress.size() >= 1);
   CHECK(sim.ActionCount() == 0);
+}
+
+TEST_CASE("procedural galaxies carry histories, lanes, ports, and camera centering",
+          "[nav][chart][expansion]") {
+  ship::Simulation sim = Fresh();
+  const ship::Catalog& world = sim.World();
+
+  std::size_t genGalaxies = 0;
+  for (const ship::Body& region : world.regions) {
+    if (region.id.rfind("gal-gen-", 0) != 0) { continue; }
+    ++genGalaxies;
+    const auto& history = sim.WorldHistory(region.id);
+    CHECK(history.size() == 2u);
+    CHECK_FALSE(world.SystemsInRegion(region.id).empty());
+
+    bool hasGalaxyLane = false;
+    for (const ship::Lane& lane : world.galaxyLanes) {
+      if (lane.from == region.id || lane.to == region.id) { hasGalaxyLane = true; break; }
+    }
+    CHECK(hasGalaxyLane);
+  }
+  CHECK(genGalaxies == static_cast<std::size_t>(ship::kNewGalaxies));
+
+  // Selecting an outer procedural galaxy and viewing its sector centres the
+  // sector camera over its star cluster so those systems project near the middle.
+  sim.SetLayer("galaxy");
+  REQUIRE(sim.ViewSector("gal-gen-1"));
+  CHECK(sim.Map().layer == "sector");
+  const auto& indices = world.SystemsInRegion("gal-gen-1");
+  REQUIRE_FALSE(indices.empty());
+  const ship::Body& sampleSystem = world.systems[indices.front()];
+  const ship::NavPoint projected =
+      ship::NavProjectPanned(sim.Map(), sim.Views().at("sector"), sampleSystem.x, sampleSystem.y);
+  CHECK(projected.x >= 0.0);
+  CHECK(projected.x <= sim.Map().vw);
+  CHECK(projected.y >= 0.0);
+  CHECK(projected.y <= sim.Map().vh);
+}
+
+TEST_CASE("procedural map events fire on exploration, resolve cleanly, and round-trip saves",
+          "[nav][events][expansion]") {
+  ship::Simulation sim = Fresh();
+  const ship::Catalog& world = sim.World();
+
+  // Locate a procedural body tagged with a salvage cache and another with an
+  // ancient nav buoy so both scan discovery paths can be exercised directly.
+  const ship::Body* salvageBody = nullptr;
+  const ship::Body* buoyBody = nullptr;
+  const ship::Body* depotBody = nullptr;
+  for (const ship::Body& body : world.bodies) {
+    for (const auto& d : body.details) {
+      if (d.first != "Map feature") { continue; }
+      if (d.second == "Salvage cache" && salvageBody == nullptr) { salvageBody = &body; }
+      if (d.second == "Ancient nav buoy" && buoyBody == nullptr) { buoyBody = &body; }
+      if (d.second == "Fuel skimmer depot" && depotBody == nullptr) { depotBody = &body; }
+    }
+  }
+  REQUIRE(salvageBody != nullptr);
+  REQUIRE(buoyBody != nullptr);
+  REQUIRE(depotBody != nullptr);
+
+  // Move into the salvage body's system, select it, run a deep scan, and acknowledge.
+  const ship::Body* salvageSys = world.FindSystem(world.BodySystem(*salvageBody));
+  REQUIRE(salvageSys != nullptr);
+  sim.MutableMap().here = salvageSys->entry;
+  REQUIRE(sim.SelectTarget(salvageBody->id));
+  const std::size_t goodsBefore = sim.Goods().size();
+  REQUIRE(sim.StartScan());
+  while (sim.FindOngoing("scan") != nullptr && sim.FindOngoing("scan")->state != "done") {
+    REQUIRE(sim.StandWatch());
+  }
+  REQUIRE(sim.Acknowledge("scan"));
+  CHECK(sim.Goods().size() == goodsBefore + 1);
+
+  // Move into the nav buoy's system and scan the buoy: insight rises and local
+  // peer bodies are revealed.
+  const ship::Body* buoySys = world.FindSystem(world.BodySystem(*buoyBody));
+  REQUIRE(buoySys != nullptr);
+  sim.MutableMap().here = buoySys->entry;
+  const double insightBefore = sim.State().sim.insight;
+  REQUIRE(sim.SelectTarget(buoyBody->id));
+  REQUIRE(sim.StartScan());
+  while (sim.FindOngoing("scan") != nullptr && sim.FindOngoing("scan")->state != "done") {
+    REQUIRE(sim.StandWatch());
+  }
+  REQUIRE(sim.Acknowledge("scan"));
+  CHECK(sim.State().sim.insight >= insightBefore + 1.0);
+
+  // Arrive at an orbital fuel skimmer depot and confirm fuel cell recovery.
+  const ship::Body* depotSys = world.FindSystem(world.BodySystem(*depotBody));
+  REQUIRE(depotSys != nullptr);
+  sim.MutableMap().here = depotSys->entry;
+  sim.FindStat("fuel")->value = 60.0;
+  const double cellsBefore = sim.State().fuelCells;
+  REQUIRE(sim.SelectTarget(depotBody->id));
+  REQUIRE(sim.StartTravel());
+  while (sim.FindOngoing("travel") != nullptr && sim.FindOngoing("travel")->state != "done") {
+    sim.FindStat("energy")->value = 100.0;
+    sim.MutableLife().canisters = 6;
+    sim.MutableMess().rack = 10;
+    REQUIRE(sim.StandWatch());
+  }
+  REQUIRE(sim.Acknowledge("travel"));
+  CHECK(sim.State().fuelCells == cellsBefore + 1.0);
+
+  // Spawn a map-tied incident, verify save validation against the unexpanded
+  // authored catalogue, load it back, and resolve it with a repair kit.
+  REQUIRE(sim.SpawnMapIncident("map-ion-squall", "Entered charged filament."));
+  std::string why;
+  const std::string saved = sim.SaveJson();
+  INFO(why);
+  REQUIRE(ship::Simulation::ValidSave(saved, World(), &why));
+
+  ship::Simulation restored = Fresh();
+  REQUIRE(restored.LoadJson(saved, &why));
+  REQUIRE_FALSE(restored.Events().empty());
+  const std::string incId = restored.Events().back().id;
+  restored.MutableState().repairKits = 3;
+  REQUIRE(restored.RemedyIncident(incId));
+}
+
+TEST_CASE("huge procedural charts build within interactive frame budgets",
+          "[nav][perf][expansion]") {
+  ship::Simulation sim = Fresh();
+  const auto t0 = std::chrono::steady_clock::now();
+  for (const char* layer : {"system", "sector", "galaxy"}) {
+    sim.SetLayer(layer);
+    const ship::NavScreenModel screen = ship::BuildNavScreen(sim);
+    CHECK_FALSE(screen.chart.bodies.empty());
+    sim.ZoomMap(4);
+    const ship::NavChartView zoomed = ship::BuildNavChart(sim);
+    CHECK_FALSE(zoomed.bodies.empty());
+  }
+  const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                             std::chrono::steady_clock::now() - t0)
+                             .count();
+  INFO("6 full chart builds across all layers took " << elapsedMs << " ms");
+  CHECK(elapsedMs < 250);
+}
+
+TEST_CASE("staged sensor upgrades unlock scanLocked tiers and deep-region scanning",
+          "[nav][sensors][expansion]") {
+  ship::Simulation sim = Fresh();
+  sim.MutableState().shiplets = 5000;
+
+  // Park and dock at the first authored port to inspect Shipyard staging first.
+  REQUIRE_FALSE(sim.World().ports.empty());
+  sim.MutableMap().here = sim.World().ports.front().id;
+  sim.MutableState().docked = false;
+  REQUIRE(sim.Dock());
+  REQUIRE(sim.State().docked);
+
+  const auto yardBefore = ship::BuildStationScreen(sim, sim.Map().here).columns[3];
+  auto findYardRow = [](const ship::StationColumn& col, const std::string& id) -> const ship::StationRow* {
+    for (const auto& r : col.rows) {
+      if (r.id == id) { return &r; }
+    }
+    return nullptr;
+  };
+  REQUIRE(findYardRow(yardBefore, "upgrade:scanner") != nullptr);
+  REQUIRE(findYardRow(yardBefore, "upgrade:scanner2") != nullptr);
+  CHECK(findYardRow(yardBefore, "upgrade:scanner")->enabled);
+  CHECK_FALSE(findYardRow(yardBefore, "upgrade:scanner2")->enabled);
+
+  // Pick a local body with scanLocked entries in Kessler, a same-region system,
+  // and a deep-region outer-galaxy system.
+  std::string localWithLocked;
+  for (std::size_t idx : sim.World().BodiesInSystem("sec-kessler")) {
+    const ship::Body& b = sim.World().bodies[idx];
+    if (b.scanLocked.size() >= 2) { localWithLocked = b.id; break; }
+  }
+  if (localWithLocked.empty()) {
+    for (std::size_t idx : sim.World().BodiesInSystem("sec-kessler")) {
+      const ship::Body& b = sim.World().bodies[idx];
+      if (!b.scanLocked.empty()) { localWithLocked = b.id; break; }
+    }
+  }
+  REQUIRE_FALSE(localWithLocked.empty());
+
+  std::string outerSysId;
+  std::string outerRegId;
+  for (const ship::Body& sys : sim.World().systems) {
+    if (sys.region != "gal-inner") {
+      outerSysId = sys.id;
+      outerRegId = sys.region;
+      break;
+    }
+  }
+  REQUIRE_FALSE(outerSysId.empty());
+
+  // Tier 0: local scan leaves scanLocked marked "sensors insufficient", and
+  // neither systems nor cross-system contacts can be scanned.
+  CHECK(sim.SensorTier() == 0);
+  CHECK_FALSE(sim.CanScan(*sim.FindBodyById("sec-vance")));
+  CHECK_FALSE(sim.CanScan(*sim.FindBodyById("vance-star")));
+  CHECK_FALSE(sim.CanScan(*sim.FindBodyById(outerSysId)));
+
+  sim.MutableState().scanned[localWithLocked] = true;
+  REQUIRE(sim.SelectTarget(localWithLocked));
+  {
+    const auto nav0 = ship::BuildNavScreen(sim);
+    bool sawInsufficient = false;
+    for (const auto& line : nav0.screen.right[0].lines) {
+      if (line.value.find("sensors insufficient") != std::string::npos) {
+        sawInsufficient = true;
+      }
+    }
+    CHECK(sawInsufficient);
+  }
+
+  // Buy Tier 1 ("scanner"): scanCost drops to 3, first scanLocked entry unlocks,
+  // and same-region systems/bodies become scannable while outer galaxies stay locked.
+  REQUIRE(sim.BuyUpgrade("scanner"));
+  CHECK(sim.SensorTier() == 1);
+  CHECK(sim.ScanCost() == 3.0);
+  CHECK(sim.CanScan(*sim.FindBodyById("sec-vance")));
+  CHECK(sim.CanScan(*sim.FindBodyById("vance-star")));
+  CHECK_FALSE(sim.CanScan(*sim.FindBodyById(outerSysId)));
+  CHECK_FALSE(sim.CanScan(*sim.FindBodyById(outerRegId)));
+
+  {
+    const auto yardMid = ship::BuildStationScreen(sim, sim.Map().here).columns[3];
+    CHECK_FALSE(findYardRow(yardMid, "upgrade:scanner")->enabled);
+    CHECK(findYardRow(yardMid, "upgrade:scanner2")->enabled);
+
+    const auto nav1 = ship::BuildNavScreen(sim);
+    bool sawTier1Unlock = false;
+    for (const auto& line : nav1.screen.right[0].lines) {
+      if (line.value.find("upgraded sensor lock") != std::string::npos) {
+        sawTier1Unlock = true;
+      }
+    }
+    CHECK(sawTier1Unlock);
+  }
+
+  // Run a remote regional scan on sec-vance from Kessler!
+  REQUIRE(sim.SelectTarget("sec-vance"));
+  REQUIRE(sim.StartScan());
+  while (sim.FindOngoing("scan")->state != "done") {
+    sim.MutableLife().canisters = 6;
+    sim.MutableMess().rack = 10;
+    REQUIRE(sim.StandWatch());
+  }
+  REQUIRE(sim.Acknowledge("scan"));
+  CHECK(sim.State().scanned.at("sec-vance"));
+
+  // Buy Tier 2 ("scanner2"): scanCost drops to 2, ALL scanLocked entries unlock,
+  // and deep-region systems & outer-galaxy clusters can be scanned remotely + saved mid-scan.
+  REQUIRE(sim.BuyUpgrade("scanner2"));
+  CHECK(sim.SensorTier() == 2);
+  CHECK(sim.ScanCost() == 2.0);
+  CHECK(sim.CanScan(*sim.FindBodyById(outerSysId)));
+  CHECK(sim.CanScan(*sim.FindBodyById(outerRegId)));
+
+  REQUIRE(sim.SelectTarget(localWithLocked));
+  {
+    const auto nav2 = ship::BuildNavScreen(sim);
+    for (const auto& line : nav2.screen.right[0].lines) {
+      CHECK(line.value.find("sensors insufficient") == std::string::npos);
+      CHECK(line.value.find("deep-array sensors required") == std::string::npos);
+    }
+  }
+
+  // Start a deep-region scan on an outer galaxy cluster and round-trip save/load mid-scan.
+  REQUIRE(sim.SelectTarget(outerRegId));
+  REQUIRE(sim.StartScan());
+  std::string why;
+  const std::string saved = sim.SaveJson();
+  INFO(why);
+  REQUIRE(ship::Simulation::ValidSave(saved, World(), &why));
+  ship::Simulation restored = Fresh();
+  REQUIRE(restored.LoadJson(saved, &why));
+  while (restored.FindOngoing("scan")->state != "done") {
+    restored.MutableLife().canisters = 6;
+    restored.MutableMess().rack = 10;
+    REQUIRE(restored.StandWatch());
+  }
+  const std::size_t surveysBefore = restored.Survey().size();
+  REQUIRE(restored.Acknowledge("scan"));
+  CHECK(restored.State().scanned.at(outerRegId));
+  REQUIRE(restored.Survey().size() == surveysBefore + 1);
+  CHECK(restored.Survey().back().value >= 180.0);  // 145 * 1.25 deep-array bonus
+}
+
+TEST_CASE("planet ore extraction, moon mining, gas skimming, and debris looting work end-to-end",
+          "[nav][extract][expansion]") {
+  ship::Simulation sim = Fresh();
+  sim.MutableState().docked = false;
+
+  // Find a rocky planet, a moon, a gas giant, a belt, and a wreck/anomaly site.
+  const ship::Body* rockyPlanet = nullptr;
+  const ship::Body* moonBody = nullptr;
+  const ship::Body* gasPlanet = nullptr;
+  const ship::Body* beltBody = nullptr;
+  const ship::Body* siteBody = nullptr;
+
+  for (const ship::Body& b : sim.World().bodies) {
+    if (sim.World().FindPort(b.id) != nullptr) { continue; }
+    const bool isGas = b.subtype == "gas" || b.klass.find("Gas") != std::string::npos ||
+                       b.klass.find("gas") != std::string::npos;
+    const bool isIce = b.subtype == "ice" || b.subtype == "ocean" ||
+                       b.klass.find("Ice") != std::string::npos ||
+                       b.klass.find("ice") != std::string::npos;
+    if (b.type == "planet" && !isGas && !isIce && rockyPlanet == nullptr) { rockyPlanet = &b; }
+    if (b.type == "moon" && moonBody == nullptr) { moonBody = &b; }
+    if (b.type == "planet" && isGas && gasPlanet == nullptr) { gasPlanet = &b; }
+    if (b.type == "belt" && beltBody == nullptr) { beltBody = &b; }
+    if (b.type == "site" && siteBody == nullptr) { siteBody = &b; }
+  }
+  REQUIRE(rockyPlanet != nullptr);
+  REQUIRE(moonBody != nullptr);
+  REQUIRE(gasPlanet != nullptr);
+  REQUIRE(beltBody != nullptr);
+  REQUIRE(siteBody != nullptr);
+
+  auto tickUntilDone = [](ship::Simulation& s, const std::string& id) {
+    while (s.FindOngoing(id) != nullptr && s.FindOngoing(id)->state != "done") {
+      s.FindStat("energy")->value = 100.0;
+      s.FindStat("hull")->value = 100.0;
+      s.MutableState().filterLife = 100.0;
+      s.MutableState().airHold = 20.0;
+      s.MutableLife().canisters = 6;
+      s.MutableMess().rack = 10;
+      REQUIRE(s.StandWatch());
+    }
+  };
+
+  auto parkAt = [&](const ship::Body& target) {
+    sim.FindStat("energy")->value = 100.0;
+    sim.FindStat("hull")->value = 100.0;
+    sim.MutableState().filterLife = 100.0;
+    sim.MutableState().airHold = 20.0;
+    sim.MutableMap().here = target.id;
+    sim.MutableState().docked = false;
+    REQUIRE(sim.SelectTarget(target.id));
+  };
+
+  // 1. Rocky planet ore extraction: scanned data reveals lootable yield,
+  //    extraction reserves 4 m3 while running/done, enforces a 5-action cooldown,
+  //    and is only possible once per body!
+  sim.MutableGoods().clear();
+  parkAt(*rockyPlanet);
+  CHECK(sim.ExtractionMaxPasses(*rockyPlanet) == 1);
+  CHECK(sim.ExtractionActionLabel(*rockyPlanet) == "Extract planetary ore");
+
+  // Scanned data includes what can be looted.
+  sim.MutableState().scanned[rockyPlanet->id] = true;
+  {
+    const auto navScanned = ship::BuildNavScreen(sim);
+    bool sawLootable = false;
+    for (const auto& line : navScanned.screen.right[0].lines) {
+      if (line.value.find("Lootable:") != std::string::npos &&
+          line.value.find("Depleted") == std::string::npos) {
+        sawLootable = true;
+      }
+    }
+    CHECK(sawLootable);
+  }
+
+  const double usedBefore = sim.CargoUsed();
+  REQUIRE(ship::PressNavAction(sim, "extract"));
+  CHECK(ship::CooldownRemaining(sim, ship::ActionCooldownKey(sim, "progress:extract")) == 5.0);
+  REQUIRE(sim.FindOngoing("extract") != nullptr);
+  CHECK(sim.CargoReserved() == 4.0);
+  CHECK_FALSE(sim.StartTravel());  // cannot jump away with surface drills deployed
+
+  std::string why;
+  const std::string savedMidExtract = sim.SaveJson();
+  INFO(why);
+  REQUIRE(ship::Simulation::ValidSave(savedMidExtract, World(), &why));
+  REQUIRE(sim.LoadJson(savedMidExtract, &why));
+  CHECK(sim.CargoReserved() == 4.0);
+
+  tickUntilDone(sim, "extract");
+  CHECK(sim.CargoReserved() == 4.0);  // still reserved while waiting to haul aboard
+  REQUIRE(ship::PressNavAction(sim, "extract"));  // acknowledges & hauls ore aboard
+  CHECK(sim.FindOngoing("extract") == nullptr);
+  CHECK(sim.CargoUsed() > usedBefore);
+  CHECK(sim.ExtractionPassesUsed(*rockyPlanet) == 1);
+  CHECK(ship::CooldownRemaining(sim, ship::ActionCooldownKey(sim, "progress:extract")) == 5.0);
+
+  // Even after cooldown clears, looting the same body a second time is refused,
+  // and Scan Data reports it depleted.
+  sim.MutableState().actionCooldowns.clear();
+  CHECK_FALSE(sim.StartExtraction());
+  {
+    const auto navAfter = ship::BuildNavScreen(sim);
+    bool sawDepleted = false;
+    for (const auto& line : navAfter.screen.right[0].lines) {
+      if (line.value.find("Lootable: Depleted") != std::string::npos) {
+        sawDepleted = true;
+      }
+    }
+    CHECK(sawDepleted);
+  }
+
+  // 2. Gas giant atmospheric skimming needs 0 m3 cargo hold and condenses fuel + cells.
+  sim.MutableGoods().clear();
+  parkAt(*gasPlanet);
+  sim.FindStat("fuel")->value = 40.0;
+  const double cells0 = sim.State().fuelCells;
+  REQUIRE(sim.StartExtraction());
+  CHECK(sim.CargoReserved() == 0.0);
+  tickUntilDone(sim, "extract");
+  REQUIRE(sim.Acknowledge("extract"));
+  CHECK(sim.StatValue("fuel") > 40.0);
+  CHECK(sim.State().fuelCells >= cells0 + 1.0);
+
+  // 3. Moon mining & Debris/Site looting produce cargo lots and can trigger live hazards.
+  parkAt(*moonBody);
+  const std::size_t lotsBeforeMoon = sim.Goods().size();
+  REQUIRE(sim.StartExtraction());
+  tickUntilDone(sim, "extract");
+  REQUIRE(sim.Acknowledge("extract"));
+  CHECK(sim.Goods().size() == lotsBeforeMoon + 1);
+
+  parkAt(*beltBody);
+  const std::size_t lotsBeforeBelt = sim.Goods().size();
+  REQUIRE(sim.StartExtraction());
+  tickUntilDone(sim, "extract");
+  REQUIRE(sim.Acknowledge("extract"));
+  CHECK(sim.Goods().size() == lotsBeforeBelt + 1);
+  CHECK(sim.Goods().back().kind == "Salvage");
+
+  parkAt(*siteBody);
+  REQUIRE(sim.StartExtraction());
+  tickUntilDone(sim, "extract");
+  REQUIRE(sim.Acknowledge("extract"));
+  CHECK(sim.ExtractionPassesUsed(*siteBody) == 1);
 }

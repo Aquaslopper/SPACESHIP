@@ -218,4 +218,38 @@ void Simulation::TickIncidents() {
   }
 }
 
+bool Simulation::SpawnMapIncident(const std::string& typeId, const std::string& contextNote) {
+  if (!state_.gameOver.empty() || events_.size() >= 4) { return false; }
+  const IncidentType* spec = nullptr;
+  for (const IncidentType& candidate : catalog_.incidentTypes) {
+    if (candidate.id == typeId) {
+      spec = &candidate;
+      break;
+    }
+  }
+  if (spec == nullptr || spec->stages.empty() || spec->stages[0].ticks <= 0) { return false; }
+  for (const Incident& live : events_) {
+    if (live.type == typeId) { return false; }
+  }
+
+  Incident incident;
+  incident.id = spec->id + "-" + std::to_string(static_cast<long long>(actionCounter_)) + "-" +
+                std::to_string(events_.size() + 1);
+  incident.type = spec->id;
+  incident.kind = spec->kind;
+  incident.source = spec->source;
+  incident.stage = 0;
+  incident.left = spec->stages[0].ticks;
+  if (spec->kind == "Crew" && crew_.size() >= 2) {
+    const std::pair<std::string, std::string> pair = SimDisputePair();
+    incident.a = pair.first;
+    incident.b = pair.second;
+  }
+  events_.push_back(incident);
+
+  if (!contextNote.empty()) { LogLine(contextNote); }
+  LogLine("Navigation alert: " + spec->title + ". Open Events to respond.");
+  return true;
+}
+
 }  // namespace ship

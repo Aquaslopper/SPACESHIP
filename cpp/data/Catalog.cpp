@@ -627,28 +627,114 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
   catalog.counts.ports = static_cast<int>(catalog.ports.size());
   catalog.counts.lanes = static_cast<int>(catalog.sectorLanes.size());
   catalog.counts.contracts = static_cast<int>(catalog.contracts.size());
+  catalog.RebuildIndex();
 
   return catalog;
 }
 
+void Catalog::RebuildIndex() const {
+  index_.bodyById.clear();
+  index_.systemById.clear();
+  index_.regionById.clear();
+  index_.portById.clear();
+  index_.bodiesBySystem.clear();
+  index_.systemsByRegion.clear();
+
+  index_.bodyById.reserve(bodies.size());
+  for (std::size_t i = 0; i < bodies.size(); ++i) {
+    index_.bodyById.emplace(bodies[i].id, i);
+    index_.bodiesBySystem[BodySystem(bodies[i])].push_back(i);
+  }
+  index_.systemById.reserve(systems.size());
+  for (std::size_t i = 0; i < systems.size(); ++i) {
+    index_.systemById.emplace(systems[i].id, i);
+    index_.systemsByRegion[systems[i].region].push_back(i);
+  }
+  index_.regionById.reserve(regions.size());
+  for (std::size_t i = 0; i < regions.size(); ++i) {
+    index_.regionById.emplace(regions[i].id, i);
+  }
+  index_.portById.reserve(ports.size());
+  for (std::size_t i = 0; i < ports.size(); ++i) {
+    index_.portById.emplace(ports[i].id, i);
+  }
+
+  index_.bodyCount = bodies.size();
+  index_.systemCount = systems.size();
+  index_.regionCount = regions.size();
+  index_.portCount = ports.size();
+  index_.firstBodyId = bodies.empty() ? std::string() : bodies.front().id;
+  index_.lastBodyId = bodies.empty() ? std::string() : bodies.back().id;
+  index_.ready = true;
+}
+
+void Catalog::EnsureIndex() const {
+  const std::string firstId = bodies.empty() ? std::string() : bodies.front().id;
+  const std::string lastId = bodies.empty() ? std::string() : bodies.back().id;
+  if (!index_.ready || index_.bodyCount != bodies.size() ||
+      index_.systemCount != systems.size() || index_.regionCount != regions.size() ||
+      index_.portCount != ports.size() || index_.firstBodyId != firstId ||
+      index_.lastBodyId != lastId) {
+    RebuildIndex();
+  }
+}
+
 const Body* Catalog::FindBody(const std::string& id) const {
+  EnsureIndex();
+  const auto it = index_.bodyById.find(id);
+  if (it != index_.bodyById.end() && it->second < bodies.size() &&
+      bodies[it->second].id == id) {
+    return &bodies[it->second];
+  }
   for (const Body& b : bodies) { if (b.id == id) { return &b; } }
   return nullptr;
 }
 
 const Body* Catalog::FindSystem(const std::string& id) const {
+  EnsureIndex();
+  const auto it = index_.systemById.find(id);
+  if (it != index_.systemById.end() && it->second < systems.size() &&
+      systems[it->second].id == id) {
+    return &systems[it->second];
+  }
   for (const Body& b : systems) { if (b.id == id) { return &b; } }
   return nullptr;
 }
 
 const Body* Catalog::FindRegion(const std::string& id) const {
+  EnsureIndex();
+  const auto it = index_.regionById.find(id);
+  if (it != index_.regionById.end() && it->second < regions.size() &&
+      regions[it->second].id == id) {
+    return &regions[it->second];
+  }
   for (const Body& b : regions) { if (b.id == id) { return &b; } }
   return nullptr;
 }
 
 const Port* Catalog::FindPort(const std::string& id) const {
+  EnsureIndex();
+  const auto it = index_.portById.find(id);
+  if (it != index_.portById.end() && it->second < ports.size() &&
+      ports[it->second].id == id) {
+    return &ports[it->second];
+  }
   for (const Port& p : ports) { if (p.id == id) { return &p; } }
   return nullptr;
+}
+
+const std::vector<std::size_t>& Catalog::BodiesInSystem(const std::string& systemId) const {
+  static const std::vector<std::size_t> kEmpty;
+  EnsureIndex();
+  const auto it = index_.bodiesBySystem.find(systemId);
+  return it == index_.bodiesBySystem.end() ? kEmpty : it->second;
+}
+
+const std::vector<std::size_t>& Catalog::SystemsInRegion(const std::string& regionId) const {
+  static const std::vector<std::size_t> kEmpty;
+  EnsureIndex();
+  const auto it = index_.systemsByRegion.find(regionId);
+  return it == index_.systemsByRegion.end() ? kEmpty : it->second;
 }
 
 std::string Catalog::BodySystem(const Body& body) const {

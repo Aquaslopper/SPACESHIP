@@ -970,6 +970,22 @@ int main() {
       Require(audit.State().navTarget == audit.HomeBody()->id,
               "Interpolated ship-position ring did not select home");
       Require(audit.ActionCount() == actions, "Selecting the ship ring advanced travel");
+      Require(std::any_of(circles.begin(), circles.end(), [](const CircleCall& c) {
+                return c.color.r >= 200 && c.color.g < 60 && c.color.b < 60 && c.r >= 9.0f;
+              }),
+              "Player ship position marker was not painted in vivid red");
+
+      audit.SetLayer("sector");
+      for (int z = 0; z < 20; ++z) { audit.ZoomMap(1); }
+      Frame(cockpit, audit, 974000);
+      Require(std::any_of(ellipses.begin(), ellipses.end(), [](const EllipseCall& e) {
+                return e.rx >= 20.0f && e.ry >= 15.0f;
+              }),
+              "Sector layer did not paint distinct sector territory contours");
+      Require(std::any_of(circles.begin(), circles.end(), [](const CircleCall& c) {
+                return c.color.r >= 200 && c.color.g < 60 && c.color.b < 60 && c.r >= 9.0f;
+              }),
+              "Sector layer did not paint the vivid red player position marker");
     }
     {
       auto tabs = ship::Simulation::ReferenceVoyage(ship::Catalog::LoadFromAssets("assets"));

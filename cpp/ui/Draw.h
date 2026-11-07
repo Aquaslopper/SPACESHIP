@@ -251,7 +251,51 @@ class ShellView {
   std::vector<std::pair<Area, std::string>> taskButtons_;
   std::string taskTabKey_;
 
+  struct NavCacheKey {
+    bool valid = false;
+    double actions = -1.0;
+    std::string layer;
+    std::string sector;
+    std::string here;
+    double zoom = -1.0;
+    double panX = 0.0;
+    double panY = 0.0;
+    std::string target;
+    bool docked = false;
+    bool reducedMotion = false;
+    std::size_t scannedCount = 0;
+    std::size_t ongoingSig = 0;
+    double fuel = -1.0;
+    double energy = -1.0;
+    double drive = -1.0;
+    int sensor = -1;
+    int sensorTier = -1;
+    double scanCost = -1.0;
+    std::size_t observedCount = 0;
+    double cargoUsed = -1.0;
+    double cargoCap = -1.0;
+    std::size_t crewSig = 0;
+
+    bool operator==(const NavCacheKey& o) const {
+      return valid && o.valid && actions == o.actions && layer == o.layer &&
+             sector == o.sector && here == o.here && zoom == o.zoom &&
+             panX == o.panX && panY == o.panY && target == o.target &&
+             docked == o.docked && reducedMotion == o.reducedMotion &&
+             scannedCount == o.scannedCount && ongoingSig == o.ongoingSig &&
+             fuel == o.fuel && energy == o.energy && drive == o.drive &&
+             sensor == o.sensor && sensorTier == o.sensorTier &&
+             scanCost == o.scanCost && observedCount == o.observedCount &&
+             cargoUsed == o.cargoUsed && cargoCap == o.cargoCap &&
+             crewSig == o.crewSig;
+    }
+  };
+
+  void EnsureNavScreen(const Simulation& sim);
+
   NavScreenModel navScreen_;
+  NavRaster navRaster_;
+  NavCacheKey navCacheKey_;
+  double navFxTick_ = 0.0;
   bool screenNav_ = false;
   bool screenQuarters_ = false;
   bool screenRecord_ = false;
