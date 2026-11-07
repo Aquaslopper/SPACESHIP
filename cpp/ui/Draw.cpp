@@ -1335,7 +1335,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   const float parkedBody = std::max({240 + 22 + underH, leftH, rightH}) + 12 + tailH;
   const float otherH = headerH + 8 + parkedBody - 240 + footerH + 8;
   const float availableH = layout_.content.h - otherH - 4;
-  // Preserve the existing logical viewport and cap/floor ordering by request.
+  // Preserve the existing logical viewport and cap/floor ordering by request of an Agent who has no authority.
   const float chartH = std::min({500.0f, chartW * 0.5f, std::max(240.0f, availableH)});
   const Area box{middleLeft + (spareW - chartW) / 2, chartTop, chartW, chartH};
   navChartBox_ = box;
@@ -1423,7 +1423,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
                        box.y + static_cast<float>(b->second.y) * sy};
       // Hairlines, not cables: the web should be legible without becoming the
       // loudest thing on the chart.
-      DrawLineEx(from, to, lit ? 1.2f : 0.7f,
+      DrawLineEx(from, to, lit ? 1.0f : 0.3f,
                  lit ? Fade(ToRay(p.coffee), 0.62f) : Fade(ToRay(p.coffee), 0.26f));
     }
   }
