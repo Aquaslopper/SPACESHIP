@@ -68,6 +68,14 @@ const std::vector<StarRow>& AuthoredStarCatalog();
 void BuildGalaxyFromRows(const std::vector<StarRow>& rows, std::size_t baseIndex, Catalog& catalog,
                          bool linkHubs);
 
+// addSystemBody(): the reference's one way of creating a local body - klass by
+// type, System and Region rows, the observation plus the type's fixed reading,
+// and the matching locked scan. Everything that adds a local body goes through
+// here, so a generated world says what an authored one says.
+Body& AddLocalBody(Catalog& catalog, const std::string& id, const std::string& type,
+                   const std::string& name, double x, double y, const Body& system,
+                   const std::string& text);
+
 // expandLocalCharts(): an outer world and a moon for every system, from
 // firstSystem onward. The reference runs it over every system with the system's
 // position in the catalogue as the index, so a later batch starts where the

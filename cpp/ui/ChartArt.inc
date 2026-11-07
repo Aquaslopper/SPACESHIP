@@ -339,9 +339,13 @@ bool ChartRectsOverlap(const Area& a, const Area& b) {
 int ChartLabelPriority(const NavBodyView& body) {
   if (body.selected) { return 0; }
   if (body.here) { return 1; }
-  if (body.inRange) { return 2; }
-  if (body.type == "star" || body.type == "system" || body.type == "region") { return 3; }
-  if (body.type == "planet") { return 4; }
-  return 5;
+  // A region outranks the stars inside it: on the galaxy scale the seven names
+  // are the map, and the two hundred stars are the detail behind them. Without
+  // this the cluster labels were whatever star happened to be nearest the ship.
+  if (body.type == "region") { return 2; }
+  if (body.inRange) { return 3; }
+  if (body.type == "star" || body.type == "system") { return 4; }
+  if (body.type == "planet") { return 5; }
+  return 6;
 }
 

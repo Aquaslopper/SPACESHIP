@@ -66,7 +66,14 @@ std::vector<const Body*> LayerBodies(const Simulation& sim) {
   const Catalog& catalog = sim.World();
   const std::string layer = BodyLayer(sim);
   if (layer == "galaxy") {
+    // The regions, and then every star inside them. The galaxy scale used to
+    // carry seven named blobs; the systems have positions of their own now
+    // (Catalog::galaxyPositions), so the third layer shows the same two hundred
+    // stars the other two layers are drawing.
     for (const Body& body : catalog.regions) { out.push_back(&body); }
+    for (const Body& body : catalog.systems) {
+      if (catalog.galaxyPositions.count(body.id) != 0) { out.push_back(&body); }
+    }
     return out;
   }
   if (layer == "system") {
@@ -336,6 +343,16 @@ NavChartView BuildNavChart(const Simulation& sim) {
 
   // --- bodies -------------------------------------------------------------
   const std::vector<const Body*> bodies = LayerBodies(sim);
+  // A system has two positions: its own on the sector board, and its place in
+  // its region's cluster on the galaxy board. Everything that projects a body
+  // asks this, so the two wide scales cannot disagree about where a star is.
+  const auto layerPoint = [&sim, &chart](const Body& body) -> std::pair<double, double> {
+    if (chart.layer == "galaxy" && body.type == "system") {
+      const auto it = sim.World().galaxyPositions.find(body.id);
+      if (it != sim.World().galaxyPositions.end()) { return it->second; }
+    }
+    return {body.x, body.y};
+  };
   for (const Body* body : bodies) {
     NavBodyView bodyView;
     bodyView.id = body->id;
@@ -344,10 +361,14 @@ NavChartView BuildNavChart(const Simulation& sim) {
     bodyView.subtype = body->subtype;
     bodyView.klass = body->klass;
     bodyView.region = body->region;
-    bodyView.worldX = body->x;
-    bodyView.worldY = body->y;
-    bodyView.at = NavProjectPanned(map, view, body->x, body->y);
+    const std::pair<double, double> at = layerPoint(*body);
+    bodyView.worldX = at.first;
+    bodyView.worldY = at.second;
+    bodyView.at = NavProjectPanned(map, view, at.first, at.second);
     bodyView.size = BodySize(*body);
+    // A star is a star on its own chart; on the galaxy scale it is one point of
+    // light in a cluster of thirty, so it is drawn at the size that reads.
+    if (chart.layer == "galaxy" && body->type == "system") { bodyView.size = 10; }
     bodyView.selected = !target.empty() && target == body->id;
     bodyView.classes = BodyClasses(*body, bodyView.selected);
     bodyView.dotX = bodyView.at.x - bodyView.size / 2;
@@ -464,7 +485,8 @@ NavChartView BuildNavChart(const Simulation& sim) {
   // --- the ship's ring ----------------------------------------------------
   const Body* home = sim.HomeBody();
   if (home != nullptr) {
-    NavPoint at{home->x, home->y};
+    const std::pair<double, double> homeAt = layerPoint(*home);
+    NavPoint at{homeAt.first, homeAt.second};
     if (chart.layer == "system") {
       at = TravelMarker(sim);
     } else {

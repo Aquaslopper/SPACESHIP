@@ -1400,6 +1400,32 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     DrawRectangle(static_cast<int>(px), static_cast<int>(py), 2, 2, ink);
   }
 
+  // The lane web, as lines. On the wide boards a lane painted as sparse dots is
+  // next to invisible, and the web is half of what the two wide scales are for:
+  // one lane reads as a route, three hundred read as a network. Same-region
+  // lanes are quiet, the ones touching the ship or the target are not.
+  if (chart.layer == "sector" || chart.layer == "galaxy") {
+    std::map<std::string, NavPoint> screen_at;
+    for (const NavBodyView& body : chart.bodies) { screen_at[body.id] = body.at; }
+    const std::vector<Lane>& lanes =
+        chart.layer == "sector" ? sim.World().sectorLanes : sim.World().galaxyLanes;
+    const std::string homeId = sim.HomeBody() == nullptr ? std::string() : sim.HomeBody()->id;
+    const std::string targetId = sim.State().navTarget.value_or(std::string());
+    for (const Lane& lane : lanes) {
+      const auto a = screen_at.find(lane.from);
+      const auto b = screen_at.find(lane.to);
+      if (a == screen_at.end() || b == screen_at.end()) { continue; }
+      const bool lit = lane.from == homeId || lane.to == homeId || lane.from == targetId ||
+                       lane.to == targetId;
+      const Vector2 from{box.x + static_cast<float>(a->second.x) * sx,
+                         box.y + static_cast<float>(a->second.y) * sy};
+      const Vector2 to{box.x + static_cast<float>(b->second.x) * sx,
+                       box.y + static_cast<float>(b->second.y) * sy};
+      DrawLineEx(from, to, lit ? 1.6f : 1.0f,
+                 lit ? Fade(ToRay(p.coffee), 0.7f) : Fade(ToRay(p.coffee), 0.34f));
+    }
+  }
+
   // The ship's ring goes DOWN FIRST: painted last it swallows every click
   // aimed at the body the ship is parked at.
   if (chart.hasMarker) {
@@ -1482,11 +1508,15 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   // bury the chart they belong to. The budget keeps the nearest and the most
   // relevant readable, and every other body is still drawn and still clickable.
   const std::size_t labelBudget =
-      chart.layer == "sector" ? 26u : (chart.layer == "galaxy" ? 16u : 48u);
+      chart.layer == "sector" ? 26u : (chart.layer == "galaxy" ? 12u : 48u);
   std::size_t labelsPainted = 0;
   std::vector<Area> takenLabels;
   takenLabels.reserve(labelled.size());
   for (const NavBodyView* body : labelled) {
+    // On the galaxy scale a name per star buries the seven names that are the
+    // map. The stars are still drawn, still clickable and still named in the
+    // panel when one is selected; they just do not shout over their region.
+    if (chart.layer == "galaxy" && body->type == "system") { continue; }
     const float labelX = box.x + static_cast<float>(body->labelX) * sx;
     // Wrap by whole words even when the scale is wide: a name split down the
     // middle ("Beaco / n") is not a label anybody can read, so the box grows to

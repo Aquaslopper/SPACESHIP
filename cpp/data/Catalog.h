@@ -13,6 +13,7 @@
 #pragma once
 
 #include <filesystem>
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -66,6 +67,12 @@ class Catalog {
   // started from an already-grown catalogue (or restarted from its own copy)
   // does not grow a second galaxy.
   bool chartExpanded = false;
+
+  // Where each system sits on the galaxy board (ChartExpansion::PlaceGalaxyDots).
+  // A system has one position, in its own region's cluster; the galaxy scale
+  // reads this, the sector scale reads Body::x/y. Empty until the chart is
+  // grown, and a system missing here is simply not drawn on the galaxy scale.
+  std::map<std::string, std::pair<double, double>> galaxyPositions;
 
   DeckPlan wren;
   DeckPlan kestrel;

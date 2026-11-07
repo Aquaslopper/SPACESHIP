@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cmath>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -196,9 +197,13 @@ TEST_CASE("three layers, each remembering its own view", "[nav]") {
   ship::Simulation sim = Fresh();
   CHECK(sim.Map().layer == "system");
 
+  std::size_t kesslerBodies = 0;
+  for (const ship::Body& body : sim.World().bodies) {
+    if (sim.World().BodySystem(body) == sim.CurrentSystemId()) { ++kesslerBodies; }
+  }
   const ship::NavChartView system = ship::BuildNavChart(sim);
   CHECK(system.layer == "system");
-  CHECK(system.bodies.size() == 8);
+  CHECK(system.bodies.size() == kesslerBodies);
   CHECK(system.scaleText == "Kessler System - System - zoom x1.0");
 
   // Looking is free, and a layer keeps its own selection.
@@ -226,7 +231,11 @@ TEST_CASE("every body is drawn at its own size, with its label on the right side
           "[nav]") {
   ship::Simulation sim = Fresh();
   const ship::NavChartView chart = ship::BuildNavChart(sim);
-  REQUIRE(chart.bodies.size() == 8);
+  std::size_t localBodies = 0;
+  for (const ship::Body& body : sim.World().bodies) {
+    if (sim.World().BodySystem(body) == sim.CurrentSystemId()) { ++localBodies; }
+  }
+  REQUIRE(chart.bodies.size() == localBodies);
 
   const ship::NavBodyView* origin = Body(chart, "kessler");
   REQUIRE(origin != nullptr);
@@ -273,10 +282,15 @@ TEST_CASE("every body is drawn at its own size, with its label on the right side
 
   sim.SetLayer("galaxy");
   const ship::NavChartView galaxy = ship::BuildNavChart(sim);
-  CHECK(galaxy.bodies.size() == 7);
+  // Seven regions, and every star inside them: the third scale draws the same
+  // systems the other two do, at their galaxy positions.
+  CHECK(galaxy.bodies.size() == sim.World().regions.size() + sim.World().systems.size());
   const ship::NavBodyView* core = Body(galaxy, "gal-core");
   REQUIRE(core != nullptr);
   CHECK(core->size == 22);
+  const ship::NavBodyView* starInGalaxy = Body(galaxy, "sec-vance");
+  REQUIRE(starInGalaxy != nullptr);
+  CHECK(starInGalaxy->size == 10);  // one point of light, not a system-sized orb
   CHECK(core->classes == "mapdot mapdot-region");
   CHECK(galaxy.scaleText == "Galaxy - zoom x1.0");
 }
@@ -793,8 +807,52 @@ TEST_CASE("the charted galaxy is grown once, deterministically, and every system
   const ship::Body* kesslerGrown = grown.FindSystem("sec-kessler");
   REQUIRE(kesslerAuthored != nullptr);
   REQUIRE(kesslerGrown != nullptr);
-  CHECK((kesslerGrown->x - kesslerAuthored->x) == 319.0);
-  CHECK((kesslerGrown->y - kesslerAuthored->y) == 139.0);
+  CHECK((kesslerGrown->x - kesslerAuthored->x) == 638.0);
+  CHECK((kesslerGrown->y - kesslerAuthored->y) == 278.0);
+
+  // ---- every system is a system, not a diagram of one --------------------
+  // The reference gives a system five local bodies; the growth gives each one
+  // worlds of its own, on rings, so the local chart has something to show.
+  std::size_t thinnest = 999;
+  for (const ship::Body& system : grown.systems) {
+    std::size_t local = 0;
+    for (const ship::Body& body : grown.bodies) {
+      if (grown.BodySystem(body) == system.id) { ++local; }
+    }
+    thinnest = std::min(thinnest, local);
+    // ...and the summary says what the chart holds.
+    bool claimed = false;
+    for (const auto& detail : system.details) {
+      if (detail.first == "Charted bodies" && detail.second == std::to_string(local)) {
+        claimed = true;
+      }
+    }
+    INFO(system.id);
+    CHECK(claimed);
+  }
+  CHECK(thinnest >= 15u);
+
+  // ---- the galaxy scale has stars on it ----------------------------------
+  // Every system is placed inside its region's cluster, so the third layer is
+  // the same two hundred stars the other two layers draw.
+  CHECK(grown.galaxyPositions.size() == grown.systems.size());
+  {
+    std::set<std::string> dots;
+    std::string clash;
+    for (const ship::Body& system : grown.systems) {
+      const auto it = grown.galaxyPositions.find(system.id);
+      REQUIRE(it != grown.galaxyPositions.end());
+      CHECK(it->second.first >= 0.0);
+      CHECK(it->second.first <= grown.map.w);
+      CHECK(it->second.second >= 0.0);
+      CHECK(it->second.second <= grown.map.h);
+      const std::string key = ship::js::NumToString(it->second.first) + "," +
+                              ship::js::NumToString(it->second.second);
+      if (!dots.insert(key).second) { clash = system.id; }
+    }
+    INFO(clash);
+    CHECK(clash.empty());
+  }
 }
 
 TEST_CASE("no filter hides a body, and a body out of sensor range is still on the chart",

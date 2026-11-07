@@ -173,6 +173,231 @@ class Spacer {
 
 }  // namespace
 
+namespace {
+
+// ---------------------------------------------------------------------------
+//  The local charts, filled in.
+//  ---------------------------------------------------------------------------
+//  A hash of the system's id, not a counter: the sky of a system must not move
+//  because a system earlier in the list was added or removed, and it must be
+//  the same sky on every machine. FNV-1a is enough for that.
+std::uint64_t HashOf(const std::string& text) {
+  std::uint64_t h = 0xcbf29ce484222325ULL;
+  for (const char c : text) {
+    h ^= static_cast<std::uint64_t>(static_cast<unsigned char>(c));
+    h *= 0x100000001b3ULL;
+  }
+  return h;
+}
+
+std::string FirstWord(const std::string& name) {
+  std::string cleaned;
+  for (const char c : name) {
+    const bool alnum = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+    cleaned.push_back(alnum ? c : ' ');
+  }
+  const std::size_t begin = cleaned.find_first_not_of(' ');
+  if (begin == std::string::npos) { return name; }
+  const std::size_t end = cleaned.find(' ', begin);
+  return cleaned.substr(begin, end == std::string::npos ? std::string::npos : end - begin);
+}
+
+}  // namespace
+
+void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
+  if (catalog.orbitalWorlds.empty() || catalog.orbitalPlanetNames.empty() ||
+      catalog.orbitalMoonNames.empty()) {
+    return;
+  }
+  const std::vector<std::string>& planetNames = catalog.orbitalPlanetNames;
+  const std::vector<std::string>& moonNames = catalog.orbitalMoonNames;
+
+  for (std::size_t i = firstSystem; i < catalog.systems.size(); ++i) {
+    Body& system = catalog.systems[i];
+    if (system.type != "system") { continue; }
+    const std::string side = system.id.substr(4);
+    const std::string word = FirstWord(system.name);
+    Rng rng(HashOf(system.id));
+
+    const std::string regionName = [&catalog, &system] {
+      for (const Body& region : catalog.regions) {
+        if (region.id == system.region) { return region.name; }
+      }
+      return std::string();
+    }();
+    // Where the reference's own bodies already sit, so nothing lands on them.
+    std::vector<std::pair<double, double>> taken;
+    std::set<std::string> names;
+    for (const Body& body : catalog.bodies) {
+      if (body.system != system.id) { continue; }
+      taken.emplace_back(body.x, body.y);
+      names.insert(body.name);
+    }
+
+    // Slots on three ellipses rather than free scatter: a system chart that
+    // reads as orbits is worth more than one that reads as noise. The angle of
+    // every slot is fixed, only a small jitter comes from the system's hash, so
+    // two systems with the same count still do not look identical.
+    const auto slotSpot = [&](int k, double& outX, double& outY) {
+      const int band = k % 3;
+      const double ring = 92.0 + static_cast<double>(band) * 54.0;
+      const int slots = 3 + band;
+      const int slot = (k / 3) % slots;
+      for (int attempt = 0; attempt < 10; ++attempt) {
+        const double angle = 6.283185307179586 *
+                                 (static_cast<double>(slot) / static_cast<double>(slots)) +
+                             rng.Range(-0.18, 0.18) + 0.35 * static_cast<double>(attempt);
+        const double x = std::clamp(catalog.map.cx + std::cos(angle) * ring, 26.0,
+                                    catalog.map.w - 26.0);
+        const double y = std::clamp(catalog.map.cy + std::sin(angle) * ring * 0.55, 26.0,
+                                    catalog.map.h - 26.0);
+        bool clear = true;
+        for (const auto& other : taken) {
+          const double dx = other.first - x;
+          const double dy = other.second - y;
+          if (dx * dx + dy * dy < 34.0 * 34.0) { clear = false; break; }
+        }
+        if (!clear) { continue; }
+        outX = x;
+        outY = y;
+        return true;
+      }
+      return false;
+    };
+
+    // Ten to fifteen more bodies, as worlds and their moons: enough that the
+    // local chart is a system rather than a diagram of one, and spread over the
+    // three rings so the board fills evenly instead of in one corner.
+    const int extra = 10 + rng.Below(6);
+    for (int k = 0; k < extra; ++k) {
+      double x = 0;
+      double y = 0;
+      if (!slotSpot(k, x, y)) { continue; }
+      taken.emplace_back(x, y);
+
+      const bool moon = (k % 3 == 2);
+      const std::size_t profileIndex =
+          (i + static_cast<std::size_t>(k)) % catalog.orbitalWorlds.size();
+      const OrbitalWorld& profile = catalog.orbitalWorlds[profileIndex];
+      const std::string id = side + "-p" + std::to_string(k + 1);
+
+      if (moon) {
+        const std::string base =
+            moonNames[(i * 5 + static_cast<std::size_t>(k)) % moonNames.size()] + " " + word;
+        std::string name = base;
+        for (int n = 2; names.count(name) != 0; ++n) { name = base + " " + std::to_string(n); }
+        names.insert(name);
+        Body& body = AddLocalBody(catalog, id, "moon", name, x, y, system,
+                                  "A small satellite traces a quiet path beyond the mapped world.");
+        body.klass = "Natural satellite - stable orbit";
+        body.details.emplace_back("Atmosphere", "None");
+        body.details.emplace_back("Surface", (k % 2 == 0) ? "Icy regolith" : "Heavily cratered");
+        body.scan = {"A natural satellite follows a stable orbit.",
+                     std::string("The surface is ") +
+                         ((k % 2 == 0) ? "covered in icy regolith." : "heavily cratered.")};
+        body.scanLocked = {"Subsurface structure", "Full orbital mechanics"};
+        continue;
+      }
+
+      const std::string base =
+          planetNames[(i * 7 + static_cast<std::size_t>(k) * 3) % planetNames.size()] + " " + word;
+      std::string name = base;
+      for (int n = 2; names.count(name) != 0; ++n) { name = base + " " + std::to_string(n); }
+      names.insert(name);
+      Body& body = AddLocalBody(catalog, id, "planet", name, x, y, system, profile.scan);
+      body.subtype = profile.id;
+      body.klass = profile.label;
+      body.details.emplace_back("Atmosphere", profile.atmosphere);
+      body.details.emplace_back("Orbital band",
+                                (k % 3 == 0) ? "Inner system"
+                                             : ((k % 3 == 1) ? "Middle band" : "Outer system"));
+      body.scan = {profile.scan, "Surface contours have been recorded."};
+      body.scanLocked = {profile.locked, "High-resolution orbital survey"};
+    }
+
+    // One belt or one derelict, for most systems: the reference's own two
+    // landmark kinds, and its own reading for each.
+    if (rng.Next() < 0.6) {
+      double x = 0;
+      double y = 0;
+      if (slotSpot(extra, x, y)) {
+        taken.emplace_back(x, y);
+        const bool belt = rng.Next() < 0.5;
+        Body& body = AddLocalBody(catalog, side + (belt ? "-field" : "-wreck"),
+                                  belt ? "belt" : "site",
+                                  belt ? FirstWord(system.name) + " Debris"
+                                       : word + " " + (belt ? "Field" : "Wreck"),
+                                  x, y, system,
+                                  belt ? "Loose material is spread across the plotted belt."
+                                       : "A hull tumbling on a dead orbit, still warm.");
+        body.details.emplace_back("System", system.name);
+        body.details.emplace_back("Region", regionName);
+        body.details.emplace_back("Hazard", belt ? "Debris" : "Unstable orbit");
+        if (!belt) { body.klass = "Chart anomaly - unclaimed"; }
+      }
+    }
+    // The summary rows now say what the chart holds, not what the reference's
+    // five-body pass held. A system chart that claims five destinations while
+    // drawing twelve is the same kind of lie as a filter.
+    // Counted through BodySystem(), so the six hand-written Kessler bodies -
+    // which carry no system id - are still counted as Kessler's.
+    std::size_t local = 0;
+    for (const Body& body : catalog.bodies) {
+      if (catalog.BodySystem(body) == system.id) { ++local; }
+    }
+    bool hasBodies = false;
+    bool hasNavigable = false;
+    for (auto& detail : system.details) {
+      if (detail.first == "Charted bodies") {
+        detail.second = std::to_string(local);
+        hasBodies = true;
+      } else if (detail.first == "Navigable") {
+        detail.second = std::to_string(local) + " local destinations";
+        hasNavigable = true;
+      }
+    }
+    if (!hasBodies) { system.details.emplace_back("Charted bodies", std::to_string(local)); }
+    if (!hasNavigable) {
+      system.details.emplace_back("Navigable", std::to_string(local) + " local destinations");
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+//  The galaxy, with stars in it.
+// ---------------------------------------------------------------------------
+void PlaceGalaxyDots(Catalog& catalog) {
+  if (catalog.regions.empty()) { return; }
+  catalog.galaxyPositions.clear();
+  const double w = catalog.map.w;
+  const double h = catalog.map.h;
+
+  std::map<std::string, int> taken;
+  for (std::size_t index = 0; index < catalog.regions.size(); ++index) {
+    taken[catalog.regions[index].id] = 0;
+  }
+  for (const Body& system : catalog.systems) {
+    const Body* region = nullptr;
+    for (const Body& candidate : catalog.regions) {
+      if (candidate.id == system.region) { region = &candidate; break; }
+    }
+    if (region == nullptr) { continue; }
+    const int k = taken[system.region]++;
+    // The region index turns each cluster's spiral, so seven regions do not
+    // read as seven copies of one pattern.
+    const std::size_t regionIndex = static_cast<std::size_t>(region - catalog.regions.data());
+    const double angle = 2.39996322972865 * static_cast<double>(k) +
+                         0.77 * static_cast<double>(regionIndex);
+    // A square-root spiral: even density, and it starts at the region's own
+    // name rather than in a ring around it - a hole in the middle of every
+    // cluster made the galaxy scale read as seven doughnuts.
+    const double radius = 3.5 + 7.6 * std::sqrt(static_cast<double>(k) + 0.35);
+    const double x = std::clamp(region->x + std::cos(angle) * radius, 12.0, w - 12.0);
+    const double y = std::clamp(region->y + std::sin(angle) * radius * 0.62, 12.0, h - 12.0);
+    catalog.galaxyPositions[system.id] = {x, y};
+  }
+}
+
 void ExpandChart(Catalog& catalog) {
   if (catalog.chartExpanded) { return; }
   catalog.chartExpanded = true;
@@ -257,7 +482,7 @@ void ExpandChart(Catalog& catalog) {
 
   Rng rng(0x5350414345534849ULL);  // "SPACES"
   const double margin = 44.0;
-  const double spacing = 44.0;
+  const double spacing = 66.0;
   Spacer spacer(spacing, placed);
 
   const std::size_t baseIndex = AuthoredStarCatalog().size();
@@ -272,7 +497,7 @@ void ExpandChart(Catalog& catalog) {
       double x = 0;
       double y = 0;
       bool found = false;
-      for (double attemptSpacing = spacing; attemptSpacing >= 22.0 && !found;
+      for (double attemptSpacing = spacing; attemptSpacing >= 30.0 && !found;
            attemptSpacing -= 2.0) {
         Spacer test(attemptSpacing, placed);
         for (int attempt = 0; attempt < 900; ++attempt) {
@@ -340,7 +565,10 @@ void ExpandChart(Catalog& catalog) {
         neighbours.emplace_back(std::sqrt(ddx * ddx + ddy * ddy), other.id);
       }
       std::sort(neighbours.begin(), neighbours.end());
-      const std::size_t links = std::min<std::size_t>(2, neighbours.size());
+      // Three neighbours, not two: a web with more than one way out of a
+      // system is what makes the sector read as a network rather than a
+      // necklace. Still same-region only, exactly like the authored lanes.
+      const std::size_t links = std::min<std::size_t>(3, neighbours.size());
       for (std::size_t i = 0; i < links; ++i) {
         const std::string& other = neighbours[i].second;
         bool exists = false;
@@ -356,7 +584,20 @@ void ExpandChart(Catalog& catalog) {
     }
   }
 
-  // ---- 6. the totals the client prints on load ----------------------------
+  // ---- 6. planets for every system, on every layer ------------------------
+  // The reference gives a system five local bodies. That is the entry star, one
+  // world, a landmark, the outer world and the moon; at chart scale it is a
+  // scatter of five dots with a lot of empty board between them. Every system -
+  // authored ones included - gains worlds of its own here, so the local chart
+  // reads as a system rather than as a diagram of one.
+  PopulateLocalCharts(catalog, 0);
+
+  // And the galaxy scale gets the same treatment: every system is placed inside
+  // its region's cluster, so the third layer shows the two hundred stars the
+  // other two layers are drawing rather than seven named circles.
+  PlaceGalaxyDots(catalog);
+
+  // ---- 7. the totals the client prints on load ----------------------------
   catalog.counts.regions = static_cast<int>(catalog.regions.size());
   catalog.counts.systems = static_cast<int>(catalog.systems.size());
   catalog.counts.bodies = static_cast<int>(catalog.bodies.size());

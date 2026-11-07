@@ -43,12 +43,32 @@ namespace ship {
 // galaxy goes from 48 systems to 48 + 7 * kNewSystemsPerRegion.
 constexpr int kNewSystemsPerRegion = 22;
 
-// The sector board, in authored boards. A doubling keeps the authored spacing
-// while quadrupling the room, which is what lets every system own a position.
-constexpr double kSectorBoardScale = 2.0;
+// The sector board, in authored boards. Tripling the authored width and height
+// multiplies the room nine times, which is what lets 202 systems keep a gap of
+// their own instead of crowding into each other at the edited scale. The
+// authored systems are translated, never scaled, so every authored distance -
+// and every crossing that has to pay for it - is unchanged.
+constexpr double kSectorBoardScale = 3.0;
 
 // Grows the charted galaxy. Safe to call on any loaded catalogue, any number of
 // times; only the first call does anything.
 void ExpandChart(Catalog& catalog);
+
+// Fills every local chart with worlds of its own: three to six extra planets,
+// two moons, and a belt or a derelict here and there, all through the
+// reference's AddLocalBody() and all laid out from a hash of the system's id.
+// Deterministic: the same system always gets the same sky, so a saved scan of
+// a generated world still points at that world.
+//
+// Called by ExpandChart() after ExpandLocalCharts(), never instead of it - the
+// reference's five bodies are what the parity test pins, and this pass only
+// adds to them.
+void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem);
+
+// Places every system on the galaxy board, inside the cluster of its region, so
+// the galaxy scale can show 202 real stars instead of seven labelled blobs.
+// Deterministic, and stored on the catalogue (Catalog::galaxyPositions) because
+// three places ask for it: the chart, the ship's marker and the tests.
+void PlaceGalaxyDots(Catalog& catalog);
 
 }  // namespace ship

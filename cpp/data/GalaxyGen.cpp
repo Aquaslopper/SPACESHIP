@@ -58,9 +58,11 @@ std::string Klass(const std::string& type) {
   return "Unoccupied landmark";
 }
 
+}  // namespace
+
 // addSystemBody(): every local body the reference creates goes through here, so
 // every local body in the port carries the same five fields in the same order.
-Body& AddSystemBody(Catalog& catalog, const std::string& id, const std::string& type,
+Body& AddLocalBody(Catalog& catalog, const std::string& id, const std::string& type,
                     const std::string& name, double x, double y, const Body& system,
                     const std::string& text) {
   Body body;
@@ -84,8 +86,6 @@ Body& AddSystemBody(Catalog& catalog, const std::string& id, const std::string& 
   catalog.bodies.push_back(std::move(body));
   return catalog.bodies.back();
 }
-
-}  // namespace
 
 const std::vector<StarRow>& AuthoredStarCatalog() {
   static const std::vector<StarRow> rows = {
@@ -240,20 +240,20 @@ void BuildGalaxyFromRows(const std::vector<StarRow>& rows, std::size_t baseIndex
     system->entry = entry;
 
     // addSystemBody(entry, "star", row[5], 100 + (i % 3) * 32, 58 + (i % 2) * 14, sys, row[9]);
-    AddSystemBody(catalog, entry, "star", row.star, 100.0 + (i % 3) * 32.0, 58.0 + (i % 2) * 14.0,
+    AddLocalBody(catalog, entry, "star", row.star, 100.0 + (i % 3) * 32.0, 58.0 + (i % 2) * 14.0,
                   *system, row.note);
 
     // addSystemBody(slug + "-world", row[6].indexOf("Belt") >= 0 ? "belt" : "planet",
     //               row[6], 390 + (i % 3) * 28, 64 + (i % 2) * 20, sys, row[9]);
     const bool belt = row.world.find("Belt") != std::string::npos;
-    AddSystemBody(catalog, slug + "-world", belt ? "belt" : "planet", row.world,
+    AddLocalBody(catalog, slug + "-world", belt ? "belt" : "planet", row.world,
                   390.0 + (i % 3) * 28.0, 64.0 + (i % 2) * 20.0, *system, row.note);
 
     // landmark = slug + (row[8] ? "-port" : "-site");
     // addSystemBody(landmark, row[8] ? "station" : "site", row[7], 260 + (i % 3) * 45, 210, sys, row[9]);
     const bool hasPort = !row.profile.empty();
     const std::string landmark = slug + (hasPort ? "-port" : "-site");
-    AddSystemBody(catalog, landmark, hasPort ? "station" : "site", row.landmark,
+    AddLocalBody(catalog, landmark, hasPort ? "station" : "site", row.landmark,
                   260.0 + (i % 3) * 45.0, 210.0, *system, row.note);
 
     // if (row[8]) { PORTS[landmark] = {name: row[7], prices: PORT_PRICES[row[8]],
@@ -294,7 +294,7 @@ void ExpandLocalCharts(Catalog& catalog, std::size_t firstSystem) {
 
     // world = addSystemBody(sys.id.substring(4) + "-outer", "planet",
     //   ORBITAL_PLANET_NAMES[i % 12] + " " + word, 470 + (i % 5) * 28, 88 + (i % 5) * 22, sys, profile.scan);
-    Body& world = AddSystemBody(catalog, system.id.substr(4) + "-outer", "planet",
+    Body& world = AddLocalBody(catalog, system.id.substr(4) + "-outer", "planet",
                                 planetNames[i % planetNames.size()] + " " + word,
                                 470.0 + (i % 5) * 28.0, 88.0 + (i % 5) * 22.0, system, profile.scan);
     world.subtype = profile.id;
@@ -309,7 +309,7 @@ void ExpandLocalCharts(Catalog& catalog, std::size_t firstSystem) {
     // AddSystemBody appends to catalog.bodies, which may move the vector, so the
     // world's name is copied out before the moon is created.
     const std::string worldName = world.name;
-    Body& moon = AddSystemBody(catalog, system.id.substr(4) + "-moon", "moon",
+    Body& moon = AddLocalBody(catalog, system.id.substr(4) + "-moon", "moon",
                                moonNames[(i * 5) % moonNames.size()] + " " + word,
                                36.0 + (i % 5) * 24.0, 194.0 + (i % 4) * 16.0, system,
                                "A small satellite traces a quiet path beyond the mapped world.");
