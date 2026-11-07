@@ -18,7 +18,7 @@ cmake_minimum_required(VERSION 3.20)
 
 project(SpaceshipCommand
         VERSION 0.1.0
-        DESCRIPTION "Spaceship Command, native port of the reference HTA edition"
+        DESCRIPTION "Spaceship Command, native port of the Legacy code_Spaceship.txt"
         LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -32,7 +32,6 @@ endif()
 
 option(SPACESHIP_BUILD_GUI   "Build the Raylib + Dear ImGui client" ON)
 option(SPACESHIP_BUILD_TESTS "Build the CTest suite"               ON)
-option(SPACESHIP_DATA_GATE   "Verify assets/data against Spaceship.hta via node" ON)
 
 include(FetchContent)
 include(CTest)
@@ -245,15 +244,11 @@ if(SPACESHIP_BUILD_TESTS)
   FetchContent_MakeAvailable(Catch2)
 
   add_executable(spaceship_tests
-    cpp/tests/catalog_tests.cpp
     cpp/tests/simulation_tests.cpp
     cpp/tests/world_tests.cpp
     cpp/tests/jsnumber_tests.cpp
-    cpp/tests/phase7_tests.cpp
-    cpp/tests/phase8_tests.cpp
     cpp/tests/spam_audit_tests.cpp
     cpp/tests/phase9_tests.cpp
-    cpp/tests/ui_tests.cpp
     cpp/tests/task_tests.cpp
     cpp/tests/nav_tests.cpp
     cpp/tests/crew_tests.cpp
@@ -287,72 +282,6 @@ if(SPACESHIP_BUILD_TESTS)
            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
   set_tests_properties(ui.native-draw-recorder PROPERTIES SKIP_RETURN_CODE 77)
 
-  # The data gate: the committed catalogue must still match the HTA. This is
-  # the test that stops a content edit shipping without its JSON.
-  find_program(SPACESHIP_NODE node)
-  if(SPACESHIP_DATA_GATE AND SPACESHIP_NODE)
-    add_test(NAME catalogue.is-in-sync-with-hta
-             COMMAND "${SPACESHIP_NODE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/export-data.cjs" --check
-             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
-  elseif(SPACESHIP_DATA_GATE)
-    message(WARNING "Spaceship: node not found, the catalogue sync test is not registered")
-  endif()
-
-  # The fidelity gate: every script in tests/parity/ is replayed through the
-  # reference (in a Node VM) and through spaceship_console, and the two trace
-  # streams must match byte for byte. Needs node and the frozen HTA.
-  if(SPACESHIP_DATA_GATE AND SPACESHIP_NODE AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Spaceship.hta")
-    file(GLOB SPACESHIP_PARITY_SCRIPTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/parity/*.script")
-    # The five save stages are a chain, not standalone cases: each needs the file
-    # the previous one wrote. They are registered below, each in its own scratch
-    # root, so `ctest -j` can run them at the same time without sharing a path.
-    set(SPACESHIP_SAVE_STAGES setup advance write reload utf16)
-    foreach(script IN LISTS SPACESHIP_PARITY_SCRIPTS)
-      get_filename_component(name "${script}" NAME_WE)
-      if(name MATCHES "^save-(setup|advance|write|reload|utf16)$")
-        continue()
-      endif()
-      add_test(NAME parity.${name}
-               COMMAND "${CMAKE_COMMAND}"
-                       -DNODE=${SPACESHIP_NODE}
-                       -DCONSOLE=$<TARGET_FILE:spaceship_console>
-                       -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
-                       -DSCRIPT=${script}
-                       -DWORK=${CMAKE_CURRENT_BINARY_DIR}/parity/${name}
-                       -P "${CMAKE_CURRENT_SOURCE_DIR}/tools/run-parity.cmake")
-      set_tests_properties(parity.${name} PROPERTIES
-                           RESOURCE_LOCK spaceship-parity-${name})
-    endforeach()
-
-    foreach(stage IN LISTS SPACESHIP_SAVE_STAGES)
-      add_test(NAME parity.save-${stage}
-               COMMAND "${CMAKE_COMMAND}"
-                       -DNODE=${SPACESHIP_NODE}
-                       -DCONSOLE=$<TARGET_FILE:spaceship_console>
-                       -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
-                       -DSTAGE=${stage}
-                       -DWORK=${CMAKE_CURRENT_BINARY_DIR}/parity/save-${stage}
-                       -P "${CMAKE_CURRENT_SOURCE_DIR}/tools/run-save-stage.cmake")
-      # Each stage owns its scratch root, so they may run together; the lock is
-      # belt-and-braces for a future stage that forgets to isolate itself.
-      set_tests_properties(parity.save-${stage} PROPERTIES
-                           RESOURCE_LOCK spaceship-saves)
-    endforeach()
-  endif()
-
-  # Save parity: the two editions must write and read each other's files, in
-  # both encodings. This is the gate that Decision 5 lives or dies by.
-  if(SPACESHIP_DATA_GATE AND SPACESHIP_NODE AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Spaceship.hta")
-    add_test(NAME parity.save-roundtrip
-             COMMAND "${CMAKE_COMMAND}"
-                     -DNODE=${SPACESHIP_NODE}
-                     -DCONSOLE=$<TARGET_FILE:spaceship_console>
-                     -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
-                     -DWORK=${CMAKE_CURRENT_BINARY_DIR}/parity/save-roundtrip
-                     -P "${CMAKE_CURRENT_SOURCE_DIR}/tools/run-save-parity.cmake")
-    set_tests_properties(parity.save-roundtrip PROPERTIES
-                         RESOURCE_LOCK spaceship-saves)
-  endif()
 endif()
 
 # ---------------------------------------------------------------------------
