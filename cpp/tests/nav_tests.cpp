@@ -1250,15 +1250,31 @@ TEST_CASE("planet ore extraction, moon mining, gas skimming, and debris looting 
     REQUIRE(sim.SelectTarget(target.id));
   };
 
-  // 1. Rocky planet ore extraction: reserves 4 m3 while running/done, blocks
-  //    travel while deployed, survives SaveJson/LoadJson, and depletes after 2 passes
-  //    until scanning unlocks the 3rd deep-vein pass!
+  // 1. Rocky planet ore extraction: scanned data reveals lootable yield,
+  //    extraction reserves 4 m3 while running/done, enforces a 5-action cooldown,
+  //    and is only possible once per body!
   sim.MutableGoods().clear();
   parkAt(*rockyPlanet);
-  CHECK(sim.ExtractionMaxPasses(*rockyPlanet) == 2);
+  CHECK(sim.ExtractionMaxPasses(*rockyPlanet) == 1);
   CHECK(sim.ExtractionActionLabel(*rockyPlanet) == "Extract planetary ore");
+
+  // Scanned data includes what can be looted.
+  sim.MutableState().scanned[rockyPlanet->id] = true;
+  {
+    const auto navScanned = ship::BuildNavScreen(sim);
+    bool sawLootable = false;
+    for (const auto& line : navScanned.screen.right[0].lines) {
+      if (line.value.find("Lootable:") != std::string::npos &&
+          line.value.find("Depleted") == std::string::npos) {
+        sawLootable = true;
+      }
+    }
+    CHECK(sawLootable);
+  }
+
   const double usedBefore = sim.CargoUsed();
   REQUIRE(ship::PressNavAction(sim, "extract"));
+  CHECK(ship::CooldownRemaining(sim, ship::ActionCooldownKey(sim, "progress:extract")) == 5.0);
   REQUIRE(sim.FindOngoing("extract") != nullptr);
   CHECK(sim.CargoReserved() == 4.0);
   CHECK_FALSE(sim.StartTravel());  // cannot jump away with surface drills deployed
@@ -1276,22 +1292,22 @@ TEST_CASE("planet ore extraction, moon mining, gas skimming, and debris looting 
   CHECK(sim.FindOngoing("extract") == nullptr);
   CHECK(sim.CargoUsed() > usedBefore);
   CHECK(sim.ExtractionPassesUsed(*rockyPlanet) == 1);
+  CHECK(ship::CooldownRemaining(sim, ship::ActionCooldownKey(sim, "progress:extract")) == 5.0);
 
-  // Run pass 2 to hit base depletion (2 / 2), then scan to unlock pass 3!
+  // Even after cooldown clears, looting the same body a second time is refused,
+  // and Scan Data reports it depleted.
   sim.MutableState().actionCooldowns.clear();
-  REQUIRE(sim.StartExtraction());
-  tickUntilDone(sim, "extract");
-  REQUIRE(sim.Acknowledge("extract"));
-  CHECK(sim.ExtractionPassesUsed(*rockyPlanet) == 2);
-  CHECK_FALSE(sim.StartExtraction());  // depleted at 2 / 2
-
-  sim.MutableState().scanned[rockyPlanet->id] = true;
-  CHECK(sim.ExtractionMaxPasses(*rockyPlanet) == 3);
-  REQUIRE(sim.StartExtraction());
-  tickUntilDone(sim, "extract");
-  REQUIRE(sim.Acknowledge("extract"));
-  CHECK(sim.ExtractionPassesUsed(*rockyPlanet) == 3);
-  CHECK_FALSE(sim.StartExtraction());  // fully depleted at 3 / 3
+  CHECK_FALSE(sim.StartExtraction());
+  {
+    const auto navAfter = ship::BuildNavScreen(sim);
+    bool sawDepleted = false;
+    for (const auto& line : navAfter.screen.right[0].lines) {
+      if (line.value.find("Lootable: Depleted") != std::string::npos) {
+        sawDepleted = true;
+      }
+    }
+    CHECK(sawDepleted);
+  }
 
   // 2. Gas giant atmospheric skimming needs 0 m3 cargo hold and condenses fuel + cells.
   sim.MutableGoods().clear();

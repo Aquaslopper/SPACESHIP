@@ -177,4 +177,18 @@ You must append a compressed summary of **every single reply and action you take
   - Enabled parked undocked extraction (`2` passes per body, `3` when scanned or `SensorTier() >= 1`) across rocky/lava planets (`Bulk metal` / `Components`), cryo/ocean worlds & moons (`Water` / `Relics` + rations), gas giants (`0 m3` hold skim yielding `+fuel%` + `fuelCells`), asteroid/debris belts (`Salvage` + `CommissionProgress("salvage")`), and derelict sites (`Salvage` / `Components` / `Relics` / `Unregistered` + chits/kits), with deterministic jackpot veins and extraction hazard incidents (`map-derelict-ping`, `map-cryo-spore`, `map-ion-squall`, `map-pirate-toll`).
 - **Verification:** `cmake --build build` clean; `ctest` **143/143 PASS** (`spaceship_tests` 138 cases / 797,874 assertions, `spaceship_audio_tests`, `ui.gui-syntax`, `ui.imgui-close-input`, `ui.native-draw-recorder`). `Legacy code_Spaceship.txt`, `assets/`, and `rescue/` untouched.
 
+### Entry #012
+- **Timestamp:** 2026-11-07 17:10 UTC
+- **Task:** Minimal fine-tune to extraction/looting: (1) loot possible only once per body, (2) loot cooldown set to `5` actions, and (3) lootable yield included in `Scan Data` when scanned.
+- **Single-use loot (`Navigation.cpp`, `NavScreen.cpp`):**
+  - Changed `Simulation::ExtractionMaxPasses` to `1` for all extractable bodies (`planet`, `moon`, `belt`, `site`), with `ExtractionPassesUsed` returning `1` once extracted and `Deposits` displaying `"Available"` vs `"Depleted"`.
+- **5-action loot cooldown (`Navigation.cpp`, `NavScreen.cpp`):**
+  - Switched `"extract"` / `"extract-busy"` `BuildProgressButton` category from `"space"` (`15` actions) to `"routine"` (`5` actions) and set `Cooldown{"routine", 5.0}` on `progress:extract` in `Simulation::Acknowledge` when hauling loot aboard.
+- **Scanned loot readout (`Simulation.h`, `Navigation.cpp`, `NavScreen.cpp`):**
+  - Added `Simulation::ExtractionScanSummary(const Body&)` matching the deterministic yield table in `FinishExtraction` (`pass = 1`) and appended the `"Lootable: ..."` line (or `"Lootable: Depleted (already looted)."`) to `ScanReadout` once a body has been scanned.
+- **Tests (`nav_tests.cpp`):**
+  - Updated the extraction test case to assert `ExtractionMaxPasses == 1`, `CooldownRemaining == 5.0` at start and upon haul completion, single-pass depletion, and presence of `"Lootable:"` / `"Lootable: Depleted"` in `Scan Data`.
+- **Verification:** `cmake --build build -j4` clean; `ctest` **143/143 PASS** (`spaceship_tests` 138 cases / 797,864 assertions, `spaceship_audio_tests`, `ui.gui-syntax`, `ui.imgui-close-input`, `ui.native-draw-recorder`). All other files untouched.
+
+
 

@@ -178,6 +178,11 @@ std::vector<PanelLine> ScanReadout(const Simulation& sim, const Body& body) {
                                 "", 0.0});
     }
   }
+  if (sim.CanExtractBody(body)) {
+    const bool depleted = sim.ExtractionPassesUsed(body) >= sim.ExtractionMaxPasses(body);
+    lines.push_back(PanelLine{depleted ? PanelLine::Kind::Dim : PanelLine::Kind::Note,
+                              "", sim.ExtractionScanSummary(body), "", 0.0});
+  }
   if (body.type == "system") {
     const auto& localIdx = sim.World().BodiesInSystem(body.id);
     int ports = 0;
@@ -672,10 +677,7 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
     if (!sim.CanExtractBody(body)) { return; }
     const int used = sim.ExtractionPassesUsed(body);
     const int maxPasses = sim.ExtractionMaxPasses(body);
-    panel.Field("Deposits",
-                used >= maxPasses
-                    ? std::string("Depleted")
-                    : Num(maxPasses - used) + " / " + Num(maxPasses) + " passes available");
+    panel.Field("Deposits", used >= maxPasses ? std::string("Depleted") : std::string("Available"));
   };
 
   if (target == nullptr) {
@@ -827,7 +829,7 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
   if (showExtract) {
     if (extractTask != nullptr && target != nullptr && extractTask->target != target->id) {
       screen.progress.push_back(BuildProgressButton(
-          sim, "extract-busy", "Extraction rig busy", false, "Haul Yield", "space"));
+          sim, "extract-busy", "Extraction rig busy", false, "Haul Yield", "routine"));
     } else {
       const Body* extBody =
           (extractTask != nullptr) ? sim.FindBodyById(extractTask->target) : target;
@@ -844,7 +846,7 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
           !sim.State().docked && running == nullptr && energy > 0 && holdFits &&
           sim.ExtractionPassesUsed(*target) < sim.ExtractionMaxPasses(*target);
       screen.progress.push_back(BuildProgressButton(
-          sim, "extract", idleLabel, extractEnabled, doneLabel, "space"));
+          sim, "extract", idleLabel, extractEnabled, doneLabel, "routine"));
     }
   }
 

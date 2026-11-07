@@ -125,6 +125,7 @@ class Simulation {
   double ExtractionWorkCost(const Body& body) const;
   std::string ExtractionActionLabel(const Body& body) const;
   std::string ExtractionDoneLabel(const Body& body) const;
+  std::string ExtractionScanSummary(const Body& body) const;
   bool InRange(const Body& body) const;
   bool AtTarget(const Body& body) const;
   std::string CurrentSystemId() const;

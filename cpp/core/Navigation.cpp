@@ -147,20 +147,55 @@ bool Simulation::CanExtractBody(const Body& body) const {
 }
 
 int Simulation::ExtractionMaxPasses(const Body& body) const {
-  if (!CanExtractBody(body)) { return 0; }
-  const auto scannedIt = state_.scanned.find(body.id);
-  const bool scanned = scannedIt != state_.scanned.end() && scannedIt->second;
-  return (scanned || SensorTier() >= 1) ? 3 : 2;
+  return CanExtractBody(body) ? 1 : 0;
 }
 
 int Simulation::ExtractionPassesUsed(const Body& body) const {
-  int used = 0;
   for (int i = 1; i <= 3; ++i) {
     const std::string key = "extract-" + std::to_string(i) + ":" + body.id;
     auto it = state_.sim.observed.find(key);
-    if (it != state_.sim.observed.end() && it->second) { ++used; }
+    if (it != state_.sim.observed.end() && it->second) { return 1; }
   }
-  return used;
+  return 0;
+}
+
+std::string Simulation::ExtractionScanSummary(const Body& body) const {
+  if (!CanExtractBody(body)) { return std::string(); }
+  if (ExtractionPassesUsed(body) >= ExtractionMaxPasses(body)) {
+    return "Lootable: Depleted (already looted).";
+  }
+  const std::uint64_t h = MapEventHash(body.id + "#extract#1");
+  const bool jackpot = (h % 5ULL) == 0ULL;
+  if (IsGasBody(body)) {
+    return jackpot
+               ? "Lootable: Helium-3 pocket (+20% fuel, 2 fuel cells, 35 sh condensate)."
+               : "Lootable: Upper-atmosphere volatiles (+14% fuel, 1 fuel cell).";
+  }
+  if (body.type == "belt") {
+    return jackpot
+               ? "Lootable: 3 m3 Belt Salvage, 1 repair kit, and 40 sh transponder cores."
+               : "Lootable: 3 m3 Belt Salvage.";
+  }
+  if (body.type == "site") {
+    const std::uint64_t pick = (h + 1ULL) % 4ULL;
+    if (pick == 0ULL) { return "Lootable: 3 m3 Derelict Salvage and 1 field repair kit."; }
+    if (pick == 1ULL) { return "Lootable: 2 m3 Recovered Components."; }
+    if (pick == 2ULL) { return "Lootable: 2 m3 Sealed Relic Cask (+1 insight)."; }
+    return "Lootable: 2 m3 Unregistered Strongbox and 55 sh chits.";
+  }
+  if (IsVolatileIceBody(body)) {
+    return jackpot
+               ? "Lootable: 2 m3 Subglacial Relic Core and +2 water/ration stores."
+               : "Lootable: 4 m3 Cryo-Volatile Ice (Water).";
+  }
+  if (jackpot) {
+    return body.type == "moon"
+               ? "Lootable: 3 m3 Rare-Earth Seam (Components) and 1 He-3 fuel cell."
+               : "Lootable: 3 m3 Rare-Earth Seam (Components).";
+  }
+  return body.type == "moon"
+             ? "Lootable: 4 m3 Lunar Regolith Ore (Bulk metal)."
+             : "Lootable: 4 m3 Planetary Ore (Bulk metal).";
 }
 
 double Simulation::ExtractionReserveVol(const Body& body) const {
@@ -501,6 +536,8 @@ bool Simulation::Acknowledge(const std::string& taskId) {
   else if (type == "scan") { RevealScan(target); handled = true; }
   else if (type == "extract" && !target.empty()) {
     FinishExtraction(target, reservedVol);
+    const std::string cdTab = state_.activeTab.empty() ? "home" : state_.activeTab;
+    state_.actionCooldowns["cd|" + cdTab + "|progress:extract"] = Cooldown{"routine", 5.0};
     handled = true;
   }
 
@@ -604,11 +641,11 @@ void Simulation::FinishExtraction(const std::string& bodyId, double reservedVol)
   const Body* body = catalog_.FindBody(bodyId);
   if (body == nullptr || !CanExtractBody(*body)) { return; }
 
-  const int pass = std::min(3, ExtractionPassesUsed(*body) + 1);
-  state_.sim.observed["extract-" + std::to_string(pass) + ":" + body->id] = true;
+  const int pass = 1;
+  state_.sim.observed["extract-1:" + body->id] = true;
 
-  const std::uint64_t h = MapEventHash(body->id + "#extract#" + std::to_string(pass));
-  const bool jackpot = (pass == 3) || ((h % 5ULL) == 0ULL);
+  const std::uint64_t h = MapEventHash(body->id + "#extract#1");
+  const bool jackpot = (h % 5ULL) == 0ULL;
   const double freeHold = std::max(0.0, cargo_.capacity - (CargoUsed() + (CargoReserved() - reservedVol)));
 
   auto addLot = [&](const std::string& name, const std::string& kind,
