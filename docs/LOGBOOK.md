@@ -283,3 +283,4 @@ You must append a compressed summary of **every single reply and action you take
 - **Checks:** Rebuilt the headless core; `tools/check-draw.sh` passed; final `ctest --test-dir build --output-on-failure` passed 125/125 including GUI syntax, ImGui input, and native draw recorder.
 - **Limit:** No windowed GUI was launched; the capture layout is checked with the CPU painter/input recorder, not a fresh screenshot.
 - **Untouched:** `Legacy code_Spaceship.txt`, `assets/`, `rescue/`, and gameplay logic. The changes are follow-up work for the existing open PR #30.
+- **PR follow-up:** Pushed commit `931e319` to `arena/cb265de8-spaceship` and updated PR #30's summary and verification section to include the screenshot-alignment changes and final 125/125 test result.
