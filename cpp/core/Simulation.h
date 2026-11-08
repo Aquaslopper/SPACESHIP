@@ -58,7 +58,8 @@ struct TradeRun {
   std::string to;     // the body that receives it
   std::string good;   // the commodity's id in the market table
   int crates = 0;
-  double fee = 0.0;   // delivery: paid on hand-over. freelance: margin over cost.
+  double fee = 0.0;     // delivery: paid on hand-over. freelance: margin over cost.
+  double freight = 0.0;  // what the leg itself costs, by chart distance
   bool accepted = false;
 };
 
@@ -257,6 +258,18 @@ class Simulation {
   // clock in blocks of 200, so a berth keeps a board that is the system's and a
   // list that is its own. Accepting costs one action and greys its own row.
   std::vector<TradeRun> TradeBoard(const std::string& portId) const;
+  // The cargo hall (Economy.cpp). Running a trade is two clicks and one leg: the
+  // board signs it, the hold carries it, and the destination settles it. What
+  // the destination pays is the market there plus the freight the leg cost.
+  std::vector<TradeContract> TradesHere() const;
+  double TradePayout(const TradeContract& trade) const;
+  bool SettleTrade(const std::string& mode, const std::string& to,
+                   const std::string& good);
+  // Stowing a lot is one click of the loading work. Most of those clicks cost
+  // nothing; one in a run of six to eighteen of them moves the clock, and which
+  // one it is is not something the player can see or plan around.
+  bool StowCargo(const std::string& lotId);
+  bool CargoStowed(const std::string& lotId) const;
   bool AcceptTrade(const std::string& mode, const std::string& to,
                    const std::string& good = std::string());
   bool TradeAccepted(const std::string& mode, const std::string& to,
@@ -433,6 +446,14 @@ class Simulation {
 
   // Economy.cpp
   const Port* HerePort() const;
+
+  // The cargo hall's own state. None of it is saved: the arrangement of the hold
+  // and the run of loading clicks belong to the session, not to the voyage.
+  std::map<std::string, bool> stowed_;
+  int stowClicks_ = 0;
+  int stowThreshold_ = 0;
+  std::uint64_t stowRng_ = 0x9E3779B97F4A7C15ULL;
+  int StowDraw();
   double SurveyWorth(const std::string& type) const;
   int ProjectLot(const std::string& kind) const;
 

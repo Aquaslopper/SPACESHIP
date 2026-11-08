@@ -608,3 +608,36 @@ You must append a compressed summary of **every single reply and action you take
 - **Read of the clock:** no action bar anywhere in this room. Finalising a trade is one click and one tick. Sorting is free most of the time, but a randomly chosen click among the sorting clicks is charged, then the count starts again with a new random threshold (the owner's "every 6 or 8, then 10 or 20").
 - **Open:** whether placing a lot gates selling/unloading or is only the picture; whether the charged click is saved so a reload cannot dodge it; how the freelance "different prices" differ; and whether the "action" wording is stripped from the station window now as well.
 - **Checks run:** none — no code. `git diff --check` clean on this entry.
+
+## 044 — The cargo hall: the room the model described now exists
+
+The room is rebuilt to the three windows the mock laid out: `Cargo Inventory` on
+the left, `Cargo Hold View` in the middle, and a window on the right that changes
+with the run in hand. `BuildCargoRoom` in `StoresScreen.cpp` is the model; the
+painter in `Widgets.cpp` puts it in three columns (`panelColumns = {0, 1, 2}`) and
+`Draw.cpp` sends every press in the room to `PressCargoRoom`.
+
+What a run is now: taking a delivery loads a real consignment into the hold, bound
+to its contract by `lot.contractId = "trade:<mode>|<to>|<good>"`. Freelance runs
+load nothing: the player buys the lot. A lot stows with one click on the left, and
+that click sorts it into the hold drawn in the middle, which reads its volume from
+the ship itself, so a hold bought at the shipyard changes it.
+
+Freight is priced off the chart (`4 + distance * 0.25`) when the board is drawn and
+signed with the run. A freelance settlement pays the market at the destination plus
+that freight; a delivery pays its flat fee. Settling happens only where the run
+ends: the destination for a trade, and docked for station-to-station.
+
+The invisible timer: `StowCargo` charges one click in a run of six to eighteen of
+them, and then the count restarts at a new threshold. Nothing shows it. Settling,
+starting a salvage bay and taking one aboard are one click and one tick each.
+
+`spentTrades` keeps a settled or lost run out of the board for the rest of the
+epoch, and survives the save. Saving a consignment needed the save validator to
+accept a trade key beside the authored contract ids.
+
+Probes (`/tmp/probe`, head-less): `cargohall` walks accept → stow → travel → settle
+→ board → save/load → jettison → freelance sale, `failures=0`; `stowclock` draws
+20,000 thresholds, all inside 6..18, and finds 60 clicks charged 5 times at gaps of
+10, 17, 8, 15 and 9 with exactly one tick per charge. `Draw.cpp` still cannot be
+compiled here, so the paint path is unverified by a compiler.

@@ -143,10 +143,56 @@ std::vector<Probe> StationProbes() {
   return probes;
 }
 
+// The cargo hall settles a run where it ends, so its one paid control needs a
+// ship standing on the destination with the consignment in the hold.
+ship::Simulation DeliveryReady() {
+  ship::Simulation sim = Rich();
+  sim.MutableMap().here = "tolme";
+  sim.MutableState().docked = true;
+  ship::TradeContract trade;
+  trade.mode = "delivery";
+  trade.from = "tolme";
+  trade.to = "tolme";
+  trade.good = "water";
+  trade.crates = 1;
+  trade.fee = 90.0;
+  trade.freight = 10.0;
+  trade.label = "Water ice";
+  sim.MutableState().trades.push_back(trade);
+  ship::GoodsLot lot;
+  lot.id = "lot-cargo";
+  lot.name = "Water ice";
+  lot.kind = "Ice";
+  lot.vol = 1;
+  lot.value = 100;
+  lot.contractId = "trade:" + ship::TradeKey(trade.mode, trade.to, trade.good);
+  sim.MutableGoods().push_back(lot);
+  return sim;
+}
+
+std::vector<Probe> CargoProbes() {
+  std::vector<Probe> probes;
+  const ship::Simulation sim = DeliveryReady();
+  const ship::CargoRoomModel room = ship::BuildCargoRoom(sim);
+  for (const ship::CargoSideRow& row : room.sideRows) {
+    if (!row.enabled || row.id.empty()) { continue; }
+    if (row.id.compare(0, 13, "cargo-settle:") != 0) { continue; }  // the paid one
+    Probe probe;
+    probe.screen = "Cargo hall";
+    probe.control = row.id;
+    probe.tier = ship::ActionCooldownCategory(row.label);
+    probe.factory = &DeliveryReady;
+    const std::string id = row.id;
+    probe.press = [id](ship::Simulation& s) { return ship::PressCargoRoom(s, id, ""); };
+    probes.push_back(probe);
+  }
+  return probes;
+}
+
 std::vector<Probe> StoresProbes() {
   std::vector<Probe> probes;
   const ship::Simulation sim = Factory();
-  for (const char* room : {"cargo", "science"}) {
+  for (const char* room : {"science"}) {
     const ship::StoresScreenModel model = ship::BuildStoresScreen(sim, room);
     for (const ship::StoreRowView& row : model.rows) {
       if (!row.enabled || row.readingOnly || row.progress) { continue; }
@@ -398,6 +444,7 @@ TEST_CASE("every paid control refuses the very next click", "[phase9][spam]") {
   };
   append(StationProbes());
   append(StoresProbes());
+  append(CargoProbes());
   append(RoomProbes());
   append(SimCoreProbes());
   append(EventProbes());

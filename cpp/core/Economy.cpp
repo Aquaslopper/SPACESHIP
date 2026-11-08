@@ -177,7 +177,19 @@ bool Simulation::Jettison(const std::string& lotId) {
     const std::string name = goods_[index].name;
     const std::string contract = goods_[index].contractId;
     goods_.erase(goods_.begin() + static_cast<std::ptrdiff_t>(index));
-    if (!contract.empty()) { state_.contracts[contract] = "failed"; }
+    if (contract.compare(0, 6, "trade:") == 0) {
+      // A trade consignment thrown out of the hold takes its run with it: the
+      // same consignment cannot be signed for twice.
+      const std::string key = contract.substr(6);
+      state_.spentTrades[key] = true;
+      state_.trades.erase(std::remove_if(state_.trades.begin(), state_.trades.end(),
+                                         [&](const TradeContract& trade) {
+                                           return TradeKey(trade.mode, trade.to, trade.good) == key;
+                                         }),
+                          state_.trades.end());
+    } else if (!contract.empty()) {
+      state_.contracts[contract] = "failed";
+    }
     PerformAction("Jettisoned " + name);
     return true;
   }
@@ -483,6 +495,24 @@ const Good* MarketGood(const Catalog& catalog, const std::string& id) {
   }
   return nullptr;
 }
+
+// What carrying a run costs, priced off the chart: the leg between the berth the
+// run starts at and the body that receives it. A close destination is nearly
+// free; the far side of the system is not.
+double TradeFreight(const Body& from, const Body& to) {
+  const double dist = std::hypot(to.x - from.x, to.y - from.y);
+  return js::Round(4.0 + dist * 0.25);
+}
+
+// What the destination pays for a commodity, over the market value: the same
+// table the board drew the run from, so an offer and its settlement cannot
+// disagree. A body that wants nothing of it pays the market value and no more.
+double TradePays(const Body& destination, const std::string& goodId) {
+  for (const Want& want : WantsOf(TradeRole(destination))) {
+    if (goodId == want.good) { return want.pays + TradeBandBonus(destination); }
+  }
+  return 1.0;
+}
 }  // namespace
 
 bool Simulation::TradeAccepted(const std::string& mode, const std::string& to,
@@ -557,10 +587,15 @@ std::vector<TradeRun> Simulation::TradeBoard(const std::string& portId) const {
       fee = js::Round(good->value * crates * std::min(rate, 1.0));
     }
     if (good->risk) { fee = js::Round(fee * 1.35); }
-    if (fee < kTradeFloor) { continue; }  // not worth the action it costs
+    if (fee < kTradeFloor) { continue; }  // not worth the click it costs
     if (!drawn.insert(to->id + "|" + good->id).second) { continue; }
     ++built;
     if (from->id != portId) { continue; }  // another berth in this system lists it
+    // A run that has been settled, or lost with its cargo, is not drawn again for
+    // the rest of the epoch: the same consignment cannot be taken twice.
+    if (Truthy(state_.spentTrades, TradeKey(delivery ? "delivery" : "freelance", to->id, good->id))) {
+      continue;
+    }
     TradeRun run;
     run.mode = delivery ? "delivery" : "freelance";
     run.from = from->id;
@@ -568,6 +603,8 @@ std::vector<TradeRun> Simulation::TradeBoard(const std::string& portId) const {
     run.good = good->id;
     run.crates = crates;
     run.fee = fee;
+    const Body* origin = catalog_.FindBody(from->id);
+    run.freight = origin == nullptr ? 0.0 : TradeFreight(*origin, *to);
     board.push_back(std::move(run));
   }
 
@@ -582,6 +619,7 @@ std::vector<TradeRun> Simulation::TradeBoard(const std::string& portId) const {
       run.accepted = true;
       run.crates = trade.crates;
       run.fee = trade.fee;
+      run.freight = trade.freight;
       break;
     }
   }
@@ -601,6 +639,7 @@ std::vector<TradeRun> Simulation::TradeBoard(const std::string& portId) const {
     run.good = trade.good;
     run.crates = trade.crates;
     run.fee = trade.fee;
+    run.freight = trade.freight;
     run.accepted = true;
     board.push_back(std::move(run));
   }
@@ -637,19 +676,160 @@ bool Simulation::AcceptTrade(const std::string& mode, const std::string& to,
       if (run.mode == mode && run.to == to && run.good == good) { offered = &run; }
     }
     if (offered == nullptr || offered->accepted) { return false; }
-    trade.crates = offered->crates;
-    trade.fee = offered->fee;
     const Body* destination = catalog_.FindBody(to);
     const Good* commodity = MarketGood(catalog_, good);
-    trade.label = (destination == nullptr ? to : destination->name) + " - " +
-                  js::NumToString(trade.crates) + " crates of " +
-                  (commodity == nullptr ? good : commodity->name);
+    if (destination == nullptr || commodity == nullptr) { return false; }
+    trade.crates = offered->crates;
+    trade.fee = offered->fee;
+    trade.freight = offered->freight;
+    trade.label = destination->name + " - " + js::NumToString(trade.crates) +
+                  " crates of " + commodity->name;
+    // A delivery is loaded at the berth and travels in the hold, bound to this
+    // contract: it cannot be sold anywhere but the destination. A freelance run
+    // is the player's own purchase, so nothing is loaded here.
+    if (mode == "delivery") {
+      const double volume = static_cast<double>(commodity->vol) * trade.crates;
+      if (CargoUsed() + CargoReserved() + volume > cargo_.capacity) { return false; }
+      state_.lotSerial += 1;
+      GoodsLot lot;
+      lot.id = "lot-" + js::NumToString(state_.lotSerial);
+      lot.name = commodity->name;
+      lot.kind = commodity->kind;
+      lot.vol = volume;
+      lot.value = commodity->value * trade.crates;
+      lot.risk = commodity->risk;
+      lot.contractId = "trade:" + TradeKey(mode, to, good);
+      goods_.push_back(std::move(lot));
+    }
   } else {
     return false;
   }
 
   state_.trades.push_back(std::move(trade));
   PerformAction("Trade contract accepted");
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// The cargo hall
+// ---------------------------------------------------------------------------
+// Three things live here: stowing a lot, which is the loading work and the only
+// place where the click count moves the clock on its own; the trade that can be
+// settled where the ship is standing; and what that settlement pays.
+//
+// A run is settled at its destination and nowhere else. The destination is the
+// body the board named, so arriving is enough: no berth is needed, and a docked
+// station is only required for the station-to-station runs, whose far end is a
+// berth by definition.
+
+std::vector<TradeContract> Simulation::TradesHere() const {
+  std::vector<TradeContract> here;
+  for (const TradeContract& trade : state_.trades) {
+    if (trade.to != map_.here) { continue; }
+    if (trade.mode == "station" && !state_.docked) { continue; }
+    here.push_back(trade);
+  }
+  return here;
+}
+
+// What the destination pays: the market there, priced by the same table the
+// board drew the run from, plus the freight the leg cost. A delivery is the
+// station's own consignment, so it pays its flat fee; a survey run likewise.
+double Simulation::TradePayout(const TradeContract& trade) const {
+  if (trade.mode == "delivery" || trade.mode == "station") { return trade.fee; }
+  const Body* destination = catalog_.FindBody(trade.to);
+  const Good* good = MarketGood(catalog_, trade.good);
+  if (destination == nullptr || good == nullptr) { return trade.fee; }
+  const double market = good->value * trade.crates * TradePays(*destination, trade.good);
+  return js::Round(market + trade.freight);
+}
+
+bool Simulation::SettleTrade(const std::string& mode, const std::string& to,
+                             const std::string& good) {
+  if (!state_.gameOver.empty()) { return false; }
+  if (to != map_.here) { return false; }  // the run ends where it points
+  if (mode == "station" && !state_.docked) { return false; }
+
+  std::size_t index = state_.trades.size();
+  for (std::size_t i = 0; i < state_.trades.size(); ++i) {
+    const TradeContract& trade = state_.trades[i];
+    if (trade.mode == mode && trade.to == to && trade.good == good) { index = i; }
+  }
+  if (index == state_.trades.size()) { return false; }
+  const TradeContract trade = state_.trades[index];
+
+  if (mode == "delivery") {
+    // The consignment leaves the hold and goes over the counter.
+    const std::string key = "trade:" + TradeKey(mode, to, good);
+    const bool carried = std::any_of(goods_.begin(), goods_.end(),
+                                     [&](const GoodsLot& lot) { return lot.contractId == key; });
+    if (!carried) { return false; }  // nothing to hand over
+    goods_.erase(std::remove_if(goods_.begin(), goods_.end(),
+                                [&](const GoodsLot& lot) { return lot.contractId == key; }),
+                 goods_.end());
+  } else if (mode == "freelance") {
+    // The player's own lots are the consignment: the run needs the goods aboard.
+    const Good* commodity = MarketGood(catalog_, trade.good);
+    if (commodity == nullptr) { return false; }
+    double aboard = 0.0;
+    for (const GoodsLot& lot : goods_) {
+      if (lot.name == commodity->name && lot.contractId.empty()) { aboard += lot.vol; }
+    }
+    if (aboard + 1e-9 < static_cast<double>(commodity->vol) * trade.crates) { return false; }
+    double owed = static_cast<double>(commodity->vol) * trade.crates;
+    for (std::size_t i = 0; i < goods_.size() && owed > 1e-9;) {
+      GoodsLot& lot = goods_[i];
+      if (lot.name != commodity->name || !lot.contractId.empty()) { ++i; continue; }
+      if (lot.vol <= owed + 1e-9) {
+        owed -= lot.vol;
+        goods_.erase(goods_.begin() + static_cast<std::ptrdiff_t>(i));
+        continue;
+      }
+      // A part lot: keep the remainder aboard, sell what the run asked for.
+      lot.vol -= owed;
+      lot.value = lot.value * (lot.vol / (lot.vol + owed));
+      owed = 0.0;
+    }
+  }
+
+  state_.shiplets += TradePayout(trade);
+  state_.spentTrades[TradeKey(mode, to, good)] = true;
+  state_.trades.erase(state_.trades.begin() + static_cast<std::ptrdiff_t>(index));
+  const Body* endedAt = FindBodyById(to);
+  PerformAction("Settled a " + std::string(mode == "station" ? "survey run" : mode) + " at " +
+                (endedAt == nullptr ? to : endedAt->name));
+  return true;
+}
+
+// The loading click: invisible, free most of the time, and never predictable.
+int Simulation::StowDraw() {
+  stowRng_ ^= stowRng_ >> 12;
+  stowRng_ ^= stowRng_ << 25;
+  stowRng_ ^= stowRng_ >> 27;
+  const std::uint64_t out = stowRng_ * 2685821657736338717ULL;
+  return 6 + static_cast<int>((out >> 11) % 13ULL);  // six to eighteen clicks
+}
+
+bool Simulation::CargoStowed(const std::string& lotId) const {
+  return Truthy(stowed_, lotId);
+}
+
+bool Simulation::StowCargo(const std::string& lotId) {
+  if (!state_.gameOver.empty()) { return false; }
+  const bool aboard = std::any_of(goods_.begin(), goods_.end(),
+                                  [&](const GoodsLot& lot) { return lot.id == lotId; });
+  if (!aboard || CargoStowed(lotId)) { return false; }
+  stowed_[lotId] = true;
+
+  // One click in the run of them is the one that costs: the player cannot see
+  // the counter and cannot plan around it.
+  if (stowThreshold_ <= 0) { stowThreshold_ = StowDraw(); }
+  stowClicks_ += 1;
+  if (stowClicks_ >= stowThreshold_) {
+    stowClicks_ = 0;
+    stowThreshold_ = StowDraw();
+    PerformAction("Stowed cargo in the hold");
+  }
   return true;
 }
 

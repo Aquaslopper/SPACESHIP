@@ -2329,7 +2329,7 @@ bool ShellView::PressPanelRow(Simulation& sim, ScreenKind kind, const std::strin
       }
       return PressStationAction(sim, id, "");
     }
-    case ScreenKind::Cargo:
+    case ScreenKind::Cargo: return PressCargoRoom(sim, id, "");
     case ScreenKind::Science: return PressStoresAction(sim, id, "");
     case ScreenKind::Room: return PressRoomAction(sim, id, "");
     case ScreenKind::SimCore: return PressSimCoreAction(sim, id, "");
