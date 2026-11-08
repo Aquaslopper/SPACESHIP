@@ -957,3 +957,32 @@ not the stagger.
 
 The save system already stores `hungerTick` and `hunger` per hand, so a reload keeps
 whatever a hand was dealt. Not proved on this branch: a save-and-load round trip.
+
+## 057 — Two refits the yard was missing
+
+The station already sold bay, bay2, drive, an O2 rack to 15 canisters, two sensor
+tiers and a hull service. Two of the owner's three examples were not for sale: a
+bigger galley counter and a filter charge that lasts longer. Both are now in
+`BuyUpgrade` and on the yard's list.
+
+GALLEY, 400 sh: `mess_.capacity` 24 -> 34. The ceiling is what the cook fills to, so
+the refit buys buffer, not speed: two rounds and five-sixths instead of exactly two,
+about seventy clicks more food on the shelf. `mess_.capacity` is already in the save,
+so it survives a reload with no extra plumbing.
+
+FILTER, 600 sh: `rules_.life.lifeMax` 200 -> 300. One charge is half again as long,
+and because the bank, the O2 screen, the description and the save all read that one
+number from the rules, they all move together. `lifeMax` is in the save already.
+
+THE SCANNER NEEDED NOTHING. `SensorTier()` already reads the scanner upgrades: tier 1
+opens the first locked entry and scans deep inside a region, tier 2 opens every
+locked survey and reaches any region. The yard's own wording says so. Nothing added.
+
+Probe `/home/user/probe/upgrades`, docked at a port with 5,000 sh: galley bought,
+ceiling 24 -> 34; filter bought, charge 200 -> 300; a charged bank then reads 300,
+not 200; buying the galley twice is refused; purse 5,000 -> 4,000. `failures=0`.
+`StationScreen.cpp` and `Economy.cpp` both pass `-fsyntax-only`.
+
+Not proved: that the extra counter actually delays starvation in a long run, and a
+save-and-load round trip of either refit. Both are arithmetic the probe implies
+(34/12 rounds, lifeMax read from rules) but they were not run end to end.

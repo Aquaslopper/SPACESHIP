@@ -44,6 +44,8 @@ const double kDrive = 900;
 const double kRack = 400;
 const double kScanner = 600;
 const double kScannerTwo = 1100;
+const double kGalley = 400;
+const double kFilter = 600;
 const double kHullService = 120;
 const double kLargeShip = 4000;
 
@@ -735,6 +737,13 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
           Owned(sim, "drive"));
   upgrade("rack", "Expand O2 rack to 15 - 400 sh",
           "O2 rack expansion: the canister rack holds 15.", kRack, true, Owned(sim, "rack"));
+  upgrade("galley", "Expand galley rack to 34 - 400 sh",
+          "Galley refit: the counter holds 34 instead of 24, so the cook can keep a "
+          "round and a half ahead of the crew.",
+          kGalley, true, Owned(sim, "galley"));
+  upgrade("filter", "Re-sleeve filter cores: a charge holds 300 clicks - 600 sh",
+          "Filter refit: one bank charge lasts 300 clicks instead of 200.",
+          kFilter, true, Owned(sim, "filter"));
   upgrade("scanner", "Upgrade sensors: scans take 3 + regional lock - 600 sh",
           "Sensor upgrade: a scan costs 3 clicks and the first locked entry opens, with "
           "deep scans inside this region.",

@@ -868,6 +868,24 @@ bool Simulation::BuyUpgrade(const std::string& upgradeId) {
     FreeCommit("O2 rack expanded");
     return true;
   }
+  if (upgradeId == "galley" && !Truthy(state_.upgrades, "galley") && state_.shiplets >= 400) {
+    state_.shiplets -= 400;
+    state_.upgrades["galley"] = true;
+    // The ceiling is what the cook fills to, so a bigger rack is a deeper buffer
+    // between the crew and the starve line, not a faster kitchen.
+    mess_.capacity = 34;
+    FreeCommit("Galley rack enlarged");
+    return true;
+  }
+  if (upgradeId == "filter" && !Truthy(state_.upgrades, "filter") && state_.shiplets >= 600) {
+    state_.shiplets -= 600;
+    state_.upgrades["filter"] = true;
+    // `lifeMax` is the length of one charge in clicks, and every reader of it -
+    // the bank, the O2 screen, the save - reads it from here.
+    rules_.life.lifeMax = 300;
+    FreeCommit("Filter cores re-sleeved");
+    return true;
+  }
   if (upgradeId == "scanner" && !Truthy(state_.upgrades, "scanner") && state_.shiplets >= 600) {
     state_.shiplets -= 600;
     state_.upgrades["scanner"] = true;
