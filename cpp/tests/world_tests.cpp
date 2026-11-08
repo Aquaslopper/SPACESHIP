@@ -194,74 +194,72 @@ TEST_CASE("a regional market still offers a margin", "[world]") {
   REQUIRE(sale > purchase);
 }
 
-TEST_CASE("freight is carried, delivered and paid exactly once", "[world]") {
+TEST_CASE("delivery freight is carried, unloaded and paid exactly once", "[world][trade]") {
   ship::Simulation sim = Fresh();
   BerthAt(sim, "tolme");
+  const std::vector<ship::TradeContract> offers = sim.TradeOffers("tolme", "delivery");
+  REQUIRE(!offers.empty());
+  const ship::TradeContract offer = offers.front();
 
   const double before = sim.State().shiplets;
-  REQUIRE(sim.AcceptContract("freight"));
-  REQUIRE(sim.State().contracts.at("freight") == "active");
+  REQUIRE(sim.AcceptTrade(offer.id));
+  const ship::TradeContract* accepted = sim.FindTradeContract(offer.id);
+  REQUIRE(accepted != nullptr);
+  REQUIRE(accepted->status == "active");
   bool held = false;
   for (const ship::GoodsLot& lot : sim.Goods()) {
-    if (lot.id == "contract-freight") {
+    if (lot.id == accepted->lotId) {
       held = true;
-      REQUIRE(lot.vol == 8);
       REQUIRE(!lot.contractId.empty());
     }
   }
   REQUIRE(held);
+  REQUIRE(!sim.SellGood(accepted->lotId));
 
-  // Contract cargo is not for sale.
-  REQUIRE(!sim.SellGood("contract-freight"));
-
-  // Delivering it to the other port empties the hold and readies the contract.
-  sim.MutableState().docked = true;
-  sim.MutableMap().here = "relay";
-  sim.ContractProgress("visit", "relay");
-  REQUIRE(sim.State().contracts.at("freight") == "ready");
-  for (const ship::GoodsLot& lot : sim.Goods()) { REQUIRE(lot.id != "contract-freight"); }
-
-  REQUIRE(sim.CollectContract("freight"));
-  REQUIRE(sim.State().shiplets == before + 420);
-  REQUIRE(!sim.CollectContract("freight"));  // already paid
+  // Arrival enables the Cargo Hold action; it does not pay by itself.
+  BerthAt(sim, offer.destination);
+  sim.SettleTradeArrival(offer.destination);
+  REQUIRE(sim.TradeReadyHere(*accepted));
+  REQUIRE(sim.State().shiplets == before);
+  REQUIRE(sim.FinalizeTrade(offer.id));
+  REQUIRE(sim.State().shiplets == before + offer.reward);
+  for (const ship::GoodsLot& lot : sim.Goods()) { REQUIRE(lot.id != accepted->lotId); }
+  REQUIRE(!sim.FinalizeTrade(offer.id));
 }
 
-TEST_CASE("a contract recognises work already done", "[world]") {
+TEST_CASE("station data trade is finalized in the cargo hold", "[world][trade]") {
   ship::Simulation sim = Fresh();
   BerthAt(sim, "tolme");
-  // The first berth is active from the start; collecting it before visiting does
-  // nothing, and arriving at Tolme is what readies it.
-  REQUIRE(!sim.CollectContract("arrival"));
-  sim.MutableMap().here = "tolme";
-  sim.MutableState().docked = true;
-  sim.ContractProgress("visit", "tolme");
-  REQUIRE(sim.State().contracts.at("arrival") == "ready");
-  REQUIRE(sim.CollectContract("arrival"));
-}
-
-TEST_CASE("commissions are deterministic and never point at the current port", "[world]") {
-  ship::Simulation sim = Fresh();
-  BerthAt(sim, "tolme");
-
-  REQUIRE(sim.AcceptCommission("visit"));
-  REQUIRE(sim.State().commissions.active.has_value());
-  const ship::Commission commission = *sim.State().commissions.active;
-  REQUIRE(commission.kind == "visit");
-  REQUIRE(commission.reward == 450);
-  REQUIRE(commission.origin == "tolme");
-  REQUIRE(commission.target != "tolme");
-  // The port the commission names is on the voyage's chart, which is the grown
-  // one; the authored catalogue alone no longer knows every station.
-  REQUIRE(sim.World().FindPort(commission.target) != nullptr);
-
-  // Delivering on it completes the objective, and it pays once.
-  sim.CommissionProgress("visit", commission.target);
-  REQUIRE(sim.State().commissions.active->progress == 1);
+  sim.RememberStationVisit("relay");
+  const std::vector<ship::TradeContract> offers = sim.TradeOffers("tolme", "station");
+  REQUIRE(!offers.empty());
+  const ship::TradeContract offer = offers.front();
+  REQUIRE(offer.destination != "tolme");
+  REQUIRE(sim.AcceptTrade(offer.id));
+  BerthAt(sim, offer.destination);
+  REQUIRE(sim.TradeReadyHere(*sim.FindTradeContract(offer.id)));
   const double before = sim.State().shiplets;
-  REQUIRE(sim.CollectCommission());
-  REQUIRE(sim.State().shiplets == before + 450);
-  REQUIRE(sim.State().commissions.completed == 1);
-  REQUIRE(!sim.CollectCommission());
+  REQUIRE(sim.FinalizeTrade(offer.id));
+  REQUIRE(sim.State().shiplets == before + offer.reward);
+  REQUIRE(sim.State().trade.completed == 1);
+}
+
+TEST_CASE("trade offers are deterministic and never point at the current port", "[world][trade]") {
+  ship::Simulation sim = Fresh();
+  BerthAt(sim, "tolme");
+  sim.RememberStationVisit("relay");
+  const auto first = sim.TradeOffers("tolme", "station");
+  const auto again = sim.TradeOffers("tolme", "station");
+  REQUIRE(first.size() == again.size());
+  for (std::size_t i = 0; i < first.size(); ++i) {
+    REQUIRE(first[i].id == again[i].id);
+    REQUIRE(first[i].destination != "tolme");
+  }
+  REQUIRE(!first.empty());
+  REQUIRE(sim.AcceptTrade(first.front().id));
+  const auto afterAccept = sim.TradeOffers("tolme", "station");
+  REQUIRE(afterAccept.size() == first.size());
+  REQUIRE(sim.FindTradeContract(first.front().id) != nullptr);
 }
 
 TEST_CASE("salvage reserves its space and lands in the hold", "[world]") {
@@ -372,7 +370,9 @@ TEST_CASE("a save round-trips, and impossible voyages are refused", "[world][sav
   ship::Simulation sim = Fresh();
   BerthAt(sim, "tolme");
   sim.MutableState().shiplets = 2000;
-  REQUIRE(sim.AcceptContract("freight"));
+  const auto offers = sim.TradeOffers("tolme", "delivery");
+  REQUIRE(!offers.empty());
+  REQUIRE(sim.AcceptTrade(offers.front().id));
   REQUIRE(sim.BuySupply("fuel-cell"));
   for (int i = 0; i < 30; ++i) { sim.PerformAction(); }
 
@@ -383,7 +383,8 @@ TEST_CASE("a save round-trips, and impossible voyages are refused", "[world][sav
   ship::Simulation restored = Fresh();
   REQUIRE(restored.LoadJson(saved, &why));
   REQUIRE(restored.State().shiplets == sim.State().shiplets);
-  REQUIRE(restored.State().contracts.at("freight") == "active");
+  REQUIRE(restored.FindTradeContract(offers.front().id) != nullptr);
+  REQUIRE(restored.FindTradeContract(offers.front().id)->status == "active");
   REQUIRE(restored.Goods().size() == sim.Goods().size());
   REQUIRE(restored.ActionCount() == sim.ActionCount());
   REQUIRE(restored.Crew().size() == sim.Crew().size());

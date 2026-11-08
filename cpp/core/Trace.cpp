@@ -231,11 +231,6 @@ std::string Simulation::TraceJson() const {
   }
 
   {
-    Json contracts = Json::object();
-    for (const auto& entry : state_.contracts) { contracts[entry.first] = entry.second; }
-    out["contracts"] = contracts;
-  }
-  {
     Json scanned = Json::array();
     for (const auto& entry : state_.scanned) {
       if (entry.second) { scanned.push_back(entry.first); }
@@ -248,7 +243,9 @@ std::string Simulation::TraceJson() const {
     for (const GoodsLot& lot : goods_) {
       goods.push_back(Json{{"id", lot.id}, {"name", lot.name}, {"kind", lot.kind},
                            {"vol", Num(lot.vol)}, {"value", Num(lot.value)},
-                           {"contractId", lot.contractId}});
+                           {"contractId", lot.contractId}, {"goodId", lot.goodId},
+                           {"originPort", lot.originPort}, {"boughtAt", Num(lot.boughtAt)},
+                           {"stowed", lot.stowed}, {"stowedAt", Num(lot.stowedAt)}});
     }
     out["goods"] = goods;
   }
@@ -274,17 +271,19 @@ std::string Simulation::TraceJson() const {
     out["upgrades"] = upgrades;
   }
   {
-    Json commissions = Json::object();
-    commissions["serial"] = Num(state_.commissions.serial);
-    commissions["completed"] = Num(state_.commissions.completed);
-    if (state_.commissions.active.has_value()) {
-      const Commission& c = *state_.commissions.active;
-      commissions["active"] = Json{{"kind", c.kind}, {"origin", c.origin}, {"target", c.target},
-                                   {"progress", Num(c.progress)}, {"reward", Num(c.reward)}};
-    } else {
-      commissions["active"] = nullptr;
+    Json trade = Json::object();
+    trade["epoch"] = Num(TradeEpoch());
+    trade["completed"] = Num(state_.trade.completed);
+    trade["visited"] = state_.trade.visited;
+    Json active = Json::array();
+    for (const TradeContract& c : ActiveTradeContracts()) {
+      active.push_back(Json{{"id", c.id}, {"kind", c.kind}, {"origin", c.origin},
+                            {"destination", c.destination}, {"goodId", c.goodId},
+                            {"quantity", c.quantity}, {"fulfilled", c.fulfilled},
+                            {"reward", Num(c.reward)}, {"status", c.status}});
     }
-    out["commissions"] = commissions;
+    trade["active"] = active;
+    out["trade"] = trade;
   }
   {
     Json infos = Json::object();

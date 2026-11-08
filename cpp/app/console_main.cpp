@@ -26,8 +26,8 @@
 //    sellgood <lotId> | sellsurvey <recordId> | jettison <lotId>
 //    package <recordId>   file a survey record for sale
 //    salvage <bay>        recover route salvage while under way
-//    contract accept|collect <id>
-//    commission accept <kind> | commission collect | commission abandon
+//    trade offers <delivery|freelance|station> | trade accept <offer-id> | trade finalize <contract-id>
+//    cargo sort <lotId>     stow a lot in the hold view (occasionally one action)
 //    hire <candidateId> | upgrade <id> | shipyard
 //    project <id> | medical <crewId> | social <a> <b>
 //    save <file> [utf16]  |  load <file>
@@ -275,13 +275,15 @@ int main(int argc, char** argv) {
       simulation.PackageSurvey(parts[1]);
     } else if (command == "salvage" && parts.size() >= 2) {
       simulation.StartSalvage(std::atoi(parts[1].c_str()));
-    } else if (command == "contract" && parts.size() >= 3) {
-      if (parts[1] == "accept") { simulation.AcceptContract(parts[2]); }
-      else if (parts[1] == "collect") { simulation.CollectContract(parts[2]); }
-    } else if (command == "commission" && parts.size() >= 2) {
-      if (parts[1] == "accept" && parts.size() >= 3) { simulation.AcceptCommission(parts[2]); }
-      else if (parts[1] == "collect") { simulation.CollectCommission(); }
-      else if (parts[1] == "abandon") { simulation.AbandonCommission(); }
+    } else if (command == "trade" && parts.size() >= 3) {
+      if (parts[1] == "offers") {
+        for (const ship::TradeContract& offer : simulation.TradeOffers(simulation.Map().here, parts[2])) {
+          std::printf("OFFER %s %s\n", offer.id.c_str(), ship::TradeDescription(simulation, offer).c_str());
+        }
+      } else if (parts[1] == "accept") { simulation.AcceptTrade(parts[2]); }
+      else if (parts[1] == "finalize") { simulation.FinalizeTrade(parts[2]); }
+    } else if (command == "cargo" && parts.size() >= 3) {
+      if (parts[1] == "sort") { simulation.SortCargo(parts[2]); }
     } else if (command == "hire" && parts.size() >= 2) {
       simulation.HireCrew(parts[1]);
     } else if (command == "upgrade" && parts.size() >= 2) {

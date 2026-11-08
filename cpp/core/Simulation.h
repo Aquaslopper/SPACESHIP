@@ -118,7 +118,8 @@ class Simulation {
   const std::vector<InfoRow>& Infos() const { return infos_; }
   const Cargo& CargoStore() const { return cargo_; }
   const std::vector<Passenger>& Passengers() const { return state_.passengers; }
-  const std::vector<Good>& Market() const { return catalog_.goods; }
+  std::vector<Good> Market() const;
+  std::vector<Good> MarketAt(const std::string& portId) const;
   const std::vector<SurveyRecord>& Survey() const { return survey_; }
   std::vector<SurveyRecord>& MutableSurvey() { return survey_; }
   double ScanCost() const { return scanCost_; }
@@ -224,6 +225,10 @@ class Simulation {
   bool BuySupply(const std::string& id);     // fuel cell, kit, medkit, canister, rations
   bool BuyGood(const std::string& goodId);
   bool SellGood(const std::string& lotId);
+  bool SortCargo(const std::string& lotId);
+  bool CargoSortDue() const;
+  bool CargoLotStowed(const GoodsLot& lot) const;
+  bool LotSatisfiesFreelance(const GoodsLot& lot, const TradeContract& contract) const;
   bool SellSurvey(const std::string& recordId);
   // The station bar: one action, once per patron, and the words they say are a
   // read-out of the data they were authored with (see StationScreen.cpp).
@@ -232,18 +237,29 @@ class Simulation {
   bool Jettison(const std::string& lotId);
   bool StartSalvage(int bay);
   bool PackageSurvey(const std::string& recordId);
-  bool AcceptContract(const std::string& contractId);
-  bool CollectContract(const std::string& contractId);
   bool HireCrew(const std::string& candidateId);
   bool BuyUpgrade(const std::string& upgradeId);   // bay, bay2, drive, rack, scanner, hull
-  void ContractProgress(const std::string& goal, const std::string& target);
-  void CommissionProgress(const std::string& kind, const std::string& target);
-  // commissionOffer(): the same deterministic draw the board shows before the
-  // player accepts it, so the offer and the acceptance can never disagree.
-  std::optional<Commission> CommissionOffer(const std::string& kind) const;
-  bool AcceptCommission(const std::string& kind);
-  bool CollectCommission();
-  bool AbandonCommission();
+
+  // Trade contracts (Trade.cpp). Browsing is free; acceptance is one action.
+  // Deliveries and data trades settle on arrival without another click. A
+  // freelance request settles only when goods bought after acceptance are sold
+  // at its destination. The board epoch is derived from the saved action clock.
+  static constexpr double kTradeRotationActions = 200;
+  static constexpr double kCargoSortPeriod = 20;   // a paid sorting click every 20 actions
+  static constexpr double kCargoShiftPeriod = 60;  // stowed cargo works loose again after this
+  std::uint64_t TradeEpoch() const;
+  std::vector<TradeContract> TradeOffers(const std::string& portId, const std::string& kind) const;
+  std::optional<TradeContract> FindTradeOffer(const std::string& offerId) const;
+  const TradeContract* FindTradeContract(const std::string& contractId) const;
+  std::vector<TradeContract> ActiveTradeContracts(const std::string& kind = std::string()) const;
+  bool AcceptTrade(const std::string& offerId);
+  void RememberStationVisit(const std::string& portId);
+  void SettleTradeArrival(const std::string& bodyId);
+  bool TradeReadyHere(const TradeContract& contract) const;
+  bool FinalizeTrade(const std::string& contractId);
+  void TradeScanProgress(const std::string& bodyId);
+  void TradeSalvageProgress();
+  double LotPriceAt(const std::string& portId, const GoodsLot& lot) const;
 
   // Projects and the shipyard (Projects.cpp, Ships.cpp)
   bool StartProject(const std::string& id);
@@ -464,9 +480,9 @@ class Simulation {
   std::map<std::string, bool> crewClaims_;
 };
 
-// The commission board's own words: the goal is a count, the description is a
-// sentence naming the body. Both editions share one spelling of each.
-double CommissionGoal(const std::string& kind);
-std::string CommissionDescription(const Simulation& sim, const Commission& commission);
+// Shared trade wording for the station, sidebar and route notes.
+std::string TradeKindLabel(const std::string& kind);
+std::string TradeDescription(const Simulation& sim, const TradeContract& contract);
+std::string TradeRouteLayer(const Simulation& sim, const TradeContract& contract);
 
 }  // namespace ship

@@ -98,6 +98,7 @@ Simulation Simulation::NewVoyage(const Catalog& catalog) {
   sim.mess_.rations = catalog.rules.mess.rationStart;
   sim.mess_.rationCapacity = catalog.rules.mess.rationCapacity;
   sim.cargo_.capacity = sim.ShipCargoCapacity("wren", 0);
+  sim.cargo_.sortDueAt = Simulation::kCargoSortPeriod;
 
   // ---- the hull the crew are standing in ---------------------------------
   {
@@ -185,7 +186,6 @@ Simulation Simulation::NewVoyage(const Catalog& catalog) {
   state.repairKits = 3;
   state.lotSerial = 0;
   state.gameOver.clear();
-  state.contracts["arrival"] = "active";
 
   // The archive begins a new watch; the first memory is authored, not earned.
   Memory first;
@@ -204,6 +204,7 @@ Simulation Simulation::ReferenceVoyage(const Catalog& catalog) {
   sim.referenceFit_ = true;
   sim.rooms_ = catalog.wren.rooms;
   sim.cargo_.capacity = sim.ShipCargoCapacity("wren", 0);
+  sim.cargo_.sortDueAt = Simulation::kCargoSortPeriod;
   sim.goods_.clear();
   for (const Good& good : catalog.startingCargo) {
     GoodsLot lot;

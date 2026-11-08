@@ -206,6 +206,7 @@ add_library(spaceship_core STATIC
   cpp/core/Navigation.cpp
   cpp/core/Orders.cpp
   cpp/core/Economy.cpp
+  cpp/core/Trade.cpp
   cpp/core/Projects.cpp
   cpp/core/Ships.cpp
   cpp/core/SaveSystem.cpp

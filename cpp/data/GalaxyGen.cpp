@@ -265,6 +265,7 @@ void BuildGalaxyFromRows(const std::vector<StarRow>& rows, std::size_t baseIndex
         Port port;
         port.id = landmark;
         port.name = row.landmark;
+        port.profile = row.profile;
         port.prices = prices->second;
         port.tip = row.note + " " + (hint != catalog.portHints.end() ? hint->second : std::string());
         catalog.ports.push_back(std::move(port));

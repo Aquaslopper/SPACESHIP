@@ -283,8 +283,10 @@ void RoomCargo(const Simulation& sim, Description& t) {
   t.sub = "Storage - " + Num(used) + " of " + Num(sim.CargoStore().capacity) +
           " m3 in use";
   t.acts = {
-      {"Jettison a lot", "1 action"},
-      {"Sell a lot", "at a station"},
+      {"Sort a lot into the hold view", "free until a paid tidy is due"},
+      {"Unload / finalize a trade", "1 action at the destination"},
+      {"Sell freelance cargo", "1 action at the destination"},
+      {"Unload unwanted cargo into space", "1 action"},
       {"Recover route salvage", "1 action + 2 work"},
   };
 }
@@ -295,7 +297,7 @@ void RoomScience(const Simulation& sim, Description& t) {
   t.rows = {
       {"Logs held", Num(static_cast<double>(sim.Survey().size())) + " survey records"},
       {"Unsold value", Num(worth) + " shiplets"},
-      {"Sources", "Deep scans, salvage, completed contracts"},
+      {"Sources", "Deep scans, salvage, carried-over agreements"},
   };
   for (const SurveyRecord& record : sim.Survey()) {
     t.rows.push_back(
@@ -339,9 +341,9 @@ Description DescribeTarget(const Simulation& sim, const std::string& kind,
       if (port.id == id) { t.title = port.name; break; }
     }
     t.kindLabel = "STATION";
-    t.sub = "Docked - market, mission board, shipyard and crew";
+    t.sub = "Docked - market, star-map, trade contracts, shipyard and crew";
     t.rows = {{"Berth", "Docked"}, {"Purse", Num(sim.State().shiplets) + " sh"}};
-    t.acts = {{"Trade, hire or accept a contract", "1 action"}, {"Undock", "1 action"}};
+    t.acts = {{"Trade, hire or accept a trade contract", "1 action"}, {"Undock", "1 action"}};
     return t;
   }
 

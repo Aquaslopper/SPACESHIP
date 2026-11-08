@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <fstream>
+#include <set>
 #include <filesystem>
 #include <sstream>
 #include <string>
@@ -149,21 +150,23 @@ std::string Simulation::SaveJson() const {
   }
   s["chronicle"] = chronicle;
 
-  Json commissions = Json::object();
-  commissions["version"] = state_.commissions.version;
-  commissions["serial"] = Num(state_.commissions.serial);
-  commissions["completed"] = Num(state_.commissions.completed);
-  if (state_.commissions.active.has_value()) {
-    const Commission& c = *state_.commissions.active;
-    commissions["active"] = Json{{"kind", c.kind},
-                                 {"origin", c.origin},
-                                 {"target", c.target},
-                                 {"progress", Num(c.progress)},
-                                 {"reward", Num(c.reward)}};
-  } else {
-    commissions["active"] = nullptr;
+  Json trade = Json::object();
+  trade["version"] = state_.trade.version;
+  trade["visited"] = state_.trade.visited;
+  trade["completed"] = Num(state_.trade.completed);
+  Json tradeContracts = Json::array();
+  for (const TradeContract& c : state_.trade.contracts) {
+    tradeContracts.push_back(Json{{"id", c.id}, {"kind", c.kind}, {"title", c.title},
+                                  {"origin", c.origin}, {"destination", c.destination},
+                                  {"goodId", c.goodId}, {"sourceBody", c.sourceBody},
+                                  {"note", c.note}, {"lotId", c.lotId}, {"status", c.status},
+                                  {"quantity", c.quantity}, {"fulfilled", c.fulfilled},
+                                  {"reward", Num(c.reward)}, {"acceptedAt", Num(c.acceptedAt)},
+                                  {"passengerId", c.passengerId}, {"legacyGoal", c.legacyGoal},
+                                  {"legacyProgress", c.legacyProgress}, {"legacyReady", c.legacyReady}});
   }
-  s["commissions"] = commissions;
+  trade["contracts"] = tradeContracts;
+  s["trade"] = trade;
 
   s["spOpen"] = Json::object();
   for (const auto& entry : state_.spOpen) { s["spOpen"][entry.first] = entry.second; }
@@ -260,10 +263,6 @@ std::string Simulation::SaveJson() const {
   s["fuelCells"] = Num(state_.fuelCells);
   s["repairKits"] = Num(state_.repairKits);
   s["lotSerial"] = Num(state_.lotSerial);
-
-  Json contracts = Json::object();
-  for (const auto& entry : state_.contracts) { contracts[entry.first] = entry.second; }
-  s["contracts"] = contracts;
 
   Json passengers = Json::array();
   for (const Passenger& passenger : state_.passengers) {
@@ -370,7 +369,7 @@ std::string Simulation::SaveJson() const {
   root["mess"] = Json{{"rack", Num(mess_.rack)}, {"capacity", Num(mess_.capacity)},
                       {"rations", Num(mess_.rations)},
                       {"rationCapacity", Num(mess_.rationCapacity)}};
-  root["cargo"] = Json{{"capacity", Num(cargo_.capacity)}};
+  root["cargo"] = Json{{"capacity", Num(cargo_.capacity)}, {"sortDueAt", Num(cargo_.sortDueAt)}};
 
   Json goods = Json::array();
   for (const GoodsLot& lot : goods_) {
@@ -381,6 +380,12 @@ std::string Simulation::SaveJson() const {
                       {"value", Num(lot.value)},
                       {"risk", lot.risk}};
     if (!lot.contractId.empty()) { entry["contractId"] = lot.contractId; }
+    entry["goodId"] = lot.goodId;
+    entry["originPort"] = lot.originPort;
+    entry["boughtAt"] = Num(lot.boughtAt);
+    entry["marketPurchase"] = lot.marketPurchase;
+    entry["stowed"] = lot.stowed;
+    entry["stowedAt"] = Num(lot.stowedAt);
     goods.push_back(entry);
   }
   root["goods"] = goods;
@@ -500,11 +505,11 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
   if (cargo == nullptr || !IsObject(*cargo)) { return fail("no hold"); }
   if (views == nullptr || !IsObject(*views)) { return fail("no layer views"); }
 
-  for (const char* key : {"spOpen", "freshTabs", "pendingOrders", "scanned", "contracts", "upgrades",
-                          "hired", "options", "chronicle", "commissions", "sim"}) {
+  for (const char* key : {"spOpen", "freshTabs", "pendingOrders", "scanned", "upgrades",
+                          "hired", "options", "chronicle", "trade", "sim"}) {
     if (!IsObject(*state)) { break; }
     if (key == std::string("options") || key == std::string("chronicle") ||
-        key == std::string("commissions") || key == std::string("sim")) {
+        key == std::string("trade") || key == std::string("sim")) {
       continue;  // optional in older saves; checked below when present
     }
     const Json* value = At(*state, key);
@@ -665,6 +670,55 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
     }
   }
 
+  if (const Json* trade = At(*state, "trade"); trade != nullptr) {
+    if (!IsObject(*trade) || !SaveNumber(*At(*trade, "completed"))) { return fail("trade ledger"); }
+    const Json* visited = At(*trade, "visited");
+    const Json* contracts = At(*trade, "contracts");
+    if (visited == nullptr || !IsArray(*visited) || contracts == nullptr || !IsArray(*contracts)) {
+      return fail("trade visits or contracts");
+    }
+    std::set<std::string> seenContracts;
+    for (const Json& port : *visited) {
+      if (!port.is_string() || catalog.FindPort(port.get<std::string>()) == nullptr) {
+        return fail("a visited station does not exist");
+      }
+    }
+    for (const Json& c : *contracts) {
+      if (!IsObject(c)) { return fail("a trade contract is unreadable"); }
+      const std::string id = GetString(c, "id");
+      const std::string kind = GetString(c, "kind");
+      const std::string status = GetString(c, "status");
+      const std::string origin = GetString(c, "origin");
+      const std::string destination = GetString(c, "destination");
+      const std::string legacyGoal = GetString(c, "legacyGoal");
+      if (id.empty() || !seenContracts.insert(id).second) { return fail("a trade contract has no unique id"); }
+      if (kind != "delivery" && kind != "freelance" && kind != "station") { return fail("unknown trade kind"); }
+      if (status != "active" && status != "ready" && status != "complete" && status != "failed") {
+        return fail("a trade contract is in an impossible state");
+      }
+      if (!origin.empty() && catalog.FindPort(origin) == nullptr) { return fail("trade origin is not a station"); }
+      const bool target = catalog.FindPort(destination) != nullptr ||
+                          (legacyGoal.empty() ? false : catalog.FindBody(destination) != nullptr ||
+                                                           catalog.FindSystem(destination) != nullptr);
+      if (!target && !(legacyGoal == "salvage" && destination.empty())) { return fail("trade destination does not exist"); }
+      if (legacyGoal.empty() && catalog.FindPort(destination) == nullptr) { return fail("trade destination is not a station"); }
+      for (const char* key : {"reward", "acceptedAt"}) {
+        const Json* value = At(c, key);
+        if (value == nullptr || !SaveNumber(*value)) { return fail("a trade contract has no numbers"); }
+      }
+      if (GetNumber(c, "acceptedAt") > actions->get<double>()) { return fail("a trade contract was accepted in the future"); }
+      const Json* quantity = At(c, "quantity");
+      const Json* fulfilled = At(c, "fulfilled");
+      if (quantity == nullptr || !SaveNumber(*quantity) || quantity->get<double>() != std::floor(quantity->get<double>()) ||
+          fulfilled == nullptr || !SaveNumber(*fulfilled) || fulfilled->get<double>() > quantity->get<double>()) {
+        return fail("trade cargo counts are impossible");
+      }
+      if (!GetString(c, "goodId").empty() && catalog.FindGood(GetString(c, "goodId")) == nullptr) {
+        return fail("trade goods do not exist");
+      }
+    }
+  }
+
   // ---- the hold ----------------------------------------------------------
   double held = 0;
   for (const Json& lot : *goods) {
@@ -677,8 +731,17 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
     const std::string contractId = GetString(lot, "contractId");
     if (!contractId.empty()) {
       bool found = false;
-      for (const Contract& contract : catalog.contracts) {
-        if (contract.id == contractId) { found = true; }
+      if (const Json* trade = At(*state, "trade"); trade != nullptr) {
+        if (const Json* contracts = At(*trade, "contracts"); contracts != nullptr && IsArray(*contracts)) {
+          for (const Json& c : *contracts) {
+            if (GetString(c, "id") == contractId && GetString(c, "kind") == "delivery" &&
+                (GetString(c, "status") == "active" || GetString(c, "status") == "ready")) { found = true; }
+          }
+        }
+      } else {
+        for (const Contract& contract : catalog.contracts) {
+          if (contract.id == contractId) { found = true; }
+        }
       }
       if (!found) { return fail("contract cargo for a contract that does not exist"); }
     }
@@ -1081,10 +1144,26 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     readBoolMap(s.at("spOpen"), &state_.spOpen);
     readBoolMap(s.at("freshTabs"), &state_.freshTabs);
 
-    state_.contracts.clear();
-    if (auto it = s.find("contracts"); it != s.end() && it->is_object()) {
-      for (auto entry = it->begin(); entry != it->end(); ++entry) {
-        if (entry.value().is_string()) { state_.contracts[entry.key()] = entry.value().get<std::string>(); }
+    state_.trade = TradeState();
+    if (auto it = s.find("trade"); it != s.end() && it->is_object()) {
+      state_.trade.version = static_cast<int>(GetNumber(*it, "version", 1));
+      state_.trade.completed = GetNumber(*it, "completed");
+      if (auto visited = it->find("visited"); visited != it->end() && visited->is_array()) {
+        for (const Json& port : *visited) { if (port.is_string()) { state_.trade.visited.push_back(port.get<std::string>()); } }
+      }
+      if (auto contracts = it->find("contracts"); contracts != it->end() && contracts->is_array()) {
+        for (const Json& c : *contracts) {
+          TradeContract entry;
+          entry.id = GetString(c, "id"); entry.kind = GetString(c, "kind"); entry.title = GetString(c, "title");
+          entry.origin = GetString(c, "origin"); entry.destination = GetString(c, "destination");
+          entry.goodId = GetString(c, "goodId"); entry.sourceBody = GetString(c, "sourceBody");
+          entry.note = GetString(c, "note"); entry.lotId = GetString(c, "lotId"); entry.status = GetString(c, "status");
+          entry.quantity = static_cast<int>(GetNumber(c, "quantity")); entry.fulfilled = static_cast<int>(GetNumber(c, "fulfilled"));
+          entry.reward = GetNumber(c, "reward"); entry.acceptedAt = GetNumber(c, "acceptedAt");
+          entry.passengerId = GetString(c, "passengerId"); entry.legacyGoal = GetString(c, "legacyGoal");
+          entry.legacyProgress = static_cast<int>(GetNumber(c, "legacyProgress")); entry.legacyReady = GetBool(c, "legacyReady");
+          state_.trade.contracts.push_back(std::move(entry));
+        }
       }
     }
 
@@ -1137,21 +1216,6 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
       if (auto regions = it->find("regions"); regions != it->end()) { readBoolMap(*regions, &state_.chronicle.regions); }
       if (auto earned = it->find("earned"); earned != it->end()) { readBoolMap(*earned, &state_.chronicle.earned); }
       if (auto claimed = it->find("claimed"); claimed != it->end()) { readBoolMap(*claimed, &state_.chronicle.claimed); }
-    }
-
-    state_.commissions = Commissions();
-    if (auto it = s.find("commissions"); it != s.end() && it->is_object()) {
-      state_.commissions.serial = GetNumber(*it, "serial");
-      state_.commissions.completed = GetNumber(*it, "completed");
-      if (auto active = it->find("active"); active != it->end() && active->is_object()) {
-        Commission commission;
-        commission.kind = GetString(*active, "kind");
-        commission.origin = GetString(*active, "origin");
-        commission.target = GetString(*active, "target");
-        commission.progress = GetNumber(*active, "progress");
-        commission.reward = GetNumber(*active, "reward");
-        state_.commissions.active = commission;
-      }
     }
 
     state_.sim = SimState();
@@ -1250,6 +1314,7 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
       mess_.rationCapacity = GetNumber(galley, "rationCapacity");
     }
     cargo_.capacity = GetNumber(d.at("cargo"), "capacity");
+    cargo_.sortDueAt = GetNumber(d.at("cargo"), "sortDueAt", actionCounter_ + kCargoSortPeriod);
 
     goods_.clear();
     for (const Json& lot : d.at("goods")) {
@@ -1261,6 +1326,12 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
       entry.value = GetNumber(lot, "value");
       entry.risk = GetBool(lot, "risk");
       entry.contractId = GetString(lot, "contractId");
+      entry.goodId = GetString(lot, "goodId");
+      entry.originPort = GetString(lot, "originPort");
+      entry.boughtAt = GetNumber(lot, "boughtAt");
+      entry.marketPurchase = GetBool(lot, "marketPurchase");
+      entry.stowed = GetBool(lot, "stowed");
+      entry.stowedAt = GetNumber(lot, "stowedAt");
       goods_.push_back(entry);
     }
 
@@ -1332,6 +1403,68 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
       events_.push_back(entry);
     }
 
+    if (s.find("trade") == s.end()) {
+      // Pre-trade saves keep unfinished agreements as carried-over snapshots.
+      // No new offer uses these legacy goals; they only let old work finish.
+      const Json* oldContracts = At(s, "contracts");
+      if (oldContracts != nullptr && IsObject(*oldContracts)) {
+        for (const Contract& def : catalog_.contracts) {
+          const std::string status = GetString(*oldContracts, def.id.c_str());
+          if (status == "complete") { state_.trade.completed += 1; continue; }
+          if (status != "active" && status != "ready") { continue; }
+          TradeContract carried;
+          carried.id = "legacy:" + def.id;
+          carried.kind = "delivery";
+          carried.title = def.title;
+          carried.origin = def.origin;
+          carried.destination = def.target;
+          carried.note = def.note;
+          carried.reward = def.reward;
+          carried.acceptedAt = actionCounter_;
+          carried.status = status == "ready" ? "ready" : "active";
+          carried.legacyGoal = def.goal;
+          carried.legacyReady = status == "ready";
+          if (def.goal == "freight") {
+            carried.lotId = "contract-" + def.id;
+            carried.quantity = 1;
+            for (GoodsLot& lot : goods_) {
+              if (lot.contractId == def.id) { lot.contractId = carried.id; }
+            }
+          }
+          if (def.goal == "passenger") { carried.passengerId = def.id; }
+          state_.trade.contracts.push_back(std::move(carried));
+        }
+      }
+      const Json* oldCommissions = At(s, "commissions");
+      if (oldCommissions != nullptr && IsObject(*oldCommissions)) {
+        state_.trade.completed += GetNumber(*oldCommissions, "completed");
+        if (const Json* active = At(*oldCommissions, "active"); active != nullptr && IsObject(*active)) {
+          TradeContract carried;
+          carried.id = "legacy:commission";
+          const std::string goal = GetString(*active, "kind");
+          carried.kind = goal == "visit" ? "station" : "delivery";
+          carried.title = "Carried-over " + goal + " agreement";
+          carried.origin = GetString(*active, "origin");
+          carried.destination = GetString(*active, "target");
+          carried.note = carried.title + " at " + carried.destination;
+          carried.reward = GetNumber(*active, "reward");
+          carried.acceptedAt = actionCounter_;
+          carried.legacyGoal = goal;
+          carried.legacyProgress = static_cast<int>(GetNumber(*active, "progress"));
+          carried.legacyReady = goal == "salvage" ? carried.legacyProgress >= 2 : GetNumber(*active, "progress") >= 1;
+          carried.status = carried.legacyReady ? "ready" : "active";
+          state_.trade.contracts.push_back(std::move(carried));
+        }
+      }
+      if (state_.docked) { RememberStationVisit(map_.here); }
+      for (const TradeContract& carried : state_.trade.contracts) {
+        RememberStationVisit(carried.origin);
+        RememberStationVisit(carried.destination);
+      }
+      if (!state_.trade.contracts.empty()) {
+        LogLine("Unfinished pre-trade agreements were carried into the trade ledger.");
+      }
+    }
     ApplySnapshotDefaults();
     ++feedRevision_; // A restored log is rendered newest-first, like renderFeed().
     return true;

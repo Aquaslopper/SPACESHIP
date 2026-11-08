@@ -250,22 +250,13 @@ std::vector<SideBlock> SideBlocks(const Simulation& sim) {
   contracts.title = "Contracts";
   contracts.open = open("contracts");
   contracts.empty = "No active contracts.";
-  for (const Contract& contract : sim.World().contracts) {
-    auto it = state.contracts.find(contract.id);
-    if (it == state.contracts.end()) { continue; }
-    if (it->second != "active" && it->second != "ready") { continue; }
-    contracts.rows.push_back({contract.title,
-                              contract.note +
-                                  (it->second == "ready" ? " Ready to collect." : ""),
-                              true, false, "long", ""});
-  }
-  if (state.commissions.active.has_value()) {
-    const Commission& active = *state.commissions.active;
-    const double goal = CommissionGoal(active.kind);
-    std::string line = CommissionDescription(sim, active) + " - " + Num(active.progress) +
-                       " / " + Num(goal);
-    line += active.progress >= goal ? ". Ready to collect at a station." : ".";
-    contracts.rows.push_back({"Commission", line, true, false, "long", ""});
+  for (const TradeContract& contract : sim.ActiveTradeContracts()) {
+    std::string line = TradeDescription(sim, contract) + " - " + Num(contract.reward) + " sh.";
+    if (contract.kind == "freelance") {
+      line += " Sold " + Num(contract.fulfilled) + "/" + Num(contract.quantity) + ".";
+    }
+    if (contract.status == "ready") { line += " Ready to hand in at a station."; }
+    contracts.rows.push_back({contract.title, line, true, false, "long", ""});
   }
   blocks.push_back(contracts);
 

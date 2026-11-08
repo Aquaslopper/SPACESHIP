@@ -1,5 +1,5 @@
 // ============================================================================
-//  Economy.cpp — ports, cargo, contracts and the commission board.
+//  Economy.cpp — ports, cargo, the yard and the station bar.
 //  ---------------------------------------------------------------------------
 //  Every transaction is one action, and every transaction is one function that
 //  the client calls after the player has already committed: the money moves, the
@@ -32,8 +32,10 @@ double Simulation::SurveyWorth(const std::string& type) const {
   return it == catalog_.surveyWorth.end() ? 60.0 : it->second;
 }
 
-double Simulation::LotPrice(const GoodsLot& lot) const {
-  const Port* port = HerePort();
+double Simulation::LotPrice(const GoodsLot& lot) const { return LotPriceAt(map_.here, lot); }
+
+double Simulation::LotPriceAt(const std::string& portId, const GoodsLot& lot) const {
+  const Port* port = catalog_.FindPort(portId);
   double factor = 1.0;
   if (port != nullptr) {
     auto it = port->prices.find(lot.kind);
@@ -108,11 +110,11 @@ bool Simulation::BuySupply(const std::string& id) {
 bool Simulation::BuyGood(const std::string& goodId) {
   if (!state_.gameOver.empty() || !state_.docked || HerePort() == nullptr) { return false; }
 
-  const Good* good = nullptr;
-  for (const Good& candidate : catalog_.goods) {
-    if (candidate.id == goodId) { good = &candidate; }
-  }
-  if (good == nullptr) { return false; }
+  const Good* good = catalog_.FindGood(goodId);
+  const std::vector<Good> shelf = MarketAt(map_.here);
+  const bool stocked = std::any_of(shelf.begin(), shelf.end(),
+                                   [&](const Good& candidate) { return candidate.id == goodId; });
+  if (good == nullptr || !stocked) { return false; }
 
   GoodsLot probe;
   probe.id = good->id;
@@ -130,6 +132,10 @@ bool Simulation::BuyGood(const std::string& goodId) {
   state_.lotSerial += 1;
   GoodsLot lot = probe;
   lot.id = "lot-" + js::NumToString(state_.lotSerial);
+  lot.goodId = good->id;
+  lot.originPort = map_.here;
+  lot.boughtAt = actionCounter_;
+  lot.marketPurchase = true;
   goods_.push_back(lot);
   FreeCommit("Bought " + good->name);
   return true;
@@ -142,10 +148,55 @@ bool Simulation::SellGood(const std::string& lotId) {
     if (goods_[index].id != lotId) { continue; }
     if (!goods_[index].contractId.empty()) { return false; }  // contract cargo is not for sale
     const double price = LotPrice(goods_[index]);
-    const std::string name = goods_[index].name;
+    const GoodsLot sold = goods_[index];
     goods_.erase(goods_.begin() + static_cast<std::ptrdiff_t>(index));
     state_.shiplets += price;
-    PerformAction("Sold " + name);
+    // A freelance request is fulfilled by the actual sale, not by arrival.
+    // Only lots bought at its origin after acceptance count, and each lot can
+    // advance one request. The bonus and the sale share this single action.
+    for (TradeContract& contract : state_.trade.contracts) {
+      if (!LotSatisfiesFreelance(sold, contract)) { continue; }
+      contract.fulfilled += 1;
+      if (contract.fulfilled >= contract.quantity) {
+        contract.status = "complete";
+        state_.trade.completed += 1;
+        state_.shiplets += contract.reward;
+        LogLine("Freelance sale finished: " + contract.title + " paid a " +
+                js::NumToString(contract.reward) + " sh bonus.");
+        SimRemember("Work", "The crew sold the requested goods and finished " + contract.title + ".");
+      } else {
+        LogLine("Freelance sale: " + std::to_string(contract.fulfilled) + " of " +
+                std::to_string(contract.quantity) + " lots sold for " + contract.title + ".");
+      }
+      break;
+    }
+    PerformAction("Sold " + sold.name);
+    return true;
+  }
+  return false;
+}
+
+bool Simulation::CargoSortDue() const { return actionCounter_ >= cargo_.sortDueAt; }
+
+bool Simulation::CargoLotStowed(const GoodsLot& lot) const {
+  return lot.stowed && actionCounter_ - lot.stowedAt < kCargoShiftPeriod;
+}
+
+bool Simulation::SortCargo(const std::string& lotId) {
+  if (!state_.gameOver.empty()) { return false; }
+  for (GoodsLot& lot : goods_) {
+    if (lot.id != lotId) { continue; }
+    if (CargoLotStowed(lot)) { return false; }
+    const bool paid = CargoSortDue();
+    const std::string name = lot.name;
+    lot.stowed = true;
+    if (paid) {
+      PerformAction("Sorted " + name + " into the hold");
+      cargo_.sortDueAt = actionCounter_ + kCargoSortPeriod;
+    } else {
+      FreeCommit("Stowed " + name);
+    }
+    lot.stowedAt = actionCounter_;
     return true;
   }
   return false;
@@ -174,7 +225,11 @@ bool Simulation::Jettison(const std::string& lotId) {
     const std::string name = goods_[index].name;
     const std::string contract = goods_[index].contractId;
     goods_.erase(goods_.begin() + static_cast<std::ptrdiff_t>(index));
-    if (!contract.empty()) { state_.contracts[contract] = "failed"; }
+    if (!contract.empty()) {
+      for (TradeContract& trade : state_.trade.contracts) {
+        if (trade.id == contract && trade.status == "active") { trade.status = "failed"; }
+      }
+    }
     PerformAction("Jettisoned " + name);
     return true;
   }
@@ -217,116 +272,6 @@ bool Simulation::PackageSurvey(const std::string& recordId) {
   AddOngoing("pkg-" + recordId, "Packaging " + name, 2, "surveyPackage", recordId);
   return true;
 }
-
-// ---------------------------------------------------------------------------
-// Contracts
-// ---------------------------------------------------------------------------
-
-void Simulation::ContractProgress(const std::string& goal, const std::string& target) {
-  bool changed = false;
-  for (const Contract& contract : catalog_.contracts) {
-    auto state = state_.contracts.find(contract.id);
-    if (state == state_.contracts.end() || state->second != "active") { continue; }
-    if (contract.target != target) { continue; }
-    const bool visitCoversFreight = goal == "visit" && (contract.goal == "freight" || contract.goal == "passenger");
-    if (contract.goal != goal && !visitCoversFreight) { continue; }
-
-    if (contract.goal == "freight") {
-      // The consignment leaves the hold when it is delivered.
-      bool found = false;
-      for (std::size_t index = goods_.size(); index-- > 0;) {
-        if (goods_[index].id != "contract-" + contract.id) { continue; }
-        goods_.erase(goods_.begin() + static_cast<std::ptrdiff_t>(index));
-        found = true;
-      }
-      if (!found) { continue; }
-    }
-    if (contract.goal == "passenger") {
-      bool found = false;
-      for (std::size_t index = state_.passengers.size(); index-- > 0;) {
-        if (state_.passengers[index].id != contract.id) { continue; }
-        state_.passengers.erase(state_.passengers.begin() + static_cast<std::ptrdiff_t>(index));
-        found = true;
-      }
-      if (!found) { continue; }
-    }
-
-    state_.contracts[contract.id] = "ready";
-    changed = true;
-    LogLine("Contract ready to collect: " + contract.title + ".");
-  }
-  (void)changed;
-}
-
-bool Simulation::AcceptContract(const std::string& contractId) {
-  if (!state_.gameOver.empty() || !state_.docked) { return false; }
-
-  const Contract* contract = nullptr;
-  for (const Contract& candidate : catalog_.contracts) {
-    if (candidate.id == contractId) { contract = &candidate; }
-  }
-  if (contract == nullptr) { return false; }
-
-  auto current = state_.contracts.find(contract->id);
-  const std::string status = current == state_.contracts.end() ? std::string("available") : current->second;
-  if (status != "available" && status != "failed") { return false; }
-
-  if (!contract->origin.empty() && contract->origin != map_.here) { return false; }
-  if (contract->vol > 0 && CargoUsed() + CargoReserved() + contract->vol > cargo_.capacity) { return false; }
-  if (contract->goal == "passenger" &&
-      static_cast<double>(crew_.size() + state_.passengers.size()) >= ship_.Berths()) {
-    return false;
-  }
-
-  state_.contracts[contract->id] = "active";
-  if (contract->goal == "freight") {
-    GoodsLot lot;
-    lot.id = "contract-" + contract->id;
-    lot.name = contract->cargo.empty() ? "Medical consignment" : contract->cargo;
-    lot.vol = contract->vol;
-    lot.value = 0;
-    lot.kind = "Contract freight";
-    lot.risk = false;
-    lot.contractId = contract->id;
-    goods_.push_back(lot);
-  }
-  if (contract->goal == "passenger") {
-    state_.passengers.push_back(Passenger{contract->id, "Station passenger"});
-  }
-
-  // A contract accepted for work already done is ready immediately.
-  const bool priorVisit = contract->goal == "visit" && (contract->target == map_.here || contract->target == CurrentSystemId());
-  const bool priorScan = contract->goal == "scan" && state_.scanned.count(contract->target) != 0 &&
-                         state_.scanned.at(contract->target);
-  if (contract->recognizePrior && (priorVisit || priorScan)) {
-    state_.contracts[contract->id] = "ready";
-    LogLine("Contract ready to collect: " + contract->title + ".");
-  }
-
-  PerformAction("Accepted contract - " + contract->title);
-  return true;
-}
-
-bool Simulation::CollectContract(const std::string& contractId) {
-  if (!state_.gameOver.empty() || !state_.docked) { return false; }
-  auto state = state_.contracts.find(contractId);
-  if (state == state_.contracts.end() || state->second != "ready") { return false; }
-
-  const Contract* contract = nullptr;
-  for (const Contract& candidate : catalog_.contracts) {
-    if (candidate.id == contractId) { contract = &candidate; }
-  }
-  if (contract == nullptr) { return false; }
-
-  state->second = "complete";
-  state_.shiplets += contract->reward;
-  PerformAction("Contract paid - " + contract->title);
-  return true;
-}
-
-// ---------------------------------------------------------------------------
-// Hiring and refits
-// ---------------------------------------------------------------------------
 
 bool Simulation::HireCrew(const std::string& candidateId) {
   if (!state_.gameOver.empty() || !state_.docked || HerePort() == nullptr) { return false; }
@@ -424,199 +369,17 @@ bool Simulation::BuyUpgrade(const std::string& upgradeId) {
   return false;
 }
 
-// ---------------------------------------------------------------------------
-// Commissions
-// ---------------------------------------------------------------------------
-
-double CommissionGoal(const std::string& kind) { return kind == "salvage" ? 2.0 : 1.0; }
-
-namespace {
-double CommissionPrice(const std::string& kind) {
-  if (kind == "visit") { return 450; }
-  if (kind == "scan") { return 550; }
-  if (kind == "salvage") { return 240; }
-  return 0;
-}
-}  // namespace
-
-void Simulation::CommissionProgress(const std::string& kind, const std::string& target) {
-  if (!state_.commissions.active.has_value()) { return; }
-  Commission& commission = *state_.commissions.active;
-  if (commission.kind != kind) { return; }
-  if (commission.progress >= CommissionGoal(kind)) { return; }
-  if (kind != "salvage" && commission.target != target) { return; }
-
-  commission.progress += 1;
-  if (commission.progress != CommissionGoal(kind)) { return; }
-
-  // The description is a sentence, not an id: the Samacron's memory keeps it.
-  std::string text;
-  if (commission.kind == "visit") {
-    const Body* body = FindBodyById(commission.target);
-    text = "Visit " + (body == nullptr ? commission.target : body->name);
-  } else if (commission.kind == "scan") {
-    const Body* body = FindBodyById(commission.target);
-    text = "Read a deep scan of " + (body == nullptr ? commission.target : body->name);
-  } else {
-    text = "Recover two salvage lots while under way";
+std::vector<Good> Simulation::MarketAt(const std::string& portId) const {
+  const Port* port = catalog_.FindPort(portId);
+  std::vector<Good> shelf;
+  if (port == nullptr) { return shelf; }
+  for (const std::string& id : port->market) {
+    const Good* good = catalog_.FindGood(id);
+    if (good != nullptr) { shelf.push_back(*good); }
   }
-  SimRemember("Work", "The crew completed a commission: " + text + ".");
-  LogLine("Commission objective complete. Collect at any station.");
+  return shelf;
 }
 
-namespace {
-std::string BodyName(const Simulation& sim, const std::string& id) {
-  const Body* const body = sim.FindBodyById(id);
-  return body != nullptr ? body->name : id;
-}
-}  // namespace
-
-std::string CommissionDescription(const Simulation& sim, const Commission& active) {
-  const Body* const body = sim.FindBodyById(active.target);
-  std::string where;
-  if (body != nullptr) {
-    const Body* const system = sim.FindBodyById(body->system);
-    if (system != nullptr) {
-      where = " (" + system->name;
-      const Body* const region = sim.FindBodyById(system->region);
-      if (region != nullptr) { where += ", " + region->name; }
-      where += ")";
-    }
-  }
-  if (active.kind == "visit") { return "Visit " + BodyName(sim, active.target) + where; }
-  if (active.kind == "scan") {
-    return "Read a deep scan of " + BodyName(sim, active.target) + where;
-  }
-  return "Recover two salvage lots while under way";
-}
-
-std::optional<Commission> Simulation::CommissionOffer(const std::string& kind) const {
-  if (CommissionPrice(kind) <= 0) { return std::nullopt; }
-
-  // commissionOffer(): a deterministic draw from the bodies this station can
-  // reasonably point at, rotated by the commission serial - no randomness.
-  Commission offer;
-  offer.kind = kind;
-  offer.origin = map_.here;
-  offer.progress = 0;
-  offer.reward = CommissionPrice(kind);
-
-  if (kind != "salvage") {
-    const Body* here = CurrentSystem();
-    const std::string curSysId = CurrentSystemId();
-    std::vector<const Body*> all;
-    std::vector<const Body*> local;
-    std::vector<const Body*> fresh;
-
-    if (kind == "visit") {
-      // Iterate ports directly rather than scanning every body in the galaxy.
-      all.reserve(catalog_.ports.size());
-      for (const Port& port : catalog_.ports) {
-        if (port.id == map_.here) { continue; }
-        const Body* body = catalog_.FindBody(port.id);
-        if (body == nullptr) { continue; }
-        const Body* system = catalog_.FindSystem(catalog_.BodySystem(*body));
-        if (system == nullptr) { continue; }
-        all.push_back(body);
-        if (here != nullptr && system->region == here->region) {
-          local.push_back(body);
-        }
-      }
-    } else {
-      // Scan regional systems first via the O(1) region/system index; only scan
-      // the full galaxy when the local region has no eligible targets.
-      if (here != nullptr) {
-        const auto& regSystems = catalog_.SystemsInRegion(here->region);
-        for (std::size_t sysIdx : regSystems) {
-          const Body& sys = catalog_.systems[sysIdx];
-          if (sys.id == curSysId) { continue; }
-          for (std::size_t bodyIdx : catalog_.BodiesInSystem(sys.id)) {
-            const Body& body = catalog_.bodies[bodyIdx];
-            if (body.type == "origin") { continue; }
-            local.push_back(&body);
-            auto sc = state_.scanned.find(body.id);
-            if (sc == state_.scanned.end() || !sc->second) { fresh.push_back(&body); }
-          }
-        }
-      }
-      if (fresh.empty() && local.empty()) {
-        for (const Body& body : catalog_.bodies) {
-          const std::string systemId = catalog_.BodySystem(body);
-          if (systemId == curSysId || body.type == "origin") { continue; }
-          if (catalog_.FindSystem(systemId) != nullptr) { all.push_back(&body); }
-        }
-      }
-    }
-
-    // A region with only two ports needs a nearby alternative rather than the
-    // same route forever.
-    if (kind == "visit" && local.size() < 2) {
-      const Body* originRegion = here == nullptr ? nullptr : FindBodyById(here->region);
-      while (local.size() < 2 && local.size() < all.size()) {
-        const Body* nearest = nullptr;
-        double best = 1e18;
-        for (const Body* body : all) {
-          if (std::find(local.begin(), local.end(), body) != local.end()) { continue; }
-          const Body* system = catalog_.FindSystem(catalog_.BodySystem(*body));
-          if (system == nullptr) { continue; }
-          const Body* candidateRegion = FindBodyById(system->region);
-          double distance = 1e18;
-          if (originRegion != nullptr && candidateRegion != nullptr) {
-            distance = std::pow(originRegion->x - candidateRegion->x, 2) +
-                       std::pow(originRegion->y - candidateRegion->y, 2);
-          }
-          if (distance < best) { nearest = body; best = distance; }
-        }
-        if (nearest == nullptr) { break; }
-        local.push_back(nearest);
-      }
-    }
-
-    const std::vector<const Body*>& pool = !fresh.empty() ? fresh : (!local.empty() ? local : all);
-    if (pool.empty()) { return std::nullopt; }
-
-    double hash = 0;
-    for (std::size_t index = 0; index < map_.here.size(); ++index) {
-      hash += static_cast<double>(static_cast<unsigned char>(map_.here[index])) * static_cast<double>(index + 1);
-    }
-    const double slot = std::fmod(hash + state_.commissions.serial, static_cast<double>(pool.size()));
-    offer.target = pool[static_cast<std::size_t>(slot)]->id;
-  }
-
-  return offer;
-}
-
-bool Simulation::AcceptCommission(const std::string& kind) {
-  if (!state_.gameOver.empty() || state_.commissions.active.has_value()) { return false; }
-  if (!state_.docked || HerePort() == nullptr) { return false; }
-  const std::optional<Commission> offer = CommissionOffer(kind);
-  if (!offer.has_value()) { return false; }
-  state_.commissions.active = *offer;
-  PerformAction("Commission accepted");
-  return true;
-}
-
-bool Simulation::CollectCommission() {
-  if (!state_.commissions.active.has_value() || !state_.docked || HerePort() == nullptr) { return false; }
-  if (state_.gameOver.empty() == false) { return false; }
-  const Commission commission = *state_.commissions.active;
-  if (commission.progress < CommissionGoal(commission.kind)) { return false; }
-
-  state_.shiplets += commission.reward;
-  state_.commissions.completed += 1;
-  state_.commissions.serial += 1;
-  state_.commissions.active.reset();
-  PerformAction("Commission paid");
-  return true;
-}
-
-bool Simulation::AbandonCommission() {
-  if (!state_.commissions.active.has_value() || !state_.docked || HerePort() == nullptr) { return false; }
-  if (!state_.gameOver.empty()) { return false; }
-  state_.commissions.serial += 1;
-  state_.commissions.active.reset();
-  PerformAction("Commission abandoned");
-  return true;
-}
+std::vector<Good> Simulation::Market() const { return MarketAt(map_.here); }
 
 }  // namespace ship

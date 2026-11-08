@@ -120,6 +120,21 @@ struct NavDot {
   std::string cls;  // rdot / rdot-sel / rdot-faint / cdot / cdot-far ...
 };
 
+// An accepted contract's green path, projected on the scale that can show it.
+struct NavTradeRoute {
+  std::string id;
+  std::string kind;
+  std::string layer;
+  std::string fromId;
+  std::string toId;
+  std::string fromName;
+  std::string toName;
+  NavPoint from;
+  NavPoint to;
+  std::vector<NavDot> dots;
+  bool sameSystem = false;
+};
+
 struct NavChartView {
   std::string layer;  // system/sector/galaxy
   double zoom = 1;
@@ -128,6 +143,7 @@ struct NavChartView {
 
   std::vector<NavBodyView> bodies;
   std::vector<NavDot> routes;
+  std::vector<NavTradeRoute> tradeRoutes;
   std::vector<NavDot> clusters;
 
   NavPoint marker;          // the 26px green ring

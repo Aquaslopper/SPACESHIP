@@ -44,7 +44,7 @@ AwardsScreenModel BuildAwardsScreen(const Simulation& sim) {
                       Num(Owned(state.chronicle.systems)) + " / " +
                           Num(Owned(state.chronicle.regions)));
   model.summary.Field("Unique deep scans", Num(sim.ChronicleValueFor("scans")));
-  model.summary.Field("Completed commissions", Num(state.commissions.completed));
+  model.summary.Field("Completed trade contracts", Num(state.trade.completed));
 
   for (const Commendation& award : sim.World().commendations) {
     const double value = sim.ChronicleValueFor(award.metric);

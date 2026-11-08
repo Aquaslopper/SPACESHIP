@@ -192,19 +192,36 @@ struct Chronicle {
   std::map<std::string, bool> claimed;
 };
 
-struct Commission {
+// The three public trade kinds are delivery, freelance and station. Accepted
+// offers are copied here in full: a board rotation changes only future offers.
+// legacy* fields exist solely to carry unfinished pre-trade agreements across
+// a save migration; the generator never creates them.
+struct TradeContract {
+  std::string id;
   std::string kind;
+  std::string title;
   std::string origin;
-  std::string target;
-  double progress = 0;
+  std::string destination;
+  std::string goodId;
+  std::string sourceBody;
+  std::string note;
+  std::string lotId;
+  std::string status = "available";
+  int quantity = 0;
+  int fulfilled = 0;          // freelance lots actually sold at the destination
   double reward = 0;
+  double acceptedAt = 0;
+  std::string passengerId;
+  std::string legacyGoal;
+  int legacyProgress = 0;
+  bool legacyReady = false;
 };
 
-struct Commissions {
+struct TradeState {
   int version = 1;
-  double serial = 0;
+  std::vector<std::string> visited;
+  std::vector<TradeContract> contracts;
   double completed = 0;
-  std::optional<Commission> active;
 };
 
 struct Options {
@@ -257,7 +274,13 @@ struct GoodsLot {
   double vol = 0;
   double value = 0;
   bool risk = false;
-  std::string contractId;
+  std::string contractId;       // sealed delivery freight; never sellable
+  std::string goodId;           // catalogue identity for freelance matching
+  std::string originPort;       // where a market lot was bought
+  double boughtAt = 0;
+  bool marketPurchase = false;
+  bool stowed = false;          // placed by hand in the hold's visual grid
+  double stowedAt = 0;          // action count when it was last stowed
 };
 
 struct SurveyRecord {
@@ -326,6 +349,7 @@ struct InfoRow {
 
 struct Cargo {
   double capacity = 40;
+  double sortDueAt = 20;        // next sorting click that costs one action
 };
 
 struct Mess {
@@ -362,7 +386,7 @@ struct GameState {
 
   Options options = {};
   Chronicle chronicle = {};
-  Commissions commissions = {};
+  TradeState trade = {};
 
   std::map<std::string, bool> spOpen;
 
@@ -390,7 +414,6 @@ struct GameState {
   double fuelCells = 12;
   double repairKits = 3;
   double lotSerial = 0;
-  std::map<std::string, std::string> contracts;  // contract id -> active/ready/complete/failed
   std::vector<Passenger> passengers;
   std::map<std::string, bool> upgrades;
   std::map<std::string, bool> hired;

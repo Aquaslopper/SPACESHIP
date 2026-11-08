@@ -166,6 +166,7 @@ void Simulation::OnTaskDone(Task& task) {
     lot.vol = task.vol;
     lot.value = 30;
     lot.kind = "Salvage";
+    TradeSalvageProgress();
     goods_.push_back(lot);
     LogLine("Salvage secured in the cargo hold.");
     return;

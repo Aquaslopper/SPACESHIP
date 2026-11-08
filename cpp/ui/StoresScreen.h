@@ -33,9 +33,15 @@ struct StoresScreenModel {
   std::string notice;
   std::string tally;       // the hold count, or the survey count
   std::string hint;        // the salvage paragraph, cargo only
-  std::vector<StoreRowView> rows;
-  std::vector<ProgressButton> buttons;
+  std::vector<StoreRowView> rows;          // cargo: inventory sorting rows
+  std::vector<ProgressButton> buttons;    // cargo: salvage bays; science: package
   bool cargo = false;
+
+  // Cargo Hold rebuild: left inventory, middle visual volume, right context.
+  std::string contextTitle;
+  std::vector<std::string> contextNotes;
+  std::vector<StoreRowView> tradeRows;
+  CargoVisualModel visual;
 };
 
 StoresScreenModel BuildStoresScreen(const Simulation& sim, const std::string& roomId);

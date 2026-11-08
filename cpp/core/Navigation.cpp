@@ -586,8 +586,7 @@ void Simulation::RevealScan(const std::string& bodyId) {
 
   FileSurvey(*body);
   ResolveMapScanEvents(*body, first);
-  ContractProgress("scan", body->id);
-  CommissionProgress("scan", body->id);
+  TradeScanProgress(body->id);
   CheckCommendations();
 
   if (body->type == "system") {
@@ -690,7 +689,7 @@ void Simulation::FinishExtraction(const std::string& bodyId, double reservedVol)
   } else if (body->type == "belt") {
     const double val = 85.0 + static_cast<double>(h % 31ULL);
     if (addLot("Belt Salvage (" + body->name + ")", "Salvage", 3.0, val, false)) {
-      CommissionProgress("salvage", body->id);
+      TradeSalvageProgress();
       LogLine("Debris field haul at " + body->name + ": 3 m3 salvage stowed in the hold.");
     }
     if (jackpot) {
@@ -704,7 +703,7 @@ void Simulation::FinishExtraction(const std::string& bodyId, double reservedVol)
     const std::uint64_t pick = (h + static_cast<std::uint64_t>(pass)) % 4ULL;
     if (pick == 0ULL) {
       if (addLot("Derelict Salvage (" + body->name + ")", "Salvage", 3.0, 96.0, false)) {
-        CommissionProgress("salvage", body->id);
+        TradeSalvageProgress();
       }
       state_.repairKits += 1;
       LogLine("Derelict cut at " + body->name +
@@ -804,20 +803,19 @@ void Simulation::ArriveAt(const std::string& bodyId) {
     views_["galaxy"].sel = system->region;
     if (map_.layer == "sector") { state_.navTarget = system->id; }
     else if (map_.layer == "galaxy") { state_.navTarget = system->region; }
-    ContractProgress("visit", system->id);
   }
   if (map_.layer == "system") { state_.navTarget = body->id; }
 
   state_.docked = HerePort() != nullptr && HerePort()->id == body->id;
   RefreshLocationInfo();
-  ContractProgress("visit", body->id);
+  if (system != nullptr) { SettleTradeArrival(system->id); }
+  SettleTradeArrival(body->id);
 
   LogLine("Arrived at " + body->name +
           (state_.docked ? " - docked. Right-click the docked indicator to open the station" : "") + ".");
   SimRemember("Arrival", "The ship arrived at " + body->name + ".");
   ChronicleVisit(CurrentSystem());
   ResolveMapArrivalEvents(*body, system, prevRegion);
-  CommissionProgress("visit", body->id);
   CheckCommendations();
 }
 
@@ -918,7 +916,7 @@ void Simulation::ResolveMapScanEvents(const Body& body, bool firstScan) {
       lot.value = 75.0;
       lot.risk = false;
       goods_.push_back(std::move(lot));
-      CommissionProgress("salvage", body.id);
+      TradeSalvageProgress();
       LogLine("Map discovery at " + body.name + ": 3 m3 salvage cache winched into the hold.");
     } else {
       state_.repairKits += 1;
@@ -985,7 +983,7 @@ bool Simulation::Dock() {
   if (port == nullptr || state_.docked || !state_.gameOver.empty()) { return false; }
   const std::string name = port->name;
   state_.docked = true;
-  ContractProgress("visit", map_.here);
+  SettleTradeArrival(map_.here);
   for (InfoRow& row : infos_) {
     if (row.id == "location") { row.value = name + " - docked"; }
   }

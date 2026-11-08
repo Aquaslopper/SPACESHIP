@@ -612,14 +612,14 @@ int main() {
     };
     const auto marketCard = startsWith("Market - purse", "the Market card did not paint");
     const auto salesCard = startsWith("Sell cargo and survey data", "the sales card did not paint");
-    const auto boardCard = startsWith("Mission board", "the mission board card did not paint");
+    const auto boardCard = startsWith("Star-map", "the star-map card did not paint");
     const auto yardCard = startsWith("Shipyard and crew", "the shipyard card did not paint");
-    const auto tavernCard = startsWith("Tavern / Bar", "the tavern card did not paint");
+    const auto tavernCard = startsWith("Trade contracts", "the trade contracts card did not paint");
     Require(std::abs(salesCard.x - marketCard.x) < 1 && std::abs(boardCard.x - marketCard.x) < 1 &&
             std::abs(yardCard.x - marketCard.x) < 1 && std::abs(tavernCard.x - marketCard.x) < 1,
             "The five station cards are not in one column");
-    Require(salesCard.y > marketCard.y && boardCard.y > salesCard.y && yardCard.y > boardCard.y &&
-            tavernCard.y > yardCard.y,
+    Require(salesCard.y > marketCard.y && boardCard.y > salesCard.y && tavernCard.y > boardCard.y &&
+            yardCard.y > tavernCard.y,
             "The station cards are not stacked in their own order");
     const auto fuel = startsWith("Fuel cell", "the market items did not paint");
     Require(fuel.x > marketCard.x, "The market's items are not in the middle column");

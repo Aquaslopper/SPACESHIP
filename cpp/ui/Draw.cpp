@@ -12,6 +12,8 @@
 //  cockpit would be the loudest possible lie about what this port is.
 // ============================================================================
 #include "ui/Draw.h"
+
+#include "core/JsNumber.h"
 #include "core/DisplaySettings.h"
 #include "ui/First2000Styles.h"
 
@@ -1706,6 +1708,31 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     }
   }
 
+  // Contract pathfinders are deliberately green, distinct from the red ship
+  // reticle and the brown lane web. They remain until the work is finished.
+  const ::Color kTradeGreen{126, 198, 63, 255};
+  for (const NavTradeRoute& route : chart.tradeRoutes) {
+    const Vector2 from{box.x + static_cast<float>(route.from.x) * sx,
+                       box.y + static_cast<float>(route.from.y) * sy};
+    const Vector2 to{box.x + static_cast<float>(route.to.x) * sx,
+                     box.y + static_cast<float>(route.to.y) * sy};
+    if (route.sameSystem) {
+      DrawCircleLinesV(to, 18.0f * bodyScale, kTradeGreen);
+      DrawCircleLinesV(to, 22.0f * bodyScale, Fade(kTradeGreen, 0.55f));
+    } else {
+      DrawLineEx(from, to, 2.0f, Fade(kTradeGreen, 0.85f));
+      for (const NavDot& dot : route.dots) {
+        const float px = box.x + static_cast<float>(dot.x) * sx;
+        const float py = box.y + static_cast<float>(dot.y) * sy;
+        if (px >= clipMinX && px <= clipMaxX && py >= clipMinY && py <= clipMaxY) {
+          DrawCircleV(Vector2{px, py}, 2.0f, kTradeGreen);
+        }
+      }
+    }
+    DrawCircleLinesV(to, 10.0f * bodyScale, kTradeGreen);
+    DrawCircleV(to, 3.0f, kTradeGreen);
+  }
+
   const ::Color kPlayerBeaconRed{220, 38, 38, 255};
   if (chart.hasMarker) {
     const float px = box.x + static_cast<float>(chart.marker.x) * sx;
@@ -1925,7 +1952,17 @@ void ShellView::PaintNavScreen(Simulation& sim) {
         std::max(0.0f, std::min(box.Right(), px + r) - std::max(box.x, px - r)),
         std::max(0.0f, std::min(box.Bottom(), py + r) - std::max(box.y, py - r))}, "select", sim.HomeBody()->id});
   }
-  EndScissorMode();
+    for (const NavTradeRoute& route : chart.tradeRoutes) {
+    const float tx = box.x + static_cast<float>(route.to.x) * sx;
+    const float ty = box.y + static_cast<float>(route.to.y) * sy;
+    if (tx >= box.x && tx <= box.Right() && ty >= box.y && ty <= box.Bottom()) {
+      const std::string label = route.sameSystem
+                                    ? "Data exchange: " + route.toName + " (two berths in this system)"
+                                    : TradeKindLabel(route.kind) + " -> " + route.toName;
+      Text(label.c_str(), static_cast<int>(tx + 12), static_cast<int>(ty + 12), TypePx(9), kTradeGreen);
+    }
+  }
+EndScissorMode();
 
   // Match the HTA controls: a vertical zoom pair, then vertical layer buttons
   // pinned at the chart's upper-right edge.
@@ -2315,14 +2352,24 @@ bool ShellView::PressPanelRow(Simulation& sim, ScreenKind kind, const std::strin
         if (stationSelection_.category != card) {
           stationSelection_.category = card;
           stationSelection_.item.clear();
+          stationSelection_.offer.clear();
         }
         return true;
       }
       if (id.compare(0, 13, "station-item:") == 0) {
         stationSelection_.item = id.substr(13);
+        if (stationSelection_.category == "trade") { stationSelection_.offer.clear(); }
         return true;
       }
-      return PressStationAction(sim, id, "");
+      if (id.compare(0, 15, "station-offer:") == 0) {
+        stationSelection_.offer = id.substr(15);
+        return true;
+      }
+      const bool pressed = PressStationAction(sim, id, "");
+      if (pressed && id.compare(0, 13, "starmap-open:") == 0) {
+        OpenTask(sim, "nav", "main", true);
+      }
+      return pressed;
     }
     case ScreenKind::Cargo:
     case ScreenKind::Science: return PressStoresAction(sim, id, "");
@@ -2337,6 +2384,65 @@ bool ShellView::PressPanelRow(Simulation& sim, ScreenKind kind, const std::strin
       return PressWikiAction(sim, verb, arg, &wiki_);
     }
     default: return false;
+  }
+}
+
+float ShellView::CargoVisualHeight(const CargoVisualModel& model) const {
+  return 112.0f + static_cast<float>(model.lots.size()) * theme_.LineHeight() + 16.0f;
+}
+
+void ShellView::PaintCargoVisual(const CargoVisualModel& model, const Area& box) {
+  const Palette& p = theme_.palette;
+  DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel2));
+  DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                     static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.border));
+
+  // One cell per cubic metre while the hold is small; larger holds scale the
+  // cell volume so the whole capacity still fits the same fixed grid.
+  const float innerX = box.x + 8.0f;
+  const float innerW = std::max(1.0f, box.w - 16.0f);
+  const int cells = std::max(1, std::min(80, static_cast<int>(std::ceil(model.capacity))));
+  const double perCell = model.capacity / static_cast<double>(cells);
+  const float cellSize = 12.0f;
+  const float cellGap = 3.0f;
+  const int cols = std::max(1, static_cast<int>((innerW + cellGap) / (cellSize + cellGap)));
+  double stowed = 0;
+  double loose = 0;
+  for (const CargoVisualLot& lot : model.lots) {
+    if (lot.stowed) { stowed += lot.vol; } else { loose += lot.vol; }
+  }
+  const int stowedCells = std::min(cells, static_cast<int>(std::floor(stowed / std::max(0.001, perCell))));
+  const int looseCells = std::min(cells - stowedCells,
+                                static_cast<int>(std::floor(loose / std::max(0.001, perCell))));
+  const int reservedCells = std::min(cells - stowedCells - looseCells,
+                                     static_cast<int>(std::floor(model.reserved / std::max(0.001, perCell))));
+  for (int i = 0; i < cells; ++i) {
+    const int cx = i % cols;
+    const int cy = i / cols;
+    const float x = innerX + static_cast<float>(cx) * (cellSize + cellGap);
+    const float y = box.y + 8.0f + static_cast<float>(cy) * (cellSize + cellGap);
+    Rgb fill = p.panel3;
+    if (i < stowedCells) { fill = p.sage; }
+    else if (i < stowedCells + looseCells) { fill = p.amber; }
+    else if (i < stowedCells + looseCells + reservedCells) { fill = p.borderDark; }
+    DrawRectangle(static_cast<int>(x), static_cast<int>(y),
+                  static_cast<int>(cellSize), static_cast<int>(cellSize), ToRay(fill));
+    DrawRectangleLines(static_cast<int>(x), static_cast<int>(y),
+                       static_cast<int>(cellSize), static_cast<int>(cellSize), ToRay(p.border));
+  }
+
+  float y = box.y + 92.0f;
+  Text("Stowed / loose / reserved / free", static_cast<int>(innerX), static_cast<int>(y),
+       TypePx(9), ToRay(p.muted));
+  y += theme_.LineHeight();
+  for (const CargoVisualLot& lot : model.lots) {
+    const std::string line = lot.label + " (" + js::NumToString(lot.vol) + " m3) - " +
+                             (lot.stowed ? "stowed" : "loose") +
+                             (lot.contract ? ", contract" : "");
+    Text(FitText(line, innerW, TypePx(10)).c_str(), static_cast<int>(innerX),
+         static_cast<int>(y), TypePx(10), ToRay(lot.stowed ? p.ink : p.muted));
+    y += theme_.LineHeight();
   }
 }
 
@@ -2882,8 +2988,8 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
     const NavPanel& panel = screen.panels[i];
     const float noteH = MeasurePanelHeight(panel, columnW);
 
-    // The station's panels contain their rows, as in the HTA, and the sales /
-    // board and shipyard / tavern panels stack in their shared columns.
+    // Grouped panels contain their rows; the Cargo Hold also reserves a fixed
+    // visual volume block in its middle column.
     float rowsH = 0;
     if (i < screen.panelRows.size()) {
       for (const CommandRowView& row : screen.panelRows[i]) {
@@ -2896,18 +3002,21 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
     // it; never make the lower text unreachable. Its sticky offset must not
     // grow the document's scroll extent or its click coordinates will drift.
     const bool stickyWiki = panelsKind_ == ScreenKind::Wiki && panel.id == "wiki-article";
-    const float panelHeight = noteH + 6.0f + rowsH;
+    const bool cargoView = panelsKind_ == ScreenKind::Cargo && panel.id == "cargo-visual" &&
+                           screen.cargoVisual.enabled;
+    const float cargoH = cargoView ? CargoVisualHeight(screen.cargoVisual) : 0.0f;
+    const float panelHeight = noteH + 6.0f + rowsH + cargoH;
     const float anchor = std::min(layout_.content.y + 8.0f,
                                   layout_.content.Bottom() - 8.0f - panelHeight);
     const float stickyShift = stickyWiki ? std::max(0.0f, contentScroll_ + anchor - originalTop) : 0.0f;
     const float panelTop = originalTop + stickyShift;
     const bool tracked = paintingContent_;
     if (stickyWiki) { paintingContent_ = false; }
-    if (grouped && rowsH > 0) {
+    if (grouped && (rowsH > 0 || cargoView)) {
       DrawRectangle(static_cast<int>(x), static_cast<int>(panelTop), static_cast<int>(columnW),
-                    static_cast<int>(noteH + rowsH + 12), ToRay(p.panel));
+                    static_cast<int>(noteH + rowsH + cargoH + 12), ToRay(p.panel));
       DrawRectangleLines(static_cast<int>(x), static_cast<int>(panelTop), static_cast<int>(columnW),
-                         static_cast<int>(noteH + rowsH + 12), ToRay(p.border));
+                         static_cast<int>(noteH + rowsH + cargoH + 12), ToRay(p.border));
     }
     PaintPanel(panel, Area{x, panelTop, columnW, noteH});
 
@@ -2989,7 +3098,11 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
         y += rowH + 3.0f;
       }
     }
-    if (grouped && rowsH > 0) { y += 6.0f; }
+    if (cargoView) {
+      PaintCargoVisual(screen.cargoVisual, Area{x + 8.0f, y, columnW - 16.0f, cargoH});
+      y += cargoH;
+    }
+    if (grouped && (rowsH > 0 || cargoView)) { y += 6.0f; }
     columnY[column] = y - stickyShift + gap;
     panelsBottom = std::max(panelsBottom, y - stickyShift);
     paintingContent_ = tracked;

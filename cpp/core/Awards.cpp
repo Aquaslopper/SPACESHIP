@@ -34,21 +34,16 @@ double Simulation::ChronicleValue(const std::string& metric) const {
     }
     return count;
   }
-  if (metric == "contracts") {
+  if (metric == "contracts") { return state_.trade.completed; }
+  if (metric == "station-data") {
     double count = 0;
-    for (const Contract& contract : catalog_.contracts) {
-      auto it = state_.contracts.find(contract.id);
-      if (it != state_.contracts.end() && it->second == "complete") { count += 1; }
+    for (const TradeContract& contract : state_.trade.contracts) {
+      if (contract.kind == "station" && contract.status == "complete") { count += 1; }
     }
     return count;
   }
-  if (metric == "commissions") { return state_.commissions.completed; }
+  if (metric == "berth") { return state_.trade.visited.empty() ? 0.0 : 1.0; }
   if (metric == "actions") { return actionCounter_; }
-  if (metric == "berth") {
-    auto it = state_.contracts.find("arrival");
-    const std::string value = it == state_.contracts.end() ? std::string() : it->second;
-    return (value == "ready" || value == "complete") ? 1.0 : 0.0;
-  }
   if (metric == "signal") {
     return (state_.sim.signal == "preserved" || state_.sim.signal == "sold") ? 1.0 : 0.0;
   }

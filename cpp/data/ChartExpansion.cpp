@@ -645,13 +645,14 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
         station.klass = "Orbital outpost - " + profile + " berth";
         station.details.emplace_back("System", system.name);
         station.details.emplace_back("Region", regionName);
-        station.details.emplace_back("Services", "Dock, market, refit, commissions");
+        station.details.emplace_back("Services", "Dock, market, refit, trade contracts");
         station.scan = {"Docking collars and fuel lines report green across the truss."};
         station.scanLocked = {"Harbour manifest archive"};
 
         Port port;
         port.id = portId;
         port.name = portName;
+        port.profile = profile;
         port.tip = "Frontier berth in " + system.name + "." +
                    (hint.empty() ? std::string() : " " + hint);
         const auto priceIt = catalog.portPrices.find(profile);
@@ -704,6 +705,129 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
     if (!hasNavigable) {
       system.details.emplace_back("Navigable", std::to_string(localCount) + " local destinations");
     }
+  }
+}
+
+namespace {
+
+bool SuppliesKind(const Body& body, const std::string& kind) {
+  const std::string subtype = body.subtype;
+  if (kind == "Water") {
+    return subtype == "ice" || subtype == "ocean" || body.type == "moon" || body.type == "station";
+  }
+  if (kind == "Bulk metal") {
+    return subtype == "rock" || body.type == "belt" || body.type == "moon";
+  }
+  if (kind == "Components") {
+    return subtype == "rock" || subtype == "gas" || body.type == "station";
+  }
+  if (kind == "Perishable") { return subtype == "ocean"; }
+  if (kind == "Medicine") {
+    return subtype == "ice" || subtype == "ocean" || body.type == "station";
+  }
+  if (kind == "Relics") {
+    return body.type == "site" || body.type == "belt" || subtype == "rock";
+  }
+  if (kind == "Unregistered") {
+    return body.type == "site" || body.type == "belt" || subtype == "gas";
+  }
+  return false;
+}
+
+std::string PageReading(const Body& body) {
+  std::string out = body.klass;
+  for (const std::string& line : body.scan) {
+    if (!line.empty()) { out += (out.empty() ? "" : " ") + line; }
+  }
+  return out;
+}
+
+std::vector<std::pair<std::string, double>> PriceBasket(const Port& port) {
+  return {port.prices.begin(), port.prices.end()};
+}
+
+}  // namespace
+
+void PopulateStationKnowledge(Catalog& catalog) {
+  catalog.RebuildIndex();
+  std::set<std::vector<std::pair<std::string, double>>> baskets;
+  for (Port& port : catalog.ports) {
+    const Body* body = catalog.FindBody(port.id);
+    if (body == nullptr) { continue; }
+    const std::string systemId = catalog.BodySystem(*body);
+    const Body* system = catalog.FindSystem(systemId);
+    if (system == nullptr) { continue; }
+
+    port.atlas = StationAtlas{};
+    port.atlas.systemId = systemId;
+    port.atlas.systemName = system->name;
+    port.atlas.systemReading = PageReading(*system);
+    port.atlas.systemDetails = system->details;
+    std::vector<const Body*> local;
+    for (std::size_t index : catalog.BodiesInSystem(systemId)) {
+      const Body& world = catalog.bodies[index];
+      local.push_back(&world);
+      if (world.type == "planet" || world.type == "moon") {
+        PlanetPage page;
+        page.id = world.id;
+        page.name = world.name;
+        page.kind = world.klass.empty() ? world.type : world.klass;
+        page.reading = PageReading(world);
+        page.details = world.details;
+        port.atlas.planets.push_back(std::move(page));
+      }
+    }
+
+    if (port.profile.empty()) {
+      port.profile = "transit";
+      for (const auto& profile : catalog.portPrices) {
+        if (profile.second == port.prices) { port.profile = profile.first; break; }
+      }
+    }
+    const auto profileIt = catalog.portPrices.find(port.profile);
+    const std::map<std::string, double> base =
+        profileIt == catalog.portPrices.end() ? port.prices : profileIt->second;
+    const std::uint64_t salt = HashOf(port.id + "|" + systemId);
+    port.market.clear();
+    port.sources.clear();
+    port.prices.clear();
+
+    struct Stock { const Good* good; const Body* source; int abundance; std::uint64_t rank; };
+    std::vector<Stock> stock;
+    for (const Good& good : catalog.goods) {
+      std::vector<const Body*> matches;
+      for (const Body* world : local) {
+        if (SuppliesKind(*world, good.kind)) { matches.push_back(world); }
+      }
+      const auto price = base.find(good.kind);
+      const double opinion = price == base.end() ? 1.0 : price->second;
+      const double supply = matches.empty() ? 1.28 : 0.86 + 0.12 / static_cast<double>(matches.size());
+      const double berth = 0.94 + static_cast<double>(salt % 13) * 0.01;
+      port.prices[good.kind] = std::round(std::clamp(opinion * supply * berth, 0.4, 2.2) * 100.0) / 100.0;
+      if (matches.empty()) { continue; }
+      const Body* source = matches[(salt / 17) % matches.size()];
+      stock.push_back({&good, source, static_cast<int>(matches.size()), HashOf(port.id + good.id)});
+    }
+    std::sort(stock.begin(), stock.end(), [](const Stock& a, const Stock& b) {
+      if (a.good->kind == "Water") { return true; }
+      if (b.good->kind == "Water") { return false; }
+      if (a.abundance != b.abundance) { return a.abundance > b.abundance; }
+      return a.rank < b.rank;
+    });
+    const std::size_t shelf = std::min(stock.size(), static_cast<std::size_t>(4 + salt % 3));
+    for (std::size_t i = 0; i < shelf; ++i) {
+      port.market.push_back(stock[i].good->id);
+      port.sources.push_back({stock[i].good->id, stock[i].source->id, PageReading(*stock[i].source)});
+    }
+    std::sort(port.market.begin(), port.market.end());
+    // A rounded basket can collide even when its bodies differ. Nudge one
+    // locally stocked kind by a hundredth until this berth has its own basket.
+    while (baskets.count(PriceBasket(port)) != 0 && !port.market.empty()) {
+      const Good* good = catalog.FindGood(port.market[salt % port.market.size()]);
+      if (good == nullptr) { break; }
+      port.prices[good->kind] = std::round((port.prices[good->kind] + 0.01) * 100.0) / 100.0;
+    }
+    baskets.insert(PriceBasket(port));
   }
 }
 
@@ -1008,6 +1132,7 @@ void ExpandChart(Catalog& catalog) {
   PlaceGalaxyDots(catalog);
   EntangleGalaxy(catalog);
   RegisterMapIncidents(catalog);
+  PopulateStationKnowledge(catalog);
   if (std::find(catalog.taskTypes.begin(), catalog.taskTypes.end(), "extract") ==
       catalog.taskTypes.end()) {
     catalog.taskTypes.push_back("extract");

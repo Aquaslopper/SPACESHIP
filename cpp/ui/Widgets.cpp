@@ -661,46 +661,161 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       screen.panelRows.push_back(itemRows);
       screen.panelRowIds.push_back(itemIds);
 
-      // ---- right: the inspector, and the one commit button ----------------
+      // ---- right: the inspector, or the chosen trade kind's offer board ----
       const StationRow* item =
           open == nullptr ? nullptr : FindStationItem(model, picked.category, picked.item);
       NavPanel inspector;
       inspector.id = "station-inspector";
-      inspector.title = item == nullptr ? "Inspector" : "Inspector and commit";
-      if (item == nullptr) {
-        inspector.Dim("Pick an item in the middle column to read it and commit.");
-      } else {
-        inspector.Field("Item", item->label);
-        inspector.Field("Cost", item->free ? "Shiplets only" : "One action");
-        for (const std::string& line : item->details) { inspector.Note(line); }
-      }
-      screen.panels.push_back(inspector);
       std::vector<CommandRowView> commitRows;
       std::vector<std::string> commitIds;
-      if (item != nullptr) {
-        CommandRowView view;
-        view.label = item->commit.empty() ? item->label : item->commit;
-        view.cost = item->cost;
-        view.hideCost = true;            // one simple button, no badge
-        view.title = item->label;
-        view.confirm = item->confirm;
-        view.enabled = item->enabled;
-        view.live = item->enabled;
-        commitRows.push_back(view);
-        commitIds.push_back(item->id);
+      if (picked.category == "trade") {
+        inspector.title = model.offers.title;
+        inspector.Dim(model.offers.badge);
+        for (const std::string& note : model.offers.notes) { inspector.Note(note); }
+        const StationRow* chosen = nullptr;
+        for (const StationRow& offer : model.offers.rows) {
+          if (offer.id == picked.offer) { chosen = &offer; break; }
+        }
+        if (chosen != nullptr) {
+          inspector.Field("Selected offer", chosen->label);
+          for (const std::string& line : chosen->details) { inspector.Note(line); }
+        }
+        for (const StationRow& offer : model.offers.rows) {
+          CommandRowView view;
+          view.label = offer.label;
+          view.title = offer.label;
+          view.selected = offer.id == picked.offer;
+          if (picked.item == "station") {
+            // Picking a visited station is itself the one-click commitment.
+            view.plain = false;
+            view.enabled = offer.enabled;
+            view.live = offer.enabled;
+            view.cost = offer.cost;
+            commitIds.push_back("trade-accept:" + offer.id);
+          } else {
+            view.plain = true;
+            view.enabled = true;
+            view.live = offer.enabled;
+            view.hideCost = true;
+            commitIds.push_back("station-offer:" + offer.id);
+          }
+          commitRows.push_back(view);
+        }
+        if (picked.item != "station" && !model.tradeCommit.id.empty()) {
+          CommandRowView view;
+          view.label = model.tradeCommit.commit;
+          view.cost = model.tradeCommit.cost;
+          view.hideCost = true;
+          view.enabled = model.tradeCommit.enabled;
+          view.live = model.tradeCommit.enabled;
+          commitRows.push_back(view);
+          commitIds.push_back("trade-accept:" + model.tradeCommit.id);
+        }
+      } else {
+        inspector.title = item == nullptr ? "Inspector" : "Inspector and commit";
+        if (item == nullptr) {
+          inspector.Dim("Pick an item in the middle column to read it and commit.");
+        } else {
+          inspector.Field("Item", item->label);
+          inspector.Field("Cost", item->free ? "Shiplets only / free" : "One action");
+          for (const std::string& line : item->details) { inspector.Note(line); }
+        }
+        const StationRow* commit = picked.category == "starmap" ? &model.tradeCommit : item;
+        if (commit != nullptr && !commit->id.empty()) {
+          CommandRowView view;
+          view.label = commit->commit.empty() ? commit->label : commit->commit;
+          view.cost = commit->cost;
+          view.hideCost = true;
+          view.title = commit->label;
+          view.confirm = commit->confirm;
+          view.enabled = commit->enabled;
+          view.live = commit->enabled;
+          commitRows.push_back(view);
+          commitIds.push_back(commit->id);
+        }
       }
+      screen.panels.push_back(inspector);
       screen.panelRows.push_back(commitRows);
       screen.panelRowIds.push_back(commitIds);
       return screen;
     }
-    case ScreenKind::Cargo:
+    case ScreenKind::Cargo: {
+      const StoresScreenModel stores = BuildStoresScreen(sim, "cargo");
+      TaskScreenModel screen;
+      screen.head = stores.head;
+      screen.panelColumns = {0, 1, 2};
+      screen.cargoVisual = stores.visual;
+
+      const auto addRows = [&](const std::vector<StoreRowView>& source,
+                               std::vector<CommandRowView>& rows,
+                               std::vector<std::string>& ids) {
+        for (const StoreRowView& row : source) {
+          CommandRowView view;
+          view.label = row.label;
+          view.cost = row.cost;
+          view.displayCost = row.cost.empty() ? "1 action" : row.cost;
+          view.enabled = row.enabled;
+          view.live = row.enabled;
+          view.confirm = row.confirm;
+          view.title = row.note;
+          view.reading = row.readingOnly;
+          if (!row.readingOnly) {
+            BindCommandCooldown(sim, view, ActionCooldownKey(sim, "press:stores:" + row.id + ":"),
+                                ActionCooldownCategory(row.id + " "));
+          }
+          rows.push_back(view);
+          ids.push_back(row.readingOnly ? std::string() : row.id);
+        }
+      };
+
+      NavPanel inventory;
+      inventory.id = "cargo-inventory";
+      inventory.title = "Cargo Inventory";
+      inventory.Note(stores.notice);
+      inventory.Dim(stores.tally);
+      inventory.Dim(sim.CargoSortDue() ? "Sorting tidy due: the next sort click costs one action."
+                                       : "Sorting is free until the next paid tidy.");
+      screen.panels.push_back(inventory);
+      std::vector<CommandRowView> inventoryRows;
+      std::vector<std::string> inventoryIds;
+      addRows(stores.rows, inventoryRows, inventoryIds);
+      screen.panelRows.push_back(inventoryRows);
+      screen.panelRowIds.push_back(inventoryIds);
+
+      NavPanel visual;
+      visual.id = "cargo-visual";
+      visual.title = "Cargo Hold View";
+      visual.Field("Capacity", Num(stores.visual.capacity) + " m3");
+      visual.Field("Used", Num(stores.visual.used) + " m3");
+      visual.Field("Reserved", Num(stores.visual.reserved) + " m3");
+      visual.Dim("Expansions at the shipyard grow this grid. Click inventory lots to stow them.");
+      screen.panels.push_back(visual);
+      screen.panelRows.push_back({});
+      screen.panelRowIds.push_back({});
+
+      NavPanel context;
+      context.id = "cargo-context";
+      context.title = stores.contextTitle;
+      for (const std::string& note : stores.contextNotes) { context.Note(note); }
+      screen.panels.push_back(context);
+      std::vector<CommandRowView> contextRows;
+      std::vector<std::string> contextIds;
+      addRows(stores.tradeRows, contextRows, contextIds);
+      screen.panelRows.push_back(contextRows);
+      screen.panelRowIds.push_back(contextIds);
+
+      screen.progress = stores.buttons;
+      screen.bandNote = stores.hint;
+      screen.hasStage = false;
+      return screen;
+    }
     case ScreenKind::Science: {
-      const StoresScreenModel stores = BuildStoresScreen(sim, tab.kind == "room" ? tab.id : "cargo");
+      const StoresScreenModel stores = BuildStoresScreen(sim, "science");
       TaskScreenModel screen;
       screen.head = stores.head;
       NavPanel panel;
       panel.id = "stores-panel";
-      panel.title = stores.cargo ? "Cargo manifest" : "Survey records";
+      panel.title = "Survey records";
       panel.Note(stores.notice);
       if (!stores.hint.empty()) { panel.Note(stores.hint); }
       panel.Dim(stores.tally);

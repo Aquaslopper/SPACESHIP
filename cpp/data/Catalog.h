@@ -167,6 +167,7 @@ class Catalog {
   Rules rules;
 
   const Port* FindPort(const std::string& id) const;
+  const Good* FindGood(const std::string& id) const;
 
  private:
   void EnsureIndex() const;

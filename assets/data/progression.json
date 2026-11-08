@@ -11,7 +11,7 @@
       "title": "First Breath"
     },
     {
-      "detail": "Reach Tolme Anchorage.",
+      "detail": "Visit any station.",
       "goal": 1,
       "id": "berth",
       "metric": "berth",
@@ -101,7 +101,7 @@
       "title": "Crisis Hand"
     },
     {
-      "detail": "Complete and collect three regular contracts.",
+      "detail": "Finish three trade contracts.",
       "goal": 3,
       "id": "courier",
       "metric": "contracts",
@@ -111,10 +111,10 @@
       "title": "Licensed Courier"
     },
     {
-      "detail": "Complete and collect three repeatable commissions.",
+      "detail": "Finish three station-to-station data exchanges.",
       "goal": 3,
       "id": "commission",
-      "metric": "commissions",
+      "metric": "station-data",
       "reward": {
         "fuel": 2
       },
@@ -142,12 +142,12 @@
       "title": "Signal Witness"
     }
   ],
-  "comment": "Contracts, incidents, ship projects, commendations, commissions and world history.",
+  "comment": "Legacy contract definitions retained for save migration, plus incidents, ship projects, commendations and world history.",
   "contracts": [
     {
       "goal": "visit",
       "id": "arrival",
-      "note": "Reach Tolme Anchorage and report to its mission board.",
+      "note": "Reach Tolme Anchorage and report to its trade counter.",
       "reward": 120,
       "target": "tolme",
       "title": "A first berth"

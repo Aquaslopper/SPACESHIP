@@ -226,6 +226,26 @@ struct Vignette {
   bool squareCore = false;  // the reactor's core is a rotated square
 };
 
+// The Cargo Hold's middle column: a capacity grid and the lots placed in it.
+// Sorting is manual, so a lot only joins the stowed grid after its inventory
+// row has been clicked; loose cargo still counts against the hold's volume.
+struct CargoVisualLot {
+  std::string id;
+  std::string label;
+  std::string kind;
+  double vol = 0;
+  bool stowed = false;
+  bool contract = false;
+};
+
+struct CargoVisualModel {
+  bool enabled = false;
+  double capacity = 0;
+  double used = 0;
+  double reserved = 0;
+  std::vector<CargoVisualLot> lots;
+};
+
 struct TaskScreenModel {
   TaskHead head;
   std::vector<NavPanel> left;
@@ -251,6 +271,7 @@ struct TaskScreenModel {
   std::vector<int> panelColumns;
   std::vector<std::vector<CommandRowView>> panelRows;
   std::vector<std::vector<std::string>> panelRowIds;
+  CargoVisualModel cargoVisual;
 };
 
 // The generic path: a described target that owns no bespoke screen.

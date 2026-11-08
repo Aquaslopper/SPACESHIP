@@ -1,12 +1,32 @@
 // ============================================================================
-//  StoresScreen.cpp — cargo manifest and survey records.
+//  StoresScreen.cpp — the Cargo Hold and the science room.
+//  ---------------------------------------------------------------------------
+//  The Cargo Hold is the trade operation's final desk: inventory on the left,
+//  the hold's real volume in the middle, and the contextual unload/sell/finalize
+//  window on the right. Arrival only enables finalization; the click here is
+//  the commitment. The science room still files and packages survey records.
 // ============================================================================
 #include "ui/StoresScreen.h"
 
 #include "core/JsNumber.h"
 #include "ui/Widgets.h"
 
+#include <set>
+
 namespace ship {
+
+namespace {
+
+std::string Num(double value) { return js::NumToString(value); }
+
+StoreRowView Reading(const std::string& label) {
+  StoreRowView row;
+  row.label = label;
+  row.readingOnly = true;
+  return row;
+}
+
+}  // namespace
 
 StoresScreenModel BuildStoresScreen(const Simulation& sim, const std::string& roomId) {
   StoresScreenModel model;
@@ -14,77 +34,143 @@ StoresScreenModel BuildStoresScreen(const Simulation& sim, const std::string& ro
 
   model.head.kind = "ROOM";
   model.head.title = model.cargo ? "Cargo Hold" : "Science Room";
-  model.head.sub = model.cargo ? "Freight, lots and the space they take"
+  model.head.sub = model.cargo ? "Inventory, hold volume and trade finalization"
                                : "Survey data, filed and packaged";
 
   if (model.cargo) {
-    model.notice = js::NumToString(sim.CargoUsed()) + " of " +
-                   js::NumToString(sim.CargoStore().capacity) + " m3 used; " +
-                   js::NumToString(sim.CargoReserved()) +
-                   " m3 reserved. Sell lots at a station.";
-    model.tally = js::NumToString(sim.Goods().size()) + " lots aboard.";
+    const double used = sim.CargoUsed();
+    const double reserved = sim.CargoReserved();
+    const double capacity = sim.CargoStore().capacity;
+    model.notice = Num(used) + " of " + Num(capacity) + " m3 used; " + Num(reserved) +
+                   " m3 reserved.";
+    model.tally = Num(sim.Goods().size()) + " lots aboard.";
     model.hint =
-        "During a crossing, each bay can recover a small salvage lot. Starting costs one "
-        "action and 4% energy; recovery takes two more actions and reserves 3 m3.";
+        "Click an inventory lot to stow it in the hold view. Sorting is free until the "
+        "hold asks for a paid tidy; stowed cargo can work loose again and need repeating. "
+        "During a crossing, each bay can recover salvage: one action and 4% energy to "
+        "start, two more actions of work, 3 m3 reserved.";
 
-    // Each bay can recover a small salvage lot DURING a crossing.
+    model.visual.enabled = true;
+    model.visual.capacity = capacity;
+    model.visual.used = used;
+    model.visual.reserved = reserved;
+
+    // ---- left: every lot, sorted only by hand -----------------------------
+    if (sim.Goods().empty()) { model.rows.push_back(Reading("Nothing stored.")); }
+    std::size_t stowedCount = 0;
+    for (const GoodsLot& lot : sim.Goods()) {
+      const bool stowed = sim.CargoLotStowed(lot);
+      if (stowed) { ++stowedCount; }
+      CargoVisualLot block;
+      block.id = lot.id;
+      block.label = lot.name;
+      block.kind = lot.kind;
+      block.vol = lot.vol;
+      block.stowed = stowed;
+      block.contract = !lot.contractId.empty();
+      model.visual.lots.push_back(block);
+
+      StoreRowView row;
+      row.id = "cargo-sort:" + lot.id;
+      row.label = (stowed ? "Stowed: " : "Sort: ") + lot.name + " (" + Num(lot.vol) + " m3)";
+      row.cost = stowed ? "done" : (sim.CargoSortDue() ? "1 action" : "0 actions");
+      row.note = lot.kind + (lot.contractId.empty() ? std::string() : std::string(" - contract freight"));
+      row.enabled = !stowed;
+      model.rows.push_back(row);
+    }
+    model.tally += " " + Num(stowedCount) + " stowed; " +
+                   Num(sim.Goods().size() - stowedCount) + " loose.";
+
+    // ---- right: the trade desk, or plain unloading ------------------------
+    const Port* port = sim.World().FindPort(sim.Map().here);
+    const bool docked = sim.State().docked && port != nullptr && port->id == sim.Map().here;
+    bool tradeContext = false;
+    for (const TradeContract& contract : sim.ActiveTradeContracts()) {
+      if (!sim.TradeReadyHere(contract)) { continue; }
+      tradeContext = true;
+      StoreRowView row;
+      row.id = "trade-finalize:" + contract.id;
+      row.label = (contract.kind == "station" ? "Exchange data and cash in: "
+                                              : "Unload delivery and cash in: ") +
+                  contract.title + " (+" + Num(contract.reward) + " sh)";
+      row.cost = "1 action";
+      row.note = TradeDescription(sim, contract);
+      row.enabled = true;
+      model.tradeRows.push_back(row);
+    }
+
+    std::set<std::string> offered;
+    for (const TradeContract& contract : sim.ActiveTradeContracts("freelance")) {
+      if (!docked || contract.destination != sim.Map().here) { continue; }
+      bool option = false;
+      for (const GoodsLot& lot : sim.Goods()) {
+        if (!sim.LotSatisfiesFreelance(lot, contract) || offered.count(lot.id) != 0) { continue; }
+        offered.insert(lot.id);
+        option = true;
+        tradeContext = true;
+        StoreRowView row;
+        row.id = "cargo-sell:" + lot.id;
+        row.label = "Sell " + lot.name + " - " + Num(sim.LotPrice(lot)) + " sh";
+        row.cost = "1 action";
+        row.note = contract.title + ": " + Num(contract.fulfilled) + "/" + Num(contract.quantity) +
+                   " lots sold; final sale adds " + Num(contract.reward) + " sh.";
+        row.enabled = true;
+        model.tradeRows.push_back(row);
+      }
+      if (!option) {
+        model.contextNotes.push_back("Freelance request here: " + TradeDescription(sim, contract) +
+                                     ". Bring lots bought at " + contract.origin +
+                                     " after acceptance; old stock does not count.");
+      }
+    }
+
+    model.contextTitle = tradeContext ? "Trade finalization" : "Unload cargo";
+    if (!tradeContext) {
+      model.contextNotes.push_back(docked
+          ? "No trade finalization at this berth. Sell cargo at the station, or unload unwanted lots into space."
+          : "No trade finalization in flight. Unwanted cargo can be unloaded into space.");
+    }
+    if (!sim.Goods().empty()) {
+      model.tradeRows.push_back(Reading("Unload cargo into space"));
+      for (const GoodsLot& lot : sim.Goods()) {
+        StoreRowView row;
+        row.id = "jettison:" + lot.id;
+        row.label = "Unload " + lot.name + " (" + Num(lot.vol) + " m3)";
+        row.cost = "1 action";
+        row.confirm = lot.contractId.empty()
+                         ? "Unload " + lot.name + " into space?"
+                         : "Unload " + lot.name + " and fail its contract?";
+        if (!lot.contractId.empty()) { row.note = "Contract cargo: unloading it fails the contract."; }
+        row.enabled = true;
+        model.tradeRows.push_back(row);
+      }
+    } else {
+      model.tradeRows.push_back(Reading("Nothing to unload."));
+    }
+
+    // Salvage bays remain commitments in the action band, not inventory rows.
     const Task* trip = sim.FindOngoing("travel");
     const bool crossing = trip != nullptr && trip->state == "running";
     for (int bay = 0; bay < 3; ++bay) {
-      StoreRowView row;
-      row.id = "salvage:" + js::NumToString(bay);
-      row.label = "Recover route salvage - bay " + js::NumToString(bay + 1);
-      row.cost = "1 action + 2 work";
-      row.note =
-          "Starting costs one action and 4% energy; recovery takes two more actions "
-          "and reserves 3 m3.";
-      row.enabled = crossing && sim.StatValue("energy") > 4 &&
-                    sim.CargoUsed() + sim.CargoReserved() + 3 <= sim.CargoStore().capacity &&
-                    sim.FindOngoing("salvage-" + js::NumToString(bay)) == nullptr;
-      row.progress = true;
-      model.rows.push_back(row);
+      const std::string id = "salvage-" + Num(bay);
+      const bool enabled = crossing && sim.StatValue("energy") > 4 &&
+                           used + reserved + 3 <= capacity && sim.FindOngoing(id) == nullptr;
       model.buttons.push_back(BuildProgressButton(
-          sim, "salvage-" + js::NumToString(bay), row.label, row.enabled));
-    }
-
-    if (sim.Goods().empty()) {
-      StoreRowView row;
-      row.label = "Nothing stored.";
-      row.readingOnly = true;
-      model.rows.push_back(row);
-    }
-    for (const GoodsLot& lot : sim.Goods()) {
-      StoreRowView row;
-      row.id = "jettison:" + lot.id;
-      row.label = "Jettison " + lot.name + " (" + js::NumToString(lot.vol) + " m3)";
-      row.cost = "1 action";
-      row.confirm = lot.contractId.empty()
-                       ? "Jettison " + lot.name + "?"
-                       : "Jettison " + lot.name + " and fail its contract?";
-      if (!lot.contractId.empty()) {
-        row.note = "Contract cargo: jettisoning fails the contract.";
-      }
-      row.enabled = true;
-      model.rows.push_back(row);
+          sim, id, "Recover route salvage - bay " + Num(bay + 1), enabled));
     }
   } else {
     model.notice =
         "Deep scans are filed here. Packaging costs one action, takes two more, and "
         "adds value.";
-    model.tally = js::NumToString(sim.Survey().size()) + " records filed.";
-    if (sim.Survey().empty()) {
-      StoreRowView row;
-      row.label = "Nothing stored.";
-      row.readingOnly = true;
-      model.rows.push_back(row);
-    }
+    model.tally = Num(sim.Survey().size()) + " records filed.";
+    if (sim.Survey().empty()) { model.rows.push_back(Reading("Nothing stored.")); }
     for (const SurveyRecord& record : sim.Survey()) {
       StoreRowView row;
       row.id = "package:" + record.id;
       row.packaged = record.state == "packaged";
       row.cost = row.packaged ? "done" : "1 action + 2 work";
       row.label = row.packaged
-                      ? "Packaged: " + record.name + " (" + js::NumToString(record.value) + " sh)"
+                      ? "Packaged: " + record.name + " (" + Num(record.value) + " sh)"
                       : "Package: " + record.name + " (1 action + 2 work)";
       row.enabled = !row.packaged;
       row.progress = true;
@@ -98,27 +184,20 @@ StoresScreenModel BuildStoresScreen(const Simulation& sim, const std::string& ro
 
 namespace {
 bool PressStoresActionRaw(Simulation& sim, const std::string& action,
-                       const std::string& arg) {
-  if (action.compare(0, 9, "jettison:") == 0) return sim.Jettison(action.substr(9));
-  if (action.compare(0, 8, "salvage:") == 0) {
-    return sim.StartSalvage(std::stoi(action.substr(8)));
-  }
-  if (action.compare(0, 8, "package:") == 0) {
-    return sim.PackageSurvey(action.substr(8));
-  }
+                          const std::string& arg) {
+  if (action.rfind("cargo-sort:", 0) == 0) { return sim.SortCargo(action.substr(11)); }
+  if (action.rfind("trade-finalize:", 0) == 0) { return sim.FinalizeTrade(action.substr(15)); }
+  if (action.rfind("cargo-sell:", 0) == 0) { return sim.SellGood(action.substr(11)); }
+  if (action.rfind("jettison:", 0) == 0) { return sim.Jettison(action.substr(9)); }
+  if (action.rfind("salvage:", 0) == 0) { return sim.StartSalvage(std::stoi(action.substr(8))); }
+  if (action.rfind("package:", 0) == 0) { return sim.PackageSurvey(action.substr(8)); }
   (void)arg;
   return false;
 }
-
 }  // namespace
 
 // ============================================================================
 //  The press, with the anti-spam lock around it (Phase 9).
-//  ---------------------------------------------------------------------------
-//  One control is one control. The first press spends the action and starts the
-//  tier's lock in ACTION_COOLDOWN_RULES; a second press of the same button
-//  before another action resolves is refused, whether it comes from the window
-//  or from this harness. Free reads spend nothing and therefore lock nothing.
 // ============================================================================
 bool PressStoresAction(Simulation& sim, const std::string& action, const std::string& arg) {
   return CommitActionButton(

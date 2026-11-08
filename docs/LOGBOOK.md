@@ -484,3 +484,32 @@ You must append a compressed summary of **every single reply and action you take
 - **Validation:** `git diff --check` only; no tests, builds, or draw checks were run, per the owner's instruction.
 - **Reference:** `Legacy code_Spaceship.txt` remains untouched and non-authoritative.
 - **State:** changes are being committed and pushed only to `arena/ae015614-spaceship`, updating open PR #33.
+
+### Entry #035
+- **Timestamp:** 2026-11-08 UTC
+- **Task:** owner task TRAD CONTRACT, then a Cargo Hold rebuild mock-up and an explicit stop on test runs.
+- **Trade state before the stop:** station-local markets/atlas pages, three trade kinds, accepted snapshots, 200-click rotation, green routes, station cards, save migration, awards/trace/console wording were integrated; `spaceship_core` and `spaceship_console` targets compiled before the stop. The full suite was not run after the stop.
+- **Owner instruction:** no further test runs. This entry records understanding and current state only.
+- **Cargo Hold layout understood:** left = Cargo Inventory listing every looted/found/bought lot; middle = visual hold volume from the ship's real capacity/used cargo, including shipyard expansions; right = contextual trade/unload window.
+- **Delivery and station-to-station:** reaching the destination enables finalization in the Cargo Hold; the player unloads and cashes in there. This supersedes the earlier automatic arrival settlement for those kinds.
+- **Freelance:** at the destination the right window shows sell options at different prices; selling/unloading finalizes the freelance trade.
+- **No trade / unwanted cargo:** the right window offers plain unload/jettison into space.
+- **Clock:** each finalization click advances the clock by +1. Arrival only enables the action; it does not itself pay or finish the contract.
+- **Sorting:** cargo is not automatically sorted in the middle view. The player clicks each cargo item on the left to sort/place it; occasionally that click advances the clock and the task may need repeating.
+- **Mock-up status:** the attached image is layout intent, not a pixel-perfect art target; no artwork under `assets/` is to be edited.
+- **Next implementation step:** rebuild the Cargo Hold screen/actions around this three-column model and reconcile Trade settlement to manual Cargo Hold finalization, without running tests unless the owner lifts the stop.
+
+### Entry #036
+- **Timestamp:** 2026-11-08 UTC
+- **Task:** owner approved the Cargo Hold mock-up as an important trade-operation part and said Execute.
+- **Cargo Hold rebuilt:** `StoresScreen` now models three columns: Cargo Inventory, Cargo Hold View, and a contextual Trade finalization / Unload cargo window.
+- **Left column:** lists every lot aboard and makes sorting manual; a lot is stowed only after its inventory row is clicked.
+- **Middle column:** paints a capacity grid from the ship's real `CargoStore().capacity`, used volume and reserved volume; shipyard expansions therefore grow the view.
+- **Sorting cadence:** stowage is saved per lot; a paid sorting click is due every 20 actions, and stowed cargo works loose again after 60 actions so the task can repeat.
+- **Right column:** delivery and station-to-station trades finalize by unloading/cashing in at the destination; freelance trades show destination sell options and finalize through the sale; unwanted cargo can be unloaded into space.
+- **Clock rule:** arrival no longer pays or completes trade contracts. `SettleTradeArrival` only remembers the berth; `FinalizeTrade` and the freelance sale are the +1 commitments.
+- **Persistence:** saves/traces carry lot `stowed`/`stowedAt` and the hold's `sortDueAt`; old saves default safely.
+- **Console/help:** added `cargo sort` and `trade finalize`; station, handbook and room wording now point finalization to the Cargo Hold.
+- **Tests:** legacy mission/commission test references were ported to the trade API and the station draw probe's card order was updated, but no tests were run.
+- **Checks:** `spaceship_core` and `spaceship_console` targets built; `Draw.cpp` passed a syntax-only compile against fetched raylib/ImGui headers; `git diff --check` clean. No ctest, draw probe, GUI run, or test suite was executed, per the owner's stop.
+- **State:** changes remain uncommitted on `arena/f91aec6c-spaceship`.

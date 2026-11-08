@@ -731,6 +731,11 @@ const Port* Catalog::FindPort(const std::string& id) const {
   return nullptr;
 }
 
+const Good* Catalog::FindGood(const std::string& id) const {
+  for (const Good& good : goods) { if (good.id == id) { return &good; } }
+  return nullptr;
+}
+
 const std::vector<std::size_t>& Catalog::BodiesInSystem(const std::string& systemId) const {
   static const std::vector<std::size_t> kEmpty;
   EnsureIndex();

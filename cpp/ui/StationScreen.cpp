@@ -1,17 +1,9 @@
 // ============================================================================
 //  StationScreen.cpp — the port window: cards, items, inspector, commits.
 //  ---------------------------------------------------------------------------
-//  The five categories are the reference's five panels, in its order. What
-//  changed is how they are walked and what a commitment costs:
-//
-//    left      five cards. Free to open. The open one is marked.
-//    middle    only what the open card holds. Free to pick.
-//    right     everything about the one picked item, and its single button.
-//
-//    Market, Shipyard and crew   shiplets only, 0 actions, no cooldown.
-//    Cargo and surveys           pays shiplets, 1 action, the lot then goes.
-//    Mission board               1 action, the button greys once accepted.
-//    Tavern / Bar                1 action per person, once, then it greys.
+//  Five cards follow the owner's card table. The old mission board and bar
+//  are gone; Star-map reads the station's own system page, and Trade contracts
+//  opens exactly three kinds whose offers come from that local knowledge.
 // ============================================================================
 #include "ui/StationScreen.h"
 
@@ -47,115 +39,29 @@ const char* kFree = "0 actions";
 const char* kOneAction = "1 action";
 const char* kDone = "done";
 
-bool Talked(const Simulation& sim, const std::string& patronId) {
-  const auto& talked = sim.State().talked;
-  auto it = talked.find(patronId);
-  return it != talked.end() && it->second;
-}
-
-bool Owned(const Simulation& sim, const std::string& upgradeId) {
-  const auto& upgrades = sim.State().upgrades;
-  auto it = upgrades.find(upgradeId);
-  return it != upgrades.end() && it->second;
-}
-
-bool Hired(const Simulation& sim, const std::string& candidateId) {
-  const auto& hired = sim.State().hired;
-  auto it = hired.find(candidateId);
-  return it != hired.end() && it->second;
-}
-
-std::string ContractStatus(const Simulation& sim, const std::string& contractId) {
-  const auto& contracts = sim.State().contracts;
-  auto it = contracts.find(contractId);
-  return it == contracts.end() ? std::string("available") : it->second;
-}
-
-// The region this station sits in, for the two authored lines the bar repeats.
-std::vector<std::string> LocalRumors(const Simulation& sim, const std::string& portId) {
-  std::string regionId;
-  const Body* portBody = sim.FindBodyById(portId);
-  if (portBody != nullptr) {
-    const std::string systemId =
-        portBody->system.empty() ? sim.World().BodySystem(*portBody) : portBody->system;
-    const Body* system = sim.FindBodyById(systemId);
-    if (system != nullptr) { regionId = system->region; }
-  }
-  if (regionId.empty()) { regionId = sim.CurrentSystemId(); }
-  const auto& history = sim.World().worldHistory;
-  auto it = history.find(regionId);
-  if (it == history.end()) { return {}; }
-  return it->second;
-}
-
-std::string RegionName(const Simulation& sim, const std::string& portId) {
-  const Body* portBody = sim.FindBodyById(portId);
-  if (portBody == nullptr) { return std::string(); }
-  const std::string systemId =
-      portBody->system.empty() ? sim.World().BodySystem(*portBody) : portBody->system;
-  const Body* system = sim.FindBodyById(systemId);
-  if (system == nullptr) { return std::string(); }
-  const Body* region = sim.FindBodyById(system->region);
-  return region == nullptr ? system->region : region->name;
-}
-
-double GoodBuyPrice(const Simulation& sim, const Good& good) {
+double GoodBuyPrice(const Simulation& sim, const std::string& portId, const Good& good) {
   GoodsLot probe;
   probe.value = good.value;
   probe.kind = good.kind;
-  return js::Ceil(sim.LotPrice(probe) * 1.2);
+  return js::Ceil(sim.LotPriceAt(portId, probe) * 1.2);
 }
 
-double GoodSellPrice(const Simulation& sim, const Good& good) {
+double GoodSellPrice(const Simulation& sim, const std::string& portId, const Good& good) {
   GoodsLot probe;
   probe.value = good.value;
   probe.kind = good.kind;
-  return sim.LotPrice(probe);
+  return sim.LotPriceAt(portId, probe);
 }
 
-// The trader's tip: the port's own authored line, then what this counter pays
-// best and worst for, read straight off the price basket in play.
-std::vector<std::string> TraderSpeech(const Simulation& sim, const std::string& tip) {
-  std::vector<std::string> said;
-  if (!tip.empty()) { said.push_back("The trader says: " + tip); }
-  const Good* best = nullptr;
-  const Good* worst = nullptr;
-  for (const Good& good : sim.Market()) {
-    if (best == nullptr || GoodSellPrice(sim, good) > GoodSellPrice(sim, *best)) { best = &good; }
-    if (worst == nullptr || GoodBuyPrice(sim, good) < GoodBuyPrice(sim, *worst)) { worst = &good; }
-  }
-  if (best != nullptr) {
-    said.push_back("Trade tip: this port pays " + Num(GoodSellPrice(sim, *best)) + " sh for " +
-                   best->name + " (" + best->kind + ").");
-  }
-  if (worst != nullptr && worst != best) {
-    said.push_back("Trade tip: " + worst->name + " goes in for " +
-                   Num(GoodBuyPrice(sim, *worst)) + " sh here, the cheapest on the board.");
-  }
-  for (const std::string& rumor : LocalRumors(sim, sim.Map().here)) {
-    said.push_back("Heard at the bar: " + rumor);
-  }
-  return said;
+bool Owned(const Simulation& sim, const std::string& id) {
+  const auto found = sim.State().upgrades.find(id);
+  return found != sim.State().upgrades.end() && found->second;
 }
 
-// What a candidate says when spoken to: their own authored fields, then the
-// two lines the region was written with. Nothing here is composed.
-std::vector<std::string> PatronSpeech(const Simulation& sim, const CandidateDefinition& person) {
-  const CrewDefinition& crew = person.crew;
-  std::vector<std::string> said;
-  if (!crew.traits.empty()) { said.push_back(crew.name + " on themselves: " + crew.traits + "."); }
-  if (!crew.skill.empty() || !crew.role.empty()) {
-    said.push_back(crew.name + " on their trade: " + (crew.skill.empty() ? std::string("Untrained") : crew.skill) +
-                   ", " + crew.role + ".");
-  }
-  if (!crew.hobby.empty()) { said.push_back("Off watch: " + crew.hobby + "."); }
-  if (!crew.homeworld.empty()) { said.push_back("From: " + crew.homeworld + "."); }
-  for (const std::string& rumor : LocalRumors(sim, sim.Map().here)) {
-    said.push_back(crew.name + " repeats a rumor: " + rumor);
-  }
-  const std::string region = RegionName(sim, sim.Map().here);
-  if (!region.empty()) { said.push_back("They are waiting out " + region + "'s next berth."); }
-  return said;
+bool Hired(const Simulation& sim, const std::string& id) {
+  for (const CrewMember& member : sim.Crew()) { if (member.id == id) { return true; } }
+  for (const Passenger& passenger : sim.Passengers()) { if (passenger.id == id) { return true; } }
+  return false;
 }
 
 }  // namespace
@@ -170,8 +76,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   model.head.kind = "STATION";
   model.head.title = model.portName;
   model.head.sub =
-      "Pick a card, pick an item, then commit. Supplies, the yard and hires cost "
-      "shiplets only; selling, contracts and the bar cost one action.";
+      "Pick a card, pick an item, then commit. Reading is free. Supplies, refits and hires cost shiplets only; selling and accepting trade cost one action.";
 
   const double purse = sim.State().shiplets;
   const double used = sim.CargoUsed();
@@ -194,10 +99,13 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   market.id = "market";
   market.title = "Market - purse " + Num(purse) + " sh";
   market.badge = "purse " + Num(purse) + " sh";
-  market.notes.push_back("Buy supplies and cargo. A different port may pay a different price.");
+  market.notes.push_back(tip);
+  market.notes.push_back("This shelf is stocked from " +
+                         (port == nullptr ? std::string("the local system") : port->atlas.systemName) +
+                         ". Prices follow this berth's supply and demand.");
   market.notes.push_back("Shiplets only: no action is spent and nothing is locked.");
 
-  const auto supply = [&market, purse](const std::string& id, const std::string& label,
+  const auto supply = [&market, purse, docked = model.docked](const std::string& id, const std::string& label,
                                        const std::string& what, double price, bool extra,
                                        const std::vector<std::string>& extraDetails) {
     StationRow row;
@@ -206,7 +114,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     row.cost = kFree;
     row.free = true;
     row.commit = "Buy - " + Num(price) + " sh";
-    row.enabled = purse >= price && extra;
+    row.enabled = docked && purse >= price && extra;
     row.details.push_back(what);
     row.details.push_back("Price: " + Num(price) + " sh at every port.");
     row.details.push_back("Purse: " + Num(purse) + " sh.");
@@ -243,9 +151,9 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
               Num(sim.GameRules().mess.foodPerRation) + " cooked food per batch.",
           "Hydroponics' ration-production project blocks purchases while it runs."});
 
-  for (const Good& good : sim.Market()) {
-    const double price = GoodBuyPrice(sim, good);
-    const double sell = GoodSellPrice(sim, good);
+  for (const Good& good : sim.MarketAt(portId)) {
+    const double price = GoodBuyPrice(sim, portId, good);
+    const double sell = GoodSellPrice(sim, portId, good);
     const bool space = used + reserved + good.vol <= capacity;
     StationRow row;
     row.id = "buy-good:" + good.id;
@@ -253,11 +161,20 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     row.cost = kFree;
     row.free = true;
     row.commit = "Buy - " + Num(price) + " sh";
-    row.enabled = purse >= price && space;
+    row.enabled = model.docked && purse >= price && space;
     row.details.push_back("Trade good: " + good.name + " (" + good.kind + ").");
     row.details.push_back("Volume: " + Num(good.vol) + " m3 per lot.");
     row.details.push_back("This port sells it in for " + Num(price) + " sh and would pay " +
                           Num(sell) + " sh for it.");
+    if (port != nullptr) {
+      for (const MarketSource& source : port->sources) {
+        if (source.goodId == good.id) {
+          const Body* body = sim.FindBodyById(source.bodyId);
+          row.details.push_back("Local source: " + (body == nullptr ? source.bodyId : body->name) +
+                                ". " + source.reading);
+        }
+      }
+    }
     row.details.push_back("Carried to another port it may pay more or less.");
     row.details.push_back("Hold: " + Num(used) + " of " + Num(capacity) + " m3 used, " +
                           Num(reserved) + " m3 reserved; this lot needs " + Num(good.vol) + " m3.");
@@ -316,124 +233,56 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     sales.rows.push_back(row);
   }
 
-  // ---- 3. the mission board -----------------------------------------------
-  StationColumn board;
-  board.id = "board";
-  board.title = "Mission board";
-  board.badge = sim.State().commissions.active.has_value() ? "one commission running"
-                                                           : "commissions open";
-  board.notes.push_back("Repeatable commissions");
-  board.notes.push_back("Accepting or collecting work costs one action; the button greys "
-                        "the moment the mission is taken.");
-  if (sim.State().commissions.active.has_value()) {
-    const Commission& active = *sim.State().commissions.active;
-    const double goal = CommissionGoal(active.kind);
-    board.notes.push_back(CommissionDescription(sim, active) + " - " +
-                          Num(active.progress) + " / " + Num(goal) + ". Payment: " +
-                          Num(active.reward) + " sh at any station.");
-    StationRow collect;
-    collect.id = "commission-collect";
-    collect.label = "Collect commission - " + Num(active.reward) + " sh";
-    collect.cost = kOneAction;
-    collect.commit = "Collect - " + Num(active.reward) + " sh";
-    collect.enabled = active.progress >= goal;
-    collect.details.push_back(CommissionDescription(sim, active) + ".");
-    collect.details.push_back("Progress: " + Num(active.progress) + " of " + Num(goal) + ".");
-    collect.details.push_back("Payment: " + Num(active.reward) + " sh into the purse.");
-    collect.details.push_back(collect.enabled
-                                  ? "Costs one action. The offer rotates afterwards."
-                                  : "The objective is not met yet; nothing to collect.");
-    board.rows.push_back(collect);
-    StationRow abandon;
-    abandon.id = "commission-abandon";
-    abandon.label = "Abandon commission and rotate offers";
-    abandon.cost = kOneAction;
-    abandon.commit = "Abandon and rotate";
-    abandon.confirm = "Abandon this commission? The reward will be lost.";
-    abandon.enabled = true;
-    abandon.details.push_back("Give up the running commission and draw three fresh offers.");
-    abandon.details.push_back("The " + Num(active.reward) + " sh reward is lost.");
-    abandon.details.push_back("Costs one action.");
-    board.rows.push_back(abandon);
-  } else {
-    board.notes.push_back(
-        "Choose one commission. Objectives begin after acceptance; offers rotate "
-        "after collection or abandonment.");
-    for (const char* kindName : {"visit", "scan", "salvage"}) {
-      const std::string kind = kindName;
-      // The board must show what the acceptance would hand over, so it asks the
-      // simulation for the same deterministic offer.
-      const std::optional<Commission> offer = sim.CommissionOffer(kind);
-      if (!offer.has_value()) { continue; }
+  // ---- 3. the station's own star-map wiki --------------------------------
+  StationColumn starmap;
+  starmap.id = "starmap";
+  starmap.title = "Star-map";
+  starmap.badge = port == nullptr ? "system page" : port->atlas.systemName;
+  starmap.notes.push_back("Every planet and moon written into this station's own system page. Pick a body to read it; opening the chart is free.");
+  if (port != nullptr) {
+    starmap.notes.push_back(port->atlas.systemReading);
+    for (const PlanetPage& page : port->atlas.planets) {
       StationRow row;
-      row.id = "commission-accept:" + kind;
-      row.label = "Accept: " + CommissionDescription(sim, *offer) + " - " +
-                  Num(offer->reward) + " sh";
-      row.cost = kOneAction;
-      row.commit = "Accept";
+      row.id = "planet:" + page.id;
+      row.label = page.name;
+      row.cost = "free";
+      row.free = true;
+      row.commit = "Open system chart";
       row.enabled = true;
-      row.details.push_back("Repeatable commission: " + CommissionDescription(sim, *offer) + ".");
-      row.details.push_back("Objective: " + kind + ", " + Num(CommissionGoal(kind)) +
-                            " to complete.");
-      row.details.push_back("Payment: " + Num(offer->reward) + " sh at any station.");
-      row.details.push_back("Costs one action, and the board closes to other offers until it "
-                            "is collected or abandoned.");
-      board.rows.push_back(row);
+      row.details.push_back("Kind: " + page.kind + ".");
+      row.details.push_back("System: " + port->atlas.systemName + ". " + port->atlas.systemReading);
+      row.details.push_back(page.reading);
+      for (const auto& field : page.details) { row.details.push_back(field.first + ": " + field.second + "."); }
+      for (const TradeContract& contract : sim.ActiveTradeContracts()) {
+        if (contract.destination == page.id) {
+          row.details.push_back("Green delivery route: " + contract.title + " (" +
+                                TradeRouteLayer(sim, contract) + " chart).");
+        }
+      }
+      starmap.rows.push_back(std::move(row));
     }
   }
-  { StationRow heading; heading.label = "Regular contracts"; heading.reading = true; board.rows.push_back(heading); }
-  for (const Contract& contract : sim.World().contracts) {
-    const std::string status = ContractStatus(sim, contract.id);
-    const bool eligible =
-        (contract.origin.empty() || contract.origin == sim.Map().here) &&
-        (contract.vol == 0 || used + reserved + contract.vol <= capacity) &&
-        (contract.goal != "passenger" ||
-         static_cast<double>(sim.Crew().size() + sim.Passengers().size()) <
-             sim.Ship().Berths());
+  if (starmap.rows.empty()) { starmap.notes.push_back("No planetary pages have been written for this berth."); }
 
+  // ---- 4. trade contracts: exactly three routes in the middle -------------
+  StationColumn trade;
+  trade.id = "trade";
+  trade.title = "Trade contracts";
+  trade.badge = Num(sim.ActiveTradeContracts().size()) + " active";
+  trade.notes.push_back("Choose a kind. Offers rotate every 200 clicks; accepted work is kept aside and stays completable.");
+  for (const char* kind : {"delivery", "freelance", "station"}) {
     StationRow row;
-    row.details.push_back("Contract: " + contract.title + ".");
-    row.details.push_back(contract.note);
-    row.details.push_back("Objective: " + contract.goal +
-                          (contract.target.empty() ? std::string() : " - " + contract.target) + ".");
-    if (contract.vol > 0) {
-      row.details.push_back("Freight: " + (contract.cargo.empty() ? std::string("consignment")
-                                                                  : contract.cargo) +
-                            ", " + Num(contract.vol) + " m3 of the hold, reserved while it runs.");
-    }
-    if (!contract.origin.empty()) { row.details.push_back("Offered only at: " + contract.origin + "."); }
-    row.details.push_back("Reward: " + Num(contract.reward) + " sh, collected at a station.");
-    row.details.push_back("Status: " + status + ".");
-
-    if (status == "available" || status == "failed") {
-      row.id = "contract-accept:" + contract.id;
-      row.label = "Accept " + contract.title;
-      row.cost = kOneAction;
-      row.commit = "Accept";
-      row.enabled = eligible;
-      row.details.push_back(eligible ? "Costs one action; the button greys once it is taken."
-                                     : "Not eligible from this berth: origin, hold space or berths.");
-    } else if (status == "ready") {
-      row.id = "contract-collect:" + contract.id;
-      row.label = "Collect " + contract.title + " - " + Num(contract.reward) + " sh";
-      row.cost = kOneAction;
-      row.commit = "Collect - " + Num(contract.reward) + " sh";
-      row.enabled = true;
-      row.details.push_back("Costs one action; the reward goes into the purse.");
-    } else {
-      row.id = "contract-accept:" + contract.id;
-      row.label = "Accept " + contract.title;
-      row.cost = kDone;
-      row.commit = status == "complete" ? "Completed" : "Accepted";
-      row.enabled = false;
-      row.done = true;
-      row.details.push_back(status == "complete" ? "Already paid out; it cannot be taken again."
-                                                 : "Already taken; it cannot be accepted again.");
-    }
-    board.rows.push_back(row);
+    row.id = kind;
+    row.label = kind == std::string("delivery") ? "Delivery trade"
+              : kind == std::string("freelance") ? "Freelance" : "Station-to-station trade";
+    row.cost = "free";
+    row.free = true;
+    row.enabled = true;
+    row.details.push_back(TradeKindLabel(kind));
+    trade.rows.push_back(std::move(row));
   }
 
-  // ---- 4. the shipyard and crew -------------------------------------------
+  // ---- 5. the shipyard and crew -------------------------------------------
   StationColumn yard;
   yard.id = "yard";
   yard.title = "Shipyard and crew";
@@ -454,7 +303,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     ship.cost = kFree;
     ship.free = true;
     ship.commit = "Buy - 4,000 sh";
-    ship.enabled = purse >= kLargeShip;
+    ship.enabled = model.docked && purse >= kLargeShip;
     ship.confirm =
         "Buy SC Tessellate for 4,000 shiplets? The crew, cargo, equipment, refits, tasks "
         "and voyage records transfer. This purchase is permanent.";
@@ -485,7 +334,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
 
   const double bay1 = sim.ShipCargoCapacity(sim.State().shipClass, 1);
   const double bay2 = sim.ShipCargoCapacity(sim.State().shipClass, 2);
-  const auto upgrade = [&yard, purse](const std::string& id, const std::string& label,
+  const auto upgrade = [&yard, purse, docked = model.docked](const std::string& id, const std::string& label,
                                       const std::string& what, double price, bool available,
                                       bool ownedAlready) {
     StationRow row;
@@ -504,7 +353,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
       row.free = true;
       row.commit = id == "scanner2" ? "Buy - 1,100 sh"
                                     : "Buy - " + Num(price) + " sh";
-      row.enabled = available && purse >= price;
+      row.enabled = docked && available && purse >= price;
       row.details.push_back("Shiplets only: no action, no cooldown.");
       if (!row.enabled) {
         row.details.push_back(available ? "Not affordable from this purse."
@@ -540,7 +389,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     row.cost = kFree;
     row.free = true;
     row.commit = "Buy service - " + Num(kHullService) + " sh";
-    row.enabled = hull < 100 && purse >= kHullService;
+    row.enabled = model.docked && hull < 100 && purse >= kHullService;
     row.details.push_back("The yard patches the hull for half again its condition.");
     row.details.push_back("Hull now: " + Num(hull) + "%. After service: " +
                           Num(std::min(100.0, hull + 50.0)) + "%.");
@@ -611,7 +460,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
       row.cost = kFree;
       row.free = true;
       row.commit = "Hire - " + Num(candidate.fee) + " sh";
-      row.enabled = berth && purse >= candidate.fee;
+      row.enabled = model.docked && berth && purse >= candidate.fee;
       row.details.push_back("Shiplets only: no action, no cooldown.");
       if (!row.enabled) {
         row.details.push_back(berth ? "Not affordable from this purse."
@@ -621,63 +470,89 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     yard.rows.push_back(row);
   }
 
-  // ---- 5. the tavern / bar -------------------------------------------------
-  StationColumn tavern;
-  tavern.id = "tavern";
-  tavern.title = "Tavern / Bar";
-  tavern.badge = "the people at this station";
-  tavern.notes.push_back(tip);
-  tavern.notes.push_back("Station training only finishes while docked.");
-  tavern.notes.push_back("Talking costs one action, once per person; the button greys after "
-                         "the first word.");
-  {
-    const bool said = Talked(sim, "trader");
-    StationRow row;
-    row.id = "talk:trader";
-    row.label = "The trader at the bar";
-    row.commit = said ? "Spoken to" : "Talk";
-    row.cost = said ? kDone : kOneAction;
-    row.done = said;
-    row.enabled = !said && model.docked;
-    row.details.push_back("A dealer who works this berth and talks to anyone who buys a round.");
-    if (said) {
-      for (const std::string& line : TraderSpeech(sim, tip)) { row.details.push_back(line); }
-    } else {
-      row.details.push_back("Talking costs one action and reveals their trade tip and what the "
-                            "bar is saying about this region.");
-    }
-    tavern.rows.push_back(row);
-  }
-  for (const CandidateDefinition& candidate : sim.World().candidates) {
-    if (!candidate.port.empty() && candidate.port != portId) { continue; }
-    if (Hired(sim, candidate.crew.id)) { continue; }  // aboard now, not at the bar
-    const CrewDefinition& person = candidate.crew;
-    const bool said = Talked(sim, person.id);
-    StationRow row;
-    row.id = "talk:" + person.id;
-    row.label = person.name + " - " + person.role;
-    row.commit = said ? "Spoken to" : "Talk";
-    row.cost = said ? kDone : kOneAction;
-    row.done = said;
-    row.enabled = !said && model.docked;
-    row.details.push_back(person.name + ": " + person.traits + "; health " +
-                          Num(person.health) + "%, " +
-                          (person.skill.empty() ? std::string("untrained") : person.skill) + ".");
-    row.details.push_back("Waiting at this station; the hiring hall asks " +
-                          Num(candidate.fee) + " sh for them.");
-    if (said) {
-      for (const std::string& line : PatronSpeech(sim, candidate)) { row.details.push_back(line); }
-    } else {
-      row.details.push_back("Talking costs one action and reveals what they say about "
-                            "themselves and the rumor they are repeating.");
-    }
-    tavern.rows.push_back(row);
-  }
-
-  model.columns = {market, sales, board, yard, tavern};
+  model.columns = {market, sales, starmap, trade, yard};
   NormalizeStationSelection(model, model.selection);
+  if (model.selection.category == "starmap") {
+    const StationRow* page = FindStationItem(model, "starmap", model.selection.item);
+    if (page != nullptr) { model.tradeCommit = *page; }
+  }
+  if (model.selection.category == "trade") {
+    const std::string kind = model.selection.item;
+    model.offers.id = "trade-offers";
+    model.offers.title = TradeKindLabel(kind);
+    model.offers.badge = "Rotation " + Num(sim.TradeEpoch()) + " - next in " +
+                         Num(Simulation::kTradeRotationActions -
+                             std::fmod(sim.ActionCount(), Simulation::kTradeRotationActions)) + " clicks";
+    if (kind == "delivery") {
+      model.offers.notes.push_back("Accept once: sealed freight is loaded, the clock advances +1, and the button greys. Carry it to the destination, then open the Cargo Hold and unload/cash in to finish. The green path marks the delivery point.");
+    } else if (kind == "freelance") {
+      model.offers.notes.push_back("Accept once (+1), then buy the requested lots at this station and carry them. At the destination, the Cargo Hold shows the sell options; selling the last requested lot finalizes the trade. The green path marks the destination.");
+    } else {
+      model.offers.notes.push_back("Every station visited so far, except this one. Picking a station activates a survey-data exchange and advances the clock +1. At the target station, finalize the exchange in the Cargo Hold to cash in. No separate data resource is managed. Its green path is on the sector chart.");
+    }
+    for (const TradeContract& active : sim.ActiveTradeContracts(kind)) {
+      StationRow row;
+      row.id = active.id;
+      row.label = active.title + (active.status == "ready" ? " - ready to finalize" : " - accepted");
+      row.cost = kDone;
+      row.commit = active.status == "ready" ? "Finalize in Cargo Hold" : "Accepted";
+      row.done = true;
+      row.details.push_back(TradeDescription(sim, active));
+      row.details.push_back("Accepted work survives every board rotation. Reward: " + Num(active.reward) + " sh. Finalize from the Cargo Hold at the destination.");
+      if (active.kind == "freelance") {
+        row.details.push_back("Sold " + Num(active.fulfilled) + " of " + Num(active.quantity) + " requested lots at the destination.");
+      }
+      model.offers.rows.push_back(std::move(row));
+    }
+    for (const TradeContract& offer : sim.TradeOffers(portId, kind)) {
+      StationRow row;
+      row.id = offer.id;
+      row.label = offer.title + " - " + Num(offer.reward) + " sh";
+      row.cost = kOneAction;
+      row.commit = kind == "station" ? "Activate trade" : "Accept";
+      row.enabled = model.docked;
+      row.details.push_back(TradeDescription(sim, offer) + ".");
+      row.details.push_back("Origin: " + model.portName + ". Destination: " +
+                            (sim.FindBodyById(offer.destination) == nullptr ? offer.destination : sim.FindBodyById(offer.destination)->name) + ".");
+      const Good* good = sim.World().FindGood(offer.goodId);
+      if (good != nullptr) {
+        row.details.push_back("Cargo: " + Num(offer.quantity) + " x " + good->name + ", " +
+                              Num(good->vol * offer.quantity) + " m3.");
+        const Body* source = sim.FindBodyById(offer.sourceBody);
+        if (source != nullptr) { row.details.push_back("System request from " + source->name + ": " + source->klass + "."); }
+        if (kind == "delivery") {
+          row.enabled = row.enabled && used + reserved + good->vol * offer.quantity <= capacity;
+          if (!row.enabled) { row.details.push_back("Not enough free hold space for the sealed freight."); }
+        } else {
+          const double buy = GoodBuyPrice(sim, portId, *good);
+          const double sale = GoodSellPrice(sim, offer.destination, *good);
+          row.details.push_back("Buy here: " + Num(buy) + " sh per lot. Sell there: " + Num(sale) +
+                                " sh per lot. Buy the lots after acceptance; old stock does not count.");
+          row.details.push_back("Bonus on the final requested sale: " + Num(offer.reward) + " sh, in addition to the sale price.");
+        }
+      }
+      row.details.push_back("Reward: " + Num(offer.reward) + " sh. Acceptance costs one action; the green route is on the " + TradeRouteLayer(sim, offer) + " chart.");
+      const TradeContract* accepted = sim.FindTradeContract(offer.id);
+      if (accepted != nullptr) {
+        row.enabled = false;
+        row.done = true;
+        row.cost = kDone;
+        row.commit = accepted->status == "complete" ? "Traded" : "Accepted";
+        row.details.push_back("This offer has already been taken; it cannot be accepted again.");
+      }
+      model.offers.rows.push_back(std::move(row));
+    }
+    if (model.offers.rows.empty()) {
+      model.offers.notes.push_back(kind == "station" ? "Visit another station to open a data exchange." : "No request of this kind is available from this berth.");
+    }
+    NormalizeStationSelection(model, model.selection);
+    for (const StationRow& row : model.offers.rows) {
+      if (row.id == model.selection.offer && kind != "station") { model.tradeCommit = row; break; }
+    }
+  }
   return model;
 }
+
 
 // ---------------------------------------------------------------------------
 //  The selection
@@ -728,6 +603,23 @@ void NormalizeStationSelection(const StationScreenModel& model, StationSelection
       break;
     }
   }
+  if (selection.category == "trade") {
+    if (selection.item != "delivery" && selection.item != "freelance" && selection.item != "station") {
+      selection.item = "delivery";
+    }
+    bool found = false;
+    for (const StationRow& row : model.offers.rows) {
+      if (!row.reading && row.id == selection.offer) { found = true; break; }
+    }
+    if (!found) {
+      selection.offer.clear();
+      for (const StationRow& row : model.offers.rows) {
+        if (!row.reading && !row.id.empty()) { selection.offer = row.id; break; }
+      }
+    }
+  } else {
+    selection.offer.clear();
+  }
 }
 
 namespace {
@@ -744,21 +636,18 @@ bool PressStationActionRaw(Simulation& sim, const std::string& action,
   if (action.compare(0, 12, "sell-survey:") == 0) {
     return sim.SellSurvey(action.substr(12));
   }
-  if (action.compare(0, 16, "contract-accept:") == 0) {
-    return sim.AcceptContract(action.substr(16));
+  if (action.compare(0, 13, "trade-accept:") == 0) {
+    return sim.AcceptTrade(action.substr(13));
   }
-  if (action.compare(0, 17, "contract-collect:") == 0) {
-    return sim.CollectContract(action.substr(17));
+  if (action.compare(0, 13, "starmap-open:") == 0) {
+    sim.SetLayer("system");
+    return sim.SelectTarget(action.substr(13));
   }
   if (action.compare(0, 5, "hire:") == 0) return sim.HireCrew(action.substr(5));
   if (action.compare(0, 8, "upgrade:") == 0) return sim.BuyUpgrade(action.substr(8));
   if (action == "ship-buy") return sim.BuyLargerShip();
   if (action.compare(0, 9, "room-buy:") == 0) return sim.BuyRoom(action.substr(9));
-  if (action.compare(0, 17, "commission-accept") == 0) {
-    return sim.AcceptCommission(action.substr(18));
-  }
-  if (action == "commission-collect") return sim.CollectCommission();
-  if (action == "commission-abandon") return sim.AbandonCommission();
+
   if (action == "hull-service") {
     if (sim.State().gameOver.size() != 0 || !sim.State().docked) return false;
     if (sim.StatValue("hull") >= 100 || sim.State().shiplets < kHullService) return false;

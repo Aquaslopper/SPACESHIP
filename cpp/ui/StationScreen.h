@@ -1,25 +1,10 @@
 // ============================================================================
 //  StationScreen.h — the port window (Section M).
 //  ---------------------------------------------------------------------------
-//  Three columns, walked in one direction: a category card on the left, the
-//  things that category holds in the middle, and everything about the one thing
-//  the reader picked — plus its single commit button — on the right.
-//
-//  Reading and choosing are free. Committing is not one rule but two:
-//
-//    Market, Shipyard and crew   shiplets only. No action, no cooldown. The
-//                                button stays live while the purse and the
-//                                hold/rack allow it, and greys out when they
-//                                do not, or once a one-time thing is owned.
-//    Cargo and survey data       pays shiplets, costs one action. The lot is
-//                                gone afterwards, so the row cannot repeat.
-//    Mission board               starts the mission, costs one action. The
-//                                button greys out the moment it is accepted.
-//    Tavern / Bar                talking costs one action, once per person;
-//                                the button greys out after the first word.
-//
-//  Nothing on this window carries an action cooldown: the state the commit
-//  itself changes is what stops a second press, not a lock on the button.
+//  The card walk is Market, Sales, Star-map, Trade contracts, Shipyard/crew.
+//  Reading and choosing are free. Only a commitment advances the clock:
+//  selling and accepting trade cost one action; supplies, refits and hires are
+//  money-only. Accepted trade buttons grey out from the saved contract state.
 // ============================================================================
 #pragma once
 
@@ -53,7 +38,7 @@ struct StationRow {
 
 // One category card on the left, and the items it opens in the middle.
 struct StationColumn {
-  std::string id;      // "market", "sales", "board", "yard", "tavern"
+  std::string id;      // "market", "sales", "starmap", "trade", "yard"
   std::string title;
   std::string badge;   // the card's own second line: the purse, the tally
   std::vector<std::string> notes;
@@ -65,6 +50,7 @@ struct StationColumn {
 struct StationSelection {
   std::string category;
   std::string item;
+  std::string offer;     // the picked offer inside the chosen trade kind
 };
 
 struct StationScreenModel {
@@ -72,7 +58,11 @@ struct StationScreenModel {
   std::string portId;
   std::string portName;
   std::string tip;
-  std::vector<StationColumn> columns;  // Market | Sales | Board | Yard | Tavern
+  std::vector<StationColumn> columns;  // Market | Sales | Star-map | Trade | Yard
+  // Populated only for the Trade contracts card. The middle column holds the
+  // three kinds; this is the right-hand board for the chosen kind.
+  StationColumn offers;
+  StationRow tradeCommit;
   std::string purseLine;
   std::string holdLine;
   bool docked = false;

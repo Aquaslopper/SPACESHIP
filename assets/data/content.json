@@ -31,11 +31,11 @@
       "systems": {},
       "version": 1
     },
-    "commissions": {
-      "active": null,
-      "completed": 0,
-      "serial": 0,
-      "version": 1
+    "trade": {
+      "version": 1,
+      "visited": [],
+      "contracts": [],
+      "completed": 0
     },
     "options": {
       "audioLevel": 0.4,
@@ -228,7 +228,7 @@
       "id": "first-watch",
       "link": "o2",
       "linkLabel": "Open O2 Filter Room",
-      "text": "Start at Kessler Drift. Right-click Navigation, choose Tolme Anchorage and start a crossing. Seat all three canisters in the O2 Filter Room and start the bank. While crossing, recover salvage in the Cargo Hold. Acknowledge arrival in Navigation; open the Docked indicator to trade and use the mission board.",
+      "text": "Start at Kessler Drift. Right-click Navigation, choose Tolme Anchorage and start a crossing. Seat all three canisters in the O2 Filter Room and start the bank. While crossing, recover salvage in the Cargo Hold. Acknowledge arrival in Navigation; open the Docked indicator to trade, read the station star-map, and use the Trade contracts card.",
       "title": "Your first watch"
     },
     {
@@ -356,14 +356,14 @@
     {
       "group": "Rewards",
       "id": "contracts",
-      "text": "At a station, accept contracts from the mission board. Some carry freight or passengers; others ask for a visit or a scan. Complete the objective and collect payment at a station. Contract freight occupies cargo space and cannot be sold. Jettisoning it fails the contract.",
-      "title": "Contracts and mission boards"
+      "text": "The Trade contracts card has three kinds. Delivery loads sealed freight; carry it to the destination, then unload and cash in from the Cargo Hold to finish it. Freelance asks you to buy goods after acceptance, carry them, and use the Cargo Hold sell options at the named destination; the last sale pays the market price plus a bonus and finalizes the trade. Station-to-station exchanges survey data with every station visited so far, draws its green path on the sector chart, and is finalized in the Cargo Hold at the target station. Acceptance costs one action and greys the button. Offers rotate every 200 clicks, but accepted work is saved separately and stays completable.",
+      "title": "Trade contracts"
     },
     {
       "group": "Rewards",
-      "id": "commissions",
-      "text": "Stations also offer one active repeatable commission at a time: visit another port, scan a specified body, or recover two salvage lots. Acceptance and collection cost one action each. Finish the objective after acceptance, then collect at any station. Abandoning costs one action and rotates the offers. No freight is reserved for these commissions.",
-      "title": "Repeatable commissions"
+      "id": "starmap",
+      "text": "Every station keeps its own star-map wiki for the system it sits in. The page lists the planets and moons generated around that station, with their names, kinds and local readings. Pick a body to read its page, then open the system chart for free. The same local knowledge stocks the market and shapes its prices; accepted trade routes are drawn in green.",
+      "title": "Station star-map and local markets"
     },
     {
       "group": "Rewards",

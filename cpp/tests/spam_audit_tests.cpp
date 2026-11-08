@@ -265,7 +265,7 @@ std::vector<Probe> AwardProbes() {
   // can be taken once, and the second click must not pay again.
   std::vector<Probe> probes;
   ship::Simulation probeSim = Factory();
-  probeSim.MutableState().contracts["arrival"] = "ready";
+  probeSim.MutableState().trade.visited.push_back("tolme");
   probeSim.CheckCommendations();
   const ship::AwardsScreenModel awards = ship::BuildAwardsScreen(probeSim);
   for (const ship::ActionRowView& row : awards.rows) {
@@ -276,7 +276,7 @@ std::vector<Probe> AwardProbes() {
     probe.tier = "free";
     probe.factory = [] {
       ship::Simulation s = Factory();
-      s.MutableState().contracts["arrival"] = "ready";
+      s.MutableState().trade.visited.push_back("tolme");
       s.CheckCommendations();
       return s;
     };

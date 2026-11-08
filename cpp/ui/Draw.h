@@ -161,6 +161,8 @@ class ShellView {
   void PaintPanelsScreen(Simulation& sim);
   void PaintPopup(Simulation& sim);
   void PaintHero(const Vignette& vignette, const Area& box);
+  float CargoVisualHeight(const CargoVisualModel& model) const;
+  void PaintCargoVisual(const CargoVisualModel& model, const Area& box);
   void PaintTitle(Simulation& sim, double nowMs);
   void PaintTutorial(const Simulation& sim, double nowMs);
   void PaintSettingsControls(Simulation& sim, const PopupModel& model);

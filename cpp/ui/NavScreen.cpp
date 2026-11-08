@@ -488,6 +488,33 @@ NavChartView BuildNavChart(const Simulation& sim) {
     }
   }
 
+  // Accepted trade work keeps a green path independent of the selected target.
+  // Delivery/freelance use the local chart when both ends are in this system;
+  // station-to-station data exchanges always use the sector chart.
+  for (const TradeContract& contract : sim.ActiveTradeContracts()) {
+    const std::string routeLayer = TradeRouteLayer(sim, contract);
+    if (routeLayer != chart.layer) { continue; }
+    const Body* destination = sim.FindBodyById(contract.destination);
+    const Body* origin = routeLayer == "system" ? sim.FindBodyById(map.here) : sim.HomeBody();
+    if (destination == nullptr || origin == nullptr) { continue; }
+    NavTradeRoute route;
+    route.id = contract.id;
+    route.kind = contract.kind;
+    route.layer = routeLayer;
+    route.fromId = origin->id;
+    route.toId = destination->id;
+    route.fromName = origin->name;
+    route.toName = destination->name;
+    const auto fromWorld = layerPoint(*origin);
+    const auto toWorld = layerPoint(*destination);
+    route.sameSystem = routeLayer == "sector" && origin->id == destination->id;
+    route.from = NavProjectPanned(map, view, fromWorld.first, fromWorld.second);
+    route.to = NavProjectPanned(map, view, toWorld.first, toWorld.second);
+    route.dots = NavRouteDots(sim, fromWorld.first, fromWorld.second, toWorld.first, toWorld.second,
+                              true, false);
+    chart.tradeRoutes.push_back(std::move(route));
+  }
+
   // --- clusters -----------------------------------------------------------
   {
     double seed = 8721;
@@ -792,6 +819,12 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
                                   : "This contact is outside the local sensor range.");
   } else {
     model.courseNote = "Plot a course by selecting a destination.";
+  }
+
+  for (const TradeContract& contract : sim.ActiveTradeContracts()) {
+    const std::string layer = TradeRouteLayer(sim, contract);
+    model.notes.push_back("Green " + TradeKindLabel(contract.kind) + " route (" + layer + "): " +
+                          TradeDescription(sim, contract) + ".");
   }
 
   NavPanel actions;

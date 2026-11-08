@@ -131,11 +131,40 @@ struct OrbitalWorld {
   std::string locked;       // first locked scan line
 };
 
+// A station's own copy of its system page. It is written after the local
+// chart pass, so later-generated planets are included rather than looked up
+// through a shared, station-independent window.
+struct PlanetPage {
+  std::string id;
+  std::string name;
+  std::string kind;
+  std::string reading;
+  std::vector<std::pair<std::string, std::string>> details;
+};
+
+struct StationAtlas {
+  std::string systemId;
+  std::string systemName;
+  std::string systemReading;
+  std::vector<std::pair<std::string, std::string>> systemDetails;
+  std::vector<PlanetPage> planets;
+};
+
+struct MarketSource {
+  std::string goodId;
+  std::string bodyId;
+  std::string reading;
+};
+
 struct Port {
   std::string id;
   std::string name;
   std::string tip;
-  std::map<std::string, double> prices;  // commodity kind -> multiplier
+  std::string profile;                   // authored economic starting point
+  std::map<std::string, double> prices;  // local supply/demand, not a shared basket
+  std::vector<std::string> market;       // only these goods are on the shelf
+  std::vector<MarketSource> sources;     // the local body behind each stocked good
+  StationAtlas atlas;
 };
 
 struct Good {
