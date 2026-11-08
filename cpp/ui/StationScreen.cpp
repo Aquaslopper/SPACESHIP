@@ -1,17 +1,20 @@
 // ============================================================================
 //  StationScreen.cpp — the port window: cards, items, inspector, commits.
 //  ---------------------------------------------------------------------------
-//  The five categories are the reference's five panels, in its order. What
-//  changed is how they are walked and what a commitment costs:
+//  The cards are the reference's panels minus the mission board and the
+//  tavern, plus the starmap the station keeps of its own system. What changed
+//  is how they are walked and what a commitment costs:
 //
-//    left      five cards. Free to open. The open one is marked.
+//    left      four cards. Free to open. The open one is marked.
 //    middle    only what the open card holds. Free to pick.
 //    right     everything about the one picked item, and its single button.
 //
 //    Market, Shipyard and crew   shiplets only, 0 actions, no cooldown.
+//    Starmap                     free, and there is nothing to commit: the
+//                                station's page for its system, read planet
+//                                by planet.
 //    Cargo and surveys           pays shiplets, 1 action, the lot then goes.
-//    Mission board               1 action, the button greys once accepted.
-//    Tavern / Bar                1 action per person, once, then it greys.
+//    Contract board              1 action, the button greys once accepted.
 // ============================================================================
 #include "ui/StationScreen.h"
 
@@ -21,6 +24,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <map>
 #include <set>
 
 namespace ship {
@@ -160,6 +164,78 @@ std::vector<std::string> PatronSpeech(const Simulation& sim, const CandidateDefi
 
 }  // namespace
 
+// ---------------------------------------------------------------------------
+//  The station's starmap
+// ---------------------------------------------------------------------------
+//  Every station writes a page for the system it stands in, out of the chart
+//  itself: the system's own reading, then every charted body of that system,
+//  grouped and ordered so the page reads like a wiki entry. There is no authored
+//  page anywhere and no per-port table to keep in step - a station that exists
+//  has its page, because the page is the system it sits in.
+StarmapPage BuildStarmapPage(const Simulation& sim, const std::string& portId) {
+  StarmapPage page;
+  const Body* berth = sim.FindBodyById(portId);
+  if (berth == nullptr) { return page; }
+
+  page.systemId = sim.World().BodySystem(*berth);
+  const Body* systemBody = page.systemId.empty() ? nullptr : sim.FindBodyById(page.systemId);
+  page.systemName = systemBody != nullptr
+                        ? systemBody->name
+                        : (page.systemId.empty() ? portId : page.systemId);
+  if (systemBody != nullptr) {
+    page.systemReading = systemBody->scan;
+    if (page.systemReading.empty()) {
+      for (const auto& detail : systemBody->details) {
+        page.systemReading.push_back(detail.first + ": " + detail.second);
+      }
+    }
+  }
+  if (page.systemId.empty()) { return page; }
+
+  // Group order: the star, its worlds, their moons, the wrecks, other berths,
+  // then anything the chart tags differently.
+  static const char* kGroups[] = {"Star", "Planets", "Moons", "Belts and wrecks",
+                                  "Stations", "Other charted bodies"};
+  constexpr int kGroupCount = 6;
+  std::map<int, std::vector<StarmapEntry>> byGroup;
+  for (std::size_t index : sim.World().BodiesInSystem(page.systemId)) {
+    const Body& body = sim.World().bodies[index];
+    if (body.id == portId) { continue; }  // the station does not write itself down
+
+    int group = kGroupCount - 1;
+    if (body.type == "star") {
+      group = 0;
+    } else if (body.type == "planet") {
+      group = 1;
+      ++page.planetCount;
+    } else if (body.type == "moon") {
+      group = 2;
+    } else if (body.type == "belt" || body.type == "site") {
+      group = 3;
+    } else if (body.type == "station") {
+      group = 4;
+    }
+
+    StarmapEntry entry;
+    entry.id = body.id;
+    entry.name = body.name;
+    entry.kind = body.klass.empty() ? body.type : body.klass;
+    entry.group = kGroups[group];
+    entry.reading = body.scan;
+    if (entry.reading.empty()) {
+      // A body the chart authored without prose still has its own facts.
+      for (const auto& detail : body.details) {
+        entry.reading.push_back(detail.first + ": " + detail.second);
+      }
+    }
+    byGroup[group].push_back(std::move(entry));
+  }
+  for (auto& bucket : byGroup) {
+    for (StarmapEntry& entry : bucket.second) { page.entries.push_back(std::move(entry)); }
+  }
+  return page;
+}
+
 StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& portId) {
   StationScreenModel model;
   const Port* port = sim.World().FindPort(portId);
@@ -270,7 +346,49 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     market.rows.push_back(row);
   }
 
-  // ---- 2. sell cargo and survey data --------------------------------------
+  // ---- 2. the starmap -----------------------------------------------------
+  // The station's own page for the system it sits in. Nothing here is authored
+  // per station and nothing is bought: every station the voyage can reach
+  // writes its page from the system it stands in, the moment its window opens.
+  StationColumn starmap;
+  starmap.id = "starmap";
+  starmap.title = "Starmap";
+  {
+    const StarmapPage page = BuildStarmapPage(sim, portId);
+    starmap.badge = page.systemName + " - " + std::to_string(page.planetCount) + " planets, " +
+                    std::to_string(page.entries.size()) + " charted bodies";
+    starmap.notes.push_back("The station's own page for " + page.systemName + ".");
+    for (const std::string& line : page.systemReading) { starmap.notes.push_back(line); }
+    starmap.notes.push_back("Reading is free: nothing on this page costs an action.");
+    if (page.entries.empty()) {
+      starmap.notes.push_back("Nothing is charted in this system yet.");
+    } else {
+      starmap.notes.push_back("Pick a body to read the station's entry for it.");
+    }
+    std::string group;
+    for (const StarmapEntry& entry : page.entries) {
+      if (entry.group != group) {
+        group = entry.group;
+        StationRow heading;
+        heading.label = group;
+        heading.reading = true;   // a heading, not a pick
+        starmap.rows.push_back(heading);
+      }
+      StationRow row;
+      row.id = "starmap:" + entry.id;
+      row.label = entry.name + " - " + entry.kind;
+      row.cost = kFree;
+      row.free = true;   // reading costs neither an action nor shiplets
+      row.page = true;   // a page entry: there is nothing to commit
+      row.enabled = true;
+      row.details.push_back("System: " + page.systemName + ".");
+      row.details.push_back("Kind: " + entry.kind + ".");
+      for (const std::string& line : entry.reading) { row.details.push_back(line); }
+      starmap.rows.push_back(row);
+    }
+  }
+
+  // ---- 3. sell cargo and survey data --------------------------------------
   StationColumn sales;
   sales.id = "sales";
   sales.title = "Sell cargo and survey data";
@@ -316,7 +434,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     sales.rows.push_back(row);
   }
 
-  // ---- 3. the mission board -----------------------------------------------
+  // ---- 4. the mission board -----------------------------------------------
   StationColumn board;
   board.id = "board";
   board.title = "Mission board";
@@ -433,7 +551,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     board.rows.push_back(row);
   }
 
-  // ---- 4. the shipyard and crew -------------------------------------------
+  // ---- 5. the shipyard and crew -------------------------------------------
   StationColumn yard;
   yard.id = "yard";
   yard.title = "Shipyard and crew";
@@ -621,7 +739,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     yard.rows.push_back(row);
   }
 
-  // ---- 5. the tavern / bar -------------------------------------------------
+  // ---- 6. the tavern / bar -------------------------------------------------
   StationColumn tavern;
   tavern.id = "tavern";
   tavern.title = "Tavern / Bar";
@@ -674,9 +792,9 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     tavern.rows.push_back(row);
   }
 
-  // The Mission board and Tavern / Bar cards are not offered; the station shows
-  // the market, the sales counter and the yard.
-  model.columns = {market, sales, yard};
+  // The Mission board and Tavern / Bar cards are not offered. The starmap sits
+  // directly under the shop, then the sales counter, then the yard.
+  model.columns = {market, starmap, sales, yard};
   NormalizeStationSelection(model, model.selection);
   return model;
 }

@@ -608,7 +608,7 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       screen.head = model.head;
       screen.panelColumns = {0, 1, 2};
 
-      // ---- left: the five category cards, free to open --------------------
+      // ---- left: the category cards, free to open -------------------------
       NavPanel cards;
       cards.id = "station-cards";
       cards.title = model.portName;
@@ -666,9 +666,15 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
           open == nullptr ? nullptr : FindStationItem(model, picked.category, picked.item);
       NavPanel inspector;
       inspector.id = "station-inspector";
-      inspector.title = item == nullptr ? "Inspector" : "Inspector and commit";
+      // A starmap entry is a page, not a purchase: it is read, never pressed.
+      const bool pageItem = item != nullptr && item->page;
+      inspector.title = item == nullptr ? "Inspector"
+                        : (pageItem ? "Starmap page" : "Inspector and commit");
       if (item == nullptr) {
         inspector.Dim("Pick an item in the middle column to read it and commit.");
+      } else if (pageItem) {
+        inspector.Field("Entry", item->label);
+        for (const std::string& line : item->details) { inspector.Note(line); }
       } else {
         inspector.Field("Item", item->label);
         inspector.Field("Cost", item->free ? "Shiplets only" : "One action");
@@ -677,7 +683,7 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       screen.panels.push_back(inspector);
       std::vector<CommandRowView> commitRows;
       std::vector<std::string> commitIds;
-      if (item != nullptr) {
+      if (item != nullptr && !item->page) {
         CommandRowView view;
         view.label = item->commit.empty() ? item->label : item->commit;
         view.cost = item->cost;

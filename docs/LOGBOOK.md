@@ -524,3 +524,16 @@ You must append a compressed summary of **every single reply and action you take
 - **Test added:** `every system keeps a space station` in `cpp/tests/nav_tests.cpp` — every system owns a berth, every port names a station body, `Validate()` is clean.
 - **Checks run:** `g++ -fsyntax-only -Wall -Wextra` on `ChartExpansion.cpp` (clean), plus three purpose-built probes compiled against the real `Catalog`/`ChartExpansion`/`GalaxyGen` with the shipped `assets/` data. The repo test suite, the client build and the draw probe were **not** run.
 - **Not touched:** `assets/data` (generated; hand edits forbidden), `Legacy code_Spaceship.txt`, `rescue/`, ship/crew/survival systems, and the station window cut from Entry #036.
+
+### Entry #038
+- **Timestamp:** 2026-11-08 12:52 UTC
+- **Task:** every station holds its own starmap, presented like a wiki page for the system it sits in, as a card under the shop; it fills itself from that system and the player browses it; all stations, all.
+- **Generator:** new `BuildStarmapPage(sim, portId)` in `cpp/ui/StationScreen.cpp` — resolves the station's system through `World().BodySystem(berth)`, copies the system body's own reading (falling back to its authored details when the chart gave no prose), then writes every charted body of that system in group order: Star, Planets, Moons, Belts and wrecks, Stations, Other.
+- **Per-entry content:** name, kind (`klass`, or the chart type when unset), and the reading the chart authored (`Body::scan`, falling back to its detail pairs). The station never writes itself into its own page.
+- **Automatic:** there is no per-port table and no authored page. `BuildStationScreen()` calls the generator every time a station window opens, which is only possible while docked, so a station that exists cannot be missing its page.
+- **Window:** card list is now `{market, starmap, sales, yard}` — the Starmap card sits directly under the shop. Its rows are group headings plus one read-only entry per body; `StationRow::page` marks them, `Widgets.cpp` retitles the inspector "Starmap page", drops the cost line and draws no commit button.
+- **Free:** page rows are `free` and cost `0 actions`; `PressStationAction` has no handler for `starmap:` ids, so nothing is spent or committed.
+- **Measured on the shipped chart:** 763 stations, 17,307 entries, average 22.7 per page; 0 empty pages, 0 pages naming the wrong system, 0 missing planets, 0 stations listing themselves, 0 entries without a reading.
+- **Tests touched:** `nav_tests.cpp` gains `every station writes its own starmap of its own system` (sweeps every port) and its two `columns[3]` yard lookups became `FindStationCategory("yard")`, which the earlier card cut had left out of range. `draw_probe.cpp` now asserts four cards in the order shop/starmap/sales/yard, a free browse of an entry and no commit button on the page.
+- **Checks run:** `-Wall -Wextra -fsyntax-only` on `StationScreen.cpp` (clean), plus two head-less probes linked against the real core and `assets/data`: one station window dump, one all-station sweep. **Not run:** the Catch2 suite, the client build, the draw probe.
+- **Not touched:** `assets/data`, `Legacy code_Spaceship.txt`, `rescue/`, save format, and the cut mission board and tavern code behind the cards.

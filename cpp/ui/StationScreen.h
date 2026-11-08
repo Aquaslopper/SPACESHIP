@@ -13,10 +13,11 @@
 //                                do not, or once a one-time thing is owned.
 //    Cargo and survey data       pays shiplets, costs one action. The lot is
 //                                gone afterwards, so the row cannot repeat.
-//    Mission board               starts the mission, costs one action. The
+//    Contract board              accepts the contract, costs one action. The
 //                                button greys out the moment it is accepted.
-//    Tavern / Bar                talking costs one action, once per person;
-//                                the button greys out after the first word.
+//    Starmap                     free, and there is nothing to commit: the
+//                                station's page for its own system, read one
+//                                planet at a time.
 //
 //  Nothing on this window carries an action cooldown: the state the commit
 //  itself changes is what stops a second press, not a lock on the button.
@@ -49,11 +50,33 @@ struct StationRow {
   std::vector<std::string> details;   // everything known about this one item
   bool free = false;    // shiplets only: no action is spent, no lock is started
   bool done = false;    // owned, hired, sold, accepted or already spoken to
+  bool page = false;    // a starmap entry: read-only, nothing to commit
+};
+
+// One body written into a station's starmap: the name, the kind and the
+// reading the chart authored for it.
+struct StarmapEntry {
+  std::string id;
+  std::string name;
+  std::string kind;
+  std::string group;    // "Star", "Planets", "Moons", "Belts and wrecks", "Stations"
+  std::vector<std::string> reading;
+};
+
+// The page a station writes for the system it sits in. There is no authored
+// copy of this anywhere: BuildStarmapPage() writes it from the chart, so every
+// station the voyage can reach has one, and each one describes its own system.
+struct StarmapPage {
+  std::string systemId;
+  std::string systemName;
+  std::size_t planetCount = 0;
+  std::vector<std::string> systemReading;
+  std::vector<StarmapEntry> entries;
 };
 
 // One category card on the left, and the items it opens in the middle.
 struct StationColumn {
-  std::string id;      // "market", "sales", "board", "yard", "tavern"
+  std::string id;      // "market", "starmap", "sales", "board", "yard", "tavern"
   std::string title;
   std::string badge;   // the card's own second line: the purse, the tally
   std::vector<std::string> notes;
@@ -72,7 +95,7 @@ struct StationScreenModel {
   std::string portId;
   std::string portName;
   std::string tip;
-  std::vector<StationColumn> columns;  // Market | Sales | Board | Yard | Tavern
+  std::vector<StationColumn> columns;  // Market | Starmap | Sales | Board | Yard | Tavern
   std::string purseLine;
   std::string holdLine;
   bool docked = false;
@@ -83,6 +106,11 @@ struct StationScreenModel {
 };
 
 StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& portId);
+
+// The station's starmap: the system it stands in, read out of the chart. Every
+// station writes its own; nothing is authored per port and nothing is cached,
+// so a page cannot go stale or be shared between stations.
+StarmapPage BuildStarmapPage(const Simulation& sim, const std::string& portId);
 
 // Clamps a stored selection to what the model actually offers, and picks the
 // first item of the first card when nothing (or nothing valid) is picked yet.

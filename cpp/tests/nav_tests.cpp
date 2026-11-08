@@ -1112,6 +1112,82 @@ TEST_CASE("huge procedural charts build within interactive frame budgets",
   CHECK(elapsedMs < 250);
 }
 
+// Every station writes its own starmap of the system it sits in, out of the
+// chart: the system's reading, then its bodies, planets first. Nothing is
+// authored per port, so a station that exists cannot be missing its page.
+TEST_CASE("every station writes its own starmap of its own system", "[station][starmap]") {
+  ship::Simulation sim = Fresh();
+  const ship::Catalog& world = sim.World();
+  REQUIRE_FALSE(world.ports.empty());
+
+  for (const ship::Port& port : world.ports) {
+    INFO(port.id);
+    const ship::Body* berth = sim.FindBodyById(port.id);
+    REQUIRE(berth != nullptr);
+    const std::string systemId = world.BodySystem(*berth);
+
+    const ship::StarmapPage page = ship::BuildStarmapPage(sim, port.id);
+    CHECK(page.systemId == systemId);
+    CHECK_FALSE(page.systemName.empty());
+    CHECK(page.planetCount > 0u);
+    CHECK_FALSE(page.entries.empty());
+    CHECK_FALSE(page.systemReading.empty());
+
+    // Every planet of that system is on the page, with its name, kind and
+    // reading - and the station itself is not.
+    for (std::size_t index : world.BodiesInSystem(systemId)) {
+      const ship::Body& body = world.bodies[index];
+      if (body.id == port.id) {
+        for (const ship::StarmapEntry& entry : page.entries) { CHECK(entry.id != port.id); }
+        continue;
+      }
+      if (body.type != "planet") { continue; }
+      const auto entry = std::find_if(page.entries.begin(), page.entries.end(),
+                                      [&](const ship::StarmapEntry& e) { return e.id == body.id; });
+      REQUIRE(entry != page.entries.end());
+      CHECK(entry->name == body.name);
+      CHECK_FALSE(entry->kind.empty());
+      CHECK_FALSE(entry->reading.empty());
+    }
+  }
+
+  // The page is a card in the station window, directly under the shop, and
+  // reading it never spends an action or asks for shiplets.
+  sim.MutableMap().here = "tolme";
+  sim.MutableState().docked = false;
+  REQUIRE(sim.Dock());
+  const ship::StationScreenModel model = ship::BuildStationScreen(sim, "tolme");
+  const ship::StationColumn* map = ship::FindStationCategory(model, "starmap");
+  REQUIRE(map != nullptr);
+  REQUIRE(model.columns.size() >= 2u);
+  CHECK(model.columns[0].id == "market");
+  CHECK(model.columns[1].id == "starmap");
+
+  const ship::StarmapPage tolme = ship::BuildStarmapPage(sim, "tolme");
+  std::size_t entries = 0;
+  std::size_t headings = 0;
+  for (const ship::StationRow& row : map->rows) {
+    if (row.reading) {
+      ++headings;   // a group heading, not a body
+      continue;
+    }
+    ++entries;
+    CHECK(row.page);
+    CHECK(row.free);
+    REQUIRE(row.id.rfind("starmap:", 0) == 0);
+    CHECK(sim.FindBodyById(row.id.substr(8)) != nullptr);
+  }
+  CHECK(entries == tolme.entries.size());
+  CHECK(headings > 0u);
+
+  const double actions = sim.ActionCount();
+  for (const ship::StationRow& row : map->rows) {
+    if (row.reading) { continue; }
+    CHECK_FALSE(ship::PressStationAction(sim, row.id));
+  }
+  CHECK(sim.ActionCount() == actions);
+}
+
 TEST_CASE("staged sensor upgrades unlock scanLocked tiers and deep-region scanning",
           "[nav][sensors][expansion]") {
   ship::Simulation sim = Fresh();
@@ -1124,7 +1200,10 @@ TEST_CASE("staged sensor upgrades unlock scanLocked tiers and deep-region scanni
   REQUIRE(sim.Dock());
   REQUIRE(sim.State().docked);
 
-  const auto yardBefore = ship::BuildStationScreen(sim, sim.Map().here).columns[3];
+  const auto stationBefore = ship::BuildStationScreen(sim, sim.Map().here);
+  const ship::StationColumn* yardBeforePtr = ship::FindStationCategory(stationBefore, "yard");
+  REQUIRE(yardBeforePtr != nullptr);
+  const ship::StationColumn& yardBefore = *yardBeforePtr;
   auto findYardRow = [](const ship::StationColumn& col, const std::string& id) -> const ship::StationRow* {
     for (const auto& r : col.rows) {
       if (r.id == id) { return &r; }
@@ -1193,7 +1272,10 @@ TEST_CASE("staged sensor upgrades unlock scanLocked tiers and deep-region scanni
   CHECK_FALSE(sim.CanScan(*sim.FindBodyById(outerRegId)));
 
   {
-    const auto yardMid = ship::BuildStationScreen(sim, sim.Map().here).columns[3];
+    const auto stationMid = ship::BuildStationScreen(sim, sim.Map().here);
+    const ship::StationColumn* yardMidPtr = ship::FindStationCategory(stationMid, "yard");
+    REQUIRE(yardMidPtr != nullptr);
+    const ship::StationColumn& yardMid = *yardMidPtr;
     CHECK_FALSE(findYardRow(yardMid, "upgrade:scanner")->enabled);
     CHECK(findYardRow(yardMid, "upgrade:scanner2")->enabled);
 

@@ -12,6 +12,7 @@
 #include "raylib.h"
 #include "ui/Draw.h"
 #include "ui/Shell.h"
+#include "ui/StationScreen.h"
 
 namespace {
 struct TextCall { std::string text; float x, y, size; int order; };
@@ -600,9 +601,10 @@ int main() {
     sim.MutableState().shiplets = 10000;
     ship::OpenTask(sim, "station", "tolme", true);
     Frame(view, sim);
-    // Three columns walked in one direction: five cards on the left, the open
-    // card's items in the middle, and the inspector with its one commit button
-    // on the right. Cards and items are free; the market's commit is money only.
+    // Three columns walked in one direction: four cards on the left, the open
+    // card's items in the middle, and the inspector on the right. Cards and
+    // items are free; the market's commit is money only, the starmap has no
+    // commit at all.
     const auto startsWith = [](const char* prefix, const char* missing) {
       const auto it = std::find_if(texts.begin(), texts.end(), [&](const auto& t) {
         return t.text.find(prefix) == 0;
@@ -611,16 +613,14 @@ int main() {
       return *it;
     };
     const auto marketCard = startsWith("Market - purse", "the Market card did not paint");
+    const auto starmapCard = startsWith("Starmap", "the starmap card did not paint");
     const auto salesCard = startsWith("Sell cargo and survey data", "the sales card did not paint");
-    const auto boardCard = startsWith("Mission board", "the mission board card did not paint");
     const auto yardCard = startsWith("Shipyard and crew", "the shipyard card did not paint");
-    const auto tavernCard = startsWith("Tavern / Bar", "the tavern card did not paint");
-    Require(std::abs(salesCard.x - marketCard.x) < 1 && std::abs(boardCard.x - marketCard.x) < 1 &&
-            std::abs(yardCard.x - marketCard.x) < 1 && std::abs(tavernCard.x - marketCard.x) < 1,
-            "The five station cards are not in one column");
-    Require(salesCard.y > marketCard.y && boardCard.y > salesCard.y && yardCard.y > boardCard.y &&
-            tavernCard.y > yardCard.y,
-            "The station cards are not stacked in their own order");
+    Require(std::abs(starmapCard.x - marketCard.x) < 1 && std::abs(salesCard.x - marketCard.x) < 1 &&
+            std::abs(yardCard.x - marketCard.x) < 1,
+            "The station cards are not in one column");
+    Require(starmapCard.y > marketCard.y && salesCard.y > starmapCard.y && yardCard.y > salesCard.y,
+            "The station cards are not stacked: shop, starmap, sales, yard");
     const auto fuel = startsWith("Fuel cell", "the market items did not paint");
     Require(fuel.x > marketCard.x, "The market's items are not in the middle column");
     const auto commit = startsWith("Buy - 45 sh", "the inspector commit button did not paint");
@@ -648,6 +648,35 @@ int main() {
     Frame(view, sim);
     Require(sim.State().fuelCells == cellsBefore + 2 && sim.ActionCount() == beforeBuy,
             "The money-only counter closed after one purchase");
+    // The starmap sits under the shop and is a page, not a purchase: opening a
+    // planet spends nothing and the inspector carries its reading, with no
+    // commit button at all.
+    const ship::StationScreenModel stationModel = ship::BuildStationScreen(sim, "tolme");
+    const ship::StationColumn* mapColumn = ship::FindStationCategory(stationModel, "starmap");
+    Require(mapColumn != nullptr && !mapColumn->rows.empty(),
+            "the station keeps no starmap of its own system");
+    const auto firstEntry = std::find_if(mapColumn->rows.begin(), mapColumn->rows.end(),
+                                         [](const ship::StationRow& row) { return !row.reading; });
+    Require(firstEntry != mapColumn->rows.end(), "the starmap card holds no entries");
+    const std::string entryLabel = firstEntry->label;
+    const std::string entryWord = entryLabel.substr(0, entryLabel.find(' '));
+    view.Click(sim, starmapCard.x + 2, starmapCard.y + 2, ship::HitButton::Left, 0);
+    Frame(view, sim);
+    const auto planet = startsWith(entryWord.c_str(), "no body of the station's system painted");
+    view.Click(sim, planet.x + 2, planet.y + 2, ship::HitButton::Left, 0);
+    Frame(view, sim);
+    Require(sim.ActionCount() == beforeBuy, "Reading a starmap entry spent an action");
+    Require(std::any_of(texts.begin(), texts.end(), [](const auto& t) {
+              return t.text.find("System: ") == 0;
+            }),
+            "the starmap page did not name the system it belongs to");
+    Require(std::none_of(texts.begin(), texts.end(), [](const auto& t) {
+              return t.text.find("Buy - ") == 0 || t.text.find("Sell - ") == 0;
+            }),
+            "A starmap page painted a commit button");
+    view.Click(sim, marketCard.x + 2, marketCard.y + 2, ship::HitButton::Left, 0);
+    Frame(view, sim);
+
     // A station row that does cost an action still marks the clock in HTA green.
     view.Click(sim, salesCard.x + 2, salesCard.y + 2, ship::HitButton::Left, 0);
     Frame(view, sim);
