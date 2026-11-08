@@ -250,14 +250,17 @@ std::vector<SideBlock> SideBlocks(const Simulation& sim) {
   contracts.title = "Contracts";
   contracts.open = open("contracts");
   contracts.empty = "No active contracts.";
-  for (const Contract& contract : sim.World().contracts) {
-    auto it = state.contracts.find(contract.id);
-    if (it == state.contracts.end()) { continue; }
-    if (it->second != "active" && it->second != "ready") { continue; }
-    contracts.rows.push_back({contract.title,
-                              contract.note +
-                                  (it->second == "ready" ? " Ready to collect." : ""),
-                              true, false, "long", ""});
+  // The work the voyage actually carries: a trade contract taken at a berth
+  // stays here until it is settled at its destination. The authored mission
+  // board that used to fill these rows has no card of its own any more, so it is
+  // not listed here either.
+  for (const TradeContract& trade : state.trades) {
+    std::string title = "Survey run";
+    if (trade.mode == "delivery") { title = "Delivery"; }
+    if (trade.mode == "freelance") { title = "Freelance"; }
+    std::string note = trade.label;
+    if (trade.fee > 0) { note += " - " + Num(trade.fee) + " sh"; }
+    contracts.rows.push_back({title, note, true, false, "long", ""});
   }
   if (state.commissions.active.has_value()) {
     const Commission& active = *state.commissions.active;

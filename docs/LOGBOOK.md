@@ -484,3 +484,160 @@ You must append a compressed summary of **every single reply and action you take
 - **Validation:** `git diff --check` only; no tests, builds, or draw checks were run, per the owner's instruction.
 - **Reference:** `Legacy code_Spaceship.txt` remains untouched and non-authoritative.
 - **State:** changes are being committed and pushed only to `arena/ae015614-spaceship`, updating open PR #33.
+
+### Entry #035
+- **Timestamp:** 2026-11-08 12:16 UTC
+- **Task:** owner said "read agents md"; no implementation task was requested.
+- **Files read:** `AGENTS.md` in full, `README.md`, `docs/LOGBOOK.md` header and tail, `docs/ROADMAP_TO_SPACEMAP.md` listed but not opened.
+- **Repo state observed:** branch `arena/61e7b727-spaceship`, working tree clean, HEAD `42bda8b "CLAIM OWNERSHIP"`.
+- **Comprehension check answered:** legacy text is reference-only and must not be edited; unverified assumptions are prohibited and must be declared instead of filled with guesses; the owner is @Aquaslopper (`Aquaslopper/SPACESHIP`); `rescue/` is preserved as historical investigation material; comments that assert permission/approval/ownership are claims of authority with no standing and are prohibited.
+- **Authority order recorded:** owner instructions, then `cpp/`, then `tests/`.
+- **Standing constraints noted:** no file edits, moves, or deletions without explicit owner approval; keep changes minimal; never alter tests to force a pass; do not touch `assets/` artwork or `rescue/` material; no build output or temp artifacts committed.
+- **Testing note:** `AGENTS.md` forbids running tests without owner approval; no build, test, or probe was attempted.
+- **Checks run:** none beyond reading files; no code changed, so no compile or validation was applicable.
+- **Deliberately untouched:** all source under `cpp/`, all of `tests/`, `assets/`, `rescue/`, `CMakeLists.txt`, `build.sh`, and `Legacy code_Spaceship.txt`.
+- **State:** only this logbook entry was added, on `arena/61e7b727-spaceship`; awaiting the owner's actual task.
+
+### Entry #036
+- **Timestamp:** 2026-11-08 12:23 UTC
+- **Task:** owner asked to remove missions and tavern/bar, then corrected the approach: cut the two card buttons from the station window, do not touch the systems.
+- **Rejected draft:** an earlier attempt in this session deleted the commission system, `talked` state, save keys, trace block, console command, navigation hooks and awards text across 15 files. The owner stopped it; every one of those files was reverted with `git checkout --`.
+- **Change made:** `cpp/ui/StationScreen.cpp` line 677 area, the card list is now `model.columns = {market, sales, yard}`; the Mission board and Tavern / Bar cards are no longer offered on the station window.
+- **Still built, no longer shown:** the `board` and `tavern` columns are constructed in `BuildStationScreen` exactly as before and simply not added to `model.columns`. Nothing else in that file changed.
+- **Effect:** the station shows three cards (Market, Sell cargo and surveys, Shipyard and crew). Contract accept/collect rows and the trader/patron talk rows cannot be reached through the window any more.
+- **Not removed:** commission and talk logic, `state_.talked`, `commissions` save keys, `commission` console command, `/contract` console command, trace snapshot fields, award metric, handbook data, and all tests.
+- **Consequence stated plainly:** regular contracts live only on that card, so they are unreachable in the client while the console `contract` command still works. That is a side effect of cutting the card, not a separate decision.
+- **Checks:** `git diff --check` implied clean by the diff; no build, no compile, no tests, no draw probe.
+- **Untouched:** `Legacy code_Spaceship.txt`, `assets/` (generated data left alone per its "do not edit by hand" manifest), `rescue/`, `tests/`, and all core/UI files except the one line above.
+- **State:** two files changed relative to HEAD (`StationScreen.cpp`, this logbook) on `arena/61e7b727-spaceship`; uncommitted.
+
+### Entry #037
+- **Timestamp:** 2026-11-08 12:32 UTC
+- **Task:** owner instruction — every system has to have a space station; authored systems, generated systems, all of them; no quota, no exceptions.
+- **Where it lives:** `PopulateLocalCharts()` in `cpp/data/ChartExpansion.cpp`, the single pass that walks every system after the authored and generated bodies exist.
+- **Detection:** before the loop, one set of system ids is built from port entries whose chart body sits in that system (`systemHasPort`); a system in that set is left exactly as authored.
+- **Placement:** a system without a berth gets a station on the existing five-ring ladder, drawn from `Rng(HashOf(system.id + "-berth"))`; separation relaxes 28/38 px down to 10 px, and a last-resort grid scan takes the chart point furthest from anything already placed, so no system can be left out.
+- **Record:** the station is a `station` body (`<side>-station`) plus a matching `Port` carrying a sorted-profile price basket and a tip, satisfying the `Catalog::Validate()` rule that a port names a station body of the same name.
+- **Ordering:** the station is created after the planets, moons, belts and landmarks, so the procedural rings, names and random draws of existing systems are untouched.
+- **Measured:** authored chart 48 systems, 29 with berths; grown chart 624 systems, 763 ports, 624 systems with a berth, 0 missing, 247 stations added by this pass, all with a 7-entry price basket, `Validate()` returns 0 problems.
+- **Blast radius checked:** a digest of every non-station body and port, grown before and after the change, is byte-identical; two fresh expansions are identical; the pre-existing "forced re-expansion grows the galaxy" behaviour is unchanged (baseline 516->866 ports, now 763->1275) and belongs to `PopulateGalaxies`, not to this pass.
+- **Test added:** `every system keeps a space station` in `cpp/tests/nav_tests.cpp` — every system owns a berth, every port names a station body, `Validate()` is clean.
+- **Checks run:** `g++ -fsyntax-only -Wall -Wextra` on `ChartExpansion.cpp` (clean), plus three purpose-built probes compiled against the real `Catalog`/`ChartExpansion`/`GalaxyGen` with the shipped `assets/` data. The repo test suite, the client build and the draw probe were **not** run.
+- **Not touched:** `assets/data` (generated; hand edits forbidden), `Legacy code_Spaceship.txt`, `rescue/`, ship/crew/survival systems, and the station window cut from Entry #036.
+
+### Entry #038
+- **Timestamp:** 2026-11-08 12:52 UTC
+- **Task:** every station holds its own starmap, presented like a wiki page for the system it sits in, as a card under the shop; it fills itself from that system and the player browses it; all stations, all.
+- **Generator:** new `BuildStarmapPage(sim, portId)` in `cpp/ui/StationScreen.cpp` — resolves the station's system through `World().BodySystem(berth)`, copies the system body's own reading (falling back to its authored details when the chart gave no prose), then writes every charted body of that system in group order: Star, Planets, Moons, Belts and wrecks, Stations, Other.
+- **Per-entry content:** name, kind (`klass`, or the chart type when unset), and the reading the chart authored (`Body::scan`, falling back to its detail pairs). The station never writes itself into its own page.
+- **Automatic:** there is no per-port table and no authored page. `BuildStationScreen()` calls the generator every time a station window opens, which is only possible while docked, so a station that exists cannot be missing its page.
+- **Window:** card list is now `{market, starmap, sales, yard}` — the Starmap card sits directly under the shop. Its rows are group headings plus one read-only entry per body; `StationRow::page` marks them, `Widgets.cpp` retitles the inspector "Starmap page", drops the cost line and draws no commit button.
+- **Free:** page rows are `free` and cost `0 actions`; `PressStationAction` has no handler for `starmap:` ids, so nothing is spent or committed.
+- **Measured on the shipped chart:** 763 stations, 17,307 entries, average 22.7 per page; 0 empty pages, 0 pages naming the wrong system, 0 missing planets, 0 stations listing themselves, 0 entries without a reading.
+- **Tests touched:** `nav_tests.cpp` gains `every station writes its own starmap of its own system` (sweeps every port) and its two `columns[3]` yard lookups became `FindStationCategory("yard")`, which the earlier card cut had left out of range. `draw_probe.cpp` now asserts four cards in the order shop/starmap/sales/yard, a free browse of an entry and no commit button on the page.
+- **Checks run:** `-Wall -Wextra -fsyntax-only` on `StationScreen.cpp` (clean), plus two head-less probes linked against the real core and `assets/data`: one station window dump, one all-station sweep. **Not run:** the Catch2 suite, the client build, the draw probe.
+- **Not touched:** `assets/data`, `Legacy code_Spaceship.txt`, `rescue/`, save format, and the cut mission board and tavern code behind the cards.
+
+### Entry #039
+- **Timestamp:** 2026-11-08 13:40 UTC
+- **Task:** owner asked for a `[TRADE CONTRACT]` card on every station: the middle column holds three buttons (Delivery / Freelance / Station-to-station) and the right panel holds the list behind the chosen one. One click accepts, the clock advances one action, the row greys. How the lists are generated was explicitly left to the next step; only station-to-station is populated now.
+- **Record:** `TradeContract{mode, from, to, label}` and `GameState::trades` hold what was taken; `GameState::visitedPorts` is the roll of stations docked at. `Dock()` writes the visit, so the roll is the game's own history rather than a table.
+- **Accepting:** `Simulation::AcceptTrade(mode, to)` in `Economy.cpp` requires a live dock, a destination that is not this station, a port that exists, and a destination already visited; `TradeAccepted()` greys the row on rebuild. It pushes the record and calls `PerformAction("Trade contract accepted")`, so the clock moves by exactly one. Only the station-to-station mode is live — the other two boards do not exist yet and an empty board hands out nothing.
+- **Fiction:** a data survey trade. It is a name and a route, not cargo the player manages; nothing enters the hold.
+- **Window:** `BuildStationScreen()` gains section 3, card `trade`, title "Trade contract", three `page` rows (`trade-mode:<id>`, `free`, `page`) filled from `model.tradeModes`; the station mode lists every visited station less the current one, labelled `<station> - data survey trade`. Sections after it renumber, and the card list is `{market, starmap, trade, sales, yard}`.
+- **Right panel:** `Widgets.cpp` returns early for the `trade` card — a `NavPanel` titled by the chosen mode (first mode until one is picked), its note, its count or its explicit empty state, then one `CommandRowView` per offer with the id `trade-accept:<mode>:<to>`, cost `1 action`, `enabled` only while untaken. There is no single commit button, so the window never greys twice.
+- **Press:** `PressStationAction` parses `trade-accept:<mode>:<to>`; the cooldown category is `routine`. Choosing a mode is `station-item:trade-mode:<id>`, which only sets the selection and spends nothing.
+- **Save:** `state.visitedPorts` (object) and `state.trades` (array of `{mode, from, to, label}`) are written by `SaveJson()` and read defensively by `LoadJson()`; a save written before this change has neither key and loads with an empty roll.
+- **Measured:** all 763 stations carry the card, five cards each, three modes in order, all three rows free and paged. A two-dock voyage lists one station, accepting costs exactly one action, a second press is refused, the rebuilt row reads `accepted`, and a save/load round trip keeps both the roll and the contract.
+- **Tests:** `nav_tests.cpp` gains `the trade board lists visited stations and greys a contract once taken`; `draw_probe.cpp` now expects five cards stacked shop/starmap/trade/sales/yard, opens the card, switches mode without spending an action, and asserts the trade list paints no commit button.
+- **Checks run:** `-Wall -Wextra -fsyntax-only` on `StationScreen.cpp` and `Widgets.cpp`; per-file `-c` of `core/*`, `data/*`, `StationScreen.cpp` and the probes with `g++ -std=c++17`; two head-less probes linked and executed against the real core and `assets/data` (voyage + all-station sweep), both exit 0; `cpp/tests/nav_tests.cpp` type-checked against a minimal Catch2 macro shim; `git diff --check` clean. **Not run:** the Catch2 suite, the client build, the real draw probe, and the CMake test target.
+- **Still owed (next step):** the lists for Delivery and Freelance, the green pathfinder to the delivery point on the system starmap, and the sector-chart route for station-to-station.
+- **Not touched:** `assets/` (including generated data), `Legacy code_Spaceship.txt`, `rescue/`, the cut mission board and tavern code, and the existing contract/commission logic.
+
+### Entry #040
+- **Timestamp:** 2026-11-08 14:25 UTC
+- **Task:** owner asked what the automatic trade generator should draw from, then answered the three open questions. This entry records the agreed model; **no code was written in this turn.**
+- **Source:** the generator reads the station's own starmap page — system, body type, planet subtype (`rock`, `ocean`, `ice`, `gas`), the reading, the moon `Surface` line, the station `klass` ("Orbital outpost - industry berth"), the port's seven-kind price basket and its tip. Nothing is authored per station and nothing new is stored per system.
+- **Scope:** every station, all 763, the same generator. The catalogue belongs to the system, so every berth in one system shows the same catalogue and only the half that starts where the player is standing.
+- **Random, not computed:** owner's instruction — a randomiser seeded from the planets' own attributes, drawn "totally random from small to big contracts", not a strict supply-and-demand solve. The invariant kept from the design pass: every offer still names a body that exists on the page, with the attribute that motivated it, so a random draw can never contradict the wiki.
+- **Freshness:** after 200 clicks the catalogue is drawn again, so a berth stays worth revisiting. Open question left for the owner: 200 clicks or 200 actions — the clock counts actions, and a free click would re-roll the board while the player is reading it, so the recommendation is `actions / 200` as the epoch.
+- **Accepted contracts survive a re-roll:** what has already been taken stays in the list, greyed, drawn from `state.trades` rather than from the draw; the new epoch is added alongside it. A taken run never becomes untaken and never spends a second action.
+- **Determinism:** seed from the system id and the epoch, so the board is reproducible without being saved and two berths in one system cannot disagree.
+- **Hand-over deferred:** where a delivery is actually handed over and a freelance lot actually sold is deliberately not built. The owner is rebuilding the ship's cargo hall next and will settle that interaction there. `AcceptTrade()` therefore still refuses the `delivery` and `freelance` modes; the generator will lift that once there is somewhere to deliver to.
+- **Deferred with it:** the berth-profile reconciliation described in the design pass (a random `Pick(profiles, rng)` can put an agri berth in a rock system). Owner chose the randomiser over reconciliation for now; the disagreement is recorded here rather than fixed.
+- **Checks run:** none — documentation only. `git diff --check` clean on the logbook edit.
+- **Not touched:** `assets/`, `Legacy code_Spaceship.txt`, `rescue/`, and every core/UI file.
+
+### Entry #041
+- **Timestamp:** 2026-11-08 15:20 UTC
+- **Task:** owner: "let's get that script so each system gets its own trade hub" — fill the Delivery and Freelance lists from the wiki, one board per system, redrawn every 200 action-clicks.
+- **Where it lives:** `Simulation::TradeBoard(portId)` in `cpp/core/Economy.cpp`, next to `AcceptTrade`. It reads only the chart the station's starmap page prints: body type, the planet sub-type (`rock`/`ocean`/`ice`/`gas`), the moon `Surface` line, the kind line an authored world carries, the `Orbital band`, the port's seven-kind price basket and the good table.
+- **Roles:** a body's economy is what the page already says about it — rock wants water/greens/medicine, ocean wants parts/medicine/ampoules, ice and gas want greens/medicine/parts, a belt wants water/greens/medicine/parts, a derelict site wants water/medicine/parts. A star, a station or a body with no surface is not a destination. Authored worlds with no sub-type fall back to their kind line, then to rock.
+- **The draw:** seed `hash(systemId + "#trade#" + epoch)`, epoch = `floor(actions / 200)`. Three to five runs, never fewer than the system has berths, each run laid out across the berths in turn so every berth has something; a run that would not cover its own fuel (fee under 40 sh) is thrown back and drawn again. Delivery gives the consignment and pays on hand-over; freelance pays the margin between the station's buy price and what the destination will pay. Nothing about the draw is stored.
+- **Sizes:** the lot must fit the hold a voyage starts with (20 m³) and stay a shipment (goods value ≤ 1200 sh), so the best-paid run on any board is one crate of something expensive and risky rather than six crates of ore.
+- **Epoch:** 200 action-clicks, as the owner specified — the clock, not raw clicks, so reading a card or a page cannot reshuffle the board under the player. Verified: the board at 200 actions is a different one.
+- **Taken runs survive the roll:** a contract is now recorded with `good`, `crates` and `fee` as well as mode/from/to/label, because after a roll-over the draw no longer knows the run exists. `TradeBoard` marks a redrawn run that matches a record, and appends records the new epoch no longer draws, greyed, with the numbers they were signed for.
+- **Signing:** `AcceptTrade(mode, to, good)` requires the run to be on the board the station is showing right now and not already taken, and copies the numbers from the board — the draw and the signature cannot disagree. Row ids are `trade-accept:<mode>:<to>[:<good>]`.
+- **Measured on the shipped chart:** 763 berths, 624 systems, 2,501 runs, 1,794 delivery / 707 freelance, **0 empty boards**, 3.28 runs per berth, every system 3–5 runs, fees 40–1,840 sh (median 216, p90 504, p99 1,135), 0 runs to an unknown body, 0 to another system, 0 duplicated between berths, 0 lots over the hold, and **0 runs off the station's own starmap page** — every offer can be checked by reading the page it was drawn from.
+- **Tests:** `nav_tests.cpp` gains `each system draws its own trade board out of its own chart` (determinism, system scope, hold and value caps, one berth per run, one action per signature, the numbers kept, a phantom run refused, panel built from the same draw, save round trip); the station-mode case lost its "the two lists are empty" assertions. `draw_probe.cpp` now expects a painted run (`1 action`) rather than the freelance empty note.
+- **Checks run:** `-Wall -Wextra -fsyntax-only` on `Economy.cpp`, `SaveSystem.cpp`, `StationScreen.cpp`, `Widgets.cpp`; `nav_tests.cpp` type-checked against the Catch2 macro shim; four head-less probes linked against the real core, data and `assets/` and executed — the board dump, a mirror of both test cases against the reference voyage (0 failures), the all-berth sweep, and the all-station card sweep. All exit 0. **Not run:** the Catch2 suite, the client build, the real draw probe.
+- **Owed to the cargo-hall pass:** the hand-over itself, the capital check on a freelance run (accepting does not test the purse, because the goods are bought later), the green pathfinder to the delivery point, and the sector-chart route for station-to-station.
+- **Not touched:** `assets/`, `Legacy code_Spaceship.txt`, `rescue/`, and the station-to-station list, which still reads the roll of visited ports.
+
+### Entry #042
+- **Timestamp:** 2026-11-08 16:05 UTC
+- **Task:** owner, after playing the board: trade contracts have to appear in the left-hand panel under Contracts, the old mission that shows there can go, and the green pathfinder has to be on the starmap.
+- **Panel:** `SideBlocks()` in `cpp/ui/Shell.cpp`. The Contracts block now lists `state.trades` — one row per accepted trade, titled Delivery / Freelance / Survey run, with the record's own label and its fee ("Rill Kessler - 3 crates of Medical supplies - 144 sh"). The row is written by the acceptance, not re-derived, so it says what was signed for.
+- **Old mission removed from the panel only:** the loop over `sim.World().contracts` is gone. That is the whole change — the contract system, `state.contracts`, `ContractProgress`, the console command, the awards metric and the still-built `board` column are untouched, exactly as in Entry #036. The voyage still holds the authored `arrival` mission; it simply has no row and no card.
+- **Commission row kept:** the `state.commissions.active` row is a different system and stays where it was.
+- **Pathfinder:** `BuildNavChart()` in `cpp/ui/NavScreen.cpp`, system layer. For every accepted trade whose mode is in-system and whose destination body is in the current system, a second trail is laid from the ship to that body with the class `rdot rdot-trade`, drawn after the ordinary routes so it paints over them.
+- **Colour:** `cpp/ui/Draw.cpp` paints `rdot-trade` in the game's own green `#7ec63f` — the same 126/198/63 as the progress-fill edge and the HTA action mark — at 3×3 instead of the usual 2×2. The three-tier route colouring (faint / plain / selected) is unchanged; the trade trail sits on top of it.
+- **Station-to-station draws nothing here:** its two ends are stations in different systems, so its route belongs on the sector chart, which is still owed.
+- **Measured:** with a freelance run taken at Tolme, the chart paints 12 green dots and every one of them lands exactly on a dot of the ordinary route to that same body, so the green line is the route the ship would fly, not a second line drawn beside it. A station-to-station run on the same chart paints none.
+- **Tests:** `nav_tests.cpp` gains, in the drawn-board case, the panel assertions (one row, right title, destination named, fee shown, no authored mission title among the rows) and the trail assertions (green dots exist and each coincides with a plain route dot), and in the station-mode case the check that a station run paints no in-system trail.
+- **Checks run:** `-Wall -Wextra -fsyntax-only` on `Shell.cpp` and `NavScreen.cpp`; `nav_tests.cpp` type-checked against the Catch2 macro shim; the reference-voyage mirror probe and a purpose-built panel/pathfinder probe, both linked against the real core, data, `assets/` and the real UI builders, both exit 0 with 0 failures. **Not run:** the Catch2 suite, the client build, the real draw probe — `Draw.cpp` cannot be compiled here (no raylib header), so its two-line change is unverified by compiler.
+- **Not touched:** `assets/`, `Legacy code_Spaceship.txt`, `rescue/`, the board's draw and acceptance, and the sector-chart route owed to the next pass.
+
+### Entry #043
+- **Timestamp:** 2026-11-08 16:40 UTC
+- **Task:** owner described the cargo hall rebuild from a mock and asked whether it was understood. **No code was written in this turn.**
+- **Wording rule, standing:** the owner objects to the `[1 action]` button and to the word "action" in the UI. It implies the player knows the clock; the station window never had an action bar, it has buttons that advance time. The cargo hall follows the station: no action bar, only clicks that move the clock. Nothing is to be named "action" in what is built here.
+- **Room today:** `ScreenKind::Cargo` → `BuildStoresScreen(sim, "cargo")` in `cpp/ui/StoresScreen.cpp`, painted by the stores painter; a single column of lot rows, a tally, a salvage paragraph and two progress buttons. The mock replaces that layout.
+- **The mock:** left card "Cargo Inventory" — one row per lot with its name, volume, description and QTY. Middle card "Cargo Hold View" — the hold's volume as a picture, the placed lots listed under it, "Hold Status: Secure", and a `10 / 20 m³ (50%)` capacity bar with Used/Free. Right column — contextual, mocked "delivery window / selling the goods / unload cargo".
+- **Read of the three windows:** left = what is aboard, unsorted. Middle = the hold itself, filled by clicking a lot on the left. Right = what is possible right now: settling an accepted trade at its destination, or throwing cargo into space.
+- **Read of the clock:** no action bar anywhere in this room. Finalising a trade is one click and one tick. Sorting is free most of the time, but a randomly chosen click among the sorting clicks is charged, then the count starts again with a new random threshold (the owner's "every 6 or 8, then 10 or 20").
+- **Open:** whether placing a lot gates selling/unloading or is only the picture; whether the charged click is saved so a reload cannot dodge it; how the freelance "different prices" differ; and whether the "action" wording is stripped from the station window now as well.
+- **Checks run:** none — no code. `git diff --check` clean on this entry.
+
+## 044 — The cargo hall: the room the model described now exists
+
+The room is rebuilt to the three windows the mock laid out: `Cargo Inventory` on
+the left, `Cargo Hold View` in the middle, and a window on the right that changes
+with the run in hand. `BuildCargoRoom` in `StoresScreen.cpp` is the model; the
+painter in `Widgets.cpp` puts it in three columns (`panelColumns = {0, 1, 2}`) and
+`Draw.cpp` sends every press in the room to `PressCargoRoom`.
+
+What a run is now: taking a delivery loads a real consignment into the hold, bound
+to its contract by `lot.contractId = "trade:<mode>|<to>|<good>"`. Freelance runs
+load nothing: the player buys the lot. A lot stows with one click on the left, and
+that click sorts it into the hold drawn in the middle, which reads its volume from
+the ship itself, so a hold bought at the shipyard changes it.
+
+Freight is priced off the chart (`4 + distance * 0.25`) when the board is drawn and
+signed with the run. A freelance settlement pays the market at the destination plus
+that freight; a delivery pays its flat fee. Settling happens only where the run
+ends: the destination for a trade, and docked for station-to-station.
+
+The invisible timer: `StowCargo` charges one click in a run of six to eighteen of
+them, and then the count restarts at a new threshold. Nothing shows it. Settling,
+starting a salvage bay and taking one aboard are one click and one tick each.
+
+`spentTrades` keeps a settled or lost run out of the board for the rest of the
+epoch, and survives the save. Saving a consignment needed the save validator to
+accept a trade key beside the authored contract ids.
+
+Probes (`/tmp/probe`, head-less): `cargohall` walks accept → stow → travel → settle
+→ board → save/load → jettison → freelance sale, `failures=0`; `stowclock` draws
+20,000 thresholds, all inside 6..18, and finds 60 clicks charged 5 times at gaps of
+10, 17, 8, 15 and 9 with exactly one tick per charge. `Draw.cpp` still cannot be
+compiled here, so the paint path is unverified by a compiler.

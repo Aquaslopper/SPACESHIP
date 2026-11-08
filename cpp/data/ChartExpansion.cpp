@@ -483,6 +483,21 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
   for (const auto& entry : catalog.portPrices) { profiles.push_back(entry.first); }
   std::sort(profiles.begin(), profiles.end());
 
+  // Which systems already keep a berth: a port entry whose chart body sits in
+  // that system. Read once, before the per-system pass, so a system that is
+  // given a station here is not given a second one.
+  std::unordered_map<std::string, bool> systemHasPort;
+  systemHasPort.reserve(catalog.systems.size() * 2);
+  {
+    std::set<std::string> portIds;
+    for (const Port& port : catalog.ports) { portIds.insert(port.id); }
+    for (const Body& body : catalog.bodies) {
+      if (body.type == "station" && portIds.count(body.id) != 0) {
+        systemHasPort[catalog.BodySystem(body)] = true;
+      }
+    }
+  }
+
   const double boardW = catalog.map.w;
   const double boardH = catalog.map.h;
   const double cx = catalog.map.cx;
@@ -686,6 +701,91 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
                : "Hull markings predate the current regional registry.",
           std::string("Survey classification: ") + feature + "."};
       body.scanLocked = {"Interior transponder log", "Sub-hull salvage assay"};
+      ++localCount;
+    }
+
+    // Every system keeps a station: authored and generated alike, with no quota
+    // and no exceptions. A system that already carries a port keeps the berth
+    // and the layout it was authored with; one that does not is given a station
+    // here. The station is placed after the planets so their rings, names and
+    // draws are untouched; only the berth is added.
+    if (systemHasPort.find(system.id) == systemHasPort.end()) {
+      Rng berth(HashOf(system.id + "-berth"));
+      double bx = 0.0;
+      double by = 0.0;
+      bool placed = false;
+      for (double sep = minSep; sep >= 10.0 && !placed; sep -= 6.0) {
+        for (int pass = 0; pass < 40 && !placed; ++pass) {
+          const int band = pass % 5;
+          const int slots = kRingSlots[band];
+          const int slot = (pass / 5) % slots;
+          const double angle =
+              phaseOffset + 0.61 * static_cast<double>(band) +
+              6.283185307179586 * (static_cast<double>(slot) / static_cast<double>(slots)) +
+              berth.Range(-0.10, 0.10);
+          const double x =
+              std::round(std::clamp(cx + std::cos(angle) * kRings[band], 20.0, boardW - 20.0));
+          const double y = std::round(
+              std::clamp(cy + std::sin(angle) * kRings[band] * 0.45, 20.0, boardH - 20.0));
+          if (!fits(x, y, sep)) { continue; }
+          bx = x;
+          by = y;
+          placed = true;
+        }
+      }
+      if (!placed) {
+        // No ring slot is free: take the chart point furthest from anything
+        // already placed, so the system still gets its station.
+        double bestX = cx;
+        double bestY = cy;
+        double bestGap = -1.0;
+        for (double gx = 24.0; gx <= boardW - 24.0; gx += 12.0) {
+          for (double gy = 24.0; gy <= boardH - 24.0; gy += 12.0) {
+            double nearest = 1e18;
+            for (const auto& other : taken) {
+              const double dx = other.first - gx;
+              const double dy = other.second - gy;
+              nearest = std::min(nearest, dx * dx + dy * dy);
+            }
+            if (nearest > bestGap) { bestGap = nearest; bestX = gx; bestY = gy; }
+          }
+        }
+        bx = std::round(bestX);
+        by = std::round(bestY);
+      }
+      taken.emplace_back(bx, by);
+
+      static const std::vector<const char*> kStationSuffixes = {
+          "Anchorage", "Waystation", "Docks", "Harbour", "Depot", "Terminus",
+      };
+      const std::string suffix =
+          kStationSuffixes[static_cast<std::size_t>(
+              berth.Below(static_cast<int>(kStationSuffixes.size())))];
+      const std::string stationName = UniqueName(word + " " + suffix, names);
+      Body& station = AddLocalBody(
+          catalog, side + "-station", "station", stationName, bx, by, system,
+          "A permanent orbital station keeps a berth open here for passing ships.");
+      station.klass = "Orbital station - " + regionName + " berth";
+      station.details.emplace_back("Services", "Dock, market, refit");
+      station.scan = {"Docking collars and fuel lines report green across the truss."};
+      station.scanLocked = {"Harbour manifest archive"};
+
+      Port berthPort;
+      berthPort.id = station.id;
+      berthPort.name = stationName;
+      berthPort.tip = "Berth in " + system.name + ".";
+      if (!profiles.empty()) {
+        const std::size_t pick = static_cast<std::size_t>(
+            berth.Below(static_cast<int>(profiles.size())));
+        const std::string profile = profiles[pick];
+        const auto priceIt = catalog.portPrices.find(profile);
+        if (priceIt != catalog.portPrices.end()) { berthPort.prices = priceIt->second; }
+        const auto hintIt = catalog.portHints.find(profile);
+        if (hintIt != catalog.portHints.end() && !hintIt->second.empty()) {
+          berthPort.tip += " " + hintIt->second;
+        }
+      }
+      catalog.ports.push_back(std::move(berthPort));
       ++localCount;
     }
 

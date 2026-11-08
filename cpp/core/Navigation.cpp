@@ -985,6 +985,7 @@ bool Simulation::Dock() {
   if (port == nullptr || state_.docked || !state_.gameOver.empty()) { return false; }
   const std::string name = port->name;
   state_.docked = true;
+  state_.visitedPorts[port->id] = true;
   ContractProgress("visit", map_.here);
   for (InfoRow& row : infos_) {
     if (row.id == "location") { row.value = name + " - docked"; }

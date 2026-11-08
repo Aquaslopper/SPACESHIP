@@ -207,6 +207,28 @@ struct Commissions {
   std::optional<Commission> active;
 };
 
+// The identity of a trade run: its mode, its destination and its commodity. The
+// board greys a run by this key, the hold marks a consignment with it, and a
+// settled run is remembered by it.
+inline std::string TradeKey(const std::string& mode, const std::string& to,
+                            const std::string& good) {
+  return mode + "|" + to + "|" + good;
+}
+
+// One accepted trade contract. The board draws its offers fresh from the
+// system's own chart, so the record has to keep everything the run promised:
+// once an epoch rolls over the draw no longer knows this contract exists.
+struct TradeContract {
+  std::string mode;   // "delivery", "freelance", "station"
+  std::string from;   // the station it was accepted at
+  std::string to;     // the destination port or body it points at
+  std::string good;   // the commodity carried; empty for a data survey trade
+  int crates = 0;     // how many lots of it
+  double fee = 0.0;   // what the run pays on hand-over, or its margin
+  double freight = 0.0;  // what carrying it there costs, priced when drawn
+  std::string label;  // the sentence the board showed when it was taken
+};
+
 struct Options {
   bool largeText = false;
   bool confirmRisk = false;
@@ -394,6 +416,14 @@ struct GameState {
   std::vector<Passenger> passengers;
   std::map<std::string, bool> upgrades;
   std::map<std::string, bool> hired;
+  // Every station the player has docked at. The station-to-station trade list
+  // is exactly this set, less the station the player is standing in.
+  std::map<std::string, bool> visitedPorts;
+  std::vector<TradeContract> trades;
+  // Runs that have been settled, or lost with their cargo. The board keeps
+  // drawing them for the rest of the epoch, so the keys have to be remembered or
+  // the same consignment could be taken twice.
+  std::map<std::string, bool> spentTrades;
   // The station bar keeps its own tally: a patron spoken to once is not
   // spoken to again, exactly as a hired hand is not hired again.
   std::map<std::string, bool> talked;

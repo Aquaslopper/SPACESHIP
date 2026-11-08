@@ -890,6 +890,41 @@ TEST_CASE("the charted galaxy is grown once, deterministically, and every system
   }
 }
 
+// The rule the station pass answers: every system keeps a space station, in the
+// authored core and the generated sky alike, with no quota and no exceptions.
+TEST_CASE("every system keeps a space station", "[nav][chart][expansion]") {
+  ship::Simulation sim = Fresh();
+  const ship::Catalog& world = sim.World();
+
+  std::set<std::string> portIds;
+  for (const ship::Port& port : world.ports) { portIds.insert(port.id); }
+
+  std::set<std::string> systemsWithPort;
+  for (const ship::Body& body : world.bodies) {
+    if (body.type == "station" && portIds.count(body.id) != 0) {
+      systemsWithPort.insert(world.BodySystem(body));
+    }
+  }
+
+  std::size_t systems = 0;
+  for (const ship::Body& system : world.systems) {
+    INFO(system.id);
+    ++systems;
+    CHECK(systemsWithPort.count(system.id) == 1u);
+  }
+  CHECK(systems > 0u);
+  CHECK(systems == world.systems.size());
+
+  // Nothing dangles: every port names a station body, and the chart validates.
+  for (const ship::Port& port : world.ports) {
+    const ship::Body* body = world.FindBody(port.id);
+    REQUIRE(body != nullptr);
+    CHECK(body->type == "station");
+    CHECK(body->name == port.name);
+  }
+  CHECK(world.Validate().empty());
+}
+
 TEST_CASE("no filter hides a body, and a body out of sensor range is still on the chart",
           "[nav][chart][expansion]") {
   ship::Simulation sim = Fresh();
@@ -1077,6 +1112,309 @@ TEST_CASE("huge procedural charts build within interactive frame budgets",
   CHECK(elapsedMs < 250);
 }
 
+// The trade card: three buttons in the middle column, and the list each one
+// opens on the right. The station-to-station list is the roll of stations the
+// player has docked at, less the station they are standing in.
+TEST_CASE("the trade board lists visited stations and greys a contract once taken",
+          "[station][trade]") {
+  ship::Simulation sim = Fresh();
+  sim.MutableMap().here = "tolme";
+  sim.MutableState().docked = false;
+  REQUIRE(sim.Dock());
+  sim.MutableState().docked = false;
+  sim.MutableMap().here = "relay";
+  REQUIRE(sim.Dock());
+
+  const ship::StationScreenModel model = ship::BuildStationScreen(sim, "relay");
+  // The card sits under the starmap, above the sales counter.
+  REQUIRE(model.columns.size() >= 3u);
+  CHECK(model.columns[0].id == "market");
+  CHECK(model.columns[1].id == "starmap");
+  CHECK(model.columns[2].id == "trade");
+
+  // Three modes, in the order the middle column shows them.
+  REQUIRE(model.tradeModes.size() == 3u);
+  CHECK(model.tradeModes[0].id == "delivery");
+  CHECK(model.tradeModes[1].id == "freelance");
+  CHECK(model.tradeModes[2].id == "station");
+  // A mode with nothing behind it says so rather than inventing a consignment.
+  CHECK_FALSE(model.tradeModes[0].empty.empty());
+  CHECK_FALSE(model.tradeModes[1].empty.empty());
+
+  // Station-to-station is every station visited so far, less this one.
+  const ship::TradeMode& station = model.tradeModes[2];
+  REQUIRE(station.offers.size() == 1u);
+  CHECK(station.offers[0].to == "tolme");
+  CHECK_FALSE(station.offers[0].accepted);
+  CHECK(station.offers[0].label.find("Tolme Anchorage") != std::string::npos);
+
+  // The card's own rows are the three mode buttons, all free to open.
+  const ship::StationColumn* card = ship::FindStationCategory(model, "trade");
+  REQUIRE(card != nullptr);
+  REQUIRE(card->rows.size() == 3u);
+  CHECK(card->rows[0].id == "trade-mode:delivery");
+  CHECK(card->rows[1].id == "trade-mode:freelance");
+  CHECK(card->rows[2].id == "trade-mode:station");
+  for (const ship::StationRow& row : card->rows) { CHECK(row.free); }
+
+  // Accepting costs one action, and the row greys from then on.
+  const double before = sim.ActionCount();
+  REQUIRE(ship::PressStationAction(sim, "trade-accept:station:tolme"));
+  CHECK(sim.ActionCount() == before + 1);
+  CHECK(sim.TradeAccepted("station", "tolme"));
+  CHECK_FALSE(ship::PressStationAction(sim, "trade-accept:station:tolme"));
+  CHECK(sim.ActionCount() == before + 1);
+
+  const ship::StationScreenModel after = ship::BuildStationScreen(sim, "relay");
+  REQUIRE(after.tradeModes.size() == 3u);
+  REQUIRE(after.tradeModes[2].offers.size() == 1u);
+  CHECK(after.tradeModes[2].offers[0].accepted);
+
+  // A station that was never visited cannot be the far end of the trade.
+  CHECK_FALSE(sim.AcceptTrade("station", "auriga-port"));
+  CHECK(sim.State().trades.size() == 1u);
+
+  // A station-to-station run is a route between two systems, so the system
+  // chart draws no green trail for it.
+  const ship::NavChartView chart = ship::BuildNavChart(sim);
+  std::size_t trails = 0;
+  for (const ship::NavDot& dot : chart.routes) {
+    if (dot.cls.find("trade") != std::string::npos) { ++trails; }
+  }
+  CHECK(trails == 0u);
+
+  // The roll of visits and the accepted trade both survive a save.
+  std::string error;
+  ship::Simulation restored = ship::Simulation::NewVoyage(sim.World());
+  REQUIRE(restored.LoadJson(sim.SaveJson(), &error));
+  CHECK(restored.State().visitedPorts.count("tolme") == 1u);
+  CHECK(restored.State().visitedPorts.count("relay") == 1u);
+  CHECK(restored.TradeAccepted("station", "tolme"));
+}
+
+// The delivery and freelance lists are a draw, not a table: one seeded board per
+// system per epoch, read off the same chart the starmap prints, so every run
+// names a body that is really there and the two berths of one system cannot
+// disagree. Nothing about the draw is stored; what a contract promised is.
+TEST_CASE("each system draws its own trade board out of its own chart", "[station][trade]") {
+  ship::Simulation sim = Fresh();
+  sim.MutableMap().here = "tolme";
+  sim.MutableState().docked = false;
+  REQUIRE(sim.Dock());
+
+  const ship::Catalog& world = sim.World();
+  const ship::Body* berth = world.FindBody("tolme");
+  REQUIRE(berth != nullptr);
+  const std::string systemId = world.BodySystem(*berth);
+
+  // Every berth of the system, and the runs the system draws between them.
+  std::vector<std::string> berths;
+  for (const ship::Port& port : world.ports) {
+    const ship::Body* body = world.FindBody(port.id);
+    if (body != nullptr && world.BodySystem(*body) == systemId) { berths.push_back(port.id); }
+  }
+  REQUIRE(berths.size() == 2u);  // Kessler keeps Tolme and the relay
+
+  std::size_t runs = 0;
+  std::set<std::string> drawn;
+  for (const std::string& id : berths) {
+    for (const ship::TradeRun& run : sim.TradeBoard(id)) {
+      ++runs;
+      CHECK(run.from == id);
+      CHECK(run.mode == "delivery" || run.mode == "freelance");
+      CHECK(run.crates >= 1);
+      CHECK(run.fee > 0);
+      // The run names a body of this system, and a commodity the market lists.
+      const ship::Body* destination = world.FindBody(run.to);
+      REQUIRE(destination != nullptr);
+      CHECK(world.BodySystem(*destination) == systemId);
+      const ship::Good* good = nullptr;
+      for (const ship::Good& candidate : world.goods) {
+        if (candidate.id == run.good) { good = &candidate; }
+      }
+      REQUIRE(good != nullptr);
+      // The lot fits the hold a voyage starts with, and stays a shipment.
+      CHECK(static_cast<double>(run.crates) * good->vol <= 20.0);
+      CHECK(good->value * run.crates <= 1200.0 + good->value);
+      // A run belongs to one berth: the berths of a system never repeat one.
+      CHECK(drawn.insert(run.to + "|" + run.good).second);
+    }
+  }
+  // Three to five runs a system, shared out across its berths.
+  CHECK(runs >= 3u);
+  CHECK(runs <= 5u);
+
+  // The same call draws the same board: nothing is stored, everything is seeded.
+  const std::vector<ship::TradeRun> first = sim.TradeBoard("tolme");
+  const std::vector<ship::TradeRun> again = sim.TradeBoard("tolme");
+  REQUIRE(first.size() == again.size());
+  for (std::size_t index = 0; index < first.size(); ++index) {
+    CHECK(first[index].mode == again[index].mode);
+    CHECK(first[index].to == again[index].to);
+    CHECK(first[index].good == again[index].good);
+    CHECK(first[index].crates == again[index].crates);
+    CHECK(first[index].fee == again[index].fee);
+  }
+
+  // Taking a run costs one action, and it keeps the numbers it was signed for.
+  REQUIRE_FALSE(first.empty());
+  const ship::TradeRun run = first.front();
+  const std::string id = "trade-accept:" + run.mode + ":" + run.to + ":" + run.good;
+  const double before = sim.ActionCount();
+  REQUIRE(ship::PressStationAction(sim, id));
+  CHECK(sim.ActionCount() == before + 1);
+  CHECK(sim.TradeAccepted(run.mode, run.to, run.good));
+  CHECK_FALSE(ship::PressStationAction(sim, id));
+  bool greyed = false;
+  for (const ship::TradeRun& row : sim.TradeBoard("tolme")) {
+    if (row.mode == run.mode && row.to == run.to && row.good == run.good) {
+      greyed = row.accepted && row.crates == run.crates && row.fee == run.fee;
+    }
+  }
+  CHECK(greyed);
+
+  // A run the board is not showing cannot be signed, and a mode that does not
+  // exist cannot either.
+  CHECK_FALSE(sim.AcceptTrade("delivery", "no-such-body", "ore"));
+  CHECK_FALSE(sim.AcceptTrade("nonsense", run.to, run.good));
+
+  // The left-hand panel carries the run, and only the run: the authored mission
+  // board has no card of its own any more, so its missions are not listed there
+  // even though the voyage still holds one.
+  const ship::SideBlock* contracts = nullptr;
+  for (const ship::SideBlock& block : ship::SideBlocks(sim)) {
+    if (block.key == "contracts") { contracts = &block; }
+  }
+  REQUIRE(contracts != nullptr);
+  REQUIRE(contracts->rows.size() == 1u);
+  CHECK(contracts->rows[0].key == (run.mode == "delivery" ? "Delivery" : "Freelance"));
+  const ship::Body* far = world.FindBody(run.to);
+  REQUIRE(far != nullptr);
+  CHECK(contracts->rows[0].value.find(far->name) != std::string::npos);
+  CHECK(contracts->rows[0].value.find(" sh") != std::string::npos);
+  REQUIRE_FALSE(world.contracts.empty());
+  for (const ship::Contract& mission : world.contracts) {
+    for (const ship::SideRow& row : contracts->rows) { CHECK(row.key != mission.title); }
+  }
+
+  // The chart paints that run: a green trail from the ship to the destination,
+  // laid over the route the ship would fly anyway.
+  const ship::NavChartView chart = ship::BuildNavChart(sim);
+  std::set<std::pair<int, int>> plain;
+  for (const ship::NavDot& dot : chart.routes) {
+    if (dot.cls == "rdot") {
+      plain.insert({static_cast<int>(dot.x), static_cast<int>(dot.y)});
+    }
+  }
+  std::size_t trails = 0;
+  for (const ship::NavDot& dot : chart.routes) {
+    if (dot.cls.find("trade") == std::string::npos) { continue; }
+    ++trails;
+    CHECK(plain.count({static_cast<int>(dot.x), static_cast<int>(dot.y)}) == 1u);
+  }
+  CHECK(trails > 0u);
+
+  // The window is built from the same draw: the two lists are the runs, and a
+  // run already taken is grey when the panel is rebuilt.
+  const ship::StationScreenModel model = ship::BuildStationScreen(sim, "tolme");
+  REQUIRE(model.tradeModes.size() == 3u);
+  CHECK(model.tradeModes[0].offers.size() + model.tradeModes[1].offers.size() == first.size());
+  for (const ship::TradeMode& mode : model.tradeModes) {
+    if (mode.id == "station") { continue; }
+    for (const ship::TradeOffer& offer : mode.offers) {
+      CHECK(offer.mode == mode.id);
+      CHECK_FALSE(offer.good.empty());
+      CHECK(offer.accepted == sim.TradeAccepted(offer.mode, offer.to, offer.good));
+      CHECK(offer.label.find("crate") != std::string::npos);
+    }
+  }
+
+  // The numbers survive the save: the draw does not, so the record carries them.
+  std::string error;
+  ship::Simulation restored = ship::Simulation::NewVoyage(sim.World());
+  REQUIRE(restored.LoadJson(sim.SaveJson(), &error));
+  REQUIRE(restored.State().trades.size() == 1u);
+  CHECK(restored.State().trades[0].good == run.good);
+  CHECK(restored.State().trades[0].crates == run.crates);
+  CHECK(restored.State().trades[0].fee == run.fee);
+}
+
+// Every station writes its own starmap of the system it sits in, out of the
+// chart: the system's reading, then its bodies, planets first. Nothing is
+// authored per port, so a station that exists cannot be missing its page.
+TEST_CASE("every station writes its own starmap of its own system", "[station][starmap]") {
+  ship::Simulation sim = Fresh();
+  const ship::Catalog& world = sim.World();
+  REQUIRE_FALSE(world.ports.empty());
+
+  for (const ship::Port& port : world.ports) {
+    INFO(port.id);
+    const ship::Body* berth = sim.FindBodyById(port.id);
+    REQUIRE(berth != nullptr);
+    const std::string systemId = world.BodySystem(*berth);
+
+    const ship::StarmapPage page = ship::BuildStarmapPage(sim, port.id);
+    CHECK(page.systemId == systemId);
+    CHECK_FALSE(page.systemName.empty());
+    CHECK(page.planetCount > 0u);
+    CHECK_FALSE(page.entries.empty());
+    CHECK_FALSE(page.systemReading.empty());
+
+    // Every planet of that system is on the page, with its name, kind and
+    // reading - and the station itself is not.
+    for (std::size_t index : world.BodiesInSystem(systemId)) {
+      const ship::Body& body = world.bodies[index];
+      if (body.id == port.id) {
+        for (const ship::StarmapEntry& entry : page.entries) { CHECK(entry.id != port.id); }
+        continue;
+      }
+      if (body.type != "planet") { continue; }
+      const auto entry = std::find_if(page.entries.begin(), page.entries.end(),
+                                      [&](const ship::StarmapEntry& e) { return e.id == body.id; });
+      REQUIRE(entry != page.entries.end());
+      CHECK(entry->name == body.name);
+      CHECK_FALSE(entry->kind.empty());
+      CHECK_FALSE(entry->reading.empty());
+    }
+  }
+
+  // The page is a card in the station window, directly under the shop, and
+  // reading it never spends an action or asks for shiplets.
+  sim.MutableMap().here = "tolme";
+  sim.MutableState().docked = false;
+  REQUIRE(sim.Dock());
+  const ship::StationScreenModel model = ship::BuildStationScreen(sim, "tolme");
+  const ship::StationColumn* map = ship::FindStationCategory(model, "starmap");
+  REQUIRE(map != nullptr);
+  REQUIRE(model.columns.size() >= 2u);
+  CHECK(model.columns[0].id == "market");
+  CHECK(model.columns[1].id == "starmap");
+
+  const ship::StarmapPage tolme = ship::BuildStarmapPage(sim, "tolme");
+  std::size_t entries = 0;
+  std::size_t headings = 0;
+  for (const ship::StationRow& row : map->rows) {
+    if (row.reading) {
+      ++headings;   // a group heading, not a body
+      continue;
+    }
+    ++entries;
+    CHECK(row.page);
+    CHECK(row.free);
+    REQUIRE(row.id.rfind("starmap:", 0) == 0);
+    CHECK(sim.FindBodyById(row.id.substr(8)) != nullptr);
+  }
+  CHECK(entries == tolme.entries.size());
+  CHECK(headings > 0u);
+
+  const double actions = sim.ActionCount();
+  for (const ship::StationRow& row : map->rows) {
+    if (row.reading) { continue; }
+    CHECK_FALSE(ship::PressStationAction(sim, row.id));
+  }
+  CHECK(sim.ActionCount() == actions);
+}
+
 TEST_CASE("staged sensor upgrades unlock scanLocked tiers and deep-region scanning",
           "[nav][sensors][expansion]") {
   ship::Simulation sim = Fresh();
@@ -1089,7 +1427,10 @@ TEST_CASE("staged sensor upgrades unlock scanLocked tiers and deep-region scanni
   REQUIRE(sim.Dock());
   REQUIRE(sim.State().docked);
 
-  const auto yardBefore = ship::BuildStationScreen(sim, sim.Map().here).columns[3];
+  const auto stationBefore = ship::BuildStationScreen(sim, sim.Map().here);
+  const ship::StationColumn* yardBeforePtr = ship::FindStationCategory(stationBefore, "yard");
+  REQUIRE(yardBeforePtr != nullptr);
+  const ship::StationColumn& yardBefore = *yardBeforePtr;
   auto findYardRow = [](const ship::StationColumn& col, const std::string& id) -> const ship::StationRow* {
     for (const auto& r : col.rows) {
       if (r.id == id) { return &r; }
@@ -1158,7 +1499,10 @@ TEST_CASE("staged sensor upgrades unlock scanLocked tiers and deep-region scanni
   CHECK_FALSE(sim.CanScan(*sim.FindBodyById(outerRegId)));
 
   {
-    const auto yardMid = ship::BuildStationScreen(sim, sim.Map().here).columns[3];
+    const auto stationMid = ship::BuildStationScreen(sim, sim.Map().here);
+    const ship::StationColumn* yardMidPtr = ship::FindStationCategory(stationMid, "yard");
+    REQUIRE(yardMidPtr != nullptr);
+    const ship::StationColumn& yardMid = *yardMidPtr;
     CHECK_FALSE(findYardRow(yardMid, "upgrade:scanner")->enabled);
     CHECK(findYardRow(yardMid, "upgrade:scanner2")->enabled);
 

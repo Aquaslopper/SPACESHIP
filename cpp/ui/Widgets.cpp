@@ -608,7 +608,7 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       screen.head = model.head;
       screen.panelColumns = {0, 1, 2};
 
-      // ---- left: the five category cards, free to open --------------------
+      // ---- left: the category cards, free to open -------------------------
       NavPanel cards;
       cards.id = "station-cards";
       cards.title = model.portName;
@@ -661,14 +661,72 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       screen.panelRows.push_back(itemRows);
       screen.panelRowIds.push_back(itemIds);
 
+      // ---- right: the trade list ------------------------------------------
+      // On the trade card the middle column is the three mode buttons and the
+      // right column is the list behind the chosen one; every row in it is its
+      // own button, so there is no single commit here.
+      if (open != nullptr && open->id == "trade") {
+        const TradeMode* mode = nullptr;
+        const std::string chosen = picked.item.compare(0, 11, "trade-mode:") == 0
+                                       ? picked.item.substr(11)
+                                       : std::string();
+        for (const TradeMode& candidate : model.tradeModes) {
+          if (candidate.id == chosen) { mode = &candidate; }
+        }
+        if (mode == nullptr && !model.tradeModes.empty()) { mode = &model.tradeModes.front(); }
+
+        NavPanel list;
+        list.id = "station-trade";
+        list.title = mode == nullptr ? "Trade contract" : mode->title;
+        if (mode == nullptr) {
+          list.Dim("No trade board at this station.");
+        } else {
+          list.Dim(mode->note);
+          if (mode->offers.empty()) {
+            list.Dim(mode->empty);
+          } else {
+            list.Dim(mode->offers.size() == 1 ? "1 offer on the board."
+                                              : std::to_string(mode->offers.size()) +
+                                                    " offers on the board.");
+          }
+        }
+        screen.panels.push_back(list);
+
+        std::vector<CommandRowView> offers;
+        std::vector<std::string> offerIds;
+        if (mode != nullptr) {
+          for (const TradeOffer& offer : mode->offers) {
+            CommandRowView view;
+            view.label = offer.label;
+            view.title = offer.note;
+            view.cost = offer.accepted ? "done" : "1 action";
+            view.displayCost = view.cost;
+            view.enabled = !offer.accepted;
+            view.live = view.enabled;
+            offers.push_back(view);
+            offerIds.push_back("trade-accept:" + offer.mode + ":" + offer.to +
+                               (offer.good.empty() ? std::string() : ":" + offer.good));
+          }
+        }
+        screen.panelRows.push_back(offers);
+        screen.panelRowIds.push_back(offerIds);
+        return screen;
+      }
+
       // ---- right: the inspector, and the one commit button ----------------
       const StationRow* item =
           open == nullptr ? nullptr : FindStationItem(model, picked.category, picked.item);
       NavPanel inspector;
       inspector.id = "station-inspector";
-      inspector.title = item == nullptr ? "Inspector" : "Inspector and commit";
+      // A starmap entry is a page, not a purchase: it is read, never pressed.
+      const bool pageItem = item != nullptr && item->page;
+      inspector.title = item == nullptr ? "Inspector"
+                        : (pageItem ? "Starmap page" : "Inspector and commit");
       if (item == nullptr) {
         inspector.Dim("Pick an item in the middle column to read it and commit.");
+      } else if (pageItem) {
+        inspector.Field("Entry", item->label);
+        for (const std::string& line : item->details) { inspector.Note(line); }
       } else {
         inspector.Field("Item", item->label);
         inspector.Field("Cost", item->free ? "Shiplets only" : "One action");
@@ -677,7 +735,7 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       screen.panels.push_back(inspector);
       std::vector<CommandRowView> commitRows;
       std::vector<std::string> commitIds;
-      if (item != nullptr) {
+      if (item != nullptr && !item->page) {
         CommandRowView view;
         view.label = item->commit.empty() ? item->label : item->commit;
         view.cost = item->cost;
@@ -693,9 +751,107 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       screen.panelRowIds.push_back(commitIds);
       return screen;
     }
-    case ScreenKind::Cargo:
+    case ScreenKind::Cargo: {
+      // Three windows: the manifest, the hold itself, and what can be done with
+      // the run in hand. No action bar: every row here is a click on the room.
+      const CargoRoomModel cargo = BuildCargoRoom(sim);
+      TaskScreenModel screen;
+      screen.head = cargo.head;
+
+      NavPanel inventory;
+      inventory.id = "cargo-inventory";
+      inventory.title = "Cargo Inventory";
+      inventory.Note("Everything aboard, whatever brought it here.");
+      inventory.Dim(cargo.inventoryNote);
+      screen.panels.push_back(inventory);
+
+      NavPanel hold;
+      hold.id = "cargo-hold";
+      hold.title = "Cargo Hold View";
+      hold.Note("Click a lot on the left to sort it into the hold.");
+      const double pct = cargo.capacity > 0 ? cargo.used / cargo.capacity * 100.0 : 0.0;
+      const std::string tone = pct > 90.0 ? "#c08a3e" : "#7f9161";
+      hold.Bar(pct, tone);
+      hold.Field("Space", cargo.capacityLine);
+      hold.Dim("Used " + js::NumToString(cargo.used) + " m3, free " +
+               js::NumToString(std::max(0.0, cargo.capacity - cargo.used)) + " m3");
+      hold.Sub(cargo.statusLine);
+      hold.Dim(cargo.statusNote);
+      screen.panels.push_back(hold);
+
+      NavPanel side;
+      side.id = "cargo-side";
+      side.title = cargo.sideTitle;
+      side.Note(cargo.sideNote);
+      screen.panels.push_back(side);
+      screen.panelColumns = {0, 1, 2};
+
+      // left: one press per lot, and the press is the click that sorts it
+      std::vector<CommandRowView> lots;
+      std::vector<std::string> lotIds;
+      for (const CargoLotView& lot : cargo.lots) {
+        CommandRowView view;
+        view.label = lot.name + " - " + js::NumToString(lot.vol) + " m3";
+        view.title = lot.note;
+        view.hideCost = true;  // the word for the clock is not used in this room
+        view.plain = true;
+        view.enabled = !lot.stowed;
+        view.live = view.enabled;
+        view.selected = lot.stowed;
+        if (lot.contract) { view.label += "  (carried for a run)"; }
+        lots.push_back(view);
+        lotIds.push_back("cargo-stow:" + lot.id);
+      }
+      if (lots.empty()) {
+        CommandRowView view;
+        view.label = "The hold is empty.";
+        view.reading = true;
+        lots.push_back(view);
+      }
+      screen.panelRows.push_back(lots);
+      screen.panelRowIds.push_back(lotIds);
+
+      // middle: what has been sorted in, in the order it went in
+      std::vector<CommandRowView> placed;
+      for (const CargoHoldLot& block : cargo.hold) {
+        CommandRowView view;
+        view.label = block.label + " - " + js::NumToString(block.vol) + " m3";
+        view.reading = true;
+        placed.push_back(view);
+      }
+      if (placed.empty()) {
+        CommandRowView view;
+        view.label = "Nothing sorted yet.";
+        view.reading = true;
+        placed.push_back(view);
+      }
+      screen.panelRows.push_back(placed);
+      screen.panelRowIds.push_back({});
+
+      // right: the delivery, the sale, or the lock -- and the bays, if the ship
+      // is under way
+      std::vector<CommandRowView> actions;
+      std::vector<std::string> actionIds;
+      std::vector<CargoSideRow> offers = cargo.sideRows;
+      offers.insert(offers.end(), cargo.salvageRows.begin(), cargo.salvageRows.end());
+      for (const CargoSideRow& row : offers) {
+        CommandRowView view;
+        view.label = row.label;
+        view.title = row.note;
+        view.hideCost = true;
+        view.enabled = row.enabled;
+        view.live = row.enabled;
+        actions.push_back(view);
+        actionIds.push_back(row.enabled ? row.id : std::string());
+      }
+      screen.panelRows.push_back(actions);
+      screen.panelRowIds.push_back(actionIds);
+
+      screen.hasStage = false;
+      return screen;
+    }
     case ScreenKind::Science: {
-      const StoresScreenModel stores = BuildStoresScreen(sim, tab.kind == "room" ? tab.id : "cargo");
+      const StoresScreenModel stores = BuildStoresScreen(sim, tab.id);
       TaskScreenModel screen;
       screen.head = stores.head;
       NavPanel panel;
