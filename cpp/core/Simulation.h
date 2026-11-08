@@ -242,6 +242,7 @@ class Simulation {
   // Economy (Economy.cpp)
   double LotPrice(const GoodsLot& lot) const;
   double CargoUsed() const;
+  double CargoCapacity() const;
   double CargoReserved() const;
   bool BuySupply(const std::string& id);     // fuel cell, kit, medkit, canister, rations
   bool BuyGood(const std::string& goodId);

@@ -45,6 +45,8 @@ double Simulation::LotPrice(const GoodsLot& lot) const {
   return js::Round(lot.value * factor);
 }
 
+double Simulation::CargoCapacity() const { return cargo_.capacity; }
+
 double Simulation::CargoUsed() const {
   double used = 0;
   for (const GoodsLot& lot : goods_) { used += lot.vol; }

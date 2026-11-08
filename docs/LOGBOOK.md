@@ -986,3 +986,45 @@ not 200; buying the galley twice is refused; purse 5,000 -> 4,000. `failures=0`.
 Not proved: that the extra counter actually delays starvation in a long run, and a
 save-and-load round trip of either refit. Both are arithmetic the probe implies
 (34/12 rounds, lifeMax read from rules) but they were not run end to end.
+
+## 058 — Dead delivery buttons, tutorial under the pot, and four washed-out themes
+
+DELIVERY. The row was live and the press did nothing. `AcceptTrade` loads a
+delivery into the hold and refuses when it will not fit, but the station screen
+never asked: it set `enabled = !accepted` and let the player press a button that
+could only fail. Thirty ports measured, 61 refusals out of 83 delivery rows, every
+one of them a full hold. `TradeOffer` now carries `fits` and `blocked`, the screen
+computes `capacity - used - reserved` against `crates x volume`, and the row goes
+dark with "Hold full: needs X m3, Y m3 free" instead of standing there pretending.
+Freelance rows load nothing, so they stay open. Cost label reads "no room", not
+"1 click". Probe `/home/user/probe/delivery`, rebuilding the screen after every
+accept: 22 consignments taken across 21 ports, 0 rows that lied (`failures=0`).
+The core refusal is untouched: the screen now agrees with it rather than the other
+way round.
+
+MESS. The Galley Crew panel carried a four-line paragraph explaining the whole
+cook, and the Cooking panel repeated the automatic threshold that the Galley Crew
+line already gives. Both cut: the note is one line - "Cooks below 10 food, one
+ration a batch, until the 24-food counter is full." - and "Auto-start" is gone from
+the machine panel. The starvation note lost its "slow on purpose" aside.
+
+THEMES. The four optional themes were pale washes: `PaletteForId` replaced six
+roles with near-white surfaces and left classic's parchment as the only one with
+any depth. They are now the same depths in their own colour: classic's role table
+is turned to the theme's hue - void 196 (petrol), aurora 148 (mint), nebula 284
+(violet), ember 20 (copper) - and the saturation is deepened to 1.15x, lightness
+untouched, so nothing that read on parchment stops reading. Terracotta, sage and
+amber are never turned; they mean something.
+
+Probe `/home/user/probe/themes`, contrast and saturation for all five:
+
+    theme    ink/pan ink/con tit/tbg mut/pan richness
+    classic    10.44   12.36    6.93    3.95     0.52
+    void       10.16   12.04    6.56    3.84     0.60
+    aurora     10.11   11.38    6.72    3.63     0.60
+    nebula     10.00   13.29    6.22    4.26     0.60
+    ember      10.09   12.50    6.47    4.00     0.60
+
+Every theme is at least as rich as classic and none lost contrast; `failures=0`.
+What is not proved: how any of it looks. No raylib here, so the boolean is "as deep
+as parchment by the numbers", not "I have seen it".

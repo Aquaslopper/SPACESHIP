@@ -184,8 +184,7 @@ MessScreenModel BuildMessScreen(const Simulation& sim) {
   starve.Field("Risk begins at", Num(sim.GameRules().mess.starveAt) + "% hunger");
   starve.Field("Cost",
                "1 health every " + Num(sim.GameRules().mess.starveEvery) + " clicks");
-  starve.Note("Slow on purpose - the same law bad air already follows. Nobody "
-              "starves on the spot.");
+  starve.Note("Slow, like bad air: nobody starves on the spot.");
   screen.left.push_back(starve);
 
   // --- under the machine -------------------------------------------------
@@ -212,8 +211,6 @@ MessScreenModel BuildMessScreen(const Simulation& sim) {
     cooking.Field("Takes",
                   Num(messRules.foodPerRation) +
                       " clicks; food lands when the batch finishes");
-    cooking.Field("Auto-start", "below " + Num(messRules.cookBelow) +
-                                   " cooked food");
     cooking.Field("Larder", Num(sim.MessRations()) + " of " +
                                 Num(sim.MessRationCapacity()) + " dry rations");
   }
@@ -247,11 +244,9 @@ MessScreenModel BuildMessScreen(const Simulation& sim) {
     crewPanel.Field("Skill", cook->skill);
     crewPanel.Field("Batch", JobThreshold(sim, *cook));
     crewPanel.Field("Activity", cook->activity);
-    crewPanel.Note("When free, and when Hydroponics is not processing produce, "
-                   "she starts cooking below " + Num(messRules.cookBelow) +
-                   " cooked food if at least one dry ration is in the larder. "
-                   "She repeats while dry rations remain, stopping when the " +
-                   Num(capacity) + "-food counter is full or the larder is empty.");
+    crewPanel.Note("Cooks below " + Num(messRules.cookBelow) +
+                   " food, one ration a batch, until the " + Num(capacity) +
+                   "-food counter is full.");
   } else {
     crewPanel.Dim("No automatic cook is assigned. The commander can start a "
                   "batch manually; it still needs one dry ration.");

@@ -53,30 +53,87 @@ Palette ClassicPalette() {
   return p;
 }
 
+// A hue and a lightness is all a role needs: the optional themes keep classic's
+// depths - so nothing that read on parchment fails to read here - and take their
+// own hue at the same strength.
+struct Hsl {
+  double h = 0.0;
+  double s = 0.0;
+  double l = 0.0;
+};
+
+double Channel(unsigned char c) { return static_cast<double>(c) / 255.0; }
+
+Hsl ToHsl(const Rgb& c) {
+  const double r = Channel(c.r), g = Channel(c.g), b = Channel(c.b);
+  const double hi = std::max({r, g, b});
+  const double lo = std::min({r, g, b});
+  const double d = hi - lo;
+  Hsl v;
+  v.l = (hi + lo) / 2.0;
+  if (d <= 0.0001) { return v; }
+  v.s = d / (1.0 - std::fabs(2.0 * v.l - 1.0));
+  if (hi == r) { v.h = 60.0 * std::fmod((g - b) / d, 6.0); }
+  else if (hi == g) { v.h = 60.0 * ((b - r) / d + 2.0); }
+  else { v.h = 60.0 * ((r - g) / d + 4.0); }
+  if (v.h < 0.0) { v.h += 360.0; }
+  return v;
+}
+
+Rgb FromHsl(const Hsl& v) {
+  const double c = (1.0 - std::fabs(2.0 * v.l - 1.0)) * v.s;
+  const double x = c * (1.0 - std::fabs(std::fmod(v.h / 60.0, 2.0) - 1.0));
+  const double m = v.l - c / 2.0;
+  double r = 0.0, g = 0.0, b = 0.0;
+  if (v.h < 60.0) { r = c; g = x; }
+  else if (v.h < 120.0) { r = x; g = c; }
+  else if (v.h < 180.0) { g = c; b = x; }
+  else if (v.h < 240.0) { g = x; b = c; }
+  else if (v.h < 300.0) { r = x; b = c; }
+  else { r = c; b = x; }
+  const auto byte = [m](double f) {
+    const double scaled = (f + m) * 255.0;
+    return static_cast<unsigned char>(std::clamp(std::lround(scaled), 0L, 255L));
+  };
+  Rgb out;
+  out.r = byte(r);
+  out.g = byte(g);
+  out.b = byte(b);
+  return out;
+}
+
+// Hue turned, saturation deepened, lightness untouched: the parchment's depth in
+// another colour. A near-neutral stays neutral, so nothing goes muddy.
+Rgb Deepen(const Rgb& c, double hue, double strength) {
+  Hsl v = ToHsl(c);
+  if (v.s < 0.02) { return c; }
+  v.h = hue;
+  v.s = std::min(0.72, v.s * strength);
+  return FromHsl(v);
+}
+
 Palette PaletteForId(const std::string& id) {
-  // Classic is the unchanged HTA parchment. The user requested light versions
-  // of the other four choices; retain their IDs and accents for saved games.
+  // Classic is the unchanged HTA parchment. The other four are the same depths in
+  // their own colour: surfaces, borders, inks and chrome all take the theme's hue
+  // at classic's strength. The semantic trio - terracotta, sage, amber - is never
+  // turned, because those three mean something.
   Palette p = ClassicPalette();
-  const char* surface = nullptr;
-  const char* raised = nullptr;
-  const char* border = nullptr;
-  const char* accent = nullptr;
-  if (id == "void") {
-    surface = "#f2f7f8"; raised = "#e7f0f2"; border = "#b8ced2"; accent = "#437b87";
-  } else if (id == "aurora") {
-    surface = "#f2f7f3"; raised = "#e7f0e9"; border = "#bbcec0"; accent = "#4a7965";
-  } else if (id == "nebula") {
-    surface = "#f7f3f8"; raised = "#eee8f2"; border = "#ccbed5"; accent = "#796487";
-  } else if (id == "ember") {
-    surface = "#faf5f0"; raised = "#f2e9df"; border = "#d6c2ac"; accent = "#956a4d";
-  }
-  if (surface != nullptr) {
-    p.panel = Hex(surface); p.panel2 = Hex(raised); p.panel3 = Hex(raised);
-    p.chrome = Hex(surface); p.hover = Hex(raised); p.control = Hex(surface);
-    p.border = Hex(border); p.borderDark = Hex(border);
-    p.coffee = Hex(accent); p.coffeeDark = Hex(accent); p.chartInk = Hex(accent);
-    p.chart = Hex(raised); p.titleDialog = Hex(surface); p.titleBorder = Hex(border);
-  }
+  double hue = -1.0;
+  if (id == "void") { hue = 196.0; }        // deep space, petrol blue
+  else if (id == "aurora") { hue = 148.0; }  // mint green
+  else if (id == "nebula") { hue = 284.0; }  // violet
+  else if (id == "ember") { hue = 20.0; }    // copper
+  if (hue < 0.0) { return p; }
+
+  const double strength = 1.15;
+  Rgb* roles[] = {&p.white,         &p.panel,        &p.panel2,       &p.panel3,
+                  &p.border,        &p.borderDark,   &p.coffee,       &p.coffeeDark,
+                  &p.coffeeLight,   &p.ink,          &p.muted,        &p.titleBackground,
+                  &p.titleDialog,   &p.titleBorder,  &p.titleInk,     &p.content,
+                  &p.chrome,        &p.hover,        &p.control,      &p.input,
+                  &p.tabInk,        &p.activeInk,    &p.chart,        &p.chartInk,
+                  &p.titleMenu,     &p.titleMenuInk, &p.titleMenuBorder, &p.titleMenuHover};
+  for (Rgb* role : roles) { *role = Deepen(*role, hue, strength); }
   return p;
 }
 

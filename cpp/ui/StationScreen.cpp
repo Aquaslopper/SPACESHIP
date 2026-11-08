@@ -422,8 +422,9 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
       const Body* destination = sim.FindBodyById(run.to);
       const std::string where = destination == nullptr ? run.to : destination->name;
       std::string commodity = run.good;
+      double commodityVol = 0.0;
       for (const Good& good : sim.World().goods) {
-        if (good.id == run.good) { commodity = good.name; }
+        if (good.id == run.good) { commodity = good.name; commodityVol = good.vol; }
       }
       TradeOffer offer;
       offer.mode = run.mode;
@@ -435,6 +436,18 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
                        ? "Pays " + Num(run.fee) + " sh on hand-over; the station loads it."
                        : "Buy the lot here first; about " + Num(run.fee) + " sh over your cost there.";
       offer.accepted = run.accepted;
+      // A delivery is loaded into the hold the moment it is signed, so a row the
+      // hold cannot take has to say so rather than sit there live and refuse the
+      // press. Freelance loads nothing here and is always open.
+      if (run.mode == "delivery" && !run.accepted) {
+        const double needed = commodityVol * run.crates;
+        const double free = sim.CargoCapacity() - sim.CargoUsed() - sim.CargoReserved();
+        if (needed > free) {
+          offer.fits = false;
+          offer.blocked = "Hold full: needs " + Num(needed) + " m3, " +
+                          Num(std::max(0.0, free)) + " m3 free. Sell or unload first.";
+        }
+      }
       (run.mode == "delivery" ? delivery : freelance).offers.push_back(std::move(offer));
     }
     modes.push_back(std::move(delivery));

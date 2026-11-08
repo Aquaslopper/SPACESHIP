@@ -84,6 +84,8 @@ struct TradeOffer {
   std::string label;      // the row in the right-hand list
   std::string note;       // the line under that row
   bool accepted = false;  // already taken: the button is grey
+  bool fits = true;       // the hold can take the consignment right now
+  std::string blocked;    // why it cannot, in the player's words
 };
 
 // One of the three buttons in the trade card's middle column.

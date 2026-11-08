@@ -718,10 +718,11 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
             CommandRowView view;
             view.label = offer.label;
             view.title = offer.note;
-            view.cost = offer.accepted ? "done" : "1 click";
+            view.cost = offer.accepted ? "done" : (offer.fits ? "1 click" : "no room");
             view.displayCost = view.cost;
-            view.enabled = !offer.accepted;
+            view.enabled = !offer.accepted && offer.fits;
             view.live = view.enabled;
+            if (!offer.fits) { view.title = offer.note + " " + offer.blocked; }
             offers.push_back(view);
             offerIds.push_back("trade-accept:" + offer.mode + ":" + offer.to +
                                (offer.good.empty() ? std::string() : ":" + offer.good));
