@@ -957,8 +957,26 @@ int main() {
         std::copy_if(texts.begin(), texts.end(), std::back_inserter(eventTitles), [&](const auto& text) {
           return text.text == "Events" && text.x >= home.LayoutNow().content.x;
         });
-        Require(eventTitles.size() >= 2 && eventTitles.front().y >= firstPanel.y + firstPanel.h,
+        Require(eventTitles.size() == 2 && eventTitles.front().y >= firstPanel.y + firstPanel.h,
                 "Two home event cards were not placed below the three information panels");
+        std::vector<RectCall> paintedCards;
+        for (const auto& info : model.infos) {
+          paintedCards.push_back(filledAt(info.box.x, info.box.y));
+        }
+        paintedCards.push_back(*navSurface);
+        for (const auto& title : eventTitles) {
+          const auto surface = std::find_if(rects.begin(), rects.end(), [&](const auto& rect) {
+            return rect.color.r == panel.r && rect.color.g == panel.g && rect.color.b == panel.b &&
+                   title.x >= rect.x && title.x < rect.x + rect.w &&
+                   title.y >= rect.y && title.y < rect.y + rect.h;
+          });
+          Require(surface != rects.end(), "Events card is missing its warm surface fill");
+          paintedCards.push_back(*surface);
+        }
+        Require(paintedCards.size() == 6 && std::all_of(paintedCards.begin(), paintedCards.end(),
+                  [&](const auto& card) {
+                    return card.w == paintedCards.front().w && card.h == paintedCards.front().h;
+                  }), "Painted Home cards do not have exactly equal dimensions");
         int valueLines = 0;
         for (const auto& line : texts) {
           if (line.size != theme.HomeInfoValuePx() || line.text.empty() ||

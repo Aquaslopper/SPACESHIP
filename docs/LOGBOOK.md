@@ -341,3 +341,17 @@ You must append a compressed summary of **every single reply and action you take
 - **Full suite:** `ctest --test-dir build --output-on-failure` passed **125/125**; `git diff --check` passed.
 - **Visual limit:** No windowed client screenshot was captured here; the native draw recorder verifies the painter's measured geometry, not a live display.
 - **Scope:** Follow-up on PR #30, branch `arena/cb265de8-spaceship`; palette, authored assets, legacy materials, and simulation/gameplay behavior remain unchanged.
+
+### Entry #024
+- **Timestamp:** 2026-11-08 00:42 UTC
+- **Task:** Close the remaining visual-sizing gap after the owner demanded a cleaner, non-chaotic Home layout.
+- **Painter bug (`Draw.cpp`):** Although the prior model placed six equal-width cards, `PaintIdle` still subtracted 8px from the first two info-card fills as residue from the old layout. Removed that trim so the rendered surfaces match the grid geometry exactly.
+- **Callout clearance:** Increased the standard three-row labels' reserved horizontal clearance to 30px from the ship-art rectangle while keeping their widths/left edges staggered; wrapping still contributes to row height.
+- **Rendered-size test (`draw_probe.cpp`):** Compare the actual six recorded background rectangles, not just model boxes, and require identical painted width and height.
+- **Art-overlap test:** The O2 Filter Room, Cargo Hold, Crew Quarters, and Bridge panels are checked against the recorded ship-art rectangle with a clearance margin.
+- **Grid test:** Retains the three-column alignment, six equal model dimensions, 12px card gutters, and 12px Activity Feed separation assertions.
+- **Checks:** `cmake --build build --parallel 2` passed; `tools/check-draw.sh` passed.
+- **Full regression suite:** `ctest --test-dir build --output-on-failure` passed **125/125**, including GUI syntax, ImGui input, and native draw recorder.
+- **Diff hygiene:** `git diff --check` passed.
+- **Visual limit:** No windowed screenshot was captured in this environment; the new checks validate the real painter's recorded fills and coordinates.
+- **Scope:** Follow-up on PR #30, branch `arena/cb265de8-spaceship`; no gameplay, palette, authored asset, or historical reference edits.

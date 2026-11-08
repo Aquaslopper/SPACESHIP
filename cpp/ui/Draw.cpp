@@ -922,7 +922,7 @@ void ShellView::PaintIdle(Simulation& sim) {
   const int valuePx = theme.HomeInfoValuePx();
   for (std::size_t i = 0; i < idle_.infos.size(); ++i) {
     const RailCell& cell = idle_.infos[i];
-    const float width = std::max(0.0f, cell.box.w - (i + 1 < idle_.infos.size() ? 8.0f : 0.0f));
+    const float width = std::max(0.0f, cell.box.w);
     DrawRectangle(static_cast<int>(cell.box.x), static_cast<int>(cell.box.y),
                   static_cast<int>(width), static_cast<int>(cell.box.h), ToRay(theme.palette.panel));
     DrawRectangleLines(static_cast<int>(cell.box.x), static_cast<int>(cell.box.y),
