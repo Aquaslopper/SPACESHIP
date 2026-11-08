@@ -415,23 +415,24 @@ Simulation::NavMetrics Simulation::MetricsFor(const Body& body) const {
     if (body.id == map_.here) { distance = 0; }
   }
 
-  // The navigator reduces FUEL, never travel time: a busy navigator cannot plot
-  // a more efficient course, and training raises the saving.
-  Simulation* self = const_cast<Simulation*>(this);
+  // The navigator shortens the crossing itself: a plotted course is fewer clicks
+  // under way, and training buys a shorter one. A busy navigator plots nothing,
+  // so only a free hand counts. Fuel follows the distance, so it is not
+  // discounted a second time.
   const CrewMember* navigator = nullptr;
   for (const CrewMember& crew : crew_) {
     if (crew.job == "navigation" && CrewBusy(crew) == nullptr) { navigator = &crew; break; }
   }
-  (void)self;
-  const double discount = navigator == nullptr
-                              ? 0.0
-                              : 4.0 * std::max(1.0, std::min(5.0, navigator->jobAt == 0 ? 1.0 : navigator->jobAt));
+  const double saving =
+      navigator == nullptr ? 0.0 : 10.0 * std::max(0.0, std::min(5.0, navigator->jobAt));
+  if (distance > 0.0 && saving > 0.0) {
+    distance = std::max(1.0, js::Round(distance * (100.0 - saving) / 100.0));
+  }
   const double drivePercent = state_.upgrades.count("drive") != 0 && state_.upgrades.at("drive") ? 80.0 : 100.0;
-  const double navPercent = 100.0 - discount;
 
   NavMetrics metrics;
   metrics.dist = distance;
-  metrics.fuel = js::Ceil(distance * drivePercent * navPercent / 10000.0);
+  metrics.fuel = js::Ceil(distance * drivePercent / 100.0);
   metrics.total = distance + 1;
 
   const double ly = distance * map_.lyPerAction;

@@ -778,3 +778,36 @@ press, because that press spends a click and the crew's start does not; the
 cleaner has no room and no button to press; navigation has no button at all. And
 nothing yet paints the press - no rising green symbol, no button flash - because
 that is `Draw.cpp`, which this sandbox cannot compile.
+
+## 050 — Three jobs, three real behaviours
+
+NAVIGATOR. `Navigation.cpp` used to discount FUEL and never the crossing: a trained
+navigator saved up to 20% of the fuel bill and nothing at all of the wait. It now
+shortens the crossing itself - `distance = round(distance * (100 - saving) / 100)`
+with `saving = 10 * clamp(jobAt, 0..5)` - and fuel follows the shorter distance, so
+it is no longer discounted twice. Measured on one target: no navigator 15 clicks,
+navigator untrained 15, at skill 3 it is 11, at skill 5 it is 8.
+
+FILTERS. The hand seats canisters two at a time and holds the third until the air
+has fallen to the stage his training allows: `line = min(3, jobAt)`, and while two
+are seated he waits for `AirStageIndex() > line`. The old blanket gate
+(`AirStageIndex() > jobAt` -> do nothing) is gone, because it made an untrained
+hand useless exactly when he was needed - he could not stock anything while the
+air was still good, so the 1-2-then-3 stocking never began.
+
+KITCHEN. Her restock line is now `cookBelow + foodPerRation * min(3, jobAt)`,
+capped at the rack: 10 untrained, 15 after one teaching, 20 after two, 24 at the
+top. She still carries on until the rack is full, so a taught cook starts a batch
+earlier and the counter never gets as low.
+
+Probe `/home/user/probe/jobs3`: at air stage 2 the untrained hand seats two and the
+third slot is never opened; a rack of twelve is left alone by an untrained cook and
+pressed by one taught once. `/home/user/probe/jobs2` measured the navigator ladder.
+`failures=0` on both.
+
+Not proved here: that a trained filter hand really fills earlier than an untrained
+one, because the probe could not drive the air down through the stages and watch
+him act; the threshold is expressed and the wait is proved, the difference is not.
+The cleaner still does nothing but lift morale, and nothing is painted.
+`assets/data` was not touched: the cook's base line is still 10 in the data and the
+per-stage step is computed in code.

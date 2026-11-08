@@ -455,7 +455,6 @@ void Simulation::AutoFilters() {
   if (o2Claim_ || state_.filterLife > 0 || StatValue("energy") <= 0) { return; }
   if (worker == nullptr || BankRunning()) { return; }
   if (CrewBusy(*worker) != nullptr) { return; }
-  if (AirStageIndex() > static_cast<int>(worker->jobAt)) { return; }
 
   if (BankReady()) {
     RunBank(worker->name + " started the filter bank. Air purified. +10 Pro-Action.");
@@ -474,6 +473,20 @@ void Simulation::AutoFilters() {
   for (std::size_t i = 0; i < life_.slots.size(); ++i) {
     if (FindOngoing("o2s" + std::to_string(i)) != nullptr) { return; }
   }
+  // Two canisters go in as soon as the rack allows; the third waits for the air
+  // to fall to the stage his training lets him wait for. An untrained hand sits
+  // on it until the air is already bad, a trained one fills while there is still
+  // room to breathe.
+  int seated = 0;
+  for (const CanisterSlot& slot : life_.slots) {
+    if (slot.state == "installed") { ++seated; }
+  }
+  // His training is what lets him fill while there is still room to breathe: an
+  // untrained hand waits for the air to actually fall, a taught one fills as soon
+  // as it leaves perfect.
+  const int line = std::min(3, static_cast<int>(worker->jobAt));
+  if (seated >= 2 && AirStageIndex() > line) { return; }
+
   // He presses the O2 panel's own control: the same press the commander makes,
   // made by a hand, so it runs at his rate and carries his name.
   for (std::size_t i = 0; i < life_.slots.size(); ++i) {
@@ -490,11 +503,14 @@ void Simulation::AutoMess() {
   if (cookClaim_ || projectClaim_ == "food" || FindOngoing("project-food") != nullptr) { return; }
   if (worker == nullptr || FindOngoing("cook") != nullptr) { return; }
   if (CrewBusy(*worker) != nullptr) { return; }
-  // She starts once the counter is under cookBelow and does not stop until it
-  // is full: cooking 1 ratio, then another ratio, until the rack is stocked.
-  // A batch started again as soon as the pot is off means a dropping counter
-  // never waits for the player.
-  if (!cookRestock_ && mess_.rack >= rules_.mess.cookBelow) { return; }
+  // She starts once the counter is under her own line and does not stop until it
+  // is full: cooking 1 ration, then another, until the rack is stocked. That line
+  // is the untrained one plus a batch per stage of her training, so a taught cook
+  // starts a batch earlier and the rack never gets as low.
+  const double line = std::min(mess_.capacity,
+                               rules_.mess.cookBelow +
+                                   rules_.mess.foodPerRation * std::min(3.0, worker->jobAt));
+  if (!cookRestock_ && mess_.rack >= line) { return; }
   if (mess_.rack >= mess_.capacity) {
     cookRestock_ = false;
     return;
