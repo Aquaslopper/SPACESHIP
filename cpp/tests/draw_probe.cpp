@@ -600,7 +600,7 @@ int main() {
     sim.MutableState().shiplets = 10000;
     ship::OpenTask(sim, "station", "tolme", true);
     Frame(view, sim);
-    // Three columns walked in one direction: five cards on the left, the open
+    // Three columns walked in one direction: three cards on the left, the open
     // card's items in the middle, and the inspector with its one commit button
     // on the right. Cards and items are free; the market's commit is money only.
     const auto startsWith = [](const char* prefix, const char* missing) {
@@ -612,15 +612,16 @@ int main() {
     };
     const auto marketCard = startsWith("Market - purse", "the Market card did not paint");
     const auto salesCard = startsWith("Sell cargo and survey data", "the sales card did not paint");
-    const auto boardCard = startsWith("Mission board", "the mission board card did not paint");
     const auto yardCard = startsWith("Shipyard and crew", "the shipyard card did not paint");
-    const auto tavernCard = startsWith("Tavern / Bar", "the tavern card did not paint");
-    Require(std::abs(salesCard.x - marketCard.x) < 1 && std::abs(boardCard.x - marketCard.x) < 1 &&
-            std::abs(yardCard.x - marketCard.x) < 1 && std::abs(tavernCard.x - marketCard.x) < 1,
-            "The five station cards are not in one column");
-    Require(salesCard.y > marketCard.y && boardCard.y > salesCard.y && yardCard.y > boardCard.y &&
-            tavernCard.y > yardCard.y,
+    Require(std::abs(salesCard.x - marketCard.x) < 1 && std::abs(yardCard.x - marketCard.x) < 1,
+            "The three station cards are not in one column");
+    Require(salesCard.y > marketCard.y && yardCard.y > salesCard.y,
             "The station cards are not stacked in their own order");
+    // The mission board and the tavern are no longer offered by this window.
+    Require(!std::any_of(texts.begin(), texts.end(), [](const auto& t) {
+              return t.text.find("Mission board") == 0 || t.text.find("Tavern / Bar") == 0;
+            }),
+            "A removed station card is still painted");
     const auto fuel = startsWith("Fuel cell", "the market items did not paint");
     Require(fuel.x > marketCard.x, "The market's items are not in the middle column");
     const auto commit = startsWith("Buy - 45 sh", "the inspector commit button did not paint");

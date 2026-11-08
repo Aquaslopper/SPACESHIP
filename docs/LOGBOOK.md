@@ -498,3 +498,17 @@ You must append a compressed summary of **every single reply and action you take
 - **Reference:** `Legacy code_Spaceship.txt` has only two ports (`tolme`, `relay`) with hand-authored baskets and six hand-authored contracts; it contains no per-port offer concept to port for the 30-port chart.
 - **Untouched:** every file in `cpp/`, `assets/`, `tests/`, `rescue/`, the Legacy reference, and the CMake build. `git status` is clean on `arena/29d1c9e6-spaceship`.
 - **Checks run:** `git status --short` (clean), `git log --oneline -1` (0cf2aca), plus read-only greps and JSON counts quoted above. No build, no test suite, no draw probe — there was no change to check.
+
+### Entry #036
+- **Timestamp:** 2026-11-08 UTC
+- **Task:** owner removed two station cards outright — "remove the mission board, it doesnt make sense anymore" and "remove the tavern bar, it doesnt make sense anymore".
+- **Scope decision, stated plainly:** this removes the two *cards from the station window*. The commission and contract engine in `cpp/core/Economy.cpp` is untouched and still reachable from the console harness (`cpp/app/console_main.cpp`). The owner named the station surfaces, not the simulation.
+- **`cpp/ui/StationScreen.cpp`, -283 lines:** deleted the mission-board block (117 lines: repeatable-commission offers, collect, abandon, the "Regular contracts" heading and the 18-contract loop) and the tavern block (53 lines: the trader row and the candidate rows). `model.columns` is now `{market, sales, yard}`.
+- **Dead helpers removed with their only callers:** `ContractStatus()`, `Talked()`, `TraderSpeech()`, `PatronSpeech()`, `LocalRumors()`, `RegionName()` — the last four existed only to compose the bar's speeches, and both rumor helpers were reachable solely from there.
+- **Press verbs removed:** `contract-accept:`, `contract-collect:`, `commission-accept:`, `commission-collect`, `commission-abandon`, `talk:`. Grep after the edit finds no reference to any of them or to any removed helper in `cpp/ui/` or `cpp/tests/`.
+- **Copy that lied about the window:** the file header comment still described five cards; the head subtitle still said "contracts and the bar cost one action"; `Describe.cpp` still read "market, mission board, shipyard and crew" and advertised "accept a contract | 1 action". All three now describe the three-card window.
+- **Handbook:** `assets/data/content.json` entry 0 no longer tells the player to "use the mission board"; entry 18 (title "Contracts and mission boards") now says the window no longer offers a board because every berth showed the same pinned list. The simulation-side text is kept.
+- **Tests updated, not run (owner: "no test"):** `cpp/tests/draw_probe.cpp` now expects three cards in one column, checks the sales/yard order, and asserts neither removed card paints; `cpp/tests/nav_tests.cpp` reads the yard at `columns[2]` instead of `[3]`.
+- **Left alone on purpose:** the yard still contains the hiring hall. It is the same "one identical hall at every berth" problem the owner named for the tavern, but a hiring hall is a door to the crew system rather than a dead end — it needs the same decision, not a silent delete.
+- **Checks run (reading only, per instruction):** `git diff --stat` = 7 files, +30/-296; brace balance scanned to depth 0 on all six edited C++ files; grep for removed symbols returns nothing; `content.json` re-parsed as valid JSON. **No build, no test suite, no draw probe.**
+- **State:** uncommitted on `arena/29d1c9e6-spaceship`.

@@ -2882,8 +2882,8 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
     const NavPanel& panel = screen.panels[i];
     const float noteH = MeasurePanelHeight(panel, columnW);
 
-    // The station's panels contain their rows, as in the HTA, and the sales /
-    // board and shipyard / tavern panels stack in their shared columns.
+    // The station's panels contain their rows, as in the HTA, and the sales
+    // and shipyard panels stack in their shared columns.
     float rowsH = 0;
     if (i < screen.panelRows.size()) {
       for (const CommandRowView& row : screen.panelRows[i]) {

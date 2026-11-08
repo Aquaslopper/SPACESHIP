@@ -13,10 +13,8 @@
 //                                do not, or once a one-time thing is owned.
 //    Cargo and survey data       pays shiplets, costs one action. The lot is
 //                                gone afterwards, so the row cannot repeat.
-//    Mission board               starts the mission, costs one action. The
-//                                button greys out the moment it is accepted.
-//    Tavern / Bar                talking costs one action, once per person;
-//                                the button greys out after the first word.
+//
+//  The mission board and the tavern are no longer cards on this window.
 //
 //  Nothing on this window carries an action cooldown: the state the commit
 //  itself changes is what stops a second press, not a lock on the button.
@@ -53,7 +51,7 @@ struct StationRow {
 
 // One category card on the left, and the items it opens in the middle.
 struct StationColumn {
-  std::string id;      // "market", "sales", "board", "yard", "tavern"
+  std::string id;      // "market", "sales", "yard"
   std::string title;
   std::string badge;   // the card's own second line: the purse, the tally
   std::vector<std::string> notes;
@@ -72,7 +70,7 @@ struct StationScreenModel {
   std::string portId;
   std::string portName;
   std::string tip;
-  std::vector<StationColumn> columns;  // Market | Sales | Board | Yard | Tavern
+  std::vector<StationColumn> columns;  // Market | Sales | Yard
   std::string purseLine;
   std::string holdLine;
   bool docked = false;

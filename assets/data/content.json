@@ -228,7 +228,7 @@
       "id": "first-watch",
       "link": "o2",
       "linkLabel": "Open O2 Filter Room",
-      "text": "Start at Kessler Drift. Right-click Navigation, choose Tolme Anchorage and start a crossing. Seat all three canisters in the O2 Filter Room and start the bank. While crossing, recover salvage in the Cargo Hold. Acknowledge arrival in Navigation; open the Docked indicator to trade and use the mission board.",
+      "text": "Start at Kessler Drift. Right-click Navigation, choose Tolme Anchorage and start a crossing. Seat all three canisters in the O2 Filter Room and start the bank. While crossing, recover salvage in the Cargo Hold. Acknowledge arrival in Navigation; open the Docked indicator to trade.",
       "title": "Your first watch"
     },
     {
@@ -356,7 +356,7 @@
     {
       "group": "Rewards",
       "id": "contracts",
-      "text": "At a station, accept contracts from the mission board. Some carry freight or passengers; others ask for a visit or a scan. Complete the objective and collect payment at a station. Contract freight occupies cargo space and cannot be sold. Jettisoning it fails the contract.",
+      "text": "The simulation still carries its contract and commission engine, but the station window no longer offers a board: every berth showed the same pinned list. Some carry freight or passengers; others ask for a visit or a scan. Complete the objective and collect payment at a station. Contract freight occupies cargo space and cannot be sold. Jettisoning it fails the contract.",
       "title": "Contracts and mission boards"
     },
     {
