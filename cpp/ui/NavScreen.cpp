@@ -942,26 +942,3 @@ bool PressNavActionRaw(Simulation& sim, const std::string& action, const std::st
   }
   return false;
 }
-
-}  // namespace
-
-// ============================================================================
-//  The press, with the anti-spam lock around it (Phase 9).
-//  ---------------------------------------------------------------------------
-//  One control is one control. The first press spends the action and starts the
-//  tier's lock in ACTION_COOLDOWN_RULES; a second press of the same button
-//  before another action resolves is refused, whether it comes from the window
-//  or from this harness. Free reads spend nothing and therefore lock nothing.
-// ============================================================================
-bool PressNavAction(Simulation& sim, const std::string& action, const std::string& arg) {
-  // Progress controls acknowledge before consulting cooldowns (HTA
-  // onProgressClick). Do not add a second lock around that dispatcher.
-  const auto screen = BuildNavScreen(sim).screen;
-  if (action == "travel" || action == "scan" || action == "extract") {
-    for (const auto& button : screen.progress) {
-      if (button.taskId == action) { return PressProgressButton(sim, button); }
-    }
-    return false;
-  }
-  
-}  // namespace ship
