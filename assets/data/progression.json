@@ -121,7 +121,7 @@
       "title": "A Name on the Board"
     },
     {
-      "detail": "Spend 200 actions on the voyage.",
+      "detail": "Spend 200 clicks on the voyage.",
       "goal": 200,
       "id": "watch",
       "metric": "actions",

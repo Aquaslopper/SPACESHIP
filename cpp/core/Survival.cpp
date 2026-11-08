@@ -61,7 +61,7 @@ void Simulation::TickFilters() {
     // does not also spend a step of it.
     state_.airHold = rules_.air.holdMax;
     LogLine("Filter bank spent. The cabin air will hold for " +
-            js::NumToString(rules_.air.holdMax) + " actions.");
+            js::NumToString(rules_.air.holdMax) + " clicks.");
     return;
   }
 

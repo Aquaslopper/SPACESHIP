@@ -277,12 +277,12 @@ std::string Simulation::JobThreshold(const CrewMember& crew) const {
     return "Fuel use -" + js::NumToString(NavigatorFuelDiscount(crew)) + "% when plotting";
   }
   if (crew.job == "cleaner") {
-    return "Crew morale +1 every " + js::NumToString(CleanerInterval(crew)) + " actions";
+    return "Crew morale +1 every " + js::NumToString(CleanerInterval(crew)) + " clicks";
   }
   if (crew.job == "kitchen") {
     return "1 dry ration -> up to " + js::NumToString(rules_.mess.foodPerRation) +
            " cooked food in " + js::NumToString(rules_.mess.foodPerRation) +
-           " actions";
+           " clicks";
   }
   return "-";
 }

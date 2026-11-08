@@ -369,7 +369,7 @@
       "trainCap": 3,
       "trainStep": 1,
       "unique": true,
-      "unit": " ration/action",
+      "unit": " ration/click",
       "wage": 15
     }
   ],
@@ -377,7 +377,7 @@
     {
       "id": "doc",
       "label": "Send to Doc",
-      "note": "away up to 7 actions"
+      "note": "away up to 7 clicks"
     },
     {
       "id": "learnOn",

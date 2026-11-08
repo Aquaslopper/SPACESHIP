@@ -274,7 +274,7 @@ void Simulation::ApplyOrderPayload(CrewMember& crew, const Task& task) {
     if (doc != nullptr) { doc->who = crew.id; }
     crew.activity = "In the medical bay";
     LogLine(crew.name + " went into the medical bay - about " +
-            js::NumToString(rules_.docAway) + " actions.");
+            js::NumToString(rules_.docAway) + " clicks.");
   }
   if (learnOn) { TrainCrew(crew, 1, "aboard"); }
   if (learnSt && state_.docked) { TrainCrew(crew, 2, "at the station"); }

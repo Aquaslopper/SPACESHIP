@@ -17,7 +17,7 @@ struct PlateView {
   std::string id;
   std::string name;
   double tickPercent = 0.0;   // how far through this hand's own clock
-  std::string sub;            // "N actions to next meal"
+  std::string sub;            // "N clicks to next meal"
   std::string tone;           // terracotta at 70 hunger, sage below
 };
 

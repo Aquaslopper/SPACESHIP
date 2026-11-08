@@ -403,7 +403,7 @@ TEST_CASE("a reachable target reads out distance, transit and cost", "[nav]") {
   CHECK(Line(distance, "Distance")->value == "8.8 ly");
   CHECK(Line(distance, "")->value == "8.3 x 10^13 km");
   CHECK(Line(distance, "Transit")->value == "~13 months, 9 days");
-  CHECK(Line(distance, "Action cost")->value == "22 actions");
+  CHECK(Line(distance, "Click cost")->value == "22 clicks");
 
   CHECK(nav.courseNote == "Course from Kessler Drift to Tolme Anchorage.");
   REQUIRE(Button(nav.screen, "travel") != nullptr);

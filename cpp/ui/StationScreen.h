@@ -38,7 +38,7 @@ namespace ship {
 struct StationRow {
   std::string id;        // the press id: "buy-fuel", "sell:<lot>", "contract:<id>"
   std::string label;     // the middle-column item, price included
-  std::string cost;      // "0 actions", "1 action", "done"
+  std::string cost;      // "0 clicks", "1 click", "done"
   std::string note;      // the small line under a contract or a hire
   std::string confirm;   // the question asked first when confirmations are on
   bool enabled = false;  // the commit button on the right is live

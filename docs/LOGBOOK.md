@@ -672,3 +672,28 @@ at 97% is 12 clicks and at 90% is 40; the room's own panels, head and band note
 never contain the word the owner rejects; the machine carries exactly one control
 inside its 650x390 frame; the bottom strip is gone; the bar survives a save and
 load. `failures=0`. `Draw.cpp` still cannot be compiled here.
+
+## 046 — The unit is a click
+
+The player-facing unit of the clock is now "click" everywhere: labels, badges,
+log lines, notes, the wiki prose and the data tables. `1 action` -> `1 click`,
+`N actions` -> `N clicks`, `one action` -> `one click`, `action cost` -> `click
+cost`, `per action` -> `per click`. 192 lines across 30 files; identifiers, JSON
+keys, save keys, the trace field `actions`, the console commands and the
+`actionCounter_` member are untouched, so no file format or lookup moved.
+
+`IsActionCost()` decided whether a control spends the clock by looking for the
+word "action" in its cost string. With the unit renamed that test would have
+gone blind and every control would have read as free, so `MentionsClick()` was
+added beside `MentionsAction()` and the two are ORed. Probe `/tmp/probe/costword`
+checks nine cost strings: `1 click`, `2 clicks`, `1 action`, `1 click + 2 work`
+are paid; `free`, `done`, `at a station`, `COOLDOWN 7` are not. `bad=0`.
+
+`assets/data/survival.json` finally loses the dead `"perAction": 10` key, and the
+engine entry in `content.json` now reads that the drive loses one percent every
+four clicks and that the machine's button is live again after twelve. Prose in
+`crew.json` and `progression.json` got the same unit.
+
+Compiled: every `cpp/core`, `cpp/ui` and `cpp/app` file under
+`-fsyntax-only -Wall -Wextra` except `Draw.cpp`, which needs raylib that this
+sandbox does not have. The Catch2 suite was not run.

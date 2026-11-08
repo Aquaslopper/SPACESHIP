@@ -44,7 +44,7 @@ struct JobDef {
   double learnOn = 0, learnSt = 0;    // the price of a lesson, in actions
   double feeOn = 0, feeSt = 0;        // ...and in shiplets
   double trainStep = 0, trainCap = 0;
-  std::string unit;                   // "%" / " air" / " ration/action"
+  std::string unit;                   // "%" / " air" / " ration/click"
   std::string cloth, dark;            // what the sprite in the quarters wears
 };
 

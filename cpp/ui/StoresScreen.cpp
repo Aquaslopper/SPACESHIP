@@ -142,7 +142,7 @@ StoresScreenModel BuildStoresScreen(const Simulation& sim, const std::string& ro
   model.head.sub = "Survey data, filed and packaged";
   {
     model.notice =
-        "Deep scans are filed here. Packaging costs one action, takes two more, and "
+        "Deep scans are filed here. Packaging costs one click, takes two more, and "
         "adds value.";
     model.tally = js::NumToString(sim.Survey().size()) + " records filed.";
     if (sim.Survey().empty()) {
@@ -155,10 +155,10 @@ StoresScreenModel BuildStoresScreen(const Simulation& sim, const std::string& ro
       StoreRowView row;
       row.id = "package:" + record.id;
       row.packaged = record.state == "packaged";
-      row.cost = row.packaged ? "done" : "1 action + 2 work";
+      row.cost = row.packaged ? "done" : "1 click + 2 work";
       row.label = row.packaged
                       ? "Packaged: " + record.name + " (" + js::NumToString(record.value) + " sh)"
-                      : "Package: " + record.name + " (1 action + 2 work)";
+                      : "Package: " + record.name + " (1 click + 2 work)";
       row.enabled = !row.packaged;
       row.progress = true;
       model.rows.push_back(row);

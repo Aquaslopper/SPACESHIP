@@ -513,7 +513,7 @@ TEST_CASE("station purchases are money only: no action, no lock, the counter sta
     return ship::CommandRowView{};
   };
   REQUIRE(fuelRow().enabled);
-  CHECK(fuelRow().cost == "0 actions");
+  CHECK(fuelRow().cost == "0 clicks");
   CHECK(fuelRow().hideCost);
   CHECK(fuelRow().remaining == 0);
   const auto before = sim.ActionCount();

@@ -120,7 +120,7 @@ CrewRecordModel BuildCrewRecord(const Simulation& sim, const std::string& crewId
   employment.Field("Acts at", sim.JobThreshold(*crew));
   employment.Field("Pay", wage > 0 ? js::NumToString(wage) + " sh each payday"
                                    : "Unpaid - holds no job");
-  employment.Field("Next payday", wage > 0 ? js::NumToString(sim.PayrollDue()) + " actions"
+  employment.Field("Next payday", wage > 0 ? js::NumToString(sim.PayrollDue()) + " clicks"
                                            : "Not on payroll");
   employment.Field("Wallet", js::NumToString(crew->wallet) + " sh");
 

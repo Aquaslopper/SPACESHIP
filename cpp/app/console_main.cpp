@@ -194,7 +194,7 @@ int main(int argc, char** argv) {
       }
     } else if (command == "action") {
       std::string detail = RestOfLine(line, "action");
-      if (detail.empty()) { detail = "Scripted action"; }
+      if (detail.empty()) { detail = "Scripted click"; }
       simulation.PerformAction(detail);
     } else if (command == "maint") {
       simulation.StartMaintenanceSelf();

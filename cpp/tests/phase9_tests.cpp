@@ -244,7 +244,7 @@ TEST_CASE("how to play offers six illustrated cards without adding a menu comman
   }
   CHECK(cards[3].body.find("Not every click") != std::string::npos);
   CHECK(cards[5].body.find("illustrates possible roles") != std::string::npos);
-  CHECK(cards[5].habit.find("costs one action") != std::string::npos);
+  CHECK(cards[5].habit.find("costs one click") != std::string::npos);
 
   ship::Simulation sim = Fresh();
   bool fromVoyage = false;

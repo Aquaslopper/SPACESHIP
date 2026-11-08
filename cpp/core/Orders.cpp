@@ -218,7 +218,7 @@ bool Simulation::CommitOrders() {
             js::NumToString(state_.shiplets) + " sh.");
   }
   QueueOrders(sheet, work);
-  LogLine("Crew assignments updated. " + js::NumToString(work) + " actions of work.");
+  LogLine("Crew assignments updated. " + js::NumToString(work) + " clicks of work.");
   return true;
 }
 
@@ -289,7 +289,7 @@ void Simulation::TrainCrew(CrewMember& crew, int steps, const std::string& where
     if (job->id == "kitchen") {
       LogLine(crew.name + " trained " + where + " - galley batches remain one dry ration "
               "for up to " + js::NumToString(rules_.mess.foodPerRation) +
-              " cooked food in " + js::NumToString(rules_.mess.foodPerRation) + " actions.");
+              " cooked food in " + js::NumToString(rules_.mess.foodPerRation) + " clicks.");
     } else {
       LogLine(crew.name + " trained " + where + " - now acts at " +
               js::NumToString(crew.jobAt) + job->unit + ".");

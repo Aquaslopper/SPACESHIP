@@ -771,7 +771,7 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
       distance.Field("Distance", metrics.ly);
       distance.Field("", metrics.km);
       distance.Field("Transit", metrics.transit);
-      distance.Field("Action cost", Plur(metrics.total, "action"));
+      distance.Field("Click cost", Plur(metrics.total, "action"));
       distance.Field("Fuel required", Num(metrics.fuel) + "%");
       distance.Field("Navigator",
                      navigator == nullptr
@@ -885,7 +885,7 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
   // The band's two notes: what standing watch costs, then why a button may be
   // off.
   model.notes.push_back(
-      "Standing watch spends one action and needs no item; work and survival "
+      "Standing watch spends one click and needs no item; work and survival "
       "clocks advance, with normal resource use.");
   if (energy <= 0) {
     model.notes.push_back("Restore energy to use navigation and sensors.");
@@ -898,8 +898,8 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
     model.notes.push_back("A crossing is already under way.");
   } else {
     model.notes.push_back(
-        "Committing costs one action now, then the distance in actions spent "
-        "elsewhere aboard the ship. A deep scan costs one action now and " +
+        "Committing costs one click now, then the distance in clicks spent "
+        "elsewhere aboard the ship. A deep scan costs one click now and " +
         Num(SimScanCost(sim)) + " spent elsewhere.");
   }
   for (const std::string& note : model.notes) { actions.Dim(note); }

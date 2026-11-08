@@ -99,7 +99,7 @@ double OngoingPercent(const Task& task);
 struct CommandRowView {
   std::string label;
   std::string cost;         // what the caller asked for
-  std::string displayCost;  // "1 action", "free", or "COOLDOWN 7"
+  std::string displayCost;  // "1 click", "free", or "COOLDOWN 7"
   std::string title;        // the hover text
   std::string cooldownKey;
   std::string category;
@@ -126,7 +126,7 @@ bool PressConversation(Simulation& sim, const std::string& crewId);
 struct ActionRowView {
   std::string id;
   std::string label;
-  std::string cost;      // "1 action", "free", "done", or empty
+  std::string cost;      // "1 click", "free", "done", or empty
   std::string note;
   std::string confirm;   // asked first when confirmations are on
   bool enabled = false;

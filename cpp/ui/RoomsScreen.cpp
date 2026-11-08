@@ -98,7 +98,7 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
     ActionRowView split;
     split.id = "fuel-split";
     split.label = "Split one fuel cell: up to +10 energy and +7 fuel";
-    split.cost = "1 action";
+    split.cost = "1 click";
     split.enabled = sim.State().fuelCells > 0 && energy < 100 && sim.StatValue("fuel") < 100;
     model.rows.push_back(split);
     return model;
@@ -120,14 +120,14 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
       row.label = "Divert 20 energy into 15 shields";
       row.enabled = energy >= 20 && shield <= 85;
     }
-    row.cost = "1 action";
+    row.cost = "1 click";
     model.rows.push_back(row);
     return model;
   }
 
   if (roomId == "r1") {
     model.body.Note(
-        "A medkit and 2% energy start a three-action treatment (up to +25 health); "
+        "A medkit and 2% energy start a three-click treatment (up to +25 health); "
         "treatment pauses without power. The ordinary medical order in Crew Quarters "
         "remains available without a medkit.");
     model.body.Dim("Medkits aboard: " + Num(sim.State().medkits));
@@ -143,8 +143,8 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
 
   if (roomId == "r13") {
     model.body.Note(
-        "A shared meal uses two units of cooked food from the galley counter and one action; it "
-        "takes three more actions. It strengthens the bond by 12 (+2 for a shared name "
+        "A shared meal uses two units of cooked food from the galley counter and one click; it "
+        "takes three more clicks. It strengthens the bond by 12 (+2 for a shared name "
         "anchor) and gives each person 4 morale. Strong bonds help morale; strained bonds "
         "hurt it.");
     if (sim.Crew().size() < 2) {
@@ -162,7 +162,7 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
         row.label = "Share a meal: " + one.name + " and " + two.name;
         row.note = "Bond " + Num(bond) + " / 100 - " + sim.SimAnchorOf(one) + " / " +
                    sim.SimAnchorOf(two) + ".";
-        row.cost = "1 action + 3 work";
+        row.cost = "1 click + 3 work";
         row.enabled = !mealBusy && sim.CrewBusy(one) == nullptr &&
                       sim.CrewBusy(two) == nullptr && sim.MessRack() >= 2;
         model.rows.push_back(row);
@@ -184,7 +184,7 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
     ActionRowView broadcast;
     broadcast.id = "broadcast";
     broadcast.label = "Request local traffic report (2% energy)";
-    broadcast.cost = "1 action";
+    broadcast.cost = "1 click";
     broadcast.enabled = !hasReport && energy > 2;
     model.rows.push_back(broadcast);
 
@@ -202,8 +202,8 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
       // a signal to work on.
       for (const ProjectDef& project : sim.World().projects) {
         if (project.id != "decode") { continue; }
-        model.body.Dim(Num(project.energy) + "% energy; 1 action to begin, then " +
-                       Num(project.work) + " actions of work. Pauses without power.");
+        model.body.Dim(Num(project.energy) + "% energy; 1 click to begin, then " +
+                       Num(project.work) + " clicks of work. Pauses without power.");
         model.buttons.push_back(BuildProgressButton(
             sim, "project-decode", project.label, sim.ProjectBlock("decode").empty()));
       }
@@ -221,7 +221,7 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
       ActionRowView shelter;
       shelter.id = "signal:preserved";
       shelter.label = "Shelter the archive at the Archive Hull (1 repair kit, 5% energy)";
-      shelter.cost = "1 action";
+      shelter.cost = "1 click";
       shelter.enabled = sim.Map().here == "palimpsest-site" && sim.State().repairKits > 0 &&
                         energy > 5;
       shelter.confirm = "Shelter the archive? This choice is permanent.";
@@ -230,7 +230,7 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
       ActionRowView sell;
       sell.id = "signal:sold";
       sell.label = "Sell the signal at this station (+900 sh, crew morale -8)";
-      sell.cost = "1 action";
+      sell.cost = "1 click";
       sell.enabled = sim.State().docked;
       sell.confirm = "Sell the signal? This choice is permanent.";
       model.rows.push_back(sell);
@@ -264,7 +264,7 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
     if (roomId == "r3") {
       model.body.Field("Insight", Num(sim.State().sim.insight));
       model.body.Field("Calibration", sim.State().sim.sensor ? "Stored" : "None");
-      model.body.Field("Next scan", Num(sim.ScanCost()) + " work actions");
+      model.body.Field("Next scan", Num(sim.ScanCost()) + " work clicks");
     }
     if (roomId == "r5") {
       model.body.Field("Drive", Num(sim.State().engineCondition) + "%");
@@ -290,7 +290,7 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
       model.body.Field("Salvage lots", Num(CountLots(sim, "Salvage")));
     }
     model.body.Note(
-        "Inputs are consumed at the start. Work advances through actions elsewhere and "
+        "Inputs are consumed at the start. Work advances through clicks elsewhere and "
         "pauses without power.");
   }
 
@@ -298,8 +298,8 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
   for (const ProjectDef& project : sim.World().projects) {
     if (project.room != roomId) { continue; }
     const std::string blocked = sim.ProjectBlock(project.id);
-    model.body.Dim(Num(project.energy) + "% energy; 1 action to begin, then " +
-                   Num(project.work) + " actions of work. Pauses without power." +
+    model.body.Dim(Num(project.energy) + "% energy; 1 click to begin, then " +
+                   Num(project.work) + " clicks of work. Pauses without power." +
                    (blocked.empty() ? std::string() : " " + blocked));
     model.buttons.push_back(
         BuildProgressButton(sim, "project-" + project.id, project.label, blocked.empty()));

@@ -200,7 +200,7 @@ TEST_CASE("the galley paints the rack and the four clocks, never an element id",
     CHECK(sub->text.find("mess-") == std::string::npos);
     CHECK(sub->text ==
           ship::js::NumToString(sim.GameRules().mess.every - crew[k].hungerTick) +
-              " actions to next meal");
+              " clicks to next meal");
   }
 
   // A hand due to eat has a full clock; a fed one is back at zero. The width
@@ -289,18 +289,18 @@ TEST_CASE("a lock reads back as a cooldown, in actions", "[ui][button]") {
   const ship::ProgressButton button =
       ship::BuildProgressButton(sim, "maint", "Run Maintenance", true);
   CHECK(button.state == ship::ButtonState::Cooldown);
-  CHECK(button.text == "Cooldown: 7 actions");
+  CHECK(button.text == "Cooldown: 7 clicks");
   CHECK(button.title ==
-        "Ship systems cooldown: 7 more actions. Other committed actions advance it; waiting does not.");
+        "Ship systems cooldown: 7 more clicks. Other committed clicks advance it; waiting does not.");
   CHECK(button.fillPercent == 0.0);
 
   // A command row shows the same lock in its cost badge.
   const ship::CommandRowView row =
-      ship::BuildCommandRow(sim, "Run Maintenance", true, "1 action", "", 0);
+      ship::BuildCommandRow(sim, "Run Maintenance", true, "1 click", "", 0);
   CHECK(row.coolingDown);
   CHECK(row.displayCost == "COOLDOWN 7");
   CHECK(row.title ==
-        "Ship systems cooldown: 7 more actions. Other committed actions advance "
+        "Ship systems cooldown: 7 more clicks. Other committed clicks advance "
         "it; waiting does not.");
 }
 
@@ -343,11 +343,11 @@ TEST_CASE("the four categories, guessed from the label", "[ui][cooldown]") {
   CHECK(ship::ActionCooldownCategory("Undock", "nonsense") == "space");
 
   CHECK(ship::IsActionCost("", false));
-  CHECK(ship::IsActionCost("1 action"));
-  CHECK(ship::IsActionCost("3 actions"));
+  CHECK(ship::IsActionCost("1 click"));
+  CHECK(ship::IsActionCost("3 clicks"));
   CHECK_FALSE(ship::IsActionCost("free"));
   CHECK_FALSE(ship::IsActionCost("at a station"));
-  CHECK(ship::IsActionCost("1 action + 2 work"));  // mixed costs still spend one
+  CHECK(ship::IsActionCost("1 click + 2 work"));  // mixed costs still spend one
 }
 
 TEST_CASE("a locked control refuses without spending the click", "[ui][cooldown]") {
@@ -380,7 +380,7 @@ TEST_CASE("the engine window is the reference's, line for line", "[ui][engine]")
   CHECK(engine.screen.head.kind == "ROOM");
   CHECK(engine.screen.head.title == "Engine Room");
   CHECK(engine.screen.head.sub ==
-        "Propulsion and power - the drive wears with every action spent "
+        "Propulsion and power - the drive wears with every click spent "
         "aboard.");
   CHECK(engine.word == "NOMINAL");
   CHECK(engine.tone == "#7f9161");
@@ -392,9 +392,9 @@ TEST_CASE("the engine window is the reference's, line for line", "[ui][engine]")
   CHECK(engine.screen.left[2].id == "eng-drive");
   CHECK(engine.screen.left[2].placement == "np-last");
   CHECK(Line(engine.screen.left[0], "Threshold")->value == "50% - warning line");
-  CHECK(Line(engine.screen.left[1], "Rate")->value == "1% per 4 actions");
-  CHECK(Line(engine.screen.left[1], "Next step")->value == "4 actions");
-  CHECK(Line(engine.screen.left[1], "Full cycle")->value == "400 actions");
+  CHECK(Line(engine.screen.left[1], "Rate")->value == "1% per 4 clicks");
+  CHECK(Line(engine.screen.left[1], "Next step")->value == "4 clicks");
+  CHECK(Line(engine.screen.left[1], "Full cycle")->value == "400 clicks");
 
   CHECK(engine.screen.under[0].id == "eng-maint");
   CHECK(engine.screen.under[0].lines[0].kind == ship::PanelLine::Kind::Dim);
@@ -420,9 +420,9 @@ TEST_CASE("the engine window is the reference's, line for line", "[ui][engine]")
   CHECK(worn.tone == "#c08a3e");
   CHECK(worn.meterWidth == 168.0f);
   CHECK(worn.screen.bandNote ==
-        "Maintenance will cost 6 actions spent anywhere aboard, and restores the "
+        "Maintenance will cost 6 clicks spent anywhere aboard, and restores the "
         "drive to 100%.");
-  CHECK(Line(worn.screen.under[0], "Cost now")->value == "6 actions");
+  CHECK(Line(worn.screen.under[0], "Cost now")->value == "6 clicks");
   CHECK(worn.screen.progress[0].state == ship::ButtonState::Idle);
   CHECK(ship::EngineConditionWord(74) == "SERVICEABLE");
   CHECK(ship::EngineConditionWord(30) == "DEGRADED");
@@ -473,7 +473,7 @@ TEST_CASE("the filter room reads the rack, the bank and the air", "[ui][o2]") {
   const ship::O2ScreenModel ready = ship::BuildO2Screen(sim);
   CHECK(ready.ready);
   CHECK(ready.screen.bandNote ==
-        "All three slots are seated. Starting the bank costs one action and "
+        "All three slots are seated. Starting the bank costs one click and "
         "advances every running job by ten.");
   CHECK(ready.screen.progress[0].state == ship::ButtonState::Idle);
 
@@ -486,7 +486,7 @@ TEST_CASE("the filter room reads the rack, the bank and the air", "[ui][o2]") {
   CHECK(running.slots[0].barPercent == 100.0);
   // The switch has just been thrown, so its lock is running down.
   CHECK(running.screen.progress[0].state == ship::ButtonState::Cooldown);
-  CHECK(running.screen.progress[0].text == "Cooldown: 10 actions");
+  CHECK(running.screen.progress[0].text == "Cooldown: 10 clicks");
 }
 
 TEST_CASE("one cooked ration becomes five food, and crew eat it back down",
@@ -574,7 +574,7 @@ TEST_CASE("the galley reads the rack and the four clocks", "[ui][mess]") {
   CHECK(mess.rackReadout == "18 of 24 food in the galley");
   CHECK(mess.plates.size() == 4);
   CHECK(mess.plates[0].name == "Rell Aventine");
-  CHECK(mess.plates[0].sub == "25 actions to next meal");
+  CHECK(mess.plates[0].sub == "25 clicks to next meal");
   CHECK(Line(mess.screen.left[0], "Capacity")->value == "24 food, hard ceiling");
   CHECK(Line(mess.screen.left[0], "Dry-ration larder")->value ==
         "21 of 24 dry rations");
@@ -585,12 +585,12 @@ TEST_CASE("the galley reads the rack and the four clocks", "[ui][mess]") {
   CHECK(Line(mess.screen.under[0], "Yield")->value ==
         "up to 5 cooked food (rack capacity applies)");
   CHECK(Line(mess.screen.under[0], "Takes")->value ==
-        "5 actions; food lands when the batch finishes");
+        "5 clicks; food lands when the batch finishes");
   CHECK(Line(mess.screen.under[0], "Larder")->value == "21 of 24 dry rations");
   CHECK(Line(mess.screen.under[1], "At least 70% hunger")->value == "0 of 4");
   CHECK(mess.screen.bandNote ==
-        "One dry ration yields up to 5 cooked food after 5 actions. 4 crew use "
-        "12 food per 25-action cycle; automatic restocking starts below 10 food "
+        "One dry ration yields up to 5 cooked food after 5 clicks. 4 crew use "
+        "12 food per 25-click cycle; automatic restocking starts below 10 food "
         "when the cook is free and a dry ration is available.");
   CHECK(mess.screen.progress[0].taskId == "cook");
   CHECK(mess.screen.progress[0].text == "Cook a Batch");

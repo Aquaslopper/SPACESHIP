@@ -44,21 +44,21 @@ EventScreenModel BuildEventScreen(const Simulation& sim, const std::string& even
   const IncidentType::Stage* stage = sim.IncidentStage(*incident);
   if (stage != nullptr) {
     model.report.Field("Condition", stage->text);
-    model.report.Field("Next change", Num(incident->left) + " actions");
+    model.report.Field("Next change", Num(incident->left) + " clicks");
   }
   if (incident->type == "crew" && !incident->a.empty() && !incident->b.empty()) {
     model.report.Field("Involved", sim.SimCrewName(incident->a) + " / " +
                                        sim.SimCrewName(incident->b) + " - bond " +
                                        Num(sim.SimBond(incident->a, incident->b)));
   }
-  model.report.Note("Ignore it and the situation will advance with your other actions.");
+  model.report.Note("Ignore it and the situation will advance with your other clicks.");
 
   const bool needsKit = spec != nullptr && spec->requiresKit.value_or(spec->kind != "Crew");
   ActionRowView remedy;
   remedy.id = "remedy:" + eventId;
   remedy.label = spec == nullptr ? std::string("Resolve the report") : spec->remedy;
   if (needsKit) { remedy.label += " - use one repair kit"; }
-  remedy.cost = "1 action";
+  remedy.cost = "1 click";
   remedy.enabled = (spec != nullptr) && (!needsKit || sim.State().repairKits > 0);
   model.rows.push_back(remedy);
 
@@ -66,10 +66,10 @@ EventScreenModel BuildEventScreen(const Simulation& sim, const std::string& even
   const bool running = sim.FindOngoing("incident-" + eventId) != nullptr;
   ActionRowView assign;
   assign.id = "assign:" + eventId;
-  assign.label = "Assign crew to resolve - 6 actions of work" +
+  assign.label = "Assign crew to resolve - 6 clicks of work" +
                  (hand == nullptr ? std::string(" (none available)")
                                   : " (" + hand->name + ")");
-  assign.cost = "1 action + 6 work";
+  assign.cost = "1 click + 6 work";
   assign.enabled = !running && hand != nullptr;
   model.rows.push_back(assign);
 

@@ -45,7 +45,6 @@
   },
   "comment": "Life support, air stages, rations, drive wear and the store definitions.",
   "engine": {
-    "perAction": 10,
     "warnBelow": 50,
     "wearEvery": 4,
     "wearStep": 1

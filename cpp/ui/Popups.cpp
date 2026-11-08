@@ -41,7 +41,7 @@ std::string SaveSlotSummary(const Simulation& sim, int slot, const std::string& 
   std::string error;
   if (!probe.LoadSlot(slot, saveDir, &error)) { return "Empty"; }
   if (written != nullptr) { *written = true; }
-  return js::NumToString(probe.ActionCount()) + " actions, " +
+  return js::NumToString(probe.ActionCount()) + " clicks, " +
          js::NumToString(probe.State().shiplets) + " sh";
 }
 
@@ -82,9 +82,9 @@ PopupModel BuildBriefPopup(const Simulation& sim, const std::string& kind,
         {"Sector", "Select a system and jump to its entry star"}};
     const double cost = std::max(1.0, sim.ScanCost() - (sim.State().sim.sensor ? 2.0 : 0.0));
     model.acts = {{"Start Travel", "varies", true},
-                  {"Run Deep Scan", js::NumToString(cost) + " actions", true}};
+                  {"Run Deep Scan", js::NumToString(cost) + " clicks", true}};
     model.footer = {
-        "Travel costs one action per step of charted distance, so the price is the crossing itself. Both run in the background and drain from actions spent anywhere on the ship.",
+        "Travel costs one click per step of charted distance, so the price is the crossing itself. Both run in the background and drain from clicks spent anywhere on the ship.",
         "Travel also uses fuel; right-click the fuel gauge to transfer a cell. Right-click to open the Navigation window. It waits in the tab bar - you are not taken there."};
   }
   model.sections.push_back(std::move(details));
@@ -175,8 +175,8 @@ PopupModel BuildPopup(const Simulation& sim, const std::string& key,
   const char* help[] = {
       "Play custom music from assets/audio/music, or the built-in shipboard theme.",
       "Soft console clicks, scan pings, drive cues and completion chimes.",
-      "Pause map and crew drift, tab glows and action marks.",
-      "Enlarge the main reading and action text.",
+      "Pause map and crew drift, tab glows and click marks.",
+      "Enlarge the main reading and click text.",
       "Ask before jettisoning, abandoning, story decisions, saving or loading.",
       "Show or hide names on the ship diagram."};
   for (std::size_t i = 0; i < model.toggles.size(); ++i) {
