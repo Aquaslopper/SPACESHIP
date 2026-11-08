@@ -811,3 +811,25 @@ him act; the threshold is expressed and the wait is proved, the difference is no
 The cleaner still does nothing but lift morale, and nothing is painted.
 `assets/data` was not touched: the cook's base line is still 10 in the data and the
 per-stage step is computed in code.
+
+## 051 — A starving hand keeps his seat
+
+Looked for the thing the owner half-remembers: a starving crew member eating
+whenever he likes, off his own clock. It is not there. `TickCrew` in
+`CrewLogic.cpp` gives every hand a private hunger clock of `mess.every` = 25
+clicks and he eats only on the click that clock comes round, whatever his hunger
+is. The meal is three food, sized by the clock rather than the counter: capped at
+what reaches `hungerFloor` (5) and at what is on the rack.
+
+So at hunger 95 - past `starveAt` = 90, already losing 1 health every `starveEvery`
+8 clicks - a hand still waits for his turn, up to 25 clicks, and then eats the same
+three food as everyone else. That is at most three health lost to a clock that has
+nothing to do with how hungry he is.
+
+Two more things the audit turned up. Eating is instantaneous: no task, no click
+spent, no walk to the galley, so a hungry hand never leaves his post and is never
+seen at the counter. And the rescue is real but late: three food takes him to 80,
+under the starve line, so one missed clock is survivable and two are not.
+
+Nothing changed in this entry. It records the law as it stands and the gap between
+it and the owner's memory.
