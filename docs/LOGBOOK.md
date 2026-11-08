@@ -751,3 +751,30 @@ healthy deck.
 
 Nothing in `cpp/` was changed by this entry; it corrects the record and the claim
 in #047 that the mechanic was unproven.
+
+## 049 — The crew press the room's own control
+
+The press belongs to the room, not to whoever makes it. Two of the panels now take
+a `by` argument naming the hand that pressed, so the crew and the commander run
+the same code:
+
+- `StartCanisterInstall(slot, by)` - the O2 panel's seating control. The crew
+  branch in `AutoFilters` no longer builds its own task; it calls this, so the
+  hand's rate (`CrewCost(2)`) and the hand's name travel with the press.
+- `StartCookingSelf(by)` - the galley's control. `AutoMess` no longer opens a
+  `cook` task by hand; it presses this, and the ration is spent by the press.
+
+Both hands land on the same task ids the room already watches (`o2s<n>`, `cook`),
+so the button a player sees is the button a hand presses. `by` empty still means
+the commander, which is what every existing call site passes.
+
+Probe `/home/user/probe/jobpress`: a cook on the galley opens the batch with
+`by = Rell Aventine`; a filter hand seats a canister with the same name on the
+task. `failures=0`.
+
+Not done, and named so nobody thinks it is: the filter bank is still started by
+the hand through `RunBank()` rather than through the panel's `StartFilterBank()`
+press, because that press spends a click and the crew's start does not; the
+cleaner has no room and no button to press; navigation has no button at all. And
+nothing yet paints the press - no rising green symbol, no button flash - because
+that is `Draw.cpp`, which this sandbox cannot compile.

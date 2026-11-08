@@ -93,10 +93,11 @@ class Simulation {
   void FreeCommit(const std::string& detail = std::string());
 
   // ---- commands that exist in Phase 1A -----------------------------------
-  bool StartCanisterInstall(int slot);  // the player carries a canister over
+  // `by` names the hand that made the press; empty means the commander.
+  bool StartCanisterInstall(int slot, const std::string& by = std::string());  // the player carries a canister over
   bool StartFilterBank();               // the player throws the switch
   bool StartMaintenanceSelf();          // startMaint(e, "maint", "the commander")
-  bool StartCookingSelf();              // startCook(e, "cook", "the commander")
+  bool StartCookingSelf(const std::string& by = std::string());              // startCook(e, "cook", "the commander")
   bool ServiceSystem(const std::string& statId);  // buildSystemScreen() service row
   bool ApplyJob(const std::string& crewId, const std::string& jobId);  // scenario setup
 

@@ -474,17 +474,13 @@ void Simulation::AutoFilters() {
   for (std::size_t i = 0; i < life_.slots.size(); ++i) {
     if (FindOngoing("o2s" + std::to_string(i)) != nullptr) { return; }
   }
+  // He presses the O2 panel's own control: the same press the commander makes,
+  // made by a hand, so it runs at his rate and carries his name.
   for (std::size_t i = 0; i < life_.slots.size(); ++i) {
-    CanisterSlot& slot = life_.slots[i];
-    if (slot.state != "empty") { continue; }
-    life_.canisters -= 1;
-    Task* task = AddOngoing("o2s" + std::to_string(i), "Seating - " + slot.name,
-                            CrewCost(2), "o2slot", slot.id);
-    if (task != nullptr) {
-      task->slot = static_cast<double>(i);
-      task->by = worker->name;
+    if (life_.slots[i].state != "empty") { continue; }
+    if (StartCanisterInstall(static_cast<int>(i), worker->name)) {
+      LogLine(worker->name + " seated a canister in " + life_.slots[i].name + ".");
     }
-    LogLine(worker->name + " is seating a canister in " + slot.name + ".");
     return;
   }
 }
@@ -511,14 +507,10 @@ void Simulation::AutoMess() {
   // One dry ration yields up to foodPerRation cooked food when the five-click
   // batch finishes. A batch that would overshoot the ceiling is still cooked;
   // the landing is clamped, so the counter ends full rather than past its lid.
-  const double cost = rules_.mess.foodPerRation;
-  Task* task = AddOngoing("cook", "Cooking - " + worker->name, cost, "cook", "mess");
-  if (task != nullptr) {
-    task->by = worker->name;
-    mess_.rations -= 1.0;  // the ration is spent when the batch starts
+  // She presses the galley's own control rather than opening work of her own.
+  if (StartCookingSelf(worker->name)) {
+    LogLine(worker->name + " started cooking without being asked.");
   }
-  cookRestock_ = true;
-  LogLine(worker->name + " started cooking without being asked.");
 }
 
 // ---------------------------------------------------------------------------
