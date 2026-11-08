@@ -883,11 +883,6 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
       sim, "Stand watch - advance ongoing work", sim.State().gameOver.empty(),
       std::string(), "space", 0));
 
-  const Port* port = sim.World().FindPort(sim.Map().here);
-  if (port != nullptr && !sim.State().docked && running == nullptr) {
-    screen.commands.push_back(BuildCommandRow(
-        sim, "Dock at " + port->name, true, std::string(), "space", 0));
-  }
 
   // The band's two notes: what standing watch costs, then why a button may be
   // off.
@@ -978,7 +973,9 @@ bool PressNavAction(Simulation& sim, const std::string& action, const std::strin
     return CommitActionButton(sim, row.cooldownKey, row.category,
         [&]() { return PressNavActionRaw(sim, action, arg); });
   }
-  if (action == "stand-watch" || action == "dock" || action == "view-sector") {
+  // "dock" is not in this list: the berth is a card in the free event slot now, so
+  // the action no longer needs a command row to exist before it can run.
+  if (action == "stand-watch" || action == "view-sector") {
     return false;
   }
   return PressNavActionRaw(sim, action, arg);

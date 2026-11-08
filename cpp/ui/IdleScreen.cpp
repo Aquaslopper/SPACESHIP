@@ -159,6 +159,13 @@ IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout
   for (const Incident& incident : sim.Events()) {
     out.events.push_back({"Events", incident.kind, incident.id, false, {}});
   }
+  // The dock is offered where the event cards are: the owner's rule - it is one of
+  // those buttons, in whichever slot is free, and it goes away once the ship is in.
+  if (!sim.State().docked) {
+    if (const Port* berth = sim.World().FindPort(sim.Map().here); berth != nullptr) {
+      out.events.push_back({"", "Dock at " + berth->name, berth->id, false, {}, true});
+    }
+  }
   while (out.events.size() < 2) {
     out.events.push_back({"Events", "No active events.", "", false, {}});
   }

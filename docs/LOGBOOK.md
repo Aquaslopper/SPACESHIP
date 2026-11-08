@@ -1653,3 +1653,38 @@ Measured (/home/user/probe/entry, exit 0):
 
 The owner also reports the two-station delivery case now behaves, so there is no
 mirrored station to chase.
+
+## 078 — The berth is one of the event buttons, and the systems got worlds and rock
+
+THE DOCK BUTTON (owner's design, built as stated)
+  The "Dock at ..." command row is gone. While the ship stands at a berth and is not
+  in it, a dock card is offered in the free event slot: same cell, same size, no
+  plate (the box is transparent), ringed in the same border colour as the cards
+  beside it so it reads as lit rather than filled. Left-click docks, and the card
+  disappears the moment the ship is in - the "Docked" card takes the slot.
+  There is no undock button, and none was added: a jump from a berth already undocks
+  (StartTravel clears the berth as part of the departure, no second action).
+  PressNavAction("dock") no longer requires a command row to exist, since that row is
+  what the card replaced.
+
+  Measured (/home/user/probe/dockcard, exit 0):
+    standing at a berth, undocked: 1 dock card(s), text "Dock at Kessler Station", 2 event cells
+    docked 1: 0 dock card(s), 2 event cells
+    undocked again: 1 dock card(s)
+    standing on a landing site ('sec-gen-7-site'): 0 dock card(s)
+    before the jump: docked 1 ; jump from the berth: 1, docked now 0
+    an Undock command exists in the band: no
+
+MORE WORLDS AND DEBRIS
+  Worlds 6..10 (up to 14 where people live). Debris no longer eats a world: belts used
+  to replace planets in the same loop; the fields now get their own pass, one to
+  three per system, and every world is a world.
+  Measured at 1200 systems: 28710 bodies, 10680 planets, 13221 moons, 2409 debris
+  fields, average 8.9 planets per system, 11..47 bodies per system, validator 0.
+  Arrival invariant unchanged: 994 entries are the dock, 206 a landing site, 0 stars;
+  200 of 200 arrivals dock and have a trade board.
+
+NOT VERIFIED: the painting of that card (cpp/ui/Draw.cpp) cannot be compiled here -
+raylib and imgui are absent - so the glow, the transparency and the click were
+checked by reading only. Everything in the model and the generator above was run.
+The Catch2 suite was not run; nav_tests.cpp now asks for the card instead of the row.

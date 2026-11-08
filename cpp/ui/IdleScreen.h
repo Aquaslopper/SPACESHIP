@@ -44,6 +44,9 @@ struct HomeEventCard {
   std::string id;
   bool station = false;
   Area box;
+  // The berth button: the free event slot while the ship stands at a dock and is
+  // not in it. Same cell as the others, no plate, a glow, and gone once docked.
+  bool dock = false;
 };
 
 struct IdleScreenModel {

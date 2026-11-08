@@ -416,26 +416,23 @@ void GenerateUniverse(Catalog& catalog, std::uint64_t seed, int systemCount) {
       // place with people in it carries more: up to ten. The worlds are spread
       // across the system board instead of being packed at its left edge, so a big
       // system stays inside its own chart.
-      const int worlds = 4 + rng.Below(4) + (traits.population > 0.55 ? rng.Below(5) : 0);
+      const int worlds = 6 + rng.Below(5) + (traits.population > 0.55 ? rng.Below(5) : 0);
       const double firstX = 120.0;
       const double lastX = 560.0;
       const double step = worlds > 1 ? (lastX - firstX) / static_cast<double>(worlds - 1) : 0.0;
       for (int w = 0; w < worlds; ++w) {
-        const bool belt = rng.Chance(0.16 + 0.12 * traits.hazard);
         const std::string worldId = id + "-w" + std::to_string(w + 1);
         const double wx = firstX + static_cast<double>(w) * step + rng.Range(-5.0, 5.0);
         const double wy = 68.0 + ((w * 37 + index) % 84);
-        Body world = MakeBody(worldId, belt ? "belt" : "planet",
-                              belt ? name + " Debris Belt" : name + " " + Roman(w),
-                              belt ? "Debris belt" : "Charted world",
+        Body world = MakeBody(worldId, "planet", name + " " + Roman(w), "Charted world",
                               std::clamp(wx, 96.0, 590.0), wy, id, region.body.id);
-        world.subtype = belt ? "rock" : kSubtypes[rng.Below(4)];
+        world.subtype = kSubtypes[rng.Below(4)];
         world.scan.push_back(ScanFor(world.type));
         world.details.emplace_back("System", name);
-        if (!belt) { world.details.emplace_back("Surface", world.subtype); }
+        world.details.emplace_back("Surface", world.subtype);
         catalog.bodies.push_back(std::move(world));
 
-        const int moons = belt ? 0 : rng.Below(1 + (traits.population > 0.6 ? 3 : 2));
+        const int moons = rng.Below(1 + (traits.population > 0.6 ? 3 : 2));
         for (int m = 0; m < moons; ++m) {
           Body moon = MakeBody(worldId + "-m" + std::to_string(m + 1), "moon",
                                name + " " + Roman(w) + " " + static_cast<char>('a' + m),
@@ -446,6 +443,22 @@ void GenerateUniverse(Catalog& catalog, std::uint64_t seed, int systemCount) {
           moon.scan.push_back(ScanFor("moon"));
           catalog.bodies.push_back(std::move(moon));
         }
+      }
+
+      // Debris of its own: one to three fields drifting between the worlds, so a
+      // system reads as a place with rocks in it and not as a row of balls.
+      const int fields = 1 + rng.Below(3);
+      for (int f = 0; f < fields; ++f) {
+        const std::string beltId = id + "-d" + std::to_string(f + 1);
+        Body field = MakeBody(beltId, "belt", name + " Debris Field " + Roman(f),
+                              "Debris belt",
+                              std::clamp(150.0 + 150.0 * f + rng.Range(-20.0, 20.0), 110.0, 600.0),
+                              174.0 + 7.0 * f, id, region.body.id);
+        field.subtype = "rock";
+        field.scan.push_back(ScanFor("belt"));
+        field.details.emplace_back("System", name);
+        field.details.emplace_back("Drift", "unclaimed");
+        catalog.bodies.push_back(std::move(field));
       }
 
       // A place with people has a dock; a place with a wreck has a site instead.

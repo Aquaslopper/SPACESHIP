@@ -995,10 +995,25 @@ void ShellView::PaintIdle(Simulation& sim) {
   paintStrip(idle_.nav);
   for (const HomeEventCard& event : idle_.events) {
     const Area& box = event.box;
-    DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
-                  static_cast<int>(box.w), static_cast<int>(box.h), ToRay(theme.palette.panel));
-    DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
-                       static_cast<int>(box.w), static_cast<int>(box.h), ToRay(theme.palette.border));
+    if (event.dock) {
+      // The berth button: the empty event slot itself, no plate, lit in the same
+      // colour as the cards beside it, and gone the moment the ship is docked.
+      for (int ring = 4; ring >= 1; --ring) {
+        DrawRectangleLines(static_cast<int>(box.x) - ring, static_cast<int>(box.y) - ring,
+                           static_cast<int>(box.w) + 2 * ring,
+                           static_cast<int>(box.h) + 2 * ring,
+                           ToRay(theme.palette.border, 18 + (4 - ring) * 14));
+      }
+      DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                         static_cast<int>(box.w), static_cast<int>(box.h),
+                         ToRay(theme.palette.border));
+    } else {
+      DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                    static_cast<int>(box.w), static_cast<int>(box.h), ToRay(theme.palette.panel));
+      DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                         static_cast<int>(box.w), static_cast<int>(box.h),
+                         ToRay(theme.palette.border));
+    }
     Text(event.heading.c_str(), static_cast<int>(box.x + 8.0f),
          static_cast<int>(box.y + 6.0f), TypePx(11), ToRay(theme.palette.muted));
     const auto lines = WrapText(event.label, std::max(1.0f, box.w - 16.0f),
@@ -3688,6 +3703,10 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
     }
     for (const HomeEventCard& event : idle_.events) {
       if (!event.box.Contains(x, y + scrollY)) { continue; }
+      if (event.dock) {
+        if (button == HitButton::Left) { sim.Dock(); }
+        return;
+      }
       if (event.station) {
         if (button == HitButton::Right) { OpenTask(sim, "station", event.id, false); }
         else { OpenBriefing(sim, "station", event.id); }

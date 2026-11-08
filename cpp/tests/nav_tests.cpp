@@ -602,8 +602,16 @@ TEST_CASE("a voyage crosses, docks and scans through the navigation screen",
   CHECK(sim.State().docked);
   CHECK(sim.Undock());
   CHECK_FALSE(sim.State().docked);
-  const ship::NavScreenModel moored = ship::BuildNavScreen(sim);
-  CHECK(HasCommand(moored.screen, "Dock at Tolme Anchorage"));
+  // The berth is offered in a free event slot instead of a command row; the command
+  // itself still docks.
+  const ship::IdleScreenModel moored =
+      ship::BuildIdleScreen(sim, ship::ComputeLayout(1280.0f, 720.0f, 720.0f, 0.0f, false),
+                            ship::Theme::ById("classic"), false, 0.0f, ship::FxRng{});
+  bool offered = false;
+  for (const ship::HomeEventCard& card : moored.events) {
+    if (card.dock && card.label == "Dock at Tolme Anchorage") { offered = true; }
+  }
+  CHECK(offered);
   CHECK(ship::PressNavAction(sim, "dock"));
   CHECK(sim.State().docked);
 
