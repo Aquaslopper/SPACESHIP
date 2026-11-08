@@ -133,21 +133,24 @@ IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout
   out.stageArea.y = statsBottom + 108.0f;
   out.stageArea.h = std::max(out.stageArea.h, Metrics::kHomeStageMinH);
 
-  const float infoH = InfoCellHeight(theme);
+  const float panelH = std::max(InfoCellHeight(theme), StripHeight(theme));
   const float infoY = out.stageArea.Bottom() + 14.0f;
-  out.infos = InfoRail(sim, Area{layout.content.x + 8.0f, infoY, inner, infoH});
-  const float infoBottom = out.infos.empty() ? infoY + infoH : out.infos.front().box.Bottom();
-
-  const float stripH = StripHeight(theme);
-  const float leftColumnW = std::max(1.0f, inner / 3.0f - 4.0f);
   const float leftX = layout.content.x + 8.0f;
-  const float lowerY = infoBottom + 10.0f;
-  out.nav = NavStrip(sim, Area{leftX, lowerY, leftColumnW, stripH});
+  const float panelW = std::max(1.0f, (inner - 2.0f * Metrics::kHomePanelGap) / 3.0f);
+  out.infos = InfoRail(sim, Area{leftX, infoY, inner, panelH});
+  for (std::size_t i = 0; i < out.infos.size(); ++i) {
+    out.infos[i].box = Area{leftX + static_cast<float>(i) * (panelW + Metrics::kHomePanelGap),
+                            infoY, panelW, panelH};
+  }
+  const float infoBottom = out.infos.empty() ? infoY + panelH : out.infos.front().box.Bottom();
+
+  const float lowerY = infoBottom + Metrics::kHomePanelGap;
+  out.nav = NavStrip(sim, Area{leftX, lowerY, panelW, panelH});
   out.nav.right.clear();
 
-  const float eventX = leftX + inner / 3.0f + 4.0f;
-  const float eventW = std::max(1.0f, layout.content.x + 8.0f + inner - eventX);
-  out.eventsBox = Area{eventX, lowerY, eventW, stripH};
+  const float eventX = leftX + panelW + Metrics::kHomePanelGap;
+  const float eventW = 2.0f * panelW + Metrics::kHomePanelGap;
+  out.eventsBox = Area{eventX, lowerY, eventW, panelH};
   if (sim.State().docked) {
     const Body* berth = sim.FindBodyById(sim.Map().here);
     out.events.push_back({"Docked", berth == nullptr ? std::string() : berth->name,
@@ -160,21 +163,21 @@ IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout
     out.events.push_back({"Events", "No active events.", "", false, {}});
   }
   const std::size_t rows = (out.events.size() + 1) / 2;
-  out.eventsBox.h = static_cast<float>(rows) * stripH + static_cast<float>(rows - 1) * 8.0f;
-  const float cardW = (eventW - 8.0f) / 2.0f;
+  out.eventsBox.h = static_cast<float>(rows) * panelH +
+                    static_cast<float>(rows - 1) * Metrics::kHomePanelGap;
   for (std::size_t i = 0; i < out.events.size(); ++i) {
     const std::size_t row = i / 2;
     const std::size_t column = i % 2;
-    out.events[i].box = Area{eventX + static_cast<float>(column) * (cardW + 8.0f),
-                             lowerY + static_cast<float>(row) * (stripH + 8.0f),
-                             cardW, stripH};
+    out.events[i].box = Area{eventX + static_cast<float>(column) * (panelW + Metrics::kHomePanelGap),
+                             lowerY + static_cast<float>(row) * (panelH + Metrics::kHomePanelGap),
+                             panelW, panelH};
   }
 
   const float after = std::max(out.nav.box.Bottom(), out.eventsBox.Bottom());
 
-  // The activity feed is the final home panel and uses the remaining content
-  // height so its lower edge reaches the bottom of the viewport.
-  const float feedStart = after;
+  // Keep a deliberate gutter before the Activity Feed, then use the remaining
+  // content height so its lower edge reaches the bottom of the viewport.
+  const float feedStart = after + Metrics::kHomePanelGap;
   const float bottomPad = 8.0f;
   const float available = layout.content.Bottom() - feedStart - bottomPad;
   out.feedHeight = std::clamp(available, Metrics::kFeedMin, Metrics::kHomeFeedMax);

@@ -326,3 +326,18 @@ You must append a compressed summary of **every single reply and action you take
 - **Checks:** `cmake --build build --parallel 2`, `tools/check-draw.sh`, full `ctest` **125/125**, and `git diff --check` all passed.
 - **Visual limit:** The recorder verifies rendered coordinates/order but no separate windowed screenshot was captured here.
 - **Scope:** Follow-up to open PR #30 on `arena/cb265de8-spaceship`; no data, authored art, palette, or gameplay changes.
+
+### Entry #023
+- **Timestamp:** 2026-11-08 00:31 UTC
+- **Task:** Clean up the cockpit after the owner reported room-card overlap, uneven six-card sizing, and cards touching each other.
+- **Room callouts (`Draw.cpp`):** Reduced the three-row callout widths and staggered their left edges while reserving a 30px horizontal gutter from the ship-art bounds. O2 Filter Room and Cargo Hold can no longer intrude into the art rectangle.
+- **Callout coverage (`draw_probe.cpp`):** Check the Wren art-to-panel clearance on both sides, plus the staggered coordinates.
+- **Six-card grid (`IdleScreen.cpp`, `Layout.h`):** Replaced proportional/mixed-width placement with a strict three-column grid: three info cards above Navigation and two separate Events cards.
+- **Equal sizing:** All six cards now use identical widths and a common height. The draw pass measures actual wrapped info, navigation, and event text, then grows all cards together when needed.
+- **Gutters:** Added a consistent 12px gap between grid columns and rows and before Activity Feed, preventing touching borders while retaining the feed's bottom anchor.
+- **Navigation text:** Wraps within its card and contributes to the shared card-height measurement instead of spilling or silently clipping.
+- **Regression coverage:** Draw probe asserts equal card dimensions, uniform gutters, feed separation, callout staggering, and that room cards stay outside the ship-art bounds.
+- **Build and draw checks:** `cmake --build build --parallel 2` and `tools/check-draw.sh` passed.
+- **Full suite:** `ctest --test-dir build --output-on-failure` passed **125/125**; `git diff --check` passed.
+- **Visual limit:** No windowed client screenshot was captured here; the native draw recorder verifies the painter's measured geometry, not a live display.
+- **Scope:** Follow-up on PR #30, branch `arena/cb265de8-spaceship`; palette, authored assets, legacy materials, and simulation/gameplay behavior remain unchanged.

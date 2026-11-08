@@ -222,27 +222,55 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
       exterior_ = BuildExteriorLayout(sim, idle_.stageArea);
       // No tutorial copy or view-switch row is drawn above the ship.
     }
-    // Measure the actual proportional-font wraps before painting so long
-    // location/life-support values grow the rail instead of overlapping Feed.
+    // All six Home cards share one measured height. Grow the whole grid when
+    // any wrapped info, navigation, or event text needs additional room.
     if (!idle_.infos.empty()) {
       const int labelPx = theme_.HomeInfoLabelPx();
       const int valuePx = theme_.HomeInfoValuePx();
+      const int stripLabelPx = TypePx(11);
+      const int stripValuePx = TypePx(13);
       float needed = idle_.infos.front().box.h;
       for (std::size_t i = 0; i < idle_.infos.size(); ++i) {
         const auto& cell = idle_.infos[i];
-        const float width = std::max(1.0f, cell.box.w - 20.0f - (i + 1 < idle_.infos.size() ? 8.0f : 0.0f));
+        const float width = std::max(1.0f, cell.box.w - 20.0f);
         const auto labels = WrapText(cell.label, width, labelPx, SelectFont(labelPx, false));
         const auto values = WrapText(cell.value, width, valuePx, SelectFont(valuePx, false));
         needed = std::max(needed, 6.0f + labels.size() * (labelPx + 3.0f) + 3.0f +
                                  values.size() * (valuePx + 3.0f) + 6.0f);
       }
+      const float navWidth = std::max(1.0f, idle_.nav.box.w - 16.0f);
+      const auto navLines = WrapText(idle_.nav.main, navWidth, stripValuePx,
+                                     SelectFont(stripValuePx, false));
+      needed = std::max(needed, 6.0f + stripLabelPx + 6.0f +
+                               navLines.size() * (stripValuePx + 3.0f) + 6.0f);
+      for (const auto& event : idle_.events) {
+        const float width = std::max(1.0f, event.box.w - 16.0f);
+        const auto heading = WrapText(event.heading, width, stripLabelPx,
+                                      SelectFont(stripLabelPx, false));
+        const auto lines = WrapText(event.label, width, stripValuePx,
+                                    SelectFont(stripValuePx, false));
+        needed = std::max(needed, 6.0f + heading.size() * (stripLabelPx + 3.0f) + 6.0f +
+                                 lines.size() * (stripValuePx + 3.0f) + 6.0f);
+      }
+
       const float extra = needed - idle_.infos.front().box.h;
       for (auto& cell : idle_.infos) { cell.box.h = needed; }
-      idle_.nav.box.y += extra;
-      idle_.eventsBox.y += extra;
-      for (auto& event : idle_.events) { event.box.y += extra; }
+      const float lowerY = idle_.nav.box.y + extra;
+      idle_.nav.box.y = lowerY;
+      idle_.nav.box.h = needed;
+      idle_.eventsBox.y = lowerY;
+      const std::size_t eventRows = (idle_.events.size() + 1) / 2;
+      idle_.eventsBox.h = static_cast<float>(eventRows) * needed +
+                          static_cast<float>(eventRows - 1) * Metrics::kHomePanelGap;
+      for (std::size_t i = 0; i < idle_.events.size(); ++i) {
+        const std::size_t row = i / 2;
+        idle_.events[i].box.y = lowerY + static_cast<float>(row) *
+                                (needed + Metrics::kHomePanelGap);
+        idle_.events[i].box.h = needed;
+      }
+
       const float lowerBottom = std::max(idle_.nav.box.Bottom(), idle_.eventsBox.Bottom());
-      const float feedStart = lowerBottom;
+      const float feedStart = lowerBottom + Metrics::kHomePanelGap;
       const float available = layout_.content.Bottom() - feedStart - 8.0f;
       idle_.feedHeight = std::clamp(available, Metrics::kFeedMin, Metrics::kHomeFeedMax);
       idle_.feedBox.y = std::max(feedStart,
@@ -732,13 +760,12 @@ ShellView::ExteriorLayout ShellView::BuildExteriorLayout(const Simulation& sim, 
       // a different amount on each side instead of forming two rigid columns.
       static constexpr float leftY[] = {0.0f, 0.354f, 0.542f};
       static constexpr float rightY[] = {0.0f, 0.306f, 0.527f};
-      static constexpr float leftInset[] = {0.0f, 0.053f, 0.193f};
-      static constexpr float rightInset[] = {0.0f, 0.014f, 0.118f};
-      static constexpr float leftWidth[] = {1.0f, 1.0f, 0.84f};
-      static constexpr float rightWidth[] = {1.0f, 0.95f, 0.70f};
+      static constexpr float leftWidth[] = {1.0f, 0.90f, 0.78f};
+      static constexpr float rightWidth[] = {1.0f, 0.93f, 0.80f};
       const std::size_t slot = std::min<std::size_t>(row, 2);
-      placement.xInset = stage.w * (left ? leftInset[slot] : rightInset[slot]);
-      placement.width = sideW * (left ? leftWidth[slot] : rightWidth[slot]);
+      const float baseWidth = std::max(1.0f, sideW - 8.0f);
+      placement.width = baseWidth * (left ? leftWidth[slot] : rightWidth[slot]);
+      placement.xInset = baseWidth - placement.width;
       placement.rowFraction = left ? leftY[slot] : rightY[slot];
     }
     placements.push_back(placement);
@@ -768,7 +795,7 @@ ShellView::ExteriorLayout ShellView::BuildExteriorLayout(const Simulation& sim, 
     item.left = placement.left;
     const float boxX = placement.left
         ? stage.x + 2.0f + placement.xInset
-        : stage.Right() - sideW - 2.0f - placement.xInset;
+        : stage.Right() - 2.0f - placement.width;
     item.box = {boxX, bodyY + bodyH * placement.rowFraction,
                 placement.width, rowH - 4.0f};
     // Conceptual anchor only: it ties a callout to the exterior visually and
@@ -878,12 +905,17 @@ void ShellView::PaintIdle(Simulation& sim) {
     DrawRectangleLines(static_cast<int>(strip.box.x), static_cast<int>(strip.box.y),
                        static_cast<int>(strip.box.w), static_cast<int>(strip.box.h),
                        ToRay(theme.palette.border));
-    const float mainY =
-        strip.box.y + 6.0f + TypePx(11) + 6.0f;
+    const float mainY = strip.box.y + 6.0f + TypePx(11) + 6.0f;
     Text(strip.label.c_str(), static_cast<int>(strip.box.x + 8.0f),
          static_cast<int>(strip.box.y + 6.0f), TypePx(11), ToRay(theme.palette.muted));
-    Text(strip.main.c_str(), static_cast<int>(strip.box.x + 8.0f),
-         static_cast<int>(mainY), TypePx(13), ToRay(theme.palette.ink));
+    const auto mainLines = WrapText(strip.main, std::max(1.0f, strip.box.w - 16.0f),
+                                    TypePx(13), SelectFont(TypePx(13), false));
+    float y = mainY;
+    for (const auto& line : mainLines) {
+      Text(line.c_str(), static_cast<int>(strip.box.x + 8.0f), static_cast<int>(y),
+           TypePx(13), ToRay(theme.palette.ink));
+      y += TypePx(13) + 3.0f;
+    }
   };
 
   const int labelPx = theme.HomeInfoLabelPx();

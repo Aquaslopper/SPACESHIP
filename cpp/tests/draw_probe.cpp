@@ -338,9 +338,32 @@ int main() {
       const auto bridgeCallout = FindText("Bridge");
       Require(engineCallout.x < oxygenCallout.x && oxygenCallout.x < cargoCallout.x &&
                   engineCallout.y < oxygenCallout.y && oxygenCallout.y < cargoCallout.y &&
-                  crewCallout.x > messCallout.x && messCallout.x > bridgeCallout.x &&
+                  crewCallout.x < messCallout.x && messCallout.x < bridgeCallout.x &&
                   crewCallout.y < messCallout.y && messCallout.y < bridgeCallout.y,
-              "Three-row room callouts lost the screenshot's inward, staggered composition");
+              "Three-row room callouts lost their measured, non-overlapping stagger");
+      const auto art = std::find_if(textureDraws.begin(), textureDraws.end(),
+                                    [](const TextureCall& draw) { return draw.id == 77; });
+      Require(art != textureDraws.end(), "Wren art bounds are missing for callout spacing check");
+      const auto panelFor = [&](const TextCall& label) {
+        return std::find_if(rects.begin(), rects.end(), [&](const RectCall& rect) {
+          return rect.color.r == starterView.CurrentTheme().palette.panel.r &&
+                 rect.color.g == starterView.CurrentTheme().palette.panel.g &&
+                 rect.color.b == starterView.CurrentTheme().palette.panel.b &&
+                 label.x >= rect.x && label.x < rect.x + rect.w &&
+                 label.y >= rect.y && label.y < rect.y + rect.h && rect.w > 100.0f;
+        });
+      };
+      const auto oxygenPanel = panelFor(oxygenCallout);
+      const auto cargoPanel = panelFor(cargoCallout);
+      const auto crewPanel = panelFor(crewCallout);
+      const auto bridgePanel = panelFor(bridgeCallout);
+      Require(oxygenPanel != rects.end() && cargoPanel != rects.end() &&
+                  crewPanel != rects.end() && bridgePanel != rects.end() &&
+                  oxygenPanel->x + oxygenPanel->w + 16.0f <= art->dest.x &&
+                  cargoPanel->x + cargoPanel->w + 16.0f <= art->dest.x &&
+                  crewPanel->x >= art->dest.x + art->dest.width + 16.0f &&
+                  bridgePanel->x >= art->dest.x + art->dest.width + 16.0f,
+              "Room callout panels overlap the Wren art bounds");
       Require(std::none_of(texts.begin(), texts.end(), [](const TextCall& t) { return t.text == "Science Room"; }),
               "Uninstalled room was shown as an exterior callout");
       for (const auto& room : starter.Rooms()) {
@@ -893,12 +916,24 @@ int main() {
         };
         Require(model.stats.front().box.h <= (step == 0 ? 64.0f : 74.0f),
                 "Ship-system gauge panels were not compacted");
+        const auto& homeCard = model.infos.front().box;
+        const float lowerBottom = std::max(model.nav.box.Bottom(), model.eventsBox.Bottom());
         Require(model.stageArea.h >= ship::Metrics::kHomeStageMinH &&
-                    model.nav.box.y >= model.infos.front().box.Bottom() + 10.0f &&
+                    model.nav.box.y >= homeCard.Bottom() + ship::Metrics::kHomePanelGap &&
                     model.eventsBox.y == model.nav.box.y,
                 "The six small Home panels are not grouped below the centered ship stage");
-        Require(model.feedBox.y == std::max(model.nav.box.Bottom(), model.eventsBox.Bottom()),
-                "A blank gap remains between the six Home panels and Activity Feed");
+        Require(std::all_of(model.infos.begin(), model.infos.end(), [&](const auto& info) {
+                  return info.box.w == homeCard.w && info.box.h == homeCard.h;
+                }) && model.nav.box.w == homeCard.w && model.nav.box.h == homeCard.h &&
+                    model.events.size() == 2 &&
+                    model.events[0].box.w == homeCard.w && model.events[1].box.w == homeCard.w &&
+                    model.events[0].box.h == homeCard.h && model.events[1].box.h == homeCard.h,
+                "The six Home cards do not share identical dimensions");
+        Require(model.nav.box.x == homeCard.x &&
+                    model.events[0].box.x == homeCard.x + homeCard.w + ship::Metrics::kHomePanelGap &&
+                    model.events[1].box.x == model.events[0].box.x + homeCard.w + ship::Metrics::kHomePanelGap &&
+                    model.feedBox.y == lowerBottom + ship::Metrics::kHomePanelGap,
+                "Home cards do not have consistent gutters above Activity Feed");
         filledAt(model.stats.front().box.x, model.stats.front().box.y);
         const auto& navTitle = FindText("Navigation");
         const auto navSurface = std::find_if(rects.begin(), rects.end(), [&](const auto& r) {

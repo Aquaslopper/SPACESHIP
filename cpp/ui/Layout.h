@@ -45,6 +45,7 @@ struct Metrics {
   static constexpr float kFeedMin = 62.0f;      // FEED.min
   static constexpr float kFeedMax = 132.0f;     // FEED.max
   static constexpr float kHomeFeedMax = 152.0f; // Home feed ceiling from the compact layout
+  static constexpr float kHomePanelGap = 12.0f; // consistent gutters between Home cards
   static constexpr float kIndH = 104.0f;        // IND.h
   static constexpr float kIndGap = 5.0f;        // IND.gap
   static constexpr float kStageW = 1160.0f;     // STAGE.ship
