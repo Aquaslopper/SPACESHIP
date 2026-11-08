@@ -330,6 +330,28 @@ int ChartPaintRank(ChartLook look) {
   return 9;
 }
 
+// Front to back, for the one flat hit list: a higher rank is tested first, and
+// the list itself is searched from the END, so whatever is registered last wins
+// the click.
+//
+// A region outranks every star, world and station - including the ones that are
+// in range. That is the opposite of what "front to back" looks like on a small
+// chart, so the reasoning is worth stating: on the galaxy scale a region carries
+// about thirty star dots inside its own footprint, and all of them are in range
+// (the ship's own cluster is full of them). Ranking in-range bodies above the
+// region put those stars last in the list, so a click on a galaxy always
+// resolved to a star inside it, no region was ever selected, and the
+// "View ... sector chart" row - the only way off the core chart - never
+// appeared. The reference never has this problem because each body is its own
+// stacked element and the browser hit-tests topmost-first; the port collapses
+// them into one list and has to state the order.
+int ChartHitRank(const NavBodyView& body) {
+  if (body.selected) { return 3; }
+  if (body.type == "region") { return 2; }
+  if (body.inRange) { return 1; }
+  return 0;
+}
+
 bool ChartRectsOverlap(const Area& a, const Area& b) {
   return a.x < b.Right() && b.x < a.Right() && a.y < b.Bottom() && b.y < a.Bottom();
 }

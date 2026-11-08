@@ -1677,6 +1677,8 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     }
     ordered.push_back(&body);
   }
+  // Paint back to front: dust and regions, then the stars that light the scene,
+  // then the worlds, then the marks people built.
   std::stable_sort(ordered.begin(), ordered.end(),
                    [](const NavBodyView* a, const NavBodyView* b) {
                      return ChartPaintRank(ChartLookOf(*a)) < ChartPaintRank(ChartLookOf(*b));
@@ -1687,7 +1689,6 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     const float cx = box.x + static_cast<float>(body->at.x) * sx;
     const float cy = box.y + static_cast<float>(body->at.y) * sy;
     const float radius = static_cast<float>(body->size) * 0.42f * bodyScale;
-    const ChartLook look = ChartLookOf(*body);
     float alpha = body->inRange || body->here ? 1.0f : 0.78f;
     if (chart.layer == "sector" && !body->region.empty() && !sim.Map().sector.empty() &&
         body->region != sim.Map().sector) {
@@ -1701,12 +1702,25 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     } else {
       PaintChartBody(*body, cx, cy, radius, bodyScale, p, alpha);
     }
+  }
 
-    if (cx >= box.x && cx <= box.Right() && cy >= box.y && cy <= box.Bottom()) {
-      const float reach = std::max(radius, ChartMinimumRadius(look, bodyScale)) + 4.0f;
-      navHits_.push_back(NavHit{Area{cx - reach, cy - reach, reach * 2.0f, reach * 2.0f},
-                                "select", body->id});
-    }
+  // Hit-test front to back. The click loop walks navHits_ backwards and takes
+  // the first box containing the point, so the winners must sit at the END:
+  // register the lowest rank first. See ChartHitRank() for why a region has to
+  // outrank the stars drawn inside it.
+  std::vector<const NavBodyView*> hitOrder = ordered;
+  std::stable_sort(hitOrder.begin(), hitOrder.end(),
+                   [](const NavBodyView* a, const NavBodyView* b) {
+                     return ChartHitRank(*a) < ChartHitRank(*b);
+                   });
+  for (const NavBodyView* body : hitOrder) {
+    const float cx = box.x + static_cast<float>(body->at.x) * sx;
+    const float cy = box.y + static_cast<float>(body->at.y) * sy;
+    if (cx < box.x || cx > box.Right() || cy < box.y || cy > box.Bottom()) { continue; }
+    const float radius = static_cast<float>(body->size) * 0.42f * bodyScale;
+    const float reach = std::max(radius, ChartMinimumRadius(ChartLookOf(*body), bodyScale)) + 4.0f;
+    navHits_.push_back(NavHit{Area{cx - reach, cy - reach, reach * 2.0f, reach * 2.0f},
+                              "select", body->id});
   }
 
   for (const NavBodyView* body : ordered) {
