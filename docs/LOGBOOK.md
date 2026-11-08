@@ -907,3 +907,28 @@ the meal. `failures=0`.
 What this does not touch: the starve line at 90 is unchanged, so a hand now reaches
 it in half the clicks it took before - a meal is also worth twice as much, so a fed
 crew is as safe as it was and an empty shelf is twice as fast to kill.
+
+## 055 — The cycle, run for 130 clicks
+
+The owner's reading of the buffer is now measured rather than argued. Four hands
+staggered the way the game staggers them (ticks 0, 6, 12, 18), one of them cooking,
+a full rack of 24:
+
+    130 clicks: peak hunger 48.8, rack low 9.0, rack high 24.0, rack now 18.0
+
+A hand tops out at 48.8 - just short of the 50 he eats from - and the shelf never
+falls past 9, just under the 10 the cook starts at. Both numbers sit exactly where
+the arithmetic said they would: the meal clears thirty points, the clock puts thirty
+back over the next twenty-five clicks, and the five points he never loses
+(`hungerFloor`) are the buffer that keeps a hand clear of the starve line at 90.
+
+The shelf's floor of 9 is the same buffer seen from the galley: the cook is woken
+five clicks before anything is actually at risk, and the batch lands before the next
+hand is due. `failures=0` on `/home/user/probe/cycle`.
+
+CAUGHT BY THE PROBE'S OWN FIRST RUN, and worth keeping: with all four hunger ticks
+set to zero, the rack went to 0.0 and stayed there long enough to be recorded. Four
+hands eating on the same click take twelve food at once - exactly half the shelf -
+and no cook of five-food batches can cover that. The stagger is not decoration; it
+is the thing the room is balanced on. Anything that re-times a hand (a save, a new
+hire, a reload) should keep his tick where it was, and that has not been checked.
