@@ -39,9 +39,10 @@ void Simulation::TickCrew() {
 
   // ---- hunger, each on their own staggered clock -------------------------
   // Everything here is counted in clicks, never in seconds. A hand gains
-  // `hungerPerMeal` (15) over its own `every` (25) clicks - a click at a time,
+  // `hungerPerMeal` (30) over its own `every` (25) clicks - a click at a time,
   // so the bar creeps up rather than jumping - and then goes to eat. One food
-  // drains `hungerPerFood` (5) of hunger, so a meal is 15 / 5 = 3 food.
+  // drains `hungerPerFood` (10) of hunger, so a meal is 30 / 10 = 3 food: three
+  // takes a hand from 50% down to 20%, which is the whole point of the number.
   //
   // THE MEAL IS SIZED BY THE CLOCK, NOT BY THE COUNTER. A hand eats the 3 food
   // its 25 clicks earned and stops; it does not clear the shelf. That is what

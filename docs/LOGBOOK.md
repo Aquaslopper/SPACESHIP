@@ -885,3 +885,25 @@ the race by better than two to one, which is what makes the trained trigger
 Nothing changed. The data already says three (`hungerPerMeal` 15 / `hungerPerFood`
 5), and now the arithmetic says so independently: not because the port wrote it,
 but because it is the only value at which the owner's three truths coexist.
+
+## 054 — One food is ten points of hunger
+
+The owner turned the arithmetic round, which is the right way to check it. Three
+food should take a hand from 50% hunger to 20%: thirty points, so one food is ten.
+The data said one food was five, which made a three-food meal worth only fifteen -
+enough to cancel one clock and no more.
+
+`hungerPerFood` 5 -> 10, and `hungerPerMeal` 15 -> 30 to keep the room as it was.
+The food economy is invariant under that change: a meal is still 30 / 10 = 3 food,
+four hands still use twelve per round, the counter still holds exactly two rounds,
+and the cook still starts under ten. Only the percentages the player reads move,
+and now they move by a number anyone can do in their head.
+
+Probe `/home/user/probe/mess`, two ships fed the same clock, one with six food on
+the shelf and one with none: the meal took exactly 30.0 of hunger and exactly 3.0
+food. The hand reading 52.4 against 22.4 is the same hand, three clicks later than
+the meal. `failures=0`.
+
+What this does not touch: the starve line at 90 is unchanged, so a hand now reaches
+it in half the clicks it took before - a meal is also worth twice as much, so a fed
+crew is as safe as it was and an empty shelf is twice as fast to kill.
