@@ -858,3 +858,30 @@ conversation, not an edit, and this entry does not start it.
 One useful thing fell out. The same page prices the filter ladder as 1 -> 2 -> 3 =
 BAD -> THIN -> FADING: a taught hand acts at progressively better air. That is the
 same shape #050 built, and it names the stages the UI should show.
+
+## 053 — The mess arithmetic, and which number is the odd one
+
+The owner holds three numbers as true: rack 24, the cook starts at 10, one ration
+fills 5. Asking what meal size makes those agree:
+
+    meal  4 hands/round   rack holds   hands that fit under 10   eat/click
+      2          8          3.00 rounds            5.0             0.32
+      3         12          2.00 rounds            3.3             0.48
+      4         16          1.50 rounds            2.5             0.64
+      5         20          1.20 rounds            2.0             0.80
+
+Three is the only meal at which 24 is a whole number of rounds - exactly two - and
+the only one where "two hands arriving back to back" still leaves food: at ten on
+the counter, two five-food meals empty it, two three-food meals leave four. The
+owner's own condition, that a pair eating one after another does not clear the
+shelf, rules out five on its own. Five is the ration: one dry ration yields five
+cooked food, which is the number he remembers the cook filling with.
+
+Production settles it. A batch is five food in five clicks, so the galley makes one
+food per click; at three food a meal four hands eat 0.48 per click. The cook wins
+the race by better than two to one, which is what makes the trained trigger
+(10 -> 15 -> 20) a comfort rather than a rescue.
+
+Nothing changed. The data already says three (`hungerPerMeal` 15 / `hungerPerFood`
+5), and now the arithmetic says so independently: not because the port wrote it,
+but because it is the only value at which the owner's three truths coexist.
