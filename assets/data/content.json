@@ -298,7 +298,7 @@
     {
       "group": "Exploration",
       "id": "markets",
-      "text": "Seven regions contain 48 navigable systems, 243 local destinations and 30 ports. Charts include stars, worlds and their natural moons. Prices vary by port and commodity. Buy where goods are plentiful, carry them within the hold limit, then sell where they are scarce. Stock fuel, canisters and repair kits for long routes; not every system has a station.",
+      "text": "Seven regions contain 48 navigable systems, 243 local destinations and 30 ports. Charts include stars, worlds and their natural moons. Prices vary by port and commodity. Buy where goods are plentiful, carry them within the hold limit, then sell where they are scarce. Stock fuel, canisters and repair kits for long routes; not every system has a station. Station-less systems have no dock, market, shipyard or trade contracts - only stars, worlds, landmarks and salvage.",
       "title": "Regions, ports and trade"
     },
     {
@@ -362,7 +362,7 @@
     {
       "group": "Rewards",
       "id": "starmap",
-      "text": "Every station keeps its own star-map wiki for the system it sits in. The page lists the planets and moons generated around that station, with their names, kinds and local readings. Pick a body to read its page, then open the system chart for free. The same local knowledge stocks the market and shapes its prices; accepted trade routes are drawn in green.",
+      "text": "Only systems with a charted space station have a station page. Every station keeps its own star-map wiki for the system it sits in; a station-less system has no station wiki, dock or trade desk. The page lists the planets and moons generated around that station, with their names, kinds and local readings. Pick a body to read its page, then open the system chart for free. The same local knowledge stocks the market and shapes its prices; accepted trade routes are drawn in green.",
       "title": "Station star-map and local markets"
     },
     {

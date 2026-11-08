@@ -527,3 +527,17 @@ You must append a compressed summary of **every single reply and action you take
 - **Checks:** `spaceship_core` and `spaceship_console` targets built; `Draw.cpp` syntax-only compile passed; `git diff --check` clean.
 - **Testing:** no test suite, ctest, draw probe, or GUI run was executed, per the standing stop.
 - **State:** committed and pushed to `arena/f91aec6c-spaceship`, updating open PR #34.
+
+### Entry #038
+- **Timestamp:** 2026-11-08 UTC
+- **Task:** owner correction: rework space stations; not all systems have a space station.
+- **Station distribution:** procedural systems no longer default to a working port. Each region now receives a deterministic station quota of about one in four generated systems, with at least one station per region.
+- **Station-less systems:** the remaining generated systems keep stars, worlds, landmarks and salvage targets, but no dock, market, shipyard or trade contracts.
+- **Secondary waystations:** the old landmark pass could add a second working port to generated systems. Those waystations are now derelict sites with no docking services, so the regional quota is the only source of new stations.
+- **System census:** every system now carries a `Station` detail naming its charted station(s), or `None charted` when it has no station.
+- **Station knowledge:** station atlas/market derivation still runs only for actual ports; station-less systems do not get a station wiki page.
+- **Help wording:** handbook and station star-map copy now state that only systems with a charted station have a station page/dock/trade desk.
+- **Invariant:** the grown-chart test now checks that station systems are fewer than all systems and that station-less systems are marked `None charted`; it was edited, not run.
+- **Checks:** `spaceship_core` and `spaceship_console` targets built; `git diff --check` clean.
+- **Testing:** no test suite, ctest, draw probe, or GUI run was executed, per the standing stop.
+- **State:** committed and pushed to `arena/f91aec6c-spaceship`, updating open PR #34.
