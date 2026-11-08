@@ -8,6 +8,7 @@
 //
 //  Script syntax, one command per line, '#' starts a comment:
 //
+//    seed <words>         a new voyage on that sky — the player's own seed
 //    action [text]        performAction(text)      — spend one action
 //    seat <0|1|2>         startInstall(slot)       — carry a canister over
 //    bank                 turnOnFilter()           — throw the filter switch
@@ -148,7 +149,12 @@ int main(int argc, char** argv) {
     if (parts.empty()) { continue; }
     const std::string& command = parts[0];
 
-    if (command == "crew-set" && parts.size() == 4) {
+    if (command == "seed" && parts.size() >= 2) {
+      // A voyage on the player's own sky: the same words draw the same stars.
+      simulation = ship::Simulation::NewVoyage(catalog, parts[1]);
+      std::fprintf(stderr, "seed '%s': %zu systems, %zu docks\n", parts[1].c_str(),
+                   simulation.World().systems.size(), simulation.World().ports.size());
+    } else if (command == "crew-set" && parts.size() == 4) {
       auto* crew = simulation.FindCrew(parts[1]);
       double* field = nullptr;
       if (crew != nullptr) {

@@ -75,7 +75,8 @@ class Catalog {
   bool chartExpanded = false;
 
   // The seed the generated universe was built from.
-  std::uint64_t universeSeed = 0;
+  std::uint64_t universeSeed = 0;        // the hash the sky was drawn from
+  std::string universeSeedText;          // the words the player typed, as typed
   int universeSystems = 180;
 
   // Where each system sits on the galaxy board (ChartExpansion::PlaceGalaxyDots).
@@ -105,18 +106,6 @@ class Catalog {
   std::vector<Port> ports;
   std::vector<Good> goods;
   std::vector<Contract> contracts;
-
-  // The old chart tables, still loaded because the files carry them, no longer
-  // used to build anything: UniverseGen derives every station's prices instead.
-  //   portPrices  PORT_PRICES: trade profile -> commodity kind -> multiplier
-  //   portHints   PORT_HINTS: trade profile -> the line appended to a port's tip
-  //   orbitalWorlds / orbitalPlanetNames / orbitalMoonNames: the local-chart
-  //               pass's four profiles and its two name tables, in order.
-  std::map<std::string, std::map<std::string, double>> portPrices;
-  std::map<std::string, std::string> portHints;
-  std::vector<OrbitalWorld> orbitalWorlds;
-  std::vector<std::string> orbitalPlanetNames;
-  std::vector<std::string> orbitalMoonNames;
 
   std::vector<std::string> taskTypes;
   std::vector<std::string> layerOrder;               // system, sector, galaxy

@@ -12,6 +12,7 @@
 #include "core/Simulation.h"
 
 #include "data/ChartExpansion.h"
+#include "data/UniverseGen.h"
 
 #include <algorithm>
 #include <cctype>
@@ -59,6 +60,20 @@ CrewMember MakeCrew(const CrewDefinition& def) {
   crew.jobAt = def.jobAt;
   return crew;
 }
+
+Simulation Simulation::NewVoyage(const Catalog& catalog, const std::string& seed) {
+  Catalog seeded = catalog;
+  if (!seed.empty()) {
+    seeded.universeSeed = SeedFromText(seed);
+    seeded.universeSeedText = seed;
+    seeded.chartExpanded = false;
+  }
+  return NewVoyage(seeded);
+}
+
+std::uint64_t Simulation::UniverseSeed() const { return catalog_.universeSeed; }
+
+std::string Simulation::UniverseSeedWords() const { return catalog_.universeSeedText; }
 
 Simulation Simulation::NewVoyage(const Catalog& catalog) {
   Simulation sim;

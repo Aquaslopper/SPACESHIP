@@ -451,7 +451,6 @@ void EntangleGalaxy(Catalog& catalog) {
 void ExpandChart(Catalog& catalog) {
   if (catalog.chartExpanded) { return; }
   catalog.chartExpanded = true;
-  if (catalog.regions.empty()) { return; }
 
   // ---- 1. the three boards -----------------------------------------------
   const double authoredW = catalog.map.w;

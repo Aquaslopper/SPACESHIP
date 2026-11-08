@@ -72,6 +72,15 @@ class Simulation {
   // A voyage in the state the reference reaches the moment its script has
   // finished loading: full stores, three canisters in the rack, three jobs.
   static Simulation NewVoyage(const Catalog& catalog);
+  // A voyage on a sky of the player's choosing. The same words always draw the
+  // same stars; an empty word keeps whatever the catalogue was built with.
+  static Simulation NewVoyage(const Catalog& catalog, const std::string& seed);
+  // The seed a voyage is flying under, as words when the player typed some.
+  std::uint64_t UniverseSeed() const;
+  std::string UniverseSeedWords() const;
+  // The seed a save file was flown under, so the sky can be rebuilt before the
+  // save is applied. False when the file is not a save or carries no seed.
+  static bool SeedOfSave(const std::string& text, std::uint64_t* seed, std::string* words);
   // Historical fully fitted HTA state, for legacy-save and differential tests.
   // The playable client always uses NewVoyage, never this reference fixture.
   static Simulation ReferenceVoyage(const Catalog& catalog);

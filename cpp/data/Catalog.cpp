@@ -134,39 +134,6 @@ CrewDefinition ReadCrew(const Json& object) {
   return c;
 }
 
-Body ReadBody(const Json& object, const std::string& where) {
-  Body b;
-  b.id = Text(object, "id", where);
-  b.type = Text(object, "type", where);
-  b.name = Text(object, "name", where);
-  b.klass = Text(object, "klass", where);
-  b.x = Number(object, "x", where);
-  b.y = Number(object, "y", where);
-  b.system = Text(object, "system", where);
-  b.region = Text(object, "region", where);
-  b.entry = Text(object, "entry", where);
-  b.subtype = Text(object, "subtype", where);
-  if (auto it = object.find("cluster"); it != object.end() && it->is_number()) {
-    b.cluster = it->get<int>();
-  }
-  if (auto it = object.find("details"); it != object.end() && it->is_array()) {
-    for (const Json& row : *it) {
-      if (row.is_array() && row.size() == 2) {
-        b.details.emplace_back(row[0].is_string() ? row[0].get<std::string>() : row[0].dump(),
-                               row[1].is_string() ? row[1].get<std::string>() : row[1].dump());
-      }
-    }
-  }
-  for (const char* key : {"scan", "scanLocked"}) {
-    auto it = object.find(key);
-    if (it == object.end() || !it->is_array()) { continue; }
-    std::vector<std::string>& target = std::string(key) == "scan" ? b.scan : b.scanLocked;
-    for (const Json& line : *it) {
-      if (line.is_string()) { target.push_back(line.get<std::string>()); }
-    }
-  }
-  return b;
-}
 
 }  // namespace
 
@@ -256,67 +223,6 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
   // still answers for all three layers.
   for (const std::string& layer : catalog.layerOrder) {
     catalog.layerBoards[layer] = catalog.map;
-  }
-
-  for (const Json& region : Field(chart, "galaxyBodies", "chart.json")) {
-    catalog.regions.push_back(ReadBody(region, "chart.json/galaxyBodies"));
-  }
-  for (const Json& system : Field(chart, "sectorBodies", "chart.json")) {
-    catalog.systems.push_back(ReadBody(system, "chart.json/sectorBodies"));
-  }
-  for (const Json& body : Field(chart, "bodies", "chart.json")) {
-    catalog.bodies.push_back(ReadBody(body, "chart.json/bodies"));
-  }
-  for (const Json& lane : Field(chart, "sectorLinks", "chart.json")) {
-    catalog.sectorLanes.push_back({lane.at(0).get<std::string>(), lane.at(1).get<std::string>()});
-  }
-  for (const Json& lane : Field(chart, "galaxyLinks", "chart.json")) {
-    catalog.galaxyLanes.push_back({lane.at(0).get<std::string>(), lane.at(1).get<std::string>()});
-  }
-
-  const Json& ports = Field(chart, "ports", "chart.json");
-  for (auto it = ports.begin(); it != ports.end(); ++it) {
-    Port port;
-    port.id = it.key();
-    port.name = Text(it.value(), "name", "chart.json/ports/" + port.id);
-    port.tip = Text(it.value(), "tip", "chart.json/ports/" + port.id);
-    if (auto prices = it.value().find("prices"); prices != it.value().end() && prices->is_object()) {
-      for (auto p = prices->begin(); p != prices->end(); ++p) {
-        port.prices[p.key()] = p.value().get<double>();
-      }
-    }
-    catalog.ports.push_back(port);
-  }
-
-  // ---- the tables the generator reads ------------------------------------
-  // Kept because the files carry them; nothing builds from them now:
-  // PORT_PRICES, PORT_HINTS, ORBITAL_WORLDS and the two name tables. They are
-  // authored, so they stay data; only the chart is computed from them.
-  const Json& prices = Field(chart, "portPrices", "chart.json");
-  for (auto it = prices.begin(); it != prices.end(); ++it) {
-    if (!it.value().is_object()) { continue; }
-    for (auto p = it.value().begin(); p != it.value().end(); ++p) {
-      catalog.portPrices[it.key()][p.key()] = p.value().get<double>();
-    }
-  }
-  const Json& hints = Field(chart, "portHints", "chart.json");
-  for (auto it = hints.begin(); it != hints.end(); ++it) {
-    catalog.portHints[it.key()] = it.value().get<std::string>();
-  }
-  for (const Json& world : Field(chart, "orbitalWorlds", "chart.json")) {
-    OrbitalWorld profile;
-    profile.id = Text(world, "id", "chart.json/orbitalWorlds");
-    profile.label = Text(world, "label", "chart.json/orbitalWorlds");
-    profile.atmosphere = Text(world, "atmo", "chart.json/orbitalWorlds");
-    profile.scan = Text(world, "scan", "chart.json/orbitalWorlds");
-    profile.locked = Text(world, "locked", "chart.json/orbitalWorlds");
-    catalog.orbitalWorlds.push_back(std::move(profile));
-  }
-  for (const Json& name : Field(chart, "orbitalPlanetNames", "chart.json")) {
-    catalog.orbitalPlanetNames.push_back(name.get<std::string>());
-  }
-  for (const Json& name : Field(chart, "orbitalMoonNames", "chart.json")) {
-    catalog.orbitalMoonNames.push_back(name.get<std::string>());
   }
 
   for (const Json& good : Field(chart, "market", "chart.json")) {    Good g;
@@ -832,14 +738,36 @@ std::vector<std::string> Catalog::Validate() const {
     }
   }
 
-  // ---- lanes join two systems inside one region -------------------------
-  for (const Lane& lane : sectorLanes) {
-    const Body* a = FindSystem(lane.from);
-    const Body* b = FindSystem(lane.to);
-    if (a == nullptr || b == nullptr) {
-      problems.push_back("sector lane " + lane.from + " -> " + lane.to + " has a missing end");
-    } else if (a->region != b->region) {
-      problems.push_back("sector lane " + lane.from + " -> " + lane.to + " crosses regions");
+  // ---- lanes join systems, and the chart can be flown end to end ---------
+  // Most lanes stay inside a neighbourhood, but a region needs a way out, so a
+  // bridge between two regions is legal: what is not legal is a system with no
+  // lane at all, or a chart split into islands nothing can cross.
+  {
+    std::map<std::string, std::vector<std::string>> neighbours;
+    for (const Lane& lane : sectorLanes) {
+      const Body* a = FindSystem(lane.from);
+      const Body* b = FindSystem(lane.to);
+      if (a == nullptr || b == nullptr) {
+        problems.push_back("sector lane " + lane.from + " -> " + lane.to + " has a missing end");
+        continue;
+      }
+      neighbours[lane.from].push_back(lane.to);
+      neighbours[lane.to].push_back(lane.from);
+    }
+    if (!systems.empty()) {
+      std::set<std::string> reached{systems.front().id};
+      std::vector<std::string> queue{systems.front().id};
+      while (!queue.empty()) {
+        const std::string here = queue.back();
+        queue.pop_back();
+        for (const std::string& next : neighbours[here]) {
+          if (reached.insert(next).second) { queue.push_back(next); }
+        }
+      }
+      if (reached.size() != systems.size()) {
+        problems.push_back("the lane chart reaches " + std::to_string(reached.size()) +
+                           " of " + std::to_string(systems.size()) + " systems");
+      }
     }
   }
 

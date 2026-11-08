@@ -27,6 +27,8 @@
 #include "data/ChartExpansion.h"
 
 #include "core/JsNumber.h"
+
+#include <cstdlib>
 #include "core/Simulation.h"
 #include "core/DisplaySettings.h"
 
@@ -89,6 +91,11 @@ bool TruthyMap(const Json& map, const std::string& key) {
 std::string Simulation::SaveJson() const {
   Json root = Json::object();
   root["format"] = "spaceship-command-1";
+  // The sky this voyage was flown under. Words are what the player typed; the
+  // hash is what drew the stars. A save without both cannot be rebuilt.
+  root["universe"] = Json{{"seed", std::to_string(catalog_.universeSeed)},
+                          {"words", catalog_.universeSeedText},
+                          {"systems", static_cast<double>(catalog_.systems.size())}};
 
   // ---- STATE -------------------------------------------------------------
   Json s = Json::object();
@@ -479,7 +486,7 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
   static Catalog cachedExpanded;
   Catalog adHocExpanded;
   const Catalog* catalogPtr = &catalogIn;
-  if (!catalogIn.chartExpanded && !catalogIn.regions.empty() && !catalogIn.systems.empty()) {
+  if (!catalogIn.chartExpanded) {
     const std::string key =
         catalogIn.sourceSha256 + ":" + std::to_string(catalogIn.bodies.size()) + ":" +
         std::to_string(catalogIn.systems.size()) + ":" + std::to_string(catalogIn.regions.size());
@@ -506,6 +513,18 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
   }
   if (!d.is_object()) { return fail("the file is not a save object"); }
   if (GetString(d, "format") != "spaceship-command-1") { return fail("unsupported format"); }
+
+  // The chart is generated, so a save only means something on the sky it was
+  // flown under: an older save on a different sky is refused loudly instead of
+  // being applied to ids that now name other stars.
+  if (const Json* universe = At(d, "universe"); universe != nullptr && IsObject(*universe)) {
+    const std::string stored = GetString(*universe, "seed");
+    if (!stored.empty() && stored != std::to_string(catalog.universeSeed)) {
+      const std::string words = GetString(*universe, "words");
+      return fail("this voyage was flown on the sky of seed '" +
+                  (words.empty() ? stored : words) + "', not the one loaded");
+    }
+  }
 
   const Json* state = At(d, "state");
   const Json* map = At(d, "map");
@@ -1040,6 +1059,22 @@ void Simulation::ApplySnapshotDefaults() {
   ApplyShipLayout();
   ChronicleVisit(CurrentSystem());
   CheckCommendations(true);
+}
+
+bool Simulation::SeedOfSave(const std::string& text, std::uint64_t* seed, std::string* words) {
+  Json d;
+  try {
+    d = Json::parse(text);
+  } catch (const std::exception&) {
+    return false;
+  }
+  const Json* universe = At(d, "universe");
+  if (universe == nullptr || !IsObject(*universe)) { return false; }
+  const std::string stored = GetString(*universe, "seed");
+  if (stored.empty()) { return false; }
+  if (seed != nullptr) { *seed = std::strtoull(stored.c_str(), nullptr, 10); }
+  if (words != nullptr) { *words = GetString(*universe, "words"); }
+  return true;
 }
 
 bool Simulation::LoadJson(const std::string& text, std::string* error) {

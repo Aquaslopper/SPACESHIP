@@ -1311,3 +1311,64 @@ because Catalog.cpp parses those files and other content (rooms, market, wiki,
 market goods) lives beside them in the same JSON. Nothing reads the chart sections
 any more. Deleting them means editing the data files and their parsers together,
 which is the next piece of this job rather than a line to slip into this one.
+
+## 068 — The universe is grown, and the player brings the seed
+
+The generator that landed in 067 scattered stars on a golden-angle spiral and
+borrowed seven region names out of the file. That is not a universe; it is a
+pattern with labels. Replaced.
+
+WHAT THE SEED NOW DRAWS
+  - Neighbourhoods first. Three to ten regions are placed with a minimum gap, so
+    the chart has distinct places instead of a stipple. Each is one of six kinds -
+    a farm belt, an industrial cluster, a core world, the frontier, an old
+    battlefield, a waystation - and leans a little off its kind, because two farm
+    belts are never the same farm belt.
+  - Systems inherit their region and differ from it by a small swing, so a belt
+    sells produce cheap all through the belt and no two docks in it are the same
+    shop. Prices follow, per commodity kind, from what the place grows, builds,
+    can make, and who runs it.
+  - Shapes stay unequal: 3 to 16 bodies per system, belts where the hazard is
+    high, moons where the population is, a station where people live and a
+    landing site where they do not.
+  - Lanes: three nearest neighbours inside a region plus one long hop; two
+    bridges from every region to its nearest neighbours; and a final pass that
+    joins any island left over to the main chart. A lane may cross regions now,
+    and the validator checks what matters instead - that no lane has a missing
+    end and that the chart can be flown end to end.
+  - Scale is not fixed. The lane pass deduplicates with a set and prunes per
+    region, so size costs build time and nothing else.
+
+MEASURED (probes, pasted):
+  180 systems  -> 1041 bodies, 180 ports, 521 lanes, 7 regions (13..37 each), build 0.01s, 0 problems
+  1000 systems -> 6040 bodies, 957 ports, 2870 lanes, 10 regions (60..136 each), build 0.14s, 0 problems
+  4000 systems -> 24297 bodies, 3861 ports, 11467 lanes, 10 regions (261..541 each), build 1.65s, 0 problems
+  region means, seed 1: Bramine March sells nothing cheap; Xanay Verge sells unregistered at 0.95;
+  Cassune Expanse sells relics at 0.93; Ashor Expanse sells produce at 1.09 - every region has a trade.
+
+THE SEED IS THE PLAYER'S
+  - NewVoyage(catalog, "kessler") flies that sky; the same words always draw the
+    same stars. SeedFromText hashes the words, so a save carries four characters
+    instead of a galaxy.
+  - The save now writes its sky: the hash as a decimal string so no double rounds
+    it away, the words as typed, and the system count.
+  - Loading a save on a different sky is refused with a sentence instead of being
+    applied to ids that name other stars: "this voyage was flown on the sky of
+    seed 'kessler', not the one loaded". SeedOfSave() lets the client read the
+    words first and build the right catalogue before applying anything.
+  - The harness has a command for it: `seed <words>` starts a new voyage on that
+    sky. Verified: `seed kessler` -> 180 systems, 143 docks; `seed omega` -> 180
+    systems, 174 docks, different names in both.
+
+ALSO IN THIS PASS
+  - chart.json is down to 87 lines: its boards, its market goods and its comment.
+    The 48 authored systems, 243 bodies, 30 ports, 8 price profiles, 6 hints, the
+    orbital profiles and both name tables are deleted with their parsers and the
+    dead catalogue fields. The catalogue is empty of chart until a seed expands it.
+  - Fixed: the generator was clearing chartExpanded, the flag its caller owns,
+    which made a save's catalogue look unexpanded and quietly re-expand it.
+  - Loading a save on a fresh catalogue with no pixels of chart now expands first.
+
+NOT VERIFIED, SAID PLAINLY: no test suite ran - catch2 is not installed here and the
+owner has not approved one. Nothing painted has been seen; Draw.cpp needs raylib,
+which this machine does not have.
