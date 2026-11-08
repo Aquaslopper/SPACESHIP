@@ -680,20 +680,18 @@ int main() {
     Frame(view, sim);
 
     // The trade card opens its own list on the right: the three modes are the
-    // middle column and the chosen one's offers are the right column, each its
-    // own button, so nothing here paints a commit.
+    // middle column and the chosen one's runs are the right column, each its own
+    // button, so nothing here paints a commit.
     view.Click(sim, tradeCard.x + 2, tradeCard.y + 2, ship::HitButton::Left, 0);
     Frame(view, sim);
-    // The card opens on its first mode, so the right column is already a list.
     startsWith("Delivery", "the trade modes did not paint");
-    const auto freelanceMode = startsWith("Freelance", "the trade modes did not paint");
-    view.Click(sim, freelanceMode.x + 2, freelanceMode.y + 2, ship::HitButton::Left, 0);
-    Frame(view, sim);
-    Require(std::any_of(texts.begin(), texts.end(), [](const auto& t) {
-              return t.text.find("No freelance requests are drawn from this system yet.") == 0;
-            }),
-            "Choosing the freelance mode did not open its own list");
-    Require(sim.ActionCount() == beforeBuy, "Choosing a trade mode spent an action");
+    startsWith("Freelance", "the trade modes did not paint");
+    // The station's own cards carry no cost at all, so a painted "1 action" is a
+    // run on the board and the list is not empty.
+    Require(std::any_of(texts.begin(), texts.end(),
+                        [](const auto& t) { return t.text == "1 action"; }),
+            "The trade list painted no run");
+    Require(sim.ActionCount() == beforeBuy, "Opening the trade list spent an action");
     Require(std::none_of(texts.begin(), texts.end(), [](const auto& t) {
               return t.text.find("Buy - ") == 0 || t.text.find("Sell - ") == 0;
             }),

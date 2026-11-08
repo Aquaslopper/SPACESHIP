@@ -48,6 +48,20 @@ struct JobDef {
   std::string cloth, dark;            // what the sprite in the quarters wears
 };
 
+// One run on a station's trade board. The board is drawn from the system's own
+// chart, so every run names a body that is really there, and the commodity is
+// one that body wants. A run keeps the numbers the board promised: the epoch
+// can roll over and the accepted record still has to stand on its own.
+struct TradeRun {
+  std::string mode;   // "delivery" or "freelance"
+  std::string from;   // the station the run starts at
+  std::string to;     // the body that receives it
+  std::string good;   // the commodity's id in the market table
+  int crates = 0;
+  double fee = 0.0;   // delivery: paid on hand-over. freelance: margin over cost.
+  bool accepted = false;
+};
+
 // Builds a live crew member from an authored definition. Shared by the new
 // voyage and by a hiring at a port.
 CrewMember MakeCrew(const CrewDefinition& def);
@@ -238,10 +252,15 @@ class Simulation {
   bool BuyUpgrade(const std::string& upgradeId);   // bay, bay2, drive, rack, scanner, hull
   void ContractProgress(const std::string& goal, const std::string& target);
 
-  // Trade contracts (Economy.cpp). Accepting one costs one action and greys its
-  // own row; the record it leaves names both ends of the run.
-  bool AcceptTrade(const std::string& mode, const std::string& to);
-  bool TradeAccepted(const std::string& mode, const std::string& to) const;
+  // Trade contracts (Economy.cpp). The board is drawn from the system's own
+  // chart: one seeded draw per system per epoch, and the epoch is the action
+  // clock in blocks of 200, so a berth keeps a board that is the system's and a
+  // list that is its own. Accepting costs one action and greys its own row.
+  std::vector<TradeRun> TradeBoard(const std::string& portId) const;
+  bool AcceptTrade(const std::string& mode, const std::string& to,
+                   const std::string& good = std::string());
+  bool TradeAccepted(const std::string& mode, const std::string& to,
+                     const std::string& good = std::string()) const;
   void CommissionProgress(const std::string& kind, const std::string& target);
   // commissionOffer(): the same deterministic draw the board shows before the
   // player accepts it, so the offer and the acceptance can never disagree.

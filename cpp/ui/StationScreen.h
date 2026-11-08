@@ -80,6 +80,7 @@ struct StarmapPage {
 struct TradeOffer {
   std::string mode;       // "delivery", "freelance", "station"
   std::string to;         // the destination the offer points at
+  std::string good;       // the commodity carried; empty for a data survey run
   std::string label;      // the row in the right-hand list
   std::string note;       // the line under that row
   bool accepted = false;  // already taken: the button is grey

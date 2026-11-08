@@ -292,6 +292,9 @@ std::string Simulation::SaveJson() const {
     trades.push_back(Json{{"mode", trade.mode},
                           {"from", trade.from},
                           {"to", trade.to},
+                          {"good", trade.good},
+                          {"crates", trade.crates},
+                          {"fee", trade.fee},
                           {"label", trade.label}});
   }
   s["trades"] = trades;
@@ -1105,6 +1108,9 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
         trade.mode = GetString(entry, "mode");
         trade.from = GetString(entry, "from");
         trade.to = GetString(entry, "to");
+        trade.good = GetString(entry, "good");
+        trade.crates = static_cast<int>(GetNumber(entry, "crates"));
+        trade.fee = GetNumber(entry, "fee");
         trade.label = GetString(entry, "label");
         if (!trade.mode.empty() && !trade.to.empty()) { state_.trades.push_back(trade); }
       }

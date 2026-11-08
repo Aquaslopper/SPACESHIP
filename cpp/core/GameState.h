@@ -207,12 +207,16 @@ struct Commissions {
   std::optional<Commission> active;
 };
 
-// One accepted trade contract. It is a record, not a resource: the
-// station-to-station trade carries no cargo and no counter beyond this line.
+// One accepted trade contract. The board draws its offers fresh from the
+// system's own chart, so the record has to keep everything the run promised:
+// once an epoch rolls over the draw no longer knows this contract exists.
 struct TradeContract {
   std::string mode;   // "delivery", "freelance", "station"
   std::string from;   // the station it was accepted at
   std::string to;     // the destination port or body it points at
+  std::string good;   // the commodity carried; empty for a data survey trade
+  int crates = 0;     // how many lots of it
+  double fee = 0.0;   // what the run pays on hand-over, or its margin
   std::string label;  // the sentence the board showed when it was taken
 };
 

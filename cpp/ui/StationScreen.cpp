@@ -390,27 +390,52 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
 
   // ---- 3. trade contracts --------------------------------------------------
   // Three buttons in the middle column, and the list each one opens on the
-  // right. Nothing here is authored per station: the station-to-station list is
-  // the roll of stations the player has docked at, and the two offer lists are
-  // drawn in the pass that follows this one.
+  // right. Nothing here is authored per station: delivery and freelance are the
+  // system's own draw (Simulation::TradeBoard) laid over the bodies this
+  // station's starmap prints, and station-to-station is the roll of stations the
+  // player has docked at.
   StationColumn trade;
   trade.id = "trade";
   trade.title = "Trade contract";
   {
     std::vector<TradeMode> modes;
 
+    // The drawn half of the board. Every run names a body of this system and the
+    // commodity that body wants, so the offer can be checked against the page.
+    const std::vector<TradeRun> runs = sim.TradeBoard(portId);
+
     TradeMode delivery;
     delivery.id = "delivery";
     delivery.title = "Delivery";
     delivery.note = "Carry a consignment from this station to its destination.";
-    delivery.empty = "No deliveries are posted at this station yet.";
-    modes.push_back(std::move(delivery));
+    delivery.empty = "No deliveries are posted at this station right now.";
 
     TradeMode freelance;
     freelance.id = "freelance";
     freelance.title = "Freelance";
     freelance.note = "Buy the goods here, carry them on, sell them where they are wanted.";
-    freelance.empty = "No freelance requests are drawn from this system yet.";
+    freelance.empty = "No freelance requests are drawn from this system right now.";
+
+    for (const TradeRun& run : runs) {
+      const Body* destination = sim.FindBodyById(run.to);
+      const std::string where = destination == nullptr ? run.to : destination->name;
+      std::string commodity = run.good;
+      for (const Good& good : sim.World().goods) {
+        if (good.id == run.good) { commodity = good.name; }
+      }
+      TradeOffer offer;
+      offer.mode = run.mode;
+      offer.to = run.to;
+      offer.good = run.good;
+      offer.label = where + " - " + Num(run.crates) + (run.crates == 1 ? " crate of " : " crates of ") +
+                    commodity;
+      offer.note = run.mode == "delivery"
+                       ? "Pays " + Num(run.fee) + " sh on hand-over; the station loads it."
+                       : "Buy the lot here first; about " + Num(run.fee) + " sh over your cost there.";
+      offer.accepted = run.accepted;
+      (run.mode == "delivery" ? delivery : freelance).offers.push_back(std::move(offer));
+    }
+    modes.push_back(std::move(delivery));
     modes.push_back(std::move(freelance));
 
     TradeMode station;
@@ -957,10 +982,16 @@ bool PressStationActionRaw(Simulation& sim, const std::string& action,
     return true;
   }
   if (action.compare(0, 13, "trade-accept:") == 0) {
+    // mode : destination [: commodity] -- the commodity is only carried by the
+    // two in-system modes, and a station-to-station run names a berth instead.
     const std::string rest = action.substr(13);
     const std::size_t cut = rest.find(':');
     if (cut == std::string::npos) { return false; }
-    return sim.AcceptTrade(rest.substr(0, cut), rest.substr(cut + 1));
+    const std::string mode = rest.substr(0, cut);
+    const std::string tail = rest.substr(cut + 1);
+    const std::size_t second = tail.find(':');
+    if (second == std::string::npos) { return sim.AcceptTrade(mode, tail); }
+    return sim.AcceptTrade(mode, tail.substr(0, second), tail.substr(second + 1));
   }
   if (action.compare(0, 5, "talk:") == 0) return sim.TalkToPatron(action.substr(5));
   (void)arg;

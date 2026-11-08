@@ -1137,10 +1137,7 @@ TEST_CASE("the trade board lists visited stations and greys a contract once take
   CHECK(model.tradeModes[0].id == "delivery");
   CHECK(model.tradeModes[1].id == "freelance");
   CHECK(model.tradeModes[2].id == "station");
-  // The two offer lists are drawn in the pass that follows; they say so rather
-  // than inventing a consignment.
-  CHECK(model.tradeModes[0].offers.empty());
-  CHECK(model.tradeModes[1].offers.empty());
+  // A mode with nothing behind it says so rather than inventing a consignment.
   CHECK_FALSE(model.tradeModes[0].empty.empty());
   CHECK_FALSE(model.tradeModes[1].empty.empty());
 
@@ -1173,11 +1170,8 @@ TEST_CASE("the trade board lists visited stations and greys a contract once take
   REQUIRE(after.tradeModes[2].offers.size() == 1u);
   CHECK(after.tradeModes[2].offers[0].accepted);
 
-  // A station that was never visited cannot be the far end of the trade, nor
-  // can a mode whose board is not drawn yet hand out a contract.
+  // A station that was never visited cannot be the far end of the trade.
   CHECK_FALSE(sim.AcceptTrade("station", "auriga-port"));
-  CHECK_FALSE(sim.AcceptTrade("freelance", "tolme"));
-  CHECK_FALSE(sim.AcceptTrade("delivery", "tolme"));
   CHECK(sim.State().trades.size() == 1u);
 
   // The roll of visits and the accepted trade both survive a save.
@@ -1187,6 +1181,117 @@ TEST_CASE("the trade board lists visited stations and greys a contract once take
   CHECK(restored.State().visitedPorts.count("tolme") == 1u);
   CHECK(restored.State().visitedPorts.count("relay") == 1u);
   CHECK(restored.TradeAccepted("station", "tolme"));
+}
+
+// The delivery and freelance lists are a draw, not a table: one seeded board per
+// system per epoch, read off the same chart the starmap prints, so every run
+// names a body that is really there and the two berths of one system cannot
+// disagree. Nothing about the draw is stored; what a contract promised is.
+TEST_CASE("each system draws its own trade board out of its own chart", "[station][trade]") {
+  ship::Simulation sim = Fresh();
+  sim.MutableMap().here = "tolme";
+  sim.MutableState().docked = false;
+  REQUIRE(sim.Dock());
+
+  const ship::Catalog& world = sim.World();
+  const ship::Body* berth = world.FindBody("tolme");
+  REQUIRE(berth != nullptr);
+  const std::string systemId = world.BodySystem(*berth);
+
+  // Every berth of the system, and the runs the system draws between them.
+  std::vector<std::string> berths;
+  for (const ship::Port& port : world.ports) {
+    const ship::Body* body = world.FindBody(port.id);
+    if (body != nullptr && world.BodySystem(*body) == systemId) { berths.push_back(port.id); }
+  }
+  REQUIRE(berths.size() == 2u);  // Kessler keeps Tolme and the relay
+
+  std::size_t runs = 0;
+  std::set<std::string> drawn;
+  for (const std::string& id : berths) {
+    for (const ship::TradeRun& run : sim.TradeBoard(id)) {
+      ++runs;
+      CHECK(run.from == id);
+      CHECK(run.mode == "delivery" || run.mode == "freelance");
+      CHECK(run.crates >= 1);
+      CHECK(run.fee > 0);
+      // The run names a body of this system, and a commodity the market lists.
+      const ship::Body* destination = world.FindBody(run.to);
+      REQUIRE(destination != nullptr);
+      CHECK(world.BodySystem(*destination) == systemId);
+      const ship::Good* good = nullptr;
+      for (const ship::Good& candidate : world.goods) {
+        if (candidate.id == run.good) { good = &candidate; }
+      }
+      REQUIRE(good != nullptr);
+      // The lot fits the hold a voyage starts with, and stays a shipment.
+      CHECK(static_cast<double>(run.crates) * good->vol <= 20.0);
+      CHECK(good->value * run.crates <= 1200.0 + good->value);
+      // A run belongs to one berth: the berths of a system never repeat one.
+      CHECK(drawn.insert(run.to + "|" + run.good).second);
+    }
+  }
+  // Three to five runs a system, shared out across its berths.
+  CHECK(runs >= 3u);
+  CHECK(runs <= 5u);
+
+  // The same call draws the same board: nothing is stored, everything is seeded.
+  const std::vector<ship::TradeRun> first = sim.TradeBoard("tolme");
+  const std::vector<ship::TradeRun> again = sim.TradeBoard("tolme");
+  REQUIRE(first.size() == again.size());
+  for (std::size_t index = 0; index < first.size(); ++index) {
+    CHECK(first[index].mode == again[index].mode);
+    CHECK(first[index].to == again[index].to);
+    CHECK(first[index].good == again[index].good);
+    CHECK(first[index].crates == again[index].crates);
+    CHECK(first[index].fee == again[index].fee);
+  }
+
+  // Taking a run costs one action, and it keeps the numbers it was signed for.
+  REQUIRE_FALSE(first.empty());
+  const ship::TradeRun run = first.front();
+  const std::string id = "trade-accept:" + run.mode + ":" + run.to + ":" + run.good;
+  const double before = sim.ActionCount();
+  REQUIRE(ship::PressStationAction(sim, id));
+  CHECK(sim.ActionCount() == before + 1);
+  CHECK(sim.TradeAccepted(run.mode, run.to, run.good));
+  CHECK_FALSE(ship::PressStationAction(sim, id));
+  bool greyed = false;
+  for (const ship::TradeRun& row : sim.TradeBoard("tolme")) {
+    if (row.mode == run.mode && row.to == run.to && row.good == run.good) {
+      greyed = row.accepted && row.crates == run.crates && row.fee == run.fee;
+    }
+  }
+  CHECK(greyed);
+
+  // A run the board is not showing cannot be signed, and a mode that does not
+  // exist cannot either.
+  CHECK_FALSE(sim.AcceptTrade("delivery", "no-such-body", "ore"));
+  CHECK_FALSE(sim.AcceptTrade("nonsense", run.to, run.good));
+
+  // The window is built from the same draw: the two lists are the runs, and a
+  // run already taken is grey when the panel is rebuilt.
+  const ship::StationScreenModel model = ship::BuildStationScreen(sim, "tolme");
+  REQUIRE(model.tradeModes.size() == 3u);
+  CHECK(model.tradeModes[0].offers.size() + model.tradeModes[1].offers.size() == first.size());
+  for (const ship::TradeMode& mode : model.tradeModes) {
+    if (mode.id == "station") { continue; }
+    for (const ship::TradeOffer& offer : mode.offers) {
+      CHECK(offer.mode == mode.id);
+      CHECK_FALSE(offer.good.empty());
+      CHECK(offer.accepted == sim.TradeAccepted(offer.mode, offer.to, offer.good));
+      CHECK(offer.label.find("crate") != std::string::npos);
+    }
+  }
+
+  // The numbers survive the save: the draw does not, so the record carries them.
+  std::string error;
+  ship::Simulation restored = ship::Simulation::NewVoyage(sim.World());
+  REQUIRE(restored.LoadJson(sim.SaveJson(), &error));
+  REQUIRE(restored.State().trades.size() == 1u);
+  CHECK(restored.State().trades[0].good == run.good);
+  CHECK(restored.State().trades[0].crates == run.crates);
+  CHECK(restored.State().trades[0].fee == run.fee);
 }
 
 // Every station writes its own starmap of the system it sits in, out of the

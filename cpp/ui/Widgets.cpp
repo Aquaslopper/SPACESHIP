@@ -704,7 +704,8 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
             view.enabled = !offer.accepted;
             view.live = view.enabled;
             offers.push_back(view);
-            offerIds.push_back("trade-accept:" + offer.mode + ":" + offer.to);
+            offerIds.push_back("trade-accept:" + offer.mode + ":" + offer.to +
+                               (offer.good.empty() ? std::string() : ":" + offer.good));
           }
         }
         screen.panelRows.push_back(offers);
