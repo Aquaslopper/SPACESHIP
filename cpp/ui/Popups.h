@@ -72,6 +72,18 @@ struct PopupModel {
   std::string fontStepLine;    // "Reading size: +5% (19 px)"
   bool fullscreen = false;
   std::string fullscreenLabel; // "Window: Borderless fullscreen"
+  // The sky rows: the words that draw the chart, how many stars it holds and how
+  // many of those systems carry a dock. Each choice value is what a press hands
+  // back; changing one starts a new voyage on the new chart.
+  std::vector<PopupChoice> skyChoices;
+  std::vector<PopupChoice> starChoices;
+  std::vector<PopupChoice> stationChoices;
+  std::vector<std::string> skyHelp;   // help line per station density
+  std::string universeSeed;
+  std::string universeSystems;
+  std::string stationDensity;
+  std::string universeSeedLine;      // "Sky: kessler"
+  std::string universeSystemsLine;   // "Stars: 1200"
   std::vector<PopupSlot> slots;
   std::string message;
   std::vector<DescribeAct> acts;

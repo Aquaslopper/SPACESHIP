@@ -81,6 +81,9 @@ class Catalog {
   // hundred as the floor and fifteen hundred as the ceiling. GenerateUniverse
   // clamps to that range, so this value cannot put the chart outside it.
   int universeSystems = 1200;
+  // How many systems get a dock, chosen by the player: 0 sparse, 1 standard,
+  // 2 crowded, 3 every system. It is a preference, not a rule of the chart.
+  int stationDensity = 1;
 
   // Where each system sits on the galaxy board (ChartExpansion::PlaceGalaxyDots).
   // A system has one position, in its own region's cluster; the galaxy scale

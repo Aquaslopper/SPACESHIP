@@ -243,6 +243,13 @@ struct Options {
   // window. Both are free preferences, saved with the voyage like the rest.
   int fontStep = 0;        // 0..3 -> 18, 19, 20, 21 px
   bool fullscreen = false;
+  // The sky, chosen by the player in the settings menu: the words that draw it,
+  // how many stars it holds (clamped by the generator to 800..1500) and how many
+  // of those systems have a dock (0 sparse .. 3 every system). Changing any of
+  // the three starts a new voyage on the new sky.
+  std::string universeSeed = "kessler";
+  int universeSystems = 1200;
+  int stationDensity = 1;
 };
 
 // A cooldown belongs to one control and is counted in actions, never seconds.

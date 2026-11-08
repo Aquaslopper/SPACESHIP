@@ -546,7 +546,10 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
   // the words the player typed and the size the player asked for. These two
   // environment variables are the head-less harness's way of doing the same.
   std::uint64_t universeSeed = catalog.universeSeed;
-  if (universeSeed == 0) { universeSeed = 1; }
+  if (universeSeed == 0) {
+    universeSeed = SeedFromText("kessler");
+    catalog.universeSeedText = "kessler";
+  }
   if (const char* env = std::getenv("SPACESHIP_SEED"); env != nullptr && env[0] != '\0') {
     universeSeed = SeedFromText(env);
     catalog.universeSeedText = env;

@@ -1442,3 +1442,45 @@ PLAYER CONTROL
 
 NOT VERIFIED: no test suite ran (catch2 absent, no approval); nothing painted has been
 seen, because Draw.cpp needs raylib.
+
+## 071 — The sky is in the settings menu
+
+Three preferences the player owns, in the settings popup, saved with the voyage:
+the words that draw the chart, the number of stars, and how many systems carry a
+dock. Changing any of them starts a new voyage on the new chart, because the chart
+is generated and nothing of the old one can survive a different seed.
+
+THE ROWS
+  Seed    a text field and a list of named skies. Typing words and pressing enter
+          draws that sky; the list is for the mouse.
+  Stars   800 / 1000 / 1200 / 1400 / 1500. The generator clamps regardless, so the
+          menu cannot produce a chart outside the owner's range.
+  Docks   0 sparse, 1 standard, 2 crowded, 3 every system, each with a help line.
+
+WHERE IT LIVES
+  Options in GameState carry the three values and SaveSystem writes and reads them,
+  so a save remembers the sky it was flown on from the menu side as well.
+  Simulation::SetUniverseSeed / SetUniverseSystems / SetStationDensity rebuild the
+  voyage through CatalogueFor(), which clears the generated chart and draws a new
+  one with the chosen density. Catalog::stationDensity maps to the dock threshold:
+  sparse 0.62, standard 0.18, crowded 0.05, every system -1.0.
+  Popups model exposes skyChoices / starChoices / stationChoices and three press
+  actions; Draw's settings page renders a text field, two combos and the density
+  combo with its help line.
+
+MEASURED (probe /home/user/probe/settings, pasted)
+  sky 'kessler': 1200 systems, 830 docks
+  after sky=omega: Rhoath/Dorara; a different seed draws different stars
+  after stars=1000: 1000 systems; after stars=99999: 1500 systems (clamped)
+  docks at 1000 stars: sparse 226, standard 846, standard again 846, every 1000
+  save carries the words, the count and the density
+  every expectation ok, exit 0
+
+ALSO FIXED IN THIS PASS
+  A voyage's options now report the sky it actually got: the loader's default is the
+  words "kessler" rather than a bare hash of 1, and NewVoyage copies the drawn count
+  and density back into the options. Without that, a save made from a default voyage
+  refused itself on load because the hash and the words disagreed.
+
+NOT VERIFIED: the Draw.cpp rows are written but cannot be compiled or seen here -
+raylib and imgui are not installed on this machine. No test suite ran.

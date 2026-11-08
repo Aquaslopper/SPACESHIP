@@ -129,7 +129,10 @@ std::string Simulation::SaveJson() const {
                       {"displayBrightness", Num(DisplayBrightness(state_.options.displayBrightness))},
                       // Phase 9: the reading size and the window travel too.
                       {"fontStep", Num(static_cast<double>(state_.options.fontStep))},
-                      {"fullscreen", state_.options.fullscreen}};
+                      {"fullscreen", state_.options.fullscreen},
+                      {"universeSeed", state_.options.universeSeed},
+                      {"universeSystems", Num(state_.options.universeSystems)},
+                      {"stationDensity", Num(state_.options.stationDensity)}};
 
   Json chronicle = Json::object();
   chronicle["version"] = state_.chronicle.version;
@@ -1224,6 +1227,13 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
       const double step = GetNumber(*it, "fontStep", 0.0);
       state_.options.fontStep = step < 0 ? 0 : (step > 3 ? 3 : static_cast<int>(step));
       state_.options.fullscreen = GetBool(*it, "fullscreen", false);
+      state_.options.universeSeed = GetString(*it, "universeSeed", state_.options.universeSeed);
+      const double systems = GetNumber(*it, "universeSystems",
+                                       static_cast<double>(state_.options.universeSystems));
+      state_.options.universeSystems = static_cast<int>(systems);
+      const double density = GetNumber(*it, "stationDensity",
+                                       static_cast<double>(state_.options.stationDensity));
+      state_.options.stationDensity = static_cast<int>(density);
     }
 
     state_.chronicle = Chronicle();

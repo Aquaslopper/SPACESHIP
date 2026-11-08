@@ -99,6 +99,13 @@ class Simulation {
   // not a turn.
   void RestartVoyage();
 
+  // The settings menu's sky rows. Each starts a fresh voyage on the sky the
+  // player asked for and keeps every other preference; the chart is generated,
+  // so nothing of the old one survives. False when the request changes nothing.
+  bool SetUniverseSeed(const std::string& words);
+  bool SetUniverseSystems(int systems);
+  bool SetStationDensity(int density);
+
   // A burst of work that is NOT an action: the filter bank's reward.
   void ProAction(double n);
 

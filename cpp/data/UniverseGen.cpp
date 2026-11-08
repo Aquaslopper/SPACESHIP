@@ -427,7 +427,12 @@ void GenerateUniverse(Catalog& catalog, std::uint64_t seed, int systemCount) {
       }
 
       // A place with people has a dock; a place with a wreck has a site instead.
-      const bool station = traits.population > 0.18 || index == 0;
+      // How many systems clear the bar is the player's setting, not a rule here.
+      double dockThreshold = 0.18;
+      if (catalog.stationDensity <= 0) { dockThreshold = 0.62; }
+      else if (catalog.stationDensity == 2) { dockThreshold = 0.05; }
+      else if (catalog.stationDensity >= 3) { dockThreshold = -1.0; }
+      const bool station = traits.population > dockThreshold || index == 0;
       const std::string landmarkId = index == 0 ? "kessler" : id + (station ? "-port" : "-site");
       Body landmark =
           MakeBody(landmarkId, station ? "station" : "site",

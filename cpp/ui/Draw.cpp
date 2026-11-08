@@ -2542,6 +2542,61 @@ void ShellView::PaintSettingsControls(Simulation& sim, const PopupModel& model) 
         }
         if (button(model.fullscreenLabel, "fullscreen")) { action("fullscreen"); }
       }
+      // ---- the sky -------------------------------------------------------
+      // The words that draw the chart, the number of stars, and how many of them
+      // have a dock. Any change starts a new voyage on the new chart.
+      heading("The sky");
+      text("The words below draw the whole chart: the same words always draw the same "
+           "stars. Changing the words, the count or the density starts a new voyage.");
+      static char seedWords[32] = "";
+      std::snprintf(seedWords, sizeof seedWords, "%s", model.universeSeed.c_str());
+      ImGui::SetNextItemWidth(-1);
+      if (ImGui::InputText("##sky-seed", seedWords, sizeof seedWords,
+                           ImGuiInputTextFlags_EnterReturnsTrue)) {
+        action("sky", std::string(seedWords));
+      }
+      if (ImGui::BeginCombo("##sky-choice", model.universeSeedLine.c_str())) {
+        for (const auto& choice : model.skyChoices) {
+          if (ImGui::Selectable(choice.label.c_str(), model.universeSeed == choice.value)) {
+            action("sky", choice.value);
+          }
+        }
+        ImGui::EndCombo();
+      }
+      ImGui::SetNextItemWidth(-1);
+      if (ImGui::BeginCombo("##sky-stars", model.universeSystemsLine.c_str())) {
+        for (const auto& choice : model.starChoices) {
+          if (ImGui::Selectable(choice.label.c_str(), model.universeSystems == choice.value)) {
+            action("stars", choice.value);
+          }
+        }
+        ImGui::EndCombo();
+      }
+      {
+        int chosen = std::atoi(model.stationDensity.c_str());
+        if (chosen < 0) { chosen = 0; }
+        if (chosen >= static_cast<int>(model.stationChoices.size()) &&
+            !model.stationChoices.empty()) {
+          chosen = static_cast<int>(model.stationChoices.size()) - 1;
+        }
+        const std::string current = model.stationChoices.empty()
+                                        ? std::string("Station density")
+                                        : model.stationChoices[static_cast<std::size_t>(chosen)].label;
+        heading("Docks");
+        if (!model.skyHelp.empty() &&
+            static_cast<std::size_t>(chosen) < model.skyHelp.size()) {
+          text(model.skyHelp[static_cast<std::size_t>(chosen)]);
+        }
+        ImGui::SetNextItemWidth(-1);
+        if (ImGui::BeginCombo("##sky-docks", current.c_str())) {
+          for (const auto& choice : model.stationChoices) {
+            if (ImGui::Selectable(choice.label.c_str(), model.stationDensity == choice.value)) {
+              action("stations", choice.value);
+            }
+          }
+          ImGui::EndCombo();
+        }
+      }
 }
 
 void ShellView::PageTutorial(int direction, double nowMs) {

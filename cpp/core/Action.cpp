@@ -82,6 +82,13 @@ Simulation Simulation::NewVoyage(const Catalog& catalog) {
   // catalogue is never touched: this works on the voyage's own copy, and a
   // catalogue that has already been grown is left exactly as it is.
   ExpandChart(sim.catalog_);
+  // The options describe the sky the voyage is flying, not what was asked for: the
+  // generator clamps the count, so the number shown is the number that was drawn.
+  sim.state_.options.universeSeed = sim.catalog_.universeSeedText.empty()
+                                        ? std::to_string(sim.catalog_.universeSeed)
+                                        : sim.catalog_.universeSeedText;
+  sim.state_.options.universeSystems = sim.catalog_.universeSystems;
+  sim.state_.options.stationDensity = sim.catalog_.stationDensity;
   sim.rules_ = catalog.rules;
   sim.scanCost_ = catalog.rules.scanCost;
 
@@ -241,6 +248,53 @@ void Simulation::RestartVoyage() {
   *this = referenceFit_ ? Simulation::ReferenceVoyage(catalog) : Simulation::NewVoyage(catalog);
   state_.options = options;
   state_.reducedMotion = motion;
+}
+
+namespace {
+
+// One sky, built from three choices. The catalogue the voyage carries already
+// holds a generated chart, so it is replaced whole: the generator clears systems,
+// bodies, ports, regions and lanes before it draws.
+Catalog CatalogueFor(const Catalog& base, const std::string& words, int systems, int density) {
+  Catalog made = base;
+  made.chartExpanded = false;
+  made.universeSeed = ship::SeedFromText(words.empty() ? std::string("kessler") : words);
+  made.universeSeedText = words;
+  made.universeSystems = systems;
+  made.stationDensity = density;
+  return made;
+}
+
+}  // namespace
+
+bool Simulation::SetUniverseSeed(const std::string& words) {
+  if (words.empty() || words == state_.options.universeSeed) { return false; }
+  const Options options = state_.options;
+  *this = NewVoyage(CatalogueFor(catalog_, words, options.universeSystems,
+                                 options.stationDensity));
+  state_.options = options;
+  state_.options.universeSeed = words;
+  return true;
+}
+
+bool Simulation::SetUniverseSystems(int systems) {
+  if (systems == state_.options.universeSystems) { return false; }
+  const Options options = state_.options;
+  *this = NewVoyage(CatalogueFor(catalog_, options.universeSeed, systems,
+                                 options.stationDensity));
+  state_.options = options;
+  state_.options.universeSystems = systems;
+  return true;
+}
+
+bool Simulation::SetStationDensity(int density) {
+  if (density == state_.options.stationDensity) { return false; }
+  const Options options = state_.options;
+  *this = NewVoyage(CatalogueFor(catalog_, options.universeSeed, options.universeSystems,
+                                 density));
+  state_.options = options;
+  state_.options.stationDensity = density;
+  return true;
 }
 
 void Simulation::PerformAction(const std::string& detail) {
