@@ -13,6 +13,7 @@
 #include <string>
 #include <vector>
 
+#include "core/JsNumber.h"
 #include "core/Simulation.h"
 #include "data/Catalog.h"
 #include "ui/EngineScreen.h"
@@ -131,6 +132,85 @@ TEST_CASE("the galley counter is 28 parts and four plates", "[ui][machine]") {
   CHECK(CountClass(stage, "mess-plate") == 4);
   CHECK(CountClass(stage, "mess-fill") == 1);
   CHECK(CountClass(stage, "mess-readout") == 1);
+}
+
+namespace {
+// The reference's paintMess() writes a value into every live element. The
+// port used to carry the element's own id in `text`, which the painter
+// printed straight onto the glass - so the galley showed "mess-readout" and
+// "mess-psub0" where the rack and the four hunger clocks belong.
+const ship::MachinePart* FindPart(const ship::TaskStage& stage,
+                                  const std::string& cls, std::size_t nth) {
+  for (const ship::MachinePart& part : stage.parts) {
+    if (part.cls != cls) { continue; }
+    if (nth == 0) { return &part; }
+    --nth;
+  }
+  return nullptr;
+}
+}  // namespace
+
+TEST_CASE("the galley paints the rack and the four clocks, never an element id",
+          "[ui][machine][mess][audit]") {
+  ship::Simulation sim = Fresh();
+
+  // Readout and rack gauge come from MESS.rack/capacity, not from a constant.
+  const ship::TaskStage stocked = ship::BuildMessMachine(sim);
+  const ship::MachinePart* readout = FindPart(stocked, "mess-readout", 0);
+  REQUIRE(readout != nullptr);
+  CHECK(readout->text == "18 of 24 rations on the rack");
+  CHECK(readout->text.find("mess-") == std::string::npos);
+
+  const ship::MachinePart* bar = FindPart(stocked, "mess-fill", 0);
+  REQUIRE(bar != nullptr);
+  CHECK(bar->box.w == 390.0f);  // 520 * 75%
+  CHECK(bar->tone == "#7f9161");
+
+  sim.MutableMess().rack = 4;  // 16% - low, so the gauge turns red
+  const ship::TaskStage low = ship::BuildMessMachine(sim);
+  const ship::MachinePart* lowBar = FindPart(low, "mess-fill", 0);
+  REQUIRE(lowBar != nullptr);
+  CHECK(lowBar->box.w == 88.0f);  // pct rounds 16.67 -> 17, 520 * 0.17 = 88.4
+  CHECK(lowBar->tone == "#b05a42");
+  CHECK(FindPart(low, "mess-readout", 0)->text == "4 of 24 rations on the rack");
+
+  // Each plate carries its owner's name, its own clock width and the count
+  // of actions left before that person eats again.
+  const std::vector<ship::CrewMember>& crew = sim.Crew();
+  REQUIRE(crew.size() == 4);
+  const ship::TaskStage clocked = ship::BuildMessMachine(sim);
+  for (std::size_t k = 0; k < crew.size(); ++k) {
+    const ship::MachinePart* name = FindPart(clocked, "mess-plate-name", k);
+    const ship::MachinePart* sub = FindPart(clocked, "mess-plate-sub", k);
+    REQUIRE(name != nullptr);
+    REQUIRE(sub != nullptr);
+    CHECK(name->text == crew[k].name);
+    CHECK(name->text.find("mess-") == std::string::npos);
+    CHECK(sub->text.find("mess-") == std::string::npos);
+    CHECK(sub->text ==
+          ship::js::NumToString(sim.GameRules().mess.every - crew[k].hungerTick) +
+              " actions to next meal");
+  }
+
+  // A hand due to eat has a full clock; a fed one is back at zero. The width
+  // is derived from hungerTick, and hunger alone decides the tone.
+  const double every = sim.GameRules().mess.every;
+  ship::CrewMember* rell = sim.FindCrew(crew[0].id);
+  REQUIRE(rell != nullptr);
+  rell->hungerTick = every;
+  const ship::TaskStage due = ship::BuildMessMachine(sim);
+  const ship::MachinePart* dueTick = FindPart(due, "mess-fill mess-fill-small", 0);
+  REQUIRE(dueTick != nullptr);
+  CHECK(dueTick->box.w == 118.0f);
+
+  rell->hungerTick = 0;
+  rell->hunger = 90;  // starving: the bar reads the alarm colour
+  const ship::TaskStage starving = ship::BuildMessMachine(sim);
+  const ship::MachinePart* starvingTick =
+      FindPart(starving, "mess-fill mess-fill-small", 0);
+  REQUIRE(starvingTick != nullptr);
+  CHECK(starvingTick->box.w == 0.0f);
+  CHECK(starvingTick->tone == "#b05a42");
 }
 
 // ---------------------------------------------------------------------------

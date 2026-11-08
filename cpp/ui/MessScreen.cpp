@@ -32,34 +32,47 @@ TaskStage BuildMessMachine(const Simulation& sim) {
   parts.push_back(Part("mess-mini", 26, 19, 70, 10, "GALLEY"));
 
   // --- the rack gauge - the one thing that actually moves ----------------
+  // paintMess(): the fill width, its tone and the readout are read off
+  // MESS.rack/capacity at paint time, so the gauge can never disagree with
+  // the panel beside it.
   parts.push_back(Part("mess-rackbox", 20, 70, 560, 90));
   parts.push_back(Part("mess-mini", 28, 76, 110, 10, "RATION RACK"));
   parts.push_back(Part("mess-track", 40, 110, 520, 22));
-  MachinePart fill = Part("mess-fill", 40, 110, 0, 22, "mess-bar");
   const double pct = sim.MessCapacity() > 0.0
                          ? std::round((sim.MessRack() / sim.MessCapacity()) * 100.0)
                          : 0.0;
+  MachinePart fill = Part("mess-fill", 40, 110, 0, 22);
   fill.box.w = static_cast<float>(std::round(520.0 * (pct / 100.0)));
+  fill.tone = pct >= 60.0 ? "#7f9161" : (pct >= 25.0 ? "#c08a3e" : "#b05a42");
   parts.push_back(fill);
-  parts.push_back(Part("mess-readout", 40, 136, 520, 16, "mess-readout"));
+  parts.push_back(Part("mess-readout", 40, 136, 520, 16,
+                       Num(sim.MessRack()) + " of " + Num(sim.MessCapacity()) +
+                           " rations on the rack"));
 
-  // --- four plates, one per crew member, each its own clock --------------
+  // --- one plate per crew member, each its own hunger clock --------------
+  // paintMess(): tp = round(hungerTick / MESS_EVERY * 100); the bar is
+  // 118 * tp/100 wide and reads red at hunger >= 70, and the caption counts
+  // the actions left on that person's clock. A hungerTick of 0 means a whole
+  // cycle is left, so the bar starts empty and fills as the clock runs.
   parts.push_back(Part("mess-mini", 28, 182, 140, 10, "WHO EATS NEXT"));
   const std::size_t hands = sim.Crew().size();
+  const double every = sim.GameRules().mess.every;
   for (std::size_t k = 0; k < hands; ++k) {
+    const CrewMember& crew = sim.Crew()[k];
+    const float px = 26.0f + static_cast<float>(k) * 141.0f;
     parts.push_back(
         Part("mess-plate", 20.0f + static_cast<float>(k) * 141.0f, 200, 130, 70));
-    parts.push_back(Part("mess-plate-name", 26.0f + static_cast<float>(k) * 141.0f,
-                         206, 118, 14,
-                         "mess-pname" + std::to_string(k)));
-    parts.push_back(Part("mess-track", 26.0f + static_cast<float>(k) * 141.0f, 228,
-                         118, 12));
-    parts.push_back(Part("mess-fill mess-fill-small",
-                         26.0f + static_cast<float>(k) * 141.0f, 228, 0, 12,
-                         "mess-ptick" + std::to_string(k)));
-    parts.push_back(Part("mess-plate-sub", 26.0f + static_cast<float>(k) * 141.0f,
-                         246, 118, 14,
-                         "mess-psub" + std::to_string(k)));
+    parts.push_back(Part("mess-plate-name", px, 206, 118, 14, crew.name));
+    parts.push_back(Part("mess-track", px, 228, 118, 12));
+    const double tickPct =
+        every > 0.0 ? std::round((crew.hungerTick / every) * 100.0) : 0.0;
+    const std::string tickTone = crew.hunger >= 70.0 ? "#b05a42" : "#7f9161";
+    MachinePart tick = Part("mess-fill mess-fill-small", px, 228, 0, 12);
+    tick.box.w = static_cast<float>(std::round(118.0 * (tickPct / 100.0)));
+    tick.tone = tickTone;
+    parts.push_back(tick);
+    parts.push_back(Part("mess-plate-sub", px, 246, 118, 14,
+                         Num(every - crew.hungerTick) + " actions to next meal"));
   }
   return stage;
 }
