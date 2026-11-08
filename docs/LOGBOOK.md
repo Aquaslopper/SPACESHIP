@@ -1514,3 +1514,31 @@ MEASURED (probe /home/user/probe/zoom, pasted)
 NOT VERIFIED: the wheel branch in Draw.cpp and the deleted button block cannot be
 compiled or seen here - raylib and imgui are absent. The ladder, the stepping and
 the anchoring were exercised head-lessly through ZoomMap. No test suite ran.
+
+## 073 — The fake stars on the local chart are gone
+
+The owner looked at the Kessler system chart and counted two stars. The system owns
+one star, one world and one station; the chart was painting 420 deep-field dust dots
+and 33 route dots on top of them, so a reader counted stars that do not exist.
+
+MEASURED BEFORE (probe, pasted): layer system: bodies 3, field dots 420, route dots 33
+  25 of the field dots were marked "bright", which is the class the chart paints as a
+  two-circle star rather than a speck.
+MEASURED AFTER: layer system: bodies 3, field dots 0, route dots 33
+  sector keeps its 960 field dots, galaxy its 720: the dust belongs to the wide
+  charts, where it is a field and not an object.
+
+The route dots stay. They are the plotted course, derived from where the ship is,
+and the diagonal dotted line in the owner's screenshot is exactly that.
+
+The bodies of the Kessler system, as the catalogue has them:
+  sec-kessler-star  star     Kessler           Charted star
+  sec-kessler-w1    planet   Kessler I         Charted world, rock
+  kessler           station  Kessler Station   Working station
+One star. If the second "star" the owner meant is the station's spiked ring, that is
+a glyph question and a different change: the station mark is a burst, and a burst
+reads as a sun. Nothing has been changed there, because nothing painted can be seen
+from this machine.
+
+NOT VERIFIED: the chart itself has not been looked at. NavScreen's model was measured
+head-lessly; the painting lives in Draw.cpp, which needs raylib. No test suite ran.

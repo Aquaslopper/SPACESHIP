@@ -506,7 +506,11 @@ NavChartView BuildNavChart(const Simulation& sim) {
   }
 
   // --- clusters -----------------------------------------------------------
-  {
+  // Deep-field dust belongs to the wide charts. On the local chart it was 420
+  // dots painted over a system that owns three objects, and a reader counts
+  // stars: every one of those dots read as a star that is not there. The system
+  // scale draws what the system has and nothing else.
+  if (chart.layer != "system") {
     double seed = 8721;
     int count = 420;
     if (chart.layer == "galaxy") { count = 720; }
