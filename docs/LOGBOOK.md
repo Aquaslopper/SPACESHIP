@@ -1484,3 +1484,33 @@ ALSO FIXED IN THIS PASS
 
 NOT VERIFIED: the Draw.cpp rows are written but cannot be compiled or seen here -
 raylib and imgui are not installed on this machine. No test suite ran.
+
+## 072 — One chart, one wheel
+
+The owner does not want three layers with three buttons. The wheel is now the only
+scale control, and the layer buttons are gone from the nav chart.
+
+HOW IT WORKS
+  ZoomMap() walks one step of the current scale's ladder. At the bottom of the
+  ladder while zooming out it calls StepScale(-1): system -> sector -> galaxy. At
+  the top while zooming in it calls StepScale(1): galaxy -> sector -> system.
+  The ship does not move. Zooming is looking; travel is travel. map_.here is
+  untouched, so a zoom-out and a zoom-back-in returns to the same berth.
+  Each scale now has its own short ladder (galaxy 0.3..1.2, sector 0.3..2.0,
+  system 0.6..2.5, step 0.1) instead of a shared 0.3..10 range: the shared range
+  took forty notches to cross, which read as a broken wheel rather than a slow one.
+  CentredOn(x, y) puts a world point under the middle of the viewport, used when a
+  step lands on the ship's own system or on the current region.
+  Scroll() takes the simulation now; over the chart the wheel zooms, everywhere
+  else it still scrolls lists.
+
+MEASURED (probe /home/user/probe/zoom, pasted)
+  start: layer 'system', zoom 1.0, here 'kessler'
+  zooming out: [5] sector@0.3 [6] galaxy@0.3
+  zooming in: [10] sector@2.0 [11] system@2.5
+  the ship is where it was: yes
+  here port resolves: Kessler Station ; board at the berth after zooming: 3 runs
+
+NOT VERIFIED: the wheel branch in Draw.cpp and the deleted button block cannot be
+compiled or seen here - raylib and imgui are absent. The ladder, the stepping and
+the anchoring were exercised head-lessly through ZoomMap. No test suite ran.

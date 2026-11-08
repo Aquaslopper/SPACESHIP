@@ -305,13 +305,82 @@ void Simulation::SetLayer(const std::string& key) {
 }
 
 bool Simulation::ZoomMap(int dir) {
-  // Free. One step on the ladder, clamped, then rounded to a tenth exactly as
-  // the reference rounds it, so the caption and the raster always agree.
+  // Free. One step on the ladder, rounded to a tenth exactly as the reference
+  // rounds it, so the caption and the raster always agree.
+  //
+  // The wheel is the only scale control: reaching the bottom of a scale's ladder
+  // while zooming out steps out to the wider chart, and reaching the top while
+  // zooming in steps in. The ship does not move - zooming is looking, and travel
+  // is travel.
+  if (dir == 0) { return false; }
+
+  const bool atWidest = map_.zoom <= map_.zmin + 1e-9;
+  const bool atClosest = map_.zoom >= map_.zmax - 1e-9;
+
+  if (dir < 0 && atWidest) { return StepScale(-1); }
+  if (dir > 0 && atClosest) { return StepScale(1); }
+
   double zoom = map_.zoom + static_cast<double>(dir) * map_.zstep;
   if (zoom < map_.zmin) { zoom = map_.zmin; }
   if (zoom > map_.zmax) { zoom = map_.zmax; }
   map_.zoom = js::Round(zoom * 10) / 10;
   return true;
+}
+
+bool Simulation::StepScale(int dir) {
+  // dir -1 widens the chart (system -> sector -> galaxy), +1 deepens it.
+  const std::string here = map_.here;
+  const std::string region = map_.sector;
+
+  if (dir < 0) {
+    if (map_.layer == "system") {
+      SetLayer("sector");
+      // Land on the ship's own star, the way the eye left it.
+      if (const Body* system = catalog_.FindSystem(here); system != nullptr) {
+        views_["sector"].sel = system->id;
+        CentredOn(system->x, system->y);
+      }
+      map_.zoom = map_.zmin;
+      return true;
+    }
+    if (map_.layer == "sector") {
+      SetLayer("galaxy");
+      if (const Body* body = catalog_.FindRegion(region); body != nullptr) {
+        views_["galaxy"].sel = body->id;
+        CentredOn(body->x, body->y);
+      }
+      map_.zoom = map_.zmin;
+      return true;
+    }
+    return false;  // the galaxy is the widest chart there is
+  }
+
+  if (map_.layer == "galaxy") {
+    SetLayer("sector");
+    ViewSector(region);
+    map_.zoom = map_.zmax;
+    return true;
+  }
+  if (map_.layer == "sector") {
+    // The system scale shows the star the ship is at; there is nowhere else to
+    // stand, and zooming does not move the ship.
+    SetLayer("system");
+    map_.zoom = map_.zmax;
+    return true;
+  }
+  return false;  // the ship's own system is the closest chart there is
+}
+
+void Simulation::CentredOn(double x, double y) {
+  // The camera is the pan, and the pan is stored per scale. Centring means the
+  // world point asked for sits under the middle of the viewport.
+  LayerView& view = views_[map_.layer];
+  const double spanX = std::max(map_.vw, map_.w);
+  const double spanY = std::max(map_.vh, map_.h);
+  const double limitX = js::Round(spanX * 0.5 * map_.zoom);
+  const double limitY = js::Round(spanY * 0.5 * map_.zoom);
+  view.px = std::clamp(js::Round((map_.cx - x) * map_.zoom), -limitX, limitX);
+  view.py = std::clamp(js::Round((map_.cy - y) * map_.zoom), -limitY, limitY);
 }
 
 void Simulation::PanMap(double dx, double dy) {

@@ -476,8 +476,18 @@ void ExpandChart(Catalog& catalog) {
     entry.second.zmax = kZoomMax;
     entry.second.zstep = kZoomStep;
   }
+  // Each scale gets its own short ladder. A ladder of ten stops means a wheel
+  // crossing it in a dozen notches; the old shared 0.3..10 range meant forty, and
+  // the wheel felt broken rather than slow.
+  catalog.layerBoards["galaxy"].zmin = 0.3;
+  catalog.layerBoards["galaxy"].zmax = 1.2;
+  catalog.layerBoards["galaxy"].zstep = 0.1;
+  catalog.layerBoards["sector"].zmin = 0.3;
+  catalog.layerBoards["sector"].zmax = 2.0;
+  catalog.layerBoards["sector"].zstep = 0.1;
   catalog.layerBoards["system"].zmin = kSystemZoomMin;
   catalog.layerBoards["system"].zmax = kSystemZoomMax;
+  catalog.layerBoards["system"].zstep = 0.1;
 
   // ---- 2. the universe ---------------------------------------------------
   // The chart has no authored baseline and no template pass any more. There were

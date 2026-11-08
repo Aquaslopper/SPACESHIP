@@ -66,7 +66,7 @@ class ShellView {
   void Click(Simulation& sim, float x, float y, HitButton button, double nowMs);
   void Move(float x, float y);
   void Drag(Simulation& sim, float x, float y, float dx, float dy, bool down, bool pressed);
-  void Scroll(float x, float y, float wheelDelta);
+  void Scroll(Simulation& sim, float x, float y, float wheelDelta);
   void Escape(Simulation& sim);
 
   bool QuitRequested() const { return quitRequested_; }

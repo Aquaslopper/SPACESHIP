@@ -250,6 +250,10 @@ class Simulation {
   bool Acknowledge(const std::string& taskId);  // the finished button
   void SetLayer(const std::string& key);    // free: looking never costs
   bool ZoomMap(int dir);                    // free: one step on the zoom ladder
+  // Crossing the end of a scale's ladder moves to the wider or closer chart.
+  // The wheel is the only scale control; nothing here moves the ship.
+  bool StepScale(int dir);
+  void CentredOn(double x, double y);
   void PanMap(double dx, double dy);        // free: clamped per layer
   bool ViewSector(const std::string& regionId);
   bool Dock();                              // Dock at <port>

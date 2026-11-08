@@ -1956,25 +1956,6 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   navHits_.push_back(NavHit{zoomIn, "zoom-in", ""});
   navHits_.push_back(NavHit{zoomOut, "zoom-out", ""});
 
-  float layerY = zoomOut.Bottom() + 6.0f;
-  for (const std::string& key : NavLayerOrder()) {
-    const bool on = key == chart.layer;
-    const std::string label = NavLayerLabel(key);
-    const float layerW = std::max(64.0f, TextWidth(label.c_str(), TypePx(9)) + 16.0f);
-    const float layerH = std::max(19.0f, theme_.LineHeight() + 4.0f);
-    const Area layerBox{box.Right() - layerW - 7.0f, layerY, layerW, layerH};
-    DrawRectangle(static_cast<int>(layerBox.x), static_cast<int>(layerBox.y),
-                  static_cast<int>(layerBox.w), static_cast<int>(layerBox.h),
-                  ToRay(on ? p.panel3 : p.panel));
-    DrawRectangleLines(static_cast<int>(layerBox.x), static_cast<int>(layerBox.y),
-                       static_cast<int>(layerBox.w), static_cast<int>(layerBox.h),
-                       ToRay(p.borderDark));
-    Text(label.c_str(), static_cast<int>(layerBox.x + 6.0f),
-         static_cast<int>(layerBox.y + (layerH - TypePx(9)) * 0.5f), TypePx(9),
-         ToRay(on ? p.ink : p.muted));
-    navHits_.push_back(NavHit{layerBox, "layer", key});
-    layerY += layerH + 4.0f;
-  }
   Text(chart.scaleText.c_str(), static_cast<int>(box.x + 8.0f),
        static_cast<int>(box.y + 7.0f), TypePx(9), ToRay(p.chartInk));
 
@@ -3353,10 +3334,16 @@ void ShellView::Drag(Simulation& sim, float x, float y, float dx, float dy, bool
              dy / std::max(0.01f, navChartScaleY_));
 }
 
-void ShellView::Scroll(float x, float y, float wheelDelta) {
+void ShellView::Scroll(Simulation& sim, float x, float y, float wheelDelta) {
   Move(x, y);
   if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow)) { return; }
   if (floating_.HasConfirmation()) { return; }
+  // Over the chart, the wheel is the only scale control: it walks the ladder and
+  // steps to the wider or closer chart at the ends of it.
+  if (screenNav_ && layout_.content.Contains(x, y) && navChartBox_.Contains(x, y + contentScroll_)) {
+    if (wheelDelta != 0.0f) { sim.ZoomMap(wheelDelta > 0.0f ? 1 : -1); }
+    return;
+  }
   const float step = wheelDelta * TypeStep(40.0f);
   if (titleActive_) { titleScroll_ = std::max(0.0f, std::min(titleMaxScroll_, titleScroll_ - step)); }
   else if (feedActive_ && layout_.content.Contains(x, y) && feedBox_.Contains(x, y + contentScroll_)) {
