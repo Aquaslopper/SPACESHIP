@@ -709,14 +709,44 @@ ShellView::ExteriorLayout ShellView::BuildExteriorLayout(const Simulation& sim, 
   };
   std::stable_sort(rooms.begin(), middle, byHeight);
   std::stable_sort(middle, rooms.end(), byHeight);
+  const std::size_t rows = (rooms.size() + 1) / 2;
+  struct CalloutPlacement {
+    bool left = false;
+    std::size_t row = 0;
+    float xInset = 0.0f;
+    float width = 0.0f;
+    float rowFraction = 0.0f;
+  };
+  std::vector<CalloutPlacement> placements;
   std::vector<std::vector<std::string>> labels;
+  placements.reserve(rooms.size());
+  labels.reserve(rooms.size());
   std::size_t maxLines = 1;
-  for (const Room& room : rooms) {
-    labels.push_back(WrapText(room.name, std::max(1.0f, sideW - 16.0f), textSize, SelectFont(textSize, false)));
+  for (std::size_t i = 0; i < rooms.size(); ++i) {
+    const bool left = i < rows;
+    const std::size_t row = left ? i : i - rows;
+    const float rowT = rows > 1 ? static_cast<float>(row) / static_cast<float>(rows - 1) : 0.0f;
+    CalloutPlacement placement{left, row, 0.0f, sideW, 0.69f * rowT};
+    if (rows == 3) {
+      // Match the reference composition: each lower callout steps inward by
+      // a different amount on each side instead of forming two rigid columns.
+      static constexpr float leftY[] = {0.0f, 0.354f, 0.542f};
+      static constexpr float rightY[] = {0.0f, 0.306f, 0.527f};
+      static constexpr float leftInset[] = {0.0f, 0.053f, 0.193f};
+      static constexpr float rightInset[] = {0.0f, 0.014f, 0.118f};
+      static constexpr float leftWidth[] = {1.0f, 1.0f, 0.84f};
+      static constexpr float rightWidth[] = {1.0f, 0.95f, 0.70f};
+      const std::size_t slot = std::min<std::size_t>(row, 2);
+      placement.xInset = stage.w * (left ? leftInset[slot] : rightInset[slot]);
+      placement.width = sideW * (left ? leftWidth[slot] : rightWidth[slot]);
+      placement.rowFraction = left ? leftY[slot] : rightY[slot];
+    }
+    placements.push_back(placement);
+    labels.push_back(WrapText(rooms[i].name, std::max(1.0f, placement.width - 16.0f),
+                              textSize, SelectFont(textSize, false)));
     maxLines = std::max(maxLines, labels.back().size());
   }
   const float rowH = static_cast<float>(maxLines) * out.lineHeight + 10.0f;
-  const std::size_t rows = (rooms.size() + 1) / 2;
   float bodyH = std::max(Metrics::kHomeStageMinH, stage.h);
   if (rows > 3) {
     bodyH = std::max(bodyH, (rowH + 8.0f) * static_cast<float>(rows - 1) / 0.69f);
@@ -731,19 +761,16 @@ ShellView::ExteriorLayout ShellView::BuildExteriorLayout(const Simulation& sim, 
   out.image = {stage.x + (stage.w - fittedW) / 2.0f,
                bodyY + bodyH * 0.40f - imageH / 2.0f, fittedW, imageH};
   for (std::size_t i = 0; i < rooms.size(); ++i) {
-    const bool left = i < rows;
-    const std::size_t row = left ? i : i - rows;
-    const float rowT = rows > 1 ? static_cast<float>(row) / static_cast<float>(rows - 1) : 0.0f;
-    const float rowFraction = rows == 3
-        ? (left ? 1.11f * rowT - 0.42f * rowT * rowT
-                : 0.884f * rowT - 0.216f * rowT * rowT)
-        : 0.69f * rowT;
+    const CalloutPlacement& placement = placements[i];
     ExteriorCallout item;
     item.id = rooms[i].id;
     item.lines = std::move(labels[i]);
-    item.left = left;
-    item.box = {left ? stage.x + 2.0f : stage.Right() - sideW - 2.0f,
-                bodyY + bodyH * rowFraction, sideW, rowH - 4.0f};
+    item.left = placement.left;
+    const float boxX = placement.left
+        ? stage.x + 2.0f + placement.xInset
+        : stage.Right() - sideW - 2.0f - placement.xInset;
+    item.box = {boxX, bodyY + bodyH * placement.rowFraction,
+                placement.width, rowH - 4.0f};
     // Conceptual anchor only: it ties a callout to the exterior visually and
     // does not claim the supplied sketch is an engineering deck layout.
     const float nx = std::clamp(static_cast<float>((rooms[i].box.x + rooms[i].box.w * 0.5) / 600.0), 0.0f, 1.0f);

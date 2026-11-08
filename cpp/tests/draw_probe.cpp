@@ -330,6 +330,17 @@ int main() {
       Require(std::any_of(textureDraws.begin(), textureDraws.end(), [](const TextureCall& t) { return t.id == 77; }),
               "The Wren exterior disappeared from the starter ship");
       Require(starter.Rooms().size() == 6, "Starter has nonstandard rooms");
+      const auto engineCallout = FindText("Engine Room");
+      const auto oxygenCallout = FindText("O2 Filter Room");
+      const auto cargoCallout = FindText("Cargo Hold");
+      const auto crewCallout = FindText("Crew Quarters");
+      const auto messCallout = FindText("Mess Hall");
+      const auto bridgeCallout = FindText("Bridge");
+      Require(engineCallout.x < oxygenCallout.x && oxygenCallout.x < cargoCallout.x &&
+                  engineCallout.y < oxygenCallout.y && oxygenCallout.y < cargoCallout.y &&
+                  crewCallout.x > messCallout.x && messCallout.x > bridgeCallout.x &&
+                  crewCallout.y < messCallout.y && messCallout.y < bridgeCallout.y,
+              "Three-row room callouts lost the screenshot's inward, staggered composition");
       Require(std::none_of(texts.begin(), texts.end(), [](const TextCall& t) { return t.text == "Science Room"; }),
               "Uninstalled room was shown as an exterior callout");
       for (const auto& room : starter.Rooms()) {

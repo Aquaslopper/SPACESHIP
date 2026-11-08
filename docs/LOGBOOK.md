@@ -312,3 +312,17 @@ You must append a compressed summary of **every single reply and action you take
 - **Full suite:** `ctest --test-dir build --output-on-failure` passed **125/125**; `git diff --check` passed.
 - **Visual limit:** The screenshot correction is verified by the CPU draw recorder; no windowed GUI screenshot was captured in this environment.
 - **Scope:** Small follow-up to PR #30 on `arena/cb265de8-spaceship`; no palette, gameplay, authored assets, or historical reference files changed.
+
+### Entry #022
+- **Timestamp:** 2026-11-08 00:18 UTC
+- **Task:** Match the room-callout placement in the supplied mockup after the owner pointed out that the labels still formed aligned columns.
+- **Correction to the prior interpretation:** The earlier tweak changed only row heights, leaving every left label at one x/width and every right label at another. The mockup also steps the boxes horizontally inward and varies their widths.
+- **Three-row callouts (`Draw.cpp`):** Added per-side normalized x-insets, widths, and y positions for the standard three rows, following the screenshot's distinct left/right stagger rather than mirroring the sides.
+- **Left sequence:** Engine Room remains at the outer edge; O2 Filter Room steps inward; Cargo Hold moves substantially inward and narrows.
+- **Right sequence:** Crew Quarters stays at the outer edge; Mess Hall shifts slightly inward; Bridge moves substantially inward and narrows.
+- **Responsive text:** Callout labels wrap against each resulting box width; the row height is measured from the widest wrapped label.
+- **Dense layouts:** More-than-three-row ships retain their existing spacing rule, avoiding a change to the larger-room layout.
+- **Regression coverage (`draw_probe.cpp`):** Starter Wren probe now asserts the mockup's left/right x progression and individually staggered y positions.
+- **Checks:** `cmake --build build --parallel 2`, `tools/check-draw.sh`, full `ctest` **125/125**, and `git diff --check` all passed.
+- **Visual limit:** The recorder verifies rendered coordinates/order but no separate windowed screenshot was captured here.
+- **Scope:** Follow-up to open PR #30 on `arena/cb265de8-spaceship`; no data, authored art, palette, or gameplay changes.
