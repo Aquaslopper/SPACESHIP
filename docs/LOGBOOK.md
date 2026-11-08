@@ -1146,3 +1146,33 @@ writing down rather than leaving to luck.
 
 The hard part was not the code. It was refusing to be confident about anything that
 had not been measured, and refusing to be loyal to code the owner did not write.
+
+## 063 — Measured: the galaxy is a template, and here is how thin
+
+The owner sailed it and said the systems and stations are all the same, and the trade
+names shuffle when he moves. He is right, and it is worse than "feels samey". Counted:
+
+    48 systems, 243 bodies, 30 ports, 7 goods.
+    every system: star 1, planet 2, moon 1, and one station or one site - 5 bodies,
+    the same recipe 48 times.
+    port price profiles: 8 for 30 stations. One profile is shared by 9 stations.
+    a station's board: 3 or 4 runs, all of them its own system's bodies.
+
+So a station is a body with one of eight price tables, offering three of seven goods
+to one of five local bodies. That is the whole of trade.
+
+The shuffling is `kTradeEpoch = 200` clicks: the board is redrawn from a hash of the
+system and the epoch, and the epoch is global. A crossing costs 15 to 25 clicks, so
+the names turn over about every eight to twelve jumps - and every arrival at a new
+station draws new names anyway, because the destinations are always that system's own
+five bodies.
+
+What is NOT fake: the engine's wear and the button that presses it, the air stages and
+their harm, hunger clocks, the navigator's shorter crossing, a delivery loading real
+cargo into a real hold. Those are state machines that measure. The hollowness is in
+the content - how many goods, how many price tables, how many shapes a system comes
+in - not in whether the sim runs.
+
+Nothing changed in this entry. The fixes are a design decision, and the first one
+worth taking is the one he noticed: a board that holds still, and offers that mean
+something.
