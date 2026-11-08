@@ -1612,3 +1612,18 @@ THE DOCK
 
 NOT VERIFIED: nothing painted has been seen - Draw.cpp needs raylib. The probe files
 and the object cache were wiped with /tmp mid-session and rebuilt. No test suite ran.
+
+## 076 — Select is select; the dock is the dock
+
+I added "click the station you are standing at and it docks" while chasing a report
+that a station was not registered. The owner never asked for it: a click is a
+selection, and docking is the dock command. Removed - PressNavAction("select") is
+back to SelectTarget and nothing else.
+
+Measured (/home/user/probe/select, exit 0):
+  boot docked 0; select Kessler Station -> selected 1, docked 0, target 'kessler'
+  the dock command still works: 1, docked 1
+
+The 987-station measurement from 075 stands (every station body has a port, every
+port docks through the command). No cause for the original report was found, and
+none was invented this time.
