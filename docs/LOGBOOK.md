@@ -1208,3 +1208,35 @@ generated and never looked at.
 
 So the build is not hollow everywhere. It is a working machine with generated content
 poured in, and the generated part is what a player sees first.
+
+## 065 — Why "procedural" produced a galaxy of copies
+
+The owner asked whether an AI cannot make a procedural world. It can write one; what it
+wrote here is not procedural variety, it is a template loop, and the difference is worth
+naming because the next generator must not repeat it.
+
+WHAT THIS ONE DOES. A fixed table of 48 sector rows, each shelling out the same five
+bodies - star, planet, planet, moon, and a station or a site - then a price table picked
+by an index into eight authored profiles. Nothing is derived from anything. Names vary;
+structure and economy do not. A generator like that produces volume, never variety, and
+a player sees through it in one system.
+
+WHAT MAKES GENERATED CONTENT STOP FEELING FAKE. Two rules, both cheap:
+
+  1. DERIVE, DO NOT DRAW FROM A HAT. A price should follow from what the place is: an
+     agricultural world sells produce cheap because it grows it, and pays over the odds
+     for medicine because it cannot make it. Seven goods and thirty stations then give
+     hundreds of distinct economies, and the player can LEARN the logic - which is the
+     reward a generated world is supposed to give.
+  2. VARY THE SHAPE, NOT THE LABEL. Some systems should be a star and a wreck. Some a
+     belt and a single port. Count, arrangement and what is missing is what a captain
+     notices from the chart; names are the cheapest thing to randomise and the least
+     noticed.
+
+AND THE PART NO AI DOES BY ITSELF: generated content has to be played and looked at.
+This data was verified as parsing, never as interesting. The bar that was missing is
+not "does it compile" but "would I notice, in the third system, that this is a copy".
+
+Nothing changed in this entry. The first real step is rule 1: derive every station's
+prices from the system it stands in, which needs no new content at all - only the seven
+goods and the traits already in the chart.
