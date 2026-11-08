@@ -164,6 +164,10 @@ struct Contract {
 // never authored, so they must not be adjusted for the port's window size.
 struct MapGeometry {
   double w = 638, h = 278;
+  // The window a scale is shown through, in board units. Zero means "the whole
+  // board", which is what the reference did; a board wider than its window is a
+  // chart you pan and zoom instead of one squeezed to fit a box.
+  double vw = 0, vh = 0;
   double cx = 319, cy = 139;
   double zoom = 1, zmin = 0.6, zmax = 2.0, zstep = 0.2;
   double grid = 45;

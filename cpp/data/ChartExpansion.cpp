@@ -479,15 +479,19 @@ void ExpandChart(Catalog& catalog) {
   // Each scale gets its own short ladder. A ladder of ten stops means a wheel
   // crossing it in a dozen notches; the old shared 0.3..10 range meant forty, and
   // the wheel felt broken rather than slow.
-  catalog.layerBoards["galaxy"].zmin = 0.3;
-  catalog.layerBoards["galaxy"].zmax = 1.2;
-  catalog.layerBoards["galaxy"].zstep = 0.1;
-  catalog.layerBoards["sector"].zmin = 0.3;
-  catalog.layerBoards["sector"].zmax = 2.0;
-  catalog.layerBoards["sector"].zstep = 0.1;
-  catalog.layerBoards["system"].zmin = kSystemZoomMin;
+  catalog.layerBoards["galaxy"].zmin = 1.0;
+  catalog.layerBoards["galaxy"].zmax = 3.0;
+  catalog.layerBoards["galaxy"].zstep = 0.2;
+  // Zoom 1 is the whole board; every step above it is a window onto part of it,
+  // which is how a chart wider than the panel is read. The old ceiling of 2.0 cut
+  // the window off at half the board, so a crowded sector could never be read at
+  // all - that is the clamp the owner objected to, and it was mine.
+  catalog.layerBoards["sector"].zmin = 1.0;
+  catalog.layerBoards["sector"].zmax = 5.0;
+  catalog.layerBoards["sector"].zstep = 0.2;
+  catalog.layerBoards["system"].zmin = 1.0;
   catalog.layerBoards["system"].zmax = kSystemZoomMax;
-  catalog.layerBoards["system"].zstep = 0.1;
+  catalog.layerBoards["system"].zstep = 0.2;
 
   // ---- 2. the universe ---------------------------------------------------
   // The chart has no authored baseline and no template pass any more. There were

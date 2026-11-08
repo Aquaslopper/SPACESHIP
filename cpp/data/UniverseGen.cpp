@@ -265,32 +265,45 @@ void GenerateUniverse(Catalog& catalog, std::uint64_t seed, int systemCount) {
   // dots shrinks as they multiply, down to the radius that lets the dots be told
   // apart on the galaxy board.
   const int regionCount = std::clamp(3 + systemCount / 60, 3, 240);
-  const double areaPerRegion = (boardW * boardH) / static_cast<double>(regionCount);
-  const double minGap =
-      std::min(0.27 * std::min(boardW, boardH), 1.02 * std::sqrt(areaPerRegion));
+
+  // A disc, packed by the golden angle: every place gets its own room and the
+  // clusters cannot overlap, which is what stops two dozen regions reading as one
+  // smear of lanes. The board is bigger than the window it is shown through, so
+  // this spreading costs nothing but coordinates.
+  struct Packed {
+    double x = 0.0;
+    double y = 0.0;
+    double spread = 0.0;
+  };
+  std::vector<Packed> packed(static_cast<std::size_t>(regionCount));
+  {
+    const double discRadius = 0.46 * std::min(boardW, boardH);
+    const double spacing =
+        regionCount > 1 ? discRadius * std::sqrt(3.14159265358979323846 / regionCount)
+                        : discRadius;
+    for (int r = 0; r < regionCount; ++r) {
+      const double angle = 2.39996322972865332 * static_cast<double>(r);
+      const double radius = discRadius * std::sqrt((static_cast<double>(r) + 0.5) /
+                                                   static_cast<double>(regionCount));
+      packed[static_cast<std::size_t>(r)].x =
+          std::clamp(boardW * 0.5 + std::cos(angle) * radius, margin, boardW - margin);
+      packed[static_cast<std::size_t>(r)].y =
+          std::clamp(boardH * 0.5 + std::sin(angle) * radius, margin, boardH - margin);
+      // Well under half the spacing, so neighbouring clusters have a gap of chart
+      // between them instead of sharing a border.
+      packed[static_cast<std::size_t>(r)].spread = spacing * 0.34;
+    }
+  }
 
   std::vector<RegionPlan> regions;
   regions.reserve(static_cast<std::size_t>(regionCount));
   for (int r = 0; r < regionCount; ++r) {
-    double bestX = margin;
-    double bestY = margin;
-    double bestClearance = -1.0;
-    for (int attempt = 0; attempt < 220; ++attempt) {
-      const double x = rng.Range(margin, boardW - margin);
-      const double y = rng.Range(margin, boardH - margin);
-      double clearance = 1e9;
-      for (const RegionPlan& other : regions) {
-        clearance = std::min(clearance, std::hypot(x - other.x, y - other.y));
-      }
-      if (clearance >= minGap) { bestX = x; bestY = y; bestClearance = clearance; break; }
-      if (clearance > bestClearance) { bestClearance = clearance; bestX = x; bestY = y; }
-    }
-
+    const Packed& slot = packed[static_cast<std::size_t>(r)];
     const Archetype& archetype = kArchetypes[rng.Below(static_cast<int>(std::size(kArchetypes)))];
     RegionPlan plan;
-    plan.x = bestX;
-    plan.y = bestY;
-    plan.spread = minGap * rng.Range(0.42, 0.68);
+    plan.x = slot.x;
+    plan.y = slot.y;
+    plan.spread = slot.spread * rng.Range(0.86, 1.12);
     plan.trade = archetype.trade;
     plan.bent.population = archetype.population;
     plan.bent.farm = archetype.farm;

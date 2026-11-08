@@ -252,8 +252,11 @@ void Simulation::ApplyChartBoard() {
   map_.h = board.h;
   map_.cx = board.cx;
   map_.cy = board.cy;
-  map_.vw = board.w;
-  map_.vh = board.h;
+  // The window is the board unless the scale states one. A sector board ten times
+  // the reference has to be read through a window, or enlarging it would change
+  // nothing but the numbers.
+  map_.vw = board.vw > 0.0 ? board.vw : board.w;
+  map_.vh = board.vh > 0.0 ? board.vh : board.h;
   map_.zmin = board.zmin;
   map_.zmax = board.zmax;
   map_.zstep = board.zstep;

@@ -16,8 +16,13 @@ namespace ship {
 // Board multipliers relative to the 638x278 reference viewport.
 // Authored core regions and systems are translated to the board centre so
 // pairwise distances between authored destinations remain unchanged.
-constexpr double kSectorBoardScale = 6.0;
+constexpr double kSectorBoardScale = 10.0;
 constexpr double kGalaxyBoardScale = 4.0;
+
+// The sector board is ten times the reference in each direction. The panel shows
+// all of it at zoom 1 and a window onto it above that; the board is not sized by
+// the panel.
+
 
 // Zoom ladder for the wide sector and galaxy boards.
 constexpr double kZoomMin = 0.3;

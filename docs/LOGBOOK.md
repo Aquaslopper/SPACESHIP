@@ -1542,3 +1542,40 @@ from this machine.
 
 NOT VERIFIED: the chart itself has not been looked at. NavScreen's model was measured
 head-lessly; the painting lives in Draw.cpp, which needs raylib. No test suite ran.
+
+## 074 — The sector board is ten times the reference, and the panel is only a window
+
+The owner looked at the sector chart, saw two dozen clusters smeared into one block
+and said the window has no authority over how big the map is. He is right, and the
+clamp was mine.
+
+WHAT WAS WRONG
+  kSectorBoardScale was 6 and the sector zoom ladder was 0.3..2.0, so the panel could
+  never show less than half the board: read at fit-all, the clusters overlapped and
+  the lanes crossed everywhere.
+  Regions were placed by rejection sampling with a fallback that accepted the best of
+  two hundred and twenty tries, so with twenty-three regions the "minimum gap" was
+  routinely not met and clusters shared ground.
+
+WHAT CHANGED
+  Sector board 6380 x 2780 (ten times the reference in each direction).
+  Regions are packed on a disc by the golden angle, one slot each, spread 0.34 of the
+  slot spacing: neighbouring clusters keep a band of empty chart between them.
+  Zoom 1 is the whole board; above it the panel is a window onto part of the chart.
+  Sector ladder 1.0..5.0, galaxy 1.0..3.0, system 1.0..2.5, step 0.2. The ceiling of
+  2.0 that stopped the sector at half the board is gone.
+  MapGeometry carries vw/vh so a board can state the window it is read through; the
+  projection still normalises by board size, which is why the window is zoom above 1.
+
+MEASURED (probe /home/user/probe/spread, pasted)
+  sector board 6380 x 2780, 23 regions, closest two centres 409 apart
+  pairs closer than 260 board units: 0
+  zoom 1.0: 1200 of 1200 systems inside the panel
+  zoom 2.0: 787 of 1200 systems inside the panel
+  zoom 5.0: 151 of 1200 systems inside the panel
+  sail: 1200 systems, 1005 ports, validator problems 0, shapes 3..20 bodies
+  voyage: Kessler resolves, 1005 distinct price tables for 1005 ports
+  zoom probe: full cycle system -> sector -> galaxy and back, ship unmoved
+
+NOT VERIFIED: the painted chart has not been looked at - Draw.cpp needs raylib.
+No test suite ran.
