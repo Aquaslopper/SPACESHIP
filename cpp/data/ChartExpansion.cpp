@@ -633,9 +633,8 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
 
       if (m == 1 && isGeneratedSystem && !profiles.empty() && rng.Next() < 0.35) {
         // A secondary waystation may exist, but it is not a working space
-        // station. Only the regional quota above creates dockable ports, so
-        // a station-less system stays station-less instead of gaining a berth
-        // through the landmark pass.
+        // station. The system's own station is its one berth, so the landmark
+        // pass does not add a second dockable port to the same system.
         const std::string siteId = side + "-outpost";
         const std::string siteName = UniqueName(word + " Outpost", names);
         const std::string profile = Pick(profiles, rng);
@@ -645,7 +644,7 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
         site.klass = "Derelict waystation - no dock";
         site.details.emplace_back("System", system.name);
         site.details.emplace_back("Region", regionName);
-        site.details.emplace_back("Services", "None - no station in this system");
+        site.details.emplace_back("Services", "None - derelict; dock at this system's station");
         site.details.emplace_back("Former trade profile", profile);
         site.scan = {"No docking collar answers; the hull is cold and unclaimed."};
         site.scanLocked = {"Interior transponder log", "Salvage assay"};
@@ -738,6 +737,85 @@ std::vector<std::pair<std::string, double>> PriceBasket(const Port& port) {
 }
 
 }  // namespace
+
+// Every system needs a space station. The authored star table leaves some
+// systems with a landmark only; this pass gives each of those systems one
+// station body and its priced port, placed on a free slot of the system board.
+// Systems that already have a station are left exactly as they are.
+void EnsureEverySystemHasStation(Catalog& catalog) {
+  if (catalog.portPrices.empty()) { return; }
+  catalog.RebuildIndex();
+
+  std::set<std::string> withStation;
+  for (const Port& port : catalog.ports) {
+    const Body* body = catalog.FindBody(port.id);
+    if (body != nullptr) { withStation.insert(catalog.BodySystem(*body)); }
+  }
+  std::vector<std::string> profiles;
+  for (const auto& entry : catalog.portPrices) { profiles.push_back(entry.first); }
+  std::sort(profiles.begin(), profiles.end());
+
+  const double boardW = catalog.map.w;
+  const double boardH = catalog.map.h;
+
+  for (const Body& system : catalog.systems) {
+    if (system.type != "system" || withStation.count(system.id) != 0) { continue; }
+
+    std::vector<std::pair<double, double>> taken;
+    std::set<std::string> names;
+    for (std::size_t index : catalog.BodiesInSystem(system.id)) {
+      const Body& body = catalog.bodies[index];
+      taken.emplace_back(body.x, body.y);
+      names.insert(body.name);
+    }
+
+    // Walk the board on a fixed lattice and take the first slot clear of the
+    // bodies already charted here, so the station never sits on a world.
+    const std::uint64_t salt = HashOf(system.id + "|station-slot");
+    double sx = catalog.map.cx;
+    double sy = catalog.map.cy;
+    bool placed = false;
+    for (double sep = 34.0; sep >= 14.0 && !placed; sep -= 4.0) {
+      for (int ring = 0; ring < 9 && !placed; ++ring) {
+        for (int step = 0; step < 16 && !placed; ++step) {
+          const double angle = static_cast<double>((step * 7 + ring * 3 +
+                                 static_cast<int>(salt % 16)) % 16) * 0.39269908169872414;
+          const double radius = 46.0 + static_cast<double>(ring) * 24.0;
+          const double x = std::round(std::clamp(catalog.map.cx + std::cos(angle) * radius,
+                                                 18.0, boardW - 18.0));
+          const double y = std::round(std::clamp(catalog.map.cy + std::sin(angle) * radius * 0.42,
+                                                 18.0, boardH - 18.0));
+          bool free = true;
+          for (const auto& other : taken) {
+            const double dx = other.first - x;
+            const double dy = other.second - y;
+            if (dx * dx + dy * dy < sep * sep) { free = false; break; }
+          }
+          if (free) { sx = x; sy = y; placed = true; }
+        }
+      }
+    }
+
+    const std::string side = system.id.substr(4);
+    const std::string name = UniqueName(FirstWord(system.name) + " Station", names);
+    const std::string profile = profiles[salt % profiles.size()];
+    const std::string note = system.scan.empty() ? std::string("A berth serves this system.")
+                                                 : system.scan.front();
+    Body& station = AddLocalBody(catalog, side + "-station", "station", name, sx, sy, system, note);
+    (void)station;
+
+    Port port;
+    port.id = side + "-station";
+    port.name = name;
+    port.profile = profile;
+    port.prices = catalog.portPrices[profile];
+    const auto hint = catalog.portHints.find(profile);
+    port.tip = note + " " + (hint == catalog.portHints.end() ? std::string() : hint->second);
+    catalog.ports.push_back(std::move(port));
+    withStation.insert(system.id);
+    catalog.RebuildIndex();
+  }
+}
 
 void PopulateStationKnowledge(Catalog& catalog) {
   catalog.RebuildIndex();
@@ -1073,24 +1151,14 @@ void ExpandChart(Catalog& catalog) {
       placed.emplace_back(x, y);
     }
 
-    // Not every system has a space station. Each region keeps a small,
-    // deterministic quota of station systems (about one in four); the rest
-    // are landmark/scan/salvage systems with no dock, market or trade desk.
-    const std::size_t regionEnd = rows.size();
-    if (regionEnd > regionBegin && !profiles.empty()) {
-      std::vector<std::size_t> order;
-      order.reserve(regionEnd - regionBegin);
-      for (std::size_t i = regionBegin; i < regionEnd; ++i) { order.push_back(i); }
-      std::sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
-        const std::uint64_t ra = HashOf(rows[a].system + "|station-rank");
-        const std::uint64_t rb = HashOf(rows[b].system + "|station-rank");
-        return ra != rb ? ra < rb : rows[a].system < rows[b].system;
-      });
-      for (std::size_t i : order) { rows[i].profile.clear(); }
-      const std::size_t quota = std::max<std::size_t>(1, (regionEnd - regionBegin) / 4);
-      for (std::size_t q = 0; q < quota && q < order.size(); ++q) {
-        StarRow& chosen = rows[order[q]];
-        chosen.profile = profiles[HashOf(chosen.system + "|station-profile") % profiles.size()];
+    // Every system has a space station. A row whose dice roll left the trade
+    // profile empty is given one here, so its landmark is built as a station
+    // and priced port by BuildGalaxyFromRows like every other row.
+    if (!profiles.empty()) {
+      for (std::size_t i = regionBegin; i < rows.size(); ++i) {
+        if (rows[i].profile.empty()) {
+          rows[i].profile = profiles[HashOf(rows[i].system + "|station-profile") % profiles.size()];
+        }
       }
     }
   }
@@ -1141,6 +1209,7 @@ void ExpandChart(Catalog& catalog) {
 
   // 7. Populate multi-ring planetary orbits, galaxy-scale star positions,
   //    inter-galactic lanes, and map-driven incident definitions.
+  EnsureEverySystemHasStation(catalog);
   PopulateLocalCharts(catalog, 0);
   PlaceGalaxyDots(catalog);
   EntangleGalaxy(catalog);

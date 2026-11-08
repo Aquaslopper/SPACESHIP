@@ -238,7 +238,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   starmap.id = "starmap";
   starmap.title = "Star-map";
   starmap.badge = port == nullptr ? "system page" : port->atlas.systemName;
-  starmap.notes.push_back("Every planet and moon written into this station's own system page. Pick a body to read it; opening the chart is free. Systems without a station have no station page.");
+  starmap.notes.push_back("Every planet and moon written into this station's own system page. Pick a body to read it; opening the chart is free. Every system has a station, so every system has a page.");
   if (port != nullptr) {
     starmap.notes.push_back(port->atlas.systemReading);
     for (const PlanetPage& page : port->atlas.planets) {

@@ -49,6 +49,10 @@ void ExpandChart(Catalog& catalog);
 void PopulateGalaxies(Catalog& catalog, double coreDx, double coreDy);
 void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem);
 // Copies each finished system into its stations and derives their shelves/prices.
+// Every system carries one space station: authored systems whose star table
+// named no trade profile gain a station body and port here.
+void EnsureEverySystemHasStation(Catalog& catalog);
+
 void PopulateStationKnowledge(Catalog& catalog);
 void PlaceGalaxyDots(Catalog& catalog);
 void EntangleGalaxy(Catalog& catalog);

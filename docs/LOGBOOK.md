@@ -541,3 +541,17 @@ You must append a compressed summary of **every single reply and action you take
 - **Checks:** `spaceship_core` and `spaceship_console` targets built; `git diff --check` clean.
 - **Testing:** no test suite, ctest, draw probe, or GUI run was executed, per the standing stop.
 - **State:** committed and pushed to `arena/f91aec6c-spaceship`, updating open PR #34.
+
+### Entry #039
+- **Timestamp:** 2026-11-08 UTC
+- **Task:** two orders: every system needs a space station; remove the action bar at the foot of the Cargo Hold.
+- **Stations, generated systems:** the 1-in-4 regional quota from #038 is deleted. Any row whose profile roll came up empty is given a profile by hash, so `BuildGalaxyFromRows` builds it as a station body plus priced port.
+- **Stations, authored systems:** new `EnsureEverySystemHasStation()` in `cpp/data/ChartExpansion.cpp`, called from `ExpandChart` before `PopulateLocalCharts`. It adds one station body and port to each system that has none, placed on a free slot of the system board.
+- **Known gap:** Kessler keeps its two authored ports. "One station per system" is therefore not strictly true there; existing ports were not removed.
+- **Copy:** handbook market/star-map entries and the station star-map note now say every system has a station. Derelict waystation service line reworded; it remains a non-port landmark.
+- **Cargo Hold:** the `PaintActionBand("Work in progress", ...)` call at the foot of `PaintCargoScreen` is deleted; `actionBandTop_` is set to the content bottom, so no bar is drawn under the Cargo Hold.
+- **Unapproved relocation, still present:** the three salvage-bay buttons and the Yes/No confirmation were re-drawn by the agent inside the right column (`Draw.cpp` ~3164-3265) with click handling in `Click()` (~4004-4012). The owner rejected this relocation. It is NOT reverted in this commit.
+- **Invariant:** the grown-chart check in `cpp/tests/nav_tests.cpp` now asserts every system has a station and a named station census. Edited, not run.
+- **Checks:** `spaceship_core` and `spaceship_console` built; `cpp/ui/Draw.cpp` passed `-fsyntax-only`; `git diff --check` clean. No test suite, ctest, probe or GUI run, per the standing stop.
+- **Not verified:** station coverage was never observed at runtime; compilation is not proof of it.
+- **State:** committed and pushed to `arena/f91aec6c-spaceship` at the owner's instruction. PR #34 updated, NOT merged.

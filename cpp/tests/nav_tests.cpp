@@ -768,26 +768,27 @@ TEST_CASE("the charted galaxy is grown once, deterministically, and every system
   CHECK(grown.bodies.size() > authored.bodies.size());
   CHECK(grown.ports.size() > authored.ports.size());
 
-  // Owner correction: not every system has a space station. The grown chart
-  // must keep station-less systems, and a station census must say so.
+  // Every system needs a space station: each system on the grown chart has a
+  // station body with a priced port, and its census names that station.
   {
     std::set<std::string> stationSystems;
     for (const ship::Port& port : grown.ports) {
       const ship::Body* body = grown.FindBody(port.id);
       REQUIRE(body != nullptr);
-      stationSystems.insert(body->system);
+      CHECK(body->type == "station");
+      stationSystems.insert(grown.BodySystem(*body));
     }
-    CHECK(stationSystems.size() < grown.systems.size());
-    bool censusSaysNone = false;
     for (const ship::Body& system : grown.systems) {
-      if (stationSystems.count(system.id) != 0) { continue; }
+      CHECK(stationSystems.count(system.id) == 1u);
+      bool censusNames = false;
       for (const auto& detail : system.details) {
-        if (detail.first == "Station" && detail.second == "None charted") {
-          censusSaysNone = true;
+        if (detail.first == "Station" && !detail.second.empty() &&
+            detail.second != "None charted") {
+          censusNames = true;
         }
       }
+      CHECK(censusNames);
     }
-    CHECK(censusSaysNone);
   }
 
   // The authored rows survive byte for byte by id and name...

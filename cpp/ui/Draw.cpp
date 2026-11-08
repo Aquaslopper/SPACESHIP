@@ -3161,7 +3161,18 @@ void ShellView::PaintCargoScreen(Simulation& sim) {
     rightContent += wrap(row.title, sideW - 32, 9).size() * (line - 2);
     rightContent += line + 18;
   }
-  const float rightH = std::max(360.0f, rightContent + 44.0f);
+  // The hold's own commitments (salvage bays) and a pending question are part
+  // of this contextual column. They are measured with it so nothing overflows.
+  const std::vector<ProgressButton>& commitments = screen.progress;
+  float commitContent = 0;
+  for (const ProgressButton& button : commitments) {
+    commitContent += wrap(button.text, sideW - 40, 10).size() * line + 12;
+  }
+  if (!pendingConfirm_.empty()) {
+    commitContent += wrap(pendingConfirm_, sideW - 24, 9).size() * (line - 2) + 8;
+    commitContent += 2 * (line + 12);
+  }
+  const float rightH = std::max(360.0f, rightContent + commitContent + 44.0f);
   float ry = panelFrame(rightBox, screen.panels.size() < 3 ? "Unload cargo" : screen.panels[2].title, rightH);
   if (screen.panels.size() >= 3) {
     for (const PanelLine& note : screen.panels[2].lines) {
@@ -3210,19 +3221,55 @@ void ShellView::PaintCargoScreen(Simulation& sim) {
     ry = box.Bottom() + 8;
   }
 
+  if (!pendingConfirm_.empty()) {
+    for (const auto& t : wrap(pendingConfirm_, sideW - 24, 9)) {
+      Text(t.c_str(), static_cast<int>(rightBox.x + 12), static_cast<int>(ry), TypePx(9), ToRay(p.terracotta));
+      ry += line - 2;
+    }
+    ry += 8;
+    const struct { const char* id; const char* label; } answers[2] = {
+        {"confirm-yes", "Yes, do it"}, {"confirm-no", "Keep as it is"}};
+    for (const auto& answer : answers) {
+      const auto lines = wrap(answer.label, sideW - 40, 10);
+      const float h = lines.size() * line + 12;
+      const Area box{rightBox.x + 10, ry, sideW - 20, h};
+      DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.w),
+                    static_cast<int>(box.h), ToRay(p.control));
+      DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.w),
+                         static_cast<int>(box.h), ToRay(p.borderDark));
+      float ty = box.y + 6;
+      for (const auto& t : lines) {
+        Text(t.c_str(), static_cast<int>(box.x + 10), static_cast<int>(ty), TypePx(10), ToRay(p.ink));
+        ty += line;
+      }
+      taskButtons_.push_back({box, answer.id});
+      ry = box.Bottom() + 8;
+    }
+  }
+  for (const ProgressButton& button : commitments) {
+    const auto lines = wrap(button.text, sideW - 40, 10);
+    const float h = lines.size() * line + 12;
+    const Area box{rightBox.x + 10, ry, sideW - 20, h};
+    DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.w),
+                  static_cast<int>(box.h), ToRay(button.enabled ? p.control : p.panel3));
+    PaintProgressFill(box, button.fillPercent);
+    DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.w),
+                       static_cast<int>(box.h), ToRay(p.borderDark));
+    float ty = box.y + 6;
+    for (const auto& t : lines) {
+      Text(t.c_str(), static_cast<int>(box.x + 10), static_cast<int>(ty), TypePx(10),
+           ToRay(button.state == ButtonState::Cooldown ? p.terracotta : p.ink));
+      ty += line;
+    }
+    taskButtons_.push_back({box, button.taskId});
+    ry = box.Bottom() + 8;
+  }
+
   contentPaintBottom_ = std::max(contentPaintBottom_,
                                  std::max({leftBox.y + leftH, midBox.y + midH, rightBox.y + rightH}) + 8);
-  auto buttons = screen.progress;
-  if (!pendingConfirm_.empty()) {
-    ProgressButton yes; yes.taskId = "confirm-yes"; yes.text = "Yes, do it";
-    ProgressButton no; no.taskId = "confirm-no"; no.text = "Keep as it is";
-    buttons.push_back(yes); buttons.push_back(no);
-  }
-  if (!buttons.empty()) {
-    PaintActionBand("Work in progress", "", buttons, pendingConfirm_);
-  } else {
-    actionBandTop_ = layout_.content.Bottom();
-  }
+  // The Cargo Hold window has no band across its foot: the window ends at its
+  // three columns, and every control lives inside them.
+  actionBandTop_ = layout_.content.Bottom();
   (void)sim;
 }
 
@@ -3954,6 +4001,15 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
   // A task window's own controls come first.
   for (const auto& entry : taskButtons_) {
     if (!entry.first.Contains(x, y + scrollY)) { continue; }
+    if (entry.second == "confirm-no") { pendingConfirm_.clear(); pendingAction_.clear(); return; }
+    if (entry.second == "confirm-yes") {
+      const std::string action = pendingAction_;
+      pendingConfirm_.clear(); pendingAction_.clear();
+      if (PressPanelRow(sim, panelsKind_, action)) {
+        SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
+      }
+      return;
+    }
     if (PressProgressButton(sim, entry.second)) {
       SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
     }
