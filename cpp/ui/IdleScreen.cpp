@@ -117,16 +117,6 @@ Strip NavStrip(const Simulation& sim, const Area& box) {
   return strip;
 }
 
-Strip DockStrip(const Simulation& sim, const Area& box) {
-  Strip strip;
-  strip.id = "dockstrip";
-  strip.label = "Docked";
-  strip.box = box;
-  const Body* body = sim.FindBodyById(sim.Map().here);
-  strip.main = body != nullptr ? body->name : std::string();
-  return strip;
-}
-
 IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout,
                                 const Theme& theme, bool hideCrewLabels,
                                 float othersHeight, FxRng& rng) {
@@ -158,10 +148,17 @@ IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout
   const float eventX = leftX + inner / 3.0f + 4.0f;
   const float eventW = std::max(1.0f, layout.content.x + 8.0f + inner - eventX);
   out.eventsBox = Area{eventX, lowerY, eventW, stripH};
-  for (const Incident& incident : sim.Events()) {
-    out.events.push_back({incident.id, incident.kind, {}});
+  if (sim.State().docked) {
+    const Body* berth = sim.FindBodyById(sim.Map().here);
+    out.events.push_back({"Docked", berth == nullptr ? std::string() : berth->name,
+                          sim.Map().here, true, {}});
   }
-  while (out.events.size() < 2) { out.events.push_back({"", "No active events.", {}}); }
+  for (const Incident& incident : sim.Events()) {
+    out.events.push_back({"Events", incident.kind, incident.id, false, {}});
+  }
+  while (out.events.size() < 2) {
+    out.events.push_back({"Events", "No active events.", "", false, {}});
+  }
   const std::size_t rows = (out.events.size() + 1) / 2;
   out.eventsBox.h = static_cast<float>(rows) * stripH + static_cast<float>(rows - 1) * 8.0f;
   const float cardW = (eventW - 8.0f) / 2.0f;
@@ -173,24 +170,20 @@ IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout
                              cardW, stripH};
   }
 
-  float after = std::max(out.nav.box.Bottom(), out.eventsBox.Bottom());
-  if (sim.State().docked) {
-    out.docked = true;
-    out.dock = DockStrip(sim, Area{leftX, out.nav.box.Bottom() + 8.0f, leftColumnW, stripH});
-    out.dock.right.clear();
-    after = std::max(after, out.dock.box.Bottom());
-  } else {
-    out.dock.box = Area{leftX, out.nav.box.Bottom(), leftColumnW, 0.0f};
-  }
+  const float after = std::max(out.nav.box.Bottom(), out.eventsBox.Bottom());
 
   // The activity feed is the final home panel and uses the remaining content
   // height so its lower edge reaches the bottom of the viewport.
-  const float feedStart = after + 20.0f;
+  const float feedStart = after;
   const float bottomPad = 8.0f;
   const float available = layout.content.Bottom() - feedStart - bottomPad;
   out.feedHeight = std::clamp(available, Metrics::kFeedMin, Metrics::kHomeFeedMax);
   const float feedY = std::max(feedStart,
                                layout.content.Bottom() - bottomPad - out.feedHeight);
+  const float panelShift = feedY - feedStart;
+  out.nav.box.y += panelShift;
+  out.eventsBox.y += panelShift;
+  for (auto& event : out.events) { event.box.y += panelShift; }
   (void)othersHeight;
   out.feedBox = Area{layout.content.x + 8.0f, feedY, inner, out.feedHeight};
 

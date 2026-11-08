@@ -241,14 +241,16 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
       idle_.nav.box.y += extra;
       idle_.eventsBox.y += extra;
       for (auto& event : idle_.events) { event.box.y += extra; }
-      if (idle_.docked) { idle_.dock.box.y += extra; }
-      const float lowerBottom = std::max({idle_.nav.box.Bottom(), idle_.eventsBox.Bottom(),
-                                          idle_.docked ? idle_.dock.box.Bottom() : 0.0f});
-      const float feedStart = lowerBottom + 20.0f;
+      const float lowerBottom = std::max(idle_.nav.box.Bottom(), idle_.eventsBox.Bottom());
+      const float feedStart = lowerBottom;
       const float available = layout_.content.Bottom() - feedStart - 8.0f;
       idle_.feedHeight = std::clamp(available, Metrics::kFeedMin, Metrics::kHomeFeedMax);
       idle_.feedBox.y = std::max(feedStart,
                                  layout_.content.Bottom() - 8.0f - idle_.feedHeight);
+      const float panelShift = idle_.feedBox.y - feedStart;
+      idle_.nav.box.y += panelShift;
+      idle_.eventsBox.y += panelShift;
+      for (auto& event : idle_.events) { event.box.y += panelShift; }
       idle_.feedBox.h = idle_.feedHeight;
     }
     rng_ = seeded;
@@ -732,8 +734,10 @@ ShellView::ExteriorLayout ShellView::BuildExteriorLayout(const Simulation& sim, 
     const bool left = i < rows;
     const std::size_t row = left ? i : i - rows;
     const float rowT = rows > 1 ? static_cast<float>(row) / static_cast<float>(rows - 1) : 0.0f;
-    const float rowFraction = rows == 3 ? 1.11f * rowT - 0.42f * rowT * rowT
-                                        : 0.69f * rowT;
+    const float rowFraction = rows == 3
+        ? (left ? 1.11f * rowT - 0.42f * rowT * rowT
+                : 0.884f * rowT - 0.216f * rowT * rowT)
+        : 0.69f * rowT;
     ExteriorCallout item;
     item.id = rooms[i].id;
     item.lines = std::move(labels[i]);
@@ -879,15 +883,14 @@ void ShellView::PaintIdle(Simulation& sim) {
     }
   }
   paintStrip(idle_.nav);
-  if (idle_.docked) { paintStrip(idle_.dock); }
   for (const HomeEventCard& event : idle_.events) {
     const Area& box = event.box;
     DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
                   static_cast<int>(box.w), static_cast<int>(box.h), ToRay(theme.palette.panel));
     DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
                        static_cast<int>(box.w), static_cast<int>(box.h), ToRay(theme.palette.border));
-    Text("Events", static_cast<int>(box.x + 8.0f), static_cast<int>(box.y + 6.0f),
-         TypePx(11), ToRay(theme.palette.muted));
+    Text(event.heading.c_str(), static_cast<int>(box.x + 8.0f),
+         static_cast<int>(box.y + 6.0f), TypePx(11), ToRay(theme.palette.muted));
     const auto lines = WrapText(event.label, std::max(1.0f, box.w - 16.0f),
                                 TypePx(13), SelectFont(TypePx(13), false));
     float eventY = box.y + 6.0f + TypePx(11) + 6.0f;
@@ -3505,17 +3508,14 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
       }
       return;
     }
-    if (idle_.docked && idle_.dock.box.Contains(x, y + scrollY)) {
-      if (button == HitButton::Right) {
-        OpenTask(sim, "station", sim.Map().here, false);
-      } else {
-        OpenBriefing(sim, "station", sim.Map().here);
-      }
-      return;
-    }
     for (const HomeEventCard& event : idle_.events) {
       if (!event.box.Contains(x, y + scrollY)) { continue; }
-      if (!event.id.empty()) { OpenTask(sim, "event", event.id, false); }
+      if (event.station) {
+        if (button == HitButton::Right) { OpenTask(sim, "station", event.id, false); }
+        else { OpenBriefing(sim, "station", event.id); }
+      } else if (!event.id.empty()) {
+        OpenTask(sim, "event", event.id, false);
+      }
       return;
     }
   }

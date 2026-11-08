@@ -51,7 +51,7 @@ struct Metrics {
   static constexpr float kStageH = 460.0f;
   static constexpr float kStageCompactW = 600.0f;
   static constexpr float kStageCompactH = 365.0f;
-  static constexpr float kHomeStageMinH = 410.0f;
+  static constexpr float kHomeStageMinH = 520.0f;
   static constexpr float kMapH = 500.0f;        // STAGE.map ceiling
   static constexpr float kMapParkH = 240.0f;    // layoutNav() parks here
   static constexpr float kTabH = 27.0f;         // .tab height

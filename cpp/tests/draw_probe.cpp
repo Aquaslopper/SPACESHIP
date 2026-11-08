@@ -882,6 +882,12 @@ int main() {
         };
         Require(model.stats.front().box.h <= (step == 0 ? 64.0f : 74.0f),
                 "Ship-system gauge panels were not compacted");
+        Require(model.stageArea.h >= ship::Metrics::kHomeStageMinH &&
+                    model.nav.box.y >= model.infos.front().box.Bottom() + 10.0f &&
+                    model.eventsBox.y == model.nav.box.y,
+                "The six small Home panels are not grouped below the centered ship stage");
+        Require(model.feedBox.y == std::max(model.nav.box.Bottom(), model.eventsBox.Bottom()),
+                "A blank gap remains between the six Home panels and Activity Feed");
         filledAt(model.stats.front().box.x, model.stats.front().box.y);
         const auto& navTitle = FindText("Navigation");
         const auto navSurface = std::find_if(rects.begin(), rects.end(), [&](const auto& r) {
@@ -928,6 +934,28 @@ int main() {
         Require(std::abs(feedSurface.y + feedSurface.h - (home.LayoutNow().content.Bottom() - 8.0f)) < 2.0f,
                 "Activity feed does not reach the bottom of the content panel");
       }
+    }
+
+    // Docking is represented inside one of the two event cards, not as a
+    // seventh panel under Navigation.
+    {
+      auto berthed = ship::Simulation::ReferenceVoyage(ship::Catalog::LoadFromAssets("assets"));
+      berthed.MutableState().docked = true;
+      ship::ShellView home;
+      home.Configure(1280, 900, ship::Theme::ById("classic"));
+      io.DisplaySize = ImVec2(1280, 900);
+      Frame(home, berthed);
+      const auto& dockedHeading = FindText("Docked");
+      const auto& feedHead = FindText("Activity Feed");
+      Require(dockedHeading.x > home.LayoutNow().content.x + 300.0f,
+              "Docked status was not placed in an Events card");
+      Require(feedHead.y >= dockedHeading.y + 20.0f,
+              "Activity Feed overlaps the dock/event cards");
+      const auto eventHeadingCount = std::count_if(texts.begin(), texts.end(), [&](const auto& text) {
+        return text.text == "Events" && text.x >= home.LayoutNow().content.x;
+      });
+      Require(eventHeadingCount == 1,
+              "Docked status did not occupy one of the two event slots");
     }
 
     // Exercise the real pointer paths and animation, not only their models.

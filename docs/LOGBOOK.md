@@ -284,3 +284,17 @@ You must append a compressed summary of **every single reply and action you take
 - **Limit:** No windowed GUI was launched; the capture layout is checked with the CPU painter/input recorder, not a fresh screenshot.
 - **Untouched:** `Legacy code_Spaceship.txt`, `assets/`, `rescue/`, and gameplay logic. The changes are follow-up work for the existing open PR #30.
 - **PR follow-up:** Pushed commit `931e319` to `arena/cb265de8-spaceship` and updated PR #30's summary and verification section to include the screenshot-alignment changes and final 125/125 test result.
+
+### Entry #020
+- **Timestamp:** 2026-11-08 00:05 UTC
+- **Task:** Follow the owner's latest Home screenshot corrections on the existing cockpit PR #30.
+- **Docking as an event (`IdleScreen.h/.cpp`, `Draw.cpp`):** Removed the separate Docked strip and its click path. Berth status and body name now occupy an event card; left/right clicks route to the existing station briefing/task.
+- **Events:** Every card carries an explicit heading; empty slots remain two independent Events cards, and live incidents keep their existing event-task route.
+- **Six-panel/feed relationship (`IdleScreen.cpp`, `Draw.cpp`):** The Home stage minimum is now 520px. Navigation and event cards are shifted lower into available space so the lower group sits directly above the bottom-anchored Activity Feed without an empty band.
+- **Room callouts (`Draw.cpp`):** The three-row left and right label curves differ, removing the previous mirror-aligned rhythm; dense room layouts retain their existing extra-stage spacing.
+- **Regression checks (`draw_probe.cpp`):** Added stage/panel grouping, zero-gap feed adjacency, and docked-event placement checks; the feed is verified not to overlap the dock/event cards.
+- **Build:** `PATH="/tmp/spaceship-test-venv/bin:$PATH" cmake --build build --parallel 2` passed.
+- **Draw recorder:** `./tools/check-draw.sh` passed against the real `Draw.cpp` with the pinned raylib 6.0 / Dear ImGui 1.92.7 / rlImGui sources.
+- **Full tests:** `ctest --test-dir build --output-on-failure` passed **125/125**, including GUI syntax, ImGui input, and native draw recorder; `git diff --check` passed.
+- **Visual limit:** No windowed client or new screenshot was captured; these checks verify source compilation and recorded painter/input geometry, not the rendered cockpit on a display.
+- **Scope:** Follow-up to the open PR #30 on `arena/cb265de8-spaceship`; `Legacy code_Spaceship.txt`, `assets/`, `rescue/`, simulation behavior, and gameplay rules remain untouched.
