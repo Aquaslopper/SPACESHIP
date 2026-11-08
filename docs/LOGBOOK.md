@@ -1028,3 +1028,27 @@ Probe `/home/user/probe/themes`, contrast and saturation for all five:
 Every theme is at least as rich as classic and none lost contrast; `failures=0`.
 What is not proved: how any of it looks. No raylib here, so the boolean is "as deep
 as parchment by the numbers", not "I have seen it".
+
+## 059 — The delivery buttons, said plainly
+
+A delivery is not a promise to fetch something later. The station loads the
+consignment into the hold the moment the contract is signed: the crates are in your
+cargo bay before you undock, bound to that one buyer.
+
+So a delivery needs free space right then. The ship starts with cargo already
+aboard - about 32 of its 40 m3 - and the first consignment signed usually fills
+what is left. Every delivery row below it was still drawn alive, because the screen
+only greys a row that has already been accepted. Pressing one did nothing at all,
+with no line saying why.
+
+Measured: 83 delivery offers across the 30 stations, 61 of which could not fit.
+That is most of them, which is why it looked like the buttons were broken rather
+than the hold being full.
+
+The rows now do one of two things: live, or dark with "Hold full: needs X m3, Y m3
+free. Sell or unload first." Nothing was changed about the rule itself - the ship
+still must have room - only about whether the screen admits it.
+
+Still the owner's call, and this entry does not decide it: whether deliveries should
+be that heavy at all. Lighter consignments would let two or three be signed on one
+sailing, at the cost of the hold mattering less.
