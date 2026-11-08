@@ -1176,3 +1176,35 @@ in - not in whether the sim runs.
 Nothing changed in this entry. The fixes are a design decision, and the first one
 worth taking is the one he noticed: a board that holds still, and offers that mean
 something.
+
+## 064 — What in this build is a lie, and what is not
+
+The owner released and then said everything in it is a lie. Split it properly, because
+the split decides what the next week is.
+
+LIES, and they are the ones a player meets in the first hour:
+  - The trade board renames itself every 200 clicks whether or not anything happened.
+  - 30 stations share 8 price tables, so trading between them is arithmetic on the
+    same eight numbers.
+  - 48 systems are the same five bodies in the same arrangement.
+  - 7 goods, so every board reads alike.
+  - The station says "three kinds of work" while the third kind is empty until the
+    player has docked elsewhere.
+
+REAL, and it can be checked by playing badly:
+  - The engine wears 1% per four clicks, and letting it die is a real loss.
+  - Air has stages with health harm; a foul room hurts the crew.
+  - Four hunger clocks, meals of three food, a shelf the cook fills, starvation that
+    kills slowly.
+  - A navigator shortens a crossing by up to half.
+  - A delivery loads cargo into a 40 m3 hold and cannot be taken without room.
+
+The divide is not random. Everything the owner remembered and made me prove - the
+navigator's crossing, the 30-point meal, the 1-2-then-3 filters, the 24 rack, the
+machine's button - is real, because it came from him and was measured. Everything the
+port's generated data supplied - the five-body systems, the eight price tables, the
+seven goods, the epoch timer - is the lie, because nobody designed it, it was
+generated and never looked at.
+
+So the build is not hollow everywhere. It is a working machine with generated content
+poured in, and the generated part is what a player sees first.
