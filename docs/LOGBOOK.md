@@ -1402,3 +1402,43 @@ NOT VERIFIED
   No test suite ran. Draw.cpp still cannot compile without raylib, so nothing has
   been looked at. The older scale numbers for 1000 and 4000 systems still stand;
   they were measured before this change and have not been re-measured after it.
+
+## 070 — One thousand two hundred stars, and nothing may leave that range
+
+The owner set the number: twelve hundred stars, floor eight hundred, ceiling fifteen
+hundred. It is a clamp in the generator, not a convention: GenerateUniverse carries
+kMinSystems 800, kDefaultSystems 1200, kMaxSystems 1500 and clamps every request
+into that band, so no default, caller, environment variable or probe can ask for
+more or fewer.
+
+WHAT WAS WRONG BEFORE
+  - The loader imposed 180 in Catalog.cpp with a comment claiming a fixed count kept
+    every voyage on the same chart. Deleted. The seed and the star count now come
+    from the voyage, defaulting to the catalogue's own values.
+  - My previous default of 99999 is withdrawn by the owner's instruction. It booted
+    in 11.25s and held 710 MB; both numbers are in the record and neither is wanted.
+  - The island join walked a string-keyed union-find without path compression. At
+    twenty thousand systems it cost 6.8 of the 8.28 seconds the build took. Replaced
+    with an index union-find with path compression.
+  - Three-nearest lanes sorted a few hundred candidates per star. Now kept by hand in
+    three slots, which took the fifty-thousand case from 7.28s to 3.61s.
+  - Region count was capped at ten, which is why a hundred thousand stars still read
+    as seven places. Places now scale with the stars (one per sixty systems), gap
+    shrinking with the count, capped at 240.
+
+MEASURED AT THE OWNER'S NUMBER
+  1200 systems -> 6784 bodies, 830 ports, 3361 lanes, 23 regions, boot 0.02s, 12 MB
+  1200 in a voyage -> 7422 bodies, 968 ports, 3385 lanes; Kessler resolves; 968
+  distinct price tables for 968 ports; validator problems 0
+  shapes 3..20 bodies per system; work per station 1..5, average 3.7
+  same seed twice identical; seed "kessler" 1199 of 1199 names differ from seed 1
+  deliveries on the board 3, taken 1
+  clamp proof: 7 -> 800 systems, 99999 -> 1500, 50000 -> 1500, 800 -> 800, 1500 -> 1500
+
+PLAYER CONTROL
+  Simulation::NewVoyage(catalog, "kessler") chooses the sky; the harness has
+  `seed <words>` and `size <n>` for the same two choices. Size is clamped by the
+  generator, so the harness prints the count it actually got.
+
+NOT VERIFIED: no test suite ran (catch2 absent, no approval); nothing painted has been
+seen, because Draw.cpp needs raylib.

@@ -233,7 +233,8 @@ const MapGeometry& BoardFor(const Catalog& catalog, const char* layer) {
 }  // namespace
 
 void GenerateUniverse(Catalog& catalog, std::uint64_t seed, int systemCount) {
-  if (systemCount < 8) { systemCount = 8; }
+  // Hard floor and ceiling: this is the count the chart is allowed to have.
+  systemCount = std::clamp(systemCount, kMinSystems, kMaxSystems);
   Rng rng(seed);
 
   const MapGeometry& board = BoardFor(catalog, "sector");
@@ -259,8 +260,14 @@ void GenerateUniverse(Catalog& catalog, std::uint64_t seed, int systemCount) {
   // Dots placed with a minimum gap, so the chart has distinct places rather than
   // a stipple. A region's spread decides how many systems it can hold and how far
   // its lanes reach.
-  const int regionCount = std::clamp(3 + systemCount / 45, 3, 10);
-  const double minGap = 0.27 * std::min(boardW, boardH);
+  // Places scale with the stars: a chart of a hundred thousand systems is not ten
+  // enormous neighbourhoods, it is hundreds of small ones. The gap between region
+  // dots shrinks as they multiply, down to the radius that lets the dots be told
+  // apart on the galaxy board.
+  const int regionCount = std::clamp(3 + systemCount / 60, 3, 240);
+  const double areaPerRegion = (boardW * boardH) / static_cast<double>(regionCount);
+  const double minGap =
+      std::min(0.27 * std::min(boardW, boardH), 1.02 * std::sqrt(areaPerRegion));
 
   std::vector<RegionPlan> regions;
   regions.reserve(static_cast<std::size_t>(regionCount));
@@ -493,28 +500,48 @@ void GenerateUniverse(Catalog& catalog, std::uint64_t seed, int systemCount) {
         .push_back(&system);
   }
 
+  std::vector<const Body*> best3(3, nullptr);
+  std::vector<double> bestD(3, 1e18);
   for (const Body& system : catalog.systems) {
+    // Three nearest, kept by hand: sorting a few hundred candidates for every
+    // star is what made this pass cost seconds instead of fractions of one.
+    best3.assign(3, nullptr);
+    bestD.assign(3, 1e18);
     const GridKey centre{static_cast<int>(system.x / cellSize),
                          static_cast<int>(system.y / cellSize)};
-    std::vector<std::pair<double, const Body*>> found;
-    for (int ring = 1; ring <= 6 && found.size() < 4; ++ring) {
-      found.clear();
+    int found = 0;
+    for (int ring = 1; ring <= 6 && found < 4; ++ring) {
+      found = 0;
+      best3.assign(3, nullptr);
+      bestD.assign(3, 1e18);
       for (int i = centre.x - ring; i <= centre.x + ring; ++i) {
         for (int j = centre.y - ring; j <= centre.y + ring; ++j) {
           const auto it = grid.find(GridKey{i, j});
           if (it == grid.end()) { continue; }
           for (const Body* other : it->second) {
             if (other == &system || other->region != system.region) { continue; }
-            found.emplace_back((other->x - system.x) * (other->x - system.x) +
-                                   (other->y - system.y) * (other->y - system.y),
-                               other);
+            ++found;
+            const double dx = other->x - system.x;
+            const double dy = other->y - system.y;
+            const double d = dx * dx + dy * dy;
+            for (int slot = 0; slot < 3; ++slot) {
+              if (d < bestD[slot]) {
+                for (int move = 2; move > slot; --move) {
+                  bestD[move] = bestD[move - 1];
+                  best3[move] = best3[move - 1];
+                }
+                bestD[slot] = d;
+                best3[slot] = other;
+                break;
+              }
+            }
           }
         }
       }
     }
-    std::sort(found.begin(), found.end(),
-              [](const auto& a, const auto& b) { return a.first < b.first; });
-    for (std::size_t k = 0; k < found.size() && k < 3; ++k) { link(system.id, found[k].second->id); }
+    for (int slot = 0; slot < 3; ++slot) {
+      if (best3[slot] != nullptr) { link(system.id, best3[slot]->id); }
+    }
 
     // The long jump is drawn, not searched: a neighbour picked at random from the
     // region reaches the far side of a big cluster without walking it.
@@ -564,25 +591,32 @@ void GenerateUniverse(Catalog& catalog, std::uint64_t seed, int systemCount) {
     }
   }
 
-  // ---- 5. no islands --------------------------------------------------------
-  // Bridge lanes are drawn by region, so two clusters inside one wide region can
-  // still end up unconnected. Walk the lane graph and join every island to the
-  // main one by its nearest pair, so a chart of any size can be flown end to end.
+  // ---- 5. no islands ------------------------------------------------------
+  // Union-find over system indices, with path compression: string-keyed parents
+  // walked without compression turned a chart of twenty thousand stars into a
+  // seven-second stall, and a bigger one into a hang.
   {
-    std::map<std::string, std::string> parent;
-    for (const Body& system : catalog.systems) { parent[system.id] = system.id; }
-    std::function<std::string(const std::string&)> root = [&](const std::string& id) {
-      std::string here = id;
-      while (parent[here] != here) { here = parent[here]; }
-      return here;
+    std::map<std::string, std::size_t> indexOf;
+    for (std::size_t i = 0; i < catalog.systems.size(); ++i) {
+      indexOf[catalog.systems[i].id] = i;
+    }
+    std::vector<std::size_t> parent(catalog.systems.size());
+    for (std::size_t i = 0; i < parent.size(); ++i) { parent[i] = i; }
+    std::function<std::size_t(std::size_t)> root = [&parent, &root](std::size_t i) {
+      if (parent[i] != i) { parent[i] = root(parent[i]); }
+      return parent[i];
     };
     for (const Lane& lane : catalog.sectorLanes) {
-      const std::string a = root(lane.from);
-      const std::string b = root(lane.to);
-      if (a != b) { parent[a] = b; }
+      const auto a = indexOf.find(lane.from);
+      const auto b = indexOf.find(lane.to);
+      if (a == indexOf.end() || b == indexOf.end()) { continue; }
+      const std::size_t left = root(a->second);
+      const std::size_t right = root(b->second);
+      if (left != right) { parent[left] = right; }
     }
-    std::map<std::string, std::vector<const Body*>> islands;
-    for (const Body& system : catalog.systems) { islands[root(system.id)].push_back(&system); }
+
+    std::map<std::size_t, std::vector<std::size_t>> islands;
+    for (std::size_t i = 0; i < parent.size(); ++i) { islands[root(i)].push_back(i); }
     if (islands.size() > 1) {
       // The island holding the most systems is the one everything joins. The
       // bridge is drawn, not optimised: joining every island to the main chart
@@ -593,11 +627,11 @@ void GenerateUniverse(Catalog& catalog, std::uint64_t seed, int systemCount) {
       }
       for (auto it = islands.begin(); it != islands.end(); ++it) {
         if (it == main) { continue; }
-        const Body* inside = it->second[static_cast<std::size_t>(rng.Below(
-            static_cast<int>(it->second.size())))];
-        const Body* outside = main->second[static_cast<std::size_t>(rng.Below(
-            static_cast<int>(main->second.size())))];
-        if (inside != nullptr && outside != nullptr) { link(inside->id, outside->id); }
+        const std::size_t inside =
+            it->second[static_cast<std::size_t>(rng.Below(static_cast<int>(it->second.size())))];
+        const std::size_t outside =
+            main->second[static_cast<std::size_t>(rng.Below(static_cast<int>(main->second.size())))];
+        link(catalog.systems[inside].id, catalog.systems[outside].id);
       }
     }
   }

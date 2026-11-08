@@ -9,6 +9,7 @@
 //  Script syntax, one command per line, '#' starts a comment:
 //
 //    seed <words>         a new voyage on that sky — the player's own seed
+//    size <n>             how many stars that sky holds
 //    action [text]        performAction(text)      — spend one action
 //    seat <0|1|2>         startInstall(slot)       — carry a canister over
 //    bank                 turnOnFilter()           — throw the filter switch
@@ -149,7 +150,19 @@ int main(int argc, char** argv) {
     if (parts.empty()) { continue; }
     const std::string& command = parts[0];
 
-    if (command == "seed" && parts.size() >= 2) {
+    if (command == "size" && parts.size() >= 2) {
+      // How many stars the player wants. The chart is generated, so this is the
+      // only size there is: no table to cut short.
+      ship::Catalog sized = catalog;
+      sized.universeSystems = std::stoi(parts[1]);
+      sized.universeSeed = simulation.UniverseSeed();
+      sized.universeSeedText = simulation.UniverseSeedWords();
+      sized.chartExpanded = false;
+      simulation = ship::Simulation::NewVoyage(sized);
+      std::fprintf(stderr, "size %s: %zu systems, %zu docks, %zu regions\n", parts[1].c_str(),
+                   simulation.World().systems.size(), simulation.World().ports.size(),
+                   simulation.World().regions.size());
+    } else if (command == "seed" && parts.size() >= 2) {
       // A voyage on the player's own sky: the same words draw the same stars.
       simulation = ship::Simulation::NewVoyage(catalog, parts[1]);
       std::fprintf(stderr, "seed '%s': %zu systems, %zu docks\n", parts[1].c_str(),

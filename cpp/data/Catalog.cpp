@@ -541,13 +541,17 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
 
   // ---- the galaxy itself --------------------------------------------------
   // The authored chart was a table of forty-eight rows; this replaces systems,
-  // worlds, stations and lanes with a sky generated from one seed. Until the
-  // player can type a seed, a fixed one keeps every voyage on the same chart.
-  std::uint64_t universeSeed = 1;
+  // worlds, stations and lanes with a sky generated from one seed. The seed and
+  // the star count belong to the voyage, not to the loader: a new voyage passes
+  // the words the player typed and the size the player asked for. These two
+  // environment variables are the head-less harness's way of doing the same.
+  std::uint64_t universeSeed = catalog.universeSeed;
+  if (universeSeed == 0) { universeSeed = 1; }
   if (const char* env = std::getenv("SPACESHIP_SEED"); env != nullptr && env[0] != '\0') {
     universeSeed = SeedFromText(env);
+    catalog.universeSeedText = env;
   }
-  int generatedSystems = 180;
+  int generatedSystems = catalog.universeSystems;
   if (const char* env = std::getenv("SPACESHIP_SYSTEMS"); env != nullptr && env[0] != '\0') {
     generatedSystems = std::atoi(env);
   }

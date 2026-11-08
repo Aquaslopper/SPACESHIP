@@ -77,7 +77,10 @@ class Catalog {
   // The seed the generated universe was built from.
   std::uint64_t universeSeed = 0;        // the hash the sky was drawn from
   std::string universeSeedText;          // the words the player typed, as typed
-  int universeSystems = 180;
+  // The chart the owner asked for: one thousand two hundred stars, with eight
+  // hundred as the floor and fifteen hundred as the ceiling. GenerateUniverse
+  // clamps to that range, so this value cannot put the chart outside it.
+  int universeSystems = 1200;
 
   // Where each system sits on the galaxy board (ChartExpansion::PlaceGalaxyDots).
   // A system has one position, in its own region's cluster; the galaxy scale
