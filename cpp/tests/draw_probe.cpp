@@ -220,6 +220,54 @@ int main() {
       Require(nav.Map().layer == "sector", "Map layer hit missed its painted control");
     }
 
+    // A region must win the click against the stars drawn inside it. Every
+    // galaxy carries a cluster of star dots in its own footprint, and the flat
+    // hit list is searched from the END, so before the hit order was pinned a
+    // click on any galaxy selected one of its stars instead - and with no
+    // region selected the "View ... sector chart" row never appeared, which is
+    // what made a jump to another galaxy impossible.
+    {
+      auto far = ship::Simulation::ReferenceVoyage(sim.World());
+      ship::ShellView galaxy;
+      galaxy.Configure(1280, 720, ship::Theme::ById("classic"));
+      ship::OpenTask(far, "nav", "main", true);
+      far.SetLayer("galaxy");
+      Frame(galaxy, far);
+      const ship::NavChartView chart = ship::BuildNavChart(far);
+      // The chart body sits in a frame of its own logical size; the painter
+      // stretches it onto that box. Map chart coordinates to the glass the way
+      // PaintNavScreen does, or the click lands in empty space.
+      const ship::NavRaster raster = ship::BuildNavRaster(far);
+      // The frame is filled with the classic palette's chart surface (#ece2d1).
+      const auto frame = std::find_if(rects.rbegin(), rects.rend(), [&](const RectCall& r) {
+        return r.color.r == 236 && r.color.g == 226 && r.color.b == 209 && r.w > 200.0f;
+      });
+      Require(frame != rects.rend(), "The chart frame was not painted");
+      const float sx = frame->w / static_cast<float>(raster.width == 0 ? 1 : raster.width);
+      const float sy = frame->h / static_cast<float>(raster.height == 0 ? 1 : raster.height);
+
+      // Stay clear of the zoom/layer stack pinned over the chart's top-right
+      // corner; those genuinely are above the chart and take the click first.
+      for (const char* regionId : {"gal-gen-1", "gal-gen-6", "gal-core"}) {
+        const auto mine = std::find_if(chart.bodies.begin(), chart.bodies.end(),
+            [&](const ship::NavBodyView& b) { return b.id == regionId; });
+        Require(mine != chart.bodies.end(), "A charted galaxy was not painted");
+        far.SelectTarget("");
+        galaxy.Click(far, frame->x + static_cast<float>(mine->at.x) * sx,
+                     frame->y + static_cast<float>(mine->at.y) * sy, ship::HitButton::Left, 0);
+        Require(far.State().navTarget.value_or("") == regionId,
+                "Clicking a galaxy selected a star inside it instead of the galaxy");
+        Frame(galaxy, far);
+        // With the region held, the free row that opens its sector chart exists.
+        bool offered = false;
+        for (const auto& row : ship::BuildNavScreen(far).screen.commands) {
+          if (row.label.find("sector chart") != std::string::npos) { offered = true; }
+        }
+        Require(offered, "A selected galaxy offered no way to open its sector chart");
+      }
+      Require(far.ActionCount() == 0, "Selecting a galaxy spent an action");
+    }
+
     // Free handbook selection and reveal do not produce action feedback; the
     // selected article stays in view as the index scrolls and its controls
     // remain clickable at the translated position.
