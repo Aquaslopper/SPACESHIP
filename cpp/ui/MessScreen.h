@@ -1,8 +1,8 @@
 // ============================================================================
 //  MessScreen.h — the galley (Section I-4c).
 //  ---------------------------------------------------------------------------
-//  A fixed 600x360 counter: the rack gauge, and four plates - one per hand, each
-//  on its own hunger clock. One moving part, watched by five clocks at once.
+//  A fixed 600x360 galley: cooked-food stock, four plates on separate hunger
+//  clocks, and the dry-ration input rack beneath the crew.
 // ============================================================================
 #pragma once
 
@@ -32,7 +32,7 @@ struct MessScreenModel {
 
 MessScreenModel BuildMessScreen(const Simulation& sim);
 
-// The stage alone, for counting: 28 scenery parts.
+// The stage alone, including the live cooked-food and dry-ration stock icons.
 TaskStage BuildMessMachine(const Simulation& sim);
 
 }  // namespace ship

@@ -220,7 +220,7 @@ std::vector<SideBlock> SideBlocks(const Simulation& sim) {
   const std::vector<std::pair<std::string, std::string>> res = {
       {"Shiplets", Num(state.shiplets)},
       {"Fuel cells", Num(state.fuelCells)},
-      {"Rations", Num(sim.MessRack())},
+      {"Dry rations", Num(sim.MessRations())},
       {"Repair kits", Num(state.repairKits)},
       {"Medkits", Num(state.medkits)},
       {"O2 tanks", Num(sim.Life().canisters)},

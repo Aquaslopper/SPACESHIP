@@ -4,7 +4,7 @@
 //  A project is a draw on the reserve, a cargo lot consumed, and four or five
 //  actions of work that pause the instant the batteries are empty. The block
 //  rules are the interesting part: a project that would make a canister the rack
-//  has no room for, or rations the galley cannot hold, is refused before a
+//  has no room for, or dry rations the larder cannot hold, is refused before a
 //  single shiplet or action is spent.
 // ============================================================================
 #include "core/JsNumber.h"
@@ -67,8 +67,9 @@ std::string Simulation::ProjectBlock(const std::string& id) const {
       }() >= life_.capacity) {
     return "The canister rack is full or reserved for an installation.";
   }
-  if (id == "food" && (mess_.rack > mess_.capacity - 8 || FindOngoing("cook") != nullptr)) {
-    return "Needs space for eight rations and an idle galley.";
+  if (id == "food" && (mess_.rations > mess_.rationCapacity - 8 ||
+                       FindOngoing("cook") != nullptr)) {
+    return "Needs room for eight dry rations in the larder and an idle galley.";
   }
   if (id == "brace" && StatValue("hull") >= 100) { return "The hull is already sound."; }
   if (id == "cooling" && (state_.engineCondition >= 100 || MaintRunning())) {
@@ -212,7 +213,7 @@ bool Simulation::StartSocial(const std::string& a, const std::string& b) {
   if (CrewBusy(*one) != nullptr || CrewBusy(*two) != nullptr) { return false; }
   if (FindOngoing("project-social") != nullptr || mess_.rack < 2 || !state_.gameOver.empty()) { return false; }
 
-  mess_.rack -= 2;
+  mess_.rack -= 2;  // a shared meal is eaten off the counter
   crewClaims_[a] = true;
   crewClaims_[b] = true;
   const std::string names = one->name + " and " + two->name;
@@ -244,8 +245,8 @@ void Simulation::ProjectDone(Task& task) {
   }
   if (id == "fuel") { state_.fuelCells += 1; text = "The reserve crew refined a fuel cell."; }
   if (id == "food") {
-    mess_.rack = std::min(mess_.capacity, mess_.rack + 8);
-    text = "The hydroponics crew processed produce into rations.";
+    mess_.rations = std::min(mess_.rationCapacity, mess_.rations + 8);
+    text = "The hydroponics crew processed produce into dry rations.";
   }
   if (id == "brace") { ClampStat("hull", 15); text = "Damage control patched the hull with recovered material."; }
   if (id == "cooling") {

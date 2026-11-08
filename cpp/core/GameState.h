@@ -112,7 +112,7 @@ struct Task {
   std::string other;  // second person (shared meals)
 
   double slot = -1;   // o2slot: which of the three slots
-  double rate = 0;    // cook: rations per action
+  double rate = 0;    // preserved task-rate field for older saved tasks
   double vol = 0;     // salvage: cubic metres held
   std::string payload;  // observe: the body recorded; dream: unused
 
@@ -329,8 +329,10 @@ struct Cargo {
 };
 
 struct Mess {
-  double rack = 18;
-  double capacity = 24;
+  double rack = 18;       // cooked food on the galley counter
+  double capacity = 24;   // the counter's ceiling
+  double rations = 21;    // dry rations in the larder - spent one per batch
+  double rationCapacity = 24;
 };
 
 // An open task tab. The reference keeps these as objects so a restored voyage

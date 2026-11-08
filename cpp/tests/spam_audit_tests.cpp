@@ -478,6 +478,8 @@ TEST_CASE("station purchases are money only: no action, no lock, the counter sta
   CHECK(fuelRow().enabled);                      // the counter is still open
   // Rebuilding/reading a screen must never tick the action clock.
   for (int read = 0; read < 12; ++read) { CHECK(fuelRow().remaining == 0); }
+  // Six dry rations can only be bought when the separate larder has room.
+  sim.MutableMess().rations = 18.0;
   const char* others[] = {"buy-repair", "buy-medkit", "buy-canister", "buy-rations"};
   for (int i = 0; i < 4; ++i) {
     REQUIRE(ship::PressStationAction(sim, others[i]));

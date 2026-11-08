@@ -90,6 +90,8 @@ class Simulation {
   std::uint64_t FeedRevision() const { return feedRevision_; }
   double MessRack() const { return mess_.rack; }
   double MessCapacity() const { return mess_.capacity; }
+  double MessRations() const { return mess_.rations; }
+  double MessRationCapacity() const { return mess_.rationCapacity; }
   const GameState& State() const { return state_; }
   GameState& MutableState() { return state_; }
   const std::vector<CrewMember>& Crew() const { return crew_; }
@@ -456,6 +458,9 @@ class Simulation {
   bool o2Claim_ = false;
   bool cookClaim_ = false;
   std::string projectClaim_;
+  // The cook keeps going: once a batch is off the pot she starts the next one
+  // until the counter is full, without waiting for the player to press again.
+  bool cookRestock_ = false;  // a chain the cook herself started
   std::map<std::string, bool> crewClaims_;
 };
 

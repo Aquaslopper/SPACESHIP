@@ -270,7 +270,7 @@
       "id": "care",
       "link": "mess",
       "linkLabel": "Open Mess Hall",
-      "text": "Crew eat from the ration rack on their own staggered clocks. With no food, hunger rises and severe hunger damages health. The galley cooks and Hydroponics turns produce into rations. Medical Bay treatment uses a medkit and energy; the slower medical order in Crew Quarters needs no medkit.",
+      "text": "Crew eat cooked food from the galley counter on their own staggered clocks. With no cooked food, hunger rises; severe hunger damages health. The galley cooks dry rations into cooked food, and Hydroponics turns produce into dry rations. Medical Bay treatment uses a medkit and energy; the slower medical order in Crew Quarters needs no medkit.",
       "title": "Food and medicine"
     },
     {
@@ -344,13 +344,13 @@
     {
       "group": "Ship systems",
       "id": "rooms",
-      "text": "Workshop makes repair kits; Recyclers make canisters; Fuel Reserve refines cells; Damage Control patches the hull. Each uses salvage and power. Hydroponics converts produce to rations, Thermal Control stabilizes the drive, and the Medical Bay treats crew. Inputs are consumed at the start; powered work pauses without energy.",
+      "text": "Workshop makes repair kits; Recyclers make canisters; Fuel Reserve refines cells; Damage Control patches the hull. Each uses salvage and power. Hydroponics makes dry rations from produce, and the Galley turns them into cooked food for the counter; Thermal Control stabilizes the drive, and the Medical Bay treats crew. Inputs are consumed at the start; powered work pauses without energy.",
       "title": "Fitted rooms and production"
     },
     {
       "group": "Ship systems",
       "id": "interlocks",
-      "text": "Cargo recovery reserves hold space while it runs. Canister and ration production reserve their output space. Hydroponics cannot overlap cooking, and Thermal Control cannot overlap engine maintenance. Crew cannot be assigned to simultaneous medical, social, incident or order work. Check the room's status when an action is unavailable.",
+      "text": "Cargo recovery reserves hold space while it runs. Canister and dry-ration production reserve their output space. Hydroponics cannot overlap Galley cooking, and Thermal Control cannot overlap engine maintenance. Crew cannot be assigned to simultaneous medical, social, incident or order work. Check the room's status when an action is unavailable.",
       "title": "Reservations and space"
     },
     {

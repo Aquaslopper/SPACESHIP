@@ -43,12 +43,29 @@ struct LifeRules {
   double capacity = 10;  // canisters the rack holds
 };
 
+// The galley, as the owner specified it. Two stores, not one:
+//   mess.rack     the cooked food sitting on the galley counter
+//   mess.rations  dry rations in the larder - one is spent per batch cooked,
+//                 and only buying or producing rations adds to it
+//
+// The whole room is one cycle of the crew's own clock, and it adds up exactly:
+//   hunger climbs 15 over a hand's 25 clicks; one food drains 5 of it, so a
+//   meal is 3 food and four fully fed hands use 12 per round. The counter holds
+//   24 and automatic cooking starts below 10, but each batch takes five clicks
+//   and the dry-ration supply is finite; running out is not ruled out.
 struct MessRules {
-  double rackStart = 18;  // rations on the table at boot
-  double capacity = 24;   // the galley counter's hard ceiling
-  double every = 25;      // each crew member's own hunger clock
-  double starveAt = 90;   // hunger at which health starts to go
+  double rackStart = 18;    // food on the galley counter at boot
+  double capacity = 24;     // the counter's hard ceiling - two crew rounds
+  double every = 25;        // each crew member's own hunger clock
+  double starveAt = 90;     // hunger at which health starts to go
   double starveEvery = 8;
+  double rationStart = 21;      // dry rations aboard at boot
+  double rationCapacity = 24;   // what the dry larder holds
+  double foodPerRation = 5;     // one dry ration yields this much cooked food
+  double cookBelow = 10;        // the cook starts once the counter is under this
+  double hungerPerMeal = 15;    // hunger gained over one full 25-click clock
+  double hungerPerFood = 5;     // one food drains this much hunger
+  double hungerFloor = 5;       // a hand stops eating here - hunger never vanishes
 };
 
 struct PayRules {

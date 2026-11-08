@@ -95,6 +95,8 @@ Simulation Simulation::NewVoyage(const Catalog& catalog) {
   // ---- the ration counter and the hold ----------------------------------
   sim.mess_.rack = catalog.rules.mess.rackStart;
   sim.mess_.capacity = catalog.rules.mess.capacity;
+  sim.mess_.rations = catalog.rules.mess.rationStart;
+  sim.mess_.rationCapacity = catalog.rules.mess.rationCapacity;
   sim.cargo_.capacity = sim.ShipCargoCapacity("wren", 0);
 
   // ---- the hull the crew are standing in ---------------------------------
@@ -401,20 +403,24 @@ bool Simulation::StartMaintenanceSelf() {
 }
 
 bool Simulation::StartCookingSelf() {
-  // startCook(e, "cook", "the commander"): refuses a full rack, refuses a
-  // second pot. Rate follows the assigned cook's jobAt, falling back to 1
-  // when nobody holds the kitchen job - matches Spaceship.hta roomMess().
+  // Cooking a batch spends one dry ration up front; up to foodPerRation cooked
+  // food lands together when the fixed foodPerRation-action timer completes.
+  // Refuse a full counter or an empty larder.
   if (mess_.rack >= mess_.capacity) {
-    LogLine("Cooking refused - the rack is already full.");
+    LogLine("Cooking refused - the galley counter is already full.");
+    return false;
+  }
+  if (mess_.rations < 1.0) {
+    LogLine("Cooking refused - there are no dry rations in the larder.");
     return false;
   }
   if (FindOngoing("cook") != nullptr || FindOngoing("project-food") != nullptr) {
     return false;
   }
 
-  const CrewMember* cook = Cook();
-  const double rate = cook ? cook->jobAt : 1.0;
-  const double cost = CrewCost(std::ceil((mess_.capacity - mess_.rack) / rate));
+  // The green bar fills for foodPerRation actions; cooked food lands together
+  // when the batch finishes, not as it runs.
+  const double cost = rules_.mess.foodPerRation;
 
   cookClaim_ = true;
   PerformAction("Cooking begun by the commander");
@@ -425,7 +431,10 @@ bool Simulation::StartCookingSelf() {
   Task* task = AddOngoing("cook", "Cooking - the commander", cost, "cook", "mess");
   if (task != nullptr) {
     task->by = "the commander";
-    task->rate = rate;
+    mess_.rations -= 1.0;  // the ration is spent when the batch starts
+    // Carrying on to a full rack is allowed: one dry ration per batch, until
+    // the cooked-food counter is stocked.
+    cookRestock_ = true;
   }
   return true;
 }

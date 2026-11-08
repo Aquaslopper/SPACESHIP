@@ -60,6 +60,57 @@ void PaintProgressFill(const Area& box, double percent) {
           static_cast<unsigned char>(rgb), 255};
 }
 
+bool PaintMessStockIcon(const MachinePart& part, const Area& origin) {
+  const bool cookedFood = part.cls == "mess-food-bottle";
+  const bool dryRation = part.cls == "mess-ration-pack";
+  if (!cookedFood && !dryRation) { return false; }
+
+  const float x = origin.x + part.box.x;
+  const float y = origin.y + part.box.y;
+  const float w = part.box.w;
+  const float h = part.box.h;
+  if (w <= 0.0f || h <= 0.0f) { return true; }
+
+  const ::Color outline = cookedFood ? ::Color{107, 125, 80, 255}
+                                      : ::Color{140, 111, 78, 255};
+  const ::Color shell = cookedFood ? ::Color{223, 236, 205, 255}
+                                    : ::Color{243, 230, 207, 255};
+  const ::Color label = ::Color{250, 247, 242, 255};
+  if (cookedFood) {
+    const Rectangle neck{x + w * 0.32f, y + h * 0.10f,
+                         w * 0.36f, h * 0.37f};
+    DrawRectangleRounded(neck, 0.25f, 6, shell);
+    DrawRectangleRoundedLinesEx(neck, 0.25f, 6, 1.0f, outline);
+
+    const Rectangle body{x + w * 0.10f, y + h * 0.31f,
+                         w * 0.80f, h * 0.65f};
+    DrawRectangleRounded(body, 0.28f, 6, shell);
+    DrawRectangleRoundedLinesEx(body, 0.28f, 6, 1.0f, outline);
+
+    const Rectangle band{x + w * 0.22f, y + h * 0.56f,
+                         w * 0.56f, h * 0.19f};
+    DrawRectangleRec(band, label);
+    const Rectangle cap{x + w * 0.25f, y + h * 0.02f,
+                        w * 0.50f, h * 0.14f};
+    DrawRectangleRounded(cap, 0.18f, 4, ::Color{127, 145, 97, 255});
+  } else {
+    const Rectangle pack{x + w * 0.10f, y + h * 0.10f,
+                         w * 0.80f, h * 0.86f};
+    DrawRectangleRounded(pack, 0.14f, 4, shell);
+    DrawRectangleRoundedLinesEx(pack, 0.14f, 4, 1.0f, outline);
+    DrawLineEx({pack.x + 1.0f, pack.y + 2.0f},
+               {pack.x + pack.width / 2.0f, pack.y + pack.height * 0.20f},
+               1.0f, outline);
+    DrawLineEx({pack.x + pack.width - 1.0f, pack.y + 2.0f},
+               {pack.x + pack.width / 2.0f, pack.y + pack.height * 0.20f},
+               1.0f, outline);
+    const Rectangle label{x + w * 0.24f, y + h * 0.48f,
+                          w * 0.52f, h * 0.22f};
+    DrawRectangleRec(label, ::Color{228, 219, 203, 255});
+  }
+  return true;
+}
+
 // WrapText(): greedy wrapping by measured width, so a long paragraph in a
 // dialog or an article breaks where the reference's CSS would break it.
 std::vector<std::string> WrapText(const std::string& text, float width, int size,
@@ -1205,6 +1256,7 @@ void ShellView::PaintStage(const TaskStage& stage, const Area& origin) {
   DrawRectangleLines(static_cast<int>(origin.x), static_cast<int>(origin.y),
                      static_cast<int>(stage.width), static_cast<int>(stage.height), edge);
   for (const MachinePart& part : stage.parts) {
+    if (PaintMessStockIcon(part, origin)) continue;
     if (PaintScenePart(part, origin)) continue;
     const int x = static_cast<int>(origin.x + part.box.x);
     const int y = static_cast<int>(origin.y + part.box.y);

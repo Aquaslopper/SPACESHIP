@@ -126,7 +126,14 @@
   },
   "mess": {
     "capacity": 24,
-    "rack": 18
+    "rack": 18,
+    "rations": 21,
+    "rationCapacity": 24,
+    "foodPerRation": 5,
+    "cookBelow": 10,
+    "hungerPerMeal": 15,
+    "hungerPerFood": 5,
+    "hungerFloor": 5
   },
   "messEvery": 25,
   "messStarve": 90,
@@ -142,7 +149,7 @@
     },
     {
       "from": "rations",
-      "label": "Rations"
+      "label": "Dry rations"
     },
     {
       "from": "repairKits",
@@ -222,5 +229,6 @@
     "star": 140,
     "station": 90,
     "system": 0
-  }
+  },
+  "hungerFloor": 5
 }

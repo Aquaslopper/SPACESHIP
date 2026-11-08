@@ -143,9 +143,10 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
 
   if (roomId == "r13") {
     model.body.Note(
-        "A shared meal costs two rations and one action; it takes three more actions. It "
-        "strengthens the bond by 12 (+2 for a shared name anchor) and gives each person 4 "
-        "morale. Strong bonds help morale; strained bonds hurt it.");
+        "A shared meal uses two units of cooked food from the galley counter and one action; it "
+        "takes three more actions. It strengthens the bond by 12 (+2 for a shared name "
+        "anchor) and gives each person 4 morale. Strong bonds help morale; strained bonds "
+        "hurt it.");
     if (sim.Crew().size() < 2) {
       model.body.Dim("At least two crew members are needed.");
       return model;
@@ -270,7 +271,10 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
       model.body.Field("Maintenance", sim.MaintRunningAny() ? "In progress" : "Available");
     }
     if (roomId == "r8") {
-      model.body.Field("Rations", Num(sim.MessRack()) + " / " + Num(sim.MessCapacity()));
+      model.body.Field("Dry rations", Num(sim.MessRations()) + " / " +
+                                           Num(sim.MessRationCapacity()));
+      model.body.Field("Cooked food", Num(sim.MessRack()) + " / " +
+                                          Num(sim.MessCapacity()));
       model.body.Field("Produce lots", Num(CountLots(sim, "Perishable")));
     }
     if (roomId == "r9") {

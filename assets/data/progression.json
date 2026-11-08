@@ -469,7 +469,7 @@
     },
     "food": {
       "energy": 3,
-      "label": "Process produce into eight rations",
+      "label": "Process produce into eight dry rations",
       "lot": "Perishable",
       "room": "r8",
       "work": 3
