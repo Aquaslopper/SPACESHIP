@@ -323,10 +323,15 @@ bool Simulation::ZoomMap(int dir) {
   if (dir < 0 && atWidest) { return StepScale(-1); }
   if (dir > 0 && atClosest) { return StepScale(1); }
 
-  double zoom = map_.zoom + static_cast<double>(dir) * map_.zstep;
+  // One notch is a ratio, not a fifth of the whole scale: a wheel that moves 20%
+  // per click jumps from a cluster to a system in two flicks. Twelve per cent is
+  // close to a hand on a dial, and the value carries two decimals so the caption
+  // shows the step.
+  const double ratio = dir > 0 ? kZoomRatio : 1.0 / kZoomRatio;
+  double zoom = map_.zoom * ratio;
   if (zoom < map_.zmin) { zoom = map_.zmin; }
   if (zoom > map_.zmax) { zoom = map_.zmax; }
-  map_.zoom = js::Round(zoom * 10) / 10;
+  map_.zoom = js::Round(zoom * 100) / 100;
   return true;
 }
 

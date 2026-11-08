@@ -92,3 +92,7 @@ struct Rules {
 };
 
 }  // namespace ship
+
+// One wheel notch on the chart. A ratio, so the same flick feels the same at the
+// galaxy, the sector and inside a system.
+constexpr double kZoomRatio = 1.12;

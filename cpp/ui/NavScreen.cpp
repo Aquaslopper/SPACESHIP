@@ -321,10 +321,13 @@ NavPoint NavProjectPanned(const MapView& map, const LayerView& view, double wx,
 }
 
 double NavZoomStep(double zoom, int dir, double zmin, double zmax, double zstep) {
-  double next = zoom + static_cast<double>(dir) * zstep;
+  // The same ratio the wheel uses, so the buttons and the wheel agree.
+  (void)zstep;
+  const double ratio = dir > 0 ? 1.12 : 1.0 / 1.12;
+  double next = zoom * (dir == 0 ? 1.0 : ratio);
   if (next < zmin) { next = zmin; }
   if (next > zmax) { next = zmax; }
-  return js::Round(next * 10) / 10;
+  return js::Round(next * 100) / 100;
 }
 
 double NavClampPan(double value, double extent) {
@@ -932,7 +935,16 @@ bool PressNavActionRaw(Simulation& sim, const std::string& action, const std::st
     sim.SetLayer(arg);
     return true;
   }
-  if (action == "select") { return sim.SelectTarget(arg); }
+  if (action == "select") {
+    const bool selected = sim.SelectTarget(arg);
+    // A dock you are standing at opens when you click it: the marker is the door,
+    // not a label. Without this the only way in was to find the command row at the
+    // bottom of the screen, which reads as "the station is not registered".
+    if (selected && !sim.State().docked && sim.Map().here == arg) {
+      if (sim.World().FindPort(arg) != nullptr) { sim.Dock(); }
+    }
+    return selected;
+  }
   if (action == "zoom-in") { return sim.ZoomMap(1); }
   if (action == "zoom-out") { return sim.ZoomMap(-1); }
   if (action == "pan") {

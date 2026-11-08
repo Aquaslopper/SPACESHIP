@@ -1579,3 +1579,36 @@ MEASURED (probe /home/user/probe/spread, pasted)
 
 NOT VERIFIED: the painted chart has not been looked at - Draw.cpp needs raylib.
 No test suite ran.
+
+## 075 — A wheel notch is a ratio, systems got worlds, and the dock opens when clicked
+
+Three things from the owner's screenshots: the zoom jumped, the systems were thin,
+and standing on a station he could not get in.
+
+ZOOM
+  A notch was a fifth of the scale (0.2 on a 1..5 ladder), so two flicks took the
+  reader from a cluster to a star. It is now a ratio, 1.12, in ZoomMap and in
+  NavZoomStep for the +/- buttons, so a flick feels the same at every scale.
+  Measured: sector wheel 1.00 -> 5.00 in 15 notches, 1.0 -> 1.12, 2.0 -> 2.24.
+
+WORLDS
+  Systems were 1..4 worlds. The owner counted a handful. Now 4..7, and up to 12 on
+  a populated world, spread across the system board instead of packed at its left
+  edge, with moons 0..3 (more where people live).
+  Measured at 1200 systems: 17801 bodies, 6164 planets, 7669 moons, 1568 belts,
+  average 5.1 planets per system, 6..31 bodies per system, validator 0 problems.
+
+THE DOCK
+  Measured first, honestly: at 1200 systems every station body has a port
+  (987 of 987), every port resolves at the berth, and 300 of 300 sampled stations
+  offered an enabled "Dock at ..." command. I could not reproduce a station that the
+  game does not register, so nothing was guessed at or "fixed" blind.
+  What was wrong is the way in: the only door was a command row at the bottom of the
+  screen. Clicking the station marker you are standing at now docks the ship
+  (PressNavAction "select" -> Dock when map.here is that port). Clicking a station
+  somewhere else still only selects it.
+  Measured: boot docked 0; click Kessler Station -> docked 1, board 5 runs; clicking
+  a remote station leaves the ship undocked.
+
+NOT VERIFIED: nothing painted has been seen - Draw.cpp needs raylib. The probe files
+and the object cache were wiped with /tmp mid-session and rebuilt. No test suite ran.

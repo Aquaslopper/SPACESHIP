@@ -412,28 +412,37 @@ void GenerateUniverse(Catalog& catalog, std::uint64_t seed, int systemCount) {
       star.details.emplace_back("Region", region.body.name);
       catalog.bodies.push_back(std::move(star));
 
-      // A crowded world keeps its moons; a frontier outpost is a rock and a pylon.
-      const int worlds = 1 + rng.Below(2 + (traits.population > 0.55 ? 3 : 1));
+      // A system is not a star and a pylon. Three to six worlds is the floor, and a
+      // place with people in it carries more: up to ten. The worlds are spread
+      // across the system board instead of being packed at its left edge, so a big
+      // system stays inside its own chart.
+      const int worlds = 4 + rng.Below(4) + (traits.population > 0.55 ? rng.Below(5) : 0);
+      const double firstX = 120.0;
+      const double lastX = 560.0;
+      const double step = worlds > 1 ? (lastX - firstX) / static_cast<double>(worlds - 1) : 0.0;
       for (int w = 0; w < worlds; ++w) {
         const bool belt = rng.Chance(0.16 + 0.12 * traits.hazard);
         const std::string worldId = id + "-w" + std::to_string(w + 1);
+        const double wx = firstX + static_cast<double>(w) * step + rng.Range(-5.0, 5.0);
+        const double wy = 68.0 + ((w * 37 + index) % 84);
         Body world = MakeBody(worldId, belt ? "belt" : "planet",
                               belt ? name + " Debris Belt" : name + " " + Roman(w),
                               belt ? "Debris belt" : "Charted world",
-                              150.0 + w * 78.0 + rng.Range(-8.0, 8.0),
-                              74.0 + ((w * 37 + index) % 90), id, region.body.id);
+                              std::clamp(wx, 96.0, 590.0), wy, id, region.body.id);
         world.subtype = belt ? "rock" : kSubtypes[rng.Below(4)];
         world.scan.push_back(ScanFor(world.type));
         world.details.emplace_back("System", name);
         if (!belt) { world.details.emplace_back("Surface", world.subtype); }
         catalog.bodies.push_back(std::move(world));
 
-        const int moons = belt ? 0 : rng.Below(2 + (traits.population > 0.6 ? 2 : 0));
+        const int moons = belt ? 0 : rng.Below(1 + (traits.population > 0.6 ? 3 : 2));
         for (int m = 0; m < moons; ++m) {
           Body moon = MakeBody(worldId + "-m" + std::to_string(m + 1), "moon",
                                name + " " + Roman(w) + " " + static_cast<char>('a' + m),
-                               "Natural satellite", 150.0 + w * 78.0 + 14.0 + m * 11.0,
-                               96.0 + ((w * 37 + index) % 90), id, region.body.id);
+                               "Natural satellite",
+                               std::clamp(wx + 12.0 + static_cast<double>(m) * 9.0, 96.0, 620.0),
+                               std::min(176.0, wy + 18.0 + static_cast<double>(m) * 6.0), id,
+                               region.body.id);
           moon.scan.push_back(ScanFor("moon"));
           catalog.bodies.push_back(std::move(moon));
         }
