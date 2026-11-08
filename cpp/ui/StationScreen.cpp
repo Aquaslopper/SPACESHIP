@@ -674,7 +674,9 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     tavern.rows.push_back(row);
   }
 
-  model.columns = {market, sales, board, yard, tavern};
+  // The Mission board and Tavern / Bar cards are not offered; the station shows
+  // the market, the sales counter and the yard.
+  model.columns = {market, sales, yard};
   NormalizeStationSelection(model, model.selection);
   return model;
 }

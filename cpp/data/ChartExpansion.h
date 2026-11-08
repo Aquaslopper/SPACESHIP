@@ -10,6 +10,9 @@
 //      systems linked by intra-region lanes
 //    * populates every star system with multi-ring planetary orbits, natural
 //      moons around host worlds, debris belts, derelict anomalies, and ports
+//    * gives every star system a station: a system that arrives with a port
+//      keeps it, and one that does not is given a berth, authored or generated
+//      alike, with no quota and no exceptions
 //    * registers map-driven incident types triggered by procedural exploration
 //
 //  Deterministic and idempotent: expanding an already-expanded Catalog is a

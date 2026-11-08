@@ -890,6 +890,41 @@ TEST_CASE("the charted galaxy is grown once, deterministically, and every system
   }
 }
 
+// The rule the station pass answers: every system keeps a space station, in the
+// authored core and the generated sky alike, with no quota and no exceptions.
+TEST_CASE("every system keeps a space station", "[nav][chart][expansion]") {
+  ship::Simulation sim = Fresh();
+  const ship::Catalog& world = sim.World();
+
+  std::set<std::string> portIds;
+  for (const ship::Port& port : world.ports) { portIds.insert(port.id); }
+
+  std::set<std::string> systemsWithPort;
+  for (const ship::Body& body : world.bodies) {
+    if (body.type == "station" && portIds.count(body.id) != 0) {
+      systemsWithPort.insert(world.BodySystem(body));
+    }
+  }
+
+  std::size_t systems = 0;
+  for (const ship::Body& system : world.systems) {
+    INFO(system.id);
+    ++systems;
+    CHECK(systemsWithPort.count(system.id) == 1u);
+  }
+  CHECK(systems > 0u);
+  CHECK(systems == world.systems.size());
+
+  // Nothing dangles: every port names a station body, and the chart validates.
+  for (const ship::Port& port : world.ports) {
+    const ship::Body* body = world.FindBody(port.id);
+    REQUIRE(body != nullptr);
+    CHECK(body->type == "station");
+    CHECK(body->name == port.name);
+  }
+  CHECK(world.Validate().empty());
+}
+
 TEST_CASE("no filter hides a body, and a body out of sensor range is still on the chart",
           "[nav][chart][expansion]") {
   ship::Simulation sim = Fresh();
