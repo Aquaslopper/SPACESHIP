@@ -26,6 +26,12 @@ struct StoreRowView {
   bool progress = false;   // a three-state button rather than a command row
   bool readingOnly = false;
   std::string confirm;     // asked first when confirmations are on
+
+  // Cargo Inventory card face, matching the mock-up's item cards.
+  bool card = false;
+  std::string badge;
+  std::string description;
+  std::string qty;
 };
 
 struct StoresScreenModel {

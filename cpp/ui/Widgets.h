@@ -113,6 +113,12 @@ struct CommandRowView {
   double remaining = 0.0;
   bool plain = false;     // a list line, not a button: no box, no border
   bool hideCost = false;  // no cost badge at all: the button is just a button
+
+  // Cargo Inventory card face: name, volume badge, description and quantity.
+  bool card = false;
+  std::string badge;
+  std::string description;
+  std::string qty;
 };
 
 // A row the player can press, with the id the press path answers to. The
@@ -243,6 +249,7 @@ struct CargoVisualModel {
   double capacity = 0;
   double used = 0;
   double reserved = 0;
+  bool sortDue = false;
   std::vector<CargoVisualLot> lots;
 };
 

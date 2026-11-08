@@ -759,6 +759,10 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
           view.confirm = row.confirm;
           view.title = row.note;
           view.reading = row.readingOnly;
+          view.card = row.card;
+          view.badge = row.badge;
+          view.description = row.description;
+          view.qty = row.qty;
           if (!row.readingOnly) {
             BindCommandCooldown(sim, view, ActionCooldownKey(sim, "press:stores:" + row.id + ":"),
                                 ActionCooldownCategory(row.id + " "));
@@ -773,8 +777,6 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       inventory.title = "Cargo Inventory";
       inventory.Note(stores.notice);
       inventory.Dim(stores.tally);
-      inventory.Dim(sim.CargoSortDue() ? "Sorting tidy due: the next sort click costs one action."
-                                       : "Sorting is free until the next paid tidy.");
       screen.panels.push_back(inventory);
       std::vector<CommandRowView> inventoryRows;
       std::vector<std::string> inventoryIds;
@@ -785,10 +787,7 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       NavPanel visual;
       visual.id = "cargo-visual";
       visual.title = "Cargo Hold View";
-      visual.Field("Capacity", Num(stores.visual.capacity) + " m3");
-      visual.Field("Used", Num(stores.visual.used) + " m3");
-      visual.Field("Reserved", Num(stores.visual.reserved) + " m3");
-      visual.Dim("Expansions at the shipyard grow this grid. Click inventory lots to stow them.");
+      visual.Dim("Cargo Hold View");
       screen.panels.push_back(visual);
       screen.panelRows.push_back({});
       screen.panelRowIds.push_back({});

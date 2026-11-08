@@ -19,6 +19,13 @@ namespace {
 
 std::string Num(double value) { return js::NumToString(value); }
 
+std::string CargoDescription(const GoodsLot& lot) {
+  if (lot.kind == "Salvage") { return "Scrap metal and components."; }
+  if (lot.name.find("Ice") != std::string::npos) { return "Usable as coolant or refined."; }
+  if (lot.kind.empty()) { return "Stored cargo."; }
+  return lot.kind;
+}
+
 StoreRowView Reading(const std::string& label) {
   StoreRowView row;
   row.label = label;
@@ -34,7 +41,7 @@ StoresScreenModel BuildStoresScreen(const Simulation& sim, const std::string& ro
 
   model.head.kind = "ROOM";
   model.head.title = model.cargo ? "Cargo Hold" : "Science Room";
-  model.head.sub = model.cargo ? "Inventory, hold volume and trade finalization"
+  model.head.sub = model.cargo ? "Freight, lots and the space they take"
                                : "Survey data, filed and packaged";
 
   if (model.cargo) {
@@ -54,6 +61,7 @@ StoresScreenModel BuildStoresScreen(const Simulation& sim, const std::string& ro
     model.visual.capacity = capacity;
     model.visual.used = used;
     model.visual.reserved = reserved;
+    model.visual.sortDue = sim.CargoSortDue();
 
     // ---- left: every lot, sorted only by hand -----------------------------
     if (sim.Goods().empty()) { model.rows.push_back(Reading("Nothing stored.")); }
@@ -72,9 +80,15 @@ StoresScreenModel BuildStoresScreen(const Simulation& sim, const std::string& ro
 
       StoreRowView row;
       row.id = "cargo-sort:" + lot.id;
-      row.label = (stowed ? "Stowed: " : "Sort: ") + lot.name + " (" + Num(lot.vol) + " m3)";
-      row.cost = stowed ? "done" : (sim.CargoSortDue() ? "1 action" : "0 actions");
-      row.note = lot.kind + (lot.contractId.empty() ? std::string() : std::string(" - contract freight"));
+      row.card = true;
+      row.label = lot.name;
+      row.badge = Num(lot.vol) + " m³";
+      row.description = CargoDescription(lot);
+      if (!lot.contractId.empty()) { row.description += " - contract freight"; }
+      if (lot.risk) { row.description += " - unregistered"; }
+      row.qty = "QTY: 1";
+      row.cost = stowed ? "stowed" : (sim.CargoSortDue() ? "sort - 1 action" : "sort - free");
+      row.note = stowed ? "Stowed in the hold view." : "Click to stow this lot in the hold view.";
       row.enabled = !stowed;
       model.rows.push_back(row);
     }
@@ -124,7 +138,7 @@ StoresScreenModel BuildStoresScreen(const Simulation& sim, const std::string& ro
       }
     }
 
-    model.contextTitle = tradeContext ? "Trade finalization" : "Unload cargo";
+    model.contextTitle = tradeContext ? "Delivery / sales window" : "Unload cargo";
     if (!tradeContext) {
       model.contextNotes.push_back(docked
           ? "No trade finalization at this berth. Sell cargo at the station, or unload unwanted lots into space."

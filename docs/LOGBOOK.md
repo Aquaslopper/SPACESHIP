@@ -513,3 +513,17 @@ You must append a compressed summary of **every single reply and action you take
 - **Tests:** legacy mission/commission test references were ported to the trade API and the station draw probe's card order was updated, but no tests were run.
 - **Checks:** `spaceship_core` and `spaceship_console` targets built; `Draw.cpp` passed a syntax-only compile against fetched raylib/ImGui headers; `git diff --check` clean. No ctest, draw probe, GUI run, or test suite was executed, per the owner's stop.
 - **State:** changes remain uncommitted on `arena/f91aec6c-spaceship`.
+
+### Entry #037
+- **Timestamp:** 2026-11-08 UTC
+- **Task:** owner rejected the Cargo Hold's appearance: it did not look like the mock-up image; rebuild the room's presentation.
+- **Presentation path:** `ScreenKind::Cargo` now leaves the generic panel list and paints a bespoke `PaintCargoScreen` laid out as the mock-up's three tall panels.
+- **Left panel:** Cargo Inventory is a stack of item cards, each with the lot name, a volume badge, a description line, QTY, and the sort cost/state.
+- **Middle panel:** Cargo Hold View is a large light hold rectangle with a capacity deck grid, labelled cargo crates, Hold Status, and the used/free capacity bar with legend.
+- **Right panel:** the contextual Delivery / sales / Unload cargo window paints large commit cards instead of generic manifest rows.
+- **Mechanics preserved:** clicking an inventory card stows the lot; stowed crates line up, loose crates sit off the rack; paid sorting cadence and finalization/sale/jettison actions remain simulation-side.
+- **Data source:** the view still reads the ship's real cargo capacity, used volume, reserved volume and lot list, so shipyard expansions change the pictured hold.
+- **Model plumbing:** `StoreRowView`/`CommandRowView` carry card badge/description/quantity fields; `CargoVisualModel` carries the sorting-due flag.
+- **Checks:** `spaceship_core` and `spaceship_console` targets built; `Draw.cpp` syntax-only compile passed; `git diff --check` clean.
+- **Testing:** no test suite, ctest, draw probe, or GUI run was executed, per the standing stop.
+- **State:** committed and pushed to `arena/f91aec6c-spaceship`, updating open PR #34.

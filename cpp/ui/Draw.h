@@ -159,6 +159,7 @@ class ShellView {
   void OpenBriefing(const Simulation& sim, const std::string& kind, const std::string& id);
   void PaintTaskScreen(Simulation& sim);
   void PaintPanelsScreen(Simulation& sim);
+  void PaintCargoScreen(Simulation& sim);
   void PaintPopup(Simulation& sim);
   void PaintHero(const Vignette& vignette, const Area& box);
   float CargoVisualHeight(const CargoVisualModel& model) const;

@@ -2932,9 +2932,304 @@ void ShellView::PaintWikiSearch(const Area& viewport) {
   ImGui::PopStyleVar();
 }
 
+// ============================================================================
+//  The Cargo Hold, painted to the owner's mock-up: inventory cards on the
+//  left, a large hold view with capacity/status in the middle, and the
+//  delivery / sales / unload window on the right. The generic panel list is
+//  only the press path's row table; the picture below is the room itself.
+// ============================================================================
+void ShellView::PaintCargoScreen(Simulation& sim) {
+  const Palette& p = theme_.palette;
+  const TaskScreenModel& screen = taskScreen_;
+  const float left = layout_.content.x + 8.0f;
+  const float right = layout_.content.Right() - 8.0f;
+  const float line = theme_.LineHeight();
+  const float headerH = PaintTaskHeader(screen.head, left, layout_.content.y);
+  const float top = layout_.content.y + headerH + 8.0f;
+  const float width = right - left;
+  const float gap = 10.0f;
+
+  float sideW = std::clamp(width * 0.28f, 230.0f, 360.0f);
+  if (width - 2.0f * sideW - 2.0f * gap < 260.0f) {
+    sideW = std::max(190.0f, (width - 2.0f * gap - 260.0f) / 2.0f);
+  }
+  const float midW = std::max(220.0f, width - 2.0f * sideW - 2.0f * gap);
+  const Area leftBox{left, top, sideW, 0};
+  const Area midBox{left + sideW + gap, top, midW, 0};
+  const Area rightBox{left + sideW + gap + midW + gap, top, sideW, 0};
+
+  const auto wrap = [&](const std::string& text, float w, int px) {
+    return WrapText(text, std::max(1.0f, w), TypePx(px), SelectFont(TypePx(px), false));
+  };
+  const auto panelFrame = [&](const Area& box, const std::string& title, float h) {
+    DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                  static_cast<int>(box.w), static_cast<int>(h), ToRay(p.panel));
+    DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                       static_cast<int>(box.w), static_cast<int>(h), ToRay(p.border));
+    Text(title.c_str(), static_cast<int>(box.x + 12), static_cast<int>(box.y + 10),
+         TypePx(11), ToRay(p.ink));
+    return box.y + 10.0f + line + 8.0f;
+  };
+
+  // ---- left: Cargo Inventory cards ---------------------------------------
+  const std::vector<CommandRowView>& cards =
+      screen.panelRows.empty() ? std::vector<CommandRowView>{} : screen.panelRows[0];
+  const std::vector<std::string>& cardIds =
+      screen.panelRowIds.empty() ? std::vector<std::string>{} : screen.panelRowIds[0];
+  float leftContent = 0;
+  for (const CommandRowView& row : cards) {
+    if (row.reading) { leftContent += wrap(row.label, sideW - 24, 10).size() * line + 6; continue; }
+    const float badgeW = row.badge.empty() ? 0 : TextWidth(row.badge.c_str(), TypePx(9)) + 14;
+    const float titleW = sideW - 32 - badgeW;
+    leftContent += wrap(row.label, titleW, 10).size() * line;
+    leftContent += wrap(row.description, sideW - 32, 9).size() * (line - 2);
+    leftContent += line + 18;
+  }
+  leftContent += wrap(screen.bandNote, sideW - 24, 9).size() * (line - 2) + 12;
+  const float leftH = std::max(360.0f, leftContent + 44.0f);
+  float ly = panelFrame(leftBox, "Cargo Inventory", leftH);
+  for (std::size_t i = 0; i < cards.size(); ++i) {
+    const CommandRowView& row = cards[i];
+    if (row.reading) {
+      for (const auto& t : wrap(row.label, sideW - 24, 10)) {
+        Text(t.c_str(), static_cast<int>(leftBox.x + 12), static_cast<int>(ly), TypePx(10), ToRay(p.muted));
+        ly += line;
+      }
+      ly += 6;
+      continue;
+    }
+    const float badgeW = row.badge.empty() ? 0 : TextWidth(row.badge.c_str(), TypePx(9)) + 14;
+    const float titleW = sideW - 32 - badgeW;
+    const auto titleLines = wrap(row.label, titleW, 10);
+    const auto descLines = wrap(row.description, sideW - 32, 9);
+    const float h = titleLines.size() * line + descLines.size() * (line - 2) + line + 18;
+    const Area box{leftBox.x + 10, ly, sideW - 20, h};
+    DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.w),
+                  static_cast<int>(box.h), ToRay(row.enabled ? p.panel2 : p.panel3));
+    DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.w),
+                       static_cast<int>(box.h), ToRay(row.enabled ? p.borderDark : p.border));
+    if (!row.enabled) {
+      DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y), 3,
+                    static_cast<int>(box.h), ToRay(p.sage));
+    }
+    float ty = box.y + 8;
+    for (const auto& t : titleLines) {
+      Text(t.c_str(), static_cast<int>(box.x + 10), static_cast<int>(ty), TypePx(10),
+           ToRay(row.enabled ? p.ink : p.muted));
+      ty += line;
+    }
+    if (!row.badge.empty()) {
+      const Area badge{box.Right() - badgeW - 8, box.y + 6, badgeW, line};
+      DrawRectangle(static_cast<int>(badge.x), static_cast<int>(badge.y), static_cast<int>(badge.w),
+                    static_cast<int>(badge.h), ToRay(p.panel));
+      DrawRectangleLines(static_cast<int>(badge.x), static_cast<int>(badge.y),
+                         static_cast<int>(badge.w), static_cast<int>(badge.h), ToRay(p.border));
+      Text(row.badge.c_str(), static_cast<int>(badge.x + 7), static_cast<int>(badge.y + 2),
+           TypePx(9), ToRay(p.coffee));
+    }
+    ty += 2;
+    for (const auto& t : descLines) {
+      Text(t.c_str(), static_cast<int>(box.x + 10), static_cast<int>(ty), TypePx(9), ToRay(p.muted));
+      ty += line - 2;
+    }
+    Text(row.cost.c_str(), static_cast<int>(box.x + 10), static_cast<int>(box.Bottom() - line - 4),
+         TypePx(9), ToRay(row.enabled ? p.coffee : p.muted));
+    if (!row.qty.empty()) {
+      const float qw = TextWidth(row.qty.c_str(), TypePx(9));
+      Text(row.qty.c_str(), static_cast<int>(box.Right() - qw - 10),
+           static_cast<int>(box.Bottom() - line - 4), TypePx(9), ToRay(p.muted));
+    }
+    if (row.enabled && i < cardIds.size() && !cardIds[i].empty()) {
+      navHits_.push_back(NavHit{box, "row", cardIds[i]});
+    }
+    ly = box.Bottom() + 8;
+  }
+  for (const auto& t : wrap(screen.bandNote, sideW - 24, 9)) {
+    Text(t.c_str(), static_cast<int>(leftBox.x + 12), static_cast<int>(ly), TypePx(9), ToRay(p.muted));
+    ly += line - 2;
+  }
+
+  // ---- middle: Cargo Hold View -------------------------------------------
+  const CargoVisualModel& hold = screen.cargoVisual;
+  const float visualH = 300.0f;
+  const float midH = std::max(420.0f, visualH + 160.0f);
+  float my = panelFrame(midBox, "Cargo Hold View", midH);
+  const Area view{midBox.x + 12, my, midBox.w - 24, visualH};
+  DrawRectangle(static_cast<int>(view.x), static_cast<int>(view.y), static_cast<int>(view.w),
+                static_cast<int>(view.h), ToRay(p.white));
+  DrawRectangleLines(static_cast<int>(view.x), static_cast<int>(view.y),
+                     static_cast<int>(view.w), static_cast<int>(view.h), ToRay(p.borderDark));
+
+  // The hold's deck grid is the real capacity: shipyard expansions add cells.
+  const int cells = std::max(1, std::min(120, static_cast<int>(std::ceil(hold.capacity))));
+  const int cols = std::max(4, static_cast<int>(view.w / 28.0f));
+  const int rows = std::max(3, (cells + cols - 1) / cols);
+  const float cw = view.w / static_cast<float>(cols);
+  const float ch = view.h / static_cast<float>(rows);
+  for (int r = 1; r < rows; ++r) {
+    DrawLine(static_cast<int>(view.x), static_cast<int>(view.y + r * ch),
+             static_cast<int>(view.Right()), static_cast<int>(view.y + r * ch), ToRay(p.panel3));
+  }
+  for (int c = 1; c < cols; ++c) {
+    DrawLine(static_cast<int>(view.x + c * cw), static_cast<int>(view.y),
+             static_cast<int>(view.x + c * cw), static_cast<int>(view.Bottom()), ToRay(p.panel3));
+  }
+
+  // Lots sit in the hold as labelled crates. Stowed crates line up; loose
+  // crates sit off the rack until their inventory card is clicked.
+  BeginScissorMode(static_cast<int>(view.x) + 1, static_cast<int>(view.y - contentScroll_) + 1,
+                   static_cast<int>(view.w) - 2, static_cast<int>(view.h) - 2);
+  float crateY = view.Bottom() - 10;
+  std::size_t looseIndex = 0;
+  for (const CargoVisualLot& lot : hold.lots) {
+    const float crateW = std::clamp(static_cast<float>(lot.vol / std::max(1.0, hold.capacity)) * view.w,
+                                    96.0f, view.w - 24);
+    const float crateH = 26.0f;
+    crateY -= crateH + 6;
+    const float offset = lot.stowed ? 10.0f : 24.0f + static_cast<float>(looseIndex % 3) * 10.0f;
+    if (!lot.stowed) { ++looseIndex; }
+    const Area crate{view.x + offset, crateY, crateW, crateH};
+    DrawRectangle(static_cast<int>(crate.x), static_cast<int>(crate.y), static_cast<int>(crate.w),
+                  static_cast<int>(crate.h), ToRay(lot.stowed ? p.sage : p.amber));
+    DrawRectangleLines(static_cast<int>(crate.x), static_cast<int>(crate.y),
+                       static_cast<int>(crate.w), static_cast<int>(crate.h), ToRay(p.borderDark));
+    const std::string label = lot.label + " (" + js::NumToString(lot.vol) + " m3)";
+    Text(FitText(label, crate.w - 12, TypePx(9)).c_str(), static_cast<int>(crate.x + 6),
+         static_cast<int>(crate.y + 7), TypePx(9), ToRay(p.ink));
+    if (crateY < view.y + 8) { break; }
+  }
+  EndScissorMode();
+  my = view.Bottom() + 12;
+
+  double stowedVol = 0;
+  double looseVol = 0;
+  for (const CargoVisualLot& lot : hold.lots) {
+    if (lot.stowed) { stowedVol += lot.vol; } else { looseVol += lot.vol; }
+  }
+  const bool secure = looseVol <= 0.0;
+  DrawRectangle(static_cast<int>(midBox.x + 14), static_cast<int>(my + 2), 8, 10, ToRay(p.sage));
+  DrawRectangleLines(static_cast<int>(midBox.x + 14), static_cast<int>(my + 2), 8, 10, ToRay(p.borderDark));
+  Text(("Hold Status: " + std::string(secure ? "Secure" : "Loose cargo")).c_str(),
+       static_cast<int>(midBox.x + 28), static_cast<int>(my), TypePx(10),
+       ToRay(secure ? p.sage : p.amber));
+  my += line;
+  Text("Environment stable and systems nominal.", static_cast<int>(midBox.x + 28),
+       static_cast<int>(my), TypePx(9), ToRay(p.muted));
+  my += line + 8;
+
+  const double pct = hold.capacity > 0 ? hold.used / hold.capacity * 100.0 : 0.0;
+  Text("Capacity", static_cast<int>(midBox.x + 12), static_cast<int>(my), TypePx(10), ToRay(p.ink));
+  const std::string cap = js::NumToString(hold.used) + " / " + js::NumToString(hold.capacity) +
+                          " m³ (" + js::NumToString(std::floor(pct + 0.5)) + "%)";
+  const float capW = TextWidth(cap.c_str(), TypePx(10));
+  Text(cap.c_str(), static_cast<int>(midBox.Right() - 12 - capW), static_cast<int>(my),
+       TypePx(10), ToRay(p.ink));
+  my += line + 2;
+  const Area bar{midBox.x + 12, my, midBox.w - 24, 10};
+  DrawRectangle(static_cast<int>(bar.x), static_cast<int>(bar.y), static_cast<int>(bar.w),
+                static_cast<int>(bar.h), ToRay(p.panel3));
+  const float usedW = static_cast<float>(std::clamp(hold.used / std::max(1.0, hold.capacity), 0.0, 1.0)) * bar.w;
+  DrawRectangle(static_cast<int>(bar.x), static_cast<int>(bar.y), static_cast<int>(usedW),
+                static_cast<int>(bar.h), ToRay(p.coffeeDark));
+  if (hold.reserved > 0) {
+    const float resW = static_cast<float>(std::clamp(hold.reserved / std::max(1.0, hold.capacity), 0.0, 1.0)) * bar.w;
+    DrawRectangle(static_cast<int>(bar.x + usedW), static_cast<int>(bar.y),
+                  static_cast<int>(std::min(resW, bar.w - usedW)), static_cast<int>(bar.h), ToRay(p.amber));
+  }
+  DrawRectangleLines(static_cast<int>(bar.x), static_cast<int>(bar.y), static_cast<int>(bar.w),
+                     static_cast<int>(bar.h), ToRay(p.borderDark));
+  my += 18;
+  DrawRectangle(static_cast<int>(midBox.x + 12), static_cast<int>(my + 2), 10, 10, ToRay(p.coffeeDark));
+  Text("Used", static_cast<int>(midBox.x + 28), static_cast<int>(my), TypePx(9), ToRay(p.muted));
+  DrawRectangle(static_cast<int>(midBox.x + 78), static_cast<int>(my + 2), 10, 10, ToRay(p.panel3));
+  DrawRectangleLines(static_cast<int>(midBox.x + 78), static_cast<int>(my + 2), 10, 10, ToRay(p.border));
+  Text("Free", static_cast<int>(midBox.x + 94), static_cast<int>(my), TypePx(9), ToRay(p.muted));
+  if (hold.sortDue) {
+    Text("Sorting tidy due", static_cast<int>(midBox.x + 140), static_cast<int>(my),
+         TypePx(9), ToRay(p.amber));
+  }
+
+  // ---- right: delivery / sales / unload window ----------------------------
+  const std::vector<CommandRowView>& acts =
+      screen.panelRows.size() < 3 ? std::vector<CommandRowView>{} : screen.panelRows[2];
+  const std::vector<std::string>& actIds =
+      screen.panelRowIds.size() < 3 ? std::vector<std::string>{} : screen.panelRowIds[2];
+  float rightContent = 0;
+  for (const CommandRowView& row : acts) {
+    if (row.reading) { rightContent += wrap(row.label, sideW - 24, 10).size() * line + 8; continue; }
+    rightContent += wrap(row.label, sideW - 32, 10).size() * line;
+    rightContent += wrap(row.title, sideW - 32, 9).size() * (line - 2);
+    rightContent += line + 18;
+  }
+  const float rightH = std::max(360.0f, rightContent + 44.0f);
+  float ry = panelFrame(rightBox, screen.panels.size() < 3 ? "Unload cargo" : screen.panels[2].title, rightH);
+  if (screen.panels.size() >= 3) {
+    for (const PanelLine& note : screen.panels[2].lines) {
+      if (note.kind != PanelLine::Kind::Note) { continue; }
+      for (const auto& t : wrap(note.value, sideW - 24, 9)) {
+        Text(t.c_str(), static_cast<int>(rightBox.x + 12), static_cast<int>(ry), TypePx(9), ToRay(p.muted));
+        ry += line - 2;
+      }
+      ry += 6;
+    }
+  }
+  for (std::size_t i = 0; i < acts.size(); ++i) {
+    const CommandRowView& row = acts[i];
+    if (row.reading) {
+      for (const auto& t : wrap(row.label, sideW - 24, 10)) {
+        Text(t.c_str(), static_cast<int>(rightBox.x + 12), static_cast<int>(ry), TypePx(10), ToRay(p.coffee));
+        ry += line;
+      }
+      ry += 8;
+      continue;
+    }
+    const auto labelLines = wrap(row.label, sideW - 32, 10);
+    const auto noteLines = wrap(row.title, sideW - 32, 9);
+    const float h = labelLines.size() * line + noteLines.size() * (line - 2) + line + 18;
+    const Area box{rightBox.x + 10, ry, sideW - 20, h};
+    DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.w),
+                  static_cast<int>(box.h), ToRay(row.enabled ? p.control : p.panel3));
+    DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.w),
+                       static_cast<int>(box.h), ToRay(row.enabled ? p.borderDark : p.border));
+    float ty = box.y + 8;
+    for (const auto& t : labelLines) {
+      Text(t.c_str(), static_cast<int>(box.x + 10), static_cast<int>(ty), TypePx(10),
+           ToRay(row.enabled ? p.ink : p.muted));
+      ty += line;
+    }
+    for (const auto& t : noteLines) {
+      Text(t.c_str(), static_cast<int>(box.x + 10), static_cast<int>(ty), TypePx(9), ToRay(p.muted));
+      ty += line - 2;
+    }
+    const std::string cost = row.displayCost.empty() ? row.cost : row.displayCost;
+    Text(cost.c_str(), static_cast<int>(box.x + 10), static_cast<int>(box.Bottom() - line - 4),
+         TypePx(9), ToRay(row.enabled ? p.coffee : p.muted));
+    if (row.enabled && i < actIds.size() && !actIds[i].empty()) {
+      navHits_.push_back(NavHit{box, "row", actIds[i]});
+    }
+    ry = box.Bottom() + 8;
+  }
+
+  contentPaintBottom_ = std::max(contentPaintBottom_,
+                                 std::max({leftBox.y + leftH, midBox.y + midH, rightBox.y + rightH}) + 8);
+  auto buttons = screen.progress;
+  if (!pendingConfirm_.empty()) {
+    ProgressButton yes; yes.taskId = "confirm-yes"; yes.text = "Yes, do it";
+    ProgressButton no; no.taskId = "confirm-no"; no.text = "Keep as it is";
+    buttons.push_back(yes); buttons.push_back(no);
+  }
+  if (!buttons.empty()) {
+    PaintActionBand("Work in progress", "", buttons, pendingConfirm_);
+  } else {
+    actionBandTop_ = layout_.content.Bottom();
+  }
+  (void)sim;
+}
+
 void ShellView::PaintPanelsScreen(Simulation& sim) {
   navHits_.clear();
   taskButtons_.clear();
+  if (panelsKind_ == ScreenKind::Cargo) { PaintCargoScreen(sim); return; }
   const Palette& p = theme_.palette;
   const TaskScreenModel& screen = taskScreen_;
   const float left = layout_.content.x + 8.0f;
