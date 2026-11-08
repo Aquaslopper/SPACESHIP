@@ -298,3 +298,17 @@ You must append a compressed summary of **every single reply and action you take
 - **Full tests:** `ctest --test-dir build --output-on-failure` passed **125/125**, including GUI syntax, ImGui input, and native draw recorder; `git diff --check` passed.
 - **Visual limit:** No windowed client or new screenshot was captured; these checks verify source compilation and recorded painter/input geometry, not the rendered cockpit on a display.
 - **Scope:** Follow-up to the open PR #30 on `arena/cb265de8-spaceship`; `Legacy code_Spaceship.txt`, `assets/`, `rescue/`, simulation behavior, and gameplay rules remain untouched.
+
+### Entry #021
+- **Timestamp:** 2026-11-08 00:13 UTC
+- **Task:** Correct the Home screenshot regression reported by the owner after commit `880fc5f`.
+- **Root cause:** The Activity Feed heading was painted 13px above its panel. With the requested zero gap, the heading fell over the Navigation card's bottom text/border.
+- **Feed header (`Draw.cpp`):** Paint the feed surface first and place “Activity Feed” inside its upper-left area, so the heading is contained by its own panel instead of floating in the preceding row.
+- **Feed content:** Start the log rows and scissor viewport beneath the heading; reserve the header space when calculating visible rows and scrollbar thumb geometry.
+- **Feed dragging:** Align thumb-drag travel and offset with the reduced content track below the header.
+- **Regression test (`draw_probe.cpp`):** Assert the Activity Feed heading lies inside the feed surface, while retaining bottom-anchor and no-gap checks.
+- **Build:** `PATH="/tmp/spaceship-test-venv/bin:$PATH" cmake --build build --parallel 2` passed (core already up to date; draw probe recompiles the real painter).
+- **Draw recorder:** `./tools/check-draw.sh` passed, including feed wheel/drag/wrap/clamp coverage.
+- **Full suite:** `ctest --test-dir build --output-on-failure` passed **125/125**; `git diff --check` passed.
+- **Visual limit:** The screenshot correction is verified by the CPU draw recorder; no windowed GUI screenshot was captured in this environment.
+- **Scope:** Small follow-up to PR #30 on `arena/cb265de8-spaceship`; no palette, gameplay, authored assets, or historical reference files changed.

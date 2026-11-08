@@ -927,8 +927,11 @@ int main() {
         Require(valueLines > 1, "Long info value was not wrapped at the compact value size");
         const auto& feedHead = FindText("Activity Feed");
         Require(feedHead.y >= firstPanel.y + firstPanel.h, "Feed overlaps the expanded info rail");
-        const auto& feedSurface = filledAt(model.feedBox.x, feedHead.y + feedHead.size + 2);
+        const auto& feedSurface = filledAt(model.feedBox.x, feedHead.y - 6.0f);
         Require(feedSurface.w > 0, "Feed has no warm background");
+        Require(feedHead.y >= feedSurface.y + 4.0f &&
+                    feedHead.y + feedHead.size <= feedSurface.y + feedSurface.h,
+                "Activity Feed heading is not inside its panel");
         Require(feedSurface.h <= ship::Metrics::kHomeFeedMax + 1.0f,
                 "Home activity feed grows too far up the screen");
         Require(std::abs(feedSurface.y + feedSurface.h - (home.LayoutNow().content.Bottom() - 8.0f)) < 2.0f,

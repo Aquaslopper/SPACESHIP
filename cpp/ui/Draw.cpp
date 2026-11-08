@@ -902,8 +902,7 @@ void ShellView::PaintIdle(Simulation& sim) {
   }
 
   // ---- feed --------------------------------------------------------------
-  Text(idle_.feedHead.c_str(), static_cast<int>(idle_.feedBox.x),
-           static_cast<int>(idle_.feedBox.y - TypePx(11) - 2.0f), TypePx(11) , ToRay(theme.palette.coffee));
+  const float feedHeaderHeight = static_cast<float>(TypePx(11)) + 12.0f;
   DrawRectangle(static_cast<int>(idle_.feedBox.x), static_cast<int>(idle_.feedBox.y),
                 static_cast<int>(idle_.feedBox.w), static_cast<int>(idle_.feedBox.h),
                 ToRay(theme.palette.panel));
@@ -911,6 +910,8 @@ void ShellView::PaintIdle(Simulation& sim) {
                      static_cast<int>(idle_.feedBox.y),
                      static_cast<int>(idle_.feedBox.w),
                      static_cast<int>(idle_.feedBox.h), ToRay(theme.palette.border));
+  Text(idle_.feedHead.c_str(), static_cast<int>(idle_.feedBox.x + 8.0f),
+       static_cast<int>(idle_.feedBox.y + 6.0f), TypePx(11), ToRay(theme.palette.coffee));
   const bool trackFeed = paintingContent_;
   paintingContent_ = false;
   feedBox_ = idle_.feedBox;
@@ -930,24 +931,28 @@ void ShellView::PaintIdle(Simulation& sim) {
     const auto wrapped = WrapText(entry, std::max(1.0f, feedBox_.w - 28), size, SelectFont(size, false));
     rows.insert(rows.end(), wrapped.begin(), wrapped.end());
   }
-  const float visibleH = std::max(1.0f, feedBox_.h - 8);
+  const float feedContentTop = feedBox_.y + feedHeaderHeight;
+  const float feedContentHeight = std::max(1.0f, feedBox_.h - feedHeaderHeight - 4.0f);
+  const float visibleH = feedContentHeight;
   feedMaxScroll_ = std::max(0.0f, rows.size() * lineH - visibleH);
   feedScroll_ = std::clamp(feedScroll_, 0.0f, feedMaxScroll_);
-  BeginScissorMode(static_cast<int>(feedBox_.x + 1), static_cast<int>(feedBox_.y - contentScroll_ + 1),
-                   std::max(0, static_cast<int>(feedBox_.w - 2)), std::max(0, static_cast<int>(feedBox_.h - 2)));
-  float y = feedBox_.y + 4 - feedScroll_;
+  BeginScissorMode(static_cast<int>(feedBox_.x + 1),
+                   static_cast<int>(feedContentTop - contentScroll_ + 1),
+                   std::max(0, static_cast<int>(feedBox_.w - 2)),
+                   std::max(0, static_cast<int>(feedContentHeight - 1.0f)));
+  float y = feedContentTop + 2.0f - feedScroll_;
   for (const auto& row : rows) {
-    if (y + lineH > feedBox_.y && y < feedBox_.Bottom()) {
+    if (y + lineH > feedContentTop && y < feedContentTop + feedContentHeight) {
       Text(row.c_str(), static_cast<int>(feedBox_.x + 6), static_cast<int>(y), size, ToRay(theme.palette.ink));
     }
     y += lineH;
   }
   feedThumb_ = {};
   if (feedMaxScroll_ > 0) {
-    const float trackH = feedBox_.h - 4;
+    const float trackH = feedContentHeight;
     const float thumbH = std::min(trackH, std::max(18.0f, trackH * visibleH / (visibleH + feedMaxScroll_)));
-    feedThumb_ = {feedBox_.Right() - 10, feedBox_.y + 2 + (trackH - thumbH) * feedScroll_ / feedMaxScroll_, 8, thumbH};
-    DrawRectangle(static_cast<int>(feedThumb_.x), static_cast<int>(feedBox_.y + 2), 8,
+    feedThumb_ = {feedBox_.Right() - 10, feedContentTop + (trackH - thumbH) * feedScroll_ / feedMaxScroll_, 8, thumbH};
+    DrawRectangle(static_cast<int>(feedThumb_.x), static_cast<int>(feedContentTop), 8,
                   static_cast<int>(trackH), ToRay(theme.palette.panel3));
     DrawRectangle(static_cast<int>(feedThumb_.x), static_cast<int>(feedThumb_.y), 8,
                   static_cast<int>(thumbH), ToRay(theme.palette.borderDark));
@@ -3135,8 +3140,9 @@ void ShellView::Drag(Simulation& sim, float x, float y, float dx, float dy, bool
   if (feedActive_ && down && (draggingFeed_ ||
       (pressed && layout_.content.Contains(x, y) && feedThumb_.Contains(x, y + contentScroll_)))) {
     if (!draggingFeed_) { draggingFeed_ = true; feedDragOffset_ = y + contentScroll_ - feedThumb_.y; }
-    const float travel = feedBox_.h - 4 - feedThumb_.h;
-    if (travel > 0) feedScroll_ = std::clamp((y + contentScroll_ - feedBox_.y - 2 - feedDragOffset_) / travel, 0.0f, 1.0f) * feedMaxScroll_;
+    const float feedTrackTop = feedBox_.y + static_cast<float>(TypePx(11)) + 12.0f;
+    const float travel = feedBox_.h - (static_cast<float>(TypePx(11)) + 16.0f) - feedThumb_.h;
+    if (travel > 0) feedScroll_ = std::clamp((y + contentScroll_ - feedTrackTop - feedDragOffset_) / travel, 0.0f, 1.0f) * feedMaxScroll_;
     return;
   }
   const float localY = y + contentScroll_;
