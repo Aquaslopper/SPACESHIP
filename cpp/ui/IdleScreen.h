@@ -1,11 +1,8 @@
 // ============================================================================
 //  IdleScreen.h — Home: the ship at rest, and everything readable from it.
 //  ---------------------------------------------------------------------------
-//  Section E's build order is the model's order: stat rail, stage, stage note,
-//  nav strip, dock strip (only while docked), info rail, feed. The feed is the
-//  only part that is measured rather than authored - it takes what the rest of
-//  the column leaves, inside the 62..132 band - so the layout is asked for the
-//  feed height and this file lays the column out around it.
+//  Home's build order is the model's order: compact stat rail, ship stage,
+//  info rail, then Navigation and two event cards, with the activity feed last.
 // ============================================================================
 #pragma once
 
@@ -41,15 +38,22 @@ struct Strip {
   Area box;
 };
 
+struct HomeEventCard {
+  std::string heading;
+  std::string label;
+  std::string id;
+  bool station = false;
+  Area box;
+};
+
 struct IdleScreenModel {
   Area content;
   std::vector<RailCell> stats;
   std::vector<RailCell> infos;
   Area stageArea;
-  std::string stageNote;
   Strip nav;
-  bool docked = false;
-  Strip dock;
+  Area eventsBox;
+  std::vector<HomeEventCard> events;
   DiagramModel diagram;
   std::vector<std::string> feed;
   std::string feedHead = "Activity Feed";
@@ -66,9 +70,6 @@ std::vector<RailCell> InfoRail(const Simulation& sim, const Area& rail);
 // buildNavStrip(): "Holding at <body> - no course plotted", or the crossing's
 // own label while one is running or waiting to be acknowledged.
 Strip NavStrip(const Simulation& sim, const Area& box);
-
-// dockStrip(): only drawn while the ship is at a berth.
-Strip DockStrip(const Simulation& sim, const Area& box);
 
 // The whole screen. `layout` is what Layout.cpp measured; `others` is the
 // height the column needs before the feed, which the shell knows and the tests

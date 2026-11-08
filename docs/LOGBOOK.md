@@ -238,3 +238,120 @@ You must append a compressed summary of **every single reply and action you take
 - **Behaviour confirmed by the passing case:** docked at Tolme, Kessler selected, the travel button reads Idle (not Off), one press spends one action, clears `docked` and starts the crossing - the berth is no longer a cage.
 - **Checks still owed:** CI `test-linux` on PR #29 is the first real client build of this branch (no X11/OpenGL/display in this sandbox); the draw recorder here is the CPU painter, not a window.
 - **Untouched:** `Legacy code_Spaceship.txt`, `assets/`, `rescue/`, the three-column station layout, every cooldown rule outside this change, `AGENTS.md`.
+
+### Entry #017
+- **Timestamp:** 2026-11-07 23:22 UTC
+- **Task:** Tune the cockpit visuals to the supplied mockup: warmer mocha colors, fixed ship/home identity, smaller gauges, ship-click deck-plan access, fewer instructions, navigation/event cards below the info rail, and the feed at the bottom.
+- **Reference trace:** Read the legacy shell, status rail, home-screen build order, navigation strip, feed, and sidebar event list before changing the C++ presentation. The historical file was not edited.
+- **Palette (`Theme.cpp`):** Warmed the classic theme's panel, chrome, border, ink, and accent roles; changed the content surface from white to warm cream.
+- **Top bar/layout (`Layout.h/.cpp`, `Draw.cpp`):** Reserved the fixed left 165px slot for the ship identity, started task tabs to its right, and removed the right-hand Home slot while retaining the two tab-scroll arrows.
+- **Home control:** Draws `SHIP` plus the current vessel name in the fixed top-left slot; clicking that slot returns to Home regardless of the open task tabs.
+- **Status rail (`IdleScreen.cpp`, `Draw.cpp`):** Reduced gauge spacing and height while retaining the configured text-size floor and the original stat values/units.
+- **Ship access (`Draw.cpp`):** Removed the `Deck plan / crew` and `Exterior view` buttons; clicking the exterior ship image enters the deck view, and clicking an unused deck-stage area returns to the exterior view. Room callouts and crew interaction remain separate.
+- **Home content order:** Removed the ship-stage left/right-click instruction; placed the three information cards directly below the ship, with Navigation beneath the left card and live incident cards beneath the other two.
+- **Events:** Home event cards use current `sim.Events()` data and open the existing event task when clicked; the sidebar Events tree remains available.
+- **Activity feed:** The feed is the final Home panel and expands to the lower content edge with an 8px inset; longer information values shift the lower panels down before feed height is recalculated.
+- **Regression coverage (`draw_probe.cpp`):** Updated fixed-home and tab coordinates, tested clicking the ship instead of a removed view button, and asserted compact gauges, navigation/events placement, and the feed's bottom alignment.
+- **Checks:** `./build.sh --headless` completed; `ctest --test-dir build --output-on-failure` passed 125/125, including GUI syntax, ImGui input, and the native draw recorder after pinned headers were supplied from `/tmp/deps`.
+- **Additional UI check:** `tools/check-gui-syntax.sh` passed for Draw.cpp, AudioDevice.cpp, and main.cpp under `-Wall -Wextra -Wpedantic`; it reported one pre-existing unused `p` warning in `PaintTaskScreen`.
+- **Limits:** No windowed GUI was linked or launched, so this verifies the painter's recorded geometry/input, not an on-screen screenshot or full visual/gameplay parity.
+- **Untouched:** `Legacy code_Spaceship.txt`, `assets/`, `rescue/`, simulation behavior, and task/event rules. The headless `build/` output and downloaded GUI headers remain ignored/outside tracked source.
+- **Final rerun:** After the small-window tab-strip bound and updated visual assertions, `ctest --test-dir build --output-on-failure` again passed 125/125, including GUI syntax, ImGui input, and the native draw recorder.
+
+### Entry #018
+- **Timestamp:** 2026-11-07 23:27 UTC
+- **Task:** Create a pull request for the Home cockpit visual tuning.
+- **Branch:** `arena/cb265de8-spaceship`, pushed to `origin`; no branch switch or rename.
+- **Commit:** `94490bb` — `Tune the home cockpit layout and mocha palette`.
+- **Pull request:** #30, `arena/cb265de8-spaceship` to `main`, open at https://github.com/Aquaslopper/SPACESHIP/pull/30.
+- **PR title:** `Tune the home cockpit layout and mocha palette`.
+- **PR contents:** Summary of the mocha palette, fixed ship home control, compact gauges, click-to-switch ship view, home content order, and bottom-anchored feed.
+- **PR verification notes:** Headless build and final 125/125 CTest result, including GUI syntax, ImGui input, and native draw recorder.
+- **PR description update:** `gh pr edit` hit the repository's classic-project GraphQL deprecation error; updated the description successfully with `gh api` PATCH.
+- **Visual verification limit:** No windowed GUI was launched; the native draw recorder checks recorded drawing and input, not a rendered screenshot.
+- **Untouched:** `Legacy code_Spaceship.txt`, `assets/`, `rescue/`, and simulation rules.
+
+### Entry #019
+- **Timestamp:** 2026-11-07 23:49 UTC
+- **Task:** Refine the Home screen against the latest side-by-side screenshots: center the Wren in a taller stage, spread room callouts around it, keep the feed compact at the bottom, and show two event cards.
+- **Screenshot reading:** The desired composition uses callouts at the upper/middle/lower ship positions, info panels around y=666 in the supplied 970px capture, two separate event slots, and an approximately 152px feed panel at the bottom.
+- **Stage (`Layout.h`, `IdleScreen.cpp`, `Draw.cpp`):** Added a 410px Home stage minimum, moved its top below the compact gauges, and centered the exterior ship image at 40% of the stage height.
+- **Callouts (`Draw.cpp`):** For the standard three rows, placed labels at normalized stage offsets 0, 0.45, and 0.69 on both sides. When more rooms require additional rows, the exterior stage grows to keep the labels from colliding.
+- **Event cards (`IdleScreen.cpp`):** Keep two separate columns beneath the second and third info cards. Fill them with live incidents, or independent "No active events." cards when slots are empty; additional incidents wrap to more rows.
+- **Feed (`Layout.h`, `IdleScreen.cpp`, `Draw.cpp`):** Anchor the feed 8px from the content bottom and cap its Home height at 152px (without changing the general feed-height helper).
+- **Regression coverage (`draw_probe.cpp`):** Check two distinct event headings, the feed height ceiling and bottom anchor, and exterior callout interactions after the stage reflow.
+- **Checks:** Rebuilt the headless core; `tools/check-draw.sh` passed; final `ctest --test-dir build --output-on-failure` passed 125/125 including GUI syntax, ImGui input, and native draw recorder.
+- **Limit:** No windowed GUI was launched; the capture layout is checked with the CPU painter/input recorder, not a fresh screenshot.
+- **Untouched:** `Legacy code_Spaceship.txt`, `assets/`, `rescue/`, and gameplay logic. The changes are follow-up work for the existing open PR #30.
+- **PR follow-up:** Pushed commit `931e319` to `arena/cb265de8-spaceship` and updated PR #30's summary and verification section to include the screenshot-alignment changes and final 125/125 test result.
+
+### Entry #020
+- **Timestamp:** 2026-11-08 00:05 UTC
+- **Task:** Follow the owner's latest Home screenshot corrections on the existing cockpit PR #30.
+- **Docking as an event (`IdleScreen.h/.cpp`, `Draw.cpp`):** Removed the separate Docked strip and its click path. Berth status and body name now occupy an event card; left/right clicks route to the existing station briefing/task.
+- **Events:** Every card carries an explicit heading; empty slots remain two independent Events cards, and live incidents keep their existing event-task route.
+- **Six-panel/feed relationship (`IdleScreen.cpp`, `Draw.cpp`):** The Home stage minimum is now 520px. Navigation and event cards are shifted lower into available space so the lower group sits directly above the bottom-anchored Activity Feed without an empty band.
+- **Room callouts (`Draw.cpp`):** The three-row left and right label curves differ, removing the previous mirror-aligned rhythm; dense room layouts retain their existing extra-stage spacing.
+- **Regression checks (`draw_probe.cpp`):** Added stage/panel grouping, zero-gap feed adjacency, and docked-event placement checks; the feed is verified not to overlap the dock/event cards.
+- **Build:** `PATH="/tmp/spaceship-test-venv/bin:$PATH" cmake --build build --parallel 2` passed.
+- **Draw recorder:** `./tools/check-draw.sh` passed against the real `Draw.cpp` with the pinned raylib 6.0 / Dear ImGui 1.92.7 / rlImGui sources.
+- **Full tests:** `ctest --test-dir build --output-on-failure` passed **125/125**, including GUI syntax, ImGui input, and native draw recorder; `git diff --check` passed.
+- **Visual limit:** No windowed client or new screenshot was captured; these checks verify source compilation and recorded painter/input geometry, not the rendered cockpit on a display.
+- **Scope:** Follow-up to the open PR #30 on `arena/cb265de8-spaceship`; `Legacy code_Spaceship.txt`, `assets/`, `rescue/`, simulation behavior, and gameplay rules remain untouched.
+
+### Entry #021
+- **Timestamp:** 2026-11-08 00:13 UTC
+- **Task:** Correct the Home screenshot regression reported by the owner after commit `880fc5f`.
+- **Root cause:** The Activity Feed heading was painted 13px above its panel. With the requested zero gap, the heading fell over the Navigation card's bottom text/border.
+- **Feed header (`Draw.cpp`):** Paint the feed surface first and place “Activity Feed” inside its upper-left area, so the heading is contained by its own panel instead of floating in the preceding row.
+- **Feed content:** Start the log rows and scissor viewport beneath the heading; reserve the header space when calculating visible rows and scrollbar thumb geometry.
+- **Feed dragging:** Align thumb-drag travel and offset with the reduced content track below the header.
+- **Regression test (`draw_probe.cpp`):** Assert the Activity Feed heading lies inside the feed surface, while retaining bottom-anchor and no-gap checks.
+- **Build:** `PATH="/tmp/spaceship-test-venv/bin:$PATH" cmake --build build --parallel 2` passed (core already up to date; draw probe recompiles the real painter).
+- **Draw recorder:** `./tools/check-draw.sh` passed, including feed wheel/drag/wrap/clamp coverage.
+- **Full suite:** `ctest --test-dir build --output-on-failure` passed **125/125**; `git diff --check` passed.
+- **Visual limit:** The screenshot correction is verified by the CPU draw recorder; no windowed GUI screenshot was captured in this environment.
+- **Scope:** Small follow-up to PR #30 on `arena/cb265de8-spaceship`; no palette, gameplay, authored assets, or historical reference files changed.
+
+### Entry #022
+- **Timestamp:** 2026-11-08 00:18 UTC
+- **Task:** Match the room-callout placement in the supplied mockup after the owner pointed out that the labels still formed aligned columns.
+- **Correction to the prior interpretation:** The earlier tweak changed only row heights, leaving every left label at one x/width and every right label at another. The mockup also steps the boxes horizontally inward and varies their widths.
+- **Three-row callouts (`Draw.cpp`):** Added per-side normalized x-insets, widths, and y positions for the standard three rows, following the screenshot's distinct left/right stagger rather than mirroring the sides.
+- **Left sequence:** Engine Room remains at the outer edge; O2 Filter Room steps inward; Cargo Hold moves substantially inward and narrows.
+- **Right sequence:** Crew Quarters stays at the outer edge; Mess Hall shifts slightly inward; Bridge moves substantially inward and narrows.
+- **Responsive text:** Callout labels wrap against each resulting box width; the row height is measured from the widest wrapped label.
+- **Dense layouts:** More-than-three-row ships retain their existing spacing rule, avoiding a change to the larger-room layout.
+- **Regression coverage (`draw_probe.cpp`):** Starter Wren probe now asserts the mockup's left/right x progression and individually staggered y positions.
+- **Checks:** `cmake --build build --parallel 2`, `tools/check-draw.sh`, full `ctest` **125/125**, and `git diff --check` all passed.
+- **Visual limit:** The recorder verifies rendered coordinates/order but no separate windowed screenshot was captured here.
+- **Scope:** Follow-up to open PR #30 on `arena/cb265de8-spaceship`; no data, authored art, palette, or gameplay changes.
+
+### Entry #023
+- **Timestamp:** 2026-11-08 00:31 UTC
+- **Task:** Clean up the cockpit after the owner reported room-card overlap, uneven six-card sizing, and cards touching each other.
+- **Room callouts (`Draw.cpp`):** Reduced the three-row callout widths and staggered their left edges while reserving a 30px horizontal gutter from the ship-art bounds. O2 Filter Room and Cargo Hold can no longer intrude into the art rectangle.
+- **Callout coverage (`draw_probe.cpp`):** Check the Wren art-to-panel clearance on both sides, plus the staggered coordinates.
+- **Six-card grid (`IdleScreen.cpp`, `Layout.h`):** Replaced proportional/mixed-width placement with a strict three-column grid: three info cards above Navigation and two separate Events cards.
+- **Equal sizing:** All six cards now use identical widths and a common height. The draw pass measures actual wrapped info, navigation, and event text, then grows all cards together when needed.
+- **Gutters:** Added a consistent 12px gap between grid columns and rows and before Activity Feed, preventing touching borders while retaining the feed's bottom anchor.
+- **Navigation text:** Wraps within its card and contributes to the shared card-height measurement instead of spilling or silently clipping.
+- **Regression coverage:** Draw probe asserts equal card dimensions, uniform gutters, feed separation, callout staggering, and that room cards stay outside the ship-art bounds.
+- **Build and draw checks:** `cmake --build build --parallel 2` and `tools/check-draw.sh` passed.
+- **Full suite:** `ctest --test-dir build --output-on-failure` passed **125/125**; `git diff --check` passed.
+- **Visual limit:** No windowed client screenshot was captured here; the native draw recorder verifies the painter's measured geometry, not a live display.
+- **Scope:** Follow-up on PR #30, branch `arena/cb265de8-spaceship`; palette, authored assets, legacy materials, and simulation/gameplay behavior remain unchanged.
+
+### Entry #024
+- **Timestamp:** 2026-11-08 00:42 UTC
+- **Task:** Close the remaining visual-sizing gap after the owner demanded a cleaner, non-chaotic Home layout.
+- **Painter bug (`Draw.cpp`):** Although the prior model placed six equal-width cards, `PaintIdle` still subtracted 8px from the first two info-card fills as residue from the old layout. Removed that trim so the rendered surfaces match the grid geometry exactly.
+- **Callout clearance:** Increased the standard three-row labels' reserved horizontal clearance to 30px from the ship-art rectangle while keeping their widths/left edges staggered; wrapping still contributes to row height.
+- **Rendered-size test (`draw_probe.cpp`):** Compare the actual six recorded background rectangles, not just model boxes, and require identical painted width and height.
+- **Art-overlap test:** The O2 Filter Room, Cargo Hold, Crew Quarters, and Bridge panels are checked against the recorded ship-art rectangle with a clearance margin.
+- **Grid test:** Retains the three-column alignment, six equal model dimensions, 12px card gutters, and 12px Activity Feed separation assertions.
+- **Checks:** `cmake --build build --parallel 2` passed; `tools/check-draw.sh` passed.
+- **Full regression suite:** `ctest --test-dir build --output-on-failure` passed **125/125**, including GUI syntax, ImGui input, and native draw recorder.
+- **Diff hygiene:** `git diff --check` passed.
+- **Visual limit:** No windowed screenshot was captured in this environment; the new checks validate the real painter's recorded fills and coordinates.
+- **Scope:** Follow-up on PR #30, branch `arena/cb265de8-spaceship`; no gameplay, palette, authored asset, or historical reference edits.
