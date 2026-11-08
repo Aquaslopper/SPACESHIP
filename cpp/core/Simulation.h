@@ -242,6 +242,10 @@ class Simulation {
   // Economy (Economy.cpp)
   double LotPrice(const GoodsLot& lot) const;
   double CargoUsed() const;
+
+  // What this port's counter charges for one crate right now, computed the way
+  // BuyGood charges it, so a label and a purchase can never disagree.
+  double GoodCounterPrice(const std::string& goodId) const;
   double CargoCapacity() const;
   double CargoReserved() const;
   bool BuySupply(const std::string& id);     // fuel cell, kit, medkit, canister, rations

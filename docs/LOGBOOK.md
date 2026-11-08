@@ -1088,3 +1088,31 @@ one you save for - so it waits for a word.
 A trap worth recording: the first version of this measurement printed an `int` with
 `%.1f` and produced "604.8 m3" for an 18 m3 consignment. The format string, not the
 game, was wrong; every freelance number above is from the corrected run.
+
+## 061 — Freelance rows stay lit and say what they cost
+
+DECIDED BY THE OWNER: a freelance run the player cannot afford stays pressable. The
+game informs, it does not take the player by the hand - the same rule the filter
+hand follows when he waits for the air his training allows.
+
+So a freelance row now carries its own arithmetic. Real row from the board:
+
+    Dawn Auriga 3 - 2 crates of Hydroponic produce - needs 18 m3 and 606 sh
+    Buy the lot here first; about 88 sh over your cost there. Hold 8 m3 free;
+    purse 340 sh. Short 266 sh. Needs 10 m3 more room.
+
+The cost is `GoodCounterPrice()`, a new const reader on Simulation that charges one
+crate exactly the way `BuyGood` charges it - `ceil(round(value * port factor) * 1.2)`
+per crate, times the crates - so a label and a purchase can never disagree. The free
+hold is `capacity - used - reserved`, the same three terms the delivery gate uses.
+
+Nothing greys. `fits` stays true for freelance, `AcceptTrade` is untouched, and the
+row with 0 sh in the purse still signs: the player may be saving for it.
+
+Probe `/home/user/probe/freelabel`, all 30 stations: 32 freelance rows, 0 greyed, 0
+without the label, and 0 refused presses with the purse set to zero (`failures=0` by
+the probe's own three counts).
+
+Not proved: that the numbers read well at a glance in the real row on screen - the
+row is one line in the build I cannot see, and "needs 18 m3 and 606 sh" may be a
+long line at small text sizes.

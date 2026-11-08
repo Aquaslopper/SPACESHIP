@@ -439,6 +439,23 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
       // A delivery is loaded into the hold the moment it is signed, so a row the
       // hold cannot take has to say so rather than sit there live and refuse the
       // press. Freelance loads nothing here and is always open.
+      // A freelance run is the player's own purchase, so it is never refused at
+      // signing and never greyed here: the row says what it wants and lets the
+      // player decide. The game does not take him by the hand.
+      if (run.mode == "freelance") {
+        const double perCrate = sim.GoodCounterPrice(run.good);
+        const double cost = perCrate * run.crates;
+        const double hold = commodityVol * run.crates;
+        const double free = std::max(0.0, sim.CargoCapacity() - sim.CargoUsed() -
+                                              sim.CargoReserved());
+        offer.label += " - needs " + Num(hold) + " m3 and " + Num(cost) + " sh";
+        offer.note += " Hold " + Num(free) + " m3 free; purse " +
+                      Num(sim.State().shiplets) + " sh.";
+        if (cost > sim.State().shiplets) {
+          offer.note += " Short " + Num(cost - sim.State().shiplets) + " sh.";
+        }
+        if (hold > free) { offer.note += " Needs " + Num(hold - free) + " m3 more room."; }
+      }
       if (run.mode == "delivery" && !run.accepted) {
         const double needed = commodityVol * run.crates;
         const double free = sim.CargoCapacity() - sim.CargoUsed() - sim.CargoReserved();

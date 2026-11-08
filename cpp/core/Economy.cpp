@@ -47,6 +47,22 @@ double Simulation::LotPrice(const GoodsLot& lot) const {
 
 double Simulation::CargoCapacity() const { return cargo_.capacity; }
 
+double Simulation::GoodCounterPrice(const std::string& goodId) const {
+  const Good* good = nullptr;
+  for (const Good& candidate : catalog_.goods) {
+    if (candidate.id == goodId) { good = &candidate; }
+  }
+  if (good == nullptr) { return 0.0; }
+  GoodsLot probe;
+  probe.id = good->id;
+  probe.name = good->name;
+  probe.kind = good->kind;
+  probe.vol = good->vol;
+  probe.value = good->value;
+  probe.risk = good->risk;
+  return js::Ceil(LotPrice(probe) * 1.2);
+}
+
 double Simulation::CargoUsed() const {
   double used = 0;
   for (const GoodsLot& lot : goods_) { used += lot.vol; }
