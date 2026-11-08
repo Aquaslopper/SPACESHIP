@@ -122,7 +122,7 @@ void Simulation::OnTaskDone(Task& task) {
     return;
   }
   if (task.type == "cook") {
-    // One ration is now five food on the counter, clamped to the ceiling.
+    // One dry ration yields cooked food on the counter, clamped to the ceiling.
     mess_.rack = std::min(mess_.capacity, mess_.rack + rules_.mess.foodPerRation);
     LogLine((task.by.empty() ? "Someone" : task.by) + " finished cooking a fresh batch.");
     // The counter is full, or the larder is empty: the cook's chain is done.

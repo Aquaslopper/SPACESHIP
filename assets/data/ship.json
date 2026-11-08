@@ -208,7 +208,7 @@
     ],
     "r8": [
       "Hydroponics",
-      "Produce / rations"
+      "Produce / dry rations"
     ],
     "r9": [
       "Recyclers",
@@ -246,7 +246,7 @@
       "code": "GALLEY / 04",
       "description": "The rack, stove and water line share one counter.",
       "glyph": "habitat",
-      "label": "Rations and meal prep"
+      "label": "Galley and dry rations"
     },
     "o2": {
       "accent": "#42aaa3",
@@ -342,7 +342,7 @@
     "r8": {
       "accent": "#7daf69",
       "code": "HYDROPONICS / 15",
-      "description": "Produce can be turned into fresh shipboard rations.",
+      "description": "Produce can be turned into dry rations for the galley.",
       "glyph": "garden",
       "label": "Grow beds"
     },
@@ -407,7 +407,7 @@
         "h": 94,
         "id": "mess",
         "name": "Mess Hall",
-        "systems": "Galley / Rations",
+        "systems": "Galley / dry rations",
         "tag": "DECK A",
         "tone": "#faf7f2",
         "w": 142,
@@ -534,7 +534,7 @@
         "id": "r8",
         "name": "Hydroponics",
         "small": true,
-        "systems": "Produce / rations",
+        "systems": "Produce / dry rations",
         "tag": "POD",
         "tone": "#faf7f2",
         "w": 106,
@@ -655,7 +655,7 @@
         "id": "mess",
         "name": "Mess Hall",
         "small": false,
-        "systems": "Galley / Rations",
+        "systems": "Galley / dry rations",
         "tag": "DECK A",
         "tone": "#faf7f2",
         "w": 79,
@@ -787,7 +787,7 @@
         "id": "r8",
         "name": "Hydroponics",
         "small": true,
-        "systems": "Produce / rations",
+        "systems": "Produce / dry rations",
         "tag": "DECK C",
         "tone": "#faf7f2",
         "w": 99,

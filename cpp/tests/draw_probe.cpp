@@ -680,8 +680,8 @@ int main() {
       Require(std::any_of(rects.begin(), rects.end(), [](const auto& r) {
         return r.color.r == 176 && r.color.g == 90 && r.color.b == 66 && r.w > 0;
       }), "Starving hunger did not paint the source red bar");
-      // Eating is what moves the number: one food drains exactly one point of
-      // hunger and eating stops at the floor, so a hand at 30 stops at 5.
+      // One food drains five hunger; the click that triggers the meal still
+      // adds its 0.6 before the three-food meal is applied.
       auto hungry = ship::Simulation::ReferenceVoyage(sim.World());
       auto* hand = hungry.FindCrew("rell");
       hand->hunger = 30;
@@ -697,9 +697,11 @@ int main() {
       const auto& mealRules = hungry.GameRules().mess;
       const double mealFood = mealRules.hungerPerMeal / mealRules.hungerPerFood;
       const double eaten = std::min(mealFood, rackBefore);
+      const double risePerClick = mealRules.hungerPerMeal / mealRules.every;
       hungry.PerformAction();
-      Require(hand->hunger == 30 - eaten * mealRules.hungerPerFood,
-              "The meal did not drain its own three food");
+      Require(std::abs(hand->hunger - (30 + risePerClick -
+                                      eaten * mealRules.hungerPerFood)) < 1e-9,
+              "The meal did not drain its own three food after the due-click rise");
       Require(hand->hunger >= floorAt, "A fed hand fell under the hunger floor");
       Require(hungry.MessRack() == rackBefore - eaten, "The meal took the wrong amount of food");
     }

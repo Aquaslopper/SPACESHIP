@@ -499,76 +499,66 @@ TEST_CASE("one cooked ration becomes five food, and crew eat it back down",
   CHECK(sim.MessRations() == rules.rationStart);
   CHECK(sim.MessRations() == 21.0);
 
-  // One batch: ONE ration leaves the larder, five food land on the counter,
-  // one piece per action - never more than the larder can pay for.
-  sim.MutableMess().rack = 4.0;
+  // One batch spends one dry ration up front; up to five cooked food land
+  // together when its five-action timer completes.
+  sim.MutableMess().rack = rules.cookBelow;
   REQUIRE(sim.StartCookingSelf());
   CHECK(sim.MessRations() == 20.0);
   CHECK(sim.FindOngoing("cook")->total == rules.foodPerRation);
   while (sim.FindOngoing("cook") != nullptr) { sim.PerformAction(); }
-  CHECK(sim.MessRack() >= 4.0 + rules.foodPerRation - rules.hungerFloor);
+  CHECK(sim.MessRack() == rules.cookBelow + rules.foodPerRation);
 
   // An empty larder refuses the pot, and says why.
   sim.MutableMess().rack = 0.0;
   sim.MutableMess().rations = 0.0;
   CHECK_FALSE(sim.StartCookingSelf());
 
-  // The clock is 25 clicks long, and hunger climbs a point on every click.
+  // Every click adds its share of the rise, including the click that triggers
+  // a meal. A fed crew member goes 5 -> 20 -> 5 over a full 25-click cycle.
   auto* hand = sim.FindCrew("rell");
   REQUIRE(hand != nullptr);
   CHECK(rules.every == 25);
-
-  // Isolate this one hand: the other three are wound back so their own clocks
-  // do not also come up mid-test and eat the counter out from under it.
-  const auto quieten = [&sim]() {
+  const auto quieten = [&sim, &rules]() {
     for (auto& member : sim.MutableCrew()) {
       member.hungerTick = 0.0;
-      member.hunger = 0.0;
+      member.hunger = rules.hungerFloor;
     }
   };
-
   quieten();
   sim.MutableMess().rack = 24.0;
-  hand->hunger = 15.0;
-  hand->hungerTick = 1.0;
-  for (int i = 0; i < 23; ++i) { sim.PerformAction(); }
-  CHECK(hand->hunger == 38.0);          // 15 + 23 clicks, nobody has eaten yet
-  CHECK(hand->hungerTick == 24.0);
-  sim.PerformAction();                  // the 24th click: this hand's clock
-  CHECK(hand->hungerTick == 0.0);
-  // There were 24 food on the counter, so it eats 24 - it cannot eat 38. The
-  // counter, not the hunger bar, is what limits the meal: 38 -> 14.
-  CHECK(sim.MessRack() == 0.0);
-  CHECK(hand->hunger == 14.0);
+  for (int i = 0; i < static_cast<int>(rules.every); ++i) { sim.PerformAction(); }
+  for (const auto& member : sim.Crew()) {
+    CHECK(std::abs(member.hunger - rules.hungerFloor) < 1e-9);
+    CHECK(member.hungerTick == 0.0);
+  }
+  CHECK(sim.MessRack() == 12.0);  // four crew consume three cooked food each
 
-  // The owner's example, exactly: the others have already eaten five, ten food
-  // are left, and this hand is at 15 hunger. It eats ten and is left at five -
-  // hunger is drained by what is on the counter, and never vanishes.
+  // A due meal uses at most three cooked food and never pushes hunger below 5.
   quieten();
   sim.MutableMess().rack = 10.0;
   hand->hunger = 15.0;
   hand->hungerTick = rules.every - 1;
   sim.PerformAction();
-  CHECK(hand->hunger == 5.0);
-  CHECK(sim.MessRack() == 0.0);
+  CHECK(hand->hunger == rules.hungerFloor);
+  CHECK(sim.MessRack() == 7.0);
 
-  // Only three food left instead: it eats three and keeps the rest of its
-  // hunger, because the counter ran out before the bar did.
+  // With only three cooked food, the hand takes three and still stops at the
+  // floor; this is not an unlimited "eat the whole rack" meal.
   quieten();
   sim.MutableMess().rack = 3.0;
   hand->hunger = 15.0;
   hand->hungerTick = rules.every - 1;
   sim.PerformAction();
-  CHECK(hand->hunger == 12.0);          // 15 down to 12, three eaten
+  CHECK(hand->hunger == rules.hungerFloor);
   CHECK(sim.MessRack() == 0.0);
 
-  // With nothing on the counter the hand cannot eat at all: hunger is where it
-  // was, and the counter stays empty.
+  // With no cooked food, the due click still raises hunger but nobody eats.
   quieten();
   hand->hunger = 40.0;
   hand->hungerTick = rules.every - 1;
+  const double risePerClick = rules.hungerPerMeal / rules.every;
   sim.PerformAction();
-  CHECK(hand->hunger == 40.0);
+  CHECK(hand->hunger == 40.0 + risePerClick);
   CHECK(sim.MessRack() == 0.0);
 }
 
@@ -586,12 +576,22 @@ TEST_CASE("the galley reads the rack and the four clocks", "[ui][mess]") {
   CHECK(mess.plates[0].name == "Rell Aventine");
   CHECK(mess.plates[0].sub == "25 actions to next meal");
   CHECK(Line(mess.screen.left[0], "Capacity")->value == "24 food, hard ceiling");
-  CHECK(Line(mess.screen.left[0], "Ration rack")->value == "21 of 24 dry rations");
-  CHECK(Line(mess.screen.under[1], "Hungry now")->value == "0 of 4");
+  CHECK(Line(mess.screen.left[0], "Dry-ration larder")->value ==
+        "21 of 24 dry rations");
+  CHECK(Line(mess.screen.left[1], "Hunger rises")->value ==
+        "by 15 over those 25 clicks");
+  CHECK(Line(mess.screen.left[1], "One meal")->value ==
+        "up to 3 food (counter and floor can limit it)");
+  CHECK(Line(mess.screen.under[0], "Yield")->value ==
+        "up to 5 cooked food (rack capacity applies)");
+  CHECK(Line(mess.screen.under[0], "Takes")->value ==
+        "5 actions; food lands when the batch finishes");
+  CHECK(Line(mess.screen.under[0], "Larder")->value == "21 of 24 dry rations");
+  CHECK(Line(mess.screen.under[1], "At least 70% hunger")->value == "0 of 4");
   CHECK(mess.screen.bandNote ==
-        "A batch spends one dry ration and puts five food on the counter, one "
-        "piece per action. A hungry hand may still eat it out from under the pot "
-        "while it runs.");
+        "One dry ration yields up to 5 cooked food after 5 actions. 4 crew use "
+        "12 food per 25-action cycle; automatic restocking starts below 10 food "
+        "when the cook is free and a dry ration is available.");
   CHECK(mess.screen.progress[0].taskId == "cook");
   CHECK(mess.screen.progress[0].text == "Cook a Batch");
 
@@ -600,7 +600,7 @@ TEST_CASE("the galley reads the rack and the four clocks", "[ui][mess]") {
   const ship::MessScreenModel full = ship::BuildMessScreen(sim);
   CHECK(full.full);
   CHECK(full.screen.bandNote ==
-        "The rack is full. Cooking is refused until something is eaten.");
+        "The cooked-food rack is full (24 of 24); cooking waits until food is eaten.");
   CHECK(full.screen.progress[0].state == ship::ButtonState::Off);
 }
 
@@ -943,10 +943,18 @@ TEST_CASE("the action click jointly clocks meals filters wear and existing work 
     // stops there. It does not clear the shelf.
     const auto& mr = sim.GameRules().mess;
     const double mealFood = mr.hungerPerMeal / mr.hungerPerFood;
+    const double risePerClick = mr.hungerPerMeal / mr.every;
+    const double hungerAtMeal = std::min(100.0, hungerBefore + risePerClick);
     const double eatable = std::min(mealFood, rackBefore);
-    CHECK(rell->hunger == (stocked ? hungerBefore - eatable * mr.hungerPerFood : hungerBefore));
+    const double expectedHunger = stocked
+        ? std::max(mr.hungerFloor, hungerAtMeal - eatable * mr.hungerPerFood)
+        : hungerAtMeal;
+    CHECK(std::abs(rell->hunger - expectedHunger) < 1e-9);
     CHECK(sim.MutableMess().rack == (stocked ? rackBefore - eatable : rackBefore));
-    // A meal due while work already exists must NOT steal a work tick.
+    // A meal due while work already exists must NOT steal a work tick. Empty
+    // the counter to check the hunger rise on a due click with no meal.
+    sim.MutableMess().rack = 0.0;
+    const double hungerBeforeEmptyMeal = rell->hunger;
     rell->hungerTick = sim.GameRules().mess.every - 1;
     sim.PerformAction();
     REQUIRE(sim.FindOngoing("maint") != nullptr);
@@ -956,10 +964,9 @@ TEST_CASE("the action click jointly clocks meals filters wear and existing work 
     CHECK(sim.State().wearTick == 2);
     CHECK(sim.State().filterLife == life - 2 * sim.GameRules().life.decay);
     CHECK(rell->hungerTick == 0);
-    // A second meal on the same clock: the counter is empty by now, so the
-    // hand cannot eat at all and its hunger only climbs another point.
+    // The empty-counter due click still adds 0.6 hunger without pausing work.
     CHECK(rell->hungerTick == 0);
-    CHECK(rell->hunger > 0.0);
+    CHECK(std::abs(rell->hunger - (hungerBeforeEmptyMeal + risePerClick)) < 1e-9);
   }
 }
 

@@ -403,23 +403,23 @@ bool Simulation::StartMaintenanceSelf() {
 }
 
 bool Simulation::StartCookingSelf() {
-  // Cooking a batch: ONE ration leaves the larder and becomes foodPerRation
-  // food on the counter, one piece per action. Refuses a full counter and
-  // refuses an empty larder - the two things a cook cannot work around.
+  // Cooking a batch spends one dry ration up front; up to foodPerRation cooked
+  // food lands together when the fixed foodPerRation-action timer completes.
+  // Refuse a full counter or an empty larder.
   if (mess_.rack >= mess_.capacity) {
     LogLine("Cooking refused - the galley counter is already full.");
     return false;
   }
   if (mess_.rations < 1.0) {
-    LogLine("Cooking refused - there are no rations in the larder.");
+    LogLine("Cooking refused - there are no dry rations in the larder.");
     return false;
   }
   if (FindOngoing("cook") != nullptr || FindOngoing("project-food") != nullptr) {
     return false;
   }
 
-  // The green bar on the button fills over five clicks, one per food the batch
-  // will yield. The food lands when the batch finishes, not as it runs.
+  // The green bar fills for foodPerRation actions; cooked food lands together
+  // when the batch finishes, not as it runs.
   const double cost = rules_.mess.foodPerRation;
 
   cookClaim_ = true;
@@ -432,8 +432,8 @@ bool Simulation::StartCookingSelf() {
   if (task != nullptr) {
     task->by = "the commander";
     mess_.rations -= 1.0;  // the ration is spent when the batch starts
-    // Carrying on to a full rack is now allowed: 1 ratio, then another ratio,
-    // until the galley is stocked.
+    // Carrying on to a full rack is allowed: one dry ration per batch, until
+    // the cooked-food counter is stocked.
     cookRestock_ = true;
   }
   return true;

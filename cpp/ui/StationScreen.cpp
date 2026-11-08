@@ -212,8 +212,9 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     row.details.push_back("Purse: " + Num(purse) + " sh.");
     for (const std::string& line : extraDetails) { row.details.push_back(line); }
     if (!row.enabled) {
-      row.details.push_back(purse < price ? "Not affordable: the purse is short."
-                                          : "Not available: the ship cannot take another.");
+      row.details.push_back(
+          purse < price ? "Not affordable: the purse is short."
+                        : "Not available: a stock limit or active project blocks this purchase.");
     }
     market.rows.push_back(row);
   };
@@ -230,11 +231,17 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
          {"Rack: " + Num(sim.Life().canisters) + " of " + Num(sim.Life().capacity) +
               " canisters.",
           "The Recyclers' oxygen project blocks this while it runs."});
-  supply("buy-rations", "Six rations - 20 sh", "Six rations for the galley rack.", kRations,
-         sim.MessRack() <= sim.MessCapacity() - 6 &&
+  supply("buy-rations", "Six dry rations - 20 sh",
+         "Six dry rations for the larder; the cook turns them into galley food.", kRations,
+         sim.MessRations() <= sim.MessRationCapacity() - 6 &&
              sim.FindOngoing("project-food") == nullptr,
-         {"Rack: " + Num(sim.MessRack()) + " of " + Num(sim.MessCapacity()) + " rations.",
-          "The galley's food project blocks this while it runs."});
+         {"Larder: " + Num(sim.MessRations()) + " of " +
+              Num(sim.MessRationCapacity()) + " dry rations.",
+          "Galley: " + Num(sim.MessRack()) + " of " +
+              Num(sim.MessCapacity()) + " cooked food.",
+          "One dry ration becomes up to " +
+              Num(sim.GameRules().mess.foodPerRation) + " cooked food per batch.",
+          "Hydroponics' ration-production project blocks purchases while it runs."});
 
   for (const Good& good : sim.Market()) {
     const double price = GoodBuyPrice(sim, good);

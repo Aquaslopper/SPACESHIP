@@ -469,3 +469,18 @@ You must append a compressed summary of **every single reply and action you take
 - **Checks:** `git diff --check` clean. No build, test suite, draw probe, or visual run was performed, in keeping with the standing stop-testing instruction.
 - **Untouched:** hunger/meal/cooking rules, simulation state transitions, assets, the legacy reference, and all unrelated rooms.
 - **State:** changes remain uncommitted on `arena/ae015614-spaceship`.
+
+### Entry #034
+- **Timestamp:** 2026-11-08 04:35 UTC
+- **Task:** owner requested accurate, live food, hunger, cooking, and ration information across all galley-related panels and help, not only the GALLEY scene.
+- **Accepted values preserved:** cooked-food cap 24; one dry ration yields up to five cooked food in five actions; meals use up to three cooked food at five hunger per food, with floor five; automatic cooking starts below ten.
+- **Clock correction:** `TickCrew()` now applies the 0.6 hunger rise on every click, including the meal-due click, so the specified rise is exactly 15 over 25 clicks.
+- **Live galley panel:** distinguishes cooked food on the counter from dry rations in the larder; reports batch progress, yield, duration, threshold, and current stock.
+- **Availability copy:** cooking and dry-ration purchases reflect empty/full stock and Hydroponics interlocks; station details show both larder and cooked-food totals.
+- **Other panels:** shared-meal copy names cooked food; Hydroponics, sidebar, room descriptions, crew activity, and progression labels identify dry rations explicitly.
+- **Help and logs:** clarified dry-ration production/conversion and made the deep-ice ration award report its actual capped amount.
+- **Training display:** kitchen job summaries and training feedback no longer claim a per-action ration rate; batch time and yield remain fixed.
+- **Assertions:** updated relevant galley, due-click hunger, draw-probe, and station-purchase expectations; they were not executed.
+- **Validation:** `git diff --check` only; no tests, builds, or draw checks were run, per the owner's instruction.
+- **Reference:** `Legacy code_Spaceship.txt` remains untouched and non-authoritative.
+- **State:** changes are being committed and pushed only to `arena/ae015614-spaceship`, updating open PR #33.

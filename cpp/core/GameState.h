@@ -112,7 +112,7 @@ struct Task {
   std::string other;  // second person (shared meals)
 
   double slot = -1;   // o2slot: which of the three slots
-  double rate = 0;    // cook: rations per action
+  double rate = 0;    // preserved task-rate field for older saved tasks
   double vol = 0;     // salvage: cubic metres held
   std::string payload;  // observe: the body recorded; dream: unused
 

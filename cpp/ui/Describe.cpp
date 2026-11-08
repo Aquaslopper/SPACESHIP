@@ -116,8 +116,9 @@ std::string JobThreshold(const Simulation& sim, const CrewMember& crew) {
     return "Crew morale +1 every " + Num(sim.CleanerIntervalOf(crew)) + " actions";
   }
   if (crew.job == "kitchen") {
-    return Num(crew.jobAt) + " ration" + (crew.jobAt == 1.0 ? "" : "s") +
-           " per action, cooking";
+    const MessRules& mess = sim.GameRules().mess;
+    return "1 dry ration -> up to " + Num(mess.foodPerRation) +
+           " cooked food in " + Num(mess.foodPerRation) + " actions";
   }
   return "-";
 }
@@ -199,40 +200,67 @@ void RoomO2(const Simulation& sim, Description& t) {
 
 void RoomMess(const Simulation& sim, Description& t) {
   const CrewMember* cook = sim.Cook();
+  const MessRules& rules = sim.GameRules().mess;
   const double rack = sim.MessRack();
   const double capacity = sim.MessCapacity();
-  const double room = capacity - rack;
-  const double food = room < sim.GameRules().mess.foodPerRation ? room
-                                                               : sim.GameRules().mess.foodPerRation;
-  const double cost = std::ceil(food);
-  t.sub = "Galley and rations - " + Num(rack) + " of " + Num(capacity) +
-          " food on the counter, " + Num(sim.MessRations()) + " dry rations";
+  const double rations = sim.MessRations();
+  const double rationCapacity = sim.MessRationCapacity();
+  const double batchActions = rules.foodPerRation;
+  const double mealFood = rules.hungerPerMeal / std::max(1.0, rules.hungerPerFood);
+  const double crewFoodPerCycle = mealFood * static_cast<double>(sim.Crew().size());
+  const Task* cookTask = sim.FindOngoing("cook");
+  const bool hydroponicsBusy = sim.FindOngoing("project-food") != nullptr;
+  const bool full = rack >= capacity;
+
+  std::string cookingStatus;
+  if (cookTask != nullptr) {
+    cookingStatus = "Batch in progress - " + Num(cookTask->left) +
+                    " actions remaining; up to " + Num(rules.foodPerRation) +
+                    " cooked food will land";
+  } else if (hydroponicsBusy) {
+    cookingStatus = "Paused while Hydroponics processes produce";
+  } else if (full) {
+    cookingStatus = "Cooked-food counter is full";
+  } else if (rations < 1.0) {
+    cookingStatus = "No dry rations in the larder";
+  } else {
+    cookingStatus = Num(batchActions) + " actions - one dry ration yields up to " +
+                    Num(rules.foodPerRation) + " cooked food";
+  }
+
+  std::string cookAction;
+  if (cookTask != nullptr) {
+    cookAction = "already in progress";
+  } else if (hydroponicsBusy) {
+    cookAction = "unavailable while Hydroponics processes produce";
+  } else if (full) {
+    cookAction = "refused - cooked-food counter full";
+  } else if (rations < 1.0) {
+    cookAction = "refused - dry-ration larder empty";
+  } else {
+    cookAction = Num(batchActions) + " actions";
+  }
+
+  t.sub = "Galley: " + Num(rack) + " of " + Num(capacity) +
+          " cooked food; larder: " + Num(rations) + " of " +
+          Num(rationCapacity) + " dry rations";
   t.rows = {
-      {"Galley", Num(rack) + " of " + Num(capacity) + " food"},
-      {"Larder", Num(sim.MessRations()) + " of " + Num(sim.MessRationCapacity()) +
-                     " dry rations"},
-      {"Hunger cycle", "every " + Num(sim.GameRules().mess.every) +
-                           " actions, per crew member, staggered"},
-      {"Cooking", sim.MessRations() < 1.0
-                      ? std::string("No rations in the larder")
-                      : (rack >= capacity ? std::string("Not needed - counter is full")
-                                          : Plural(cost, "action") +
-                                                " - one ration becomes " +
-                                                Num(sim.GameRules().mess.foodPerRation) +
-                                                " food")},
-      {"Starvation", "at " + Num(sim.GameRules().mess.starveAt) +
-                         "% hunger health is at risk, slowly"},
-      {"Cook", cook ? cook->name + " - acts at " + JobThreshold(sim, *cook)
-                    : std::string("Nobody holds the job")},
+      {"Galley", Num(rack) + " of " + Num(capacity) + " cooked food"},
+      {"Larder", Num(rations) + " of " + Num(rationCapacity) + " dry rations"},
+      {"Hunger cycle", Num(rules.hungerPerMeal) + " hunger over " +
+                           Num(rules.every) + " actions per crew member; clocks staggered"},
+      {"Meal", "Up to " + Num(mealFood) + " cooked food; " +
+                   Num(rules.hungerPerFood) + " hunger per food, stops at " +
+                   Num(rules.hungerFloor)},
+      {"Crew demand", Num(crewFoodPerCycle) + " cooked food per " +
+                          Num(rules.every) + "-action cycle"},
+      {"Cooking", cookingStatus},
+      {"Starvation", "1 health every " + Num(rules.starveEvery) +
+                         " actions at " + Num(rules.starveAt) + "+ hunger"},
+      {"Cook", cook ? cook->name + " - kitchen duty" :
+                       std::string("No automatic cook assigned")},
   };
-  t.acts = {
-      {"Cook a batch",
-       rack >= capacity ? std::string("refused - counter full")
-       : sim.MessRations() < 1.0 ? std::string("refused - larder empty")
-                        : Num(cost) + " action" + (cost == 1.0 ? "" : "s")},
-      {"The cook acts alone",
-       cook ? "at " + JobThreshold(sim, *cook) : std::string("nobody assigned")},
-  };
+  t.acts = {{"Cook a batch", cookAction}};
 }
 
 void RoomCargo(const Simulation& sim, Description& t) {

@@ -185,7 +185,7 @@ std::string Simulation::ExtractionScanSummary(const Body& body) const {
   }
   if (IsVolatileIceBody(body)) {
     return jackpot
-               ? "Lootable: 2 m3 Subglacial Relic Core and +2 water/ration stores."
+               ? "Lootable: 2 m3 Subglacial Relic Core and up to 2 dry rations."
                : "Lootable: 4 m3 Cryo-Volatile Ice (Water).";
   }
   if (jackpot) {
@@ -728,9 +728,10 @@ void Simulation::FinishExtraction(const std::string& bodyId, double reservedVol)
   } else if (IsVolatileIceBody(*body)) {
     if (jackpot) {
       addLot("Subglacial Relic Core (" + body->name + ")", "Relics", 2.0, 185.0, false);
+      const double rationStock = mess_.rations;
       mess_.rations = std::min(mess_.rationCapacity, mess_.rations + 2.0);
-      LogLine("Deep ice core at " + body->name +
-              ": recovered 2 m3 subglacial relics and +2 purified water/ration stores.");
+      LogLine("Deep ice core at " + body->name + ": recovered 2 m3 subglacial relics and " +
+              js::NumToString(mess_.rations - rationStock) + " dry rations.");
       SimRemember("Discovery", "Extracted a preserved subglacial core on " + body->name + ".");
     } else {
       const double val = 70.0 + static_cast<double>(h % 25ULL);

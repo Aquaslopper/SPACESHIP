@@ -4,7 +4,7 @@
 //  A project is a draw on the reserve, a cargo lot consumed, and four or five
 //  actions of work that pause the instant the batteries are empty. The block
 //  rules are the interesting part: a project that would make a canister the rack
-//  has no room for, or rations the galley cannot hold, is refused before a
+//  has no room for, or dry rations the larder cannot hold, is refused before a
 //  single shiplet or action is spent.
 // ============================================================================
 #include "core/JsNumber.h"
@@ -69,7 +69,7 @@ std::string Simulation::ProjectBlock(const std::string& id) const {
   }
   if (id == "food" && (mess_.rations > mess_.rationCapacity - 8 ||
                        FindOngoing("cook") != nullptr)) {
-    return "Needs larder space for eight rations and an idle galley.";
+    return "Needs room for eight dry rations in the larder and an idle galley.";
   }
   if (id == "brace" && StatValue("hull") >= 100) { return "The hull is already sound."; }
   if (id == "cooling" && (state_.engineCondition >= 100 || MaintRunning())) {

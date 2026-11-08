@@ -55,10 +55,8 @@ void Simulation::TickCrew() {
 
   for (CrewMember& crew : crew_) {
     crew.hungerTick += 1;
-    if (crew.hungerTick < rules_.mess.every) {
-      crew.hunger = std::min(100.0, crew.hunger + risePerClick);
-      continue;
-    }
+    crew.hunger = std::min(100.0, crew.hunger + risePerClick);
+    if (crew.hungerTick < rules_.mess.every) { continue; }
     crew.hungerTick = 0;
 
     // What the meal is worth to this hand: three food, but never more than it
@@ -279,8 +277,9 @@ std::string Simulation::JobThreshold(const CrewMember& crew) const {
     return "Crew morale +1 every " + js::NumToString(CleanerInterval(crew)) + " actions";
   }
   if (crew.job == "kitchen") {
-    return js::NumToString(crew.jobAt) + (crew.jobAt == 1 ? " ration" : " rations") +
-           " per action, cooking";
+    return "1 dry ration -> up to " + js::NumToString(rules_.mess.foodPerRation) +
+           " cooked food in " + js::NumToString(rules_.mess.foodPerRation) +
+           " actions";
   }
   return "-";
 }
@@ -501,9 +500,9 @@ void Simulation::AutoMess() {
     return;
   }
 
-  // One ration becomes foodPerRation food when the five-click batch finishes.
-  // A batch that would overshoot the ceiling is still cooked; the landing is
-  // clamped, so the counter ends full rather than past its lid.
+  // One dry ration yields up to foodPerRation cooked food when the five-click
+  // batch finishes. A batch that would overshoot the ceiling is still cooked;
+  // the landing is clamped, so the counter ends full rather than past its lid.
   const double cost = rules_.mess.foodPerRation;
   Task* task = AddOngoing("cook", "Cooking - " + worker->name, cost, "cook", "mess");
   if (task != nullptr) {

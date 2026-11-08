@@ -286,8 +286,14 @@ void Simulation::TrainCrew(CrewMember& crew, int steps, const std::string& where
       crew.jobAt = std::min(job->trainCap,
                             (crew.jobAt == 0 ? job->baseAt : crew.jobAt) + job->trainStep);
     }
-    LogLine(crew.name + " trained " + where + " - now acts at " +
-            js::NumToString(crew.jobAt) + job->unit + ".");
+    if (job->id == "kitchen") {
+      LogLine(crew.name + " trained " + where + " - galley batches remain one dry ration "
+              "for up to " + js::NumToString(rules_.mess.foodPerRation) +
+              " cooked food in " + js::NumToString(rules_.mess.foodPerRation) + " actions.");
+    } else {
+      LogLine(crew.name + " trained " + where + " - now acts at " +
+              js::NumToString(crew.jobAt) + job->unit + ".");
+    }
   } else {
     LogLine(crew.name + " trained " + where + ", but holds no job to use it on.");
   }
