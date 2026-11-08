@@ -1174,6 +1174,15 @@ TEST_CASE("the trade board lists visited stations and greys a contract once take
   CHECK_FALSE(sim.AcceptTrade("station", "auriga-port"));
   CHECK(sim.State().trades.size() == 1u);
 
+  // A station-to-station run is a route between two systems, so the system
+  // chart draws no green trail for it.
+  const ship::NavChartView chart = ship::BuildNavChart(sim);
+  std::size_t trails = 0;
+  for (const ship::NavDot& dot : chart.routes) {
+    if (dot.cls.find("trade") != std::string::npos) { ++trails; }
+  }
+  CHECK(trails == 0u);
+
   // The roll of visits and the accepted trade both survive a save.
   std::string error;
   ship::Simulation restored = ship::Simulation::NewVoyage(sim.World());
@@ -1268,6 +1277,42 @@ TEST_CASE("each system draws its own trade board out of its own chart", "[statio
   // exist cannot either.
   CHECK_FALSE(sim.AcceptTrade("delivery", "no-such-body", "ore"));
   CHECK_FALSE(sim.AcceptTrade("nonsense", run.to, run.good));
+
+  // The left-hand panel carries the run, and only the run: the authored mission
+  // board has no card of its own any more, so its missions are not listed there
+  // even though the voyage still holds one.
+  const ship::SideBlock* contracts = nullptr;
+  for (const ship::SideBlock& block : ship::SideBlocks(sim)) {
+    if (block.key == "contracts") { contracts = &block; }
+  }
+  REQUIRE(contracts != nullptr);
+  REQUIRE(contracts->rows.size() == 1u);
+  CHECK(contracts->rows[0].key == (run.mode == "delivery" ? "Delivery" : "Freelance"));
+  const ship::Body* far = world.FindBody(run.to);
+  REQUIRE(far != nullptr);
+  CHECK(contracts->rows[0].value.find(far->name) != std::string::npos);
+  CHECK(contracts->rows[0].value.find(" sh") != std::string::npos);
+  REQUIRE_FALSE(world.contracts.empty());
+  for (const ship::Contract& mission : world.contracts) {
+    for (const ship::SideRow& row : contracts->rows) { CHECK(row.key != mission.title); }
+  }
+
+  // The chart paints that run: a green trail from the ship to the destination,
+  // laid over the route the ship would fly anyway.
+  const ship::NavChartView chart = ship::BuildNavChart(sim);
+  std::set<std::pair<int, int>> plain;
+  for (const ship::NavDot& dot : chart.routes) {
+    if (dot.cls == "rdot") {
+      plain.insert({static_cast<int>(dot.x), static_cast<int>(dot.y)});
+    }
+  }
+  std::size_t trails = 0;
+  for (const ship::NavDot& dot : chart.routes) {
+    if (dot.cls.find("trade") == std::string::npos) { continue; }
+    ++trails;
+    CHECK(plain.count({static_cast<int>(dot.x), static_cast<int>(dot.y)}) == 1u);
+  }
+  CHECK(trails > 0u);
 
   // The window is built from the same draw: the two lists are the runs, and a
   // run already taken is grey when the panel is rebuilt.

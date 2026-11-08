@@ -1585,12 +1585,17 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     const float px = box.x + static_cast<float>(dot.x) * sx;
     const float py = box.y + static_cast<float>(dot.y) * sy;
     if (px < clipMinX || px > clipMaxX || py < clipMinY || py > clipMaxY) { continue; }
-    const Color ink = dot.cls.find("sel") != std::string::npos
-                          ? ToRay(p.sage)
-                          : (dot.cls.find("faint") != std::string::npos
-                                 ? Fade(ToRay(p.coffeeLight), 0.55f)
-                                 : Fade(ToRay(p.coffee), 0.8f));
-    DrawRectangle(static_cast<int>(px), static_cast<int>(py), 2, 2, ink);
+    Color ink = Fade(ToRay(p.coffee), 0.8f);
+    int size = 2;
+    if (dot.cls.find("faint") != std::string::npos) { ink = Fade(ToRay(p.coffeeLight), 0.55f); }
+    if (dot.cls.find("sel") != std::string::npos) { ink = ToRay(p.sage); }
+    // A trade trail is the one route the chart is asked about, so it is drawn in
+    // the game's own green (#7ec63f) and a pixel larger than the rest.
+    if (dot.cls.find("trade") != std::string::npos) {
+      ink = ::Color{126, 198, 63, 255};
+      size = 3;
+    }
+    DrawRectangle(static_cast<int>(px), static_cast<int>(py), size, size, ink);
   }
 
   // Sector territory contours & region map on Layer 2 ("sector").

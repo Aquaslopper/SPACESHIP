@@ -457,6 +457,23 @@ NavChartView BuildNavChart(const Simulation& sim) {
       append(NavRouteDots(sim, here->x, here->y, body->x, body->y,
                           target == body->id, false));
     }
+
+    // The trade pathfinder: every trade taken with a destination in this system
+    // gets a green trail from wherever the ship is, so the board and the chart
+    // say the same thing without the player digging through a list.
+    if (here != nullptr) {
+      const std::string systemId = sim.CurrentSystemId();
+      for (const TradeContract& trade : sim.State().trades) {
+        if (trade.mode == "station") { continue; }  // its route is a sector one
+        const Body* destination = sim.FindBodyById(trade.to);
+        if (destination == nullptr || destination->id == here->id) { continue; }
+        if (sim.World().BodySystem(*destination) != systemId) { continue; }
+        std::vector<NavDot> trail =
+            NavRouteDots(sim, here->x, here->y, destination->x, destination->y, false, false);
+        for (NavDot& dot : trail) { dot.cls = "rdot rdot-trade"; }
+        append(std::move(trail));
+      }
+    }
   } else {
     const Catalog& world = sim.World();
     const bool isSector = (chart.layer == "sector");
