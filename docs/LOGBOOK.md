@@ -697,3 +697,30 @@ four clicks and that the machine's button is live again after twelve. Prose in
 Compiled: every `cpp/core`, `cpp/ui` and `cpp/app` file under
 `-fsyntax-only -Wall -Wextra` except `Draw.cpp`, which needs raylib that this
 sandbox does not have. The Catch2 suite was not run.
+
+## 047 — The engineer presses the button
+
+`AutoMaint` no longer opens a `maint-eng` job of its own. The engineer waits until
+the drive is under his line and presses the machine's button, which is now the
+only repair there is.
+
+His press is the click of the action already in flight, so `ServiceDrive()` arms
+the bar and lifts the drive instead of performing a second action. Calling
+`EngineClick()` from inside an action re-entered the clock until the simulation
+stopped moving, so `engineClicking_` now refuses a press inside a press.
+
+His line is `max(maintBelow, EffectiveJobAt(worker))`: thirty percent is the floor
+he never lets it pass, and his training is meant to raise the point at which he
+takes the button. `maintBelow` is read from the data table with a default of
+thirty. `EngineClick()` also refuses while `MaintRunning()`, so the commander can
+no longer lift a drive the crew already has in hand.
+
+Probe `/home/user/probe/engcrew` (core objects, head-less). Verified: with an
+engineer on the job the drive at 25% is lifted to 100% by one action; at 25% with
+the bar filling he waits and leaves it at 25; after the bar comes back round he
+presses again; nobody on the job leaves 10% alone; the commander's own press still
+lands. Not verified: that `EffectiveJobAt` really raises the line. The probe could
+not place an assigned engineer with high skill, so every early-press case came
+back unchanged - skill 0 and skill 100 behaved identically. The training half is
+expressed in the code and unproven by this harness; it needs a test that drives
+`AssignedEngineer()` directly.
