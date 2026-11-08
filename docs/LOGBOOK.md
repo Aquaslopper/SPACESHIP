@@ -833,3 +833,28 @@ under the starve line, so one missed clock is survivable and two are not.
 
 Nothing changed in this entry. It records the law as it stands and the gap between
 it and the owner's memory.
+
+## 052 — The logbook says hunger was never real
+
+#051 read the hunger law as it stands. The old build log, all 68 entries of it,
+says hunger was never a mechanic in the core game. It appears three times:
+
+  "statLine painted fatigue 28 and hunger 15 RED."
+  "Hunger and fatigue keep their fields and still have no drain. They belong
+   to the needs phase."
+  "A future effect (fatigue, morale, a medical event) is another ..."
+
+A field with no drain, drawn on a stat line, waiting for a needs phase that was
+never reached. No meal, no galley, no rack, no cook, no starve line: those words
+do not occur in the log at all. The 25-click private hunger clock, the three-food
+meal, `starveAt` 90 and one health per 8 clicks are all later than the core - they
+arrived with the port, not with the game the owner built.
+
+So "something is off" was right, and precisely: he remembers a starving hand
+breaking his schedule to eat, and there was no starving hand. Nothing to restore,
+which means the hunger system is ours to design rather than to recover. That is a
+conversation, not an edit, and this entry does not start it.
+
+One useful thing fell out. The same page prices the filter ladder as 1 -> 2 -> 3 =
+BAD -> THIN -> FADING: a taught hand acts at progressively better air. That is the
+same shape #050 built, and it names the stages the UI should show.
