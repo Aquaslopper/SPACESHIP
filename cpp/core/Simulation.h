@@ -237,6 +237,11 @@ class Simulation {
   bool HireCrew(const std::string& candidateId);
   bool BuyUpgrade(const std::string& upgradeId);   // bay, bay2, drive, rack, scanner, hull
   void ContractProgress(const std::string& goal, const std::string& target);
+
+  // Trade contracts (Economy.cpp). Accepting one costs one action and greys its
+  // own row; the record it leaves names both ends of the run.
+  bool AcceptTrade(const std::string& mode, const std::string& to);
+  bool TradeAccepted(const std::string& mode, const std::string& to) const;
   void CommissionProgress(const std::string& kind, const std::string& target);
   // commissionOffer(): the same deterministic draw the board shows before the
   // player accepts it, so the offer and the acceptance can never disagree.

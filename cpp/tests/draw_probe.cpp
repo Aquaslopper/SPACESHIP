@@ -601,10 +601,10 @@ int main() {
     sim.MutableState().shiplets = 10000;
     ship::OpenTask(sim, "station", "tolme", true);
     Frame(view, sim);
-    // Three columns walked in one direction: four cards on the left, the open
+    // Three columns walked in one direction: five cards on the left, the open
     // card's items in the middle, and the inspector on the right. Cards and
     // items are free; the market's commit is money only, the starmap has no
-    // commit at all.
+    // commit at all, and the trade card puts its own list on the right.
     const auto startsWith = [](const char* prefix, const char* missing) {
       const auto it = std::find_if(texts.begin(), texts.end(), [&](const auto& t) {
         return t.text.find(prefix) == 0;
@@ -614,13 +614,15 @@ int main() {
     };
     const auto marketCard = startsWith("Market - purse", "the Market card did not paint");
     const auto starmapCard = startsWith("Starmap", "the starmap card did not paint");
+    const auto tradeCard = startsWith("Trade contract", "the trade card did not paint");
     const auto salesCard = startsWith("Sell cargo and survey data", "the sales card did not paint");
     const auto yardCard = startsWith("Shipyard and crew", "the shipyard card did not paint");
-    Require(std::abs(starmapCard.x - marketCard.x) < 1 && std::abs(salesCard.x - marketCard.x) < 1 &&
-            std::abs(yardCard.x - marketCard.x) < 1,
+    Require(std::abs(starmapCard.x - marketCard.x) < 1 && std::abs(tradeCard.x - marketCard.x) < 1 &&
+            std::abs(salesCard.x - marketCard.x) < 1 && std::abs(yardCard.x - marketCard.x) < 1,
             "The station cards are not in one column");
-    Require(starmapCard.y > marketCard.y && salesCard.y > starmapCard.y && yardCard.y > salesCard.y,
-            "The station cards are not stacked: shop, starmap, sales, yard");
+    Require(starmapCard.y > marketCard.y && tradeCard.y > starmapCard.y &&
+            salesCard.y > tradeCard.y && yardCard.y > salesCard.y,
+            "The station cards are not stacked: shop, starmap, trade, sales, yard");
     const auto fuel = startsWith("Fuel cell", "the market items did not paint");
     Require(fuel.x > marketCard.x, "The market's items are not in the middle column");
     const auto commit = startsWith("Buy - 45 sh", "the inspector commit button did not paint");
@@ -674,6 +676,28 @@ int main() {
               return t.text.find("Buy - ") == 0 || t.text.find("Sell - ") == 0;
             }),
             "A starmap page painted a commit button");
+    view.Click(sim, marketCard.x + 2, marketCard.y + 2, ship::HitButton::Left, 0);
+    Frame(view, sim);
+
+    // The trade card opens its own list on the right: the three modes are the
+    // middle column and the chosen one's offers are the right column, each its
+    // own button, so nothing here paints a commit.
+    view.Click(sim, tradeCard.x + 2, tradeCard.y + 2, ship::HitButton::Left, 0);
+    Frame(view, sim);
+    // The card opens on its first mode, so the right column is already a list.
+    startsWith("Delivery", "the trade modes did not paint");
+    const auto freelanceMode = startsWith("Freelance", "the trade modes did not paint");
+    view.Click(sim, freelanceMode.x + 2, freelanceMode.y + 2, ship::HitButton::Left, 0);
+    Frame(view, sim);
+    Require(std::any_of(texts.begin(), texts.end(), [](const auto& t) {
+              return t.text.find("No freelance requests are drawn from this system yet.") == 0;
+            }),
+            "Choosing the freelance mode did not open its own list");
+    Require(sim.ActionCount() == beforeBuy, "Choosing a trade mode spent an action");
+    Require(std::none_of(texts.begin(), texts.end(), [](const auto& t) {
+              return t.text.find("Buy - ") == 0 || t.text.find("Sell - ") == 0;
+            }),
+            "The trade list painted a commit button");
     view.Click(sim, marketCard.x + 2, marketCard.y + 2, ship::HitButton::Left, 0);
     Frame(view, sim);
 

@@ -207,6 +207,15 @@ struct Commissions {
   std::optional<Commission> active;
 };
 
+// One accepted trade contract. It is a record, not a resource: the
+// station-to-station trade carries no cargo and no counter beyond this line.
+struct TradeContract {
+  std::string mode;   // "delivery", "freelance", "station"
+  std::string from;   // the station it was accepted at
+  std::string to;     // the destination port or body it points at
+  std::string label;  // the sentence the board showed when it was taken
+};
+
 struct Options {
   bool largeText = false;
   bool confirmRisk = false;
@@ -394,6 +403,10 @@ struct GameState {
   std::vector<Passenger> passengers;
   std::map<std::string, bool> upgrades;
   std::map<std::string, bool> hired;
+  // Every station the player has docked at. The station-to-station trade list
+  // is exactly this set, less the station the player is standing in.
+  std::map<std::string, bool> visitedPorts;
+  std::vector<TradeContract> trades;
   // The station bar keeps its own tally: a patron spoken to once is not
   // spoken to again, exactly as a hired hand is not hired again.
   std::map<std::string, bool> talked;

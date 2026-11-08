@@ -283,6 +283,19 @@ std::string Simulation::SaveJson() const {
   for (const auto& entry : state_.talked) { talked[entry.first] = entry.second; }
   s["talked"] = talked;
 
+  Json visited = Json::object();
+  for (const auto& entry : state_.visitedPorts) { visited[entry.first] = entry.second; }
+  s["visitedPorts"] = visited;
+
+  Json trades = Json::array();
+  for (const TradeContract& trade : state_.trades) {
+    trades.push_back(Json{{"mode", trade.mode},
+                          {"from", trade.from},
+                          {"to", trade.to},
+                          {"label", trade.label}});
+  }
+  s["trades"] = trades;
+
   s["gameOver"] = state_.gameOver;
   root["state"] = s;
 
@@ -1077,6 +1090,24 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     state_.talked.clear();
     if (auto talkedIt = s.find("talked"); talkedIt != s.end()) {
       readBoolMap(*talkedIt, &state_.talked);
+    }
+    // Optional: a save written before the stations kept a roll of visits has
+    // none, and an absent roll simply means the voyage has just begun.
+    state_.visitedPorts.clear();
+    if (auto it = s.find("visitedPorts"); it != s.end() && it->is_object()) {
+      readBoolMap(*it, &state_.visitedPorts);
+    }
+    state_.trades.clear();
+    if (auto it = s.find("trades"); it != s.end() && it->is_array()) {
+      for (const Json& entry : *it) {
+        if (!entry.is_object()) { continue; }
+        TradeContract trade;
+        trade.mode = GetString(entry, "mode");
+        trade.from = GetString(entry, "from");
+        trade.to = GetString(entry, "to");
+        trade.label = GetString(entry, "label");
+        if (!trade.mode.empty() && !trade.to.empty()) { state_.trades.push_back(trade); }
+      }
     }
     readBoolMap(s.at("spOpen"), &state_.spOpen);
     readBoolMap(s.at("freshTabs"), &state_.freshTabs);

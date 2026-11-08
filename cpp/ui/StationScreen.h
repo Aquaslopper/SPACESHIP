@@ -74,6 +74,26 @@ struct StarmapPage {
   std::vector<StarmapEntry> entries;
 };
 
+// One offer on a station's trade board. The station-to-station mode fills its
+// list from the stations already visited; the other two draw their offers in
+// the pass that follows.
+struct TradeOffer {
+  std::string mode;       // "delivery", "freelance", "station"
+  std::string to;         // the destination the offer points at
+  std::string label;      // the row in the right-hand list
+  std::string note;       // the line under that row
+  bool accepted = false;  // already taken: the button is grey
+};
+
+// One of the three buttons in the trade card's middle column.
+struct TradeMode {
+  std::string id;     // "delivery", "freelance", "station"
+  std::string title;
+  std::string note;   // what the mode is for
+  std::string empty;  // what the right panel says when the list is empty
+  std::vector<TradeOffer> offers;
+};
+
 // One category card on the left, and the items it opens in the middle.
 struct StationColumn {
   std::string id;      // "market", "starmap", "sales", "board", "yard", "tavern"
@@ -95,7 +115,9 @@ struct StationScreenModel {
   std::string portId;
   std::string portName;
   std::string tip;
-  std::vector<StationColumn> columns;  // Market | Starmap | Sales | Board | Yard | Tavern
+  std::vector<StationColumn> columns;  // Market | Starmap | Trade | Sales | Board | Yard | Tavern
+  // The trade card's three buttons and the lists behind them.
+  std::vector<TradeMode> tradeModes;
   std::string purseLine;
   std::string holdLine;
   bool docked = false;

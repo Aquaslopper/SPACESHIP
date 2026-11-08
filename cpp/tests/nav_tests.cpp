@@ -1112,6 +1112,83 @@ TEST_CASE("huge procedural charts build within interactive frame budgets",
   CHECK(elapsedMs < 250);
 }
 
+// The trade card: three buttons in the middle column, and the list each one
+// opens on the right. The station-to-station list is the roll of stations the
+// player has docked at, less the station they are standing in.
+TEST_CASE("the trade board lists visited stations and greys a contract once taken",
+          "[station][trade]") {
+  ship::Simulation sim = Fresh();
+  sim.MutableMap().here = "tolme";
+  sim.MutableState().docked = false;
+  REQUIRE(sim.Dock());
+  sim.MutableState().docked = false;
+  sim.MutableMap().here = "relay";
+  REQUIRE(sim.Dock());
+
+  const ship::StationScreenModel model = ship::BuildStationScreen(sim, "relay");
+  // The card sits under the starmap, above the sales counter.
+  REQUIRE(model.columns.size() >= 3u);
+  CHECK(model.columns[0].id == "market");
+  CHECK(model.columns[1].id == "starmap");
+  CHECK(model.columns[2].id == "trade");
+
+  // Three modes, in the order the middle column shows them.
+  REQUIRE(model.tradeModes.size() == 3u);
+  CHECK(model.tradeModes[0].id == "delivery");
+  CHECK(model.tradeModes[1].id == "freelance");
+  CHECK(model.tradeModes[2].id == "station");
+  // The two offer lists are drawn in the pass that follows; they say so rather
+  // than inventing a consignment.
+  CHECK(model.tradeModes[0].offers.empty());
+  CHECK(model.tradeModes[1].offers.empty());
+  CHECK_FALSE(model.tradeModes[0].empty.empty());
+  CHECK_FALSE(model.tradeModes[1].empty.empty());
+
+  // Station-to-station is every station visited so far, less this one.
+  const ship::TradeMode& station = model.tradeModes[2];
+  REQUIRE(station.offers.size() == 1u);
+  CHECK(station.offers[0].to == "tolme");
+  CHECK_FALSE(station.offers[0].accepted);
+  CHECK(station.offers[0].label.find("Tolme Anchorage") != std::string::npos);
+
+  // The card's own rows are the three mode buttons, all free to open.
+  const ship::StationColumn* card = ship::FindStationCategory(model, "trade");
+  REQUIRE(card != nullptr);
+  REQUIRE(card->rows.size() == 3u);
+  CHECK(card->rows[0].id == "trade-mode:delivery");
+  CHECK(card->rows[1].id == "trade-mode:freelance");
+  CHECK(card->rows[2].id == "trade-mode:station");
+  for (const ship::StationRow& row : card->rows) { CHECK(row.free); }
+
+  // Accepting costs one action, and the row greys from then on.
+  const double before = sim.ActionCount();
+  REQUIRE(ship::PressStationAction(sim, "trade-accept:station:tolme"));
+  CHECK(sim.ActionCount() == before + 1);
+  CHECK(sim.TradeAccepted("station", "tolme"));
+  CHECK_FALSE(ship::PressStationAction(sim, "trade-accept:station:tolme"));
+  CHECK(sim.ActionCount() == before + 1);
+
+  const ship::StationScreenModel after = ship::BuildStationScreen(sim, "relay");
+  REQUIRE(after.tradeModes.size() == 3u);
+  REQUIRE(after.tradeModes[2].offers.size() == 1u);
+  CHECK(after.tradeModes[2].offers[0].accepted);
+
+  // A station that was never visited cannot be the far end of the trade, nor
+  // can a mode whose board is not drawn yet hand out a contract.
+  CHECK_FALSE(sim.AcceptTrade("station", "auriga-port"));
+  CHECK_FALSE(sim.AcceptTrade("freelance", "tolme"));
+  CHECK_FALSE(sim.AcceptTrade("delivery", "tolme"));
+  CHECK(sim.State().trades.size() == 1u);
+
+  // The roll of visits and the accepted trade both survive a save.
+  std::string error;
+  ship::Simulation restored = ship::Simulation::NewVoyage(sim.World());
+  REQUIRE(restored.LoadJson(sim.SaveJson(), &error));
+  CHECK(restored.State().visitedPorts.count("tolme") == 1u);
+  CHECK(restored.State().visitedPorts.count("relay") == 1u);
+  CHECK(restored.TradeAccepted("station", "tolme"));
+}
+
 // Every station writes its own starmap of the system it sits in, out of the
 // chart: the system's reading, then its bodies, planets first. Nothing is
 // authored per port, so a station that exists cannot be missing its page.

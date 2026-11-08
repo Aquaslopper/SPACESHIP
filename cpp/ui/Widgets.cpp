@@ -661,6 +661,57 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       screen.panelRows.push_back(itemRows);
       screen.panelRowIds.push_back(itemIds);
 
+      // ---- right: the trade list ------------------------------------------
+      // On the trade card the middle column is the three mode buttons and the
+      // right column is the list behind the chosen one; every row in it is its
+      // own button, so there is no single commit here.
+      if (open != nullptr && open->id == "trade") {
+        const TradeMode* mode = nullptr;
+        const std::string chosen = picked.item.compare(0, 11, "trade-mode:") == 0
+                                       ? picked.item.substr(11)
+                                       : std::string();
+        for (const TradeMode& candidate : model.tradeModes) {
+          if (candidate.id == chosen) { mode = &candidate; }
+        }
+        if (mode == nullptr && !model.tradeModes.empty()) { mode = &model.tradeModes.front(); }
+
+        NavPanel list;
+        list.id = "station-trade";
+        list.title = mode == nullptr ? "Trade contract" : mode->title;
+        if (mode == nullptr) {
+          list.Dim("No trade board at this station.");
+        } else {
+          list.Dim(mode->note);
+          if (mode->offers.empty()) {
+            list.Dim(mode->empty);
+          } else {
+            list.Dim(mode->offers.size() == 1 ? "1 offer on the board."
+                                              : std::to_string(mode->offers.size()) +
+                                                    " offers on the board.");
+          }
+        }
+        screen.panels.push_back(list);
+
+        std::vector<CommandRowView> offers;
+        std::vector<std::string> offerIds;
+        if (mode != nullptr) {
+          for (const TradeOffer& offer : mode->offers) {
+            CommandRowView view;
+            view.label = offer.label;
+            view.title = offer.note;
+            view.cost = offer.accepted ? "done" : "1 action";
+            view.displayCost = view.cost;
+            view.enabled = !offer.accepted;
+            view.live = view.enabled;
+            offers.push_back(view);
+            offerIds.push_back("trade-accept:" + offer.mode + ":" + offer.to);
+          }
+        }
+        screen.panelRows.push_back(offers);
+        screen.panelRowIds.push_back(offerIds);
+        return screen;
+      }
+
       // ---- right: the inspector, and the one commit button ----------------
       const StationRow* item =
           open == nullptr ? nullptr : FindStationItem(model, picked.category, picked.item);

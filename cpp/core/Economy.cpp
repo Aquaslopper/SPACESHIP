@@ -366,6 +366,44 @@ bool Simulation::TalkToPatron(const std::string& patronId) {
   return true;
 }
 
+// ---------------------------------------------------------------------------
+// Trade contracts
+// ---------------------------------------------------------------------------
+// A trade contract is accepted once, costs one action, and the row that carried
+// it is grey from then on. Station-to-station trades are the one mode that can
+// be accepted today: the destination has to be a station the player has already
+// docked at, because the list is that set and nothing else.
+bool Simulation::TradeAccepted(const std::string& mode, const std::string& to) const {
+  for (const TradeContract& trade : state_.trades) {
+    if (trade.mode == mode && trade.to == to) { return true; }
+  }
+  return false;
+}
+
+bool Simulation::AcceptTrade(const std::string& mode, const std::string& to) {
+  if (!state_.gameOver.empty() || !state_.docked || HerePort() == nullptr) { return false; }
+  // Three modes, but only the station-to-station list is drawn so far: the
+  // delivery and freelance boards come in the pass after this one, and an empty
+  // board has nothing to take.
+  if (mode != "station") { return false; }
+  if (to.empty() || to == map_.here) { return false; }
+  const Port* destination = catalog_.FindPort(to);
+  if (destination == nullptr) { return false; }
+  // Only a station the player has actually stood in can carry the other end of
+  // a station-to-station trade.
+  if (!Truthy(state_.visitedPorts, to)) { return false; }
+  if (TradeAccepted(mode, to)) { return false; }
+
+  TradeContract trade;
+  trade.mode = mode;
+  trade.from = map_.here;
+  trade.to = to;
+  trade.label = HerePort()->name + " - " + destination->name;
+  state_.trades.push_back(std::move(trade));
+  PerformAction("Trade contract accepted");
+  return true;
+}
+
 bool Simulation::BuyUpgrade(const std::string& upgradeId) {
   if (!state_.gameOver.empty() || !state_.docked || HerePort() == nullptr) { return false; }
 
