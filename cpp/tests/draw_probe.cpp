@@ -611,6 +611,38 @@ int main() {
       return r.color.r == 126 && r.color.g == 198 && r.color.b == 63 && r.w == 11 && r.h == 2;
     }), "HTA 654–659 action mark is not the green 11 by 2 bar");
 
+    // The Mess Hall must paint values, never the ids it used to carry as text.
+    {
+      auto galley = ship::Simulation::ReferenceVoyage(sim.World());
+      ship::ShellView kitchen;
+      kitchen.Configure(1280, 720, ship::Theme::ById("classic"));
+      ship::OpenTask(galley, "room", "mess", true);
+      Frame(kitchen, galley);
+      for (const auto& painted : texts) {
+        Require(painted.text.find("mess-") == std::string::npos,
+                "The galley painted an element id instead of a value");
+      }
+      FindText("18 of 24 rations on the rack");
+      FindText("25 actions to next meal");
+      // Hunger is a live value on the crew record, and it drives a red bar.
+      galley.FindCrew("jax")->hunger = 88;
+      ship::OpenTask(galley, "crew", "jax", true);
+      Frame(kitchen, galley);
+      FindText("88%  Starving");
+      Require(std::any_of(rects.begin(), rects.end(), [](const auto& r) {
+        return r.color.r == 176 && r.color.g == 90 && r.color.b == 66 && r.w > 0;
+      }), "Starving hunger did not paint the source red bar");
+      // Eating is what moves the number: a full rack feeds a due hand.
+      auto hungry = ship::Simulation::ReferenceVoyage(sim.World());
+      auto* hand = hungry.FindCrew("rell");
+      hand->hunger = 90;
+      hand->hungerTick = hungry.GameRules().mess.every - 1;
+      const double rackBefore = hungry.MessRack();
+      hungry.PerformAction();
+      Require(hand->hunger == 50, "A fed crew member's hunger did not fall by 40");
+      Require(hungry.MessRack() == rackBefore - 1, "A meal did not take a ration");
+    }
+
     sim.FindCrew("jax")->health = 25;
     sim.FindCrew("jax")->morale = 55;
     sim.FindCrew("jax")->fatigue = 80;
