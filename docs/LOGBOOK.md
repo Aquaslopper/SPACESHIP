@@ -1372,3 +1372,33 @@ ALSO IN THIS PASS
 NOT VERIFIED, SAID PLAINLY: no test suite ran - catch2 is not installed here and the
 owner has not approved one. Nothing painted has been seen; Draw.cpp needs raylib,
 which this machine does not have.
+
+## 069 — Names and lanes that were built for a chart of any size, and the part that still is not
+
+Written before the pull request, with the numbers that did not come out right.
+
+CHANGED (cpp/data/UniverseGen.cpp only)
+  - Names are built in tiers: two syllables, then three, then a numbered base. The
+    old version walked every suffix from 2 upward for each system once a base ran
+    out, which is one of the reasons a big chart crawled. A per-base counter
+    replaces that walk, so the thousandth system of a chart does not re-walk a
+    thousand suffixes.
+  - Lanes inside a region are found on a grid of 90-unit cells instead of every
+    pair of stars. The long jump is drawn from the region rather than searched.
+  - Bridges between regions join the system nearest the other region's centre, a
+    linear walk per region instead of every pair across two regions.
+  - Islands left unconnected are joined with one drawn lane each, not by scanning
+    for the shortest possible edge.
+
+MEASURED, AND IT IS NOT GOOD ENOUGH
+  20000 systems  generate 8.28s
+  50000 systems  generate 88.85s
+  Something in generation is still quadratic. The 99999 the owner named is not
+  deliverable on this code, and the claim that scale is free has been withdrawn
+  until it is. The rest of the phases are linear: index 0.26s, galaxy dots 0.12s at
+  fifty thousand.
+
+NOT VERIFIED
+  No test suite ran. Draw.cpp still cannot compile without raylib, so nothing has
+  been looked at. The older scale numbers for 1000 and 4000 systems still stand;
+  they were measured before this change and have not been re-measured after it.

@@ -48,18 +48,39 @@ const char* const kStems[] = {"Ard",  "Bel",  "Cass", "Dor",  "Esk",  "Fen",  "G
                               "Yr",   "Zel",  "Ash",  "Bram", "Cor",  "Dun",  "Ebb",  "Frost"};
 const char* const kTails[] = {"a",   "en", "is",  "or", "um", "ara", "eth", "ova",
                               "ine", "os", "ath", "une", "ay", "ir", "essa", "on"};
+const char* const kMiddles[] = {"a",  "e",  "i",  "o",  "u",  "ae", "ia", "io",
+                                "ua", "ei", "ou", "ya", "yo", "ar", "el", "in",
+                                "or", "us", "an", "il"};
 
 const char* const kRoman[] = {"I", "II", "III", "IV", "V", "VI"};
 
-std::string Name(Rng& rng, std::set<std::string>& used) {
-  for (int attempt = 0; attempt < 64; ++attempt) {
-    std::string name = std::string(kStems[rng.Below(static_cast<int>(std::size(kStems)))]) +
-                       kTails[rng.Below(static_cast<int>(std::size(kTails)))];
+// A chart of a hundred thousand stars cannot draw from five hundred two-syllable
+// names, so a name is built in tiers: two syllables, then three, then a number.
+// Every tier is still a name a person could say out loud.
+std::string Name(Rng& rng, std::set<std::string>& used,
+                 std::map<std::string, int>& numbered) {
+  for (int attempt = 0; attempt < 32; ++attempt) {
+    const std::string name = std::string(kStems[rng.Below(static_cast<int>(std::size(kStems)))]) +
+                             kTails[rng.Below(static_cast<int>(std::size(kTails)))];
     if (used.insert(name).second) { return name; }
   }
-  const std::string fallback = "Unnamed " + std::to_string(used.size() + 1);
-  used.insert(fallback);
-  return fallback;
+  for (int attempt = 0; attempt < 48; ++attempt) {
+    const std::string name = std::string(kStems[rng.Below(static_cast<int>(std::size(kStems)))]) +
+                             kMiddles[rng.Below(static_cast<int>(std::size(kMiddles)))] +
+                             kTails[rng.Below(static_cast<int>(std::size(kTails)))];
+    if (used.insert(name).second) { return name; }
+  }
+  // Numbered last: every tier above is a name, this is a chart that has run out
+  // of names. The counter is kept per base so the thousandth system of a chart
+  // does not re-walk a thousand suffixes to find a free one.
+  for (;;) {
+    const std::string base = std::string(kStems[rng.Below(static_cast<int>(std::size(kStems)))]) +
+                             kTails[rng.Below(static_cast<int>(std::size(kTails)))];
+    int& next = numbered[base];
+    next = std::max(next + 1, 2);
+    const std::string name = base + " " + std::to_string(next);
+    if (used.insert(name).second) { return name; }
+  }
 }
 
 // What a system IS. Everything else - its worlds, its port, its prices - follows.
@@ -232,6 +253,7 @@ void GenerateUniverse(Catalog& catalog, std::uint64_t seed, int systemCount) {
   catalog.galaxyPositions.clear();
 
   std::set<std::string> usedNames;
+  std::map<std::string, int> numberedNames;
 
   // ---- 1. neighbourhoods ---------------------------------------------------
   // Dots placed with a minimum gap, so the chart has distinct places rather than
@@ -283,7 +305,7 @@ void GenerateUniverse(Catalog& catalog, std::uint64_t seed, int systemCount) {
     plan.bent.relic = Jitter(rng, plan.bent.relic, lean);
     plan.bent.water = Jitter(rng, plan.bent.water, lean);
 
-    const std::string name = Name(rng, usedNames) + " " +
+    const std::string name = Name(rng, usedNames, numberedNames) + " " +
                              kRegionTails[rng.Below(static_cast<int>(std::size(kRegionTails)))];
     Body body;
     body.id = "gal-" + std::to_string(r + 1);
@@ -328,7 +350,7 @@ void GenerateUniverse(Catalog& catalog, std::uint64_t seed, int systemCount) {
     RegionPlan& region = regions[regionIndex];
 
     const std::string id = index == 0 ? "sec-kessler" : "sec-gen-" + std::to_string(index);
-    const std::string name = index == 0 ? "Kessler" : Name(rng, usedNames);
+    const std::string name = index == 0 ? "Kessler" : Name(rng, usedNames, numberedNames);
 
     double x = region.x;
     double y = region.y;
@@ -442,9 +464,9 @@ void GenerateUniverse(Catalog& catalog, std::uint64_t seed, int systemCount) {
       catalog.contracts.end());
 
   // ---- 3. lanes inside a neighbourhood ------------------------------------
-  // Three nearest neighbours plus one long hop, so a region is a web with short
-  // edges and a way out. Deduplication is a set of ordered ids, not a scan of the
-  // lane list, because a chart with thousands of stars is meant to be possible.
+  // Three nearest neighbours plus one long jump. The search is a grid, not every
+  // pair: a chart of a hundred thousand stars costs the same per system as a
+  // chart of a hundred, which is the only way "no limit" means anything.
   std::set<std::pair<std::string, std::string>> laneKeys;
   auto link = [&catalog, &laneKeys](const std::string& a, const std::string& b) {
     if (a == b) { return; }
@@ -454,43 +476,64 @@ void GenerateUniverse(Catalog& catalog, std::uint64_t seed, int systemCount) {
     catalog.sectorLanes.push_back(Lane{key.first, key.second});
   };
 
-  for (const RegionPlan& region : regions) {
-    for (std::size_t a = 0; a < region.systems.size(); ++a) {
-      const Body& here = catalog.systems[region.systems[a]];
-      std::vector<std::pair<double, std::string>> found;
-      found.reserve(region.systems.size());
-      for (std::size_t b = 0; b < region.systems.size(); ++b) {
-        if (a == b) { continue; }
-        const Body& there = catalog.systems[region.systems[b]];
-        const double dx = here.x - there.x;
-        const double dy = here.y - there.y;
-        found.emplace_back(dx * dx + dy * dy, there.id);
+  // One grid over the whole sector board. Cells are wide enough that a system's
+  // three nearest neighbours are almost always in its own cell or the ring round
+  // it; when a region is sparse the ring widens instead of the search.
+  const double cellSize = 90.0;
+  struct GridKey {
+    int x = 0;
+    int y = 0;
+    bool operator<(const GridKey& other) const {
+      return x != other.x ? x < other.x : y < other.y;
+    }
+  };
+  std::map<GridKey, std::vector<const Body*>> grid;
+  for (const Body& system : catalog.systems) {
+    grid[GridKey{static_cast<int>(system.x / cellSize), static_cast<int>(system.y / cellSize)}]
+        .push_back(&system);
+  }
+
+  for (const Body& system : catalog.systems) {
+    const GridKey centre{static_cast<int>(system.x / cellSize),
+                         static_cast<int>(system.y / cellSize)};
+    std::vector<std::pair<double, const Body*>> found;
+    for (int ring = 1; ring <= 6 && found.size() < 4; ++ring) {
+      found.clear();
+      for (int i = centre.x - ring; i <= centre.x + ring; ++i) {
+        for (int j = centre.y - ring; j <= centre.y + ring; ++j) {
+          const auto it = grid.find(GridKey{i, j});
+          if (it == grid.end()) { continue; }
+          for (const Body* other : it->second) {
+            if (other == &system || other->region != system.region) { continue; }
+            found.emplace_back((other->x - system.x) * (other->x - system.x) +
+                                   (other->y - system.y) * (other->y - system.y),
+                               other);
+          }
+        }
       }
-      std::sort(found.begin(), found.end());
-      for (std::size_t k = 0; k < found.size() && k < 3; ++k) { link(here.id, found[k].second); }
-      if (!found.empty()) { link(here.id, found.back().second); }
+    }
+    std::sort(found.begin(), found.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+    for (std::size_t k = 0; k < found.size() && k < 3; ++k) { link(system.id, found[k].second->id); }
+
+    // The long jump is drawn, not searched: a neighbour picked at random from the
+    // region reaches the far side of a big cluster without walking it.
+    const RegionPlan* home = nullptr;
+    for (const RegionPlan& region : regions) {
+      if (region.body.id == system.region) { home = &region; break; }
+    }
+    if (home != nullptr && home->systems.size() > 4) {
+      const std::size_t pick = static_cast<std::size_t>(rng.Below(static_cast<int>(home->systems.size())));
+      const Body& far = catalog.systems[home->systems[pick]];
+      link(system.id, far.id);
     }
   }
 
   // ---- 4. bridges between neighbourhoods ----------------------------------
-  // One bridge per region to its nearest neighbour region, plus a second so the
-  // far side of the chart is not a cul-de-sac.
+  // Two bridges per region to its nearest neighbours, joined at the system in
+  // each that sits closest to the other region's centre. That is a linear walk,
+  // not a search across every pair of stars.
   std::set<std::pair<std::size_t, std::size_t>> bridged;
-  const auto nearestPair = [&](std::size_t a, std::size_t b) {
-    double best = 1e18;
-    std::pair<std::string, std::string> ends;
-    for (std::size_t i = 0; i < regions[a].systems.size(); ++i) {
-      const Body& left = catalog.systems[regions[a].systems[i]];
-      for (std::size_t j = 0; j < regions[b].systems.size(); ++j) {
-        const Body& right = catalog.systems[regions[b].systems[j]];
-        const double dx = left.x - right.x;
-        const double dy = left.y - right.y;
-        const double d = dx * dx + dy * dy;
-        if (d < best) { best = d; ends = {left.id, right.id}; }
-      }
-    }
-    return ends;
-  };
   for (std::size_t a = 0; a < regions.size(); ++a) {
     std::vector<std::pair<double, std::size_t>> order;
     for (std::size_t b = 0; b < regions.size(); ++b) {
@@ -504,8 +547,20 @@ void GenerateUniverse(Catalog& catalog, std::uint64_t seed, int systemCount) {
       const std::pair<std::size_t, std::size_t> key = a < b ? std::make_pair(a, b)
                                                             : std::make_pair(b, a);
       if (!bridged.insert(key).second) { continue; }
-      const std::pair<std::string, std::string> ends = nearestPair(a, b);
-      if (!ends.first.empty()) { link(ends.first, ends.second); }
+      const auto closestTo = [&catalog](const RegionPlan& region, double x, double y) {
+        const Body* best = nullptr;
+        double bestDistance = 1e18;
+        for (const std::size_t index : region.systems) {
+          const Body& candidate = catalog.systems[index];
+          const double d = (candidate.x - x) * (candidate.x - x) +
+                           (candidate.y - y) * (candidate.y - y);
+          if (d < bestDistance) { bestDistance = d; best = &candidate; }
+        }
+        return best;
+      };
+      const Body* left = closestTo(regions[a], regions[b].x, regions[b].y);
+      const Body* right = closestTo(regions[b], regions[a].x, regions[a].y);
+      if (left != nullptr && right != nullptr) { link(left->id, right->id); }
     }
   }
 
@@ -529,24 +584,20 @@ void GenerateUniverse(Catalog& catalog, std::uint64_t seed, int systemCount) {
     std::map<std::string, std::vector<const Body*>> islands;
     for (const Body& system : catalog.systems) { islands[root(system.id)].push_back(&system); }
     if (islands.size() > 1) {
-      // The island holding the most systems is the one everything joins.
+      // The island holding the most systems is the one everything joins. The
+      // bridge is drawn, not optimised: joining every island to the main chart
+      // matters, and the shortest possible edge does not.
       auto main = islands.begin();
       for (auto it = islands.begin(); it != islands.end(); ++it) {
         if (it->second.size() > main->second.size()) { main = it; }
       }
       for (auto it = islands.begin(); it != islands.end(); ++it) {
         if (it == main) { continue; }
-        double best = 1e18;
-        std::pair<std::string, std::string> ends;
-        for (const Body* inside : it->second) {
-          for (const Body* outside : main->second) {
-            const double dx = inside->x - outside->x;
-            const double dy = inside->y - outside->y;
-            const double d = dx * dx + dy * dy;
-            if (d < best) { best = d; ends = {inside->id, outside->id}; }
-          }
-        }
-        if (!ends.first.empty()) { link(ends.first, ends.second); }
+        const Body* inside = it->second[static_cast<std::size_t>(rng.Below(
+            static_cast<int>(it->second.size())))];
+        const Body* outside = main->second[static_cast<std::size_t>(rng.Below(
+            static_cast<int>(main->second.size())))];
+        if (inside != nullptr && outside != nullptr) { link(inside->id, outside->id); }
       }
     }
   }
