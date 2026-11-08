@@ -963,22 +963,5 @@ bool PressNavAction(Simulation& sim, const std::string& action, const std::strin
     }
     return false;
   }
-  for (const auto& row : screen.commands) {
-    const bool matches =
-        (action == "stand-watch" && row.label.find("Stand watch") == 0) ||
-        (action == "dock" && row.label.find("Dock at ") == 0) ||
-        (action == "view-sector" && row.label.find("View ") == 0);
-    if (!matches) { continue; }
-    if (!row.enabled || row.coolingDown) { return false; }
-    return CommitActionButton(sim, row.cooldownKey, row.category,
-        [&]() { return PressNavActionRaw(sim, action, arg); });
-  }
-  // "dock" is not in this list: the berth is a card in the free event slot now, so
-  // the action no longer needs a command row to exist before it can run.
-  if (action == "stand-watch" || action == "view-sector") {
-    return false;
-  }
-  return PressNavActionRaw(sim, action, arg);
-}
-
+  
 }  // namespace ship
