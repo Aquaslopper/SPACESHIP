@@ -1277,3 +1277,37 @@ from the environment, not something the player types and not yet saved with a vo
 the board still re-rolls on the 200-click epoch, so names can still change under the
 player; there are still only seven goods; and none of it has been looked at, because
 this build has no renderer to look with.
+
+## 067 — The fake chart code is deleted, not bypassed
+
+The owner asked when the fake code would be removed. Removed this time, not routed around.
+
+GONE FROM THE REPOSITORY:
+  - cpp/data/GalaxyGen.cpp / .h - the table of forty-eight star rows and the pass
+    that rebuilt it on every load, including the five-body recipe and the eight
+    named price profiles it fed ports from.
+  - cpp/tests/galaxy_gen_tests.cpp - the tests that described that table.
+  - Two test cases in nav_tests.cpp that asserted the old growth (624 systems, 24
+    regions) and the authored rows surviving byte for byte.
+  - PopulateGalaxies() and PopulateLocalCharts() - the passes that drafted star
+    systems per region from those profiles and then populated orbits, moons,
+    belts and a berth for every system. Both were unreachable once the chart was
+    generated, and both were deleted from ChartExpansion.cpp with their
+    declarations and the kNewGalaxies / kNewSystemsPerRegion constants.
+
+WHAT ExpandChart DOES NOW, in full: sets the three boards, calls
+GenerateUniverse(seed), rebuilds the index, places galaxy dots, entangles galaxy
+lanes, records the counts. Fifty-eight lines where there were two hundred and
+fifty.
+
+MEASURED AFTER THE DELETION (probe, not description): systems 180, ports 125,
+validator 0 problems, work per station 2 to 5 (average 3.7), shapes 3 to 13
+bodies, same seed identical, seed "kessler" 179 of 179 names different, a delivery
+still signs at the start.
+
+STILL IN THE TREE, and honestly dead rather than removed: chart.json still carries
+its sectorBodies rows, the eight portPrices profiles and the 243 authored bodies,
+because Catalog.cpp parses those files and other content (rooms, market, wiki,
+market goods) lives beside them in the same JSON. Nothing reads the chart sections
+any more. Deleting them means editing the data files and their parsers together,
+which is the next piece of this job rather than a line to slip into this one.

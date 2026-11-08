@@ -289,7 +289,7 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
   }
 
   // ---- the tables the generator reads ------------------------------------
-  // BUILD reads these before it builds anything (see data/GalaxyGen.h):
+  // Kept because the files carry them; nothing builds from them now:
   // PORT_PRICES, PORT_HINTS, ORBITAL_WORLDS and the two name tables. They are
   // authored, so they stay data; only the chart is computed from them.
   const Json& prices = Field(chart, "portPrices", "chart.json");
