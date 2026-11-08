@@ -468,6 +468,15 @@ void GenerateUniverse(Catalog& catalog, std::uint64_t seed, int systemCount) {
       if (station) { landmark.details.emplace_back("Berth", "one berth"); }
       catalog.bodies.push_back(std::move(landmark));
 
+      // Arriving at a system puts the ship at that system's landmark - the dock if it
+      // has one, the landing site if not, and the star only for a system with neither.
+      // Docking is an exact match on `here` (HerePort() = FindPort(map.here)), so a
+      // system that entered at its star could never be entered at all: the station was
+      // there, drawn and priced, and the dock command could never succeed.
+      if (!catalog.systems.empty() && catalog.systems.back().id == id) {
+        catalog.systems.back().entry = landmarkId;
+      }
+
       if (station) {
         Port port;
         port.id = landmarkId;

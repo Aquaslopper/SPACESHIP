@@ -1627,3 +1627,29 @@ Measured (/home/user/probe/select, exit 0):
 The 987-station measurement from 075 stands (every station body has a port, every
 port docks through the command). No cause for the original report was found, and
 none was invented this time.
+
+## 077 — The station was never unregistered; arrival dropped you in the wrong place
+
+The bug class, found by reading the gate instead of guessing:
+
+  HerePort()  = catalog.FindPort(map_.here)      // one exact string match
+  ArriveAt()  = map_.here = system.entry;  docked = (HerePort() is here)
+  UniverseGen = system.entry = id + "-star"      // for all 1200 systems
+
+So every arrival put the ship on the system's star, and Dock() then asked for a port
+at the star's id, got nullptr and refused. The station existed, was drawn, priced and
+listed in 987 of 987 cases - it simply could never be entered, at any station in the
+sky. That is exactly "it is not registered by the game". The authored chart had it
+right (entry = the port); the generator lost it.
+
+Fix: the system's entry is its landmark - the dock when it has one, the landing site
+when it does not, the star only when it has neither.
+
+Measured (/home/user/probe/entry, exit 0):
+  systems 1200: entry is the dock in 987, a site in 213, a star in 0, missing in 0
+  systems with a station 987, without 213
+  of 200 arrivals at a station system: 200 docked, 200 had a trade board
+  dock commands that succeeded in the 213 systems without a station: 0
+
+The owner also reports the two-station delivery case now behaves, so there is no
+mirrored station to chase.
