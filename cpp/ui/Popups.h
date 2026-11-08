@@ -47,7 +47,7 @@ struct PopupChoice {
 struct PopupSlot {
   int slot = 1;
   std::string label;    // "Slot 1 (original)"
-  std::string summary;  // "12 actions, 340 sh" or "Empty"
+  std::string summary;  // "12 clicks, 340 sh" or "Empty"
   bool written = false;
 };
 

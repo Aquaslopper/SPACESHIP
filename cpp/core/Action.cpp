@@ -196,6 +196,9 @@ Simulation Simulation::NewVoyage(const Catalog& catalog) {
   first.processed = false;
   state.sim.memories.push_back(first);
 
+  // Nobody waits his turn: the clocks are dealt before the watch begins.
+  sim.StaggerHungerClocks();
+
   return sim;
 }
 
@@ -339,7 +342,7 @@ const CrewMember* Simulation::FindCrew(const std::string& id) const {
 // Commands (Phase 1A). Each mirrors the reference function named beside it.
 // ---------------------------------------------------------------------------
 
-bool Simulation::StartCanisterInstall(int slot) {
+bool Simulation::StartCanisterInstall(int slot, const std::string& by) {
   // startInstall(e, i): the action is spent FIRST, then the work is registered,
   // so the tick caused by the action cannot eat a step of that work.
   if (slot < 0 || slot >= static_cast<int>(life_.slots.size())) { return false; }
@@ -352,15 +355,23 @@ bool Simulation::StartCanisterInstall(int slot) {
   }
   life_.canisters -= 1;
 
+  const std::string who = by.empty() ? "the commander" : by;
   o2Claim_ = true;
-  PerformAction("Canister carried to " + target.name);
+  PerformAction(by.empty() ? "Canister carried to " + target.name
+                           : by + " carried a canister to " + target.name);
   o2Claim_ = false;
 
   if (!state_.gameOver.empty()) { return true; }
 
-  Task* task = AddOngoing("o2s" + std::to_string(slot), "Seating - " + target.name, 2,
+  // The same press, made by a hand: it works at that hand's rate, not at the
+  // commander's.
+  const double length = by.empty() ? 2.0 : CrewCost(2.0);
+  Task* task = AddOngoing("o2s" + std::to_string(slot), "Seating - " + target.name, length,
                           "o2slot", target.id);
-  if (task != nullptr) { task->slot = slot; }
+  if (task != nullptr) {
+    task->slot = slot;
+    task->by = who;
+  }
   return true;
 }
 
@@ -402,7 +413,7 @@ bool Simulation::StartMaintenanceSelf() {
   return true;
 }
 
-bool Simulation::StartCookingSelf() {
+bool Simulation::StartCookingSelf(const std::string& by) {
   // Cooking a batch spends one dry ration up front; up to foodPerRation cooked
   // food lands together when the fixed foodPerRation-action timer completes.
   // Refuse a full counter or an empty larder.
@@ -422,15 +433,16 @@ bool Simulation::StartCookingSelf() {
   // when the batch finishes, not as it runs.
   const double cost = rules_.mess.foodPerRation;
 
+  const std::string who = by.empty() ? "the commander" : by;
   cookClaim_ = true;
-  PerformAction("Cooking begun by the commander");
+  PerformAction(by.empty() ? "Cooking begun by the commander" : "Cooking begun by " + by);
   cookClaim_ = false;
 
   if (!state_.gameOver.empty()) { return false; }
 
-  Task* task = AddOngoing("cook", "Cooking - the commander", cost, "cook", "mess");
+  Task* task = AddOngoing("cook", "Cooking - " + who, cost, "cook", "mess");
   if (task != nullptr) {
-    task->by = "the commander";
+    task->by = who;
     mess_.rations -= 1.0;  // the ration is spent when the batch starts
     // Carrying on to a full rack is allowed: one dry ration per batch, until
     // the cooked-food counter is stocked.

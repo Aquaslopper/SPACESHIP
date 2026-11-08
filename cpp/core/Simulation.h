@@ -44,7 +44,7 @@ struct JobDef {
   double learnOn = 0, learnSt = 0;    // the price of a lesson, in actions
   double feeOn = 0, feeSt = 0;        // ...and in shiplets
   double trainStep = 0, trainCap = 0;
-  std::string unit;                   // "%" / " air" / " ration/action"
+  std::string unit;                   // "%" / " air" / " ration/click"
   std::string cloth, dark;            // what the sprite in the quarters wears
 };
 
@@ -76,6 +76,12 @@ class Simulation {
   // The playable client always uses NewVoyage, never this reference fixture.
   static Simulation ReferenceVoyage(const Catalog& catalog);
 
+  // Every hand eats on a clock of his own, so the room is never fed in one
+  // mouthful. Dealt once at boot and once for each new signing; the save system
+  // keeps whatever a hand was dealt.
+  void StaggerHungerClocks();
+  void DealHungerClock(CrewMember& crew);
+
   // ---- the clock ---------------------------------------------------------
   // The only function that advances the world. Mirrors performAction(detail).
   void PerformAction(const std::string& detail = std::string());
@@ -93,10 +99,11 @@ class Simulation {
   void FreeCommit(const std::string& detail = std::string());
 
   // ---- commands that exist in Phase 1A -----------------------------------
-  bool StartCanisterInstall(int slot);  // the player carries a canister over
+  // `by` names the hand that made the press; empty means the commander.
+  bool StartCanisterInstall(int slot, const std::string& by = std::string());  // the player carries a canister over
   bool StartFilterBank();               // the player throws the switch
   bool StartMaintenanceSelf();          // startMaint(e, "maint", "the commander")
-  bool StartCookingSelf();              // startCook(e, "cook", "the commander")
+  bool StartCookingSelf(const std::string& by = std::string());              // startCook(e, "cook", "the commander")
   bool ServiceSystem(const std::string& statId);  // buildSystemScreen() service row
   bool ApplyJob(const std::string& crewId, const std::string& jobId);  // scenario setup
 
@@ -235,6 +242,11 @@ class Simulation {
   // Economy (Economy.cpp)
   double LotPrice(const GoodsLot& lot) const;
   double CargoUsed() const;
+
+  // What this port's counter charges for one crate right now, computed the way
+  // BuyGood charges it, so a label and a purchase can never disagree.
+  double GoodCounterPrice(const std::string& goodId) const;
+  double CargoCapacity() const;
   double CargoReserved() const;
   bool BuySupply(const std::string& id);     // fuel cell, kit, medkit, canister, rations
   bool BuyGood(const std::string& goodId);
@@ -261,6 +273,13 @@ class Simulation {
   // The cargo hall (Economy.cpp). Running a trade is two clicks and one leg: the
   // board signs it, the hold carries it, and the destination settles it. What
   // the destination pays is the market there plus the freight the leg cost.
+  // The machine's button in the engine room. One press is one click of the
+  // clock; the button is live again once twelve clicks have gone by.
+  // `by` is who pressed it: the commander, or the engineer acting alone.
+  bool EngineClick(const std::string& by = std::string());
+  bool EngineClickReady() const;
+  double EngineClickFill() const;
+
   std::vector<TradeContract> TradesHere() const;
   double TradePayout(const TradeContract& trade) const;
   bool SettleTrade(const std::string& mode, const std::string& to,
@@ -449,6 +468,9 @@ class Simulation {
 
   // The cargo hall's own state. None of it is saved: the arrangement of the hold
   // and the run of loading clicks belong to the session, not to the voyage.
+  bool engineClicking_ = false;      // one press at a time, while its own click runs
+  bool engineClickAtPending_ = false;  // the press still has to arm its bar
+  void ServiceDrive(const std::string& by);
   std::map<std::string, bool> stowed_;
   int stowClicks_ = 0;
   int stowThreshold_ = 0;

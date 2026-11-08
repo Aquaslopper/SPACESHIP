@@ -14,6 +14,48 @@
 
 namespace ship {
 
+// The machine's button. A press is a click of the clock like any other: the
+// world ages, hunger rises and the drive wears. It also brings the drive back to
+// full, which is all the tending there is, so the press can never outrun the
+// wear it causes - and the button then waits out a whole cycle of clicks.
+// The press itself: the bar is armed to the click that is in flight and the
+// drive comes back up. Called from the commander's own press, and from the
+// engineer's tick, which is already an action of its own.
+void Simulation::ServiceDrive(const std::string& by) {
+  const std::string who = by.empty() ? "The commander" : by;
+  state_.engineClickAt = ActionCount();
+  LogLine(who + " pressed the maintenance button");
+  if (state_.gameOver.empty()) { state_.engineCondition = 100.0; }
+}
+
+bool Simulation::EngineClick(const std::string& by) {
+  if (!state_.gameOver.empty()) { return false; }
+  if (engineClicking_) { return false; }
+  if (!EngineClickReady()) { return false; }
+  // A maintenance job already in hand owns the drive; the button waits for it.
+  if (MaintRunning()) { return false; }
+
+  const std::string who = by.empty() ? "The commander" : by;
+  engineClicking_ = true;
+  engineClickAtPending_ = true;
+  PerformAction(who + " pressed the maintenance button");
+  engineClicking_ = false;
+  if (engineClickAtPending_) { ServiceDrive(who); }
+  engineClickAtPending_ = false;
+  return true;
+}
+
+double Simulation::EngineClickFill() const {
+  const double cycle =
+      rules_.engine.engineClickEvery > 0 ? rules_.engine.engineClickEvery : 12.0;
+  const double since = ActionCount() - state_.engineClickAt;
+  if (since >= cycle) { return 100.0; }
+  if (since <= 0.0) { return 0.0; }
+  return since / cycle * 100.0;
+}
+
+bool Simulation::EngineClickReady() const { return EngineClickFill() >= 100.0; }
+
 void Simulation::WearEngine() {
   state_.wearTick += 1;
   if (state_.wearTick < rules_.engine.wearEvery) { return; }
@@ -35,7 +77,7 @@ void Simulation::TickFilters() {
     // does not also spend a step of it.
     state_.airHold = rules_.air.holdMax;
     LogLine("Filter bank spent. The cabin air will hold for " +
-            js::NumToString(rules_.air.holdMax) + " actions.");
+            js::NumToString(rules_.air.holdMax) + " clicks.");
     return;
   }
 

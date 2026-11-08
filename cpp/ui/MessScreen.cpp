@@ -93,7 +93,7 @@ TaskStage BuildMessMachine(const Simulation& sim) {
     tick.tone = tickTone;
     parts.push_back(tick);
     parts.push_back(Part("mess-plate-sub", px, 246, 118, 14,
-                         Num(every - crew.hungerTick) + " actions to next meal"));
+                         Num(every - crew.hungerTick) + " clicks to next meal"));
   }
 
   // --- the dry-ration input shelf, below the crew's meal clocks ------------
@@ -139,7 +139,7 @@ MessScreenModel BuildMessScreen(const Simulation& sim) {
     plate.tickPercent =
         std::round((crew.hungerTick / sim.GameRules().mess.every) * 100.0);
     plate.sub = Num(sim.GameRules().mess.every - crew.hungerTick) +
-                " actions to next meal";
+                " clicks to next meal";
     plate.tone = crew.hunger >= 70.0 ? "#b05a42" : "#7f9161";
     model.plates.push_back(plate);
   }
@@ -166,7 +166,7 @@ MessScreenModel BuildMessScreen(const Simulation& sim) {
   cycle.id = "mess-cycle";
   cycle.title = "Hunger Cycle";
   cycle.Field("Every crew member",
-              Num(sim.GameRules().mess.every) + " of their own actions");
+              Num(sim.GameRules().mess.every) + " of their own clicks");
   cycle.Field("Hunger rises", "by " + Num(sim.GameRules().mess.hungerPerMeal) +
                                   " over those " + Num(sim.GameRules().mess.every) + " clicks");
   cycle.Field("One food", "takes " + Num(sim.GameRules().mess.hungerPerFood) + " hunger off");
@@ -183,9 +183,8 @@ MessScreenModel BuildMessScreen(const Simulation& sim) {
   starve.placement = "np-last";
   starve.Field("Risk begins at", Num(sim.GameRules().mess.starveAt) + "% hunger");
   starve.Field("Cost",
-               "1 health every " + Num(sim.GameRules().mess.starveEvery) + " actions");
-  starve.Note("Slow on purpose - the same law bad air already follows. Nobody "
-              "starves on the spot.");
+               "1 health every " + Num(sim.GameRules().mess.starveEvery) + " clicks");
+  starve.Note("Slow, like bad air: nobody starves on the spot.");
   screen.left.push_back(starve);
 
   // --- under the machine -------------------------------------------------
@@ -194,7 +193,7 @@ MessScreenModel BuildMessScreen(const Simulation& sim) {
   cooking.title = "Cooking";
   cooking.placement = "np-half";
   if (cookTask != nullptr) {
-    cooking.Field("Batch progress", Num(cookTask->left) + " actions remaining");
+    cooking.Field("Batch progress", Num(cookTask->left) + " clicks remaining");
     cooking.Field("Batch yield", "up to " + Num(messRules.foodPerRation) +
                                       " cooked food");
     cooking.Field("Larder", Num(sim.MessRations()) + " of " +
@@ -211,9 +210,7 @@ MessScreenModel BuildMessScreen(const Simulation& sim) {
                                " cooked food (rack capacity applies)");
     cooking.Field("Takes",
                   Num(messRules.foodPerRation) +
-                      " actions; food lands when the batch finishes");
-    cooking.Field("Auto-start", "below " + Num(messRules.cookBelow) +
-                                   " cooked food");
+                      " clicks; food lands when the batch finishes");
     cooking.Field("Larder", Num(sim.MessRations()) + " of " +
                                 Num(sim.MessRationCapacity()) + " dry rations");
   }
@@ -247,11 +244,9 @@ MessScreenModel BuildMessScreen(const Simulation& sim) {
     crewPanel.Field("Skill", cook->skill);
     crewPanel.Field("Batch", JobThreshold(sim, *cook));
     crewPanel.Field("Activity", cook->activity);
-    crewPanel.Note("When free, and when Hydroponics is not processing produce, "
-                   "she starts cooking below " + Num(messRules.cookBelow) +
-                   " cooked food if at least one dry ration is in the larder. "
-                   "She repeats while dry rations remain, stopping when the " +
-                   Num(capacity) + "-food counter is full or the larder is empty.");
+    crewPanel.Note("Cooks below " + Num(messRules.cookBelow) +
+                   " food, one ration a batch, until the " + Num(capacity) +
+                   "-food counter is full.");
   } else {
     crewPanel.Dim("No automatic cook is assigned. The commander can start a "
                   "batch manually; it still needs one dry ration.");
@@ -266,7 +261,7 @@ MessScreenModel BuildMessScreen(const Simulation& sim) {
     screen.bandNote =
         "Batch in progress: one dry ration was spent; up to " +
         Num(messRules.foodPerRation) + " cooked food lands after " +
-        Num(cookTask->left) + " more actions.";
+        Num(cookTask->left) + " more clicks.";
   } else if (model.full) {
     screen.bandNote =
         "The cooked-food rack is full (" + Num(rack) + " of " +
@@ -277,10 +272,10 @@ MessScreenModel BuildMessScreen(const Simulation& sim) {
   } else {
     screen.bandNote =
         "One dry ration yields up to " + Num(messRules.foodPerRation) +
-        " cooked food after " + Num(messRules.foodPerRation) + " actions. " +
+        " cooked food after " + Num(messRules.foodPerRation) + " clicks. " +
         Num(static_cast<double>(sim.Crew().size())) + " crew use " +
         Num(crewFoodPerCycle) + " food per " + Num(messRules.every) +
-        "-action cycle; automatic restocking starts below " +
+        "-click cycle; automatic restocking starts below " +
         Num(messRules.cookBelow) + " food when the cook is free and a dry "
         "ration is available.";
   }

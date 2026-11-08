@@ -146,7 +146,7 @@ O2ScreenModel BuildO2Screen(const Simulation& sim) {
                                             : Num(state.airHold) + " of " +
                                                   Num(sim.GameRules().air.holdMax));
   airPanel.Field("Declines", "one step per " + Num(sim.GameRules().air.step) +
-                                 " actions");
+                                 " clicks");
   airPanel.Field("Crew", airSpec.word);
   if (sim.AirStageIndex() < 3) {
     airPanel.Note("Bad air harms the crew and can eventually kill them. It "
@@ -159,11 +159,11 @@ O2ScreenModel BuildO2Screen(const Simulation& sim) {
   life.title = "Filter Lifespan";
   life.Name(Num(state.filterLife));
   life.Sub("of " + Num(sim.GameRules().life.lifeMax));
-  life.Sub("actions of clean air");
+  life.Sub("clicks of clean air");
   life.Bar(pct, airSpec.tone);
-  life.Field("Burn rate", Num(sim.GameRules().life.decay) + " per action");
+  life.Field("Burn rate", Num(sim.GameRules().life.decay) + " per click");
   life.Field("Full charge",
-             Num(sim.GameRules().life.lifeMax / sim.GameRules().life.decay) + " actions");
+             Num(sim.GameRules().life.lifeMax / sim.GameRules().life.decay) + " clicks");
   screen.left.push_back(life);
 
   NavPanel slotPanel;
@@ -197,8 +197,8 @@ O2ScreenModel BuildO2Screen(const Simulation& sim) {
   burst.id = "o2-burst";
   burst.title = "Pro-Action Burst";
   burst.placement = "np-half-last";
-  burst.Note("Starting the bank costs one ordinary action and hands ten back: "
-             "every job already running jumps forward by ten actions. The "
+  burst.Note("Starting the bank costs one ordinary click and hands ten back: "
+             "every job already running jumps forward by ten clicks. The "
              "counter does not move and nothing wears. It is the only thing "
              "aboard that gives time instead of taking it.");
   screen.under.push_back(burst);
@@ -228,7 +228,7 @@ O2ScreenModel BuildO2Screen(const Simulation& sim) {
     crew.Field("Skill", hand->skill);
     crew.Field("Acts at", JobThreshold(sim, *hand));
     crew.Field("Activity", hand->activity);
-    crew.Field("Seating", Num(sim.CrewCost(2.0)) + " actions per slot");
+    crew.Field("Seating", Num(sim.CrewCost(2.0)) + " clicks per slot");
     const std::string stageWord = JobThreshold(sim, *hand);
     crew.Note("He holds the filter job and works the bank unasked - but not "
               "until the air is already " + stageWord +
@@ -290,12 +290,12 @@ O2ScreenModel BuildO2Screen(const Simulation& sim) {
   screen.bandNote =
       model.running
           ? "The bank is running. " + Num(state.filterLife) +
-                " actions of clean air left."
+                " clicks of clean air left."
           : (sim.StatValue("energy") <= 0.0
                  ? "No power. Recharge energy to run the filter bank."
                  : (model.ready
                         ? "All three slots are seated. Starting the bank costs "
-                          "one action and advances every running job by ten."
+                          "one click and advances every running job by ten."
                         : "Seat a canister in all three slots before the bank "
                           "can be started."));
 

@@ -133,9 +133,26 @@ double RuleActions(const Simulation& sim, const std::string& category) {
   return it == sim.World().rules.cooldowns.end() ? 5.0 : it->second.actions;
 }
 
+// The unit of the clock, as it is printed now: a cost that says "click" is a
+// cost like one that says "action", and both have to be seen.
+bool MentionsClick(const std::string& text) {
+  const std::string lower = Lower(text);
+  std::size_t at = lower.find("click");
+  while (at != std::string::npos) {
+    const std::size_t end = at + 5 + (at + 5 < lower.size() && lower[at + 5] == 's' ? 1 : 0);
+    const bool startOk =
+        at == 0 || !(std::isalnum(static_cast<unsigned char>(lower[at - 1])) || lower[at - 1] == '_');
+    const bool endOk = end >= lower.size() ||
+                       !(std::isalnum(static_cast<unsigned char>(lower[end])) || lower[end] == '_');
+    if (startOk && endOk) { return true; }
+    at = lower.find("click", at + 1);
+  }
+  return false;
+}
+
 bool IsActionCost(const std::string& cost, bool hasCost) {
   if (!hasCost || cost.empty()) { return true; }
-  return MentionsAction(cost);
+  return MentionsAction(cost) || MentionsClick(cost);
 }
 
 // A control that takes no cooldown at all. Cooking is one: the batch is its own
@@ -201,9 +218,9 @@ ProgressButton BuildProgressButton(const Simulation& sim, const std::string& tas
     button.fillPercent = 0.0;
     if (remaining > 0.0) {
       button.state = ButtonState::Cooldown;
-      button.text = "Cooldown: " + Num(remaining) + " actions";
+      button.text = "Cooldown: " + Num(remaining) + " clicks";
       button.title = RuleLabel(sim, sim.State().actionCooldowns.at(button.cooldownKey).category) +
-                     " cooldown: " + Num(remaining) + " more actions. Other committed actions advance it; waiting does not.";
+                     " cooldown: " + Num(remaining) + " more clicks. Other committed clicks advance it; waiting does not.";
     } else {
       button.state = enabled ? ButtonState::Idle : ButtonState::Off;
       button.text = idleLabel;
@@ -244,6 +261,8 @@ bool PressProgressButton(Simulation& sim, const std::string& taskId) {
 
 bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
   const std::string& taskId = button.taskId;
+  // The machine's button is a click of the clock gated by its own green bar.
+  if (taskId == "engine-click") { return sim.EngineClick(); }
   const Task* task = sim.FindOngoing(taskId);
   if (task != nullptr && task->state == "running") { return false; }  // inert
   if (task != nullptr && task->state == "done") { return sim.Acknowledge(taskId); }
@@ -321,7 +340,7 @@ CommandRowView BuildCommandRow(const Simulation& sim, const std::string& label,
   row.label = label;
   row.cost = cost;
   row.actionCost = IsActionCost(cost, !cost.empty());
-  row.displayCost = cost.empty() ? "1 action" : cost;
+  row.displayCost = cost.empty() ? "1 click" : cost;
   row.enabled = enabled;
   row.category = ActionCooldownCategory(label, category);
   row.cooldownKey =
@@ -341,7 +360,7 @@ void BindCommandCooldown(const Simulation& sim, CommandRowView& row,
     row.displayCost = "COOLDOWN " + Num(row.remaining);
     row.title = RuleLabel(sim, sim.State().actionCooldowns.at(key).category) +
         " cooldown: " + Num(row.remaining) +
-        " more actions. Other committed actions advance it; waiting does not.";
+        " more clicks. Other committed clicks advance it; waiting does not.";
     row.enabled = false;
     row.live = false;
   }
@@ -356,9 +375,9 @@ CommandRowView BuildConversationRow(const Simulation& sim, const std::string& cr
   CommandRowView row;
   if (crew == nullptr) { return row; }
   const auto space = crew->name.find(' ');
-  row.label = "Talk to " + crew->name.substr(0, space) + " - 1 action, up to +" +
+  row.label = "Talk to " + crew->name.substr(0, space) + " - 1 click, up to +" +
               Num(Simulation::kConversationMorale) + " morale";
-  row.cost = row.displayCost = "1 action";
+  row.cost = row.displayCost = "1 click";
   row.actionCost = true;
   row.enabled = crew->health > 0 && sim.State().gameOver.empty() &&
                 sim.FindOngoing("doc-" + crewId) == nullptr;
@@ -699,10 +718,11 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
             CommandRowView view;
             view.label = offer.label;
             view.title = offer.note;
-            view.cost = offer.accepted ? "done" : "1 action";
+            view.cost = offer.accepted ? "done" : (offer.fits ? "1 click" : "no room");
             view.displayCost = view.cost;
-            view.enabled = !offer.accepted;
+            view.enabled = !offer.accepted && offer.fits;
             view.live = view.enabled;
+            if (!offer.fits) { view.title = offer.note + " " + offer.blocked; }
             offers.push_back(view);
             offerIds.push_back("trade-accept:" + offer.mode + ":" + offer.to +
                                (offer.good.empty() ? std::string() : ":" + offer.good));
@@ -729,7 +749,7 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         for (const std::string& line : item->details) { inspector.Note(line); }
       } else {
         inspector.Field("Item", item->label);
-        inspector.Field("Cost", item->free ? "Shiplets only" : "One action");
+        inspector.Field("Cost", item->free ? "Shiplets only" : "One click");
         for (const std::string& line : item->details) { inspector.Note(line); }
       }
       screen.panels.push_back(inspector);
@@ -867,7 +887,7 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         CommandRowView view;
         view.label = row.label;
         view.cost = row.cost;
-        view.displayCost = row.cost.empty() ? "1 action" : row.cost;
+        view.displayCost = row.cost.empty() ? "1 click" : row.cost;
         view.enabled = row.enabled;
         view.live = row.enabled;
         view.confirm = row.confirm;
@@ -893,7 +913,7 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         CommandRowView view;
         view.label = row.label;
         view.cost = row.cost;
-        view.displayCost = row.cost.empty() ? "1 action" : row.cost;
+        view.displayCost = row.cost.empty() ? "1 click" : row.cost;
         view.enabled = row.enabled;
         view.live = row.enabled;
         view.confirm = row.confirm;
@@ -925,7 +945,7 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         CommandRowView view;
         view.label = row.label;
         view.cost = row.cost;
-        view.displayCost = row.cost.empty() ? "1 action" : row.cost;
+        view.displayCost = row.cost.empty() ? "1 click" : row.cost;
         view.enabled = row.enabled;
         view.live = row.enabled;
         view.confirm = row.confirm;
@@ -1025,7 +1045,7 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         CommandRowView view;
         view.label = row.label;
         view.cost = row.cost;
-        view.displayCost = row.cost.empty() ? "1 action" : row.cost;
+        view.displayCost = row.cost.empty() ? "1 click" : row.cost;
         view.enabled = row.enabled;
         view.live = row.enabled;
         view.confirm = row.confirm;

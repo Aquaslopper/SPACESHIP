@@ -38,7 +38,7 @@ namespace ship {
 struct StationRow {
   std::string id;        // the press id: "buy-fuel", "sell:<lot>", "contract:<id>"
   std::string label;     // the middle-column item, price included
-  std::string cost;      // "0 actions", "1 action", "done"
+  std::string cost;      // "0 clicks", "1 click", "done"
   std::string note;      // the small line under a contract or a hire
   std::string confirm;   // the question asked first when confirmations are on
   bool enabled = false;  // the commit button on the right is live
@@ -84,6 +84,8 @@ struct TradeOffer {
   std::string label;      // the row in the right-hand list
   std::string note;       // the line under that row
   bool accepted = false;  // already taken: the button is grey
+  bool fits = true;       // the hold can take the consignment right now
+  std::string blocked;    // why it cannot, in the player's words
 };
 
 // One of the three buttons in the trade card's middle column.

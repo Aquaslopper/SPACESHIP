@@ -234,19 +234,19 @@
     {
       "group": "Getting started",
       "id": "controls",
-      "text": "Left-click a ship element for a briefing; right-click it to open a task tab. Use the arrows to scroll tabs and Home to return to the ship. The disk icon has three independent save slots, a new-voyage command and a return to the main menu; slot one reads the original save. The gear holds five bridge palettes, ambient music, sound effects, volume, motion, reading, crew labels and confirmations. Rapid repeat action clicks are briefly ignored while each command settles. Reading and changing options are free.",
+      "text": "Left-click a ship element for a briefing; right-click it to open a task tab. Use the arrows to scroll tabs and Home to return to the ship. The disk icon has three independent save slots, a new-voyage command and a return to the main menu; slot one reads the original save. The gear holds five bridge palettes, ambient music, sound effects, volume, motion, reading, crew labels and confirmations. Rapid repeat click clicks are briefly ignored while each command settles. Reading and changing options are free.",
       "title": "Controls, tabs and saves"
     },
     {
       "group": "Getting started",
       "id": "ships",
-      "text": "A new voyage begins on the compact Wren courier: 40 m3 of cargo and six berths, with all ship systems fitted. At any station shipyard, buy the larger Kestrel-series SC Tessellate for 4,000 shiplets. It has 60 m3 of cargo and 14 berths before refits. Cargo, crew, active work, equipment, refits, condition and records transfer; the purchase is permanent and takes one action. Cargo refits increase the Wren to 60 then 90 m3; the same refits carry over to 90 then 120 m3 on the Kestrel.",
+      "text": "A new voyage begins on the compact Wren courier: 40 m3 of cargo and six berths, with all ship systems fitted. At any station shipyard, buy the larger Kestrel-series SC Tessellate for 4,000 shiplets. It has 60 m3 of cargo and 14 berths before refits. Cargo, crew, active work, equipment, refits, condition and records transfer; the purchase is permanent and takes one click. Cargo refits increase the Wren to 60 then 90 m3; the same refits carry over to 90 then 120 m3 on the Kestrel.",
       "title": "Your ships and the shipyard"
     },
     {
       "group": "Getting started",
       "id": "actions",
-      "text": "One committed action advances the ship clock once. Starting a process costs one action, then its remaining work progresses on later actions. Completed crossings and scans must be acknowledged. Use Stand watch in Navigation to spend one action advancing work and survival clocks, even with a full hold. The filter bank grants ten units of work progress without advancing the world clock. Opening tabs, reading and selecting map targets never cost an action.",
+      "text": "One committed click advances the ship clock once. Starting a process costs one click, then its remaining work progresses on later clicks. Completed crossings and scans must be acknowledged. Use Stand watch in Navigation to spend one click advancing work and survival clocks, even with a full hold. The filter bank grants ten units of work progress without advancing the world clock. Opening tabs, reading and selecting map targets never cost a click.",
       "title": "Actions and ongoing work"
     },
     {
@@ -254,7 +254,7 @@
       "id": "air",
       "link": "o2",
       "linkLabel": "Open O2 Filter Room",
-      "text": "The O2 Filter Room needs three canisters seated before the bank can start. A full bank contains 200 charge and uses four per action. After it stops, cabin air gradually worsens: bad air slows crew and eventually harms health. The Recyclers can make a canister from salvage, or stations sell supplies.",
+      "text": "The O2 Filter Room needs three canisters seated before the bank can start. A full bank contains 200 charge and uses four per click. After it stops, cabin air gradually worsens: bad air slows crew and eventually harms health. The Recyclers can make a canister from salvage, or stations sell supplies.",
       "title": "Air and the filter bank"
     },
     {
@@ -262,7 +262,7 @@
       "id": "power",
       "link": "engine",
       "linkLabel": "Open Engine Room",
-      "text": "The engine loses one condition every four actions. Maintenance restores it; an engineer can maintain it automatically. A dead drive stops travel. Energy falls over time; powered work pauses at zero. Right-click the energy or fuel gauge to use a fuel cell. The Power Bus and Shield Array exchange energy and shields with conversion loss.",
+      "text": "The drive loses one percent every four clicks. The button on the machine runs it and brings it back to full; it is live again after twelve clicks. An engineer can maintain it as well. A dead drive stops travel. Energy falls over time; powered work pauses at zero. Right-click the energy or fuel gauge to use a fuel cell. The Power Bus and Shield Array exchange energy and shields with conversion loss.",
       "title": "Power, fuel and drive"
     },
     {
@@ -276,7 +276,7 @@
     {
       "group": "Survival",
       "id": "hazards",
-      "text": "Reports appear in Events as actions pass and can escalate if ignored. Open a report to resolve it with supplies or assign an available crew member for six actions of work. Hull failure or the loss of all crew ends the voyage. Load a saved slot or start a new voyage after a loss.",
+      "text": "Reports appear in Events as clicks pass and can escalate if ignored. Open a report to resolve it with supplies or assign an available crew member for six clicks of work. Hull failure or the loss of all crew ends the voyage. Load a saved slot or start a new voyage after a loss.",
       "title": "Incidents and loss"
     },
     {
@@ -284,7 +284,7 @@
       "id": "charts",
       "link": "nav",
       "linkLabel": "Open Navigation",
-      "text": "The chart has System, Sector and Galaxy layers. Galaxy selects a region for browsing; Sector selects a system for a jump; System selects a local destination. Travel requires fuel, power and a working drive. Start a crossing, spend actions elsewhere, then acknowledge the finished crossing. Undock before plotting another course.",
+      "text": "The chart has System, Sector and Galaxy layers. Galaxy selects a region for browsing; Sector selects a system for a jump; System selects a local destination. Travel requires fuel, power and a working drive. Start a crossing, spend clicks elsewhere, then acknowledge the finished crossing. Undock before plotting another course.",
       "title": "Charts and travel"
     },
     {
@@ -306,7 +306,7 @@
       "id": "jobs",
       "link": "quarters",
       "linkLabel": "Open Crew Quarters",
-      "text": "In Crew Quarters, stage jobs and orders, then issue the sheet. Work takes the listed actions and training has a fee. A navigator reduces departure fuel use, a cleaner supports morale, and an engineer, filter hand and cook can work autonomously. Wages are paid from the ship's purse on the action clock.",
+      "text": "In Crew Quarters, stage jobs and orders, then issue the sheet. Work takes the listed clicks and training has a fee. A navigator reduces departure fuel use, a cleaner supports morale, and an engineer, filter hand and cook can work autonomously. Wages are paid from the ship's purse on the click clock.",
       "title": "Jobs, training and wages"
     },
     {
@@ -350,7 +350,7 @@
     {
       "group": "Ship systems",
       "id": "interlocks",
-      "text": "Cargo recovery reserves hold space while it runs. Canister and dry-ration production reserve their output space. Hydroponics cannot overlap Galley cooking, and Thermal Control cannot overlap engine maintenance. Crew cannot be assigned to simultaneous medical, social, incident or order work. Check the room's status when an action is unavailable.",
+      "text": "Cargo recovery reserves hold space while it runs. Canister and dry-ration production reserve their output space. Hydroponics cannot overlap Galley cooking, and Thermal Control cannot overlap engine maintenance. Crew cannot be assigned to simultaneous medical, social, incident or order work. Check the room's status when a click is unavailable.",
       "title": "Reservations and space"
     },
     {
@@ -362,7 +362,7 @@
     {
       "group": "Rewards",
       "id": "commissions",
-      "text": "Stations also offer one active repeatable commission at a time: visit another port, scan a specified body, or recover two salvage lots. Acceptance and collection cost one action each. Finish the objective after acceptance, then collect at any station. Abandoning costs one action and rotates the offers. No freight is reserved for these commissions.",
+      "text": "Stations also offer one active repeatable commission at a time: visit another port, scan a specified body, or recover two salvage lots. Acceptance and collection cost one click each. Finish the objective after acceptance, then collect at any station. Abandoning costs one click and rotates the offers. No freight is reserved for these commissions.",
       "title": "Repeatable commissions"
     },
     {

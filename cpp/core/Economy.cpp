@@ -45,6 +45,24 @@ double Simulation::LotPrice(const GoodsLot& lot) const {
   return js::Round(lot.value * factor);
 }
 
+double Simulation::CargoCapacity() const { return cargo_.capacity; }
+
+double Simulation::GoodCounterPrice(const std::string& goodId) const {
+  const Good* good = nullptr;
+  for (const Good& candidate : catalog_.goods) {
+    if (candidate.id == goodId) { good = &candidate; }
+  }
+  if (good == nullptr) { return 0.0; }
+  GoodsLot probe;
+  probe.id = good->id;
+  probe.name = good->name;
+  probe.kind = good->kind;
+  probe.vol = good->vol;
+  probe.value = good->value;
+  probe.risk = good->risk;
+  return js::Ceil(LotPrice(probe) * 1.2);
+}
+
 double Simulation::CargoUsed() const {
   double used = 0;
   for (const GoodsLot& lot : goods_) { used += lot.vol; }
@@ -359,6 +377,7 @@ bool Simulation::HireCrew(const std::string& candidateId) {
   state_.shiplets -= candidate->fee;
   state_.hired[candidateId] = true;
   crew_.push_back(MakeCrew(candidate->crew));
+  DealHungerClock(crew_.back());
   const std::string name = candidate->crew.name;
   SimRemember("Arrival", name + " joined the crew at " + HerePort()->name + ".", candidateId);
   FreeCommit(name + " joined the crew");
@@ -865,6 +884,24 @@ bool Simulation::BuyUpgrade(const std::string& upgradeId) {
     state_.upgrades["rack"] = true;
     life_.capacity = 15;
     FreeCommit("O2 rack expanded");
+    return true;
+  }
+  if (upgradeId == "galley" && !Truthy(state_.upgrades, "galley") && state_.shiplets >= 400) {
+    state_.shiplets -= 400;
+    state_.upgrades["galley"] = true;
+    // The ceiling is what the cook fills to, so a bigger rack is a deeper buffer
+    // between the crew and the starve line, not a faster kitchen.
+    mess_.capacity = 34;
+    FreeCommit("Galley rack enlarged");
+    return true;
+  }
+  if (upgradeId == "filter" && !Truthy(state_.upgrades, "filter") && state_.shiplets >= 600) {
+    state_.shiplets -= 600;
+    state_.upgrades["filter"] = true;
+    // `lifeMax` is the length of one charge in clicks, and every reader of it -
+    // the bank, the O2 screen, the save - reads it from here.
+    rules_.life.lifeMax = 300;
+    FreeCommit("Filter cores re-sleeved");
     return true;
   }
   if (upgradeId == "scanner" && !Truthy(state_.upgrades, "scanner") && state_.shiplets >= 600) {

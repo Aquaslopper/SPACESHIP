@@ -345,7 +345,7 @@ TEST_CASE("the record has four shelves and reads them off the live crew",
   CHECK(Line(employment, "Skill")->value == "Untrained");
   CHECK(Line(employment, "Acts at")->value == "30% condition");
   CHECK(Line(employment, "Pay")->value == "10 sh each payday");
-  CHECK(Line(employment, "Next payday")->value == "100 actions");
+  CHECK(Line(employment, "Next payday")->value == "100 clicks");
   CHECK(Line(employment, "Wallet")->value.size() > 0);
 
   // Reading a record is free: no clock moved.
@@ -383,7 +383,7 @@ TEST_CASE("the quarters and the record open from their own tabs", "[crew]") {
   CHECK(quarters.roster[0].role.find(" /") == std::string::npos);
   CHECK(quarters.roster[1].role == quarters.roster[1].role);
   CHECK(quarters.roster[1].flag.empty());
-  CHECK(quarters.payEvery == "100 actions");
+  CHECK(quarters.payEvery == "100 clicks");
   CHECK(quarters.payNext == "in 100");
   CHECK(quarters.bandNote == "No orders written.");
   CHECK(quarters.screen.progress.size() == 1);
@@ -394,7 +394,7 @@ TEST_CASE("the quarters and the record open from their own tabs", "[crew]") {
   // and the station lesson refused while there is no dock.
   REQUIRE(quarters.orders.size() == 5);
   CHECK(quarters.orders[0].label == "Send to Doc");
-  CHECK(quarters.orders[0].note == "away up to 7 actions");
+  CHECK(quarters.orders[0].note == "away up to 7 clicks");
   CHECK(quarters.orders[0].cost == "1");
   CHECK(quarters.orders[1].label == "Learn - aboard");
   CHECK(quarters.orders[1].note == "cheap, one step");
@@ -431,7 +431,7 @@ TEST_CASE("the quarters and the record open from their own tabs", "[crew]") {
   CHECK(record.left[3].title == "Employment");
   REQUIRE(record.commands.size() == 1);
   CHECK(record.commands.front().enabled);
-  CHECK(record.commands.front().cost == "1 action");
+  CHECK(record.commands.front().cost == "1 click");
 }
 
 TEST_CASE("quarters commits only the displayed progress cooldown", "[crew][ui][cooldown]") {
@@ -482,7 +482,7 @@ TEST_CASE("crew conversation gains morale for one action and shares a per-person
   sim.FindCrew("suri")->morale = 40;
   auto row = ship::BuildQuartersScreen(sim).conversation;
   CHECK(row.enabled);
-  CHECK(row.label.find("1 action") != std::string::npos);
+  CHECK(row.label.find("1 click") != std::string::npos);
   CHECK(row.label.find("+5 morale") != std::string::npos);
   const auto start = sim.ActionCount();
   REQUIRE(ship::PressQuartersAction(sim, "talk"));

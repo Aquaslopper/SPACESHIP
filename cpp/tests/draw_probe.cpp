@@ -70,7 +70,7 @@ RectCall FindBand(const ship::ShellView& view) {
     return std::abs(r.x - (c.x + 8)) < 1 && std::abs(r.w - (c.w - 16)) < 1 &&
            std::abs(r.y + r.h - (c.Bottom() - 8)) < 2 && r.h > 45;
   });
-  Require(it != rects.end(), "Measured action band is not anchored at viewport bottom");
+  Require(it != rects.end(), "Measured click band is not anchored at viewport bottom");
   Require(it->y >= c.y, "Action band grew above the viewport");
   return *it;
 }
@@ -83,7 +83,7 @@ void RequireCenteredButtons(const ship::ShellView& view, const RectCall& band) {
     const bool disabled = r.color.r == p.panel3.r && r.color.g == p.panel3.g && r.color.b == p.panel3.b;
     if (enabled || disabled) buttons.push_back(r);
   }
-  Require(!buttons.empty(), "No action buttons inside the measured band");
+  Require(!buttons.empty(), "No click buttons inside the measured band");
   for (const auto& button : buttons) {
     float left = button.x, right = button.x + button.w;
     for (const auto& other : buttons) if (std::abs(other.y - button.y) < 1) {
@@ -266,7 +266,7 @@ int main() {
         }
         Require(offered, "A selected galaxy offered no way to open its sector chart");
       }
-      Require(far.ActionCount() == 0, "Selecting a galaxy spent an action");
+      Require(far.ActionCount() == 0, "Selecting a galaxy spent a click");
     }
 
     // Free handbook selection and reveal do not produce action feedback; the
@@ -289,7 +289,7 @@ int main() {
       FindText("Reveal the spoiler entry");
       Require(std::none_of(rects.begin(), rects.end(), [](const RectCall& r) {
         return r.color.r == 126 && r.color.g == 198 && r.color.b == 63 && r.w == 11 && r.h == 2;
-      }), "Free wiki selection displayed a positive action mark");
+      }), "Free wiki selection displayed a positive click mark");
       const auto content = reader.LayoutNow().content;
       reader.Scroll(content.Right() - 10, content.y + 50, -20);
       Frame(reader, handbook);
@@ -305,10 +305,10 @@ int main() {
       reader.Click(handbook, reveal.x + 2, reveal.y + 2, ship::HitButton::Left, 0);
       Frame(reader, handbook);
       FindText("The hidden article.");
-      Require(handbook.ActionCount() == 0, "Free wiki navigation spent an action");
+      Require(handbook.ActionCount() == 0, "Free wiki navigation spent a click");
       Require(std::none_of(rects.begin(), rects.end(), [](const RectCall& r) {
         return r.color.r == 126 && r.color.g == 198 && r.color.b == 63 && r.w == 11 && r.h == 2;
-      }), "Free wiki reveal displayed a positive action mark");
+      }), "Free wiki reveal displayed a positive click mark");
 
       // A tall article scrolls through its bottom before the sticky position is
       // reached, rather than trapping the end below the viewport.
@@ -358,7 +358,7 @@ int main() {
           Require(ship::FindTab(fitted.State(), "room:engine") != nullptr,
                   "Resized exterior label stopped opening its room");
           Require(fitted.ActionCount() == before,
-                  "Changing reading size or inspecting a room spent an action");
+                  "Changing reading size or inspecting a room spent a click");
           previousRoomSize = static_cast<int>(room.size);
           previousInfoSize = static_cast<int>(info.size);
         }
@@ -494,7 +494,7 @@ int main() {
               "Exterior left click did not open the room briefing");
       Require(artShip.ActionCount() == actions && artShip.State().wearTick == wear &&
               ship::CooldownRemaining(artShip, lockKey) == lock,
-              "Exterior browsing, view switching or wall time advanced the action clock");
+              "Exterior browsing, view switching or wall time advanced the click clock");
 
       // Missing art and a different ship class retain their deck plans.
       ship::ShellView fallback; fallback.Configure(1280, 1200, ship::Theme::ById("classic"));
@@ -546,7 +546,7 @@ int main() {
     const auto quarters = ship::BuildQuartersScreen(sim);
     const auto commitText = FindText(quarters.screen.progress.front().text);
     Require(commitText.y >= initialBandY && commitText.y + commitText.size < viewport.Bottom(),
-            "Windowed commit action is not visible");
+            "Windowed commit click is not visible");
     Require(std::abs(commitText.x + MeasureTextEx({}, commitText.text.c_str(), commitText.size, 1).x / 2 -
                      (viewport.x + viewport.w / 2)) < 2, "Assignments commit button/label is not centered");
     const auto beforeCommit = sim.ActionCount();
@@ -631,19 +631,19 @@ int main() {
     const double cellsBefore = sim.State().fuelCells;
     view.Click(sim, yardCard.x + 2, yardCard.y + 2, ship::HitButton::Left, 0);
     Frame(view, sim);
-    Require(sim.ActionCount() == beforeBuy, "Opening a station card spent an action");
+    Require(sim.ActionCount() == beforeBuy, "Opening a station card spent a click");
     Require(startsWith("Buy larger ship", "the yard items did not open").x > marketCard.x, "The yard's items did not open");
     view.Click(sim, marketCard.x + 2, marketCard.y + 2, ship::HitButton::Left, 0);
     Frame(view, sim);
-    Require(sim.ActionCount() == beforeBuy, "Returning to the market card spent an action");
+    Require(sim.ActionCount() == beforeBuy, "Returning to the market card spent a click");
     const auto fuelItem = startsWith("Fuel cell", "the market items did not paint");
     view.Click(sim, fuelItem.x + 2, fuelItem.y + 2, ship::HitButton::Left, 0);
     Frame(view, sim);
-    Require(sim.ActionCount() == beforeBuy, "Picking a station item spent an action");
+    Require(sim.ActionCount() == beforeBuy, "Picking a station item spent a click");
     const auto buyNow = startsWith("Buy - 45 sh", "the inspector commit button did not paint");
     view.Click(sim, buyNow.x + 2, buyNow.y + 2, ship::HitButton::Left, 0);
     Frame(view, sim);
-    Require(sim.ActionCount() == beforeBuy, "A market purchase spent an action");
+    Require(sim.ActionCount() == beforeBuy, "A market purchase spent a click");
     Require(sim.State().fuelCells == cellsBefore + 1, "Native station click failed to buy");
     const auto buyAgain = startsWith("Buy - 45 sh", "the inspector commit button did not paint");
     view.Click(sim, buyAgain.x + 2, buyAgain.y + 2, ship::HitButton::Left, 0);
@@ -667,7 +667,7 @@ int main() {
     const auto planet = startsWith(entryWord.c_str(), "no body of the station's system painted");
     view.Click(sim, planet.x + 2, planet.y + 2, ship::HitButton::Left, 0);
     Frame(view, sim);
-    Require(sim.ActionCount() == beforeBuy, "Reading a starmap entry spent an action");
+    Require(sim.ActionCount() == beforeBuy, "Reading a starmap entry spent a click");
     Require(std::any_of(texts.begin(), texts.end(), [](const auto& t) {
               return t.text.find("System: ") == 0;
             }),
@@ -686,12 +686,12 @@ int main() {
     Frame(view, sim);
     startsWith("Delivery", "the trade modes did not paint");
     startsWith("Freelance", "the trade modes did not paint");
-    // The station's own cards carry no cost at all, so a painted "1 action" is a
+    // The station's own cards carry no cost at all, so a painted "1 click" is a
     // run on the board and the list is not empty.
     Require(std::any_of(texts.begin(), texts.end(),
-                        [](const auto& t) { return t.text == "1 action"; }),
+                        [](const auto& t) { return t.text == "1 click"; }),
             "The trade list painted no run");
-    Require(sim.ActionCount() == beforeBuy, "Opening the trade list spent an action");
+    Require(sim.ActionCount() == beforeBuy, "Opening the trade list spent a click");
     Require(std::none_of(texts.begin(), texts.end(), [](const auto& t) {
               return t.text.find("Buy - ") == 0 || t.text.find("Sell - ") == 0;
             }),
@@ -705,10 +705,10 @@ int main() {
     const auto sellCommit = startsWith("Sell - ", "the sales commit button did not paint");
     view.Click(sim, sellCommit.x + 2, sellCommit.y + 2, ship::HitButton::Left, 0);
     Frame(view, sim);
-    Require(sim.ActionCount() == beforeBuy + 1, "Selling a lot did not spend one action");
+    Require(sim.ActionCount() == beforeBuy + 1, "Selling a lot did not spend one click");
     Require(std::any_of(rects.begin(), rects.end(), [](const auto& r) {
       return r.color.r == 126 && r.color.g == 198 && r.color.b == 63 && r.w == 11 && r.h == 2;
-    }), "HTA 654–659 action mark is not the green 11 by 2 bar");
+    }), "HTA 654–659 click mark is not the green 11 by 2 bar");
 
     // The Mess Hall must paint values, never the ids it used to carry as text.
     {
@@ -722,7 +722,7 @@ int main() {
                 "The galley painted an element id instead of a value");
       }
       FindText("18 of 24 food in the galley");
-      FindText("25 actions to next meal");
+      FindText("25 clicks to next meal");
       // Hunger is a live value on the crew record, and it drives a red bar.
       galley.FindCrew("jax")->hunger = 88;
       ship::OpenTask(galley, "crew", "jax", true);
@@ -795,9 +795,9 @@ int main() {
         shell.Scroll(c.x + 20, c.y + 20, -100);
         Frame(shell, check);
         const auto scrolledBand = FindBand(shell);
-        Require(std::abs(band.y - scrolledBand.y) < 1, "Body scrolling moved pinned action band");
+        Require(std::abs(band.y - scrolledBand.y) < 1, "Body scrolling moved pinned click band");
         RequireCenteredButtons(shell, scrolledBand);
-        Require(check.ActionCount() == actions, "UI scrolling spent an action");
+        Require(check.ActionCount() == actions, "UI scrolling spent a click");
       }
     }
 
@@ -902,7 +902,7 @@ int main() {
       Frame(shell, check);
       FindText(stamp + "  Newest feed probe");
       Require(std::abs(scissors.back().y - clip.y) < 1, "New activity shifted the surrounding Home column");
-      Require(check.ActionCount() == actions, "Cosmetic log update spent an action");
+      Require(check.ActionCount() == actions, "Cosmetic log update spent a click");
       // Shortened history clamps safely, and long entries wrap within the feed.
       check.MutableState().feed = {{"", std::string(300, 'W')}};
       Frame(shell, check);
@@ -951,7 +951,7 @@ int main() {
       shell.Click(check, purchase.x + 2, purchase.y + 2, ship::HitButton::Left, 0);
       Frame(shell, check);
       RequireCenteredButtons(shell, FindBand(shell));
-      Require(check.ActionCount() == actions, "Opening confirmation spent an action");
+      Require(check.ActionCount() == actions, "Opening confirmation spent a click");
       const auto no = FindText("Keep as it is");
       shell.Click(check, no.x + 2, no.y + 2, ship::HitButton::Left, 0);
       Require(check.ActionCount() == actions && check.State().shipClass == "wren", "Cancel changed the ship or simulation");
@@ -997,13 +997,13 @@ int main() {
       io.DisplaySize = ImVec2(1280, 1600);
       ship::OpenTask(talkSim, "crew", "suri", true);
       Frame(conversation, talkSim);
-      const auto button = FindText("Talk to Suri - 1 action, up to +5 morale");
+      const auto button = FindText("Talk to Suri - 1 click, up to +5 morale");
       const double before = talkSim.ActionCount();
       conversation.Click(talkSim, button.x + 2, button.y + 2, ship::HitButton::Left, 0);
       Require(talkSim.ActionCount() == before + 1 && talkSim.FindCrew("suri")->morale == 45,
-              "Crew record conversation did not spend one action and improve morale");
+              "Crew record conversation did not spend one click and improve morale");
       Frame(conversation, talkSim);
-      const auto locked = FindText("Talk to Suri - 1 action, up to +5 morale - COOLDOWN 5");
+      const auto locked = FindText("Talk to Suri - 1 click, up to +5 morale - COOLDOWN 5");
       conversation.Click(talkSim, locked.x + 2, locked.y + 2, ship::HitButton::Left, 0);
       Require(talkSim.ActionCount() == before + 1, "Locked crew record conversation was clickable");
       ship::OpenTask(talkSim, "room", "quarters", true);
@@ -1029,10 +1029,10 @@ int main() {
       ship::OpenTask(talkSim, "room", "quarters", true);
       ship::PressQuartersAction(talkSim, "select", "suri");
       Frame(conversation, talkSim);
-      const auto button = FindText("Talk to Suri - 1 action, up to +5 morale");
+      const auto button = FindText("Talk to Suri - 1 click, up to +5 morale");
       conversation.Click(talkSim, button.x + 2, button.y + 2, ship::HitButton::Left, 0);
       Require(talkSim.ActionCount() == 1 && talkSim.FindCrew("suri")->morale == 45,
-              "Quarters conversation did not spend one action and improve morale");
+              "Quarters conversation did not spend one click and improve morale");
     }
 
     // The Home painter must fill the pale warm CSS panels, not leave them on
@@ -1220,7 +1220,7 @@ int main() {
       dot = paintedHand();
       Require(dot.x != before.x, "Corridor crew indicator never drifts");
       Require(audit.ActionCount() == 0 && audit.State().wearTick == 0,
-              "Cosmetic crew movement advanced the action clock");
+              "Cosmetic crew movement advanced the click clock");
 
       ship::OpenTask(audit, "crew", "missing", true);
       Frame(cockpit, audit, 970000);
@@ -1266,7 +1266,7 @@ int main() {
                      mapBox->y + labelBody->labelY * mapBox->h / audit.Map().vh + 3,
                      ship::HitButton::Left, 972000);
       Require(audit.State().navTarget == "halvan", "Visible map label did not select its body");
-      Require(audit.ActionCount() == 0, "Selecting a label spent an action");
+      Require(audit.ActionCount() == 0, "Selecting a label spent a click");
       Require(audit.StartTravel(), "Could not start ring-interpolation fixture");
       auto* trip = audit.FindOngoing("travel");
       Require(trip != nullptr, "No travel fixture"); trip->left = trip->total * .5;
@@ -1418,7 +1418,7 @@ int main() {
     Require(view.Panel() == ship::TitlePanel::Settings && textureCalls == 1,
             "Options replaced the title image instead of opening a sheet over it");
     ImGui::DestroyContext();
-    std::cout << "PASS: real Draw.cpp scroll direction, windowed Assignments, Vessel input/clamp, green action/air fills, station card/item/inspector walk with money-only purchases, source health colours/live values, literal engine pipe, screen-space green click mark/glow after scrolling, pinned/centered measured action bands at 1180/1280, independent feed wheel/drag/wrap/clamp plus timestamp/reset, centered fixed machine/crew scenes with panel reflow, measured chart height and wide centering, preserved purchase confirmation, free-click feedback/rise/fade, four dark title menus, title art retained behind Options; source crew relocation/corridor drift, life-info routing, crew/event GONE rendering, map-label and moving-ring selection, active-tab glow/reduced-motion, new/existing background-tab reveal; general text >=18px; compact scaled Home info\n";
+    std::cout << "PASS: real Draw.cpp scroll direction, windowed Assignments, Vessel input/clamp, green click/air fills, station card/item/inspector walk with money-only purchases, source health colours/live values, literal engine pipe, screen-space green click mark/glow after scrolling, pinned/centered measured click bands at 1180/1280, independent feed wheel/drag/wrap/clamp plus timestamp/reset, centered fixed machine/crew scenes with panel reflow, measured chart height and wide centering, preserved purchase confirmation, free-click feedback/rise/fade, four dark title menus, title art retained behind Options; source crew relocation/corridor drift, life-info routing, crew/event GONE rendering, map-label and moving-ring selection, active-tab glow/reduced-motion, new/existing background-tab reveal; general text >=18px; compact scaled Home info\n";
     return 0;
   } catch (const std::exception& error) {
     std::cerr << "draw probe: " << error.what() << '\n'; return 1;

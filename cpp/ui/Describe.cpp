@@ -113,12 +113,12 @@ std::string JobThreshold(const Simulation& sim, const CrewMember& crew) {
     return "Fuel use -" + Num(rate) + "% when plotting";
   }
   if (crew.job == "cleaner") {
-    return "Crew morale +1 every " + Num(sim.CleanerIntervalOf(crew)) + " actions";
+    return "Crew morale +1 every " + Num(sim.CleanerIntervalOf(crew)) + " clicks";
   }
   if (crew.job == "kitchen") {
     const MessRules& mess = sim.GameRules().mess;
     return "1 dry ration -> up to " + Num(mess.foodPerRation) +
-           " cooked food in " + Num(mess.foodPerRation) + " actions";
+           " cooked food in " + Num(mess.foodPerRation) + " clicks";
   }
   return "-";
 }
@@ -151,7 +151,7 @@ void RoomEngine(const Simulation& sim, Description& t) {
   t.rows = {
       {"Condition", Num(sim.State().engineCondition) + "%"},
       {"Wear rate", "1% per " + Num(sim.GameRules().engine.wearEvery) +
-                        " actions spent aboard"},
+                        " clicks spent aboard"},
       {"Maintenance",
        sim.State().engineCondition >= 100.0
            ? std::string("Not needed - drive is perfect")
@@ -166,7 +166,7 @@ void RoomEngine(const Simulation& sim, Description& t) {
       {"Run Maintenance",
        sim.State().engineCondition >= 100.0
            ? std::string("refused at 100%")
-           : Num(cost) + " action" + (cost == 1.0 ? "" : "s")},
+           : Num(cost) + " click" + (cost == 1.0 ? "" : "s")},
       {"The engineer acts alone",
        engineer ? "at " + Num(EffectiveJobAt(sim, *engineer)) + "%"
                 : std::string("nobody assigned")},
@@ -181,7 +181,7 @@ void RoomO2(const Simulation& sim, Description& t) {
       {"Filter life",
        sim.BankRunning()
            ? Num(sim.State().filterLife) + " of " +
-                 Num(sim.GameRules().life.lifeMax) + " actions"
+                 Num(sim.GameRules().life.lifeMax) + " clicks"
            : std::string("bank is not running")},
       {"Slots", Num(SlotsIn(sim, "empty")) + " bare, " +
                     Num(SlotsIn(sim, "installed")) + " seated, " +
@@ -190,11 +190,11 @@ void RoomO2(const Simulation& sim, Description& t) {
        Num(sim.Life().canisters) + " of " + Num(sim.Life().capacity) + " racked"},
       {"Filter hand", hand ? hand->name + " - acts at " + JobThreshold(sim, *hand)
                            : std::string("nobody assigned")},
-      {"Reward", "+10 pro-action when all three run"},
+      {"Reward", "+10 pro-click when all three run"},
   };
   t.acts = {
-      {"Install a canister", "1 action + 2 to seat"},
-      {"Turn on the filters", "1 action - needs all three"},
+      {"Install a canister", "1 click + 2 to seat"},
+      {"Turn on the filters", "1 click - needs all three"},
   };
 }
 
@@ -215,7 +215,7 @@ void RoomMess(const Simulation& sim, Description& t) {
   std::string cookingStatus;
   if (cookTask != nullptr) {
     cookingStatus = "Batch in progress - " + Num(cookTask->left) +
-                    " actions remaining; up to " + Num(rules.foodPerRation) +
+                    " clicks remaining; up to " + Num(rules.foodPerRation) +
                     " cooked food will land";
   } else if (hydroponicsBusy) {
     cookingStatus = "Paused while Hydroponics processes produce";
@@ -224,7 +224,7 @@ void RoomMess(const Simulation& sim, Description& t) {
   } else if (rations < 1.0) {
     cookingStatus = "No dry rations in the larder";
   } else {
-    cookingStatus = Num(batchActions) + " actions - one dry ration yields up to " +
+    cookingStatus = Num(batchActions) + " clicks - one dry ration yields up to " +
                     Num(rules.foodPerRation) + " cooked food";
   }
 
@@ -238,7 +238,7 @@ void RoomMess(const Simulation& sim, Description& t) {
   } else if (rations < 1.0) {
     cookAction = "refused - dry-ration larder empty";
   } else {
-    cookAction = Num(batchActions) + " actions";
+    cookAction = Num(batchActions) + " clicks";
   }
 
   t.sub = "Galley: " + Num(rack) + " of " + Num(capacity) +
@@ -248,15 +248,15 @@ void RoomMess(const Simulation& sim, Description& t) {
       {"Galley", Num(rack) + " of " + Num(capacity) + " cooked food"},
       {"Larder", Num(rations) + " of " + Num(rationCapacity) + " dry rations"},
       {"Hunger cycle", Num(rules.hungerPerMeal) + " hunger over " +
-                           Num(rules.every) + " actions per crew member; clocks staggered"},
+                           Num(rules.every) + " clicks per crew member; clocks staggered"},
       {"Meal", "Up to " + Num(mealFood) + " cooked food; " +
                    Num(rules.hungerPerFood) + " hunger per food, stops at " +
                    Num(rules.hungerFloor)},
       {"Crew demand", Num(crewFoodPerCycle) + " cooked food per " +
-                          Num(rules.every) + "-action cycle"},
+                          Num(rules.every) + "-click cycle"},
       {"Cooking", cookingStatus},
       {"Starvation", "1 health every " + Num(rules.starveEvery) +
-                         " actions at " + Num(rules.starveAt) + "+ hunger"},
+                         " clicks at " + Num(rules.starveAt) + "+ hunger"},
       {"Cook", cook ? cook->name + " - kitchen duty" :
                        std::string("No automatic cook assigned")},
   };
@@ -283,9 +283,9 @@ void RoomCargo(const Simulation& sim, Description& t) {
   t.sub = "Storage - " + Num(used) + " of " + Num(sim.CargoStore().capacity) +
           " m3 in use";
   t.acts = {
-      {"Jettison a lot", "1 action"},
+      {"Jettison a lot", "1 click"},
       {"Sell a lot", "at a station"},
-      {"Recover route salvage", "1 action + 2 work"},
+      {"Recover route salvage", "1 click + 2 work"},
   };
 }
 
@@ -304,7 +304,7 @@ void RoomScience(const Simulation& sim, Description& t) {
   t.sub = "Survey records - " + Num(static_cast<double>(sim.Survey().size())) +
           " logs on file";
   t.acts = {
-      {"Prepare a data package", "1 action + 2 work"},
+      {"Prepare a data package", "1 click + 2 work"},
       {"Sell a survey", "at a station"},
   };
 }
@@ -341,7 +341,7 @@ Description DescribeTarget(const Simulation& sim, const std::string& kind,
     t.kindLabel = "STATION";
     t.sub = "Docked - market, mission board, shipyard and crew";
     t.rows = {{"Berth", "Docked"}, {"Purse", Num(sim.State().shiplets) + " sh"}};
-    t.acts = {{"Trade, hire or accept a contract", "1 action"}, {"Undock", "1 action"}};
+    t.acts = {{"Trade, hire or accept a contract", "1 click"}, {"Undock", "1 click"}};
     return t;
   }
 
@@ -357,9 +357,9 @@ Description DescribeTarget(const Simulation& sim, const std::string& kind,
         {"Detail", "Not yet established"},
     };
     t.acts = {
-        {"Examine the report", "1 action"},
+        {"Examine the report", "1 click"},
         {"Send a crew member", "varies"},
-        {"Log and ignore", "1 action"},
+        {"Log and ignore", "1 click"},
     };
     return t;
   }
@@ -395,7 +395,7 @@ Description DescribeTarget(const Simulation& sim, const std::string& kind,
     if (id == "cargo") { RoomCargo(sim, t); }
     if (id == "science") { RoomScience(sim, t); }
     if (id == "quarters") {
-      t.acts = {{"Talk to crew", "1 action - up to +5 morale"}, {"Give orders", "1 action + work"}};
+      t.acts = {{"Talk to crew", "1 click - up to +5 morale"}, {"Give orders", "1 click + work"}};
     }
     return t;
   }
@@ -432,7 +432,7 @@ Description DescribeTarget(const Simulation& sim, const std::string& kind,
         : id == "energy" ? "Recharge energy"
                           : "Transfer fuel";
     const bool kit = id == "hull" || id == "shield";
-    t.acts = {{label, std::string("1 action - consumes ") + (kit ? "a repair kit" : "a fuel cell")}};
+    t.acts = {{label, std::string("1 click - consumes ") + (kit ? "a repair kit" : "a fuel cell")}};
     return t;
   }
 

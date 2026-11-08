@@ -120,7 +120,7 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
   roster.title = "Crew";
   roster.placement = "np-last";
   model.payWages = js::NumToString(sim.PayrollBill()) + " sh";
-  model.payEvery = js::NumToString(sim.GameRules().pay.every) + " actions";
+  model.payEvery = js::NumToString(sim.GameRules().pay.every) + " clicks";
   model.payNext = "in " + js::NumToString(sim.PayrollDue());
   model.payPurse = js::NumToString(sim.State().shiplets) + " sh";
   roster.Field("Wages owed", model.payWages);
@@ -203,7 +203,7 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
         (sim.FindOngoing("doc-" + hand.id) != nullptr
              ? std::string("In the medical bay.")
              : (busy != nullptr ? "Carrying out orders." : "Orders in hand.")) +
-        " " + js::NumToString(task == nullptr ? 0 : task->left) + " action" +
+        " " + js::NumToString(task == nullptr ? 0 : task->left) + " click" +
         (task != nullptr && task->left == 1 ? "" : "s") + " remaining.";
     ordersPanel.Dim(hand.name);
     ordersPanel.Dim(model.closedText);
@@ -215,7 +215,7 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
     const double cost = sim.JobCost(model.selectedJob);
     model.jobCostLine =
         staged != nullptr && staged->hasJob
-            ? "staged - " + js::NumToString(cost) + " action" + (cost == 1 ? "" : "s")
+            ? "staged - " + js::NumToString(cost) + " click" + (cost == 1 ? "" : "s")
             : "costs " + js::NumToString(cost) + " to hand over";
     ordersPanel.Dim(model.jobCostLine);
     for (const JobDef& option : sim.Jobs()) {

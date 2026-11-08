@@ -63,7 +63,7 @@ SimScreenModel BuildSimCoreScreen(const Simulation& sim) {
       row.label = "Consolidate #" + Num(first.at) + " " + first.kind + " with #" +
                   Num(second.at) + " " + second.kind;
       row.note = first.text + " / " + second.text;
-      row.cost = "1 action";
+      row.cost = "1 click";
       row.enabled = sim.ProjectBlock("dream").empty();
       model.rows.push_back(row);
     }
@@ -96,8 +96,8 @@ SimScreenModel BuildSimCoreScreen(const Simulation& sim) {
     if (project.id == "dream") { dream = &project; }
   }
   if (dream != nullptr) {
-    model.body.Dim(Num(dream->energy) + "% energy; 1 action to begin, then " +
-                   Num(dream->work) + " actions of work. Pauses without power.");
+    model.body.Dim(Num(dream->energy) + "% energy; 1 click to begin, then " +
+                   Num(dream->work) + " clicks of work. Pauses without power.");
     const std::string blocked = sim.ProjectBlock("dream");
     model.buttons.push_back(
         BuildProgressButton(sim, "project-dream", dream->label, blocked.empty()));

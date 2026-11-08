@@ -641,3 +641,478 @@ Probes (`/tmp/probe`, head-less): `cargohall` walks accept → stow → travel �
 20,000 thresholds, all inside 6..18, and finds 60 clicks charged 5 times at gaps of
 10, 17, 8, 15 and 9 with exactly one tick per charge. `Draw.cpp` still cannot be
 compiled here, so the paint path is unverified by a compiler.
+
+## 045 — The machine's button: one click, twelve clicks, no cooldown
+
+The engine room loses its bottom strip (`Engine Actions`) and its maintenance
+cost text. In its place, one control set into the machine: `engine-click`, a
+positive click. One press calls `EngineClick()`, which is exactly one
+`PerformAction` - the clock moves one click, hunger rises, the drive wears - and
+then brings the drive back to full. That is all the tending there is.
+
+The button is then inert until `engineClickEvery` (twelve) clicks have gone by.
+`EngineClickFill()` reports the bar, and `EngineClickReady()` the gate. The press
+never enters `CommitActionButton`, so no cooldown tier is written: the bar is the
+only gate. A refusal costs nothing and does not move the clock.
+
+`perAction` is gone from `Constants.h` and from the data read in `Catalog.cpp`.
+The work is now priced in the drive's own clicks: `MaintCost()` is
+`missing_percent * wearEvery / wearStep`, so three percent is twelve clicks and
+ten percent is forty. No new number was introduced - 4 clicks a percent was
+already the truth, and the eighty percent exchange rate was the injection.
+
+`engineClickAt` is saved beside `wearTick` (optional on load, so older saves
+still open). The engineer's `maint-eng` readout stays, because the crew does that
+work with or without the commander in the room.
+
+Probe `/tmp/probe/engineclick`: starts live, one press moves the clock exactly one
+click and services the drive from 86% to 100%, the bar empties, a second press is
+refused and costs nothing, twelve clicks fill it, the press lands again; the work
+at 97% is 12 clicks and at 90% is 40; the room's own panels, head and band note
+never contain the word the owner rejects; the machine carries exactly one control
+inside its 650x390 frame; the bottom strip is gone; the bar survives a save and
+load. `failures=0`. `Draw.cpp` still cannot be compiled here.
+
+## 046 — The unit is a click
+
+The player-facing unit of the clock is now "click" everywhere: labels, badges,
+log lines, notes, the wiki prose and the data tables. `1 action` -> `1 click`,
+`N actions` -> `N clicks`, `one action` -> `one click`, `action cost` -> `click
+cost`, `per action` -> `per click`. 192 lines across 30 files; identifiers, JSON
+keys, save keys, the trace field `actions`, the console commands and the
+`actionCounter_` member are untouched, so no file format or lookup moved.
+
+`IsActionCost()` decided whether a control spends the clock by looking for the
+word "action" in its cost string. With the unit renamed that test would have
+gone blind and every control would have read as free, so `MentionsClick()` was
+added beside `MentionsAction()` and the two are ORed. Probe `/tmp/probe/costword`
+checks nine cost strings: `1 click`, `2 clicks`, `1 action`, `1 click + 2 work`
+are paid; `free`, `done`, `at a station`, `COOLDOWN 7` are not. `bad=0`.
+
+`assets/data/survival.json` finally loses the dead `"perAction": 10` key, and the
+engine entry in `content.json` now reads that the drive loses one percent every
+four clicks and that the machine's button is live again after twelve. Prose in
+`crew.json` and `progression.json` got the same unit.
+
+Compiled: every `cpp/core`, `cpp/ui` and `cpp/app` file under
+`-fsyntax-only -Wall -Wextra` except `Draw.cpp`, which needs raylib that this
+sandbox does not have. The Catch2 suite was not run.
+
+## 047 — The engineer presses the button
+
+`AutoMaint` no longer opens a `maint-eng` job of its own. The engineer waits until
+the drive is under his line and presses the machine's button, which is now the
+only repair there is.
+
+His press is the click of the action already in flight, so `ServiceDrive()` arms
+the bar and lifts the drive instead of performing a second action. Calling
+`EngineClick()` from inside an action re-entered the clock until the simulation
+stopped moving, so `engineClicking_` now refuses a press inside a press.
+
+His line is `max(maintBelow, EffectiveJobAt(worker))`: thirty percent is the floor
+he never lets it pass, and his training is meant to raise the point at which he
+takes the button. `maintBelow` is read from the data table with a default of
+thirty. `EngineClick()` also refuses while `MaintRunning()`, so the commander can
+no longer lift a drive the crew already has in hand.
+
+Probe `/home/user/probe/engcrew` (core objects, head-less). Verified: with an
+engineer on the job the drive at 25% is lifted to 100% by one action; at 25% with
+the bar filling he waits and leaves it at 25; after the bar comes back round he
+presses again; nobody on the job leaves 10% alone; the commander's own press still
+lands. Not verified: that `EffectiveJobAt` really raises the line. The probe could
+not place an assigned engineer with high skill, so every early-press case came
+back unchanged - skill 0 and skill 100 behaved identically. The training half is
+expressed in the code and unproven by this harness; it needs a test that drives
+`AssignedEngineer()` directly.
+
+## 048 — The training ladder is real, and my probe was measuring nobody
+
+Entry #047 said the training half was unproven. It was wrong for a dull reason:
+the probe set `crew.job = "engine"`, a job id that does not exist.
+`AssignedEngineer()` looks for `crew.job == "maintenance"`, so the probe never
+touched the engineer at all - it was measuring whichever crew member already held
+the maintenance job, whose skill it never changed. Skill 0 and skill 100 looked
+identical because neither was the hand pressing the button.
+
+Measured properly (`/home/user/probe/ladder`, fresh ship per point, scanning
+condition in fives for the highest point at which the button is taken):
+
+- a fresh hand acts at 0 and presses at **30%** - the floor
+- one station session (`TrainCrew(hand, 1, "at the station")`) takes it to 45 and
+  he presses at **40%**
+- two sessions: 60, presses at **55%**
+- eleven sessions: capped at 75, presses at **70%**
+
+`baseAt` is 30 for the maintenance job, `trainStep` 15, `trainCap` 75, and
+`Tasks.cpp:280` gives two steps at a time while docked, one aboard. So teaching
+the engineer at a station is the mechanic, it was already wired, and the line he
+takes the button at is `max(30, jobAt - airDrop)` with an air drop of 0 on a
+healthy deck.
+
+Nothing in `cpp/` was changed by this entry; it corrects the record and the claim
+in #047 that the mechanic was unproven.
+
+## 049 — The crew press the room's own control
+
+The press belongs to the room, not to whoever makes it. Two of the panels now take
+a `by` argument naming the hand that pressed, so the crew and the commander run
+the same code:
+
+- `StartCanisterInstall(slot, by)` - the O2 panel's seating control. The crew
+  branch in `AutoFilters` no longer builds its own task; it calls this, so the
+  hand's rate (`CrewCost(2)`) and the hand's name travel with the press.
+- `StartCookingSelf(by)` - the galley's control. `AutoMess` no longer opens a
+  `cook` task by hand; it presses this, and the ration is spent by the press.
+
+Both hands land on the same task ids the room already watches (`o2s<n>`, `cook`),
+so the button a player sees is the button a hand presses. `by` empty still means
+the commander, which is what every existing call site passes.
+
+Probe `/home/user/probe/jobpress`: a cook on the galley opens the batch with
+`by = Rell Aventine`; a filter hand seats a canister with the same name on the
+task. `failures=0`.
+
+Not done, and named so nobody thinks it is: the filter bank is still started by
+the hand through `RunBank()` rather than through the panel's `StartFilterBank()`
+press, because that press spends a click and the crew's start does not; the
+cleaner has no room and no button to press; navigation has no button at all. And
+nothing yet paints the press - no rising green symbol, no button flash - because
+that is `Draw.cpp`, which this sandbox cannot compile.
+
+## 050 — Three jobs, three real behaviours
+
+NAVIGATOR. `Navigation.cpp` used to discount FUEL and never the crossing: a trained
+navigator saved up to 20% of the fuel bill and nothing at all of the wait. It now
+shortens the crossing itself - `distance = round(distance * (100 - saving) / 100)`
+with `saving = 10 * clamp(jobAt, 0..5)` - and fuel follows the shorter distance, so
+it is no longer discounted twice. Measured on one target: no navigator 15 clicks,
+navigator untrained 15, at skill 3 it is 11, at skill 5 it is 8.
+
+FILTERS. The hand seats canisters two at a time and holds the third until the air
+has fallen to the stage his training allows: `line = min(3, jobAt)`, and while two
+are seated he waits for `AirStageIndex() > line`. The old blanket gate
+(`AirStageIndex() > jobAt` -> do nothing) is gone, because it made an untrained
+hand useless exactly when he was needed - he could not stock anything while the
+air was still good, so the 1-2-then-3 stocking never began.
+
+KITCHEN. Her restock line is now `cookBelow + foodPerRation * min(3, jobAt)`,
+capped at the rack: 10 untrained, 15 after one teaching, 20 after two, 24 at the
+top. She still carries on until the rack is full, so a taught cook starts a batch
+earlier and the counter never gets as low.
+
+Probe `/home/user/probe/jobs3`: at air stage 2 the untrained hand seats two and the
+third slot is never opened; a rack of twelve is left alone by an untrained cook and
+pressed by one taught once. `/home/user/probe/jobs2` measured the navigator ladder.
+`failures=0` on both.
+
+Not proved here: that a trained filter hand really fills earlier than an untrained
+one, because the probe could not drive the air down through the stages and watch
+him act; the threshold is expressed and the wait is proved, the difference is not.
+The cleaner still does nothing but lift morale, and nothing is painted.
+`assets/data` was not touched: the cook's base line is still 10 in the data and the
+per-stage step is computed in code.
+
+## 051 — A starving hand keeps his seat
+
+Looked for the thing the owner half-remembers: a starving crew member eating
+whenever he likes, off his own clock. It is not there. `TickCrew` in
+`CrewLogic.cpp` gives every hand a private hunger clock of `mess.every` = 25
+clicks and he eats only on the click that clock comes round, whatever his hunger
+is. The meal is three food, sized by the clock rather than the counter: capped at
+what reaches `hungerFloor` (5) and at what is on the rack.
+
+So at hunger 95 - past `starveAt` = 90, already losing 1 health every `starveEvery`
+8 clicks - a hand still waits for his turn, up to 25 clicks, and then eats the same
+three food as everyone else. That is at most three health lost to a clock that has
+nothing to do with how hungry he is.
+
+Two more things the audit turned up. Eating is instantaneous: no task, no click
+spent, no walk to the galley, so a hungry hand never leaves his post and is never
+seen at the counter. And the rescue is real but late: three food takes him to 80,
+under the starve line, so one missed clock is survivable and two are not.
+
+Nothing changed in this entry. It records the law as it stands and the gap between
+it and the owner's memory.
+
+## 052 — The logbook says hunger was never real
+
+#051 read the hunger law as it stands. The old build log, all 68 entries of it,
+says hunger was never a mechanic in the core game. It appears three times:
+
+  "statLine painted fatigue 28 and hunger 15 RED."
+  "Hunger and fatigue keep their fields and still have no drain. They belong
+   to the needs phase."
+  "A future effect (fatigue, morale, a medical event) is another ..."
+
+A field with no drain, drawn on a stat line, waiting for a needs phase that was
+never reached. No meal, no galley, no rack, no cook, no starve line: those words
+do not occur in the log at all. The 25-click private hunger clock, the three-food
+meal, `starveAt` 90 and one health per 8 clicks are all later than the core - they
+arrived with the port, not with the game the owner built.
+
+So "something is off" was right, and precisely: he remembers a starving hand
+breaking his schedule to eat, and there was no starving hand. Nothing to restore,
+which means the hunger system is ours to design rather than to recover. That is a
+conversation, not an edit, and this entry does not start it.
+
+One useful thing fell out. The same page prices the filter ladder as 1 -> 2 -> 3 =
+BAD -> THIN -> FADING: a taught hand acts at progressively better air. That is the
+same shape #050 built, and it names the stages the UI should show.
+
+## 053 — The mess arithmetic, and which number is the odd one
+
+The owner holds three numbers as true: rack 24, the cook starts at 10, one ration
+fills 5. Asking what meal size makes those agree:
+
+    meal  4 hands/round   rack holds   hands that fit under 10   eat/click
+      2          8          3.00 rounds            5.0             0.32
+      3         12          2.00 rounds            3.3             0.48
+      4         16          1.50 rounds            2.5             0.64
+      5         20          1.20 rounds            2.0             0.80
+
+Three is the only meal at which 24 is a whole number of rounds - exactly two - and
+the only one where "two hands arriving back to back" still leaves food: at ten on
+the counter, two five-food meals empty it, two three-food meals leave four. The
+owner's own condition, that a pair eating one after another does not clear the
+shelf, rules out five on its own. Five is the ration: one dry ration yields five
+cooked food, which is the number he remembers the cook filling with.
+
+Production settles it. A batch is five food in five clicks, so the galley makes one
+food per click; at three food a meal four hands eat 0.48 per click. The cook wins
+the race by better than two to one, which is what makes the trained trigger
+(10 -> 15 -> 20) a comfort rather than a rescue.
+
+Nothing changed. The data already says three (`hungerPerMeal` 15 / `hungerPerFood`
+5), and now the arithmetic says so independently: not because the port wrote it,
+but because it is the only value at which the owner's three truths coexist.
+
+## 054 — One food is ten points of hunger
+
+The owner turned the arithmetic round, which is the right way to check it. Three
+food should take a hand from 50% hunger to 20%: thirty points, so one food is ten.
+The data said one food was five, which made a three-food meal worth only fifteen -
+enough to cancel one clock and no more.
+
+`hungerPerFood` 5 -> 10, and `hungerPerMeal` 15 -> 30 to keep the room as it was.
+The food economy is invariant under that change: a meal is still 30 / 10 = 3 food,
+four hands still use twelve per round, the counter still holds exactly two rounds,
+and the cook still starts under ten. Only the percentages the player reads move,
+and now they move by a number anyone can do in their head.
+
+Probe `/home/user/probe/mess`, two ships fed the same clock, one with six food on
+the shelf and one with none: the meal took exactly 30.0 of hunger and exactly 3.0
+food. The hand reading 52.4 against 22.4 is the same hand, three clicks later than
+the meal. `failures=0`.
+
+What this does not touch: the starve line at 90 is unchanged, so a hand now reaches
+it in half the clicks it took before - a meal is also worth twice as much, so a fed
+crew is as safe as it was and an empty shelf is twice as fast to kill.
+
+## 055 — The cycle, run for 130 clicks
+
+The owner's reading of the buffer is now measured rather than argued. Four hands
+staggered the way the game staggers them (ticks 0, 6, 12, 18), one of them cooking,
+a full rack of 24:
+
+    130 clicks: peak hunger 48.8, rack low 9.0, rack high 24.0, rack now 18.0
+
+A hand tops out at 48.8 - just short of the 50 he eats from - and the shelf never
+falls past 9, just under the 10 the cook starts at. Both numbers sit exactly where
+the arithmetic said they would: the meal clears thirty points, the clock puts thirty
+back over the next twenty-five clicks, and the five points he never loses
+(`hungerFloor`) are the buffer that keeps a hand clear of the starve line at 90.
+
+The shelf's floor of 9 is the same buffer seen from the galley: the cook is woken
+five clicks before anything is actually at risk, and the batch lands before the next
+hand is due. `failures=0` on `/home/user/probe/cycle`.
+
+CAUGHT BY THE PROBE'S OWN FIRST RUN, and worth keeping: with all four hunger ticks
+set to zero, the rack went to 0.0 and stayed there long enough to be recorded. Four
+hands eating on the same click take twelve food at once - exactly half the shelf -
+and no cook of five-food batches can cover that. The stagger is not decoration; it
+is the thing the room is balanced on. Anything that re-times a hand (a save, a new
+hire, a reload) should keep his tick where it was, and that has not been checked.
+
+## 056 — The clocks are dealt, not shared
+
+Every hand used to start on tick 0, which meant four meals landing on one click and
+twelve food leaving a shelf of twenty-four in a single go - exactly the failure #055
+caught. Nobody else could cover that, least of all a cook making five at a time.
+
+`StaggerHungerClocks()` now runs at the end of the boot, and `DealHungerClock()` runs
+for each new signing at a port. A hand is dealt a tick somewhere in his own twenty-
+five-click round and a counter to match, `hungerFloor + risePerClick * tick`, so he
+starts part-way round his cycle instead of at the top of it and everything about him
+agrees. The draw is `std::random_device` per hand, so it is not the same watch twice.
+
+First voyage dealt: Rell 18, Jax 8, Bo 14, Suri 5 - hunger 26.6, 14.6, 21.8, 11.0.
+A second voyage dealt a different set, checked. Over 200 clicks on the dealt clocks:
+peak hunger 33.8, shelf never below 3. `failures=0` on `/home/user/probe/clocks`.
+
+The shelf running out is not this. Ten runs of 400 clicks all ended dry with hunger
+at 100, because the galley carries 21 dry rations at boot - 105 food, plus 24 on the
+counter, 129 in all - and four hands eat 0.48 food per click. That is roughly 270
+clicks of food aboard, and no clock can change it. Replenishment is the ration line,
+not the stagger.
+
+The save system already stores `hungerTick` and `hunger` per hand, so a reload keeps
+whatever a hand was dealt. Not proved on this branch: a save-and-load round trip.
+
+## 057 — Two refits the yard was missing
+
+The station already sold bay, bay2, drive, an O2 rack to 15 canisters, two sensor
+tiers and a hull service. Two of the owner's three examples were not for sale: a
+bigger galley counter and a filter charge that lasts longer. Both are now in
+`BuyUpgrade` and on the yard's list.
+
+GALLEY, 400 sh: `mess_.capacity` 24 -> 34. The ceiling is what the cook fills to, so
+the refit buys buffer, not speed: two rounds and five-sixths instead of exactly two,
+about seventy clicks more food on the shelf. `mess_.capacity` is already in the save,
+so it survives a reload with no extra plumbing.
+
+FILTER, 600 sh: `rules_.life.lifeMax` 200 -> 300. One charge is half again as long,
+and because the bank, the O2 screen, the description and the save all read that one
+number from the rules, they all move together. `lifeMax` is in the save already.
+
+THE SCANNER NEEDED NOTHING. `SensorTier()` already reads the scanner upgrades: tier 1
+opens the first locked entry and scans deep inside a region, tier 2 opens every
+locked survey and reaches any region. The yard's own wording says so. Nothing added.
+
+Probe `/home/user/probe/upgrades`, docked at a port with 5,000 sh: galley bought,
+ceiling 24 -> 34; filter bought, charge 200 -> 300; a charged bank then reads 300,
+not 200; buying the galley twice is refused; purse 5,000 -> 4,000. `failures=0`.
+`StationScreen.cpp` and `Economy.cpp` both pass `-fsyntax-only`.
+
+Not proved: that the extra counter actually delays starvation in a long run, and a
+save-and-load round trip of either refit. Both are arithmetic the probe implies
+(34/12 rounds, lifeMax read from rules) but they were not run end to end.
+
+## 058 — Dead delivery buttons, tutorial under the pot, and four washed-out themes
+
+DELIVERY. The row was live and the press did nothing. `AcceptTrade` loads a
+delivery into the hold and refuses when it will not fit, but the station screen
+never asked: it set `enabled = !accepted` and let the player press a button that
+could only fail. Thirty ports measured, 61 refusals out of 83 delivery rows, every
+one of them a full hold. `TradeOffer` now carries `fits` and `blocked`, the screen
+computes `capacity - used - reserved` against `crates x volume`, and the row goes
+dark with "Hold full: needs X m3, Y m3 free" instead of standing there pretending.
+Freelance rows load nothing, so they stay open. Cost label reads "no room", not
+"1 click". Probe `/home/user/probe/delivery`, rebuilding the screen after every
+accept: 22 consignments taken across 21 ports, 0 rows that lied (`failures=0`).
+The core refusal is untouched: the screen now agrees with it rather than the other
+way round.
+
+MESS. The Galley Crew panel carried a four-line paragraph explaining the whole
+cook, and the Cooking panel repeated the automatic threshold that the Galley Crew
+line already gives. Both cut: the note is one line - "Cooks below 10 food, one
+ration a batch, until the 24-food counter is full." - and "Auto-start" is gone from
+the machine panel. The starvation note lost its "slow on purpose" aside.
+
+THEMES. The four optional themes were pale washes: `PaletteForId` replaced six
+roles with near-white surfaces and left classic's parchment as the only one with
+any depth. They are now the same depths in their own colour: classic's role table
+is turned to the theme's hue - void 196 (petrol), aurora 148 (mint), nebula 284
+(violet), ember 20 (copper) - and the saturation is deepened to 1.15x, lightness
+untouched, so nothing that read on parchment stops reading. Terracotta, sage and
+amber are never turned; they mean something.
+
+Probe `/home/user/probe/themes`, contrast and saturation for all five:
+
+    theme    ink/pan ink/con tit/tbg mut/pan richness
+    classic    10.44   12.36    6.93    3.95     0.52
+    void       10.16   12.04    6.56    3.84     0.60
+    aurora     10.11   11.38    6.72    3.63     0.60
+    nebula     10.00   13.29    6.22    4.26     0.60
+    ember      10.09   12.50    6.47    4.00     0.60
+
+Every theme is at least as rich as classic and none lost contrast; `failures=0`.
+What is not proved: how any of it looks. No raylib here, so the boolean is "as deep
+as parchment by the numbers", not "I have seen it".
+
+## 059 — The delivery buttons, said plainly
+
+A delivery is not a promise to fetch something later. The station loads the
+consignment into the hold the moment the contract is signed: the crates are in your
+cargo bay before you undock, bound to that one buyer.
+
+So a delivery needs free space right then. The ship starts with cargo already
+aboard - about 32 of its 40 m3 - and the first consignment signed usually fills
+what is left. Every delivery row below it was still drawn alive, because the screen
+only greys a row that has already been accepted. Pressing one did nothing at all,
+with no line saying why.
+
+Measured: 83 delivery offers across the 30 stations, 61 of which could not fit.
+That is most of them, which is why it looked like the buttons were broken rather
+than the hold being full.
+
+The rows now do one of two things: live, or dark with "Hold full: needs X m3, Y m3
+free. Sell or unload first." Nothing was changed about the rule itself - the ship
+still must have room - only about whether the screen admits it.
+
+Still the owner's call, and this entry does not decide it: whether deliveries should
+be that heavy at all. Lighter consignments would let two or three be signed on one
+sailing, at the cost of the hold mattering less.
+
+## 060 — Deliveries stay heavy, and what a freelance run actually is
+
+DECIDED BY THE OWNER: a delivery keeps needing real space in the hold. If the ship
+cannot take it, it is not a job for that ship - and bigger hulls are coming later,
+which is when more of a board opens up. #058's greyed rows are the whole fix; the
+weights do not change.
+
+FREELANCE, explained because the logbook was not clear and the owner asked. A
+delivery is loaded by the station, so it needs space at the moment of signing. A
+freelance run loads nothing, because the player buys the crates at this station's
+own counter and carries them: the contract is the promise, the purchase is the work.
+
+Measured, six freelance runs as drawn:
+
+    station       good                hold    buy here    margin
+    auriga-port   greens x2           18 m3    ~605 sh      88 sh
+    bryce-port    parts x1             6 m3    ~907 sh     269 sh
+    fallow-port   greens x2           18 m3    ~302 sh     420 sh
+    fallow-port   medicine x2          8 m3    ~691 sh     125 sh
+    gull-port     water x2            12 m3    ~422 sh      58 sh
+    gull-port     parts x1             6 m3   ~1109 sh     151 sh
+
+So a freelance row asks for capital first and hold second: 300 to 1,100 shiltes up
+front for a margin of 58 to 420. A thin purse can take none of them, and the row
+does not say so - the same lie #058 removed from the delivery rows, only deferred to
+the counter.
+
+NOT DONE, and it is the owner's call: grey a freelance row that the purse or the
+hold cannot carry right now, with the number it needs. It is the same shape as the
+delivery fix, but it is a design decision - a run you cannot afford today may be the
+one you save for - so it waits for a word.
+
+A trap worth recording: the first version of this measurement printed an `int` with
+`%.1f` and produced "604.8 m3" for an 18 m3 consignment. The format string, not the
+game, was wrong; every freelance number above is from the corrected run.
+
+## 061 — Freelance rows stay lit and say what they cost
+
+DECIDED BY THE OWNER: a freelance run the player cannot afford stays pressable. The
+game informs, it does not take the player by the hand - the same rule the filter
+hand follows when he waits for the air his training allows.
+
+So a freelance row now carries its own arithmetic. Real row from the board:
+
+    Dawn Auriga 3 - 2 crates of Hydroponic produce - needs 18 m3 and 606 sh
+    Buy the lot here first; about 88 sh over your cost there. Hold 8 m3 free;
+    purse 340 sh. Short 266 sh. Needs 10 m3 more room.
+
+The cost is `GoodCounterPrice()`, a new const reader on Simulation that charges one
+crate exactly the way `BuyGood` charges it - `ceil(round(value * port factor) * 1.2)`
+per crate, times the crates - so a label and a purchase can never disagree. The free
+hold is `capacity - used - reserved`, the same three terms the delivery gate uses.
+
+Nothing greys. `fits` stays true for freelance, `AcceptTrade` is untouched, and the
+row with 0 sh in the purse still signs: the player may be saving for it.
+
+Probe `/home/user/probe/freelabel`, all 30 stations: 32 freelance rows, 0 greyed, 0
+without the label, and 0 refused presses with the purse set to zero (`failures=0` by
+the probe's own three counts).
+
+Not proved: that the numbers read well at a glance in the real row on screen - the
+row is one line in the build I cannot see, and "needs 18 m3 and 606 sh" may be a
+long line at small text sizes.

@@ -44,11 +44,13 @@ const double kDrive = 900;
 const double kRack = 400;
 const double kScanner = 600;
 const double kScannerTwo = 1100;
+const double kGalley = 400;
+const double kFilter = 600;
 const double kHullService = 120;
 const double kLargeShip = 4000;
 
-const char* kFree = "0 actions";
-const char* kOneAction = "1 action";
+const char* kFree = "0 clicks";
+const char* kOneAction = "1 click";
 const char* kDone = "done";
 
 bool Talked(const Simulation& sim, const std::string& patronId) {
@@ -247,7 +249,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   model.head.title = model.portName;
   model.head.sub =
       "Pick a card, pick an item, then commit. Supplies, the yard and hires cost "
-      "shiplets only; selling, contracts and the bar cost one action.";
+      "shiplets only; selling, contracts and the bar cost one click.";
 
   const double purse = sim.State().shiplets;
   const double used = sim.CargoUsed();
@@ -271,7 +273,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   market.title = "Market - purse " + Num(purse) + " sh";
   market.badge = "purse " + Num(purse) + " sh";
   market.notes.push_back("Buy supplies and cargo. A different port may pay a different price.");
-  market.notes.push_back("Shiplets only: no action is spent and nothing is locked.");
+  market.notes.push_back("Shiplets only: no click is spent and nothing is locked.");
 
   const auto supply = [&market, purse](const std::string& id, const std::string& label,
                                        const std::string& what, double price, bool extra,
@@ -359,7 +361,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
                     std::to_string(page.entries.size()) + " charted bodies";
     starmap.notes.push_back("The station's own page for " + page.systemName + ".");
     for (const std::string& line : page.systemReading) { starmap.notes.push_back(line); }
-    starmap.notes.push_back("Reading is free: nothing on this page costs an action.");
+    starmap.notes.push_back("Reading is free: nothing on this page costs a click.");
     if (page.entries.empty()) {
       starmap.notes.push_back("Nothing is charted in this system yet.");
     } else {
@@ -420,8 +422,9 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
       const Body* destination = sim.FindBodyById(run.to);
       const std::string where = destination == nullptr ? run.to : destination->name;
       std::string commodity = run.good;
+      double commodityVol = 0.0;
       for (const Good& good : sim.World().goods) {
-        if (good.id == run.good) { commodity = good.name; }
+        if (good.id == run.good) { commodity = good.name; commodityVol = good.vol; }
       }
       TradeOffer offer;
       offer.mode = run.mode;
@@ -433,6 +436,35 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
                        ? "Pays " + Num(run.fee) + " sh on hand-over; the station loads it."
                        : "Buy the lot here first; about " + Num(run.fee) + " sh over your cost there.";
       offer.accepted = run.accepted;
+      // A delivery is loaded into the hold the moment it is signed, so a row the
+      // hold cannot take has to say so rather than sit there live and refuse the
+      // press. Freelance loads nothing here and is always open.
+      // A freelance run is the player's own purchase, so it is never refused at
+      // signing and never greyed here: the row says what it wants and lets the
+      // player decide. The game does not take him by the hand.
+      if (run.mode == "freelance") {
+        const double perCrate = sim.GoodCounterPrice(run.good);
+        const double cost = perCrate * run.crates;
+        const double hold = commodityVol * run.crates;
+        const double free = std::max(0.0, sim.CargoCapacity() - sim.CargoUsed() -
+                                              sim.CargoReserved());
+        offer.label += " - needs " + Num(hold) + " m3 and " + Num(cost) + " sh";
+        offer.note += " Hold " + Num(free) + " m3 free; purse " +
+                      Num(sim.State().shiplets) + " sh.";
+        if (cost > sim.State().shiplets) {
+          offer.note += " Short " + Num(cost - sim.State().shiplets) + " sh.";
+        }
+        if (hold > free) { offer.note += " Needs " + Num(hold - free) + " m3 more room."; }
+      }
+      if (run.mode == "delivery" && !run.accepted) {
+        const double needed = commodityVol * run.crates;
+        const double free = sim.CargoCapacity() - sim.CargoUsed() - sim.CargoReserved();
+        if (needed > free) {
+          offer.fits = false;
+          offer.blocked = "Hold full: needs " + Num(needed) + " m3, " +
+                          Num(std::max(0.0, free)) + " m3 free. Sell or unload first.";
+        }
+      }
       (run.mode == "delivery" ? delivery : freelance).offers.push_back(std::move(offer));
     }
     modes.push_back(std::move(delivery));
@@ -477,7 +509,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     trade.badge = "delivery, freelance, station-to-station";
     trade.notes.push_back("Three kinds of work, all of it settled at a station.");
     trade.notes.push_back(
-        "Accepting a trade costs one action and greys its own row; the window never greys twice.");
+        "Accepting a trade costs one click and greys its own row; the window never greys twice.");
     model.tradeModes = std::move(modes);
   }
 
@@ -487,7 +519,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   sales.title = "Sell cargo and survey data";
   sales.badge = Num(sim.Goods().size()) + " lots, " + Num(sim.Survey().size()) + " surveys";
   sales.notes.push_back("Everything aboard that a counter will take.");
-  sales.notes.push_back("Selling pays shiplets and costs one action; the lot is then gone.");
+  sales.notes.push_back("Selling pays shiplets and costs one click; the lot is then gone.");
   if (sim.Goods().empty() && sim.Survey().empty()) {
     sales.notes.push_back("Nothing to sell.");
   }
@@ -506,7 +538,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     row.details.push_back("Cargo lot aboard: " + lot.name + " (" + lot.kind + ").");
     row.details.push_back("Volume: " + Num(lot.vol) + " m3, freed on sale.");
     row.details.push_back("This port pays " + Num(price) + " sh for it now.");
-    row.details.push_back("Costs one action. The lot leaves the hold and cannot be sold twice.");
+    row.details.push_back("Costs one click. The lot leaves the hold and cannot be sold twice.");
     sales.rows.push_back(row);
   }
   for (const SurveyRecord& record : sim.Survey()) {
@@ -523,7 +555,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     row.details.push_back("This port pays " + Num(record.value) + " sh for the record.");
     row.details.push_back(packaging
                               ? "The Science Room is packaging this record; it cannot be sold yet."
-                              : "Costs one action. The record is sold and leaves the ship.");
+                              : "Costs one click. The record is sold and leaves the ship.");
     sales.rows.push_back(row);
   }
 
@@ -534,7 +566,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   board.badge = sim.State().commissions.active.has_value() ? "one commission running"
                                                            : "commissions open";
   board.notes.push_back("Repeatable commissions");
-  board.notes.push_back("Accepting or collecting work costs one action; the button greys "
+  board.notes.push_back("Accepting or collecting work costs one click; the button greys "
                         "the moment the mission is taken.");
   if (sim.State().commissions.active.has_value()) {
     const Commission& active = *sim.State().commissions.active;
@@ -552,7 +584,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     collect.details.push_back("Progress: " + Num(active.progress) + " of " + Num(goal) + ".");
     collect.details.push_back("Payment: " + Num(active.reward) + " sh into the purse.");
     collect.details.push_back(collect.enabled
-                                  ? "Costs one action. The offer rotates afterwards."
+                                  ? "Costs one click. The offer rotates afterwards."
                                   : "The objective is not met yet; nothing to collect.");
     board.rows.push_back(collect);
     StationRow abandon;
@@ -564,7 +596,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     abandon.enabled = true;
     abandon.details.push_back("Give up the running commission and draw three fresh offers.");
     abandon.details.push_back("The " + Num(active.reward) + " sh reward is lost.");
-    abandon.details.push_back("Costs one action.");
+    abandon.details.push_back("Costs one click.");
     board.rows.push_back(abandon);
   } else {
     board.notes.push_back(
@@ -587,7 +619,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
       row.details.push_back("Objective: " + kind + ", " + Num(CommissionGoal(kind)) +
                             " to complete.");
       row.details.push_back("Payment: " + Num(offer->reward) + " sh at any station.");
-      row.details.push_back("Costs one action, and the board closes to other offers until it "
+      row.details.push_back("Costs one click, and the board closes to other offers until it "
                             "is collected or abandoned.");
       board.rows.push_back(row);
     }
@@ -622,7 +654,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
       row.cost = kOneAction;
       row.commit = "Accept";
       row.enabled = eligible;
-      row.details.push_back(eligible ? "Costs one action; the button greys once it is taken."
+      row.details.push_back(eligible ? "Costs one click; the button greys once it is taken."
                                      : "Not eligible from this berth: origin, hold space or berths.");
     } else if (status == "ready") {
       row.id = "contract-collect:" + contract.id;
@@ -630,7 +662,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
       row.cost = kOneAction;
       row.commit = "Collect - " + Num(contract.reward) + " sh";
       row.enabled = true;
-      row.details.push_back("Costs one action; the reward goes into the purse.");
+      row.details.push_back("Costs one click; the reward goes into the purse.");
     } else {
       row.id = "contract-accept:" + contract.id;
       row.label = "Accept " + contract.title;
@@ -649,7 +681,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   yard.id = "yard";
   yard.title = "Shipyard and crew";
   yard.badge = Num(purse) + " sh, hull " + Num(sim.StatValue("hull")) + "%";
-  yard.notes.push_back("Shiplets only: no action is spent and nothing is locked. A one-time "
+  yard.notes.push_back("Shiplets only: no click is spent and nothing is locked. A one-time "
                        "refit, room or hire greys out once it is owned.");
   if (sim.State().shipClass == "wren") {
     yard.notes.push_back(
@@ -675,7 +707,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     ship.details.push_back("Price: " + Num(kLargeShip) + " sh. Purse: " + Num(purse) + " sh.");
     ship.details.push_back("Crew, cargo, active work, equipment, refits, condition and every "
                            "voyage record transfer.");
-    ship.details.push_back("Permanent, and it costs no action: shiplets only.");
+    ship.details.push_back("Permanent, and it costs no click: shiplets only.");
     if (!ship.enabled) { ship.details.push_back("Not affordable from this purse."); }
     yard.rows.push_back(ship);
   } else {
@@ -716,7 +748,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
       row.commit = id == "scanner2" ? "Buy - 1,100 sh"
                                     : "Buy - " + Num(price) + " sh";
       row.enabled = available && purse >= price;
-      row.details.push_back("Shiplets only: no action, no cooldown.");
+      row.details.push_back("Shiplets only: no click, no cooldown.");
       if (!row.enabled) {
         row.details.push_back(available ? "Not affordable from this purse."
                                         : "Not available yet: an earlier refit is required.");
@@ -735,8 +767,15 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
           Owned(sim, "drive"));
   upgrade("rack", "Expand O2 rack to 15 - 400 sh",
           "O2 rack expansion: the canister rack holds 15.", kRack, true, Owned(sim, "rack"));
+  upgrade("galley", "Expand galley rack to 34 - 400 sh",
+          "Galley refit: the counter holds 34 instead of 24, so the cook can keep a "
+          "round and a half ahead of the crew.",
+          kGalley, true, Owned(sim, "galley"));
+  upgrade("filter", "Re-sleeve filter cores: a charge holds 300 clicks - 600 sh",
+          "Filter refit: one bank charge lasts 300 clicks instead of 200.",
+          kFilter, true, Owned(sim, "filter"));
   upgrade("scanner", "Upgrade sensors: scans take 3 + regional lock - 600 sh",
-          "Sensor upgrade: a scan costs 3 actions and the first locked entry opens, with "
+          "Sensor upgrade: a scan costs 3 clicks and the first locked entry opens, with "
           "deep scans inside this region.",
           kScanner, true, Owned(sim, "scanner"));
   upgrade("scanner2", "Fit deep-array sensors: full unlock + deep-region scans - 1,100 sh",
@@ -757,7 +796,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
                           Num(std::min(100.0, hull + 50.0)) + "%.");
     row.details.push_back("Price: " + Num(kHullService) + " sh. Purse: " + Num(purse) + " sh.");
     row.details.push_back("Repeatable while the hull is short and the purse allows it; it "
-                          "costs no action.");
+                          "costs no click.");
     if (!row.enabled) {
       row.details.push_back(hull >= 100 ? "The hull is already whole; there is nothing to patch."
                                         : "Not affordable from this purse.");
@@ -785,7 +824,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
       if (!room.tag.empty()) { row.details.push_back("Fitted as: " + room.tag + "."); }
       row.details.push_back("Price: " + Num(Simulation::RoomPrice()) +
                             " sh, added to the deck plan of the ship you are flying.");
-      row.details.push_back("Purse: " + Num(purse) + " sh. Shiplets only: no action.");
+      row.details.push_back("Purse: " + Num(purse) + " sh. Shiplets only: no click.");
       if (!row.enabled) { row.details.push_back("Needs a dock at this station and the price."); }
       yard.rows.push_back(row);
     }
@@ -823,7 +862,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
       row.free = true;
       row.commit = "Hire - " + Num(candidate.fee) + " sh";
       row.enabled = berth && purse >= candidate.fee;
-      row.details.push_back("Shiplets only: no action, no cooldown.");
+      row.details.push_back("Shiplets only: no click, no cooldown.");
       if (!row.enabled) {
         row.details.push_back(berth ? "Not affordable from this purse."
                                     : "No berth free for another hand.");
@@ -839,7 +878,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   tavern.badge = "the people at this station";
   tavern.notes.push_back(tip);
   tavern.notes.push_back("Station training only finishes while docked.");
-  tavern.notes.push_back("Talking costs one action, once per person; the button greys after "
+  tavern.notes.push_back("Talking costs one click, once per person; the button greys after "
                          "the first word.");
   {
     const bool said = Talked(sim, "trader");
@@ -854,7 +893,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     if (said) {
       for (const std::string& line : TraderSpeech(sim, tip)) { row.details.push_back(line); }
     } else {
-      row.details.push_back("Talking costs one action and reveals their trade tip and what the "
+      row.details.push_back("Talking costs one click and reveals their trade tip and what the "
                             "bar is saying about this region.");
     }
     tavern.rows.push_back(row);
@@ -879,7 +918,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     if (said) {
       for (const std::string& line : PatronSpeech(sim, candidate)) { row.details.push_back(line); }
     } else {
-      row.details.push_back("Talking costs one action and reveals what they say about "
+      row.details.push_back("Talking costs one click and reveals what they say about "
                             "themselves and the rumor they are repeating.");
     }
     tavern.rows.push_back(row);
