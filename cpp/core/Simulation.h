@@ -261,6 +261,12 @@ class Simulation {
   // The cargo hall (Economy.cpp). Running a trade is two clicks and one leg: the
   // board signs it, the hold carries it, and the destination settles it. What
   // the destination pays is the market there plus the freight the leg cost.
+  // The machine's button in the engine room. One press is one click of the
+  // clock; the button is live again once twelve clicks have gone by.
+  bool EngineClick();
+  bool EngineClickReady() const;
+  double EngineClickFill() const;
+
   std::vector<TradeContract> TradesHere() const;
   double TradePayout(const TradeContract& trade) const;
   bool SettleTrade(const std::string& mode, const std::string& to,

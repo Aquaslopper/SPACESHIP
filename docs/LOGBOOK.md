@@ -641,3 +641,34 @@ Probes (`/tmp/probe`, head-less): `cargohall` walks accept → stow → travel �
 20,000 thresholds, all inside 6..18, and finds 60 clicks charged 5 times at gaps of
 10, 17, 8, 15 and 9 with exactly one tick per charge. `Draw.cpp` still cannot be
 compiled here, so the paint path is unverified by a compiler.
+
+## 045 — The machine's button: one click, twelve clicks, no cooldown
+
+The engine room loses its bottom strip (`Engine Actions`) and its maintenance
+cost text. In its place, one control set into the machine: `engine-click`, a
+positive click. One press calls `EngineClick()`, which is exactly one
+`PerformAction` - the clock moves one click, hunger rises, the drive wears - and
+then brings the drive back to full. That is all the tending there is.
+
+The button is then inert until `engineClickEvery` (twelve) clicks have gone by.
+`EngineClickFill()` reports the bar, and `EngineClickReady()` the gate. The press
+never enters `CommitActionButton`, so no cooldown tier is written: the bar is the
+only gate. A refusal costs nothing and does not move the clock.
+
+`perAction` is gone from `Constants.h` and from the data read in `Catalog.cpp`.
+The work is now priced in the drive's own clicks: `MaintCost()` is
+`missing_percent * wearEvery / wearStep`, so three percent is twelve clicks and
+ten percent is forty. No new number was introduced - 4 clicks a percent was
+already the truth, and the eighty percent exchange rate was the injection.
+
+`engineClickAt` is saved beside `wearTick` (optional on load, so older saves
+still open). The engineer's `maint-eng` readout stays, because the crew does that
+work with or without the commander in the room.
+
+Probe `/tmp/probe/engineclick`: starts live, one press moves the clock exactly one
+click and services the drive from 86% to 100%, the bar empties, a second press is
+refused and costs nothing, twelve clicks fill it, the press lands again; the work
+at 97% is 12 clicks and at 90% is 40; the room's own panels, head and band note
+never contain the word the owner rejects; the machine carries exactly one control
+inside its 650x390 frame; the bottom strip is gone; the bar survives a save and
+load. `failures=0`. `Draw.cpp` still cannot be compiled here.

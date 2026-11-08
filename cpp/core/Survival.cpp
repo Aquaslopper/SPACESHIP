@@ -14,6 +14,32 @@
 
 namespace ship {
 
+// The machine's button. A press is a click of the clock like any other: the
+// world ages, hunger rises and the drive wears. It also brings the drive back to
+// full, which is all the tending there is, so the press can never outrun the
+// wear it causes - and the button then waits out a whole cycle of clicks.
+bool Simulation::EngineClick() {
+  if (!state_.gameOver.empty()) { return false; }
+  if (!EngineClickReady()) { return false; }
+
+  PerformAction("The drive was run by the commander");
+  state_.engineClickAt = ActionCount();
+  if (!state_.gameOver.empty()) { return true; }
+  state_.engineCondition = 100.0;
+  return true;
+}
+
+double Simulation::EngineClickFill() const {
+  const double cycle =
+      rules_.engine.engineClickEvery > 0 ? rules_.engine.engineClickEvery : 12.0;
+  const double since = ActionCount() - state_.engineClickAt;
+  if (since >= cycle) { return 100.0; }
+  if (since <= 0.0) { return 0.0; }
+  return since / cycle * 100.0;
+}
+
+bool Simulation::EngineClickReady() const { return EngineClickFill() >= 100.0; }
+
 void Simulation::WearEngine() {
   state_.wearTick += 1;
   if (state_.wearTick < rules_.engine.wearEvery) { return; }

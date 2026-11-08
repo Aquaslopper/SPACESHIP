@@ -207,8 +207,11 @@ double Simulation::EffectiveJobAt(const CrewMember& crew) const {
 }
 
 double Simulation::MaintCost() const {
-  // 1 action of work per 10% missing, rounded up.
-  return js::Ceil((100.0 - state_.engineCondition) / rules_.engine.perAction);
+  // The work is priced in the drive's own clicks: it wears a step every
+  // wearEvery clicks, so a missing percent costs exactly the clicks that took it.
+  const double step = rules_.engine.wearStep > 0 ? rules_.engine.wearStep : 1.0;
+  const double clicksPerPercent = rules_.engine.wearEvery / step;
+  return js::Ceil((100.0 - state_.engineCondition) * clicksPerPercent);
 }
 
 bool Simulation::MaintRunning() const {

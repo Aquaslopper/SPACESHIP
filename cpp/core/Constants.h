@@ -20,7 +20,7 @@ struct EngineRules {
   double wearEvery = 4;   // actions per step of wear
   double wearStep = 1;    // percent lost per step
   double warnBelow = 50;  // sidebar bar appears here
-  double perAction = 10;  // 1 action of work per 10% missing
+  double engineClickEvery = 12;  // clicks before the machine's button is live again
 };
 
 struct AirStage {

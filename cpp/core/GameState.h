@@ -396,6 +396,9 @@ struct GameState {
   // The engine. Decays with attention, not with time.
   double engineCondition = 100;
   double wearTick = 0;
+  // The clock reading the machine's button was last pressed at, so the green bar
+  // knows how much of the twelve has come back round.
+  double engineClickAt = -1e9;
 
   // Life support: charge in the bank, and the breathable air in the cabin.
   double filterLife = 0;

@@ -244,7 +244,7 @@ EngineScreenModel BuildEngineScreen(const Simulation& sim) {
   TaskScreenModel& screen = model.screen;
   screen.head = TaskHead{"ROOM", "Engine Room",
                          "Propulsion and power - the drive wears with every "
-                         "action spent aboard."};
+                         "click of the clock."};
 
   // --- left: what the drive is doing -------------------------------------
   NavPanel cond;
@@ -260,10 +260,9 @@ EngineScreenModel BuildEngineScreen(const Simulation& sim) {
   NavPanel wear;
   wear.id = "eng-wear";
   wear.title = "Wear";
-  wear.Field("Rate", "1% per " + Num(wearEvery) + " actions");
-  wear.Field("Next step",
-             Num(untilNext) + " action" + (untilNext == 1.0 ? "" : "s"));
-  wear.Field("Full cycle", Num(100.0 * wearEvery) + " actions");
+  wear.Field("Rate", "1% per " + Num(wearEvery) + " clicks");
+  wear.Field("Next step", Num(untilNext) + " click" + (untilNext == 1.0 ? "" : "s"));
+  wear.Field("Full cycle", Num(100.0 * wearEvery) + " clicks");
   screen.left.push_back(wear);
 
   NavPanel drive;
@@ -284,8 +283,8 @@ EngineScreenModel BuildEngineScreen(const Simulation& sim) {
   if (model.condition >= 100) {
     maint.Dim("Engine is at full condition. Nothing to maintain.");
   } else {
-    maint.Field("Cost now", Num(cost) + " action" + (cost == 1.0 ? "" : "s"));
-    maint.Field("Formula", "1 action per 10% missing");
+    maint.Field("Missing", Num(100.0 - model.condition) + "%");
+    maint.Field("Work", Num(cost) + " click" + (cost == 1.0 ? "" : "s"));
     maint.Field("Restores", "to 100%");
   }
   screen.under.push_back(maint);
@@ -329,30 +328,31 @@ EngineScreenModel BuildEngineScreen(const Simulation& sim) {
   screen.right.push_back(crew);
 
   // --- the commitments band ----------------------------------------------
-  screen.bandNote =
-      model.condition >= 100
-          ? "The drive is at full condition. Maintenance cannot be run on a "
-            "perfect engine."
-          : "Maintenance will cost " + Num(cost) + " action" +
-                (cost == 1.0 ? "" : "s") +
-                " spent anywhere aboard, and restores the drive to 100%.";
-
+  // The engineer's own job still reads out here, because the crew does that
+  // work whether or not the commander is standing in the room.
   if (sim.FindOngoing("maint-eng") != nullptr) {
     screen.progress.push_back(
         BuildProgressButton(sim, "maint-eng", "Engineer working", false));
-  } else {
-    screen.progress.push_back(BuildProgressButton(
-        sim, "maint", "Run Maintenance",
-        model.condition < 100 && sim.FindOngoing("project-cooling") == nullptr));
   }
 
-  NavPanel actions;
-  actions.id = "eng-actions";
-  actions.title = "Engine Actions";
-  actions.placement = "np-full";
-  screen.band.push_back(actions);
-
   screen.stage = BuildEngineMachine(sim);
+
+  // The button, set into the machine: one press is one click of the clock and a
+  // service of the drive. The green bar under it fills as the twelve clicks come
+  // back round, and it is live again when the bar is full.
+  const bool live = sim.EngineClickReady();
+  LiveControl run;
+  run.id = "eng-run";
+  run.box = Area{452.0f, 316.0f, 176.0f, 30.0f};
+  run.button.taskId = "engine-click";
+  run.button.idleLabel = "Run the drive";
+  run.button.text = "Run the drive";
+  run.button.title = "One click of the clock, and the drive is brought back to full.";
+  run.button.fillPercent = sim.EngineClickFill();
+  run.button.enabled = live;
+  run.button.inert = !live;
+  run.button.state = live ? ButtonState::Idle : ButtonState::Running;
+  screen.stage.controls.push_back(run);
   screen.hasStage = true;
   return model;
 }

@@ -244,6 +244,8 @@ bool PressProgressButton(Simulation& sim, const std::string& taskId) {
 
 bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
   const std::string& taskId = button.taskId;
+  // The machine's button is a click of the clock gated by its own green bar.
+  if (taskId == "engine-click") { return sim.EngineClick(); }
   const Task* task = sim.FindOngoing(taskId);
   if (task != nullptr && task->state == "running") { return false; }  // inert
   if (task != nullptr && task->state == "done") { return sim.Acknowledge(taskId); }
