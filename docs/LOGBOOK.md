@@ -484,3 +484,17 @@ You must append a compressed summary of **every single reply and action you take
 - **Validation:** `git diff --check` only; no tests, builds, or draw checks were run, per the owner's instruction.
 - **Reference:** `Legacy code_Spaceship.txt` remains untouched and non-authoritative.
 - **State:** changes are being committed and pushed only to `arena/ae015614-spaceship`, updating open PR #33.
+
+### Entry #035
+- **Timestamp:** 2026-11-08 UTC
+- **Task:** owner asked for a **Trade Routes** station category with offers tied to the docked station's system, cargo bought at the origin, delivered to the named destination, paid out there, and a green route drawn on the starmap while a contract runs; existing story contracts and repeatable commissions stay separate.
+- **Owner correction, mid-task:** owner stopped the work — "every spacestation is the same and only the name changes". No code was written, no file was edited for the feature, and nothing was committed.
+- **Verified before stopping (read-only trace of `cpp/ui/StationScreen.cpp`):** the five cards (Market, Sales, Board, Yard, Tavern) are rebuilt per port only from `portId`; the market loop is `for (const Good& good : sim.Market())` with no per-port filter, so all 7 goods appear at all 30 ports.
+- **Goods and prices:** `assets/data/chart.json` gives every port its own `prices` basket, and `Simulation::LotPrice` already multiplies by the docked port's factor, so the *price* differs per station while the *shelf* does not.
+- **Board:** `for (const Contract& contract : sim.World().contracts)` lists all 18 authored contracts at every berth; the eligibility gate greys the 7 origin-locked ones elsewhere but still shows them. 11 contracts have no origin and are identical everywhere.
+- **Yard and tavern:** refits, hull service and rooms are port-independent by design; only 3 of 5 candidates carry a `port` (`ryn` vance-port, `sol` lorn-port, `umi` shipgrave-port, `nemi` and `ori` unbounded), so the other 27 berths share one identical hall and bar.
+- **Commissions:** `Simulation::CommissionOffer` draws from the regional pool by a hash of `map_.here` plus the serial, so the three offers do vary per berth — the one station surface that is not identical.
+- **Consequence for the requested feature:** a Trade Routes card built on the current model would list the same offers at all 30 stations, which is exactly the sameness the owner named. A station-level identity (per-port goods shelf and per-port offer set) has to be decided first.
+- **Reference:** `Legacy code_Spaceship.txt` has only two ports (`tolme`, `relay`) with hand-authored baskets and six hand-authored contracts; it contains no per-port offer concept to port for the 30-port chart.
+- **Untouched:** every file in `cpp/`, `assets/`, `tests/`, `rescue/`, the Legacy reference, and the CMake build. `git status` is clean on `arena/29d1c9e6-spaceship`.
+- **Checks run:** `git status --short` (clean), `git log --oneline -1` (0cf2aca), plus read-only greps and JSON counts quoted above. No build, no test suite, no draw probe — there was no change to check.
