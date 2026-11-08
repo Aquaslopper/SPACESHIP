@@ -18,14 +18,30 @@ namespace ship {
 // world ages, hunger rises and the drive wears. It also brings the drive back to
 // full, which is all the tending there is, so the press can never outrun the
 // wear it causes - and the button then waits out a whole cycle of clicks.
-bool Simulation::EngineClick() {
-  if (!state_.gameOver.empty()) { return false; }
-  if (!EngineClickReady()) { return false; }
-
-  PerformAction("The drive was run by the commander");
+// The press itself: the bar is armed to the click that is in flight and the
+// drive comes back up. Called from the commander's own press, and from the
+// engineer's tick, which is already an action of its own.
+void Simulation::ServiceDrive(const std::string& by) {
+  const std::string who = by.empty() ? "The commander" : by;
   state_.engineClickAt = ActionCount();
-  if (!state_.gameOver.empty()) { return true; }
-  state_.engineCondition = 100.0;
+  LogLine(who + " pressed the maintenance button");
+  if (state_.gameOver.empty()) { state_.engineCondition = 100.0; }
+}
+
+bool Simulation::EngineClick(const std::string& by) {
+  if (!state_.gameOver.empty()) { return false; }
+  if (engineClicking_) { return false; }
+  if (!EngineClickReady()) { return false; }
+  // A maintenance job already in hand owns the drive; the button waits for it.
+  if (MaintRunning()) { return false; }
+
+  const std::string who = by.empty() ? "The commander" : by;
+  engineClicking_ = true;
+  engineClickAtPending_ = true;
+  PerformAction(who + " pressed the maintenance button");
+  engineClicking_ = false;
+  if (engineClickAtPending_) { ServiceDrive(who); }
+  engineClickAtPending_ = false;
   return true;
 }
 

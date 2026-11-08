@@ -263,7 +263,8 @@ class Simulation {
   // the destination pays is the market there plus the freight the leg cost.
   // The machine's button in the engine room. One press is one click of the
   // clock; the button is live again once twelve clicks have gone by.
-  bool EngineClick();
+  // `by` is who pressed it: the commander, or the engineer acting alone.
+  bool EngineClick(const std::string& by = std::string());
   bool EngineClickReady() const;
   double EngineClickFill() const;
 
@@ -455,6 +456,9 @@ class Simulation {
 
   // The cargo hall's own state. None of it is saved: the arrangement of the hold
   // and the run of loading clicks belong to the session, not to the voyage.
+  bool engineClicking_ = false;      // one press at a time, while its own click runs
+  bool engineClickAtPending_ = false;  // the press still has to arm its bar
+  void ServiceDrive(const std::string& by);
   std::map<std::string, bool> stowed_;
   int stowClicks_ = 0;
   int stowThreshold_ = 0;

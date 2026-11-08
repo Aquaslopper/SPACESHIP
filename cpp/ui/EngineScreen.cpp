@@ -328,11 +328,13 @@ EngineScreenModel BuildEngineScreen(const Simulation& sim) {
   screen.right.push_back(crew);
 
   // --- the commitments band ----------------------------------------------
-  // The engineer's own job still reads out here, because the crew does that
-  // work whether or not the commander is standing in the room.
-  if (sim.FindOngoing("maint-eng") != nullptr) {
-    screen.progress.push_back(
-        BuildProgressButton(sim, "maint-eng", "Engineer working", false));
+  // Who presses the button, and when: the engineer takes it over under the
+  // line, so the room reads out the rule rather than a job of his own.
+  if (!sim.Crew().empty()) {
+    const double floor = sim.GameRules().engine.maintBelow;
+    screen.bandNote = "Under " + Num(floor) +
+                      "% the engineer presses this button himself; the better trained he "
+                      "is, the earlier he takes it.";
   }
 
   screen.stage = BuildEngineMachine(sim);

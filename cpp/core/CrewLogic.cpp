@@ -430,19 +430,24 @@ const Task* Simulation::CrewBusy(const CrewMember& crew) const {
 // ---------------------------------------------------------------------------
 
 void Simulation::AutoMaint() {
+  // The engineer does not run a job of his own: he presses the machine's button,
+  // and only once the drive has fallen below the line he is charged to watch.
   CrewMember* worker = AssignedEngineer();
   if (maintClaim_ || projectClaim_ == "cooling" || FindOngoing("project-cooling") != nullptr) {
     return;
   }
   if (worker == nullptr || MaintRunning()) { return; }
   if (CrewBusy(*worker) != nullptr) { return; }
-  if (state_.engineCondition > EffectiveJobAt(*worker)) { return; }
-  if (state_.engineCondition >= 100) { return; }
+  // How early he takes the button is what his training buys: an untrained hand
+  // waits until the drive is under the floor, a trained one presses at his own
+  // level, so the ship is kept further from trouble the better he knows it.
+  const double line = std::max(rules_.engine.maintBelow, EffectiveJobAt(*worker));
+  if (state_.engineCondition >= line) { return; }
+  if (!EngineClickReady()) { return; }  // the bar comes back round in its own time
 
-  Task* task = AddOngoing("maint-eng", "Maintenance - " + worker->name,
-                          CrewCost(MaintCost()), "maint", "engine");
-  if (task != nullptr) { task->by = worker->name; }
-  LogLine(worker->name + " has started maintenance without being asked.");
+  // His press is this action's click, so it arms the bar and lifts the drive
+  // without performing a second action of its own.
+  ServiceDrive(worker->name);
 }
 
 void Simulation::AutoFilters() {
