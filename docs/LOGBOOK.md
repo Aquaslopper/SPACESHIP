@@ -1052,3 +1052,39 @@ still must have room - only about whether the screen admits it.
 Still the owner's call, and this entry does not decide it: whether deliveries should
 be that heavy at all. Lighter consignments would let two or three be signed on one
 sailing, at the cost of the hold mattering less.
+
+## 060 — Deliveries stay heavy, and what a freelance run actually is
+
+DECIDED BY THE OWNER: a delivery keeps needing real space in the hold. If the ship
+cannot take it, it is not a job for that ship - and bigger hulls are coming later,
+which is when more of a board opens up. #058's greyed rows are the whole fix; the
+weights do not change.
+
+FREELANCE, explained because the logbook was not clear and the owner asked. A
+delivery is loaded by the station, so it needs space at the moment of signing. A
+freelance run loads nothing, because the player buys the crates at this station's
+own counter and carries them: the contract is the promise, the purchase is the work.
+
+Measured, six freelance runs as drawn:
+
+    station       good                hold    buy here    margin
+    auriga-port   greens x2           18 m3    ~605 sh      88 sh
+    bryce-port    parts x1             6 m3    ~907 sh     269 sh
+    fallow-port   greens x2           18 m3    ~302 sh     420 sh
+    fallow-port   medicine x2          8 m3    ~691 sh     125 sh
+    gull-port     water x2            12 m3    ~422 sh      58 sh
+    gull-port     parts x1             6 m3   ~1109 sh     151 sh
+
+So a freelance row asks for capital first and hold second: 300 to 1,100 shiltes up
+front for a margin of 58 to 420. A thin purse can take none of them, and the row
+does not say so - the same lie #058 removed from the delivery rows, only deferred to
+the counter.
+
+NOT DONE, and it is the owner's call: grey a freelance row that the purse or the
+hold cannot carry right now, with the number it needs. It is the same shape as the
+delivery fix, but it is a design decision - a run you cannot afford today may be the
+one you save for - so it waits for a word.
+
+A trap worth recording: the first version of this measurement printed an `int` with
+`%.1f` and produced "604.8 m3" for an 18 m3 consignment. The format string, not the
+game, was wrong; every freelance number above is from the corrected run.
