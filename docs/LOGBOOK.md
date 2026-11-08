@@ -1116,3 +1116,33 @@ the probe's own three counts).
 Not proved: that the numbers read well at a glance in the real row on screen - the
 row is one line in the build I cannot see, and "needs 18 m3 and 606 sh" may be a
 long line at small text sizes.
+
+## 062 — How this run went, for whoever comes next
+
+The owner asked why this one worked after several that did not, so it is worth
+writing down rather than leaving to luck.
+
+1. HE WAS THE SPEC AND HE WAS THE CHECK. Every mechanic this run was settled by his
+   memory plus arithmetic, not by what the code already said. When the two disagreed
+   - "the navigator is about travel, not fuel", "the meal is thirty points", "hunger
+   was never real" - the code was wrong and the logbook was wrong, and the work was
+   to prove which. Defending what was already there would have lost every one.
+
+2. NOTHING WAS CLAIMED THAT WAS NOT RUN. A probe, a count, a table before a sentence
+   that says "works". Four of those runs caught me: the ladder probe that set a job
+   id that does not exist, the sync-clock probe that starved the shelf through its
+   own doing, the `%.1f` on an `int` that reported a 604 m3 crate, the delivery probe
+   that pressed a stale screen. Each was a wrong claim found before the owner read
+   it, and each went into this book as a trap.
+
+3. THE GAPS WERE NAMED OUT LOUD. No raylib, so painting is unverified; the Catch2
+   suite never ran; the cleaner's job is unknown and was not invented; the trained
+   filter hand's "earlier" is expressed but not observed. Saying that is what makes
+   the rest of it believable.
+
+4. SMALL COMMITS, ONE IDEA EACH, IN HIS WORDS. "Click", never "action". The room's
+   own button, not a parallel path. The bottom strip stays deleted. Those cost
+   nothing to honour and everything to get wrong.
+
+The hard part was not the code. It was refusing to be confident about anything that
+had not been measured, and refusing to be loyal to code the owner did not write.
