@@ -1089,7 +1089,7 @@ TEST_CASE("staged sensor upgrades unlock scanLocked tiers and deep-region scanni
   REQUIRE(sim.Dock());
   REQUIRE(sim.State().docked);
 
-  const auto yardBefore = ship::BuildStationScreen(sim, sim.Map().here).columns[2];
+  const auto yardBefore = ship::BuildStationScreen(sim, sim.Map().here).columns[3];
   auto findYardRow = [](const ship::StationColumn& col, const std::string& id) -> const ship::StationRow* {
     for (const auto& r : col.rows) {
       if (r.id == id) { return &r; }
@@ -1158,7 +1158,7 @@ TEST_CASE("staged sensor upgrades unlock scanLocked tiers and deep-region scanni
   CHECK_FALSE(sim.CanScan(*sim.FindBodyById(outerRegId)));
 
   {
-    const auto yardMid = ship::BuildStationScreen(sim, sim.Map().here).columns[2];
+    const auto yardMid = ship::BuildStationScreen(sim, sim.Map().here).columns[3];
     CHECK_FALSE(findYardRow(yardMid, "upgrade:scanner")->enabled);
     CHECK(findYardRow(yardMid, "upgrade:scanner2")->enabled);
 

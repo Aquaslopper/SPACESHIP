@@ -265,6 +265,23 @@ std::string Simulation::SaveJson() const {
   for (const auto& entry : state_.contracts) { contracts[entry.first] = entry.second; }
   s["contracts"] = contracts;
 
+  // Trade contracts are optional in older saves: a voyage written before they
+  // existed simply carries none.
+  Json trades = Json::object();
+  for (const auto& entry : state_.trades) {
+    const TradeRun& run = entry.second;
+    trades[entry.first] = Json{{"origin", run.origin},
+                               {"destination", run.destination},
+                               {"good", run.good},
+                               {"goodName", run.goodName},
+                               {"kind", run.kind},
+                               {"vol", Num(static_cast<double>(run.vol))},
+                               {"price", Num(run.price)},
+                               {"payment", Num(run.payment)},
+                               {"state", run.state}};
+  }
+  s["trades"] = trades;
+
   Json passengers = Json::array();
   for (const Passenger& passenger : state_.passengers) {
     passengers.push_back(Json{{"id", passenger.id}, {"name", passenger.name}});
@@ -1085,6 +1102,25 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     if (auto it = s.find("contracts"); it != s.end() && it->is_object()) {
       for (auto entry = it->begin(); entry != it->end(); ++entry) {
         if (entry.value().is_string()) { state_.contracts[entry.key()] = entry.value().get<std::string>(); }
+      }
+    }
+
+    state_.trades.clear();
+    if (auto it = s.find("trades"); it != s.end() && it->is_object()) {
+      for (auto entry = it->begin(); entry != it->end(); ++entry) {
+        if (!entry.value().is_object()) { continue; }
+        TradeRun run;
+        run.id = entry.key();
+        run.origin = GetString(entry.value(), "origin");
+        run.destination = GetString(entry.value(), "destination");
+        run.good = GetString(entry.value(), "good");
+        run.goodName = GetString(entry.value(), "goodName");
+        run.kind = GetString(entry.value(), "kind");
+        run.vol = static_cast<int>(GetNumber(entry.value(), "vol"));
+        run.price = GetNumber(entry.value(), "price");
+        run.payment = GetNumber(entry.value(), "payment");
+        run.state = GetString(entry.value(), "state");
+        state_.trades[entry.key()] = run;
       }
     }
 

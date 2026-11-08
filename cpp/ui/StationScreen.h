@@ -13,6 +13,8 @@
 //                                do not, or once a one-time thing is owned.
 //    Cargo and survey data       pays shiplets, costs one action. The lot is
 //                                gone afterwards, so the row cannot repeat.
+//    Trade routes                buys this berth's consignment, one action; the
+//                                fee is collected at the destination, one action.
 //
 //  The mission board and the tavern are no longer cards on this window.
 //
@@ -51,7 +53,7 @@ struct StationRow {
 
 // One category card on the left, and the items it opens in the middle.
 struct StationColumn {
-  std::string id;      // "market", "sales", "yard"
+  std::string id;      // "market", "sales", "trade", "yard"
   std::string title;
   std::string badge;   // the card's own second line: the purse, the tally
   std::vector<std::string> notes;
@@ -70,7 +72,7 @@ struct StationScreenModel {
   std::string portId;
   std::string portName;
   std::string tip;
-  std::vector<StationColumn> columns;  // Market | Sales | Yard
+  std::vector<StationColumn> columns;  // Market | Sales | Trade | Yard
   std::string purseLine;
   std::string holdLine;
   bool docked = false;

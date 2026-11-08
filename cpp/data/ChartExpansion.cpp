@@ -778,6 +778,208 @@ void EntangleGalaxy(Catalog& catalog) {
   }
 }
 
+
+// ---------------------------------------------------------------------------
+//  One station in every system
+//  ---------------------------------------------------------------------------
+//  The authored chart left most systems without a berth, so the station window
+//  had nothing port-specific to show and the fleet learned a handful of berths
+//  by heart. Every system now owns a station. A system that already has one
+//  keeps it - the authored berths are never moved or renamed, and a system that
+//  already fields two berths keeps both; only systems with none are given one.
+void StationPerSystem(Catalog& catalog) {
+  std::set<std::string> served;      // systems that already answer to a berth
+  std::set<std::string> portNames;   // names are a fleet-wide address
+  for (const Port& port : catalog.ports) {
+    portNames.insert(port.name);
+    const Body* body = catalog.FindBody(port.id);
+    if (body == nullptr) { continue; }
+    const std::string system = catalog.BodySystem(*body);
+    if (!system.empty()) { served.insert(system); }
+  }
+
+  std::vector<std::string> profiles;
+  for (const auto& entry : catalog.portPrices) { profiles.push_back(entry.first); }
+  std::sort(profiles.begin(), profiles.end());
+
+  std::vector<Body> systems = catalog.systems;  // AddLocalBody may reallocate
+  std::size_t systemIndex = 0;
+  for (const Body& system : systems) {
+    if (served.count(system.id) != 0) {
+      ++systemIndex;
+      continue;
+    }
+
+    // A berth sits in the system's own local lane, well clear of the planets
+    // and moons the local-chart pass places on its ring.
+    const double x = 336.0;
+    const double y = 246.0;
+    const std::string word = FirstWord(system.name);
+    const std::string portId = system.id + "-berth";
+    const std::string portName = UniqueName(word + " Anchorage", portNames);
+    Body& station = AddLocalBody(
+        catalog, portId, "station", portName, x, y, system,
+        "A working dock answers on the approach channel.");
+    station.klass = "Charted berth - " + word + " lane";
+    station.details.emplace_back("System", system.name);
+    station.details.emplace_back("Services", "Dock, market, trade contracts, refit");
+    station.scan = {"Docking collars and fuel lines report green across the truss.",
+                    "The berth keeps a trade counter and a refit slip."};
+    station.scanLocked = {"Harbour manifest archive"};
+
+    Port port;
+    port.id = portId;
+    port.name = portName;
+    // The berth trades in the profile that sits at this system's place on the
+    // fleet ring, so neighbouring systems do not all quote the same basket.
+    const std::string profile =
+        profiles.empty() ? std::string() : profiles[systemIndex++ % profiles.size()];
+    const auto priceIt = catalog.portPrices.find(profile);
+    if (priceIt != catalog.portPrices.end()) { port.prices = priceIt->second; }
+    const auto hintIt = catalog.portHints.find(profile);
+    port.tip = "Berth in " + system.name + "." +
+               (hintIt == catalog.portHints.end() ? std::string() : " " + hintIt->second);
+    catalog.ports.push_back(std::move(port));
+    served.insert(system.id);
+  }
+}
+
+// ---------------------------------------------------------------------------
+//  Trade contracts
+// ---------------------------------------------------------------------------
+//  One contract per station, and its content is a fact about the system the
+//  station is in: the commodity follows the region's trade profile, and the two
+//  ends of the run follow the lanes that already link that system to its
+//  neighbours. Nothing is drawn from a global list, so two berths in two systems
+//  never offer the same work unless their systems genuinely are alike.
+void BuildTradeContracts(Catalog& catalog) {
+  catalog.tradeContracts.clear();
+  catalog.tradesByStation.clear();
+  if (catalog.ports.empty() || catalog.goods.empty()) { return; }
+
+  // Which systems each system can reach in one hop on the sector chart.
+  std::map<std::string, std::vector<std::string>> lanes;
+  for (const Lane& lane : catalog.sectorLanes) {
+    lanes[lane.from].push_back(lane.to);
+    lanes[lane.to].push_back(lane.from);
+  }
+
+  const auto systemOfPort = [&catalog](const std::string& portId) -> std::string {
+    const Body* body = catalog.FindBody(portId);
+    return body == nullptr ? std::string() : catalog.BodySystem(*body);
+  };
+  const auto portInSystem = [&catalog](const std::string& systemId) -> const Port* {
+    for (const Port& port : catalog.ports) {
+      const Body* body = catalog.FindBody(port.id);
+      if (body == nullptr) { continue; }
+      if (catalog.BodySystem(*body) == systemId) { return &port; }
+    }
+    return nullptr;
+  };
+  // A berth's opinion of one commodity, from its own basket. A berth with no
+  // basket trades at par, exactly as LotPrice() treats it.
+  const auto factorOf = [](const Port& port, const std::string& kind) -> double {
+    const auto it = port.prices.find(kind);
+    return it == port.prices.end() ? 1.0 : it->second;
+  };
+
+  int serial = 0;
+  std::size_t stationIndex = 0;
+  for (const Port& port : catalog.ports) {
+    ++stationIndex;
+    const std::string systemId = systemOfPort(port.id);
+    if (systemId.empty()) { continue; }
+    const Body* system = catalog.FindSystem(systemId);
+    if (system == nullptr) { continue; }
+
+    // What this berth exports: the commodity its own basket values least. That
+    // is the cargo it can let go cheaply, and the reason the run exists.
+    const Good* cargo = nullptr;
+    double exportFactor = 0.0;
+    for (const Good& good : catalog.goods) {
+      const double factor = factorOf(port, good.kind);
+      if (cargo == nullptr || factor < exportFactor) {
+        cargo = &good;
+        exportFactor = factor;
+      }
+    }
+    if (cargo == nullptr) { continue; }
+
+    // Where it goes: a berth one lane away that wants this cargo most. Local
+    // systems first, so the run stays flyable on one tank; the cross-system
+    // case is what makes a delivery between stations.
+    std::vector<std::string> local;
+    std::vector<std::string> anywhere;
+    const auto laneIt = lanes.find(systemId);
+    if (laneIt != lanes.end()) {
+      for (const std::string& peer : laneIt->second) {
+        const Body* peerBody = catalog.FindSystem(peer);
+        if (peerBody == nullptr || peer == systemId) { continue; }
+        if (portInSystem(peer) == nullptr) { continue; }
+        anywhere.push_back(peer);
+        if (peerBody->region == system->region) { local.push_back(peer); }
+      }
+    }
+    std::sort(local.begin(), local.end());
+    std::sort(anywhere.begin(), anywhere.end());
+    const std::vector<std::string>& pool = !local.empty() ? local : anywhere;
+    if (pool.empty()) { continue; }
+
+    const Port* destination = nullptr;
+    double bestFactor = -1.0;
+    for (const std::string& peer : pool) {
+      const Port* candidate = portInSystem(peer);
+      if (candidate == nullptr) { continue; }
+      const double factor = factorOf(*candidate, cargo->kind);
+      // Ties go to the first berth in lane order, so the draw is deterministic.
+      if (factor > bestFactor) {
+        bestFactor = factor;
+        destination = candidate;
+      }
+    }
+    if (destination == nullptr) { continue; }
+
+    const std::string destinationSystem = systemOfPort(destination->id);
+    const bool crossesSystems = destinationSystem != systemId;
+
+    ++serial;
+    TradeContract trade;
+    trade.id = "trade-" + std::to_string(serial);
+    trade.station = port.id;
+    trade.origin = port.id;
+    trade.destination = destination->id;
+    trade.good = cargo->id;
+    trade.goodName = cargo->name;
+    trade.vol = cargo->vol;
+    trade.units = 1;
+    // Bought here at this berth's own asking price, which is the price the
+    // market counter would charge for the same lot.
+    trade.price = std::ceil(cargo->value * exportFactor * 1.2);
+
+    // A run across systems is always handed over; a local one is either handed
+    // over or carried on and sold at the destination counter.
+    const bool soldAtCounter = !crossesSystems && (stationIndex % 2 == 1);
+    trade.kind = soldAtCounter ? kTradeSale : kTradeDelivery;
+    if (soldAtCounter) {
+      // What that berth actually pays for it - the counter's own money.
+      trade.payment = std::ceil(cargo->value * bestFactor);
+    } else {
+      // The goods are the shipper's, so the fee covers the crossing only.
+      trade.payment = std::ceil(cargo->value * 0.55) +
+                      std::ceil(static_cast<double>(cargo->vol) * 6.0);
+    }
+    trade.title = cargo->name + " for " + destination->name;
+    trade.note = soldAtCounter
+                     ? "Carry the consignment from " + port.name + " to " + destination->name +
+                           " and sell it at the counter there."
+                     : "Carry the consignment from " + port.name + " to " + destination->name +
+                           " and hand it over to the buyer.";
+
+    catalog.tradeContracts.push_back(trade);
+    catalog.tradesByStation[port.id].push_back(trade);
+  }
+}
+
 void ExpandChart(Catalog& catalog) {
   if (catalog.chartExpanded) { return; }
   catalog.chartExpanded = true;
@@ -1012,6 +1214,10 @@ void ExpandChart(Catalog& catalog) {
       catalog.taskTypes.end()) {
     catalog.taskTypes.push_back("extract");
   }
+
+  // 8. One berth per system, and one trade contract per berth.
+  StationPerSystem(catalog);
+  BuildTradeContracts(catalog);
 
   catalog.counts.regions = static_cast<int>(catalog.regions.size());
   catalog.counts.systems = static_cast<int>(catalog.systems.size());

@@ -600,7 +600,7 @@ int main() {
     sim.MutableState().shiplets = 10000;
     ship::OpenTask(sim, "station", "tolme", true);
     Frame(view, sim);
-    // Three columns walked in one direction: three cards on the left, the open
+    // Three columns walked in one direction: four cards on the left, the open
     // card's items in the middle, and the inspector with its one commit button
     // on the right. Cards and items are free; the market's commit is money only.
     const auto startsWith = [](const char* prefix, const char* missing) {
@@ -612,10 +612,12 @@ int main() {
     };
     const auto marketCard = startsWith("Market - purse", "the Market card did not paint");
     const auto salesCard = startsWith("Sell cargo and survey data", "the sales card did not paint");
+    const auto tradeCard = startsWith("Trade routes", "the trade card did not paint");
     const auto yardCard = startsWith("Shipyard and crew", "the shipyard card did not paint");
-    Require(std::abs(salesCard.x - marketCard.x) < 1 && std::abs(yardCard.x - marketCard.x) < 1,
-            "The three station cards are not in one column");
-    Require(salesCard.y > marketCard.y && yardCard.y > salesCard.y,
+    Require(std::abs(salesCard.x - marketCard.x) < 1 && std::abs(tradeCard.x - marketCard.x) < 1 &&
+            std::abs(yardCard.x - marketCard.x) < 1,
+            "The four station cards are not in one column");
+    Require(salesCard.y > marketCard.y && tradeCard.y > salesCard.y && yardCard.y > tradeCard.y,
             "The station cards are not stacked in their own order");
     // The mission board and the tavern are no longer offered by this window.
     Require(!std::any_of(texts.begin(), texts.end(), [](const auto& t) {

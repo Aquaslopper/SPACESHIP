@@ -448,6 +448,65 @@ NavChartView BuildNavChart(const Simulation& sim) {
     chart.routes.insert(chart.routes.end(), dots.begin(), dots.end());
   };
 
+  // --- the trade route -----------------------------------------------------
+  // A trade contract the player has taken on is drawn as a green trail between
+  // the berth the cargo came from and the berth it is owed to, on whichever
+  // scale shows both ends. It is derived from live state, so it disappears the
+  // moment the run is paid out.
+  for (const auto& entry : sim.State().trades) {
+    const TradeRun& run = entry.second;
+    if (run.state == "paid") { continue; }
+    const Body* origin = sim.FindBodyById(run.origin);
+    const Body* destination = sim.FindBodyById(run.destination);
+    if (origin == nullptr || destination == nullptr) { continue; }
+
+    double ax = 0.0;
+    double ay = 0.0;
+    double bx = 0.0;
+    double by = 0.0;
+    bool drawable = false;
+    if (chart.layer == "system") {
+      // The system chart carries one system, so both ends are present or
+      // neither is. A berth is a body here, so its own body position is used.
+      const bool originHere = sim.World().BodySystem(*origin) == sim.CurrentSystemId();
+      const bool destinationHere =
+          sim.World().BodySystem(*destination) == sim.CurrentSystemId();
+      if (originHere && destinationHere) {
+        ax = origin->x;
+        ay = origin->y;
+        bx = destination->x;
+        by = destination->y;
+        drawable = true;
+      }
+    } else {
+      const Body* fromSystem = sim.World().FindSystem(sim.World().BodySystem(*origin));
+      const Body* toSystem = sim.World().FindSystem(sim.World().BodySystem(*destination));
+      const auto pointOf = [&sim, &chart](const Body* system, double* px,
+                                                double* py) -> bool {
+        if (system == nullptr) { return false; }
+        if (chart.layer == "galaxy") {
+          const auto it = sim.World().galaxyPositions.find(system->id);
+          if (it == sim.World().galaxyPositions.end()) { return false; }
+          *px = it->second.first;
+          *py = it->second.second;
+          return true;
+        }
+        *px = system->x;
+        *py = system->y;
+        return true;
+      };
+      if (fromSystem != toSystem && pointOf(fromSystem, &ax, &ay) &&
+          pointOf(toSystem, &bx, &by)) {
+        drawable = true;
+      }
+    }
+    if (!drawable) { continue; }
+    for (NavDot& dot : NavRouteDots(sim, ax, ay, bx, by, false, false)) {
+      dot.cls += " rdot-trade";
+      chart.tradeRoutes.push_back(dot);
+    }
+  }
+
   if (chart.layer == "system") {
     // Routes are derived: they radiate from wherever the ship actually is, so
     // they stay honest after it moves.

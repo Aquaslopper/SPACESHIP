@@ -200,6 +200,22 @@ struct Commission {
   double reward = 0;
 };
 
+// A trade contract the player has taken on. The consignment is bought when the
+// contract is accepted, so the hold carries it; the payment is collected at the
+// destination, once the ship is actually docked there.
+struct TradeRun {
+  std::string id;
+  std::string origin;
+  std::string destination;
+  std::string good;
+  std::string goodName;
+  std::string kind;       // delivery | haul | run
+  int vol = 0;
+  double price = 0;       // already paid at the origin
+  double payment = 0;     // collected at the destination
+  std::string state;      // carried | ready | paid
+};
+
 struct Commissions {
   int version = 1;
   double serial = 0;
@@ -391,6 +407,9 @@ struct GameState {
   double repairKits = 3;
   double lotSerial = 0;
   std::map<std::string, std::string> contracts;  // contract id -> active/ready/complete/failed
+  // Trade contracts are separate from the story contracts above: one is offered
+  // per station, and this is the accepted set, by trade id.
+  std::map<std::string, TradeRun> trades;
   std::vector<Passenger> passengers;
   std::map<std::string, bool> upgrades;
   std::map<std::string, bool> hired;

@@ -45,7 +45,17 @@ constexpr double kZoomStep = 0.2;
 constexpr double kSystemZoomMin = 0.6;
 constexpr double kSystemZoomMax = 2.5;
 
+// What a trade contract asks of the player.
+constexpr const char* kTradeDelivery = "delivery";  // handed straight to the buyer
+constexpr const char* kTradeSale = "sale";          // carried on and sold at the counter
+
 void ExpandChart(Catalog& catalog);
+
+// One berth in every system that has none, and one trade contract per berth
+// bound to the system the berth sits in. Both run inside ExpandChart; they are
+// public so a test can build them on a chart that is already grown.
+void StationPerSystem(Catalog& catalog);
+void BuildTradeContracts(Catalog& catalog);
 void PopulateGalaxies(Catalog& catalog, double coreDx, double coreDy);
 void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem);
 void PlaceGalaxyDots(Catalog& catalog);

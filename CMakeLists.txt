@@ -311,7 +311,8 @@ if(SPACESHIP_BUILD_TESTS)
     cpp/tests/nav_tests.cpp
     cpp/tests/crew_tests.cpp
     cpp/tests/starter_tests.cpp
-    cpp/tests/galaxy_gen_tests.cpp)
+    cpp/tests/galaxy_gen_tests.cpp
+    cpp/tests/trade_tests.cpp)
   # The Phase 0 data gate: the catalogue must hold the reference world. It was
   # left out of the suite while the CI flag that names it (-DSPACESHIP_DATA_GATE)
   # had no definition in this file, so the gate never ran. Now the option

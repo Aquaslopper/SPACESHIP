@@ -117,7 +117,7 @@ struct NavBodyView {
 struct NavDot {
   double x = 0;
   double y = 0;
-  std::string cls;  // rdot / rdot-sel / rdot-faint / cdot / cdot-far ...
+  std::string cls;  // rdot / rdot-sel / rdot-faint / rdot-trade / cdot ...
 };
 
 struct NavChartView {
@@ -128,6 +128,9 @@ struct NavChartView {
 
   std::vector<NavBodyView> bodies;
   std::vector<NavDot> routes;
+  // The live trade contract's route: the same dot trail, marked rdot-trade so it
+  // paints green. Drawn over the ordinary routes, never instead of them.
+  std::vector<NavDot> tradeRoutes;
   std::vector<NavDot> clusters;
 
   NavPoint marker;          // the 26px green ring

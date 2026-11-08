@@ -27,6 +27,7 @@
 //    package <recordId>   file a survey record for sale
 //    salvage <bay>        recover route salvage while under way
 //    contract accept|collect <id>
+//    trade accept|collect <id>
 //    commission accept <kind> | commission collect | commission abandon
 //    hire <candidateId> | upgrade <id> | shipyard
 //    project <id> | medical <crewId> | social <a> <b>
@@ -275,6 +276,9 @@ int main(int argc, char** argv) {
       simulation.PackageSurvey(parts[1]);
     } else if (command == "salvage" && parts.size() >= 2) {
       simulation.StartSalvage(std::atoi(parts[1].c_str()));
+    } else if (command == "trade" && parts.size() >= 3) {
+      if (parts[1] == "accept") { simulation.AcceptTrade(parts[2]); }
+      else if (parts[1] == "collect") { simulation.CollectTrade(parts[2]); }
     } else if (command == "contract" && parts.size() >= 3) {
       if (parts[1] == "accept") { simulation.AcceptContract(parts[2]); }
       else if (parts[1] == "collect") { simulation.CollectContract(parts[2]); }

@@ -818,6 +818,7 @@ void Simulation::ArriveAt(const std::string& bodyId) {
   ChronicleVisit(CurrentSystem());
   ResolveMapArrivalEvents(*body, system, prevRegion);
   CommissionProgress("visit", body->id);
+  TradeProgress();
   CheckCommendations();
 }
 
@@ -990,6 +991,8 @@ bool Simulation::Dock() {
     if (row.id == "location") { row.value = name + " - docked"; }
   }
   PerformAction("Docked at " + name);
+  // The trade counter takes the consignment from the hold on the way in.
+  TradeProgress();
   return true;
 }
 

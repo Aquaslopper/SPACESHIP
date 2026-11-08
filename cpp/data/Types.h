@@ -160,6 +160,33 @@ struct Contract {
   bool recognizePrior = false;
 };
 
+// One trade contract. Generated per station by chart expansion, and bound to
+// the system that station sits in: no two berths offer the same work, and the
+// offer never changes between voyages with the same seed.
+//
+// `origin` is where the goods are taken on and paid for. `destination` is where
+// they are handed over and the payment is collected. `kind` says what the
+// player is doing on the way:
+//
+//   delivery  the goods are handed straight to the destination's buyer
+//   haul      the goods are carried on and sold at the destination counter
+//   run       the run crosses to another system before that hand-over
+struct TradeContract {
+  std::string id;
+  std::string station;      // the port that offers it
+  std::string origin;       // where the cargo is bought
+  std::string destination;  // where it is delivered and paid for
+  std::string good;         // market commodity id
+  std::string goodName;
+  std::string kind;         // delivery | haul | run
+  int vol = 0;
+  int units = 1;
+  double price = 0;         // charged at the origin
+  double payment = 0;       // paid at the destination
+  std::string title;
+  std::string note;
+};
+
 // The chart's own drawing board. Distances are derived from these numbers and
 // never authored, so they must not be adjusted for the port's window size.
 struct MapGeometry {

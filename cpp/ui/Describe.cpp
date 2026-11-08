@@ -339,7 +339,7 @@ Description DescribeTarget(const Simulation& sim, const std::string& kind,
       if (port.id == id) { t.title = port.name; break; }
     }
     t.kindLabel = "STATION";
-    t.sub = "Docked - market, shipyard and crew";
+    t.sub = "Docked - market, trade routes, shipyard and crew";
     t.rows = {{"Berth", "Docked"}, {"Purse", Num(sim.State().shiplets) + " sh"}};
     t.acts = {{"Trade or hire", "0 actions"}, {"Undock", "1 action"}};
     return t;

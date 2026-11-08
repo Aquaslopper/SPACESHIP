@@ -1592,6 +1592,14 @@ void ShellView::PaintNavScreen(Simulation& sim) {
                                  : Fade(ToRay(p.coffee), 0.8f));
     DrawRectangle(static_cast<int>(px), static_cast<int>(py), 2, 2, ink);
   }
+  // The trade contract's route, in the green the chart already uses for a
+  // plotted course, but one pixel wider so it reads as the run in hand.
+  for (const NavDot& dot : chart.tradeRoutes) {
+    const float px = box.x + static_cast<float>(dot.x) * sx;
+    const float py = box.y + static_cast<float>(dot.y) * sy;
+    if (px < clipMinX || px > clipMaxX || py < clipMinY || py > clipMaxY) { continue; }
+    DrawRectangle(static_cast<int>(px), static_cast<int>(py), 3, 3, ToRay(p.sage));
+  }
 
   // Sector territory contours & region map on Layer 2 ("sector").
   struct SectorTerritory {

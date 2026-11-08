@@ -324,6 +324,104 @@ bool Simulation::CollectContract(const std::string& contractId) {
   return true;
 }
 
+
+// ---------------------------------------------------------------------------
+// Trade contracts
+// ---------------------------------------------------------------------------
+//  A trade contract is bought, carried and paid: accepting it takes the cargo
+//  out of the station's hands and into the hold, one action; delivering it at
+//  the named berth pays the fee, one action. The cargo is contract freight, so
+//  the sales counter refuses it and jettisoning it loses the run.
+
+const TradeContract* Simulation::FindTrade(const std::string& tradeId) const {
+  for (const TradeContract& trade : catalog_.tradeContracts) {
+    if (trade.id == tradeId) { return &trade; }
+  }
+  return nullptr;
+}
+
+const TradeRun* Simulation::TradeRunOf(const std::string& tradeId) const {
+  auto it = state_.trades.find(tradeId);
+  return it == state_.trades.end() ? nullptr : &it->second;
+}
+
+std::string Simulation::TradeStatus(const std::string& tradeId) const {
+  auto it = state_.trades.find(tradeId);
+  return it == state_.trades.end() ? std::string("available") : it->second.state;
+}
+
+bool Simulation::AcceptTrade(const std::string& tradeId) {
+  if (!state_.gameOver.empty() || !state_.docked || HerePort() == nullptr) { return false; }
+  const TradeContract* trade = FindTrade(tradeId);
+  if (trade == nullptr) { return false; }
+  // The offer is a fact about the berth: it is taken on where it is offered.
+  if (trade->origin != map_.here) { return false; }
+  if (TradeStatus(tradeId) != "available") { return false; }
+  if (state_.shiplets < trade->price) { return false; }
+  if (CargoUsed() + CargoReserved() + trade->vol > cargo_.capacity) { return false; }
+
+  state_.shiplets -= trade->price;
+  state_.lotSerial += 1;
+  GoodsLot lot;
+  lot.id = "trade-" + trade->id + "-" + js::NumToString(state_.lotSerial);
+  lot.name = trade->goodName;
+  lot.kind = "Trade freight";
+  lot.vol = trade->vol;
+  lot.value = 0;             // the fee was agreed at the counter, not by weight
+  lot.risk = false;
+  lot.contractId = trade->id;  // keeps it out of the sales counter
+  goods_.push_back(lot);
+
+  TradeRun run;
+  run.id = trade->id;
+  run.origin = trade->origin;
+  run.destination = trade->destination;
+  run.good = trade->good;
+  run.goodName = trade->goodName;
+  run.kind = trade->kind;
+  run.vol = trade->vol;
+  run.price = trade->price;
+  run.payment = trade->payment;
+  run.state = "carried";
+  state_.trades[trade->id] = run;
+
+  PerformAction("Trade contract taken - " + trade->title);
+  return true;
+}
+
+void Simulation::TradeProgress() {
+  for (auto& entry : state_.trades) {
+    TradeRun& run = entry.second;
+    if (run.state != "carried") { continue; }
+    if (run.destination != map_.here || !state_.docked) { continue; }
+    // The consignment leaves the hold here; the fee is collected next press.
+    bool found = false;
+    for (std::size_t index = goods_.size(); index-- > 0;) {
+      if (goods_[index].contractId != run.id) { continue; }
+      goods_.erase(goods_.begin() + static_cast<std::ptrdiff_t>(index));
+      found = true;
+    }
+    if (!found) { continue; }
+    run.state = "ready";
+    LogLine("Trade consignment delivered. Collect the fee at the counter.");
+  }
+}
+
+bool Simulation::CollectTrade(const std::string& tradeId) {
+  if (!state_.gameOver.empty() || !state_.docked || HerePort() == nullptr) { return false; }
+  auto it = state_.trades.find(tradeId);
+  if (it == state_.trades.end()) { return false; }
+  TradeRun& run = it->second;
+  if (run.state != "ready") { return false; }
+  // The payment is collected where the goods were handed over, nowhere else.
+  if (run.destination != map_.here) { return false; }
+
+  state_.shiplets += run.payment;
+  run.state = "paid";
+  PerformAction("Trade contract paid - " + run.goodName);
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // Hiring and refits
 // ---------------------------------------------------------------------------

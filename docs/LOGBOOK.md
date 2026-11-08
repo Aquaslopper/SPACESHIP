@@ -512,3 +512,13 @@ You must append a compressed summary of **every single reply and action you take
 - **Left alone on purpose:** the yard still contains the hiring hall. It is the same "one identical hall at every berth" problem the owner named for the tavern, but a hiring hall is a door to the crew system rather than a dead end — it needs the same decision, not a silent delete.
 - **Checks run (reading only, per instruction):** `git diff --stat` = 7 files, +30/-296; brace balance scanned to depth 0 on all six edited C++ files; grep for removed symbols returns nothing; `content.json` re-parsed as valid JSON. **No build, no test suite, no draw probe.**
 - **State:** uncommitted on `arena/29d1c9e6-spaceship`.
+
+### Entry #037
+- **Timestamp:** 2026-11-08 UTC
+- **Task:** owner specified the trade system afresh (station star-wiki panel, three trade kinds, 200-click re-roll, sector-level green path) and then asked for it written up as a list. No code was written in this reply.
+- **Deliverable:** `docs/TRADE_CONTRACTS.md` — the design list: the sameness being replaced, the star-wiki panel and its double role (player browsing / the mechanism that gives each station its own system bodies), the four-card window, the three trade kinds with their exact click costs and button behaviour, the 200-click rotation, the green route per map level, the economy guarantees, what stays separate, and the open points.
+- **Owner corrections answered in the document:** the re-roll never touches accepted work; "data trade" is a name for station-to-station trade, not a new resource; freelance resolves to buy-deliver-sell with the accepted request pinning the commodity.
+- **Carried into the list, not hidden:** buy `ceil(value × f × 1.2)` against sell `value × f` loses ~20% on every crossing, so a freelance margin needs the exporter/buyer rule now written in section 7.
+- **Also recorded as unverified:** the 701 generated trade contracts all hauled Refined ore before the commodity pick was rewritten to use each berth's cheapest export and best-paying reachable buyer. That rewrite has not been compiled.
+- **State of the tree:** 19 files modified plus `cpp/tests/trade_tests.cpp`, all uncommitted and unbuilt. The last build attempt was killed mid-compile; no build, test or draw probe has completed since the owner's "no test" instruction.
+- **Untouched:** `Legacy code_Spaceship.txt`, `rescue/`, `assets/` artwork, and every existing test body.

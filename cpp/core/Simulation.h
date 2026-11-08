@@ -237,6 +237,18 @@ class Simulation {
   bool HireCrew(const std::string& candidateId);
   bool BuyUpgrade(const std::string& upgradeId);   // bay, bay2, drive, rack, scanner, hull
   void ContractProgress(const std::string& goal, const std::string& target);
+  // Trade contracts: one offered per station, bound to the system it sits in.
+  const TradeContract* FindTrade(const std::string& tradeId) const;
+  const TradeRun* TradeRunOf(const std::string& tradeId) const;
+  std::string TradeStatus(const std::string& tradeId) const;
+  bool AcceptTrade(const std::string& tradeId);    // buys the consignment, 1 action
+  bool CollectTrade(const std::string& tradeId);   // pays the fee at the destination
+  // Called on arrival and on docking: a consignment whose destination the ship
+  // has just reached leaves the hold and becomes collectable there.
+  void TradeProgress();
+  const std::vector<TradeContract>& TradesHere() const {
+    return catalog_.TradesAt(map_.here);
+  }
   void CommissionProgress(const std::string& kind, const std::string& target);
   // commissionOffer(): the same deterministic draw the board shows before the
   // player accepts it, so the offer and the acceptance can never disagree.

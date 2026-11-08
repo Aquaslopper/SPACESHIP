@@ -1,19 +1,22 @@
 // ============================================================================
 //  StationScreen.cpp — the port window: cards, items, inspector, commits.
 //  ---------------------------------------------------------------------------
-//  Three cards, walked in one direction. What changed from the reference is how
+//  Four cards, walked in one direction. What changed from the reference is how
 //  they are walked and what a commitment costs:
 //
-//    left      three cards. Free to open. The open one is marked.
+//    left      four cards. Free to open. The open one is marked.
 //    middle    only what the open card holds. Free to pick.
 //    right     everything about the one picked item, and its single button.
 //
 //    Market, Shipyard and crew   shiplets only, 0 actions, no cooldown.
 //    Cargo and surveys           pays shiplets, 1 action, the lot then goes.
+//    Trade routes                buys the consignment, 1 action; the fee is
+//                                collected at the destination, 1 action.
 //
 //  The mission board and the tavern cards are gone. The commission and contract
 //  engine is still in the simulation; this window no longer offers it, because
-//  every berth offered the same pinned list.
+//  every berth offered the same pinned list. The trade counter replaces it with
+//  the one thing that is not shared: the contract of this berth's own system.
 // ============================================================================
 #include "ui/StationScreen.h"
 
@@ -61,6 +64,24 @@ bool Hired(const Simulation& sim, const std::string& candidateId) {
   return it != hired.end() && it->second;
 }
 
+// This berth's system and the display name of any berth or system, so the trade
+// card can name both ends of a run without the reader decoding ids.
+std::string SystemNameOf(const Simulation& sim, const std::string& portId) {
+  const Body* port = sim.FindBodyById(portId);
+  if (port == nullptr) { return std::string(); }
+  const std::string systemId =
+      port->system.empty() ? sim.World().BodySystem(*port) : port->system;
+  const Body* system = sim.FindBodyById(systemId);
+  return system == nullptr ? std::string() : system->name;
+}
+
+std::string PortNameOf(const Simulation& sim, const std::string& portId) {
+  const Port* port = sim.World().FindPort(portId);
+  if (port != nullptr) { return port->name; }
+  const Body* body = sim.FindBodyById(portId);
+  return body == nullptr ? portId : body->name;
+}
+
 double GoodBuyPrice(const Simulation& sim, const Good& good) {
   GoodsLot probe;
   probe.value = good.value;
@@ -88,7 +109,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   model.head.title = model.portName;
   model.head.sub =
       "Pick a card, pick an item, then commit. Supplies, the yard and hires cost "
-      "shiplets only; selling costs one action.";
+      "shiplets only; selling and trade contracts cost one action each.";
 
   const double purse = sim.State().shiplets;
   const double used = sim.CargoUsed();
@@ -421,7 +442,105 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     yard.rows.push_back(row);
   }
 
-  model.columns = {market, sales, yard};
+  // ---- 3. the trade counter ------------------------------------------------
+  // Everything here is a fact about this berth: the station's own contract, the
+  // system it sits in, and the run it names.
+  StationColumn trade;
+  trade.id = "trade";
+  trade.title = "Trade routes";
+  trade.badge = sim.TradesHere().empty() ? "no contract at this berth"
+                                         : "1 contract offered here";
+  {
+    const std::string systemName = SystemNameOf(sim, portId);
+    trade.notes.push_back(systemName.empty() ? "This berth's own contract."
+                                             : "Contract bound to " + systemName + ".");
+    trade.notes.push_back("Take the cargo here, deliver it at the named berth, then collect "
+                          "the payment there.");
+    trade.notes.push_back("Accepting and delivering cost one action each; the cargo is "
+                          "bought with shiplets.");
+  }
+  for (const TradeContract& offer : sim.TradesHere()) {
+    const std::string status = sim.TradeStatus(offer.id);
+    const std::string where = PortNameOf(sim, offer.destination);
+    StationRow row;
+    row.details.push_back("Trade contract: " + offer.title + ".");
+    row.details.push_back(offer.note);
+    row.details.push_back("Run: " + offer.kind + " - " + offer.goodName + ", " +
+                          Num(static_cast<double>(offer.vol)) + " m3, " +
+                          Num(static_cast<double>(offer.units)) + " lot.");
+    row.details.push_back("Delivery berth: " + where + ".");
+    row.details.push_back("Cargo bought here for " + Num(offer.price) + " sh; the fee is " +
+                          Num(offer.payment) + " sh paid at " + where + ".");
+    row.details.push_back("Status: " + status + ".");
+
+    if (status == "available") {
+      const bool affordable = purse >= offer.price;
+      const bool space = used + reserved + static_cast<double>(offer.vol) <= capacity;
+      row.id = "trade-accept:" + offer.id;
+      row.label = "Take " + offer.goodName + " to " + where + " - " + Num(offer.payment) + " sh";
+      row.cost = kOneAction;
+      row.commit = "Buy and sign - " + Num(offer.price) + " sh";
+      row.enabled = model.docked && affordable && space;
+      row.details.push_back("Costs one action and " + Num(offer.price) +
+                            " sh; the cargo goes into the hold, reserved for this run.");
+      if (!row.enabled) {
+        row.details.push_back(!space ? "Not enough hold space for the consignment."
+                                     : "Not affordable at this berth.");
+      }
+    } else if (status == "carried") {
+      row.id = "trade-accept:" + offer.id;
+      row.label = "Under contract: " + offer.goodName + " for " + where;
+      row.cost = kDone;
+      row.commit = "Under way";
+      row.enabled = false;
+      row.done = true;
+      row.details.push_back("Deliver to " + where + " to unlock the payment.");
+    } else if (status == "ready") {
+      row.id = "trade-collect:" + offer.id;
+      row.label = "Collect " + Num(offer.payment) + " sh for " + offer.goodName;
+      row.cost = kOneAction;
+      row.commit = "Collect - " + Num(offer.payment) + " sh";
+      row.enabled = model.docked;
+      row.details.push_back("The consignment has been handed over here. Costs one action; the "
+                            "payment goes into the purse.");
+    } else {
+      row.id = "trade-accept:" + offer.id;
+      row.label = "Paid: " + offer.goodName + " for " + where;
+      row.cost = kDone;
+      row.commit = "Paid";
+      row.enabled = false;
+      row.done = true;
+      row.details.push_back("This run has been paid out; it cannot be taken again.");
+    }
+    trade.rows.push_back(row);
+  }
+  // Consignments taken at other berths and not yet handed over: they ride in the
+  // hold, so this berth shows them rather than pretending they are not there.
+  for (const auto& entry : sim.State().trades) {
+    const TradeRun& run = entry.second;
+    if (run.state != "carried") { continue; }
+    bool offeredHere = false;
+    for (const TradeContract& offer : sim.TradesHere()) {
+      if (offer.id == run.id) { offeredHere = true; }
+    }
+    if (offeredHere) { continue; }
+    StationRow row;
+    row.id = "trade-elsewhere:" + run.id;
+    row.label = "Carrying " + run.goodName + " to " + PortNameOf(sim, run.destination);
+    row.cost = kDone;
+    row.commit = "In the hold";
+    row.enabled = false;
+    row.done = true;
+    row.reading = true;
+    row.details.push_back("Contract cargo aboard: " + run.goodName + ", " +
+                          Num(static_cast<double>(run.vol)) + " m3.");
+    row.details.push_back("Hand it over at " + PortNameOf(sim, run.destination) +
+                          " to unlock " + Num(run.payment) + " sh.");
+    row.details.push_back("Contract freight cannot be sold or jettisoned for profit.");
+    trade.rows.push_back(row);
+  }
+
+  model.columns = {market, sales, trade, yard};
   NormalizeStationSelection(model, model.selection);
   return model;
 }
@@ -491,6 +610,8 @@ bool PressStationActionRaw(Simulation& sim, const std::string& action,
   if (action.compare(0, 12, "sell-survey:") == 0) {
     return sim.SellSurvey(action.substr(12));
   }
+  if (action.compare(0, 14, "trade-accept:") == 0) return sim.AcceptTrade(action.substr(14));
+  if (action.compare(0, 15, "trade-collect:") == 0) return sim.CollectTrade(action.substr(15));
   if (action.compare(0, 5, "hire:") == 0) return sim.HireCrew(action.substr(5));
   if (action.compare(0, 8, "upgrade:") == 0) return sim.BuyUpgrade(action.substr(8));
   if (action == "ship-buy") return sim.BuyLargerShip();
