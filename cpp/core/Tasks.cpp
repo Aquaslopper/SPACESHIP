@@ -98,13 +98,9 @@ void Simulation::SweepAutoTasks() {
   state_.ongoing.swap(keep);
 }
 
-void Simulation::TickTask(const Task& task, double used) {
-  // The one producer of something mid-flight: rations land as the bake runs,
-  // clamped to what is actually left so a ten-action burst landing on the last
-  // two actions of a bake cannot credit it for ten.
-  if (task.type != "cook") { return; }
-  const double rate = task.rate > 0 ? task.rate : 1.0;
-  mess_.rack = std::min(mess_.capacity, mess_.rack + used * rate);
+void Simulation::TickTask(const Task&, double) {
+  // Nothing lands mid-batch. A cook's five clicks are the bar filling; the
+  // food appears on completion, in OnTaskDone.
 }
 
 void Simulation::OnTaskDone(Task& task) {
@@ -126,7 +122,11 @@ void Simulation::OnTaskDone(Task& task) {
     return;
   }
   if (task.type == "cook") {
+    // One ration is now five food on the counter, clamped to the ceiling.
+    mess_.rack = std::min(mess_.capacity, mess_.rack + rules_.mess.foodPerRation);
     LogLine((task.by.empty() ? "Someone" : task.by) + " finished cooking a fresh batch.");
+    // The counter is full, or the larder is empty: the cook's chain is done.
+    if (mess_.rack >= mess_.capacity || mess_.rations < 1.0) { cookRestock_ = false; }
     return;
   }
   if (task.type == "crewJob") {

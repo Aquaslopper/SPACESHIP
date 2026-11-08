@@ -329,8 +329,10 @@ struct Cargo {
 };
 
 struct Mess {
-  double rack = 18;
-  double capacity = 24;
+  double rack = 18;       // cooked food on the galley counter
+  double capacity = 24;   // the counter's ceiling
+  double rations = 21;    // dry rations in the larder - spent one per batch
+  double rationCapacity = 24;
 };
 
 // An open task tab. The reference keeps these as objects so a restored voyage

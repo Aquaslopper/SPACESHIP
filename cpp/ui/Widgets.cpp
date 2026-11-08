@@ -138,10 +138,18 @@ bool IsActionCost(const std::string& cost, bool hasCost) {
   return MentionsAction(cost);
 }
 
+// A control that takes no cooldown at all. Cooking is one: the batch is its own
+// lock - the button is inert while the pot runs - so a second lock on top only
+// makes the player wait for a bar to drain.
+bool TakesNoCooldown(const std::string& key) {
+  return key.find("progress:cook") != std::string::npos;
+}
+
 bool CommitActionButton(Simulation& sim, const std::string& key,
                         const std::string& category,
                         const std::function<bool()>& action) {
-  if (CooldownRemaining(sim, key) > 0.0) { return false; }
+  const bool unlocked = TakesNoCooldown(key);
+  if (!unlocked && CooldownRemaining(sim, key) > 0.0) { return false; }
 
   const double before = sim.ActionCount();
   bool result = false;
@@ -150,14 +158,14 @@ bool CommitActionButton(Simulation& sim, const std::string& key,
   } catch (...) {
     // A callback that throws must still leave the clock consistent, exactly as
     // the reference's finally block does.
-    if (sim.ActionCount() > before) {
+    if (!unlocked && sim.ActionCount() > before) {
       const std::string chosen = ActionCooldownCategory(key, category);
       sim.MutableState().actionCooldowns[key] =
           Cooldown{chosen, RuleActions(sim, chosen)};
     }
     throw;
   }
-  if (sim.ActionCount() > before) {
+  if (!unlocked && sim.ActionCount() > before) {
     const std::string chosen = ActionCooldownCategory(key, category);
     sim.MutableState().actionCooldowns[key] =
         Cooldown{chosen, RuleActions(sim, chosen)};

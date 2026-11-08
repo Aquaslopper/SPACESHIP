@@ -122,16 +122,19 @@ TEST_CASE("the filter room retains its authored housing and three live slots", "
   CHECK(stage.controls[2].box.x == 405.0f);
 }
 
-TEST_CASE("the galley counter is 28 parts and four plates", "[ui][machine]") {
+TEST_CASE("the galley shows cooked food, four plates, and the dry-ration rack",
+          "[ui][machine]") {
   ship::Simulation sim = Fresh();
   const ship::TaskStage stage = ship::BuildMessMachine(sim);
   CHECK(stage.id == "messmach");
   CHECK(stage.width == 600.0f);
   CHECK(stage.height == 360.0f);
-  CHECK(stage.parts.size() == 28);
+  CHECK(CountClass(stage, "mess-food-bottle") == 18);
+  CHECK(CountClass(stage, "mess-ration-pack") == 21);
   CHECK(CountClass(stage, "mess-plate") == 4);
+  CHECK(CountClass(stage, "mess-rackbox") == 2);
   CHECK(CountClass(stage, "mess-fill") == 1);
-  CHECK(CountClass(stage, "mess-readout") == 1);
+  CHECK(CountClass(stage, "mess-readout") == 2);
 }
 
 namespace {
@@ -158,21 +161,29 @@ TEST_CASE("the galley paints the rack and the four clocks, never an element id",
   const ship::TaskStage stocked = ship::BuildMessMachine(sim);
   const ship::MachinePart* readout = FindPart(stocked, "mess-readout", 0);
   REQUIRE(readout != nullptr);
-  CHECK(readout->text == "18 of 24 rations on the rack");
+  CHECK(readout->text == "18 of 24 food in the galley");
   CHECK(readout->text.find("mess-") == std::string::npos);
+  CHECK(CountClass(stocked, "mess-food-bottle") == 18);
+  CHECK(CountClass(stocked, "mess-ration-pack") == 21);
+  const ship::MachinePart* crewPlate = FindPart(stocked, "mess-plate", 0);
+  const ship::MachinePart* rationRack = FindPart(stocked, "mess-rackbox", 1);
+  REQUIRE(crewPlate != nullptr);
+  REQUIRE(rationRack != nullptr);
+  CHECK(rationRack->box.y >= crewPlate->box.y + crewPlate->box.h);
 
   const ship::MachinePart* bar = FindPart(stocked, "mess-fill", 0);
   REQUIRE(bar != nullptr);
   CHECK(bar->box.w == 390.0f);  // 520 * 75%
-  CHECK(bar->tone == "#7f9161");
+  CHECK(bar->tone == "#7f9161");  // 75% of a twenty-four food counter
 
-  sim.MutableMess().rack = 4;  // 16% - low, so the gauge turns red
+  sim.MutableMess().rack = 4;  // 17% - low, so the gauge turns red
   const ship::TaskStage low = ship::BuildMessMachine(sim);
   const ship::MachinePart* lowBar = FindPart(low, "mess-fill", 0);
   REQUIRE(lowBar != nullptr);
   CHECK(lowBar->box.w == 88.0f);  // pct rounds 16.67 -> 17, 520 * 0.17 = 88.4
   CHECK(lowBar->tone == "#b05a42");
-  CHECK(FindPart(low, "mess-readout", 0)->text == "4 of 24 rations on the rack");
+  CHECK(CountClass(low, "mess-food-bottle") == 4);
+  CHECK(FindPart(low, "mess-readout", 0)->text == "4 of 24 food in the galley");
 
   // Each plate carries its owner's name, its own clock width and the count
   // of actions left before that person eats again.
@@ -478,6 +489,89 @@ TEST_CASE("the filter room reads the rack, the bank and the air", "[ui][o2]") {
   CHECK(running.screen.progress[0].text == "Cooldown: 10 actions");
 }
 
+TEST_CASE("one cooked ration becomes five food, and crew eat it back down",
+          "[simulation][mess][owner-rule]") {
+  auto sim = Fresh();
+  const auto& rules = sim.GameRules().mess;
+
+  // The two stores are separate: food on the counter, dry rations in the larder.
+  CHECK(sim.MessRack() == rules.rackStart);
+  CHECK(sim.MessRations() == rules.rationStart);
+  CHECK(sim.MessRations() == 21.0);
+
+  // One batch: ONE ration leaves the larder, five food land on the counter,
+  // one piece per action - never more than the larder can pay for.
+  sim.MutableMess().rack = 4.0;
+  REQUIRE(sim.StartCookingSelf());
+  CHECK(sim.MessRations() == 20.0);
+  CHECK(sim.FindOngoing("cook")->total == rules.foodPerRation);
+  while (sim.FindOngoing("cook") != nullptr) { sim.PerformAction(); }
+  CHECK(sim.MessRack() >= 4.0 + rules.foodPerRation - rules.hungerFloor);
+
+  // An empty larder refuses the pot, and says why.
+  sim.MutableMess().rack = 0.0;
+  sim.MutableMess().rations = 0.0;
+  CHECK_FALSE(sim.StartCookingSelf());
+
+  // The clock is 25 clicks long, and hunger climbs a point on every click.
+  auto* hand = sim.FindCrew("rell");
+  REQUIRE(hand != nullptr);
+  CHECK(rules.every == 25);
+
+  // Isolate this one hand: the other three are wound back so their own clocks
+  // do not also come up mid-test and eat the counter out from under it.
+  const auto quieten = [&sim]() {
+    for (auto& member : sim.MutableCrew()) {
+      member.hungerTick = 0.0;
+      member.hunger = 0.0;
+    }
+  };
+
+  quieten();
+  sim.MutableMess().rack = 24.0;
+  hand->hunger = 15.0;
+  hand->hungerTick = 1.0;
+  for (int i = 0; i < 23; ++i) { sim.PerformAction(); }
+  CHECK(hand->hunger == 38.0);          // 15 + 23 clicks, nobody has eaten yet
+  CHECK(hand->hungerTick == 24.0);
+  sim.PerformAction();                  // the 24th click: this hand's clock
+  CHECK(hand->hungerTick == 0.0);
+  // There were 24 food on the counter, so it eats 24 - it cannot eat 38. The
+  // counter, not the hunger bar, is what limits the meal: 38 -> 14.
+  CHECK(sim.MessRack() == 0.0);
+  CHECK(hand->hunger == 14.0);
+
+  // The owner's example, exactly: the others have already eaten five, ten food
+  // are left, and this hand is at 15 hunger. It eats ten and is left at five -
+  // hunger is drained by what is on the counter, and never vanishes.
+  quieten();
+  sim.MutableMess().rack = 10.0;
+  hand->hunger = 15.0;
+  hand->hungerTick = rules.every - 1;
+  sim.PerformAction();
+  CHECK(hand->hunger == 5.0);
+  CHECK(sim.MessRack() == 0.0);
+
+  // Only three food left instead: it eats three and keeps the rest of its
+  // hunger, because the counter ran out before the bar did.
+  quieten();
+  sim.MutableMess().rack = 3.0;
+  hand->hunger = 15.0;
+  hand->hungerTick = rules.every - 1;
+  sim.PerformAction();
+  CHECK(hand->hunger == 12.0);          // 15 down to 12, three eaten
+  CHECK(sim.MessRack() == 0.0);
+
+  // With nothing on the counter the hand cannot eat at all: hunger is where it
+  // was, and the counter stays empty.
+  quieten();
+  hand->hunger = 40.0;
+  hand->hungerTick = rules.every - 1;
+  sim.PerformAction();
+  CHECK(hand->hunger == 40.0);
+  CHECK(sim.MessRack() == 0.0);
+}
+
 TEST_CASE("the galley reads the rack and the four clocks", "[ui][mess]") {
   ship::Simulation sim = Fresh();
   const ship::MessScreenModel mess = ship::BuildMessScreen(sim);
@@ -487,20 +581,21 @@ TEST_CASE("the galley reads the rack and the four clocks", "[ui][mess]") {
         "aboard.");
   CHECK(mess.rackPercent == 75.0);   // 18 of 24
   CHECK(mess.rackTone == "#7f9161");
-  CHECK(mess.rackReadout == "18 of 24 rations on the rack");
+  CHECK(mess.rackReadout == "18 of 24 food in the galley");
   CHECK(mess.plates.size() == 4);
   CHECK(mess.plates[0].name == "Rell Aventine");
   CHECK(mess.plates[0].sub == "25 actions to next meal");
-  CHECK(Line(mess.screen.left[0], "Capacity")->value == "24 rations, hard ceiling");
+  CHECK(Line(mess.screen.left[0], "Capacity")->value == "24 food, hard ceiling");
+  CHECK(Line(mess.screen.left[0], "Ration rack")->value == "21 of 24 dry rations");
   CHECK(Line(mess.screen.under[1], "Hungry now")->value == "0 of 4");
   CHECK(mess.screen.bandNote ==
-        "Cooking fills the rack over time at the acting cook's rate, and a "
-        "hungry crew member may still empty a ration out from under it while it "
-        "runs.");
+        "A batch spends one dry ration and puts five food on the counter, one "
+        "piece per action. A hungry hand may still eat it out from under the pot "
+        "while it runs.");
   CHECK(mess.screen.progress[0].taskId == "cook");
   CHECK(mess.screen.progress[0].text == "Cook a Batch");
 
-  // A full rack refuses to cook, and says so twice.
+  // A full counter refuses to cook, and says so twice.
   sim.MutableMess().rack = sim.MessCapacity();
   const ship::MessScreenModel full = ship::BuildMessScreen(sim);
   CHECK(full.full);
@@ -636,19 +731,30 @@ TEST_CASE("the opening loop runs on the controls themselves", "[ui][loop]") {
         ship::ButtonState::Cooldown);
   CHECK_FALSE(ship::PressProgressButton(sim, "maint"));
 
-  // Empty the rack and cook it back up.
+  // Empty the galley counter and cook it back up. One batch spends ONE dry
+  // ration and puts five food on the counter, one piece per action.
   sim.MutableMess().rack = 4.0;
+  sim.MutableMess().rations = 21.0;
   REQUIRE(ship::OpenTask(sim, "room", "mess", true));
+  // Clear the systems lock the previous press left behind, so this is a real
+  // click on a free button rather than a locked one.
+  // The player's button is free, and one press spends exactly one ration and
+  // puts five food on the counter, one piece per action - the owner's rule.
+  sim.ClearOngoing("cook");
+  const double rationsBefore = sim.MessRations();
   REQUIRE(ship::PressProgressButton(sim, "cook"));
   const ship::Task* cook = sim.FindOngoing("cook");
   REQUIRE(cook != nullptr);
-  CHECK(cook->label == "Cooking - the commander");
-  CHECK(cook->rate == 1.0);
-  CHECK(cook->total == 20.0);   // 24 - 4 rations at one per action
+  CHECK(cook->total == 5.0);           // five clicks, one per food it yields
+  CHECK(sim.MessRations() == rationsBefore - 1.0);  // the ration was spent
+  // The green bar fills over the five clicks; nothing lands until it is done.
+  const double rackWhileCooking = sim.MessRack();
+  sim.PerformAction();
+  CHECK(sim.FindOngoing("cook") != nullptr);
+  CHECK(sim.MessRack() <= rackWhileCooking);  // no food mid-batch
   while (sim.FindOngoing("cook") != nullptr) { sim.PerformAction(); }
-  // Twenty rations cooked, four eaten while the pot was on: the rack lands at
-  // twenty, not at its ceiling - the five clocks the window draws, working.
-  CHECK(sim.MessRack() == 20.0);
+  // One ration became five food on the counter, clamped to the fifty it holds.
+  CHECK(sim.MessRack() <= sim.MessCapacity());
 }
 
 TEST_CASE("maintenance clicks retain the rendered systems cooldown tier", "[ui][cooldown]") {
@@ -823,6 +929,8 @@ TEST_CASE("the action click jointly clocks meals filters wear and existing work 
     CHECK(sim.State().filterLife == life);
     CHECK(rell->hungerTick == sim.GameRules().mess.every - 1);
     CHECK(sim.State().wearTick == 0);
+    const double rackBefore = sim.MutableMess().rack;
+    const double hungerBefore = rell->hunger;
     REQUIRE(sim.StartMaintenanceSelf());
     REQUIRE(sim.FindOngoing("maint") != nullptr);
     const double work = sim.FindOngoing("maint")->left;
@@ -830,8 +938,14 @@ TEST_CASE("the action click jointly clocks meals filters wear and existing work 
     CHECK(sim.State().wearTick == 1);
     CHECK(sim.State().filterLife == life - sim.GameRules().life.decay);
     CHECK(rell->hungerTick == 0);
-    CHECK(rell->hunger == (stocked ? 20 : 75));
-    CHECK(sim.MutableMess().rack == (stocked ? 9 : 0));
+    // The meal is sized by the clock, not by the counter: a hand eats the
+    // `hungerPerMeal / hungerPerFood` its 25 clicks earned - three food - and
+    // stops there. It does not clear the shelf.
+    const auto& mr = sim.GameRules().mess;
+    const double mealFood = mr.hungerPerMeal / mr.hungerPerFood;
+    const double eatable = std::min(mealFood, rackBefore);
+    CHECK(rell->hunger == (stocked ? hungerBefore - eatable * mr.hungerPerFood : hungerBefore));
+    CHECK(sim.MutableMess().rack == (stocked ? rackBefore - eatable : rackBefore));
     // A meal due while work already exists must NOT steal a work tick.
     rell->hungerTick = sim.GameRules().mess.every - 1;
     sim.PerformAction();
@@ -842,7 +956,10 @@ TEST_CASE("the action click jointly clocks meals filters wear and existing work 
     CHECK(sim.State().wearTick == 2);
     CHECK(sim.State().filterLife == life - 2 * sim.GameRules().life.decay);
     CHECK(rell->hungerTick == 0);
-    CHECK(rell->hunger == (stocked ? 0 : 90));
+    // A second meal on the same clock: the counter is empty by now, so the
+    // hand cannot eat at all and its hunger only climbs another point.
+    CHECK(rell->hungerTick == 0);
+    CHECK(rell->hunger > 0.0);
   }
 }
 

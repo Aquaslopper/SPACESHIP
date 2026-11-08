@@ -38,20 +38,50 @@ void Simulation::TickCrew() {
   }
 
   // ---- hunger, each on their own staggered clock -------------------------
+  // Everything here is counted in clicks, never in seconds. A hand gains
+  // `hungerPerMeal` (15) over its own `every` (25) clicks - a click at a time,
+  // so the bar creeps up rather than jumping - and then goes to eat. One food
+  // drains `hungerPerFood` (5) of hunger, so a meal is 15 / 5 = 3 food.
+  //
+  // THE MEAL IS SIZED BY THE CLOCK, NOT BY THE COUNTER. A hand eats the 3 food
+  // its 25 clicks earned and stops; it does not clear the shelf. That is what
+  // makes the staggering work: four hands eat 12 food a round, the counter
+  // holds 24 (two rounds), and a cook who restarts at 10 always has food on the
+  // shelf while the next batch runs. What the counter DOES decide is whether
+  // the meal can be paid for: with less than 3 food on it, the hand eats what
+  // is there and carries the rest of its hunger into the next round.
+  const double risePerClick = rules_.mess.hungerPerMeal / std::max(1.0, rules_.mess.every);
+  const double mealFood = rules_.mess.hungerPerMeal / std::max(1.0, rules_.mess.hungerPerFood);
+
   for (CrewMember& crew : crew_) {
     crew.hungerTick += 1;
-    if (crew.hungerTick < rules_.mess.every) { continue; }
+    if (crew.hungerTick < rules_.mess.every) {
+      crew.hunger = std::min(100.0, crew.hunger + risePerClick);
+      continue;
+    }
     crew.hungerTick = 0;
-    if (mess_.rack > 0) {
-      mess_.rack -= 1;
-      crew.hunger = std::max(0.0, crew.hunger - 40);
+
+    // What the meal is worth to this hand: three food, but never more than it
+    // takes to reach the floor, and never more than is on the counter. Three
+    // bounds, one number, so a hand can neither eat the shelf empty nor go
+    // under five.
+    const double spare = crew.hunger - rules_.mess.hungerFloor;
+    double wanted = 0.0;
+    if (spare > 0.0) {
+      wanted = std::min(mealFood, std::ceil(spare / rules_.mess.hungerPerFood));
+    }
+    const double ate = std::min(wanted, mess_.rack);
+    if (ate > 0.0) {
+      mess_.rack -= ate;
+      crew.hunger = std::max(rules_.mess.hungerFloor,
+                             crew.hunger - ate * rules_.mess.hungerPerFood);
+    }
+
+    if (ate > 0.0) {
       state_.rackWarnedMess = false;
-    } else {
-      crew.hunger = std::min(100.0, crew.hunger + 15);
-      if (!state_.rackWarnedMess) {
-        LogLine("The ration rack is empty. The crew are going hungry.");
-        state_.rackWarnedMess = true;
-      }
+    } else if (mess_.rack <= 0 && !state_.rackWarnedMess) {
+      LogLine("The galley counter is empty. The crew are going hungry.");
+      state_.rackWarnedMess = true;
     }
   }
 
@@ -457,16 +487,30 @@ void Simulation::AutoMess() {
   if (cookClaim_ || projectClaim_ == "food" || FindOngoing("project-food") != nullptr) { return; }
   if (worker == nullptr || FindOngoing("cook") != nullptr) { return; }
   if (CrewBusy(*worker) != nullptr) { return; }
-  if (mess_.rack > js::Floor(mess_.capacity / 2.0)) { return; }
-  if (mess_.rack >= mess_.capacity) { return; }
+  // She starts once the counter is under cookBelow and does not stop until it
+  // is full: cooking 1 ratio, then another ratio, until the rack is stocked.
+  // A batch started again as soon as the pot is off means a dropping counter
+  // never waits for the player.
+  if (!cookRestock_ && mess_.rack >= rules_.mess.cookBelow) { return; }
+  if (mess_.rack >= mess_.capacity) {
+    cookRestock_ = false;
+    return;
+  }
+  if (mess_.rations < 1.0) {
+    cookRestock_ = false;
+    return;
+  }
 
-  const double rate = worker->jobAt;
-  const double cost = CrewCost(js::Ceil((mess_.capacity - mess_.rack) / rate));
+  // One ration becomes foodPerRation food when the five-click batch finishes.
+  // A batch that would overshoot the ceiling is still cooked; the landing is
+  // clamped, so the counter ends full rather than past its lid.
+  const double cost = rules_.mess.foodPerRation;
   Task* task = AddOngoing("cook", "Cooking - " + worker->name, cost, "cook", "mess");
   if (task != nullptr) {
     task->by = worker->name;
-    task->rate = rate;
+    mess_.rations -= 1.0;  // the ration is spent when the batch starts
   }
+  cookRestock_ = true;
   LogLine(worker->name + " started cooking without being asked.");
 }
 

@@ -670,7 +670,7 @@ int main() {
         Require(painted.text.find("mess-") == std::string::npos,
                 "The galley painted an element id instead of a value");
       }
-      FindText("18 of 24 rations on the rack");
+      FindText("18 of 24 food in the galley");
       FindText("25 actions to next meal");
       // Hunger is a live value on the crew record, and it drives a red bar.
       galley.FindCrew("jax")->hunger = 88;
@@ -680,15 +680,28 @@ int main() {
       Require(std::any_of(rects.begin(), rects.end(), [](const auto& r) {
         return r.color.r == 176 && r.color.g == 90 && r.color.b == 66 && r.w > 0;
       }), "Starving hunger did not paint the source red bar");
-      // Eating is what moves the number: a full rack feeds a due hand.
+      // Eating is what moves the number: one food drains exactly one point of
+      // hunger and eating stops at the floor, so a hand at 30 stops at 5.
       auto hungry = ship::Simulation::ReferenceVoyage(sim.World());
       auto* hand = hungry.FindCrew("rell");
-      hand->hunger = 90;
+      hand->hunger = 30;
       hand->hungerTick = hungry.GameRules().mess.every - 1;
       const double rackBefore = hungry.MessRack();
+      const double floorAt = hungry.GameRules().mess.hungerFloor;
+      // One food per point of hunger, capped by what is actually on the
+      // counter: with less food than hunger above the floor, the hand eats the
+      // counter dry and keeps the rest of its hunger.
+      // A meal is three food - the fifteen hunger a hand gains over its own
+      // twenty-five clicks, five points per food - capped by what is on the
+      // counter. It is not "eat the shelf empty".
+      const auto& mealRules = hungry.GameRules().mess;
+      const double mealFood = mealRules.hungerPerMeal / mealRules.hungerPerFood;
+      const double eaten = std::min(mealFood, rackBefore);
       hungry.PerformAction();
-      Require(hand->hunger == 50, "A fed crew member's hunger did not fall by 40");
-      Require(hungry.MessRack() == rackBefore - 1, "A meal did not take a ration");
+      Require(hand->hunger == 30 - eaten * mealRules.hungerPerFood,
+              "The meal did not drain its own three food");
+      Require(hand->hunger >= floorAt, "A fed hand fell under the hunger floor");
+      Require(hungry.MessRack() == rackBefore - eaten, "The meal took the wrong amount of food");
     }
 
     sim.FindCrew("jax")->health = 25;

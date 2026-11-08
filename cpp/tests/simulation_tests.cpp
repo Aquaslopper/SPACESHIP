@@ -46,7 +46,7 @@ TEST_CASE("a new voyage opens where the reference opens", "[simulation]") {
 
   REQUIRE(sim.State().engineCondition == 100);
   REQUIRE(sim.MessRack() == 18);
-  REQUIRE(sim.MessCapacity() == 24);
+  REQUIRE(sim.MessCapacity() == 50);
 
   REQUIRE(sim.Life().canisters == 6);
   REQUIRE(sim.Life().slots.size() == 3);

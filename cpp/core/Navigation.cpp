@@ -728,7 +728,7 @@ void Simulation::FinishExtraction(const std::string& bodyId, double reservedVol)
   } else if (IsVolatileIceBody(*body)) {
     if (jackpot) {
       addLot("Subglacial Relic Core (" + body->name + ")", "Relics", 2.0, 185.0, false);
-      mess_.rack = std::min(mess_.capacity, mess_.rack + 2.0);
+      mess_.rations = std::min(mess_.rationCapacity, mess_.rations + 2.0);
       LogLine("Deep ice core at " + body->name +
               ": recovered 2 m3 subglacial relics and +2 purified water/ration stores.");
       SimRemember("Discovery", "Extracted a preserved subglacial core on " + body->name + ".");

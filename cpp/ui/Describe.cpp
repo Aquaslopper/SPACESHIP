@@ -201,17 +201,25 @@ void RoomMess(const Simulation& sim, Description& t) {
   const CrewMember* cook = sim.Cook();
   const double rack = sim.MessRack();
   const double capacity = sim.MessCapacity();
-  const double cost =
-      std::ceil((capacity - rack) / (cook ? cook->jobAt : 1.0));
+  const double room = capacity - rack;
+  const double food = room < sim.GameRules().mess.foodPerRation ? room
+                                                               : sim.GameRules().mess.foodPerRation;
+  const double cost = std::ceil(food);
   t.sub = "Galley and rations - " + Num(rack) + " of " + Num(capacity) +
-          " on the rack";
+          " food on the counter, " + Num(sim.MessRations()) + " dry rations";
   t.rows = {
-      {"Rack", Num(rack) + " of " + Num(capacity) + " rations"},
+      {"Galley", Num(rack) + " of " + Num(capacity) + " food"},
+      {"Larder", Num(sim.MessRations()) + " of " + Num(sim.MessRationCapacity()) +
+                     " dry rations"},
       {"Hunger cycle", "every " + Num(sim.GameRules().mess.every) +
                            " actions, per crew member, staggered"},
-      {"Cooking", rack >= capacity
-                      ? std::string("Not needed - rack is full")
-                      : Plural(cost, "action") + " - tops up the rack"},
+      {"Cooking", sim.MessRations() < 1.0
+                      ? std::string("No rations in the larder")
+                      : (rack >= capacity ? std::string("Not needed - counter is full")
+                                          : Plural(cost, "action") +
+                                                " - one ration becomes " +
+                                                Num(sim.GameRules().mess.foodPerRation) +
+                                                " food")},
       {"Starvation", "at " + Num(sim.GameRules().mess.starveAt) +
                          "% hunger health is at risk, slowly"},
       {"Cook", cook ? cook->name + " - acts at " + JobThreshold(sim, *cook)
@@ -219,7 +227,8 @@ void RoomMess(const Simulation& sim, Description& t) {
   };
   t.acts = {
       {"Cook a batch",
-       rack >= capacity ? std::string("refused - rack full")
+       rack >= capacity ? std::string("refused - counter full")
+       : sim.MessRations() < 1.0 ? std::string("refused - larder empty")
                         : Num(cost) + " action" + (cost == 1.0 ? "" : "s")},
       {"The cook acts alone",
        cook ? "at " + JobThreshold(sim, *cook) : std::string("nobody assigned")},

@@ -367,7 +367,9 @@ std::string Simulation::SaveJson() const {
   life["slots"] = slots;
   root["life"] = life;
 
-  root["mess"] = Json{{"rack", Num(mess_.rack)}, {"capacity", Num(mess_.capacity)}};
+  root["mess"] = Json{{"rack", Num(mess_.rack)}, {"capacity", Num(mess_.capacity)},
+                      {"rations", Num(mess_.rations)},
+                      {"rationCapacity", Num(mess_.rationCapacity)}};
   root["cargo"] = Json{{"capacity", Num(cargo_.capacity)}};
 
   Json goods = Json::array();
@@ -1240,6 +1242,13 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
 
     mess_.rack = GetNumber(d.at("mess"), "rack");
     mess_.capacity = GetNumber(d.at("mess"), "capacity");
+    // Older voyages carry no larder: they restore with an empty store, which
+    // is exactly the situation their save describes - they never cooked one.
+    const Json& galley = d.at("mess");
+    mess_.rations = At(galley, "rations") != nullptr ? GetNumber(galley, "rations") : 0.0;
+    if (At(galley, "rationCapacity") != nullptr) {
+      mess_.rationCapacity = GetNumber(galley, "rationCapacity");
+    }
     cargo_.capacity = GetNumber(d.at("cargo"), "capacity");
 
     goods_.clear();
