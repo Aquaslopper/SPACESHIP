@@ -724,3 +724,30 @@ not place an assigned engineer with high skill, so every early-press case came
 back unchanged - skill 0 and skill 100 behaved identically. The training half is
 expressed in the code and unproven by this harness; it needs a test that drives
 `AssignedEngineer()` directly.
+
+## 048 — The training ladder is real, and my probe was measuring nobody
+
+Entry #047 said the training half was unproven. It was wrong for a dull reason:
+the probe set `crew.job = "engine"`, a job id that does not exist.
+`AssignedEngineer()` looks for `crew.job == "maintenance"`, so the probe never
+touched the engineer at all - it was measuring whichever crew member already held
+the maintenance job, whose skill it never changed. Skill 0 and skill 100 looked
+identical because neither was the hand pressing the button.
+
+Measured properly (`/home/user/probe/ladder`, fresh ship per point, scanning
+condition in fives for the highest point at which the button is taken):
+
+- a fresh hand acts at 0 and presses at **30%** - the floor
+- one station session (`TrainCrew(hand, 1, "at the station")`) takes it to 45 and
+  he presses at **40%**
+- two sessions: 60, presses at **55%**
+- eleven sessions: capped at 75, presses at **70%**
+
+`baseAt` is 30 for the maintenance job, `trainStep` 15, `trainCap` 75, and
+`Tasks.cpp:280` gives two steps at a time while docked, one aboard. So teaching
+the engineer at a station is the mechanic, it was already wired, and the line he
+takes the button at is `max(30, jobAt - airDrop)` with an air drop of 0 on a
+healthy deck.
+
+Nothing in `cpp/` was changed by this entry; it corrects the record and the claim
+in #047 that the mechanic was unproven.
