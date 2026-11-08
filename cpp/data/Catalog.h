@@ -14,6 +14,7 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <cstdint>
 #include <map>
 #include <stdexcept>
 #include <string>
@@ -72,6 +73,10 @@ class Catalog {
   // started from an already-grown catalogue (or restarted from its own copy)
   // does not grow a second galaxy.
   bool chartExpanded = false;
+
+  // The seed the generated universe was built from.
+  std::uint64_t universeSeed = 0;
+  int universeSystems = 180;
 
   // Where each system sits on the galaxy board (ChartExpansion::PlaceGalaxyDots).
   // A system has one position, in its own region's cluster; the galaxy scale

@@ -3,6 +3,7 @@
 //  and map-integrated incident definitions.
 // ============================================================================
 #include "data/ChartExpansion.h"
+#include "data/UniverseGen.h"
 
 #include <algorithm>
 #include <cmath>
@@ -914,6 +915,18 @@ void ExpandChart(Catalog& catalog) {
   }
   catalog.layerBoards["system"].zmin = kSystemZoomMin;
   catalog.layerBoards["system"].zmax = kSystemZoomMax;
+
+  // A generated universe replaces the authored baseline outright. Its systems,
+  // worlds, berths and lanes were written from the seed, and the board it is drawn
+  // on now exists, so the passes below - which rebuild the old chart and then fill
+  // it out - are not run on top of it.
+  if (catalog.universeSeed != 0) {
+    GenerateUniverse(catalog, catalog.universeSeed, catalog.universeSystems);
+    catalog.RebuildIndex();
+    PlaceGalaxyDots(catalog);
+    catalog.chartExpanded = true;
+    return;
+  }
 
   // 3. Expand the galaxy layer: translate the 7 authored regions to the central
   //    core (preserving all authored inter-region distances) and generate outer

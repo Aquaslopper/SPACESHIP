@@ -1,4 +1,7 @@
+#include <cstdlib>
+
 #include "data/Catalog.h"
+#include "data/UniverseGen.h"
 
 #include <algorithm>
 #include <fstream>
@@ -629,6 +632,21 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     catalog.rules.docAway = Number(crew, "docAway", "crew.json", 7);
     catalog.rules.scanCost = Number(survival, "scanCost", "survival.json", 5);
   }
+
+  // ---- the galaxy itself --------------------------------------------------
+  // The authored chart was a table of forty-eight rows; this replaces systems,
+  // worlds, stations and lanes with a sky generated from one seed. Until the
+  // player can type a seed, a fixed one keeps every voyage on the same chart.
+  std::uint64_t universeSeed = 1;
+  if (const char* env = std::getenv("SPACESHIP_SEED"); env != nullptr && env[0] != '\0') {
+    universeSeed = SeedFromText(env);
+  }
+  int generatedSystems = 180;
+  if (const char* env = std::getenv("SPACESHIP_SYSTEMS"); env != nullptr && env[0] != '\0') {
+    generatedSystems = std::atoi(env);
+  }
+  catalog.universeSeed = universeSeed;
+  catalog.universeSystems = generatedSystems;
 
   // ---- totals ------------------------------------------------------------
   catalog.counts.regions = static_cast<int>(catalog.regions.size());

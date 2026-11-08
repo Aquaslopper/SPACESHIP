@@ -1240,3 +1240,40 @@ not "does it compile" but "would I notice, in the third system, that this is a c
 Nothing changed in this entry. The first real step is rule 1: derive every station's
 prices from the system it stands in, which needs no new content at all - only the seven
 goods and the traits already in the chart.
+
+## 066 — A generated universe, and the numbers it produces
+
+The chart is no longer a table of forty-eight rows. `UniverseGen` builds the galaxy
+from one seed and `ExpandChart` uses it instead of rebuilding the authored baseline.
+
+WHAT IT BUILDS. Each system gets traits - population, farming, industry, medicine,
+law, hazard, a possible wreck - and everything else follows from them: how many
+worlds it has, whether there is a belt, how many moons, whether there is a station at
+all, and every price at that station. Prices are derived per commodity kind from what
+the place makes and what it needs, centred on 1.0, so a farming colony is cheap in
+produce and dear in medicine and a frontier dock is cheap in things nobody asks about.
+
+MEASURED on seed 1, through the probe, not from a description:
+
+    systems 180, bodies 1140, ports 125, lanes 505
+    distinct price tables 121 for 125 ports   (was 8 for 30)
+    distinct station tips 125
+    work per station: least 2, most 5, average 3.7
+    price range 0.85 to 1.66, none pinned at a clamp
+    system shapes: 3 to 13 bodies, spread across the chart
+    validator: 0 problems
+    same seed twice: identical sky; seed "kessler": all 179 other names differ
+    voyage boots at Kessler Station, docked, board 3 runs, a delivery signs
+
+Two samples of what a station now reads like:
+
+    Kessler Station: Frontier outpost at Kessler. There is no pharmacy, so medicine
+      fetches a premium. Nobody at this dock asks what is in the crates.
+    Kaline Station: Agricultural colony at Kaline. Produce is cheap here and the ice
+      is spoken for. There is no pharmacy, so medicine fetches a premium.
+
+STILL MISSING, in the order it matters: the seed is a fixed 1 or `SPACESHIP_SEED`
+from the environment, not something the player types and not yet saved with a voyage;
+the board still re-rolls on the 200-click epoch, so names can still change under the
+player; there are still only seven goods; and none of it has been looked at, because
+this build has no renderer to look with.
