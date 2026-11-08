@@ -8,6 +8,8 @@
 //  breathing.
 // ============================================================================
 #include "core/JsNumber.h"
+#include <random>
+
 #include "core/Simulation.h"
 
 #include <algorithm>
@@ -92,6 +94,22 @@ void Simulation::TickCrew() {
       }
     }
   }
+}
+
+void Simulation::DealHungerClock(CrewMember& crew) {
+  std::random_device seed;
+  std::mt19937 rng(seed());
+  const double every = std::max(1.0, rules_.mess.every);
+  const double risePerClick = rules_.mess.hungerPerMeal / every;
+  const double offset = std::floor(std::uniform_real_distribution<double>(0.0, every)(rng));
+  // He starts part-way round his own cycle rather than at the top of it: his
+  // counter, the click he eats on and the food he then spends all agree.
+  crew.hungerTick = offset;
+  crew.hunger = std::min(100.0, rules_.mess.hungerFloor + risePerClick * offset);
+}
+
+void Simulation::StaggerHungerClocks() {
+  for (CrewMember& crew : crew_) { DealHungerClock(crew); }
 }
 
 const CrewMember* Simulation::Engineer() const {

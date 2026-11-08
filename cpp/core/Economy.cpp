@@ -359,6 +359,7 @@ bool Simulation::HireCrew(const std::string& candidateId) {
   state_.shiplets -= candidate->fee;
   state_.hired[candidateId] = true;
   crew_.push_back(MakeCrew(candidate->crew));
+  DealHungerClock(crew_.back());
   const std::string name = candidate->crew.name;
   SimRemember("Arrival", name + " joined the crew at " + HerePort()->name + ".", candidateId);
   FreeCommit(name + " joined the crew");

@@ -196,6 +196,9 @@ Simulation Simulation::NewVoyage(const Catalog& catalog) {
   first.processed = false;
   state.sim.memories.push_back(first);
 
+  // Nobody waits his turn: the clocks are dealt before the watch begins.
+  sim.StaggerHungerClocks();
+
   return sim;
 }
 

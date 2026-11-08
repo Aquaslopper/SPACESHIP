@@ -932,3 +932,28 @@ hands eating on the same click take twelve food at once - exactly half the shelf
 and no cook of five-food batches can cover that. The stagger is not decoration; it
 is the thing the room is balanced on. Anything that re-times a hand (a save, a new
 hire, a reload) should keep his tick where it was, and that has not been checked.
+
+## 056 — The clocks are dealt, not shared
+
+Every hand used to start on tick 0, which meant four meals landing on one click and
+twelve food leaving a shelf of twenty-four in a single go - exactly the failure #055
+caught. Nobody else could cover that, least of all a cook making five at a time.
+
+`StaggerHungerClocks()` now runs at the end of the boot, and `DealHungerClock()` runs
+for each new signing at a port. A hand is dealt a tick somewhere in his own twenty-
+five-click round and a counter to match, `hungerFloor + risePerClick * tick`, so he
+starts part-way round his cycle instead of at the top of it and everything about him
+agrees. The draw is `std::random_device` per hand, so it is not the same watch twice.
+
+First voyage dealt: Rell 18, Jax 8, Bo 14, Suri 5 - hunger 26.6, 14.6, 21.8, 11.0.
+A second voyage dealt a different set, checked. Over 200 clicks on the dealt clocks:
+peak hunger 33.8, shelf never below 3. `failures=0` on `/home/user/probe/clocks`.
+
+The shelf running out is not this. Ten runs of 400 clicks all ended dry with hunger
+at 100, because the galley carries 21 dry rations at boot - 105 food, plus 24 on the
+counter, 129 in all - and four hands eat 0.48 food per click. That is roughly 270
+clicks of food aboard, and no clock can change it. Replenishment is the ration line,
+not the stagger.
+
+The save system already stores `hungerTick` and `hunger` per hand, so a reload keeps
+whatever a hand was dealt. Not proved on this branch: a save-and-load round trip.
