@@ -888,19 +888,19 @@ void ExpandChart(Catalog& catalog) {
   BuildGalaxyFromRows(AuthoredStarCatalog(), 0, catalog, /*linkHubs=*/true);
   ExpandLocalCharts(catalog, 0);
 
-  const double authoredW = catalog.map.w;
-  const double authoredH = catalog.map.h;
+  const double baseW = catalog.map.w;
+  const double baseH = catalog.map.h;
 
   // 2. Configure board geometries for all three scales.
   MapGeometry sector = catalog.map;
-  sector.w = authoredW * kSectorBoardScale;
-  sector.h = authoredH * kSectorBoardScale;
+  sector.w = baseW * kSectorBoardScale;
+  sector.h = baseH * kSectorBoardScale;
   sector.cx = sector.w / 2.0;
   sector.cy = sector.h / 2.0;
 
   MapGeometry galaxy = catalog.map;
-  galaxy.w = authoredW * kGalaxyBoardScale;
-  galaxy.h = authoredH * kGalaxyBoardScale;
+  galaxy.w = baseW * kGalaxyBoardScale;
+  galaxy.h = baseH * kGalaxyBoardScale;
   galaxy.cx = galaxy.w / 2.0;
   galaxy.cy = galaxy.h / 2.0;
 
@@ -915,17 +915,16 @@ void ExpandChart(Catalog& catalog) {
   catalog.layerBoards["system"].zmin = kSystemZoomMin;
   catalog.layerBoards["system"].zmax = kSystemZoomMax;
 
-  // 3. Expand the galaxy layer: translate the 7 authored regions to the central
-  //    core (preserving all authored inter-region distances) and generate outer
-  //    galactic clusters/dwarf galaxies around them.
-  const double galDx = (galaxy.w - authoredW) / 2.0;
-  const double galDy = (galaxy.h - authoredH) / 2.0;
+  // 3. Expand the galaxy layer: place every region on the galaxy board by one rule,
+  //    the ones that came in the file and the generated ones alike.
+  const double galDx = (galaxy.w - baseW) / 2.0;
+  const double galDy = (galaxy.h - baseH) / 2.0;
   PopulateGalaxies(catalog, galDx, galDy);
 
-  // 4. Translate authored systems to the centre of the wide sector board and
+  // 4. Translate the systems to the centre of the wide sector board and
   //    separate stacked positions.
-  const double secDx = (sector.w - authoredW) / 2.0;
-  const double secDy = (sector.h - authoredH) / 2.0;
+  const double secDx = (sector.w - baseW) / 2.0;
+  const double secDy = (sector.h - baseH) / 2.0;
   for (Body& system : catalog.systems) {
     system.x += secDx;
     system.y += secDy;
