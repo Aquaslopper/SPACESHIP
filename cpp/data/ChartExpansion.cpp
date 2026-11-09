@@ -501,10 +501,12 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
     }
   }
 
-  const double boardW = catalog.map.w;
-  const double boardH = catalog.map.h;
-  const double cx = catalog.map.cx;
-  const double cy = catalog.map.cy;
+  const MapGeometry sysBoard = BoardOrDefault(catalog, "system");
+  const double boardW = sysBoard.w > 0 ? sysBoard.w : catalog.map.w;
+  const double boardH = sysBoard.h > 0 ? sysBoard.h : catalog.map.h;
+  const double cx = sysBoard.cx;
+  const double cy = sysBoard.cy;
+  const double orbitScale = std::min(boardW, boardH) / 638.0;
 
   for (std::size_t i = firstSystem; i < catalog.systems.size(); ++i) {
     Body& system = catalog.systems[i];
@@ -529,9 +531,10 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
       }
     }
 
-    const double minSep = isKessler ? 38.0 : 28.0;
+    const double minSep = (isKessler ? 38.0 : 28.0) * orbitScale;
+    const double edge = 18.0 * orbitScale;
     const auto fits = [&](double x, double y, double sep) {
-      if (x < 18.0 || x > boardW - 18.0 || y < 18.0 || y > boardH - 18.0) { return false; }
+      if (!InsideCircle(x, y, cx, cy, std::min(boardW, boardH) * 0.5 - edge)) { return false; }
       for (const auto& other : taken) {
         const double dx = other.first - x;
         const double dy = other.second - y;
@@ -554,8 +557,9 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
             phaseOffset + 0.61 * static_cast<double>(band) +
             6.283185307179586 * (static_cast<double>(slot) / static_cast<double>(slots)) +
             rng.Range(-0.16, 0.16);
-        const double x = std::round(std::clamp(cx + std::cos(angle) * kRings[band], 20.0, boardW - 20.0));
-        const double y = std::round(std::clamp(cy + std::sin(angle) * kRings[band] * 0.45, 20.0, boardH - 20.0));
+        const double ring = kRings[band] * orbitScale;
+        const double x = std::round(cx + std::cos(angle) * ring);
+        const double y = std::round(cy + std::sin(angle) * ring);
         if (fits(x, y, minSep)) {
           outX = x;
           outY = y;
@@ -579,10 +583,10 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
         bool moonPlaced = false;
         for (int attempt = 0; attempt < 16; ++attempt) {
           const double ang = rng.Range(0.0, 6.283185307179586);
-          const double dist = 19.0 + static_cast<double>(attempt % 4) * 3.0;
-          const double tx = std::round(std::clamp(host.second.first + std::cos(ang) * dist, 18.0, boardW - 18.0));
-          const double ty = std::round(std::clamp(host.second.second + std::sin(ang) * dist * 0.8, 18.0, boardH - 18.0));
-          if (fits(tx, ty, 17.0) && (!isKessler || fits(tx, ty, 24.0))) {
+          const double dist = (19.0 + static_cast<double>(attempt % 4) * 3.0) * orbitScale;
+          const double tx = std::round(host.second.first + std::cos(ang) * dist);
+          const double ty = std::round(host.second.second + std::sin(ang) * dist);
+          if (fits(tx, ty, 17.0 * orbitScale) && (!isKessler || fits(tx, ty, 24.0 * orbitScale))) {
             mx = tx;
             my = ty;
             moonPlaced = true;
@@ -726,10 +730,9 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
               phaseOffset + 0.61 * static_cast<double>(band) +
               6.283185307179586 * (static_cast<double>(slot) / static_cast<double>(slots)) +
               berth.Range(-0.10, 0.10);
-          const double x =
-              std::round(std::clamp(cx + std::cos(angle) * kRings[band], 20.0, boardW - 20.0));
-          const double y = std::round(
-              std::clamp(cy + std::sin(angle) * kRings[band] * 0.45, 20.0, boardH - 20.0));
+          const double ring = kRings[band] * orbitScale;
+          const double x = std::round(cx + std::cos(angle) * ring);
+          const double y = std::round(cy + std::sin(angle) * ring);
           if (!fits(x, y, sep)) { continue; }
           bx = x;
           by = y;
