@@ -293,13 +293,6 @@ bool PressPopupAction(Simulation& sim, const std::string& key,
         int stations = options.stations;
         if (action == "galaxies") { galaxies = static_cast<int>(value); }
         if (action == "systems-per-region") { systems = static_cast<int>(value); }
-        // One budget, two dials: more galaxies means fewer systems in each, so the
-        // chart stays the same size in memory whichever end is moved.
-        if (action == "galaxies") {
-          systems = std::clamp(Catalog::kChartSystemBudget / std::max(1, galaxies), 8, 96);
-        } else if (action == "systems-per-region") {
-          galaxies = std::clamp(Catalog::kChartSystemBudget / std::max(1, systems), 1, 64);
-        }
         if (action == "chaos") { chaos = value / 100.0; }
         if (action == "stations") { stations = static_cast<int>(value); }
         return sim.SetChartDials(galaxies, systems, chaos, stations);
