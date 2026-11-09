@@ -883,15 +883,12 @@ void ExpandChart(Catalog& catalog) {
   catalog.chartExpanded = true;
   if (catalog.regions.empty() || catalog.systems.empty()) { return; }
 
-  // 1. Rebuild the baseline from its star table.
-  StripGeneratedChart(catalog);
-  BuildGalaxyFromRows(AuthoredStarCatalog(), 0, catalog, /*linkHubs=*/true);
-  ExpandLocalCharts(catalog, 0);
-
+  // The loaded chart places are not used. Their tables remain inputs to
+  // the generator below; the places themselves are discarded.
   const double baseW = catalog.map.w;
   const double baseH = catalog.map.h;
 
-  // 2. Configure board geometries for all three scales.
+  // 1. Configure board geometries for all three scales.
   MapGeometry sector = catalog.map;
   sector.w = baseW * kSectorBoardScale;
   sector.h = baseH * kSectorBoardScale;
@@ -915,13 +912,26 @@ void ExpandChart(Catalog& catalog) {
   catalog.layerBoards["system"].zmin = kSystemZoomMin;
   catalog.layerBoards["system"].zmax = kSystemZoomMax;
 
-  // 3. Expand the galaxy layer: place every region on the galaxy board by one rule,
-  //    the ones that came in the file and the generated ones alike.
+  // Discard every loaded chart place. The tables loaded with them stay:
+  // prices, port hints, orbital profiles and name lists are generator inputs.
+  catalog.regions.clear();
+  catalog.systems.clear();
+  catalog.bodies.clear();
+  catalog.ports.clear();
+  catalog.sectorLanes.clear();
+  catalog.galaxyLanes.clear();
+  catalog.galaxyPositions.clear();
+  catalog.worldHistory.clear();
+  // Fixed contracts name the discarded places, so they go with them.
+  catalog.contracts.clear();
+  catalog.RebuildIndex();
+
+  // 2. Generate the galaxy layer on the galaxy board.
   const double galDx = (galaxy.w - baseW) / 2.0;
   const double galDy = (galaxy.h - baseH) / 2.0;
   PopulateGalaxies(catalog, galDx, galDy);
 
-  // 4. Translate the systems to the centre of the wide sector board and
+  // 3. Translate the systems to the centre of the wide sector board and
   //    separate stacked positions.
   const double secDx = (sector.w - baseW) / 2.0;
   const double secDy = (sector.h - baseH) / 2.0;
@@ -965,7 +975,7 @@ void ExpandChart(Catalog& catalog) {
     regionAnchor[region.id] = {sx, sy};
   }
 
-  // 5. Draft procedural star systems inside each region's sector territory.
+  // 4. Draft procedural star systems inside each region's sector territory.
   std::set<std::string> systemNames;
   for (const Body& system : catalog.systems) { systemNames.insert(system.name); }
 
@@ -980,7 +990,7 @@ void ExpandChart(Catalog& catalog) {
 
   Rng rng(0x5350414345534849ULL);
   const double margin = 42.0;
-  const std::size_t baseIndex = AuthoredStarCatalog().size();
+  const std::size_t baseIndex = catalog.systems.size();
   std::vector<StarRow> rows;
   rows.reserve(static_cast<std::size_t>(kNewSystemsPerRegion) * catalog.regions.size());
 
@@ -1046,7 +1056,7 @@ void ExpandChart(Catalog& catalog) {
   BuildGalaxyFromRows(rows, baseIndex, catalog, /*linkHubs=*/false);
   ExpandLocalCharts(catalog, firstNewSystem);
 
-  // 6. Connect intra-region sector lanes in O(R * S_r^2) using regional buckets.
+  // 5. Connect intra-region sector lanes in O(R * S_r^2) using regional buckets.
   {
     std::unordered_map<std::string, std::vector<std::size_t>> byRegion;
     for (std::size_t i = 0; i < catalog.systems.size(); ++i) {
@@ -1086,7 +1096,7 @@ void ExpandChart(Catalog& catalog) {
     }
   }
 
-  // 7. Populate multi-ring planetary orbits, galaxy-scale star positions,
+  // 6. Populate multi-ring planetary orbits, galaxy-scale star positions,
   //    inter-galactic lanes, and map-driven incident definitions.
   PopulateLocalCharts(catalog, 0);
   PlaceGalaxyDots(catalog);
