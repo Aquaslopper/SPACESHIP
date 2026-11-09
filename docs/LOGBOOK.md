@@ -1159,3 +1159,15 @@ had not been measured, and refusing to be loyal to code the owner did not write.
 - **Rewraps:** two lines rewritten past 100 columns were rewrapped; one phrase in `WikiScreen.h` that read "Its story entry is carries" was corrected to "Its story entry / carries" by dropping the orphan `is`.
 - **Checks run:** comment-stripping equality against `HEAD` (33/33 files identical code); comment-parser scan for residual occurrences (0); `git diff --check` for whitespace damage. **No build and no test was run** — the owner's approval is required for tests, and comments do not affect compilation, so nothing was inferred about runtime or visual parity from this change.
 - **Deliberately left untouched:** `assets/data/content.json:325` (a handbook line, player-facing content, not commentary), `docs/LOGBOOK.md` history and `rescue/` (records), `AGENTS.md` (its own wording), `Legacy code_Spaceship.txt` (reference).
+
+### Entry #046
+- **Timestamp:** 2026-11-09 00:20 UTC
+- **Task:** owner asked for a pull request covering the branch `arena/df60572e-spaceship`. No source file changed in this turn.
+- **PR opened:** #46, base `main`, head `arena/df60572e-spaceship`, title "Remove the word Authored from commentary in cpp/ (comments only)". URL: https://github.com/Aquaslopper/SPACESHIP/pull/46
+- **Diff at open:** 34 files, 120 insertions, 108 deletions — 33 `cpp/` files of comment wording plus this logbook.
+- **Body states:** 141 comment occurrences cleared, 100 replacements, deletions only with no synonym; the six glue words (`there`, `its`, `exist`, `left`, `carries`, `from`) are named explicitly so they can be challenged.
+- **Body lists as untouched:** `AuthoredStarCatalog()` and the local `authored` variables, four `TEST_CASE` name strings, `assets/data/content.json:325`, `AGENTS.md`, `rescue/`, `Legacy code_Spaceship.txt`.
+- **Body states plainly:** no build and no test was run; tests need the owner's approval and comments cannot affect compilation, so the PR claims nothing about runtime, visual or gameplay parity.
+- **Body flags:** this logbook entry is the only file outside `cpp/` in the diff, added under the `AGENTS.md` logging rule, and offers to revert that hunk on request.
+- **Left open:** whether the six glue words should be dropped for bare deletions, and whether the logbook belongs in the PR at all.
+- **Checks run:** `git log origin/main..HEAD` and `git diff --shortstat origin/main..HEAD` to confirm the PR carries one commit; `gh pr list --head` to confirm no duplicate PR existed. Nothing else was run.
