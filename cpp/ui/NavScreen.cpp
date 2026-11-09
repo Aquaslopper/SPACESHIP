@@ -422,7 +422,7 @@ NavChartView BuildNavChart(const Simulation& sim) {
     bodyView.size = BodySize(*body) * mapGrow;
     // A star is a star on its own chart; on the galaxy scale it is one point of
     // light in a cluster of thirty, so it is drawn at the size that reads.
-    if (chart.layer == "galaxy" && body->type == "system") { bodyView.size = 10.0 * mapGrow; }
+    if (chart.layer == "galaxy" && body->type == "system") { bodyView.size = 15.0 * mapGrow; }
     bodyView.selected = !target.empty() && target == body->id;
     bodyView.classes = BodyClasses(*body, bodyView.selected);
     bodyView.dotX = bodyView.at.x - bodyView.size / 2;
