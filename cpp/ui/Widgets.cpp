@@ -147,6 +147,11 @@ bool MentionsClick(const std::string& text) {
   return false;
 }
 
+bool TakesNoCooldown(const std::string& key) {
+  (void)key;
+  return false;
+}
+
 bool IsActionCost(const std::string& cost, bool hasCost) {
   if (!hasCost || cost.empty()) { return true; }
   return MentionsAction(cost) || MentionsClick(cost);
@@ -157,6 +162,7 @@ bool CommitActionButton(Simulation& sim, const std::string& key,
                         const std::function<bool()>& action) {
   const bool unlocked = TakesNoCooldown(key);
   if (!unlocked && CooldownRemaining(sim, key) > 0.0) { return false; }
+ 
 
   const double before = sim.ActionCount();
   bool result = false;
