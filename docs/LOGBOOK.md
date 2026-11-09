@@ -1161,3 +1161,18 @@ had not been measured, and refusing to be loyal to code the owner did not write.
 - **Regressions edited:** count, mixed placement, loaded identity/history, named-system offsets, deterministic positions, lane connectivity.
 - **Checks:** static diff inspection and `git diff --check` only; no tests or builds were run.
 - **Untouched:** assets, save data format, incident/story logic, UI rendering, rescue and historical material.
+
+## 064 — Pull request for the mixed galaxy placement
+
+- **Timestamp:** 2026-11-09 12:53 UTC
+- **Request:** open a pull request for the branch's galaxy-placement changes.
+- **Branch:** `arena/b6786d4e-spaceship`; no branch switch.
+- **Preflight:** four modified paths from the placement pass; no pre-existing PR for this branch.
+- **Static check:** `git diff --check` passed before the implementation commit.
+- **Commit:** `6ccc85d` — mix seven loaded regions into seventeen generated galaxy placements.
+- **Push:** implementation commit pushed to `origin/arena/b6786d4e-spaceship`.
+- **PR:** #44 — https://github.com/Aquaslopper/SPACESHIP/pull/44.
+- **Base/head:** `main` ← `arena/b6786d4e-spaceship`.
+- **PR description:** 24 total regions, moved existing systems, rebuilt galaxy lanes, regression edits.
+- **Verification disclosure:** no tests or builds run under the user's edit-only instruction; runtime unverified.
+- **Source changes this reply:** none beyond committing the previous placement pass; this entry records the PR action.
