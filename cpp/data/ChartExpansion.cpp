@@ -1083,17 +1083,26 @@ void ExpandChart(Catalog& catalog) {
                               galaxyDistance(catalog.regions[b]);
                      });
   }
+  // Chaos is what the disc looks like. Aligned, the territories sit on an even
+  // sunflower, every one of them the same size. Chaotic, each territory is nudged off
+  // its slot and stretched or squeezed on its own, so the disc comes out in clumps with
+  // empty water between them and no two neighbourhoods alike.
+  const double chaos = std::clamp(catalog.chaos, 0.0, 1.0);
+  Rng shape(0x4348414F5331ULL);
   std::vector<std::pair<double, double>> galaxyAnchors;
   for (std::size_t k = 0; k < discOrder.size(); ++k) {
     const Body& region = catalog.regions[discOrder[k]];
     const double step = static_cast<double>(k) + 0.5;
     const double radius =
         std::sqrt(step / static_cast<double>(std::max<std::size_t>(1, discOrder.size())));
-    const double angle = step * 2.39996322972865;
+    const double angle = step * 2.39996322972865 + shape.Range(-1.0, 1.0) * (0.01 + 0.40 * chaos);
+    const double reach = radius * (1.0 + shape.Range(-1.0, 1.0) * (0.01 + 0.32 * chaos));
     const double sx =
-        std::clamp(sector.w * 0.5 + std::cos(angle) * radius * rx, 300.0, sector.w - 300.0);
+        std::clamp(sector.w * 0.5 + std::cos(angle) * reach * rx, 300.0, sector.w - 300.0);
     const double sy =
-        std::clamp(sector.h * 0.5 + std::sin(angle) * radius * ry, 220.0, sector.h - 220.0);
+        std::clamp(sector.h * 0.5 + std::sin(angle) * reach * ry, 220.0, sector.h - 220.0);
+    const double stretch = 1.0 + shape.Range(-1.0, 1.0) * (0.02 + 0.48 * chaos);
+    regionSpread[region.id] = {1110.0 * stretch, 525.0 * stretch};
     regionAnchor[region.id] = {sx, sy};
     galaxyAnchors.emplace_back(sx, sy);
   }

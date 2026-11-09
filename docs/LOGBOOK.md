@@ -1546,3 +1546,33 @@ Chaos and stations are left exactly as they are: neither changes how much is dra
 CHECKED: cpp/data/Catalog.h, cpp/ui/Popups.cpp compile clean with -Wall -Wextra
 -fsyntax-only; the numbers are a probe driving `PressPopupAction` against a real Simulation.
 NOT CHECKED: the picture, and the frame rate on his machine.
+
+## 096 - chaos bends the disc
+
+He moved the chaos dial and the map did not move. He was right and the data layer was the
+wrong place to look: chaos changed how many worlds sat inside a system and nothing else, so
+on the sector layer - the one he was looking at - it was a no-op by construction.
+
+Chaos now decides the shape of the disc itself:
+
+  aligned (0)    every territory on the even golden-angle sunflower, every territory the
+                 same size, no two neighbourhoods different
+  chaotic (1)    each territory nudged off its slot (up to 0.40 rad) and off its ring
+                 (up to 32 per cent), and stretched or squeezed on its own (up to 48 per
+                 cent), so the disc comes out in clumps with empty water between them
+
+Seeded from one fixed seed, so a given chaos always draws the same disc. The number of
+systems does not change with it, so RAM and the frame cost do not move either.
+
+Measured with the probe (territory radius and the spacing of territory centres, sector
+board 11484x5004):
+
+  chaos 0.0   radius 131..1172   centre spacing  457..1261
+  chaos 0.5   radius 126..1612   centre spacing  297..1197
+  chaos 1.0   radius 138..1609   centre spacing  505..1351
+
+The small radius is a blob; the range and the arrangement are what move.
+
+CHECKED: cpp/data/ChartExpansion.cpp compiles clean with -Wall -Wextra -fsyntax-only; the
+numbers are the probe's output.
+NOT CHECKED: the picture. He is the confirmation.
