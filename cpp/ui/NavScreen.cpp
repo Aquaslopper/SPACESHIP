@@ -800,27 +800,12 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
   const double fuel = sim.StatValue("fuel");
 
   screen.bandNote.clear();
-  if (reach && !hereTarget) {
-    model.courseNote = "Course from " +
-                       std::string(target->type == "system"
-                                       ? (system == nullptr ? hereName : system->name)
-                                       : hereName) +
-                       " to " + target->name + ".";
-  } else if (target != nullptr && !reach) {
-    model.courseNote = target->type == "region"
-                           ? "Open this sector chart to plot a jump."
-                           : (canScanTarget
-                                  ? "Long-range sensor lock acquired. Jump to parent system to visit."
-                                  : "This contact is outside the local sensor range.");
-  } else {
-    model.courseNote = "Plot a course by selecting a destination.";
-  }
+  model.courseNote.clear();
 
   NavPanel actions;
   actions.id = "nav-actions";
   actions.title = "Target Actions";
   actions.placement = "np-full";
-  actions.Note(model.courseNote);
 
   const bool travelEnabled =
       reach && !hereTarget && sim.State().engineCondition > 0 &&

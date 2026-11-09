@@ -1447,3 +1447,22 @@ unused-variable warning, untouched); the commit value was proved with the headle
 probe above, not by reading the code.
 NOT CHECKED: the real window. Whether the redraw freeze that follows a release is short
 enough to feel like a dial rather than a stall.
+
+## 092 - the course line is out of the navigation band
+
+Still prose in that area after entry 088: `model.courseNote`, drawn under the Target
+Actions band. Five variants, all of them instructions - "Plot a course by selecting a
+destination.", "Course from X to Y.", "Open this sector chart to plot a jump.",
+"Long-range sensor lock acquired...", "This contact is outside the local sensor range."
+The note is cleared and no longer given to the band panel, so the band is buttons and the
+panel title.
+
+What the navigation screen still draws is labels, not prose:
+  headers      "Target Details", "Distance", "Target Actions"
+  field rows   "No target.", "No route plotted.", "Authority", "Systems"
+  rows         "View <region> sector chart", "Dock at <port>"
+  buttons      "Start Travel", "Run Deep Scan", and the progress labels
+  caption      "<name> - Sector - zoom x1.0"
+
+CHECKED: cpp/ui/NavScreen.cpp compiles clean with -Wall -Wextra -fsyntax-only.
+NOT CHECKED: the picture.
