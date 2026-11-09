@@ -1564,7 +1564,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     const float y1 = box.y + static_cast<float>(raster.vy - dy * 4000) * sy;
     const float x2 = box.x + static_cast<float>(raster.vx + dx * 4000) * sx;
     const float y2 = box.y + static_cast<float>(raster.vy + dy * 4000) * sy;
-    DrawLineEx(Vector2{x1, y1}, Vector2{x2, y2}, 1.0f, Fade(ToRay(p.ink), 0.13f));
+    DrawLineEx(Vector2{x1, y1}, Vector2{x2, y2}, 0.5f, Fade(ToRay(p.ink), 0.10f));
   }
 
   // Deep field stars, frustum-culled to the chart viewport.
@@ -1610,7 +1610,6 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     bool active = false;
   };
   std::vector<SectorTerritory> sectorTerritories;
-  std::unordered_map<std::string, ::Color> systemSectorTint;
   if (chart.layer == "sector") {
     static constexpr ::Color kSectorPalette[6] = {
         ::Color{146, 98, 42, 255},   // ochre-amber
@@ -1656,19 +1655,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
       terr.ry = std::max(20.0f, 0.5f * (acc.maxY - acc.minY) + pad * 0.85f);
       terr.tint = tint;
       terr.active = (reg.id == sim.Map().sector || reg.id == shipRegion);
-      if (terr.cx + terr.rx >= box.x && terr.cx - terr.rx <= box.Right() &&
-          terr.cy + terr.ry >= box.y && terr.cy - terr.ry <= box.Bottom()) {
-        DrawEllipse(static_cast<int>(terr.cx), static_cast<int>(terr.cy),
-                    terr.rx, terr.ry, Fade(tint, terr.active ? 0.12f : 0.06f));
-        DrawEllipseLines(static_cast<int>(terr.cx), static_cast<int>(terr.cy),
-                         terr.rx, terr.ry, Fade(tint, terr.active ? 0.56f : 0.28f));
-      }
       sectorTerritories.push_back(std::move(terr));
-      for (std::size_t sysIdx : sim.World().SystemsInRegion(reg.id)) {
-        if (sysIdx < sim.World().systems.size()) {
-          systemSectorTint.emplace(sim.World().systems[sysIdx].id, tint);
-        }
-      }
     }
   }
 
@@ -1695,18 +1682,8 @@ void ShellView::PaintNavScreen(Simulation& sim) {
       }
       const bool lit = lane.from == homeId || lane.to == homeId || lane.from == targetId ||
                        lane.to == targetId;
-      ::Color laneColor = lit ? Fade(ToRay(p.coffee), 0.68f) : Fade(ToRay(p.coffee), 0.26f);
-      float laneWidth = lit ? 1.15f : 0.45f;
-      if (chart.layer == "sector" && !lit) {
-        const auto ta = systemSectorTint.find(lane.from);
-        const auto tb = systemSectorTint.find(lane.to);
-        if (ta != systemSectorTint.end() && tb != systemSectorTint.end()) {
-          const bool sameSector =
-              ta->second.r == tb->second.r && ta->second.g == tb->second.g && ta->second.b == tb->second.b;
-          laneColor = sameSector ? Fade(ta->second, 0.36f) : Fade(ToRay(p.amber), 0.34f);
-          laneWidth = sameSector ? 0.65f : 0.85f;
-        }
-      }
+      ::Color laneColor = lit ? Fade(ToRay(p.coffee), 0.55f) : Fade(ToRay(p.coffee), 0.18f);
+      float laneWidth = lit ? 0.7f : 0.35f;
       DrawLineEx(from, to, laneWidth, laneColor);
     }
   }
@@ -3471,10 +3448,15 @@ void ShellView::Drag(Simulation& sim, float x, float y, float dx, float dy, bool
              dy / std::max(0.01f, navChartScaleY_));
 }
 
-void ShellView::Scroll(float x, float y, float wheelDelta) {
+void ShellView::Scroll(Simulation& sim, float x, float y, float wheelDelta) {
   Move(x, y);
   if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow)) { return; }
   if (floating_.HasConfirmation()) { return; }
+  if (!titleActive_ && navChartBox_.Contains(x, y + contentScroll_)) {
+    const int dir = wheelDelta > 0.0f ? 1 : -1;
+    sim.ZoomMap(dir);
+    return;
+  }
   const float step = wheelDelta * TypeStep(40.0f);
   if (titleActive_) { titleScroll_ = std::max(0.0f, std::min(titleMaxScroll_, titleScroll_ - step)); }
   else if (feedActive_ && layout_.content.Contains(x, y) && feedBox_.Contains(x, y + contentScroll_)) {
