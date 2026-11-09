@@ -36,7 +36,7 @@ constexpr int kNewSystemsPerRegion = 24;
 // Board multipliers relative to the 638x278 reference viewport.
 // Authored core regions and systems are translated to the board centre so
 // pairwise distances between authored destinations remain unchanged.
-constexpr double kSectorBoardScale = 8.0;
+constexpr double kSectorBoardScale = 6.0;
 constexpr double kGalaxyBoardScale = 4.0;
 
 // Zoom ladder for the wide sector and galaxy boards.
