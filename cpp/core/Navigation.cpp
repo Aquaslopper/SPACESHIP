@@ -977,7 +977,18 @@ void Simulation::RefreshLocationInfo() {
   const bool docked = HerePort() != nullptr;
   for (InfoRow& row : infos_) {
     if (row.id == "location") {
-      row.value = name + (docked ? " - docked" : "");
+      // Where the ship is, with the place's own identity beside it: the chart's id
+      // and the number this voyage gave it on arrival.
+      std::string tag;
+      const Body* system = CurrentSystem();
+      if (system != nullptr) {
+        const auto serial = state_.systemSerials.find(system->id);
+        tag = " [" + system->id + (serial == state_.systemSerials.end()
+                                       ? std::string()
+                                       : " #" + std::to_string(serial->second)) +
+              "]";
+      }
+      row.value = name + (docked ? " - docked" : "") + tag;
     } else if (row.id == "contacts") {
       const Body* system = CurrentSystem();
       row.value = docked ? name + " - station contact"
