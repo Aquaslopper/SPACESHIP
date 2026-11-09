@@ -507,6 +507,7 @@ bool Simulation::StartScan() {
   state_.sim.sensor = 0;
   const bool remote = body->type == "system" || body->type == "region" ||
                       catalog_.BodySystem(*body) != CurrentSystemId();
+  if (!remote) { cost = 1.0; } 
   PerformAction((remote ? "Long-range scan started - " : "Deep scan started - ") + body->name);
   if (!state_.gameOver.empty()) { return true; }
 
