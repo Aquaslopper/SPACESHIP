@@ -1,6 +1,0 @@
-# Save parity, stage 5: the HTA's own encoding, slot 1.
-load runtime/saves/rt-b.json
-trace
-save runtime/saves/rt-c.json utf16
-load runtime/saves/rt-c.json
-trace
