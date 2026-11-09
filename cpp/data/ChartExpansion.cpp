@@ -294,11 +294,11 @@ void PopulateGalaxies(Catalog& catalog, double coreDx, double coreDy) {
   // Pack galaxies in the circular board. Spread is the gap between them;
   // map size is the circle they sit in.
   for (int i = 0; i < galaxyCount; ++i) {
-    const GalaxyArchetype& arch = archetypes[static_cast<std::size_t>(i) % archetypes.size()];
-    const double golden = 2.399963229728653;
-    const double u = (static_cast<double>(i) + 0.5) / static_cast<double>(galaxyCount);
+    const GalaxyArchetype& arch =
+        archetypes[static_cast<std::size_t>(rng.Below(static_cast<int>(archetypes.size())))];
+    const double u = rng.Next();
     const double ring = fillR * std::sqrt(u);
-    const double angle = golden * static_cast<double>(i);
+    const double angle = rng.Range(0.0, 6.283185307179586);
 
     double gx = galaxyBoard.cx;
     double gy = galaxyBoard.cy;

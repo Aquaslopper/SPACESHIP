@@ -437,7 +437,7 @@ int main(int argc, char** argv) {
                  IsMouseButtonPressed(MOUSE_BUTTON_LEFT));
     }
     const float wheel = GetMouseWheelMove();
-    if (wheel != 0.0f) { shell.Scroll(pointer.x, pointer.y, wheel); }
+    if (wheel != 0.0f) { shell.Scroll(sim, pointer.x, pointer.y, wheel); }
     if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
       const Vector2 mouse = GetMousePosition();
       if (!leftPointer.Release()) {
