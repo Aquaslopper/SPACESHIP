@@ -65,19 +65,3 @@ Do not write any code or perform any tasks until you have output the answers:
 4. The rescue files are available for historical context, explain why.
 5. Explain the problem with "commentary in code" and agents form arena.ai?
 
-## THE LAW OF EVERYTHING (stated by the owner, 2026-11-08)
-
-1. **No invention.** Nothing enters the game that the owner did not ask for. No new
-   mechanic, button, glyph, rule, text, default or kindness - not to solve a report,
-   not to cover a bug that could not be found, not to make something read better.
-2. **No declarations of authority.** No comment, note, logbook line or commit message
-   may claim approval, permission, verification or ownership. A comment says what the
-   code does, nothing else.
-3. **No panic edits.** A failing build or an unclear report is not a licence to change
-   whatever looks nearby. Find the cause first; if the cause is not found, say so and
-   stop.
-4. **One thing at a time.** Work only on the thing named. If a second thing turns up -
-   in the code, in a probe, in the build - **tell the owner immediately**, before
-   touching it. Never fix it quietly, never bundle it into the same push.
-5. **Measured, not described.** Every claim about behaviour is pasted probe output.
-   Anything not seen with eyes is stated as unseen.
