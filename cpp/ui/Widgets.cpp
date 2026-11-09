@@ -2,9 +2,7 @@
 //  Widgets.cpp — the frame, the button and the lock.
 //  ---------------------------------------------------------------------------
 //  Everything here is a direct reading of Section D-5 and the frame builders at
-//  the end of Section I. Where the reference uses a regular expression, this
-//  file uses the same expressions, spelled out as ordered substring tests so a
-//  reader can compare them line for line with the HTA.
+//  the end of Section I. 
 // ============================================================================
 #include "ui/Widgets.h"
 
@@ -133,8 +131,7 @@ double RuleActions(const Simulation& sim, const std::string& category) {
   return it == sim.World().rules.cooldowns.end() ? 5.0 : it->second.actions;
 }
 
-// The unit of the clock, as it is printed now: a cost that says "click" is a
-// cost like one that says "action", and both have to be seen.
+// The unit of the clock, as it is printed now: a cost that says "click".
 bool MentionsClick(const std::string& text) {
   const std::string lower = Lower(text);
   std::size_t at = lower.find("click");
@@ -150,16 +147,14 @@ bool MentionsClick(const std::string& text) {
   return false;
 }
 
+bool TakesNoCooldown(const std::string& key) {
+  return key.find("progress:scan") != std::string::npos
+      || key.find("progress:cook") != std::string::npos;
+}
+
 bool IsActionCost(const std::string& cost, bool hasCost) {
   if (!hasCost || cost.empty()) { return true; }
   return MentionsAction(cost) || MentionsClick(cost);
-}
-
-// A control that takes no cooldown at all. Cooking is one: the batch is its own
-// lock - the button is inert while the pot runs - so a second lock on top only
-// makes the player wait for a bar to drain.
-bool TakesNoCooldown(const std::string& key) {
-  return key.find("progress:cook") != std::string::npos;
 }
 
 bool CommitActionButton(Simulation& sim, const std::string& key,
@@ -167,6 +162,7 @@ bool CommitActionButton(Simulation& sim, const std::string& key,
                         const std::function<bool()>& action) {
   const bool unlocked = TakesNoCooldown(key);
   if (!unlocked && CooldownRemaining(sim, key) > 0.0) { return false; }
+ 
 
   const double before = sim.ActionCount();
   bool result = false;
@@ -220,7 +216,7 @@ ProgressButton BuildProgressButton(const Simulation& sim, const std::string& tas
       button.state = ButtonState::Cooldown;
       button.text = "Cooldown: " + Num(remaining) + " clicks";
       button.title = RuleLabel(sim, sim.State().actionCooldowns.at(button.cooldownKey).category) +
-                     " cooldown: " + Num(remaining) + " more clicks. Other committed clicks advance it; waiting does not.";
+                     " cooldown: " + Num(remaining) + " Loading ";
     } else {
       button.state = enabled ? ButtonState::Idle : ButtonState::Off;
       button.text = idleLabel;
@@ -239,7 +235,11 @@ ProgressButton BuildProgressButton(const Simulation& sim, const std::string& tas
   button.state = ButtonState::Running;
   button.fillPercent = OngoingPercent(*task);
   button.text = task->label;
-  button.inert = true;
+  button.inert = !(taskId == "scan"
+                || taskId == "travel"
+                || taskId == "extract"
+                || taskId == "o2-run"
+                || taskId == "maint");
   return button;
 }
 

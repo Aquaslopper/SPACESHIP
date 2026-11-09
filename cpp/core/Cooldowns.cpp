@@ -2,9 +2,8 @@
 //  Cooldowns.cpp — per-control locks that live on the action clock.
 //  ---------------------------------------------------------------------------
 //  There is no real-time cooldown anywhere in this game. A repeatable control
-//  that commits an action starts a count in ACTIONS, the count is saved with
-//  the voyage, and it ticks down only when the player spends an action. A
-//  blocked repeat commits nothing and advances no countdown.
+//  ###ENTWICKLER HIER: FIND ICH RICHTIG SCHEISSE WAS DIE AGENTEN HIER MACHEN###
+//  blocked repeat commits nothing and advances no countdown. fuck off
 // ============================================================================
 #include "core/Simulation.h"
 
