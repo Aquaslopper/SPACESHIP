@@ -1707,3 +1707,28 @@ Measured (/home/user/probe/notes, exit 0):
 Check run: tools/check-gui-syntax.sh with the pinned raylib 6.0 / imgui 1.92.7 /
 rlImGui headers fetched into /tmp/gui - Draw.cpp, AudioDevice.cpp, main.cpp and
 NavScreen.cpp clean under -Wall -Wextra -Wpedantic.
+
+## 080 — The seed sticks: the loader draws the sky the save names
+
+Reported: the seed resets in the settings. The field was one cause (it was overwritten
+from the model every frame, fixed in 079); the larger one was the loader. A save
+records the sky it was flown on - `universe.seed` and `universe.words` - and
+`LoadFromFile` validated that against the catalogue the game happened to boot on.
+Boot is the default kessler sky, so a voyage flown on the player's words was refused,
+and the game fell back to a fresh default sky: the seed appeared to reset every time
+the game was started.
+
+Now `LoadFromFile` reads the seed and words out of the save first (through the
+existing `SeedOfSave`), draws that sky - seed, words, star count and density all taken
+from the save's own options block - and only then validates and applies. A refused
+save puts the live voyage back as it was.
+
+Also in this commit: AGENTS.md gains THE LAW OF EVERYTHING as the owner stated it -
+no invention, no declarations of authority, no panic edits, one thing at a time with
+a second thing reported immediately, measured not described.
+
+STATUS, stated plainly: `SaveSystem.cpp` compiles clean under -Wall -Wextra. The
+round trip (fly on a seed, save, reboot on the default sky, load) was NOT re-measured
+after the change - the owner closed probing before that run finished. The earlier run,
+with the old loader, refused the save with "this voyage was flown on the sky of seed
+'zephyr nine', not the one loaded".

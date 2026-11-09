@@ -1600,6 +1600,40 @@ bool Simulation::LoadFromFile(const std::string& path, std::string* error) {
              static_cast<unsigned char>(bytes[1]) == 0xBB && static_cast<unsigned char>(bytes[2]) == 0xBF) {
     text = bytes.substr(3);
   }
+  // The save names its own sky. A voyage flown on the player's seed must be drawn
+  // on that seed before it is validated, or the sky the game happened to boot on
+  // refuses it and the seed appears to reset.
+  std::uint64_t seed = 0;
+  std::string words;
+  if (Simulation::SeedOfSave(text, &seed, &words) && seed != catalog_.universeSeed) {
+    int systems = 0;
+    int density = -1;
+    Json parsed;
+    try {
+      parsed = Json::parse(text);
+    } catch (const std::exception&) {
+      return LoadJson(text, error);  // let the reader report the bad file
+    }
+    if (const Json* state = At(parsed, "state"); state != nullptr && IsObject(*state)) {
+      if (const Json* options = At(*state, "options"); options != nullptr && IsObject(*options)) {
+        systems = static_cast<int>(GetNumber(*options, "universeSystems", 0.0));
+        density = static_cast<int>(GetNumber(*options, "stationDensity", -1.0));
+      }
+    }
+    const Simulation previous = *this;
+    Catalog sky = catalog_;
+    sky.universeSeed = seed;
+    sky.universeSeedText = words;
+    sky.chartExpanded = false;
+    if (systems > 0) { sky.universeSystems = systems; }
+    if (density >= 0) { sky.stationDensity = density; }
+    *this = NewVoyage(sky);
+    if (!LoadJson(text, error)) {
+      *this = previous;  // a refused save leaves the live voyage where it was
+      return false;
+    }
+    return true;
+  }
   return LoadJson(text, error);
 }
 
