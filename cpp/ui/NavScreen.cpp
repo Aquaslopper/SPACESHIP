@@ -414,9 +414,18 @@ NavChartView BuildNavChart(const Simulation& sim) {
     bodyView.klass = body->klass;
     bodyView.region = body->region;
     const std::pair<double, double> at = layerPoint(*body);
+    // Only what the window can show is built. At two thousand systems the chart
+    // used to project and label every one of them every frame, most of them far
+    // outside the board.
+    const NavPoint projected = NavProjectPanned(map, view, at.first, at.second);
+    const double pad = 180.0;
+    if (projected.x < -pad || projected.x > map.vw + pad || projected.y < -pad ||
+        projected.y > map.vh + pad) {
+      continue;
+    }
     bodyView.worldX = at.first;
     bodyView.worldY = at.second;
-    bodyView.at = NavProjectPanned(map, view, at.first, at.second);
+    bodyView.at = projected;
     bodyView.size = BodySize(*body);
     // A star is a star on its own chart; on the galaxy scale it is one point of
     // light in a cluster of thirty, so it is drawn at the size that reads.

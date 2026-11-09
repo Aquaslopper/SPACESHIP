@@ -1265,3 +1265,32 @@ SaveSystem}.cpp compile clean with -fsyntax-only.
 NOT CHECKED: the drawn result. The disc is crowded enough that a territory's fringe can
 reach into a blob; the closest two systems anywhere are 48 px apart, which is the floor,
 not a collision. Test suite still not building - unchanged from 082.
+
+## 084 - the chart builds only what the window can show
+
+The chart was fine on paper and 3 fps in the window. Measured first, with a probe of the
+data layer:
+
+  local bodies   120970   137.9 MB   (1195 bytes each)
+  systems          2246     1.5 MB
+  regions            41     0.04 MB
+  ports            2657     0.46 MB
+  total chart             139.8 MB
+
+So the weight is entirely in the local bodies of systems the ship has never been to, and
+the frame cost is separate: `LayerBodies()` hands the builder every system on the layer,
+and the builder projected and labelled all of them every frame with no culling at all.
+
+This entry fixes the frame cost only. `BuildNavChart()` now projects a body before it
+builds a view for it and drops anything more than 180 px outside the window - the same
+kind of test `NavRouteDots()` has always done for faint lane segments. Nothing else
+changed, so the layer still contains everything; it just is not all built.
+
+CHECKED: cpp/ui/NavScreen.cpp compiles clean with -fsyntax-only.
+NOT CHECKED: the frame rate on the real machine; the number is his to read.
+NEXT, not done yet: the 137.9 MB. Local charts are drawn for every system at start-up
+(`ExpandLocalCharts`) although the ship visits one at a time, and every local chart is
+already deterministic from `Rng(HashOf(system.id))`, so a system's worlds can be drawn
+when it is entered instead of all of them in advance. What stops that from being a
+ten-line change is everything that names a body in a system the ship has not entered -
+contract targets, extraction jobs, station boards.
