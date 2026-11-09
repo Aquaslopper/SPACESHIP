@@ -148,8 +148,8 @@ bool MentionsClick(const std::string& text) {
 }
 
 bool TakesNoCooldown(const std::string& key) {
-  (void)key;
-  return false;
+  return key.find("progress:scan") != std::string::npos
+      || key.find("progress:cook") != std::string::npos;
 }
 
 bool IsActionCost(const std::string& cost, bool hasCost) {
@@ -235,7 +235,11 @@ ProgressButton BuildProgressButton(const Simulation& sim, const std::string& tas
   button.state = ButtonState::Running;
   button.fillPercent = OngoingPercent(*task);
   button.text = task->label;
-  button.inert = true;
+  button.inert = !(taskId == "scan"
+                || taskId == "travel"
+                || taskId == "extract"
+                || taskId == "o2-run"
+                || taskId == "maint");
   return button;
 }
 
