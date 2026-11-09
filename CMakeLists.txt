@@ -24,7 +24,6 @@ endif()
 
 option(SPACESHIP_BUILD_GUI   "Build the Raylib + Dear ImGui client" ON)
 option(SPACESHIP_BUILD_TESTS "Build the CTest suite"               ON)
-option(SPACESHIP_DATA_GATE   "Compile the Phase 0 catalogue data gate (cpp/tests/catalog_tests.cpp) into the test suite" ON)
 # A warning is the right outcome for `cmake -S . -B build` on a machine that
 # simply has no graphics packages. A build that intends to produce the client
 # (build.sh, CI) sets this ON, so a missing dependency fails at configure
@@ -135,8 +134,6 @@ if(SPACESHIP_BUILD_GUI AND SPACESHIP_GUI_REASON STREQUAL "")
   # config.h guards JPG with #ifndef, so override this one format directly
   # without replacing every other raylib feature flag.
   target_compile_definitions(raylib PRIVATE SUPPORT_FILEFORMAT_JPG=1)
-  # Compile these guards INSIDE raylib with its actual private definitions.
-  target_sources(raylib PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/cpp/tests/raylib_config_guard.c")
   target_include_directories(raylib PRIVATE "${raylib_SOURCE_DIR}/src")
 
   # FetchContent's SOURCE_DIR spelling has varied with declaration casing
@@ -295,5 +292,4 @@ message(STATUS "  build type : ${CMAKE_BUILD_TYPE}")
 message(STATUS "  assets     : ${SPACESHIP_ASSETS}")
 message(STATUS "  client     : ${SPACESHIP_GUI}")
 message(STATUS "  tests      : ${SPACESHIP_BUILD_TESTS}")
-message(STATUS "  data gate  : ${SPACESHIP_DATA_GATE}")
 message(STATUS "")
