@@ -296,8 +296,8 @@ struct SurveyRecord {
 // ---------------------------------------------------------------------------
 struct MapView {
   std::string layer = "system";
-  std::string here = "kessler";
-  std::string sector = "gal-inner";
+  std::string here;    // set when the voyage docks at its first station
+  std::string sector;
   double zoom = 1;
   double cx = 319;
   double cy = 139;

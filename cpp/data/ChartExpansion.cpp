@@ -252,7 +252,35 @@ const std::vector<GalaxyArchetype>& GalaxyArchetypes() {
       {"Onyx", "Rim", "Far-edge galactic arc beyond the last charter stones", "None",
        "Lane blockades",
        "Beyond Onyx Rim the old survey stones stop; every chart line is captain-drawn.",
-       "Sparse hails carry coordinates of newly sounded anomalies and wrecks."}};
+       "Sparse hails carry coordinates of newly sounded anomalies and wrecks."},
+      {"Inner", "Rim", "Settled space - the first lanes were chartered here", "Independent",
+       "Lane blockades",
+       "The first lanes were chartered by independent haulers.",
+       "Old salvage rights still divide the ports."},
+      {"Galactic", "Core", "Dense core - navigation hazardous", "The Compact",
+       "Solar gusts",
+       "The Compact joined crowded worlds into a common market.",
+       "The archives remember agreements the markets outgrew."},
+      {"Outer", "Reach", "Thin settlement - long crossings", "Frontier Charter",
+       "Subspace shear",
+       "Convoys built their own stations beyond the assembly's reach.",
+       "Long supply lines remain their common obligation."},
+      {"The", "Verge", "Edge of charted space", "None",
+       "Cryo-dust plumes",
+       "Small harbours grew around ships that could go no farther.",
+       "Weather and empty fuel tanks erase routes every year."},
+      {"Cradle", "Shoal", "Deep space shallows - old wreck fields", "Salvage Syndicate",
+       "Drifting hulks",
+       "Wrecks and listening posts mark an older migration.",
+       "The names of many vessels were lost before their signals."},
+      {"The", "Rift", "Fractured lanes and isolated havens", "Free Captains",
+       "Subspace shear",
+       "Broken lanes forced scattered havens to negotiate passage.",
+       "Every crossing still relies on a promise between pilots."},
+      {"Far", "Halo", "Cold stars beyond the settled lanes", "Survey Guild",
+       "Ghost telemetry",
+       "Ice haulers carried the first lamps into the cold.",
+       "Isolation makes water, shelter and a working beacon precious."}};
   return items;
 }
 
@@ -284,11 +312,11 @@ void PopulateGalaxies(Catalog& catalog, double coreDx, double coreDy) {
 
   // Arrange outer galaxies on two elliptical rings around the core disc so
   // every quadrant of the galaxy board has reachable clusters without crowding.
-  for (int i = 0; i < kNewGalaxies; ++i) {
+  for (int i = 0; i < kGalaxyCount; ++i) {
     const GalaxyArchetype& arch = archetypes[static_cast<std::size_t>(i) % archetypes.size()];
     const bool outerRing = (i >= 8);
     const int ringIndex = outerRing ? (i - 8) : i;
-    const int ringCount = outerRing ? (kNewGalaxies - 8) : std::min(8, kNewGalaxies);
+    const int ringCount = outerRing ? (kGalaxyCount - 8) : std::min(8, kGalaxyCount);
     const double baseAngle =
         6.283185307179586 * (static_cast<double>(ringIndex) / static_cast<double>(ringCount)) +
         (outerRing ? 0.34 : 0.11);
@@ -506,8 +534,6 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
   for (std::size_t i = firstSystem; i < catalog.systems.size(); ++i) {
     Body& system = catalog.systems[i];
     if (system.type != "system") { continue; }
-    const bool isKessler = (system.id == "sec-kessler");
-    const bool isGeneratedSystem = (system.id.rfind("sec-gen-", 0) == 0);
     const std::string side = system.id.substr(4);
     const std::string word = FirstWord(system.name);
     Rng rng(HashOf(system.id));
@@ -526,7 +552,7 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
       }
     }
 
-    const double minSep = isKessler ? 38.0 : 28.0;
+    const double minSep = 28.0;
     const auto fits = [&](double x, double y, double sep) {
       if (x < 18.0 || x > boardW - 18.0 || y < 18.0 || y > boardH - 18.0) { return false; }
       for (const auto& other : taken) {
@@ -562,7 +588,7 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
       return false;
     };
 
-    const int targetExtra = isKessler ? 11 : (13 + rng.Below(7));
+    const int targetExtra = 13 + rng.Below(7);
     std::vector<std::pair<std::string, std::pair<double, double>>> hostPlanets;
 
     for (int k = 0; k < targetExtra; ++k) {
@@ -579,7 +605,7 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
           const double dist = 19.0 + static_cast<double>(attempt % 4) * 3.0;
           const double tx = std::round(std::clamp(host.second.first + std::cos(ang) * dist, 18.0, boardW - 18.0));
           const double ty = std::round(std::clamp(host.second.second + std::sin(ang) * dist * 0.8, 18.0, boardH - 18.0));
-          if (fits(tx, ty, 17.0) && (!isKessler || fits(tx, ty, 24.0))) {
+          if (fits(tx, ty, 17.0)) {
             mx = tx;
             my = ty;
             moonPlaced = true;
@@ -598,7 +624,7 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
         body.details.emplace_back("Primary", host.first);
         body.details.emplace_back("Atmosphere", (k % 4 == 0) ? "Thin nitrogen" : "None");
         body.details.emplace_back("Surface", (k % 2 == 0) ? "Icy regolith" : "Tidal basalt");
-        if (isGeneratedSystem && rng.Next() < 0.28) {
+        if (rng.Next() < 0.28) {
           const char* feat = kMapFeatures[static_cast<std::size_t>(rng.Below(4))];
           body.details.emplace_back("Map feature", feat);
         }
@@ -628,7 +654,7 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
       body.details.emplace_back(
           "Orbital band",
           (k < 4) ? "Inner system" : ((k < 9) ? "Habitable / middle band" : "Outer system"));
-      if (isGeneratedSystem && rng.Next() < 0.25) {
+      if (rng.Next() < 0.25) {
         const char* feat = kMapFeatures[static_cast<std::size_t>(rng.Below(static_cast<int>(kMapFeatures.size())))];
         body.details.emplace_back("Map feature", feat);
       }
@@ -639,14 +665,14 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
     }
 
     // Belts, derelict anomalies, and secondary frontier outposts in larger systems.
-    const int landmarks = isKessler ? 1 : (1 + rng.Below(3));
+    const int landmarks = 1 + rng.Below(3);
     for (int m = 0; m < landmarks; ++m) {
       double lx = 0.0;
       double ly = 0.0;
       if (!slotSpot(targetExtra + m * 2, lx, ly)) { continue; }
       taken.emplace_back(lx, ly);
 
-      if (m == 1 && isGeneratedSystem && !profiles.empty() && rng.Next() < 0.35) {
+      if (m == 1 && !profiles.empty() && rng.Next() < 0.35) {
         // Secondary orbital waystation with a working port.
         const std::string portId = side + "-outpost";
         const std::string portName = UniqueName(word + " Outpost", names);
@@ -694,7 +720,7 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
       body.details.emplace_back("System", system.name);
       body.details.emplace_back("Region", regionName);
       body.details.emplace_back("Hazard", belt ? "Debris" : "Unstable orbit");
-      if (isGeneratedSystem) { body.details.emplace_back("Map feature", feature); }
+      body.details.emplace_back("Map feature", feature);
       if (!belt) { body.klass = "Chart anomaly - unclaimed"; }
       body.scan = {
           belt ? "Spectrometry shows metallic nodules and frozen volatiles."
@@ -881,12 +907,6 @@ void EntangleGalaxy(Catalog& catalog) {
 void ExpandChart(Catalog& catalog) {
   if (catalog.chartExpanded) { return; }
   catalog.chartExpanded = true;
-  if (catalog.regions.empty() || catalog.systems.empty()) { return; }
-
-  // 1. Rebuild the authored baseline from its star table.
-  StripGeneratedChart(catalog);
-  BuildGalaxyFromRows(AuthoredStarCatalog(), 0, catalog, /*linkHubs=*/true);
-  ExpandLocalCharts(catalog, 0);
 
   const double baseW = catalog.map.w;
   const double baseH = catalog.map.h;
@@ -921,33 +941,13 @@ void ExpandChart(Catalog& catalog) {
   const double galDy = (galaxy.h - baseH) / 2.0;
   PopulateGalaxies(catalog, galDx, galDy);
 
-  // 4. Translate the systems to the centre of the wide sector board and
-  //    separate stacked positions.
-  const double secDx = (sector.w - baseW) / 2.0;
-  const double secDy = (sector.h - baseH) / 2.0;
+  // 4. The systems that came with names point at their region by name; the
+  //    regions themselves are the pool's, so the ids are the pool's.
   for (Body& system : catalog.systems) {
-    system.x += secDx;
-    system.y += secDy;
-  }
-  {
-    std::map<std::pair<double, double>, std::vector<std::size_t>> stacks;
-    for (std::size_t i = 0; i < catalog.systems.size(); ++i) {
-      stacks[{catalog.systems[i].x, catalog.systems[i].y}].push_back(i);
-    }
-    int stackIndex = 0;
-    for (auto& entry : stacks) {
-      const std::vector<std::size_t>& members = entry.second;
-      if (members.size() < 2) { continue; }
-      const double anchorX = catalog.systems[members[0]].x;
-      const double anchorY = catalog.systems[members[0]].y;
-      ++stackIndex;
-      for (std::size_t k = 1; k < members.size(); ++k) {
-        const double angle = 2.39996322972865 * static_cast<double>(k) +
-                             0.7 * static_cast<double>(stackIndex);
-        const double radius = 36.0 + 22.0 * static_cast<double>(k - 1);
-        Body& system = catalog.systems[members[k]];
-        system.x = std::round(std::clamp(anchorX + std::cos(angle) * radius, 32.0, sector.w - 32.0));
-        system.y = std::round(std::clamp(anchorY + std::sin(angle) * radius * 0.8, 32.0, sector.h - 32.0));
+    for (const Body& region : catalog.regions) {
+      if (region.name == system.region) {
+        system.region = region.id;
+        break;
       }
     }
   }
@@ -973,21 +973,75 @@ void ExpandChart(Catalog& catalog) {
   for (const auto& entry : catalog.portPrices) { profiles.push_back(entry.first); }
   std::sort(profiles.begin(), profiles.end());
 
-  std::vector<std::pair<double, double>> placed;
-  placed.reserve(catalog.systems.size() +
-                 static_cast<std::size_t>(kNewSystemsPerRegion) * catalog.regions.size());
-  for (const Body& system : catalog.systems) { placed.emplace_back(system.x, system.y); }
-
   Rng rng(0x5350414345534849ULL);
   const double margin = 42.0;
-  const std::size_t baseIndex = AuthoredStarCatalog().size();
+  const std::size_t baseIndex = catalog.systems.size();
+
+  // 5. Place the named systems first: their order inside a region comes from
+  //    their old chart, their position from the region's territory and the
+  //    same gap ladder the drafted systems use.
+  std::vector<std::pair<double, double>> placed;
+  placed.reserve(catalog.systems.size() +
+                 static_cast<std::size_t>(kSystemsPerRegion) * catalog.regions.size());
+  {
+    std::unordered_map<std::string, std::pair<double, double>> centre;
+    std::unordered_map<std::string, double> tally;
+    for (const Body& system : catalog.systems) {
+      centre[system.region].first += system.x;
+      centre[system.region].second += system.y;
+      tally[system.region] += 1.0;
+    }
+    for (auto& entry : centre) {
+      const double n = tally[entry.first];
+      if (n > 0.0) {
+        entry.second.first /= n;
+        entry.second.second /= n;
+      }
+    }
+    for (Body& system : catalog.systems) {
+      const auto anchor = regionAnchor[system.region];
+      const auto mid = centre[system.region];
+      const double wantedX = std::clamp(anchor.first + (system.x - mid.first) * 1.6,
+                                        anchor.first - 360.0, anchor.first + 360.0);
+      const double wantedY = std::clamp(anchor.second + (system.y - mid.second) * 1.6,
+                                        anchor.second - 170.0, anchor.second + 170.0);
+      double x = std::round(wantedX);
+      double y = std::round(wantedY);
+      bool found = false;
+      for (double minGap = 46.0; minGap >= 20.0 && !found; minGap -= 4.0) {
+        Spacer test(minGap, placed);
+        for (int attempt = 0; attempt < 160; ++attempt) {
+          const double angle = 2.39996322972865 * static_cast<double>(attempt + 1);
+          const double radius = 24.0 * std::sqrt(static_cast<double>(attempt));
+          const double cx =
+              std::round(std::clamp(wantedX + std::cos(angle) * radius, margin, sector.w - margin));
+          const double cy =
+              std::round(std::clamp(wantedY + std::sin(angle) * radius * 0.8, margin, sector.h - margin));
+          if (test.Fits(cx, cy)) {
+            x = cx;
+            y = cy;
+            found = true;
+            break;
+          }
+        }
+      }
+      system.x = x;
+      system.y = y;
+      placed.emplace_back(x, y);
+    }
+  }
+
   std::vector<StarRow> rows;
-  rows.reserve(static_cast<std::size_t>(kNewSystemsPerRegion) * catalog.regions.size());
 
   int serial = 0;
   for (const Body& region : catalog.regions) {
     const auto anchor = regionAnchor[region.id];
-    for (int n = 0; n < kNewSystemsPerRegion; ++n) {
+    std::size_t named = 0;
+    for (const Body& system : catalog.systems) {
+      if (system.region == region.id) { ++named; }
+    }
+    const int want = std::max(0, kSystemsPerRegion - static_cast<int>(named));
+    for (int n = 0; n < want; ++n) {
       double x = 0.0;
       double y = 0.0;
       bool found = false;
@@ -1062,7 +1116,6 @@ void ExpandChart(Catalog& catalog) {
       const auto& indices = bucket.second;
       for (std::size_t idx : indices) {
         const Body& system = catalog.systems[idx];
-        if (system.id.rfind("sec-gen-", 0) != 0) { continue; }
         std::vector<std::pair<double, std::string>> neighbours;
         neighbours.reserve(indices.size());
         for (std::size_t peerIdx : indices) {

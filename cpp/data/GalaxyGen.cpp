@@ -87,111 +87,10 @@ Body& AddLocalBody(Catalog& catalog, const std::string& id, const std::string& t
   return catalog.bodies.back();
 }
 
-const std::vector<StarRow>& AuthoredStarCatalog() {
-  static const std::vector<StarRow> rows = {
-    {"sec-vance", "gal-inner", "Vance Cluster", 120, 70, "Vance A", "Furnace Belt", "Vance Exchange", "industry",
-     "Smelter tugs thread a bright trail through the dust."},
-    {"sec-orrin", "gal-inner", "Orrin Gate", 470, 60, "Orrin Beacon", "Gateworld", "Orrin Gatehouse", "transit",
-     "Old navigation beacons still guide the morning traffic."},
-    {"sec-pell", "gal-inner", "Pell Hollow", 540, 180, "Hollow Remnant", "Blackglass", "Grey Dawn Wreck", "",
-     "A wreck lies silent behind a veil of black debris."},
-    {"sec-bryce", "gal-inner", "Bryce Anchorage", 190, 240, "Bryce Trinary", "Bay Nine", "Bryce Shipyard", "industry",
-     "Three suns shine over crowded repair slips."},
-    {"sec-marrow", "gal-inner", "Marrow Field", 420, 235, "Marrow Star", "Pale Belt", "Bone Orchard", "",
-     "Ancient hulls turn slowly among the stones."},
-    {"sec-lumen", "gal-core", "Lumen Crown", 140, 65, "Lumen Prime", "Auric", "Lumen Arcology", "core",
-     "A bright metropolis keeps its night side lit."},
-    {"sec-caldera", "gal-core", "Caldera Run", 440, 70, "Caldera Nova", "Cinderfall", "Ash Spindle", "",
-     "A dark spindle hangs above the ash clouds."},
-    {"sec-meridian", "gal-core", "Meridian Accord", 285, 205, "Meridian Star", "Accord", "Meridian Exchange", "core",
-     "Convoys assemble around a crowded exchange."},
-    {"sec-auriga", "gal-outer", "Auriga Passage", 140, 65, "Auriga Red", "Kestrel", "Auriga Junction", "frontier",
-     "Long-haul freighters share the approach lane."},
-    {"sec-stillwater", "gal-outer", "Stillwater", 440, 70, "Stillwater Dwarf", "Morrow Ice", "Quiet Observatory", "",
-     "A frozen observatory sends a regular beacon."},
-    {"sec-fallow", "gal-outer", "Fallow Reach", 285, 205, "Fallow Star", "Gael IV", "Fallow Station", "agri",
-     "Greenhouses cover the sheltered side of the station."},
-    {"sec-lorn", "gal-verge", "Lorn Verge", 140, 65, "Lorn Ember", "Veil", "Lorn Harbour", "frontier",
-     "Harbour lights mark a refuge at the edge of the lanes."},
-    {"sec-knell", "gal-verge", "Knell", 440, 70, "Knell Star", "Blackshoal", "Broken Lantern", "",
-     "A broken beacon flashes without any traffic."},
-    {"sec-thorn", "gal-verge", "Thorn Expanse", 285, 205, "Thorn Sun", "Thornfall", "Gate of Thorns", "",
-     "Metallic dust rings a silent transit arch."},
-    {"sec-shipgrave", "gal-shoal", "Shipgrave", 140, 65, "Shipgrave Core", "Driftwood", "Salvagers Rest", "salvage",
-     "Salvagers sort a field of forgotten vessels."},
-    {"sec-palimpsest", "gal-shoal", "Palimpsest", 440, 70, "Palimpsest Star", "Script", "Archive Hull", "",
-     "An old archive hull broadcasts fragments of a catalogue."},
-    {"sec-echo", "gal-shoal", "Echo Shoal", 285, 205, "Echo Star", "Glasswater", "Choir Array", "",
-     "An array repeats an unfamiliar signal at long intervals."},
-    {"sec-needle", "gal-rift", "Needle Crossing", 140, 65, "Needle Star", "Razor", "Needle Dock", "frontier",
-     "Pilots trade safe passages through the rift."},
-    {"sec-rill", "gal-rift", "Rill Drift", 440, 70, "Rill Star", "Silt", "Wreck of Lilt", "",
-     "Fine dust has settled on an unclaimed wreck."},
-    {"sec-haven", "gal-rift", "Haven Bend", 285, 205, "Hearth Star", "Greyfield", "Haven Anchorage", "agri",
-     "A quiet anchorage shelters farms and repair crews."},
-    {"sec-frost", "gal-halo", "Frostline", 140, 65, "Frostlight", "Whiteglass", "Frostline Station", "frontier",
-     "Ice haulers bring water in from the halo."},
-    {"sec-thale", "gal-halo", "Thale", 440, 70, "Thale Star", "Windbound", "Far Bell", "",
-     "A lone bell beacon calls through the static."},
-    {"sec-ember", "gal-halo", "Last Ember", 285, 205, "Last Ember", "Hollow Frost", "Wayfarer Wreck", "",
-     "A tiny ember of a star warms an abandoned ship."},
-    {"sec-vesper", "gal-core", "Vesper Spur", 140, 205, "Vesper Star", "Gilt", "Vesper Ring", "core",
-     "Couriers weave between the towers of the ring."},
-    {"sec-temper", "gal-core", "Temper", 440, 205, "Temper Star", "Kiln", "Soot Archive", "",
-     "A soot-dark archive drifts beyond the inner worlds."},
-    {"sec-gull", "gal-outer", "Gullward", 140, 205, "Gull Star", "Saltwind", "Gullward Port", "transit",
-     "A waystation marks the turn toward the outer lanes."},
-    {"sec-cairn", "gal-outer", "Cairn Drift", 440, 205, "Cairn Star", "Stonewake", "Pilgrim Cairn", "",
-     "Pilots have stacked markers around an old refuge."},
-    {"sec-levin", "gal-verge", "Levin Edge", 140, 205, "Levin Star", "Blue Ash", "Levin Outpost", "frontier",
-     "The outpost exchanges weather reports with passing ships."},
-    {"sec-lowlight", "gal-verge", "Lowlight", 440, 205, "Lowlight Star", "Duskwater", "Far Buoy", "",
-     "A weathered buoy still repeats its lonely position."},
-    {"sec-hinge", "gal-shoal", "Hinge Reach", 140, 205, "Hinge Star", "Lockstep", "Hinge Yard", "salvage",
-     "Workers cut usable parts from abandoned freighters."},
-    {"sec-keeprow", "gal-shoal", "Keeprow", 440, 205, "Keeprow Star", "Old Wake", "Keeper Array", "",
-     "A line of listening posts watches the empty lanes."},
-    {"sec-spindle", "gal-rift", "Spindle Way", 140, 205, "Spindle Star", "Thread", "Spindle Station", "transit",
-     "Supply ships shelter in the lee of a narrow dust lane."},
-    {"sec-drawbridge", "gal-rift", "Drawbridge", 440, 205, "Drawbridge Star", "Causeway", "Broken Span", "",
-     "A collapsed gate has become a landmark for navigators."},
-    {"sec-kite", "gal-halo", "Kiteward", 140, 205, "Kite Star", "White Sail", "Kiteward Haven", "frontier",
-     "A small harbour welcomes ships returning from the halo."},
-    {"sec-winter", "gal-halo", "Winter Sound", 440, 205, "Winter Star", "Snowmelt", "Distant Choir", "",
-     "A quiet transmitter sings beneath the ice."},
-    {"sec-ravelin", "gal-inner", "Ravelin Reach", 72, 145, "Ravelin Primary", "Aster Quay", "Ravelin Platform", "transit",
-     "Convoy lights curve between the inner moons."},
-    {"sec-kharon", "gal-inner", "Kharon Fields", 570, 72, "Kharon B", "Sable Verge", "Sable Exchange", "frontier",
-     "Pilots barter for water beneath a dark red sun."},
-    {"sec-orison", "gal-core", "Orison Crown", 65, 145, "Orison Prime", "Mosaic", "Orison Exchange", "core",
-     "A ring of habitats glitters around a blue-white star."},
-    {"sec-ardent", "gal-core", "Ardent Spiral", 535, 145, "Ardent Pair", "Cinderwake", "The Long Archive", "",
-     "Two close stars light a drifting library hull."},
-    {"sec-morrow", "gal-outer", "Morrow Reach", 285, 60, "Morrow Beacon", "Glass Delta", "Morrow Station", "agri",
-     "A green ocean world feeds the outer convoy routes."},
-    {"sec-talbot", "gal-outer", "Talbot Yard", 535, 145, "Talbot Red", "Iron Choir", "Talbot Salvage Yard", "salvage",
-     "A field of old drives turns slowly above the yard."},
-    {"sec-glassfall", "gal-verge", "Glassfall", 285, 145, "Glassfall White", "Blue Shard", "Glassfall Beacon", "frontier",
-     "A lone beacon refracts starlight through a crystal belt."},
-    {"sec-lacuna", "gal-shoal", "Lacuna Drift", 285, 145, "Lacuna Star", "Quiet Mare", "Null Choir", "",
-     "A silent sea of ice hides a warm fissure below."},
-    {"sec-novafold", "gal-shoal", "Novafold", 535, 145, "Novafold A", "Paper Moon", "Novafold Exchange", "core",
-     "A folded orbital city trades in old survey records."},
-    {"sec-nacre", "gal-rift", "Nacre Crossing", 285, 145, "Nacre Pair", "Pearlwind", "Nacre Dock", "transit",
-     "A pale dust lane marks the safest passage through the Rift."},
-    {"sec-palem", "gal-halo", "Pale Meridian", 285, 145, "Pale Meridian", "Rimeward", "Pale Meridian Station", "frontier",
-     "Ice haulers meet beneath a star that barely warms them."},
-    {"sec-tern", "gal-halo", "Tern Anchorage", 535, 145, "Tern Star", "Gannet", "Tern Haven", "agri",
-     "A chain of greenhouse barges follows the blue dusk."},
-  };
-  return rows;
-}
-
 void BuildGalaxyFromRows(const std::vector<StarRow>& rows, std::size_t baseIndex, Catalog& catalog,
                          bool linkHubs) {
-  // var hub = {}; hub["gal-inner"] = "sec-kessler";
+  // Each region delegates to whichever of its systems the row pass met first.
   std::map<std::string, std::string> hub;
-  hub["gal-inner"] = "sec-kessler";
 
   for (std::size_t k = 0; k < rows.size(); ++k) {
     const StarRow& row = rows[k];
@@ -226,10 +125,6 @@ void BuildGalaxyFromRows(const std::vector<StarRow>& rows, std::size_t baseIndex
       // builds its sky once. The port rebuilds on every new voyage, so the same
       // statements are gated on the row not being there yet; the result is the
       // export's, not the export's plus an extra line per load.
-      if (system->id == "sec-pell" && !system->details.empty() &&
-          system->details[0].second == "3") {
-        system->details[0].second = "2 previously reported; 3 now charted";
-      }
       bool hasNavigable = false;
       for (const auto& detail : system->details) {
         if (detail.first == "Navigable") { hasNavigable = true; }
@@ -324,49 +219,15 @@ void ExpandLocalCharts(Catalog& catalog, std::size_t firstSystem) {
     // The summary rows the system chart prints under the name.
     for (auto& detail : system.details) {
       if (detail.first == "Charted bodies") {
-        detail.second = system.id == "sec-kessler" ? "8" : "5";
+        detail.second = "5";
       } else if (detail.first == "Navigable") {
         detail.second = "5 local destinations";
       }
     }
-    if (system.id == "sec-kessler") {
-      system.klass = "Eight charted destinations";
-    } else if (system.klass == "Charted star system") {
+    if (system.klass == "Charted star system") {
       system.klass = "Five charted destinations";
     }
   }
-}
-
-bool IsGeneratedSystem(const Body& system) {
-  if (system.entry.empty() || system.entry != system.id.substr(4) + "-star") { return false; }
-  for (const auto& detail : system.details) {
-    if (detail.first == "Traffic") { return false; }
-  }
-  return true;
-}
-
-void StripGeneratedChart(Catalog& catalog) {
-  // Local bodies belong to a system; the hand-written Kessler bodies do not.
-  catalog.bodies.erase(std::remove_if(catalog.bodies.begin(), catalog.bodies.end(),
-                                      [](const Body& body) { return !body.system.empty(); }),
-                       catalog.bodies.end());
-
-  // A port lives on a body, so it goes when its body goes.
-  catalog.ports.erase(
-      std::remove_if(catalog.ports.begin(), catalog.ports.end(),
-                     [&catalog](const Port& port) {
-                       for (const Body& body : catalog.bodies) {
-                         if (body.id == port.id) { return false; }
-                       }
-                       return true;
-                     }),
-      catalog.ports.end());
-
-  // The systems the row pass created go back to the row pass; the authored six
-  // stay, and the pass only annotates them when it meets them again.
-  catalog.systems.erase(std::remove_if(catalog.systems.begin(), catalog.systems.end(),
-                                       [](const Body& system) { return IsGeneratedSystem(system); }),
-                        catalog.systems.end());
 }
 
 }  // namespace ship

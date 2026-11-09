@@ -36,7 +36,8 @@
       ],
       "type": "origin",
       "x": 210,
-      "y": 150
+      "y": 150,
+      "system": "sec-kessler"
     },
     {
       "details": [
@@ -76,7 +77,8 @@
       ],
       "type": "star",
       "x": 100,
-      "y": 66
+      "y": 66,
+      "system": "sec-kessler"
     },
     {
       "details": [
@@ -114,7 +116,8 @@
       ],
       "type": "star",
       "x": 395,
-      "y": 62
+      "y": 62,
+      "system": "sec-kessler"
     },
     {
       "details": [
@@ -154,7 +157,8 @@
       ],
       "type": "station",
       "x": 545,
-      "y": 205
+      "y": 205,
+      "system": "sec-kessler"
     },
     {
       "details": [
@@ -193,7 +197,8 @@
       ],
       "type": "star",
       "x": 78,
-      "y": 245
+      "y": 245,
+      "system": "sec-kessler"
     },
     {
       "details": [
@@ -222,7 +227,8 @@
       ],
       "type": "station",
       "x": 160,
-      "y": 235
+      "y": 235,
+      "system": "sec-kessler"
     },
     {
       "details": [
@@ -7300,191 +7306,6 @@
     }
   ],
   "comment": "The star chart: three layers, 7 regions, 48 systems, 243 bodies, 30 ports.",
-  "galaxyBodies": [
-    {
-      "cluster": 26,
-      "details": [
-        [
-          "Charted systems",
-          "Uncountable"
-        ],
-        [
-          "Authority",
-          "Core Compact"
-        ]
-      ],
-      "id": "gal-core",
-      "klass": "Dense core - navigation hazardous",
-      "name": "Galactic Core",
-      "range": false,
-      "scan": [],
-      "scanLocked": [],
-      "type": "region",
-      "x": 319,
-      "y": 128
-    },
-    {
-      "cluster": 21,
-      "details": [
-        [
-          "Charted systems",
-          "Thousands"
-        ],
-        [
-          "Authority",
-          "Rim Assembly"
-        ]
-      ],
-      "home": true,
-      "id": "gal-inner",
-      "klass": "Settled space - contains the Kessler System",
-      "name": "Inner Rim",
-      "range": false,
-      "scan": [],
-      "scanLocked": [],
-      "type": "region",
-      "x": 170,
-      "y": 76
-    },
-    {
-      "cluster": 18,
-      "details": [
-        [
-          "Charted systems",
-          "Hundreds"
-        ],
-        [
-          "Authority",
-          "Contested"
-        ]
-      ],
-      "id": "gal-outer",
-      "klass": "Thin settlement - long crossings",
-      "name": "Outer Reach",
-      "range": false,
-      "scan": [],
-      "scanLocked": [],
-      "type": "region",
-      "x": 500,
-      "y": 68
-    },
-    {
-      "cluster": 16,
-      "details": [
-        [
-          "Charted systems",
-          "Few"
-        ],
-        [
-          "Authority",
-          "None"
-        ]
-      ],
-      "id": "gal-verge",
-      "klass": "Edge of charted space",
-      "name": "The Verge",
-      "range": false,
-      "scan": [],
-      "scanLocked": [],
-      "type": "region",
-      "x": 118,
-      "y": 212
-    },
-    {
-      "cluster": 19,
-      "details": [
-        [
-          "Charted systems",
-          "Unsurveyed"
-        ],
-        [
-          "Authority",
-          "None"
-        ]
-      ],
-      "id": "gal-shoal",
-      "klass": "Deep space shallows - old wreck fields",
-      "name": "Cradle Shoal",
-      "range": false,
-      "scan": [],
-      "scanLocked": [],
-      "type": "region",
-      "x": 488,
-      "y": 216
-    },
-    {
-      "cluster": 22,
-      "details": [
-        [
-          "Authority",
-          "Independent"
-        ]
-      ],
-      "id": "gal-rift",
-      "klass": "Fractured lanes and isolated havens",
-      "name": "The Rift",
-      "scan": [],
-      "scanLocked": [],
-      "type": "region",
-      "x": 310,
-      "y": 225
-    },
-    {
-      "cluster": 20,
-      "details": [
-        [
-          "Authority",
-          "None"
-        ]
-      ],
-      "id": "gal-halo",
-      "klass": "Cold stars beyond the settled lanes",
-      "name": "Far Halo",
-      "scan": [],
-      "scanLocked": [],
-      "type": "region",
-      "x": 428,
-      "y": 145
-    }
-  ],
-  "galaxyLinks": [
-    [
-      "gal-core",
-      "gal-inner"
-    ],
-    [
-      "gal-core",
-      "gal-outer"
-    ],
-    [
-      "gal-core",
-      "gal-shoal"
-    ],
-    [
-      "gal-inner",
-      "gal-verge"
-    ],
-    [
-      "gal-outer",
-      "gal-shoal"
-    ],
-    [
-      "gal-rift",
-      "gal-core"
-    ],
-    [
-      "gal-rift",
-      "gal-verge"
-    ],
-    [
-      "gal-halo",
-      "gal-outer"
-    ],
-    [
-      "gal-halo",
-      "gal-shoal"
-    ]
-  ],
   "layerOrder": [
     "system",
     "sector",
@@ -8093,7 +7914,7 @@
       "klass": "Eight charted destinations",
       "name": "Kessler System",
       "range": false,
-      "region": "gal-inner",
+      "region": "Inner Rim",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8120,7 +7941,7 @@
       "klass": "Binary system - heavy industry",
       "name": "Vance Cluster",
       "range": false,
-      "region": "gal-inner",
+      "region": "Inner Rim",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8147,7 +7968,7 @@
       "klass": "Single star - registered waypoint",
       "name": "Orrin Gate",
       "range": false,
-      "region": "gal-inner",
+      "region": "Inner Rim",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8174,7 +7995,7 @@
       "klass": "Collapsed star - salvage rights disputed",
       "name": "Pell Hollow",
       "range": false,
-      "region": "gal-inner",
+      "region": "Inner Rim",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8201,7 +8022,7 @@
       "klass": "Triple star - shipyard and berths",
       "name": "Bryce Anchorage",
       "range": false,
-      "region": "gal-inner",
+      "region": "Inner Rim",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8228,7 +8049,7 @@
       "klass": "Dead system - debris belt, no anchorage",
       "name": "Marrow Field",
       "range": false,
-      "region": "gal-inner",
+      "region": "Inner Rim",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8246,7 +8067,7 @@
       "id": "sec-lumen",
       "klass": "Five charted destinations",
       "name": "Lumen Crown",
-      "region": "gal-core",
+      "region": "Galactic Core",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8264,7 +8085,7 @@
       "id": "sec-caldera",
       "klass": "Five charted destinations",
       "name": "Caldera Run",
-      "region": "gal-core",
+      "region": "Galactic Core",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8282,7 +8103,7 @@
       "id": "sec-meridian",
       "klass": "Five charted destinations",
       "name": "Meridian Accord",
-      "region": "gal-core",
+      "region": "Galactic Core",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8300,7 +8121,7 @@
       "id": "sec-auriga",
       "klass": "Five charted destinations",
       "name": "Auriga Passage",
-      "region": "gal-outer",
+      "region": "Outer Reach",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8318,7 +8139,7 @@
       "id": "sec-stillwater",
       "klass": "Five charted destinations",
       "name": "Stillwater",
-      "region": "gal-outer",
+      "region": "Outer Reach",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8336,7 +8157,7 @@
       "id": "sec-fallow",
       "klass": "Five charted destinations",
       "name": "Fallow Reach",
-      "region": "gal-outer",
+      "region": "Outer Reach",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8354,7 +8175,7 @@
       "id": "sec-lorn",
       "klass": "Five charted destinations",
       "name": "Lorn Verge",
-      "region": "gal-verge",
+      "region": "The Verge",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8372,7 +8193,7 @@
       "id": "sec-knell",
       "klass": "Five charted destinations",
       "name": "Knell",
-      "region": "gal-verge",
+      "region": "The Verge",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8390,7 +8211,7 @@
       "id": "sec-thorn",
       "klass": "Five charted destinations",
       "name": "Thorn Expanse",
-      "region": "gal-verge",
+      "region": "The Verge",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8408,7 +8229,7 @@
       "id": "sec-shipgrave",
       "klass": "Five charted destinations",
       "name": "Shipgrave",
-      "region": "gal-shoal",
+      "region": "Cradle Shoal",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8426,7 +8247,7 @@
       "id": "sec-palimpsest",
       "klass": "Five charted destinations",
       "name": "Palimpsest",
-      "region": "gal-shoal",
+      "region": "Cradle Shoal",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8444,7 +8265,7 @@
       "id": "sec-echo",
       "klass": "Five charted destinations",
       "name": "Echo Shoal",
-      "region": "gal-shoal",
+      "region": "Cradle Shoal",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8462,7 +8283,7 @@
       "id": "sec-needle",
       "klass": "Five charted destinations",
       "name": "Needle Crossing",
-      "region": "gal-rift",
+      "region": "The Rift",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8480,7 +8301,7 @@
       "id": "sec-rill",
       "klass": "Five charted destinations",
       "name": "Rill Drift",
-      "region": "gal-rift",
+      "region": "The Rift",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8498,7 +8319,7 @@
       "id": "sec-haven",
       "klass": "Five charted destinations",
       "name": "Haven Bend",
-      "region": "gal-rift",
+      "region": "The Rift",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8516,7 +8337,7 @@
       "id": "sec-frost",
       "klass": "Five charted destinations",
       "name": "Frostline",
-      "region": "gal-halo",
+      "region": "Far Halo",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8534,7 +8355,7 @@
       "id": "sec-thale",
       "klass": "Five charted destinations",
       "name": "Thale",
-      "region": "gal-halo",
+      "region": "Far Halo",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8552,7 +8373,7 @@
       "id": "sec-ember",
       "klass": "Five charted destinations",
       "name": "Last Ember",
-      "region": "gal-halo",
+      "region": "Far Halo",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8570,7 +8391,7 @@
       "id": "sec-vesper",
       "klass": "Five charted destinations",
       "name": "Vesper Spur",
-      "region": "gal-core",
+      "region": "Galactic Core",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8588,7 +8409,7 @@
       "id": "sec-temper",
       "klass": "Five charted destinations",
       "name": "Temper",
-      "region": "gal-core",
+      "region": "Galactic Core",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8606,7 +8427,7 @@
       "id": "sec-gull",
       "klass": "Five charted destinations",
       "name": "Gullward",
-      "region": "gal-outer",
+      "region": "Outer Reach",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8624,7 +8445,7 @@
       "id": "sec-cairn",
       "klass": "Five charted destinations",
       "name": "Cairn Drift",
-      "region": "gal-outer",
+      "region": "Outer Reach",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8642,7 +8463,7 @@
       "id": "sec-levin",
       "klass": "Five charted destinations",
       "name": "Levin Edge",
-      "region": "gal-verge",
+      "region": "The Verge",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8660,7 +8481,7 @@
       "id": "sec-lowlight",
       "klass": "Five charted destinations",
       "name": "Lowlight",
-      "region": "gal-verge",
+      "region": "The Verge",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8678,7 +8499,7 @@
       "id": "sec-hinge",
       "klass": "Five charted destinations",
       "name": "Hinge Reach",
-      "region": "gal-shoal",
+      "region": "Cradle Shoal",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8696,7 +8517,7 @@
       "id": "sec-keeprow",
       "klass": "Five charted destinations",
       "name": "Keeprow",
-      "region": "gal-shoal",
+      "region": "Cradle Shoal",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8714,7 +8535,7 @@
       "id": "sec-spindle",
       "klass": "Five charted destinations",
       "name": "Spindle Way",
-      "region": "gal-rift",
+      "region": "The Rift",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8732,7 +8553,7 @@
       "id": "sec-drawbridge",
       "klass": "Five charted destinations",
       "name": "Drawbridge",
-      "region": "gal-rift",
+      "region": "The Rift",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8750,7 +8571,7 @@
       "id": "sec-kite",
       "klass": "Five charted destinations",
       "name": "Kiteward",
-      "region": "gal-halo",
+      "region": "Far Halo",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8768,7 +8589,7 @@
       "id": "sec-winter",
       "klass": "Five charted destinations",
       "name": "Winter Sound",
-      "region": "gal-halo",
+      "region": "Far Halo",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8786,7 +8607,7 @@
       "id": "sec-ravelin",
       "klass": "Five charted destinations",
       "name": "Ravelin Reach",
-      "region": "gal-inner",
+      "region": "Inner Rim",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8804,7 +8625,7 @@
       "id": "sec-kharon",
       "klass": "Five charted destinations",
       "name": "Kharon Fields",
-      "region": "gal-inner",
+      "region": "Inner Rim",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8822,7 +8643,7 @@
       "id": "sec-orison",
       "klass": "Five charted destinations",
       "name": "Orison Crown",
-      "region": "gal-core",
+      "region": "Galactic Core",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8840,7 +8661,7 @@
       "id": "sec-ardent",
       "klass": "Five charted destinations",
       "name": "Ardent Spiral",
-      "region": "gal-core",
+      "region": "Galactic Core",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8858,7 +8679,7 @@
       "id": "sec-morrow",
       "klass": "Five charted destinations",
       "name": "Morrow Reach",
-      "region": "gal-outer",
+      "region": "Outer Reach",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8876,7 +8697,7 @@
       "id": "sec-talbot",
       "klass": "Five charted destinations",
       "name": "Talbot Yard",
-      "region": "gal-outer",
+      "region": "Outer Reach",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8894,7 +8715,7 @@
       "id": "sec-glassfall",
       "klass": "Five charted destinations",
       "name": "Glassfall",
-      "region": "gal-verge",
+      "region": "The Verge",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8912,7 +8733,7 @@
       "id": "sec-lacuna",
       "klass": "Five charted destinations",
       "name": "Lacuna Drift",
-      "region": "gal-shoal",
+      "region": "Cradle Shoal",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8930,7 +8751,7 @@
       "id": "sec-novafold",
       "klass": "Five charted destinations",
       "name": "Novafold",
-      "region": "gal-shoal",
+      "region": "Cradle Shoal",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8948,7 +8769,7 @@
       "id": "sec-nacre",
       "klass": "Five charted destinations",
       "name": "Nacre Crossing",
-      "region": "gal-rift",
+      "region": "The Rift",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8966,7 +8787,7 @@
       "id": "sec-palem",
       "klass": "Five charted destinations",
       "name": "Pale Meridian",
-      "region": "gal-halo",
+      "region": "Far Halo",
       "scan": [],
       "scanLocked": [],
       "type": "system",
@@ -8984,7 +8805,7 @@
       "id": "sec-tern",
       "klass": "Five charted destinations",
       "name": "Tern Anchorage",
-      "region": "gal-halo",
+      "region": "Far Halo",
       "scan": [],
       "scanLocked": [],
       "type": "system",

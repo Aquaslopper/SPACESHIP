@@ -117,6 +117,16 @@ Simulation Simulation::NewVoyage(const Catalog& catalog) {
   // ---- the chart ---------------------------------------------------------
   sim.map_ = MapView();
   sim.map_.zoom = sim.catalog_.map.zoom;
+  // The voyage starts at the first station the chart offers, in the region
+  // that holds it. No place is named in code.
+  for (const Body& body : sim.catalog_.bodies) {
+    if (body.type != "station") { continue; }
+    sim.map_.here = body.id;
+    if (const Body* system = sim.catalog_.FindSystem(body.system)) {
+      sim.map_.sector = system->region;
+    }
+    break;
+  }
   sim.ApplyChartBoard();
   for (const std::string& layer : catalog.layerOrder) { sim.views_[layer] = LayerView(); }
 

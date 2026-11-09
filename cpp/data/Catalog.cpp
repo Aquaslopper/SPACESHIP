@@ -255,9 +255,9 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     catalog.layerBoards[layer] = catalog.map;
   }
 
-  for (const Json& region : Field(chart, "galaxyBodies", "chart.json")) {
-    catalog.regions.push_back(ReadBody(region, "chart.json/galaxyBodies"));
-  }
+  // The regions beside these systems are generated from the archetype pool, so
+  // the file carries the systems, their bodies, their ports and their lanes -
+  // the content that has names people know - and nothing that is drafted.
   for (const Json& system : Field(chart, "sectorBodies", "chart.json")) {
     catalog.systems.push_back(ReadBody(system, "chart.json/sectorBodies"));
   }
@@ -266,9 +266,6 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
   }
   for (const Json& lane : Field(chart, "sectorLinks", "chart.json")) {
     catalog.sectorLanes.push_back({lane.at(0).get<std::string>(), lane.at(1).get<std::string>()});
-  }
-  for (const Json& lane : Field(chart, "galaxyLinks", "chart.json")) {
-    catalog.galaxyLanes.push_back({lane.at(0).get<std::string>(), lane.at(1).get<std::string>()});
   }
 
   const Json& ports = Field(chart, "ports", "chart.json");
@@ -747,9 +744,7 @@ const std::vector<std::size_t>& Catalog::SystemsInRegion(const std::string& regi
   return it == index_.systemsByRegion.end() ? kEmpty : it->second;
 }
 
-std::string Catalog::BodySystem(const Body& body) const {
-  return body.system.empty() ? std::string("sec-kessler") : body.system;
-}
+std::string Catalog::BodySystem(const Body& body) const { return body.system; }
 
 std::vector<std::string> Catalog::Validate() const {
   std::vector<std::string> problems;

@@ -1376,7 +1376,7 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     map_.zmin = GetNumber(map, "zmin", 0.6);
     map_.zmax = GetNumber(map, "zmax", 2.0);
     map_.zstep = GetNumber(map, "zstep", 0.2);
-    map_.here = GetString(map, "here", "kessler");
+    map_.here = GetString(map, "here", "");
     map_.layer = GetString(map, "layer", "system");
     map_.sector = GetString(map, "sector");
     map_.grid = GetNumber(map, "grid", 45);

@@ -25,17 +25,16 @@
 
 namespace ship {
 
-// Procedural galactic regions added around the 7 authored core regions
-// (7 + 17 = 24 galactic regions/clusters on the galaxy layer).
-constexpr int kNewGalaxies = 17;
+// Galactic regions, all of them drafted from the one archetype pool.
+constexpr int kGalaxyCount = 24;
 
-// Procedural star systems drafted per galactic region
-// (48 authored + 24 * 24 = 624 star systems across the universe).
-constexpr int kNewSystemsPerRegion = 24;
+// Systems in a region. The named systems that come with the chart count
+// toward it; the row pass drafts the rest.
+constexpr int kSystemsPerRegion = 24;
 
 // Board multipliers relative to the 638x278 reference viewport.
-// Authored core regions and systems are translated to the board centre so
-// pairwise distances between authored destinations remain unchanged.
+// Regions and systems are placed on the wide boards by one rule, so pairwise
+// distances between destinations stay navigable.
 constexpr double kSectorBoardScale = 6.0;
 constexpr double kGalaxyBoardScale = 4.0;
 

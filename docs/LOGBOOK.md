@@ -1146,3 +1146,40 @@ writing down rather than leaving to luck.
 
 The hard part was not the code. It was refusing to be confident about anything that
 had not been measured, and refusing to be loyal to code the owner did not write.
+
+## 063 — One galaxy: the named cluster inside the generated chart
+
+The chart had two kinds of region and two kinds of system: seven regions and
+forty-eight systems loaded out of `chart.json`, seventeen regions and their
+systems drafted by `ChartExpansion`. This entry ends that, without losing the
+named content.
+
+WHAT THE FILE KEEPS. `chart.json` still carries `sectorBodies` (48 systems),
+`bodies` (243 local bodies), `ports` (30) and `sectorLinks` (43). It no longer
+carries `galaxyBodies` or `galaxyLinks`: regions come from the pool and galaxy
+lanes from `EntangleGalaxy()`. The six Kessler-area bodies (`kessler`, `halvan`,
+`sirrus`, `tolme`, `coldwell`, `relay`) now name `sec-kessler` in their `system`
+field instead of leaning on a fallback, and each system's `region` names its
+region instead of pointing at a deleted id.
+
+WHAT THE CODE DROPS. `AuthoredStarCatalog()`, `StripGeneratedChart()` and
+`IsGeneratedSystem()` are gone. So are `hub["gal-inner"] = "sec-kessler"`, the
+`sec-pell` annotation and both `sec-kessler` branches in the local-chart pass.
+`BodySystem()` is a plain getter; `MapView` starts empty and `NewVoyage()` docks
+the ship at the first station the chart offers (`tolme`).
+
+ONE RULE NOW. `kGalaxyCount = 24` regions come from `GalaxyArchetypes()`, seven
+of them carrying the old identities and their histories (`Inner Rim`, `Galactic
+Core`, `Outer Reach`, `The Verge`, `Cradle Shoal`, `The Rift`, `Far Halo`).
+Named systems are placed inside their region's territory by the same gap ladder
+as drafted systems; the row pass then fills each region to
+`kSystemsPerRegion = 24`; the lane rule no longer tests an id prefix.
+
+MEASURED. Probe against the core: 24 regions, 576 systems, exactly 24 per
+region, 13,603 bodies, 711 ports, 1,113 sector lanes, 41 galaxy lanes,
+`Validate()` 0 problems. Console run: starts at `tolme` in `gal-gen-18`, the
+sector layer opens, and a crossing to `sec-vance` plots and runs.
+
+NOT RUN: the Catch2 suite (needs the owner's word) and the client (not built
+here). `tests/galaxy.test.cjs` and several Catch2 files still describe the old
+two-layer chart and have to be converted.

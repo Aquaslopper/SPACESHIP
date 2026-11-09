@@ -62,7 +62,7 @@ const Body* Simulation::FindBodyById(const std::string& id) const {
 
 std::string Simulation::CurrentSystemId() const {
   const Body* here = FindBodyById(map_.here);
-  return here == nullptr ? std::string("sec-kessler") : catalog_.BodySystem(*here);
+  return here == nullptr ? std::string() : catalog_.BodySystem(*here);
 }
 
 const Body* Simulation::CurrentSystem() const { return FindBodyById(CurrentSystemId()); }
@@ -377,10 +377,9 @@ CrewMember* Simulation::AssignedNavigator() {
 }
 
 Simulation::NavMetrics Simulation::MetricsFor(const Body& body) const {
-  static const std::string kDefaultSystem = "sec-kessler";
   const Body* here = catalog_.FindBody(map_.here);
-  const std::string& curSysId =
-      (here == nullptr || here->system.empty()) ? kDefaultSystem : here->system;
+  const std::string curSysId =
+      (here == nullptr || here->system.empty()) ? std::string() : here->system;
   double distance = 0;
 
   if (body.type == "system") {
