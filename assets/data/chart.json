@@ -142,7 +142,7 @@
           "+21 C"
         ]
       ],
-      "id": "tolme",
+      "id": "tol-ma",
       "klass": "Independent station, class C",
       "name": "Tolme Anchorage",
       "scan": [
@@ -7860,7 +7860,7 @@
       },
       "tip": "A chain of greenhouse barges follows the blue dusk. Produce and water are plentiful at this port."
     },
-    "tolme": {
+    "tol-ma": {
       "name": "Tolme Anchorage",
       "prices": {
         "Bulk metal": 1.2,

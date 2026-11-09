@@ -1183,3 +1183,22 @@ sector layer opens, and a crossing to `sec-vance` plots and runs.
 NOT RUN: the Catch2 suite (needs the owner's word) and the client (not built
 here). `tests/galaxy.test.cjs` and several Catch2 files still describe the old
 two-layer chart and have to be converted.
+
+## 064 — The first berth answers to tol-ma
+
+The station id `tolme` is now `tol-ma`, in the body record and in the port that
+sits on it, and in the four contract references that point at it (targets and
+the one origin). The displayed name is untouched: the page still reads
+"Tolme Anchorage", because an id and a name are separate things here and only
+the id was asked for.
+
+Nothing else moved. `TradeKey()` and the lot stamp `"trade:" + key` take the
+body id, so trade runs and settled-trade records follow the new id without a
+code change; the station's starmap key is the body's system, not its id.
+
+Checked with the console and the probe: a fresh voyage docks at `tol-ma` in
+`gal-gen-18`, the chart still builds 24 regions and 576 systems with 24 in each,
+`Validate()` returns 0 problems, and no `"tolme"` remains in `assets/`.
+
+NOT RUN: the Catch2 suite and the client. The node reference tests under
+`tests/` still use `tolme`; they drive the HTA edition, not this chart.

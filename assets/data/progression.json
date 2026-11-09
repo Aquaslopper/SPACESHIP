@@ -149,7 +149,7 @@
       "id": "arrival",
       "note": "Reach Tolme Anchorage and report to its mission board.",
       "reward": 120,
-      "target": "tolme",
+      "target": "tol-ma",
       "title": "A first berth"
     },
     {
@@ -180,7 +180,7 @@
       "goal": "freight",
       "id": "freight",
       "note": "Take 8 m3 of medical supplies from Tolme to Coldwell Relay.",
-      "origin": "tolme",
+      "origin": "tol-ma",
       "reward": 420,
       "target": "relay",
       "title": "Medical shipment",
@@ -192,7 +192,7 @@
       "note": "Bring a passenger from Coldwell Relay to Tolme; one berth is needed.",
       "origin": "relay",
       "reward": 350,
-      "target": "tolme",
+      "target": "tol-ma",
       "title": "A passage home"
     },
     {
@@ -236,7 +236,7 @@
       "goal": "freight",
       "id": "verge-aid",
       "note": "Deliver 8 m3 of relief supplies from Tolme to Lorn Harbour.",
-      "origin": "tolme",
+      "origin": "tol-ma",
       "reward": 1400,
       "target": "lorn-port",
       "title": "Aid for the Verge",
