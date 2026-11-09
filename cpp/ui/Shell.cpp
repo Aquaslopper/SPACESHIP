@@ -251,7 +251,7 @@ std::vector<SideBlock> SideBlocks(const Simulation& sim) {
   contracts.open = open("contracts");
   contracts.empty = "No active contracts.";
   // The work the voyage actually carries: a trade contract taken at a berth
-  // stays here until it is settled at its destination. The authored mission
+  // stays here until it is settled at its destination. The mission
   // board that used to fill these rows has no card of its own any more, so it is
   // not listed here either.
   for (const TradeContract& trade : state.trades) {

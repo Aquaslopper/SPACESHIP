@@ -2346,7 +2346,7 @@ bool ShellView::PressPanelRow(Simulation& sim, ScreenKind kind, const std::strin
 }
 
 // ============================================================================
-//  The room hero: the authored vignette from ROOM_SCENES — a scope, two orbits,
+//  The room hero: the vignette from ROOM_SCENES — a scope, two orbits,
 //  a core, two beacons, the code and label, and an eight-bar gauge. Every
 //  rectangle is read from the model; none of it is measured here.
 // ============================================================================

@@ -1,12 +1,12 @@
 // ============================================================================
 //  WikiScreen.h — the ship's handbook (Section N).
 //  ---------------------------------------------------------------------------
-//  Twenty-one authored entries, grouped by subject, with a search box that
+//  Twenty-one entries, grouped by subject, with a search box that
 //  matches title, group and body the way `wikiMatches` does. Reading and
 //  navigating are free: nothing here can reach PerformAction.
 //
 //  The one addition to the reference is the spoiler gate. Its story entry is
-//  authored with "(spoilers)" in the title and a body that gives the whole
+//  with "(spoilers)" in the title and a body that gives the whole
 //  Silicon Marrow route away; the port keeps that body behind a reveal row so a
 //  first watch is not spoiled by accident. The reveal itself is free and local.
 // ============================================================================

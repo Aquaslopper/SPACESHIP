@@ -39,7 +39,7 @@ struct TitleModel {
   std::string heading = "SPACESHIP";
   std::string subtitle = "Command deck of the Wren courier";
   std::string artPath;            // assets/art/title.jpg
-  float artWidth = 840.0f;        // the card's authored 3:2 crop of the 1672x941 art
+  float artWidth = 840.0f;        // the card's 3:2 crop of the 1672x941 art
   float artHeight = 560.0f;
   bool fromVoyage = false;        // RESUME when true, EXIT when not
   std::vector<ActionRowView> actions;

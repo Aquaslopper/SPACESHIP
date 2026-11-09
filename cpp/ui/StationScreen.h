@@ -54,7 +54,7 @@ struct StationRow {
 };
 
 // One body written into a station's starmap: the name, the kind and the
-// reading the chart authored for it.
+// reading the chart for it.
 struct StarmapEntry {
   std::string id;
   std::string name;
@@ -63,7 +63,7 @@ struct StarmapEntry {
   std::vector<std::string> reading;
 };
 
-// The page a station writes for the system it sits in. There is no authored
+// The page a station writes for the system it sits in. There is no
 // copy of this anywhere: BuildStarmapPage() writes it from the chart, so every
 // station the voyage can reach has one, and each one describes its own system.
 struct StarmapPage {
@@ -133,7 +133,7 @@ struct StationScreenModel {
 StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& portId);
 
 // The station's starmap: the system it stands in, read out of the chart. Every
-// station writes its own; nothing is authored per port and nothing is cached,
+// station writes its own; nothing is per port and nothing is cached,
 // so a page cannot go stale or be shared between stations.
 StarmapPage BuildStarmapPage(const Simulation& sim, const std::string& portId);
 

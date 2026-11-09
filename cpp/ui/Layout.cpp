@@ -20,7 +20,7 @@ float GiveFeedHeight(float contentHeight, float others) {
 
 float GiveMapHeight(float contentHeight, float others, float mapViewWidth) {
   const float leftover = contentHeight - others - 4.0f;
-  // The map may grow, but never past its authored ceiling, and never past half
+  // The map may grow, but never past its ceiling, and never past half
   // the plot's width - beyond that the perspective raster stops reading as a
   // floor and starts reading as a wall.
   const float ceiling = std::min(Metrics::kMapH, std::round(mapViewWidth / 2.0f));

@@ -181,7 +181,7 @@ struct MachinePart {
   std::string cls;
   Area box;
   std::string text;
-  std::string tone = "";  // authored CSS colour, when a part has a state-specific fill
+  std::string tone = "";  // CSS colour, when a part has a state-specific fill
 };
 
 // A live control drawn over the scenery: the O2 slot buttons.
@@ -238,7 +238,7 @@ struct TaskScreenModel {
   std::string bandNote;
   bool hasStage = false;
 
-  // The authored hero vignette a fitted room paints above its lists: the
+  // The hero vignette a fitted room paints above its lists: the
   // geometry, the readout and the eight-meter gauge come from ROOM_SCENES.
   Vignette hero;
   bool hasHero = false;

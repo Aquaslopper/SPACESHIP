@@ -2,7 +2,7 @@
 //  RoomsScreen.h — the fitted compartments (Sections I and M).
 //  ---------------------------------------------------------------------------
 //  Fourteen bays, one bridge and the Simulacron are real rooms rather than
-//  store cupboards: each opens on its own authored vignette, its own fields and
+//  store cupboards: each opens on its own vignette, its own fields and
 //  the work that belongs to it — a project, a treatment, a transfer, a meal, a
 //  traffic report, or the two permanent answers to a signal.
 //
@@ -26,7 +26,7 @@ struct RoomScreenModel {
   std::string code;       // "PROPULSION / 01"
   std::string caption;    // the scene's own label
   std::string description;
-  std::string accent;     // authored hex
+  std::string accent;     // hex
   NavPanel body;          // "Ship systems": the room's fields and notices
   std::vector<ActionRowView> rows;
   std::vector<ProgressButton> buttons;

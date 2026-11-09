@@ -147,10 +147,10 @@ TEST_CASE("Stripping removes only what the generator can rebuild", "[galaxy][gen
   const std::size_t ports = catalog.ports.size();
 
   ship::StripGeneratedChart(catalog);
-  // Six systems were authored (Kessler and five with a designer's klass); the
+  // Six systems were (Kessler and five with a designer's klass); the
   // forty-two the row pass creates are stripped and rebuilt with the rest.
   CHECK(catalog.systems.size() == 6);
-  // The authored shell is Kessler's six hand-written bodies and its two ports.
+  // The shell is Kessler's six hand-written bodies and its two ports.
   CHECK(catalog.bodies.size() == 6);
   CHECK(catalog.ports.size() == 2);
   for (const Body& body : catalog.bodies) { CHECK(body.system.empty()); }
@@ -169,7 +169,7 @@ TEST_CASE("A generated batch carries the reference's conventions", "[galaxy][gen
   ship::ExpandLocalCharts(catalog, 0);
 
   // One new row: the same passes must give it the same five local bodies and
-  // the same summary strings an authored system has.
+  // the same summary strings an system has.
   ship::StarRow row;
   row.system = "sec-gen-1";
   row.region = "gal-core";
@@ -202,7 +202,7 @@ TEST_CASE("A generated batch carries the reference's conventions", "[galaxy][gen
   CHECK(Find(catalog.bodies, "gen-1-outer") != nullptr);
   CHECK(Find(catalog.bodies, "gen-1-moon") != nullptr);
 
-  // The port trades the profile's authored basket, and its tip is the row's
+  // The port trades the profile's basket, and its tip is the row's
   // observation plus the profile's hint - PORT_PRICES row[8] and row[9] + " " +
   // PORT_HINTS[row[8]] in the reference.
   const ship::Port* port = nullptr;
