@@ -2879,7 +2879,11 @@ void ShellView::PaintTitle(Simulation& sim, double nowMs) {
       ImGui::TextWrapped("%s", titleMessage_.c_str());
       if (ImGui::Button("OK")) {
         PressTitleAction(sim, "new-voyage", "", &fromVoyage_, &titlePanel_, &titleSlot_, saveDir_, &titleMessage_, &titleActive_);
-        HideTitle();
+        titleConfirm_ = false;
+        setupPreviewDirty_ = true;
+        setupSystemId_.clear();
+        setupGalaxyId_.clear();
+        setupLayer_ = "galaxy";
       }
       ImGui::SameLine();
       if (ImGui::Button("Cancel")) { titleConfirm_ = false; titleMessage_.clear(); }
@@ -3307,7 +3311,16 @@ void ShellView::PaintPopup(Simulation& sim) {
   ImGui::PopStyleVar(2);
   ImGui::PopStyleColor(10);
   for (int serial : closed) { floating_.Close(serial); }
-  if (restarted) { floating_.Clear(); ResetContentScroll(); }
+  if (restarted) {
+    floating_.Clear();
+    ResetContentScroll();
+    ShowTitle(false);
+    titlePanel_ = TitlePanel::Setup;
+    setupPreviewDirty_ = true;
+    setupSystemId_.clear();
+    setupGalaxyId_.clear();
+    setupLayer_ = "galaxy";
+  }
   if (showMenu) { ShowTitle(true); }
   popupKey_ = floating_.Panels().empty() ? "" : floating_.Panels().back().key;
 }

@@ -917,11 +917,11 @@ void ExpandChart(Catalog& catalog, const ChartSettings& settings) {
   catalog.layerBoards["galaxy"] = galaxy;
   for (auto& entry : catalog.layerBoards) {
     entry.second.zmin = kZoomMin;
-    entry.second.zmax = kZoomMax;
+    entry.second.zmax = kZoomMax * mapScale;
     entry.second.zstep = kZoomStep;
   }
   catalog.layerBoards["system"].zmin = kSystemZoomMin;
-  catalog.layerBoards["system"].zmax = kSystemZoomMax;
+  catalog.layerBoards["system"].zmax = kSystemZoomMax * mapScale;
 
   // Discard every loaded chart place. The tables loaded with them stay:
   // prices, port hints, orbital profiles and name lists are generator inputs.

@@ -66,13 +66,13 @@ constexpr double kSectorBoardScale = 6.0;
 constexpr double kGalaxyBoardScale = 4.0;
 
 // Zoom ladder for the wide sector and galaxy boards.
-constexpr double kZoomMin = 0.3;
-constexpr double kZoomMax = 10.0;
+constexpr double kZoomMin = 0.25;
+constexpr double kZoomMax = 16.0;
 constexpr double kZoomStep = 0.2;
 
 // Zoom ladder for the local system chart.
-constexpr double kSystemZoomMin = 0.6;
-constexpr double kSystemZoomMax = 2.5;
+constexpr double kSystemZoomMin = 0.5;
+constexpr double kSystemZoomMax = 12.0;
 
 void ExpandChart(Catalog& catalog);
 void ExpandChart(Catalog& catalog, const ChartSettings& settings);
