@@ -263,32 +263,28 @@ const MapGeometry& BoardOrDefault(const Catalog& catalog, const std::string& lay
 
 }  // namespace
 
-void PopulateGalaxies(Catalog& catalog, double coreDx, double coreDy) {
+void PopulateGalaxies(Catalog& catalog) {
   const MapGeometry& galaxyBoard = BoardOrDefault(catalog, "galaxy");
-  for (Body& region : catalog.regions) {
-    region.x += coreDx;
-    region.y += coreDy;
-  }
 
   std::set<std::string> usedNames;
-  std::vector<std::pair<double, double>> taken;
-  for (const Body& region : catalog.regions) {
-    usedNames.insert(region.name);
-    taken.emplace_back(region.x, region.y);
-  }
+  for (const Body& region : catalog.regions) { usedNames.insert(region.name); }
 
   Rng rng(0x47414C4158593234ULL);  // "GALAXY24"
   const auto& archetypes = GalaxyArchetypes();
   const double marginX = 120.0;
   const double marginY = 82.0;
 
-  // Arrange outer galaxies on two elliptical rings around the core disc so
-  // every quadrant of the galaxy board has reachable clusters without crowding.
-  for (int i = 0; i < kNewGalaxies; ++i) {
-    const GalaxyArchetype& arch = archetypes[static_cast<std::size_t>(i) % archetypes.size()];
+  // One placement for every galaxy. The regions already in the catalogue take the
+  // first slots of the same two-ring sequence as the ones added below, so no galaxy
+  // is the centre and none of them is arranged around another.
+  const std::size_t baseCount = catalog.regions.size();
+  const int slotTotal = static_cast<int>(baseCount) + kNewGalaxies;
+  std::vector<std::pair<double, double>> taken;
+
+  const auto slotSpot = [&](int i, double& outX, double& outY) {
     const bool outerRing = (i >= 8);
     const int ringIndex = outerRing ? (i - 8) : i;
-    const int ringCount = outerRing ? (kNewGalaxies - 8) : std::min(8, kNewGalaxies);
+    const int ringCount = outerRing ? (slotTotal - 8) : std::min(8, slotTotal);
     const double baseAngle =
         6.283185307179586 * (static_cast<double>(ringIndex) / static_cast<double>(ringCount)) +
         (outerRing ? 0.34 : 0.11);
@@ -300,7 +296,7 @@ void PopulateGalaxies(Catalog& catalog, double coreDx, double coreDy) {
     bool placed = false;
     for (double minGap = 210.0; minGap >= 120.0 && !placed; minGap -= 18.0) {
       Spacer spacer(minGap, taken);
-      for (int attempt = 0; attempt < 160; ++attempt) {
+      for (int attempt = 0; attempt < 160 && !placed; ++attempt) {
         const double jitterA = attempt == 0 ? rng.Range(-0.14, 0.14) : rng.Range(-0.55, 0.55);
         const double jitterR = attempt == 0 ? rng.Range(0.92, 1.06) : rng.Range(0.65, 1.12);
         const double cx = std::clamp(
@@ -313,14 +309,31 @@ void PopulateGalaxies(Catalog& catalog, double coreDx, double coreDy) {
           gx = std::round(cx);
           gy = std::round(cy);
           placed = true;
-          break;
         }
       }
     }
+    outX = gx;
+    outY = gy;
+  };
+
+  for (std::size_t k = 0; k < baseCount; ++k) {
+    double gx = 0.0;
+    double gy = 0.0;
+    slotSpot(static_cast<int>(k), gx, gy);
+    catalog.regions[k].x = gx;
+    catalog.regions[k].y = gy;
+    taken.emplace_back(gx, gy);
+  }
+
+  for (int k = 0; k < kNewGalaxies; ++k) {
+    double gx = 0.0;
+    double gy = 0.0;
+    slotSpot(static_cast<int>(baseCount) + k, gx, gy);
     taken.emplace_back(gx, gy);
 
+    const GalaxyArchetype& arch = archetypes[static_cast<std::size_t>(k) % archetypes.size()];
     Body region;
-    region.id = "gal-gen-" + std::to_string(i + 1);
+    region.id = "gal-gen-" + std::to_string(k + 1);
     region.type = "region";
     region.name = UniqueName(std::string(arch.stem) + " " + arch.form, usedNames);
     region.x = gx;
@@ -917,9 +930,7 @@ void ExpandChart(Catalog& catalog) {
 
   // 3. Expand the galaxy layer: place every region on the galaxy board by one rule,
   //    the ones that came in the file and the generated ones alike.
-  const double galDx = (galaxy.w - baseW) / 2.0;
-  const double galDy = (galaxy.h - baseH) / 2.0;
-  PopulateGalaxies(catalog, galDx, galDy);
+  PopulateGalaxies(catalog);
 
   // 4. Translate the systems to the centre of the wide sector board and
   //    separate stacked positions.
