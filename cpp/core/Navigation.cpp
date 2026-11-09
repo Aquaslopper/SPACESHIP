@@ -785,6 +785,11 @@ void Simulation::ChronicleVisit(const Body* system) {
   if (system == nullptr) { return; }
   state_.chronicle.systems[system->id] = true;
   state_.chronicle.regions[system->region] = true;
+  if (state_.systemSerials.find(system->id) == state_.systemSerials.end()) {
+    state_.systemSerials[system->id] = state_.nextSystemSerial++;
+    LogLine("New system charted - " + system->name + " (" + system->id + " #" +
+            std::to_string(state_.systemSerials[system->id]) + ")");
+  }
 }
 
 void Simulation::ArriveAt(const std::string& bodyId) {
