@@ -264,7 +264,7 @@ const MapGeometry& BoardOrDefault(const Catalog& catalog, const std::string& lay
 }  // namespace
 
 void PopulateGalaxies(Catalog& catalog, double coreDx, double coreDy) {
-  const MapGeometry& galaxyBoard = BoardOrDefault(catalog, "galaxy");
+  const MapGeometry galaxyBoard = BoardOrDefault(catalog, "galaxy");
   for (Body& region : catalog.regions) {
     region.x += coreDx;
     region.y += coreDy;
@@ -810,7 +810,7 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
 void PlaceGalaxyDots(Catalog& catalog) {
   if (catalog.regions.empty()) { return; }
   catalog.galaxyPositions.clear();
-  const MapGeometry& galaxyBoard = BoardOrDefault(catalog, "galaxy");
+  const MapGeometry galaxyBoard = BoardOrDefault(catalog, "galaxy");
   const double w = galaxyBoard.w;
   const double h = galaxyBoard.h;
 
