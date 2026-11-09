@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <map>
 #include <set>
 #include <string>
@@ -263,68 +264,20 @@ const MapGeometry& BoardOrDefault(const Catalog& catalog, const std::string& lay
 
 }  // namespace
 
-void PopulateGalaxies(Catalog& catalog, double coreDx, double coreDy) {
-  const MapGeometry& galaxyBoard = BoardOrDefault(catalog, "galaxy");
-  for (Body& region : catalog.regions) {
-    region.x += coreDx;
-    region.y += coreDy;
-  }
-
+void PopulateGalaxies(Catalog& catalog) {
+  const MapGeometry& board = BoardOrDefault(catalog, "galaxy");
+  const std::size_t loadedCount = catalog.regions.size();
   std::set<std::string> usedNames;
-  std::vector<std::pair<double, double>> taken;
-  for (const Body& region : catalog.regions) {
-    usedNames.insert(region.name);
-    taken.emplace_back(region.x, region.y);
-  }
+  for (const Body& region : catalog.regions) { usedNames.insert(region.name); }
 
   Rng rng(0x47414C4158593234ULL);  // "GALAXY24"
   const auto& archetypes = GalaxyArchetypes();
-  const double marginX = 120.0;
-  const double marginY = 82.0;
-
-  // Arrange outer galaxies on two elliptical rings around the core disc so
-  // every quadrant of the galaxy board has reachable clusters without crowding.
   for (int i = 0; i < kNewGalaxies; ++i) {
     const GalaxyArchetype& arch = archetypes[static_cast<std::size_t>(i) % archetypes.size()];
-    const bool outerRing = (i >= 8);
-    const int ringIndex = outerRing ? (i - 8) : i;
-    const int ringCount = outerRing ? (kNewGalaxies - 8) : std::min(8, kNewGalaxies);
-    const double baseAngle =
-        6.283185307179586 * (static_cast<double>(ringIndex) / static_cast<double>(ringCount)) +
-        (outerRing ? 0.34 : 0.11);
-    const double rx = outerRing ? (galaxyBoard.w * 0.43) : (galaxyBoard.w * 0.28);
-    const double ry = outerRing ? (galaxyBoard.h * 0.40) : (galaxyBoard.h * 0.27);
-
-    double gx = galaxyBoard.cx;
-    double gy = galaxyBoard.cy;
-    bool placed = false;
-    for (double minGap = 210.0; minGap >= 120.0 && !placed; minGap -= 18.0) {
-      Spacer spacer(minGap, taken);
-      for (int attempt = 0; attempt < 160; ++attempt) {
-        const double jitterA = attempt == 0 ? rng.Range(-0.14, 0.14) : rng.Range(-0.55, 0.55);
-        const double jitterR = attempt == 0 ? rng.Range(0.92, 1.06) : rng.Range(0.65, 1.12);
-        const double cx = std::clamp(
-            galaxyBoard.cx + std::cos(baseAngle + jitterA) * rx * jitterR,
-            marginX, galaxyBoard.w - marginX);
-        const double cy = std::clamp(
-            galaxyBoard.cy + std::sin(baseAngle + jitterA) * ry * jitterR,
-            marginY, galaxyBoard.h - marginY);
-        if (spacer.Fits(cx, cy)) {
-          gx = std::round(cx);
-          gy = std::round(cy);
-          placed = true;
-          break;
-        }
-      }
-    }
-    taken.emplace_back(gx, gy);
-
     Body region;
     region.id = "gal-gen-" + std::to_string(i + 1);
     region.type = "region";
     region.name = UniqueName(std::string(arch.stem) + " " + arch.form, usedNames);
-    region.x = gx;
-    region.y = gy;
     region.cluster = 16 + rng.Below(10);
     region.klass = arch.klass;
     region.details = {
@@ -337,9 +290,77 @@ void PopulateGalaxies(Catalog& catalog, double coreDx, double coreDy) {
         std::string("Dominant navigation condition: ") + arch.hazard + ".",
     };
     region.scanLocked = {"Deep-cluster gravimetric map", "Long-baseline relay key"};
-    catalog.regions.push_back(region);
-
     catalog.worldHistory[region.id] = {arch.history, arch.traffic};
+    catalog.regions.push_back(std::move(region));
+  }
+
+  // Keep catalogue order, but allocate positions from one shuffled pool:
+  // the seven loaded regions join the seventeen generated.
+  std::vector<std::size_t> order;
+  order.reserve(catalog.regions.size());
+  for (std::size_t i = loadedCount; i < catalog.regions.size(); ++i) { order.push_back(i); }
+  for (std::size_t i = 0; i < loadedCount; ++i) { order.push_back(i); }
+  for (std::size_t i = order.size(); i > 1; --i) {
+    std::swap(order[i - 1], order[static_cast<std::size_t>(rng.Below(static_cast<int>(i)))]);
+  }
+
+  // Leave room at the edge for the existing systems' offsets after scaling.
+  const double marginX = 300.0;
+  const double marginY = 185.0;
+  const std::size_t innerCount = (order.size() + 1) / 2;
+  std::vector<std::pair<double, double>> taken;
+  for (std::size_t slot = 0; slot < order.size(); ++slot) {
+    const bool outerRing = slot >= innerCount;
+    const std::size_t ringIndex = outerRing ? slot - innerCount : slot;
+    const std::size_t ringCount = outerRing ? order.size() - innerCount : innerCount;
+    const double baseAngle =
+        6.283185307179586 * (static_cast<double>(ringIndex) / static_cast<double>(ringCount)) +
+        (outerRing ? 0.34 : 0.11);
+    const double rx = board.w * (outerRing ? 0.43 : 0.28);
+    const double ry = board.h * (outerRing ? 0.40 : 0.27);
+    double gx = std::round(std::clamp(board.cx + std::cos(baseAngle) * rx,
+                                      marginX, board.w - marginX));
+    double gy = std::round(std::clamp(board.cy + std::sin(baseAngle) * ry,
+                                      marginY, board.h - marginY));
+    bool placed = false;
+    for (double minGap = 210.0; minGap >= 120.0 && !placed; minGap -= 18.0) {
+      for (int attempt = 0; attempt < 160; ++attempt) {
+        const double jitterA = attempt == 0 ? rng.Range(-0.14, 0.14) : rng.Range(-0.55, 0.55);
+        const double jitterR = attempt == 0 ? rng.Range(0.92, 1.06) : rng.Range(0.65, 1.12);
+        const double cx = std::round(std::clamp(
+            board.cx + std::cos(baseAngle + jitterA) * rx * jitterR,
+            marginX, board.w - marginX));
+        const double cy = std::round(std::clamp(
+            board.cy + std::sin(baseAngle + jitterA) * ry * jitterR,
+            marginY, board.h - marginY));
+        bool fits = true;
+        for (const auto& other : taken) {
+          const double dx = cx - other.first;
+          const double dy = cy - other.second;
+          if (dx * dx + dy * dy < minGap * minGap) { fits = false; break; }
+        }
+        if (fits) { gx = cx; gy = cy; placed = true; break; }
+      }
+    }
+    if (!placed) {
+      // A full board still gets a distinct position, rather than falling back
+      // to the centre that previously held only the loaded regions.
+      double bestGap = -1.0;
+      for (double x = marginX; x <= board.w - marginX; x += 24.0) {
+        for (double y = marginY; y <= board.h - marginY; y += 24.0) {
+          double nearest = board.w * board.w + board.h * board.h;
+          for (const auto& other : taken) {
+            const double dx = x - other.first;
+            const double dy = y - other.second;
+            nearest = std::min(nearest, dx * dx + dy * dy);
+          }
+          if (nearest > bestGap) { bestGap = nearest; gx = x; gy = y; }
+        }
+      }
+    }
+    catalog.regions[order[slot]].x = gx;
+    catalog.regions[order[slot]].y = gy;
+    taken.emplace_back(gx, gy);
   }
 }
 
@@ -849,7 +870,31 @@ void PlaceGalaxyDots(Catalog& catalog) {
 }
 
 void EntangleGalaxy(Catalog& catalog) {
-  if (catalog.regions.size() < 2) { return; }
+  // Loaded lanes describe the former seven-region layout. Build connected
+  // routes for all twenty-four positions before adding nearby links.
+  catalog.galaxyLanes.clear();
+  const std::size_t count = catalog.regions.size();
+  if (count < 2) { return; }
+  std::vector<bool> connected(count, false);
+  connected[count - 1] = true;
+  for (std::size_t added = 1; added < count; ++added) {
+    double closest = std::numeric_limits<double>::max();
+    std::size_t from = 0;
+    std::size_t to = 0;
+    for (std::size_t i = 0; i < count; ++i) {
+      if (!connected[i]) { continue; }
+      for (std::size_t j = 0; j < count; ++j) {
+        if (connected[j]) { continue; }
+        const double dx = catalog.regions[i].x - catalog.regions[j].x;
+        const double dy = catalog.regions[i].y - catalog.regions[j].y;
+        const double distanceSquared = dx * dx + dy * dy;
+        if (distanceSquared < closest) { closest = distanceSquared; from = i; to = j; }
+      }
+    }
+    catalog.galaxyLanes.push_back(Lane{catalog.regions[from].id, catalog.regions[to].id});
+    connected[to] = true;
+  }
+
   const auto linked = [&catalog](const std::string& a, const std::string& b) {
     for (const Lane& lane : catalog.galaxyLanes) {
       if ((lane.from == a && lane.to == b) || (lane.from == b && lane.to == a)) { return true; }
@@ -915,20 +960,28 @@ void ExpandChart(Catalog& catalog) {
   catalog.layerBoards["system"].zmin = kSystemZoomMin;
   catalog.layerBoards["system"].zmax = kSystemZoomMax;
 
-  // 3. Expand the galaxy layer: place every region on the galaxy board by one rule,
-  //    the ones that came in the file and the generated ones alike.
-  const double galDx = (galaxy.w - baseW) / 2.0;
-  const double galDy = (galaxy.h - baseH) / 2.0;
-  PopulateGalaxies(catalog, galDx, galDy);
-
-  // 4. Translate the systems to the centre of the wide sector board and
-  //    separate stacked positions.
-  const double secDx = (sector.w - baseW) / 2.0;
-  const double secDy = (sector.h - baseH) / 2.0;
-  for (Body& system : catalog.systems) {
-    system.x += secDx;
-    system.y += secDy;
+  // 3. Move the seven loaded regions into the same layout as the seventeen.
+  std::unordered_map<std::string, std::pair<double, double>> oldRegionPosition;
+  for (const Body& region : catalog.regions) {
+    oldRegionPosition[region.id] = {region.x, region.y};
   }
+  PopulateGalaxies(catalog);
+
+  // 4. Anchor every region on the sector board, then move each existing system
+  //    by its own region's displacement. Local offsets stay the same.
+  std::unordered_map<std::string, std::pair<double, double>> regionAnchor;
+  for (const Body& region : catalog.regions) {
+    const double sx = std::clamp(region.x * (sector.w / galaxy.w), 260.0, sector.w - 260.0);
+    const double sy = std::clamp(region.y * (sector.h / galaxy.h), 150.0, sector.h - 150.0);
+    regionAnchor[region.id] = {sx, sy};
+  }
+  for (Body& system : catalog.systems) {
+    const auto& oldPosition = oldRegionPosition.at(system.region);
+    const auto& anchor = regionAnchor.at(system.region);
+    system.x += anchor.first - oldPosition.first;
+    system.y += anchor.second - oldPosition.second;
+  }
+  // Separate systems that still share a dot within their region.
   {
     std::map<std::pair<double, double>, std::vector<std::size_t>> stacks;
     for (std::size_t i = 0; i < catalog.systems.size(); ++i) {
@@ -950,19 +1003,6 @@ void ExpandChart(Catalog& catalog) {
         system.y = std::round(std::clamp(anchorY + std::sin(angle) * radius * 0.8, 32.0, sector.h - 32.0));
       }
     }
-  }
-
-  // Compute each region's territory anchor on the sector board so systems of a
-  // galactic region form a navigable cluster with intra-region jump distances
-  // well within a single fuel tank.
-  std::unordered_map<std::string, std::pair<double, double>> regionAnchor;
-  for (std::size_t ri = 0; ri < catalog.regions.size(); ++ri) {
-    const Body& region = catalog.regions[ri];
-    // Every region is placed by this one rule, whether it came from the file or was
-    // generated: no region is the centre and none is exempt.
-    const double sx = std::clamp(region.x * (sector.w / galaxy.w), 260.0, sector.w - 260.0);
-    const double sy = std::clamp(region.y * (sector.h / galaxy.h), 150.0, sector.h - 150.0);
-    regionAnchor[region.id] = {sx, sy};
   }
 
   // 5. Draft procedural star systems inside each region's sector territory.

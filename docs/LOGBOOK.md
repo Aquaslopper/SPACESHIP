@@ -1146,3 +1146,18 @@ writing down rather than leaving to luck.
 
 The hard part was not the code. It was refusing to be confident about anything that
 had not been measured, and refusing to be loyal to code the owner did not write.
+
+## 063 — Seven loaded regions among seventeen generated regions
+
+- **Timestamp:** 2026-11-09 12:52 UTC
+- **Request:** place the seven loaded regions with the seventeen generated regions, for 24 total.
+- **Prior turn:** abandoned partial edits were reverted; this pass began on a clean branch.
+- **Placement:** generate seventeen named region records, then shuffle all twenty-four identities into the same positional layout.
+- **Loaded records:** retain the seven names, IDs, and histories; no source asset changes.
+- **Geometry:** remove the seven-region central translation; assign all regions spaced positions on the enlarged galaxy board.
+- **Systems:** move original named systems to their own region's sector anchor while retaining their original local offset.
+- **Generation:** existing per-region procedural system count remains unchanged.
+- **Galaxy links:** rebuild routes for all twenty-four positions using a spanning tree before nearby links.
+- **Regressions edited:** count, mixed placement, loaded identity/history, named-system offsets, deterministic positions, lane connectivity.
+- **Checks:** static diff inspection and `git diff --check` only; no tests or builds were run.
+- **Untouched:** assets, save data format, incident/story logic, UI rendering, rescue and historical material.

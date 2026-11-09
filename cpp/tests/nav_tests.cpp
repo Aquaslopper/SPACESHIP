@@ -13,9 +13,11 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <initializer_list>
 #include <map>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "core/Simulation.h"
@@ -759,7 +761,9 @@ TEST_CASE("the charted galaxy is grown once, deterministically, and every system
   ship::Simulation first = ship::Simulation::NewVoyage(authored);
   const ship::Catalog& grown = first.World();
 
-  // Every region is expanded, outer galactic regions are added, and nothing authored is lost.
+  // The seven loaded regions join the seventeen generated ones: 24 total.
+  REQUIRE(authored.regions.size() == 7u);
+  REQUIRE(grown.regions.size() == 24u);
   CHECK(grown.regions.size() ==
         authored.regions.size() + static_cast<std::size_t>(ship::kNewGalaxies));
   CHECK(grown.systems.size() ==
@@ -829,26 +833,40 @@ TEST_CASE("the charted galaxy is grown once, deterministically, and every system
     CHECK(second.World().systems[i].x == grown.systems[i].x);
     CHECK(second.World().systems[i].y == grown.systems[i].y);
   }
+  for (std::size_t i = 0; i < grown.regions.size(); ++i) {
+    CHECK(second.World().regions[i].id == grown.regions[i].id);
+    CHECK(second.World().regions[i].x == grown.regions[i].x);
+    CHECK(second.World().regions[i].y == grown.regions[i].y);
+  }
   ship::Simulation again = ship::Simulation::NewVoyage(first.World());
   CHECK(again.World().systems.size() == grown.systems.size());
   CHECK(again.World().bodies.size() == grown.bodies.size());
 
-  // The system chart keeps the reference's board; the sector chart is the wide
-  // one the galaxy is laid out on, and the authored crossings still cost the
-  // same because the authored systems only moved.
+  // Existing systems stay in their named regions. Their offsets from their
+  // region's old position move with the region, not to a shared board centre.
   CHECK(first.Map().w == 638);
   CHECK(first.Map().h == 278);
   first.SetLayer("sector");
   CHECK(first.Map().w > 638);
   CHECK(first.Map().h > 278);
-  const ship::Body* kesslerAuthored = authored.FindSystem("sec-kessler");
-  const ship::Body* kesslerGrown = grown.FindSystem("sec-kessler");
-  REQUIRE(kesslerAuthored != nullptr);
-  REQUIRE(kesslerGrown != nullptr);
-  CHECK((kesslerGrown->x - kesslerAuthored->x) ==
-        (ship::kSectorBoardScale - 1.0) * 0.5 * authored.map.w);
-  CHECK((kesslerGrown->y - kesslerAuthored->y) ==
-        (ship::kSectorBoardScale - 1.0) * 0.5 * authored.map.h);
+  const ship::MapGeometry& galaxyBoard = grown.layerBoards.at("galaxy");
+  for (const char* systemId : {"sec-kessler", "sec-lumen", "sec-auriga", "sec-frost"}) {
+    const ship::Body* oldSystem = authored.FindSystem(systemId);
+    const ship::Body* movedSystem = grown.FindSystem(systemId);
+    REQUIRE(oldSystem != nullptr);
+    REQUIRE(movedSystem != nullptr);
+    REQUIRE(movedSystem->region == oldSystem->region);
+    const ship::Body* oldRegion = authored.FindRegion(oldSystem->region);
+    const ship::Body* movedRegion = grown.FindRegion(movedSystem->region);
+    REQUIRE(oldRegion != nullptr);
+    REQUIRE(movedRegion != nullptr);
+    const double anchorX = std::clamp(movedRegion->x * first.Map().w / galaxyBoard.w,
+                                      260.0, first.Map().w - 260.0);
+    const double anchorY = std::clamp(movedRegion->y * first.Map().h / galaxyBoard.h,
+                                      150.0, first.Map().h - 150.0);
+    CHECK(movedSystem->x - oldSystem->x == anchorX - oldRegion->x);
+    CHECK(movedSystem->y - oldSystem->y == anchorY - oldRegion->y);
+  }
 
   // ---- every system is a system, not a diagram of one --------------------
   std::size_t thinnest = 999;
@@ -867,10 +885,49 @@ TEST_CASE("the charted galaxy is grown once, deterministically, and every system
   CHECK(thinnest >= 15u);
 
   // ---- the galaxy scale has stars on it ----------------------------------
-  const ship::MapGeometry& galaxyBoard = grown.layerBoards.at("galaxy");
   CHECK(galaxyBoard.w == authored.map.w * ship::kGalaxyBoardScale);
   CHECK(galaxyBoard.h == authored.map.h * ship::kGalaxyBoardScale);
   CHECK(grown.galaxyPositions.size() == grown.systems.size());
+
+  // All 24 dots use the wide board. The seven loaded ones keep their IDs and
+  // history but none remains in the former translated central patch.
+  std::set<std::pair<double, double>> regionDots;
+  for (const ship::Body& region : grown.regions) {
+    CHECK(regionDots.insert({region.x, region.y}).second);
+    CHECK(region.x >= 0.0);
+    CHECK(region.x <= galaxyBoard.w);
+    CHECK(region.y >= 0.0);
+    CHECK(region.y <= galaxyBoard.h);
+  }
+  const double oldLeft = (galaxyBoard.w - authored.map.w) / 2.0;
+  const double oldTop = (galaxyBoard.h - authored.map.h) / 2.0;
+  std::set<std::string> loadedIds;
+  for (const ship::Body& original : authored.regions) {
+    loadedIds.insert(original.id);
+    const ship::Body* moved = grown.FindRegion(original.id);
+    REQUIRE(moved != nullptr);
+    CHECK(moved->name == original.name);
+    CHECK(grown.worldHistory.at(original.id) == authored.worldHistory.at(original.id));
+    CHECK(moved->x < oldLeft || moved->x > oldLeft + authored.map.w ||
+          moved->y < oldTop || moved->y > oldTop + authored.map.h);
+  }
+
+  // The re-laid galaxy lanes connect loaded and generated regions as one web.
+  std::set<std::string> reachable{grown.regions.front().id};
+  bool mixedLane = false;
+  for (const ship::Lane& lane : grown.galaxyLanes) {
+    REQUIRE(grown.FindRegion(lane.from) != nullptr);
+    REQUIRE(grown.FindRegion(lane.to) != nullptr);
+    if (loadedIds.count(lane.from) != loadedIds.count(lane.to)) { mixedLane = true; }
+  }
+  for (std::size_t pass = 0; pass < grown.regions.size(); ++pass) {
+    for (const ship::Lane& lane : grown.galaxyLanes) {
+      if (reachable.count(lane.from) != 0) { reachable.insert(lane.to); }
+      if (reachable.count(lane.to) != 0) { reachable.insert(lane.from); }
+    }
+  }
+  CHECK(mixedLane);
+  CHECK(reachable.size() == grown.regions.size());
   {
     std::set<std::string> dots;
     std::string clash;
