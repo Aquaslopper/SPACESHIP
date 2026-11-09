@@ -1294,3 +1294,26 @@ already deterministic from `Rng(HashOf(system.id))`, so a system's worlds can be
 when it is entered instead of all of them in advance. What stops that from being a
 ten-line change is everything that names a body in a system the ship has not entered -
 contract targets, extraction jobs, station boards.
+
+## 085 - the third layer is forty-one dots
+
+The galaxy layer was drawing the region bodies and then every system that has a place
+on the galaxy board - twenty-two hundred and eighty-seven bodies for a layer that is a
+picture, not a place to set course. It now draws the regions only: forty-one dots.
+
+Measured, layer two, with a 1600x900 window and the sector board at 11484x5004 holding
+2246 systems - how many systems the box actually shows at each step of the ladder:
+
+  zoom  0.3   world box 5333x3000   systems in the box  852
+  zoom  0.5   world box 3200x1800   systems in the box  294
+  zoom  1.0   world box 1600x 900   systems in the box   87
+  zoom  2.0   world box  800x 450   systems in the box   28
+  zoom  4.0   world box  400x 225   systems in the box    7
+  zoom  8.0   world box  200x 112   systems in the box    1
+
+So the wide end of the ladder is the whole cost: 852 bodies at 0.3 against 87 at 1.0.
+A floor of 0.5 would cap the box at about 294; 0.6 at about 200. Not changed here -
+the floor is a decision, not a bug.
+
+CHECKED: cpp/ui/NavScreen.cpp compiles clean with -fsyntax-only.
+NOT CHECKED: the frame rate; nobody has seen this run.

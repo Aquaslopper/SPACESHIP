@@ -59,14 +59,10 @@ std::vector<const Body*> LayerBodies(const Simulation& sim) {
   const Catalog& catalog = sim.World();
   const std::string layer = BodyLayer(sim);
   if (layer == "galaxy") {
-    // The regions, and then every star inside them. The galaxy scale used to
-    // carry seven named blobs; the systems have positions of their own now
-    // (Catalog::galaxyPositions), so the third layer shows the same two hundred
-    // stars the other two layers are drawing.
+    // The third layer is a snapshot: the galaxies as dots, nothing else. It is not
+    // a layer to set course on, so it does not carry the systems the other two
+    // layers draw, and it costs forty-one bodies instead of twenty-two hundred.
     for (const Body& body : catalog.regions) { out.push_back(&body); }
-    for (const Body& body : catalog.systems) {
-      if (catalog.galaxyPositions.count(body.id) != 0) { out.push_back(&body); }
-    }
     return out;
   }
   if (layer == "system") {
