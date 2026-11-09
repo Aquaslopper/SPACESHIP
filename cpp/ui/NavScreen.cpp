@@ -887,18 +887,7 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
         sim, "Dock at " + port->name, true, std::string(), "space", 0));
   }
 
-  // The band says why a button may be off. It does not explain the clicks.
-  if (energy <= 0) {
-    model.notes.push_back("Restore energy to use navigation and sensors.");
-  } else if (sim.State().engineCondition <= 0) {
-    model.notes.push_back("The drive needs maintenance before travel.");
-  } else if (reach && !hereTarget && target != nullptr &&
-             fuel < sim.MetricsFor(*target).fuel) {
-    model.notes.push_back("Insufficient fuel. Right-click the fuel gauge to refuel.");
-  } else if (running != nullptr) {
-    model.notes.push_back("A crossing is already under way.");
-  }
-  for (const std::string& note : model.notes) { actions.Dim(note); }
+  // The band is rows, not sentences. Nothing in it explains anything.
   screen.band = {actions};
 
   screen.hasStage = true;

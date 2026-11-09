@@ -1369,3 +1369,14 @@ they are one line each.
 
 CHECKED: cpp/ui/NavScreen.cpp compiles clean with -Wall -Wextra -fsyntax-only.
 NOT CHECKED: the picture. Whether the band now sits in its box is his to see.
+
+## 088 - no text in the band, at all
+
+The four one-line notes went too. The band under the target panels now holds the rows and
+nothing else; there is no text in it that is not a row. `model.notes` is no longer filled
+from `NavScreen.cpp` at all, so the band's note list is always empty.
+
+CHECKED: cpp/ui/NavScreen.cpp compiles clean with -Wall -Wextra -fsyntax-only.
+NOT CHECKED: the picture.
+NOT TOUCHED: the station windows have notes of their own (`StationScreen.cpp`); they are
+a different area and were left as they were.
