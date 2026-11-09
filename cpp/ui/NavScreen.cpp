@@ -78,7 +78,7 @@ std::vector<const Body*> LayerBodies(const Simulation& sim) {
   return out;
 }
 
-double BodySize(const Body& body) {
+double BodySize(const Body& body, const std::string& layer) {
   double size = 16;
   if (body.type == "station") { size = 18; }
   if (body.type == "origin") { size = 14; }
@@ -86,6 +86,14 @@ double BodySize(const Body& body) {
   if (body.subtype == "gas") { size = 20; }
   if (body.type == "system") { size = 18; }
   if (body.type == "region") { size = 22; }
+  // The local chart is drawn on a board three times the old one, so a world that was
+  // sixteen pixels there is a third of the size it used to be. The wide scales keep
+  // their sizes; the worlds of a system grow with the board they sit on.
+  if (layer == "system") {
+    size *= 1.75;
+    if (body.type == "moon") { size = 20; }
+    if (body.subtype == "gas") { size = 34; }
+  }
   return size;
 }
 
@@ -356,7 +364,10 @@ std::vector<NavDot> NavRouteDots(const Simulation& sim, double ax, double ay,
   const double dy = b.y - a.y;
   const double len = std::sqrt(dx * dx + dy * dy);
   const double boardScale = std::max(1.0, map.vw / 638.0);
-  const double gap = (selected ? 8.0 : (faint ? 15.0 : 11.0)) * boardScale;
+  double gap = (selected ? 8.0 : (faint ? 15.0 : 11.0)) * boardScale;
+  // Zoomed out, a faint lane's dots are a screen apart at most and read as a dotted
+  // line either way; spread them so the wide view asks for a third of the dots.
+  if (faint) { gap *= std::clamp(1.0 / std::max(0.05, view.zoom), 1.0, 3.0); }
   double n = std::floor(len / gap);
   if (n > 90) { n = 90; }
 
@@ -422,7 +433,7 @@ NavChartView BuildNavChart(const Simulation& sim) {
     bodyView.worldX = at.first;
     bodyView.worldY = at.second;
     bodyView.at = projected;
-    bodyView.size = BodySize(*body);
+    bodyView.size = BodySize(*body, chart.layer);
     // A star is a star on its own chart; on the galaxy scale it is one point of
     // light in a cluster of thirty, so it is drawn at the size that reads.
     if (chart.layer == "galaxy" && body->type == "system") { bodyView.size = 10; }
@@ -483,10 +494,22 @@ NavChartView BuildNavChart(const Simulation& sim) {
     const Catalog& world = sim.World();
     const bool isSector = (chart.layer == "sector");
     const std::vector<Lane>& lanes = isSector ? world.sectorLanes : world.galaxyLanes;
+    // Two projections decide whether a lane is worth dividing into dots; the dots
+    // themselves are up to ninety. A lane whose whole segment lies outside the
+    // window is skipped before it can ask.
+    const double lanePad = 64.0;
     for (const Lane& lane : lanes) {
       const Body* a = isSector ? world.FindSystem(lane.from) : world.FindRegion(lane.from);
       const Body* b = isSector ? world.FindSystem(lane.to) : world.FindRegion(lane.to);
       if (a == nullptr || b == nullptr) { continue; }
+      const NavPoint pa = NavProjectPanned(map, view, a->x, a->y);
+      const NavPoint pb = NavProjectPanned(map, view, b->x, b->y);
+      if ((pa.x < -lanePad && pb.x < -lanePad) ||
+          (pa.x > map.vw + lanePad && pb.x > map.vw + lanePad) ||
+          (pa.y < -lanePad && pb.y < -lanePad) ||
+          (pa.y > map.vh + lanePad && pb.y > map.vh + lanePad)) {
+        continue;
+      }
       append(NavRouteDots(sim, a->x, a->y, b->x, b->y, false, true));
     }
     if (isSector) {

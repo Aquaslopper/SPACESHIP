@@ -1493,3 +1493,31 @@ CHECKED: cpp/data/{Catalog,ChartExpansion}.cpp compile clean with -fsyntax-only;
 are the output of a probe that drives `PressPopupAction` against a real Simulation.
 NOT CHECKED: the picture. Whether the view is where it was is his to see - the board no
 longer moves under the camera, which is the part that made it a ball.
+
+## 094 - lanes only where the window is, and worlds twice the size
+
+Two things, both in `BuildNavChart`.
+
+The second layer was laggy regardless of how few systems it showed, because the culling
+from entry 084 covered bodies and never lanes. Every frame divided every lane into dots:
+
+  lanes                4840
+  dots per lane        up to 90, spaced by 15 px * boardScale
+  rejection            one bounding box on the whole segment, tested inside NavRouteDots
+
+Now a lane is projected at its two ends first, and skipped when the whole segment lies
+outside the window - that is two projections instead of up to ninety dots. And a faint
+lane's dot spacing now grows with `1 / zoom` (clamped to three times), so a wide view asks
+for a third of the dots on the lanes that do cross the window.
+
+The worlds of a system were sixteen pixels on a board that has since tripled, so they read
+as dust. `BodySize()` now takes the layer and, on the local chart only, multiplies by 1.75:
+
+  planet   16 -> 28     moon   12 -> 20     gas giant  20 -> 34
+  station  18 -> 31.5   origin 14 -> 24.5
+  system / region and both wide scales unchanged
+
+CHECKED: cpp/ui/NavScreen.cpp compiles clean with -Wall -Wextra -fsyntax-only.
+NOT CHECKED: the frame rate and the drawn size. The dot counts above are arithmetic from
+the code (lanes x dots per lane), not a timing; the timing probe was interrupted and needs
+about three minutes to build before it can say milliseconds.
