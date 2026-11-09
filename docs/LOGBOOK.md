@@ -1146,3 +1146,18 @@ writing down rather than leaving to luck.
 
 The hard part was not the code. It was refusing to be confident about anything that
 had not been measured, and refusing to be loyal to code the owner did not write.
+
+## 063 — Remove PR #44 code and start over
+
+- **Timestamp:** 2026-11-09 13:30 UTC
+- **Request:** remove the code in PR #44 and start over without replacement work.
+- **Branch:** `arena/b6786d4e-spaceship`; no branch switch.
+- **Rollback:** reverted `86b4aa2` with commit `5fc9a55`.
+- **Rollback:** reverted `6ccc85d` with commit `084af83`.
+- **Result:** game code and tests match pre-PR commit `0ea66a6`.
+- **Remaining change against that commit:** this rollback logbook entry only.
+- **PR:** #44 remains open; no merge or close.
+- **Checks:** `git status`, local log and diffs, `git diff --check`.
+- **Tests/builds:** not run; gameplay remains unverified.
+- **Untouched:** assets, artwork, rescue and historical files.
+- **Next implementation:** none in this turn.
