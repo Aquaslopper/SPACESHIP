@@ -1146,3 +1146,27 @@ writing down rather than leaving to luck.
 
 The hard part was not the code. It was refusing to be confident about anything that
 had not been measured, and refusing to be loyal to code the owner did not write.
+
+## 098 - the sector board is one third wider
+
+His words: make the sector map bigger and let every galaxy spread out, all of them.
+
+The sector board is drawn from one constant, `kSectorBoardScale` in
+`cpp/data/ChartExpansion.h`. It was 6.0, it is 8.0: 3828 x 1668 becomes 5104 x 2224. Every
+galaxy anchor on that board is the region's galaxy-board position scaled by
+sector/galaxy, so a wider board spreads all of them - the ones that came in the file and
+the generated ones - by the same factor, with no origin test anywhere.
+
+Measured on the real catalogue, distance to the nearest other galaxy on the sector board:
+
+  before   board 3828 x 1668   min 139   median 336   max 510
+  after    board 5104 x 2224   min 186   median 448   max 680
+
+One attempt was measured and thrown away: a rule that pushed any region nearer than the
+inner ring out onto that ring. It made the board wider but the closest pair worse - min
+63 against 186 - because the pushed regions landed on top of the generated ring. It is
+not in the code.
+
+CHECKED: cpp/data/ChartExpansion.cpp compiles clean with -Wall -Wextra -fsyntax-only; the
+numbers are the probe's, before and after, same formula for both.
+NOT CHECKED: the picture, and the frame cost of the bigger board.
