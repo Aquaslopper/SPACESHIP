@@ -237,7 +237,7 @@ TEST_CASE("three layers, each remembering its own view", "[nav]") {
   // Viewing a region is the same free switch, and it prefills the selection
   // when the ship is inside that sector.
   sim.SetLayer("galaxy");
-  CHECK(sim.ViewSector("gal-inner"));
+  CHECK(sim.ViewSector("gal-gen-19"));
   CHECK(sim.Map().layer == "sector");
   CHECK(sim.State().navTarget.value_or("") == "sec-kessler");
   CHECK(sim.ActionCount() == 0);
@@ -298,10 +298,10 @@ TEST_CASE("every body is drawn at its own size, with its label on the right side
 
   sim.SetLayer("galaxy");
   const ship::NavChartView galaxy = ship::BuildNavChart(sim);
-  // Seven regions, and every star inside them: the third scale draws the same
+  // Twenty-four regions, and every star inside them: the third scale draws the same
   // systems the other two do, at their galaxy positions.
   CHECK(galaxy.bodies.size() == sim.World().regions.size() + sim.World().systems.size());
-  const ship::NavBodyView* core = Body(galaxy, "gal-core");
+  const ship::NavBodyView* core = Body(galaxy, "gal-gen-18");
   REQUIRE(core != nullptr);
   CHECK(core->size == 22);
   const ship::NavBodyView* starInGalaxy = Body(galaxy, "sec-vance");
@@ -420,14 +420,14 @@ TEST_CASE("a reachable target reads out distance, transit and cost", "[nav]") {
 
   // A region is a chart container, not a destination: it offers the sector.
   sim.SetLayer("galaxy");
-  REQUIRE(sim.SelectTarget("gal-inner"));
+  REQUIRE(sim.SelectTarget("gal-gen-19"));
   const ship::NavScreenModel region = ship::BuildNavScreen(sim);
   CHECK(HasText(*Panel(region.screen.left, "nav-status"), "Current region"));
   // Inner Rim keeps its authored eight and gains the generated systems of its
   // own region, so the count is read off the voyage's chart rather than fixed.
   std::size_t innerSystems = 0;
   for (const ship::Body& system : sim.World().systems) {
-    if (system.region == "gal-inner") { ++innerSystems; }
+    if (system.region == "gal-gen-19") { ++innerSystems; }
   }
   CHECK(Line(*Panel(region.screen.under, "nav-details"), "Systems")->value ==
         std::to_string(innerSystems) + " navigable");
@@ -759,9 +759,12 @@ TEST_CASE("the charted galaxy is grown once, deterministically, and every system
   ship::Simulation first = ship::Simulation::NewVoyage(authored);
   const ship::Catalog& grown = first.World();
 
-  // Every region is expanded, outer galactic regions are added, and nothing authored is lost.
-  CHECK(grown.regions.size() ==
-        authored.regions.size() + static_cast<std::size_t>(ship::kNewGalaxies));
+  // Every region comes from the shared 24-entry pool.
+  CHECK(grown.regions.size() == static_cast<std::size_t>(ship::kGalaxyCount));
+  for (const char* id : {"gal-gen-18", "gal-gen-19", "gal-gen-20", "gal-gen-21",
+                         "gal-gen-22", "gal-gen-23", "gal-gen-24"}) {
+    REQUIRE(grown.FindRegion(id) != nullptr);
+  }
   CHECK(grown.systems.size() ==
         authored.systems.size() +
             static_cast<std::size_t>(ship::kNewSystemsPerRegion) * grown.regions.size());
@@ -993,7 +996,7 @@ TEST_CASE("procedural galaxies carry histories, lanes, ports, and camera centeri
     }
     CHECK(hasGalaxyLane);
   }
-  CHECK(genGalaxies == static_cast<std::size_t>(ship::kNewGalaxies));
+  CHECK(genGalaxies == static_cast<std::size_t>(ship::kGalaxyCount));
 
   // Selecting an outer procedural galaxy and viewing its sector centres the
   // sector camera over its star cluster so those systems project near the middle.
@@ -1460,7 +1463,7 @@ TEST_CASE("staged sensor upgrades unlock scanLocked tiers and deep-region scanni
   std::string outerSysId;
   std::string outerRegId;
   for (const ship::Body& sys : sim.World().systems) {
-    if (sys.region != "gal-inner") {
+    if (sys.region != "gal-gen-19") {
       outerSysId = sys.id;
       outerRegId = sys.region;
       break;

@@ -16,6 +16,7 @@
 #include <string>
 
 #include "data/Catalog.h"
+#include "data/ChartExpansion.h"
 
 namespace {
 
@@ -37,8 +38,8 @@ int CountType(const std::vector<ship::Body>& bodies, const std::string& type) {
 TEST_CASE("the catalogue matches the reference edition's totals", "[catalog][counts]") {
   const ship::Catalog& c = Reference();
 
-  // The three numbers the README promises the player.
-  CHECK(c.regions.size() == 7u);
+  // Regions join the chart when ChartExpansion builds a voyage.
+  CHECK(c.regions.empty());
   CHECK(c.systems.size() == 48u);
   CHECK(c.bodies.size() == 243u);
   CHECK(c.ports.size() == 30u);
@@ -49,7 +50,7 @@ TEST_CASE("the catalogue matches the reference edition's totals", "[catalog][cou
   CHECK(c.counts.fittedRooms == 14);
   CHECK(c.contracts.size() == 18u);
   CHECK(c.sectorLanes.size() == 43u);
-  CHECK(c.galaxyLanes.size() == 9u);   // 5 authored + 4 added by region expansion
+  CHECK(c.galaxyLanes.empty());  // the common expansion links all 24 regions
   CHECK(c.taskTypes.size() == 12u);
   CHECK(c.counts.incidents == 5);
   CHECK(c.counts.projects == 10);
@@ -78,8 +79,9 @@ TEST_CASE("the chart is composed of the same body types as the reference",
         50 + 93 + 48 + 30 + 2 + 19 + 1);
 }
 
-TEST_CASE("every reference in the catalogue resolves", "[catalog][integrity]") {
-  const ship::Catalog& c = Reference();
+TEST_CASE("every reference in the expanded catalogue resolves", "[catalog][integrity]") {
+  ship::Catalog c = Reference();
+  ship::ExpandChart(c);
   const std::vector<std::string> problems = c.Validate();
 
   INFO("problems found: " << problems.size());

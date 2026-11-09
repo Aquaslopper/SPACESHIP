@@ -126,7 +126,7 @@ TEST_CASE("The row table is the reference's, not a paraphrase", "[galaxy][gen]")
   const std::vector<ship::StarRow>& rows = ship::AuthoredStarCatalog();
   REQUIRE(rows.size() == 47);  // STAR_CATALOG.length
   CHECK(rows.front().system == "sec-vance");
-  CHECK(rows.front().region == "gal-inner");
+  CHECK(rows.front().region == "gal-gen-19");
   CHECK(rows.front().name == "Vance Cluster");
   CHECK(rows.front().x == 120);
   CHECK(rows.front().y == 70);
@@ -137,7 +137,7 @@ TEST_CASE("The row table is the reference's, not a paraphrase", "[galaxy][gen]")
   std::map<std::string, int> perRegion;
   for (const ship::StarRow& row : rows) { ++perRegion[row.region]; }
   CHECK(perRegion.size() == 7);
-  CHECK(perRegion["gal-inner"] == 7);
+  CHECK(perRegion["gal-gen-19"] == 7);
 }
 
 TEST_CASE("Stripping removes only what the generator can rebuild", "[galaxy][gen]") {
@@ -172,7 +172,7 @@ TEST_CASE("A generated batch carries the reference's conventions", "[galaxy][gen
   // the same summary strings an authored system has.
   ship::StarRow row;
   row.system = "sec-gen-1";
-  row.region = "gal-core";
+  row.region = "gal-gen-18";
   row.name = "Test Verge";
   row.x = 10;
   row.y = 10;

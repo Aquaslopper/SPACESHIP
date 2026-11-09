@@ -174,13 +174,33 @@ const std::vector<std::string>& Observations() {
 }
 
 struct GalaxyArchetype {
+  using Details = std::vector<std::pair<std::string, std::string>>;
+
+  GalaxyArchetype(const char* stem, const char* form, const char* klass,
+                  const char* authority, const char* hazard,
+                  const char* history, const char* traffic)
+      : stem(stem), form(form), klass(klass),
+        details{{"Authority", authority}, {"Cluster class", form},
+                {"Dominant hazard", hazard}},
+        scan{history, std::string("Dominant navigation condition: ") + hazard + "."},
+        scanLocked{"Deep-cluster gravimetric map", "Long-baseline relay key"},
+        history{history, traffic} {}
+
+  GalaxyArchetype(const char* stem, const char* form, const char* klass,
+                  Details details, int cluster, double x, double y)
+      : stem(stem), form(form), klass(klass), details(std::move(details)),
+        cluster(cluster), x(x), y(y) {}
+
   const char* stem;
   const char* form;
   const char* klass;
-  const char* authority;
-  const char* hazard;
-  const char* history;
-  const char* traffic;
+  Details details;
+  std::vector<std::string> scan;
+  std::vector<std::string> scanLocked;
+  std::vector<std::string> history;
+  int cluster = 0;
+  double x = 0.0;
+  double y = 0.0;
 };
 
 const std::vector<GalaxyArchetype>& GalaxyArchetypes() {
@@ -252,7 +272,21 @@ const std::vector<GalaxyArchetype>& GalaxyArchetypes() {
       {"Onyx", "Rim", "Far-edge galactic arc beyond the last charter stones", "None",
        "Lane blockades",
        "Beyond Onyx Rim the old survey stones stop; every chart line is captain-drawn.",
-       "Sparse hails carry coordinates of newly sounded anomalies and wrecks."}};
+       "Sparse hails carry coordinates of newly sounded anomalies and wrecks."},
+      {"Galactic", "Core", "Dense core - navigation hazardous",
+       {{"Charted systems", "Uncountable"}, {"Authority", "Core Compact"}}, 26, 319, 128},
+      {"Inner", "Rim", "Settled space - contains the Kessler System",
+       {{"Charted systems", "Thousands"}, {"Authority", "Rim Assembly"}}, 21, 170, 76},
+      {"Outer", "Reach", "Thin settlement - long crossings",
+       {{"Charted systems", "Hundreds"}, {"Authority", "Contested"}}, 18, 500, 68},
+      {"The", "Verge", "Edge of charted space",
+       {{"Charted systems", "Few"}, {"Authority", "None"}}, 16, 118, 212},
+      {"Cradle", "Shoal", "Deep space shallows - old wreck fields",
+       {{"Charted systems", "Unsurveyed"}, {"Authority", "None"}}, 19, 488, 216},
+      {"The", "Rift", "Fractured lanes and isolated havens",
+       {{"Authority", "Independent"}}, 22, 310, 225},
+      {"Far", "Halo", "Cold stars beyond the settled lanes",
+       {{"Authority", "None"}}, 20, 428, 145}};
   return items;
 }
 
@@ -265,17 +299,9 @@ const MapGeometry& BoardOrDefault(const Catalog& catalog, const std::string& lay
 
 void PopulateGalaxies(Catalog& catalog, double coreDx, double coreDy) {
   const MapGeometry& galaxyBoard = BoardOrDefault(catalog, "galaxy");
-  for (Body& region : catalog.regions) {
-    region.x += coreDx;
-    region.y += coreDy;
-  }
-
+  catalog.regions.clear();
   std::set<std::string> usedNames;
   std::vector<std::pair<double, double>> taken;
-  for (const Body& region : catalog.regions) {
-    usedNames.insert(region.name);
-    taken.emplace_back(region.x, region.y);
-  }
 
   Rng rng(0x47414C4158593234ULL);  // "GALAXY24"
   const auto& archetypes = GalaxyArchetypes();
@@ -284,11 +310,11 @@ void PopulateGalaxies(Catalog& catalog, double coreDx, double coreDy) {
 
   // Arrange outer galaxies on two elliptical rings around the core disc so
   // every quadrant of the galaxy board has reachable clusters without crowding.
-  for (int i = 0; i < kNewGalaxies; ++i) {
+  for (int i = 0; i < kGalaxyCount; ++i) {
     const GalaxyArchetype& arch = archetypes[static_cast<std::size_t>(i) % archetypes.size()];
     const bool outerRing = (i >= 8);
     const int ringIndex = outerRing ? (i - 8) : i;
-    const int ringCount = outerRing ? (kNewGalaxies - 8) : std::min(8, kNewGalaxies);
+    const int ringCount = outerRing ? (kGalaxyCount - 8) : std::min(8, kGalaxyCount);
     const double baseAngle =
         6.283185307179586 * (static_cast<double>(ringIndex) / static_cast<double>(ringCount)) +
         (outerRing ? 0.34 : 0.11);
@@ -317,6 +343,10 @@ void PopulateGalaxies(Catalog& catalog, double coreDx, double coreDy) {
         }
       }
     }
+    if (arch.x != 0.0 || arch.y != 0.0) {
+      gx = arch.x + coreDx;
+      gy = arch.y + coreDy;
+    }
     taken.emplace_back(gx, gy);
 
     Body region;
@@ -325,21 +355,14 @@ void PopulateGalaxies(Catalog& catalog, double coreDx, double coreDy) {
     region.name = UniqueName(std::string(arch.stem) + " " + arch.form, usedNames);
     region.x = gx;
     region.y = gy;
-    region.cluster = 16 + rng.Below(10);
+    region.cluster = arch.cluster == 0 ? 16 + rng.Below(10) : arch.cluster;
     region.klass = arch.klass;
-    region.details = {
-        {"Authority", arch.authority},
-        {"Cluster class", arch.form},
-        {"Dominant hazard", arch.hazard},
-    };
-    region.scan = {
-        arch.history,
-        std::string("Dominant navigation condition: ") + arch.hazard + ".",
-    };
-    region.scanLocked = {"Deep-cluster gravimetric map", "Long-baseline relay key"};
+    region.details = arch.details;
+    region.scan = arch.scan;
+    region.scanLocked = arch.scanLocked;
     catalog.regions.push_back(region);
 
-    catalog.worldHistory[region.id] = {arch.history, arch.traffic};
+    if (!arch.history.empty()) { catalog.worldHistory[region.id] = arch.history; }
   }
 }
 
@@ -808,7 +831,6 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
 }
 
 void PlaceGalaxyDots(Catalog& catalog) {
-  if (catalog.regions.empty()) { return; }
   catalog.galaxyPositions.clear();
   const MapGeometry& galaxyBoard = BoardOrDefault(catalog, "galaxy");
   const double w = galaxyBoard.w;
@@ -881,7 +903,6 @@ void EntangleGalaxy(Catalog& catalog) {
 void ExpandChart(Catalog& catalog) {
   if (catalog.chartExpanded) { return; }
   catalog.chartExpanded = true;
-  if (catalog.regions.empty() || catalog.systems.empty()) { return; }
 
   // 1. Rebuild the authored baseline from its star table.
   StripGeneratedChart(catalog);
@@ -915,8 +936,8 @@ void ExpandChart(Catalog& catalog) {
   catalog.layerBoards["system"].zmin = kSystemZoomMin;
   catalog.layerBoards["system"].zmax = kSystemZoomMax;
 
-  // 3. Expand the galaxy layer: place every region on the galaxy board by one rule,
-  //    the ones that came in the file and the generated ones alike.
+  // 3. Build the galaxy layer's shared region pool and place every record on
+  //    the galaxy board by one rule.
   const double galDx = (galaxy.w - baseW) / 2.0;
   const double galDy = (galaxy.h - baseH) / 2.0;
   PopulateGalaxies(catalog, galDx, galDy);
@@ -958,8 +979,8 @@ void ExpandChart(Catalog& catalog) {
   std::unordered_map<std::string, std::pair<double, double>> regionAnchor;
   for (std::size_t ri = 0; ri < catalog.regions.size(); ++ri) {
     const Body& region = catalog.regions[ri];
-    // Every region is placed by this one rule, whether it came from the file or was
-    // generated: no region is the centre and none is exempt.
+    // Every region is placed by this one rule: no region is the centre and none
+    // is exempt.
     const double sx = std::clamp(region.x * (sector.w / galaxy.w), 260.0, sector.w - 260.0);
     const double sy = std::clamp(region.y * (sector.h / galaxy.h), 150.0, sector.h - 150.0);
     regionAnchor[region.id] = {sx, sy};

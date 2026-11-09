@@ -509,31 +509,31 @@
     }
   },
   "worldHistory": {
-    "gal-core": [
+    "gal-gen-18": [
       "The Compact joined crowded worlds into a common market.",
       "The archives remember agreements the markets outgrew."
     ],
-    "gal-halo": [
+    "gal-gen-24": [
       "Ice haulers carried the first lamps into the cold.",
       "Isolation makes water, shelter and a working beacon precious."
     ],
-    "gal-inner": [
+    "gal-gen-19": [
       "The first lanes were chartered by independent haulers.",
       "Old salvage rights still divide the ports."
     ],
-    "gal-outer": [
+    "gal-gen-20": [
       "Convoys built their own stations beyond the assembly's reach.",
       "Long supply lines remain their common obligation."
     ],
-    "gal-rift": [
+    "gal-gen-23": [
       "Broken lanes forced scattered havens to negotiate passage.",
       "Every crossing still relies on a promise between pilots."
     ],
-    "gal-shoal": [
+    "gal-gen-22": [
       "Wrecks and listening posts mark an older migration.",
       "The names of many vessels were lost before their signals."
     ],
-    "gal-verge": [
+    "gal-gen-21": [
       "Small harbours grew around ships that could go no farther.",
       "Weather and empty fuel tanks erase routes every year."
     ]

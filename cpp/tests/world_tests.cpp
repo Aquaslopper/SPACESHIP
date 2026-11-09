@@ -16,6 +16,7 @@
 
 #include "core/Simulation.h"
 #include "data/Catalog.h"
+#include "data/ChartExpansion.h"
 
 namespace {
 
@@ -44,28 +45,35 @@ int CountType(const std::vector<ship::Body>& bodies, const std::string& type) {
 
 }  // namespace
 
-TEST_CASE("the chart is complete and consistent", "[world]") {
-  const ship::Catalog& catalog = World();
+TEST_CASE("the expanded chart is complete and consistent", "[world]") {
+  ship::Simulation sim = ship::Simulation::NewVoyage(World());
+  const ship::Catalog& catalog = sim.World();
 
-  REQUIRE(catalog.regions.size() == 7);
-  REQUIRE(catalog.systems.size() == 48);
-  REQUIRE(catalog.bodies.size() == 243);
-  REQUIRE(catalog.ports.size() == 30);
-  REQUIRE(CountType(catalog.bodies, "star") == 50);
-  REQUIRE(CountType(catalog.bodies, "planet") == 93);
-  REQUIRE(CountType(catalog.bodies, "moon") == 48);
+  REQUIRE(catalog.regions.size() == 24);
+  REQUIRE(catalog.systems.size() ==
+          World().systems.size() +
+              static_cast<std::size_t>(ship::kNewSystemsPerRegion) * catalog.regions.size());
+  REQUIRE(catalog.bodies.size() > World().bodies.size());
+  REQUIRE(catalog.ports.size() > World().ports.size());
+  REQUIRE(CountType(catalog.bodies, "star") > 50);
+  REQUIRE(CountType(catalog.bodies, "planet") > 93);
+  REQUIRE(CountType(catalog.bodies, "moon") > 48);
 
   // Ids are unique across every layer, because a lookup never knows the layer.
   std::set<std::string> ids;
-  for (const auto* layer : {&catalog.regions, &catalog.systems, &catalog.bodies}) {
-    for (const ship::Body& body : *layer) {
+  const auto checkLayer = [&ids](const std::vector<ship::Body>& layer,
+                                 const ship::MapGeometry& board) {
+    for (const ship::Body& body : layer) {
       REQUIRE(ids.insert(body.id).second);
       REQUIRE(body.x >= 0);
-      REQUIRE(body.x <= catalog.map.w);
+      REQUIRE(body.x <= board.w);
       REQUIRE(body.y >= 0);
-      REQUIRE(body.y <= catalog.map.h);
+      REQUIRE(body.y <= board.h);
     }
-  }
+  };
+  checkLayer(catalog.regions, catalog.layerBoards.at("galaxy"));
+  checkLayer(catalog.systems, catalog.layerBoards.at("sector"));
+  checkLayer(catalog.bodies, catalog.layerBoards.at("system"));
 
   for (const ship::Body& system : catalog.systems) {
     REQUIRE(catalog.FindRegion(system.region) != nullptr);
@@ -440,7 +448,7 @@ TEST_CASE("an old save without a sector is migrated, not rejected", "[world][sav
 
   ship::Simulation restored = Fresh();
   REQUIRE(restored.LoadJson(snapshot.dump(), &why));
-  REQUIRE(restored.Map().sector == "gal-inner");
+  REQUIRE(restored.Map().sector == "gal-gen-19");
   REQUIRE(restored.Map().here == "kessler");
 }
 

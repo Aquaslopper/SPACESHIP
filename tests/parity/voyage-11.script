@@ -2,7 +2,7 @@
 # deep scan. Every looking verb here is free; only travel, watch and ack move
 # the clock.
 layer galaxy
-sector gal-inner
+sector gal-gen-19
 layer sector
 layer system
 target tolme

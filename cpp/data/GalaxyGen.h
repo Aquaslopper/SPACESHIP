@@ -40,7 +40,7 @@ namespace ship {
 // One STAR_CATALOG row, in the reference's column order.
 struct StarRow {
   std::string system;    // "sec-vance"
-  std::string region;    // "gal-inner"
+  std::string region;    // "gal-gen-19"
   std::string name;      // "Vance Cluster"
   double x = 0.0;        // position on the sector board the reference's
   double y = 0.0;        // designer laid out by hand
@@ -91,9 +91,9 @@ bool IsGeneratedSystem(const Body& system);
 
 // Removes everything BuildGalaxyFromRows() and ExpandLocalCharts() compute: the
 // forty-two created systems, every body that belongs to a system, and the ports
-// on those bodies. The authored shell - regions, Kessler's six hand-written
+// on those bodies. The authored shell - Kessler's six hand-written
 // bodies and the two ports on them, the five systems with a designer's klass -
-// is left alone, because the reference authored it too. ChartExpansion strips
+// is left alone. Galactic regions are built separately by ChartExpansion, which strips
 // before it rebuilds, so a catalogue is always the product of the current
 // generator rather than a mix of two.
 void StripGeneratedChart(Catalog& catalog);

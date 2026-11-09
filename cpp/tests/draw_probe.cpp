@@ -249,7 +249,7 @@ int main() {
 
       // Stay clear of the zoom/layer stack pinned over the chart's top-right
       // corner; those genuinely are above the chart and take the click first.
-      for (const char* regionId : {"gal-gen-1", "gal-gen-6", "gal-core"}) {
+      for (const char* regionId : {"gal-gen-1", "gal-gen-6", "gal-gen-18"}) {
         const auto mine = std::find_if(chart.bodies.begin(), chart.bodies.end(),
             [&](const ship::NavBodyView& b) { return b.id == regionId; });
         Require(mine != chart.bodies.end(), "A charted galaxy was not painted");

@@ -1146,3 +1146,30 @@ writing down rather than leaving to luck.
 
 The hard part was not the code. It was refusing to be confident about anything that
 had not been measured, and refusing to be loyal to code the owner did not write.
+
+### Entry #044
+- **Timestamp:** 2026-11-09 13:59 UTC
+- **Task:** merge the seven separately loaded galactic maps into the seventeen-entry runtime pool and remove dependencies on their old IDs.
+- **Single pool:** `GalaxyArchetypes()` now contains 24 records; `PopulateGalaxies()` builds every region through the same loop with `gal-gen-1` through `gal-gen-24` IDs.
+- **Copied content:** names, classes, detail rows, cluster values, coordinates, and empty scan rows from the seven records are retained in that shared list.
+- **Deleted source:** `assets/data/chart.json` no longer contains `galaxyBodies`, and `Catalog::LoadFromAssets` no longer has its loading path; all other chart sections remain.
+- **References migrated:** system region assignments, world-history keys, the initial home region, native tests, and the native parity script use the new generated IDs; Inner Rim is `gal-gen-19`.
+- **Links:** the nine old seven-region `galaxyLinks` entries were removed; `EntangleGalaxy()` now creates the whole topology from the 24-region pool.
+- **Guards:** empty-region/system early-outs were removed from chart expansion, save expansion no longer requires preloaded lists, and the empty-region early-out was removed from galaxy-dot placement; idempotent `chartExpanded` protection remains.
+- **Counts/tests:** the raw asset catalog now has zero preloaded regions, the voyage catalog has 24, and the affected integrity, navigation, draw-probe, and parity references were updated.
+- **Checks run:** `g++ -std=c++17 -Wall -Wextra -Wpedantic -Icpp -fsyntax-only cpp/data/ChartExpansion.cpp cpp/data/GalaxyGen.cpp` passed; all four modified JSON files parsed; static reference assertions passed; `git diff --check` passed.
+- **Tests not run:** no test suite, gameplay probe, client build, or visual check was run because the repository instructions require explicit approval before running tests.
+- **Untouched:** `Legacy code_Spaceship.txt`, `rescue/`, artwork, and the JavaScript reference tests that assert the historical HTA's original region IDs.
+
+### Entry #045
+- **Timestamp:** 2026-11-09 14:35 UTC
+- **Task:** confirm the station/system ID prefix still feeds the starmap and trade board, confirm the 24-record pool, and open a pull request for that work.
+- **Pool:** `GalaxyArchetypes()` holds 24 records; `kGalaxyCount` is 24; `PopulateGalaxies()` builds `gal-gen-1` through `gal-gen-24` from that one list.
+- **Station prefix:** authored ports stay `system.id.substr(4) + "-port"`; a system with no port receives `side + "-station"`; `port.id` is that station ID.
+- **Starmap:** `BuildStarmapPage()` resolves the berth through `BodySystem()` and lists `BodiesInSystem(systemId)`, storing each `body.id`.
+- **Trade:** `TradeBoard()` draws destinations from that same system set and stores `to = body.id`; cargo keys are `trade:` plus mode, destination ID, and good ID.
+- **Not rewritten:** `sec-*` system IDs, port IDs, and local body prefixes were not renamed by the pool edit.
+- **Rewritten separately:** authored region IDs `gal-inner` through `gal-halo` became `gal-gen-18` through `gal-gen-24`; that does not change the station prefix chain.
+- **PR:** the uncommitted pool diff is committed on `arena/e7a26639-spaceship` and opened against `main`.
+- **Checks:** no new compile, test, probe, or gameplay run in this step; the earlier syntax-only check of `ChartExpansion.cpp` and `GalaxyGen.cpp` still stands.
+- **Left untouched:** configurable galaxy count, new-game map selection, and `tests/galaxy.test.cjs`.

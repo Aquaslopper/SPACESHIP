@@ -297,7 +297,7 @@ struct SurveyRecord {
 struct MapView {
   std::string layer = "system";
   std::string here = "kessler";
-  std::string sector = "gal-inner";
+  std::string sector = "gal-gen-19";
   double zoom = 1;
   double cx = 319;
   double cy = 139;

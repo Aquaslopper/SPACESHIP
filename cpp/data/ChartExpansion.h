@@ -3,8 +3,8 @@
 //  ---------------------------------------------------------------------------
 //  Expands an authored Catalog copy before a voyage begins:
 //    * rebuilds the authored star rows and local five-body pass via GalaxyGen
-//    * widens the galaxy board and generates outer galactic regions/clusters
-//      with regional histories, traffic reports, and inter-galactic lanes
+//    * widens the galaxy board and builds all galactic regions from one shared
+//      archetype pool, with regional histories, traffic, and connecting lanes
 //    * widens the sector board, preserves authored system offsets at its core,
 //      and populates each galactic region with a coherent territory of star
 //      systems linked by intra-region lanes
@@ -25,9 +25,8 @@
 
 namespace ship {
 
-// Procedural galactic regions added around the 7 authored core regions
-// (7 + 17 = 24 galactic regions/clusters on the galaxy layer).
-constexpr int kNewGalaxies = 17;
+// Galactic regions built from the shared archetype pool.
+constexpr int kGalaxyCount = 24;
 
 // Procedural star systems drafted per galactic region
 // (48 authored + 24 * 24 = 624 star systems across the universe).

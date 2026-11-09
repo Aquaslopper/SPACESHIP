@@ -255,9 +255,6 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     catalog.layerBoards[layer] = catalog.map;
   }
 
-  for (const Json& region : Field(chart, "galaxyBodies", "chart.json")) {
-    catalog.regions.push_back(ReadBody(region, "chart.json/galaxyBodies"));
-  }
   for (const Json& system : Field(chart, "sectorBodies", "chart.json")) {
     catalog.systems.push_back(ReadBody(system, "chart.json/sectorBodies"));
   }

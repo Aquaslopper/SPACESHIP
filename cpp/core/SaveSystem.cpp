@@ -484,7 +484,7 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
   static Catalog cachedExpanded;
   Catalog adHocExpanded;
   const Catalog* catalogPtr = &catalogIn;
-  if (!catalogIn.chartExpanded && !catalogIn.regions.empty() && !catalogIn.systems.empty()) {
+  if (!catalogIn.chartExpanded) {
     const std::string key =
         catalogIn.sourceSha256 + ":" + std::to_string(catalogIn.bodies.size()) + ":" +
         std::to_string(catalogIn.systems.size()) + ":" + std::to_string(catalogIn.regions.size());
