@@ -422,6 +422,11 @@ struct GameState {
   // Every station the player has docked at. The station-to-station trade list
   // is exactly this set, less the station the player is standing in.
   std::map<std::string, bool> visitedPorts;
+  // A system keeps the id the chart gave it; the voyage gives it a number the first
+  // time the ship arrives there. The id says which place this is, the number says
+  // when this voyage met it, and neither is ever handed out twice while it lives.
+  std::map<std::string, int> systemSerials;
+  int nextSystemSerial = 1;
   std::vector<TradeContract> trades;
   // Runs that have been settled, or lost with their cargo. The board keeps
   // drawing them for the rest of the epoch, so the keys have to be remembered or

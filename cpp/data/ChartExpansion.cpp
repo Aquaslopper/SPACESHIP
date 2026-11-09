@@ -298,7 +298,7 @@ void PopulateGalaxies(Catalog& catalog, double coreDx, double coreDy) {
     double gx = galaxyBoard.cx;
     double gy = galaxyBoard.cy;
     bool placed = false;
-    for (double minGap = 210.0; minGap >= 120.0 && !placed; minGap -= 18.0) {
+    for (double minGap = 630.0; minGap >= 360.0 && !placed; minGap -= 54.0) {
       Spacer spacer(minGap, taken);
       for (int attempt = 0; attempt < 160; ++attempt) {
         const double jitterA = attempt == 0 ? rng.Range(-0.14, 0.14) : rng.Range(-0.55, 0.55);
@@ -526,9 +526,10 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
       }
     }
 
-    const double minSep = isKessler ? 38.0 : 28.0;
+    const double minSep = (isKessler ? 38.0 : 28.0) * kSystemBoardScale;
     const auto fits = [&](double x, double y, double sep) {
-      if (x < 18.0 || x > boardW - 18.0 || y < 18.0 || y > boardH - 18.0) { return false; }
+      const double inset = 18.0 * kSystemBoardScale;
+      if (x < inset || x > boardW - inset || y < inset || y > boardH - inset) { return false; }
       for (const auto& other : taken) {
         const double dx = other.first - x;
         const double dy = other.second - y;
@@ -551,8 +552,12 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
             phaseOffset + 0.61 * static_cast<double>(band) +
             6.283185307179586 * (static_cast<double>(slot) / static_cast<double>(slots)) +
             rng.Range(-0.16, 0.16);
-        const double x = std::round(std::clamp(cx + std::cos(angle) * kRings[band], 20.0, boardW - 20.0));
-        const double y = std::round(std::clamp(cy + std::sin(angle) * kRings[band] * 0.45, 20.0, boardH - 20.0));
+        const double inset = 20.0 * kSystemBoardScale;
+        const double x = std::round(
+            std::clamp(cx + std::cos(angle) * kRings[band] * kSystemBoardScale, inset, boardW - inset));
+        const double y = std::round(
+            std::clamp(cy + std::sin(angle) * kRings[band] * 0.45 * kSystemBoardScale, inset,
+                       boardH - inset));
         if (fits(x, y, minSep)) {
           outX = x;
           outY = y;
@@ -562,7 +567,9 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
       return false;
     };
 
-    const int targetExtra = isKessler ? 11 : (13 + rng.Below(7));
+    // Three times the bodies a system used to hold: more worlds, more moons, more
+    // debris, on a chart with room for them.
+    const int targetExtra = isKessler ? 33 : (39 + rng.Below(21));
     std::vector<std::pair<std::string, std::pair<double, double>>> hostPlanets;
 
     for (int k = 0; k < targetExtra; ++k) {
@@ -891,6 +898,21 @@ void ExpandChart(Catalog& catalog) {
   const double authoredW = catalog.map.w;
   const double authoredH = catalog.map.h;
 
+  // The reference 638x278 is a paper size, not a limit. The local chart is drawn on
+  // kSystemBoardScale times it, and everything authored inside a system moves with
+  // it so nothing is left stranded at the old edge.
+  const double localScale = kSystemBoardScale;
+  catalog.map.w = authoredW * localScale;
+  catalog.map.h = authoredH * localScale;
+  catalog.map.cx = catalog.map.w / 2.0;
+  catalog.map.cy = catalog.map.h / 2.0;
+  catalog.map.grid = catalog.map.grid * localScale;
+  for (Body& body : catalog.bodies) {
+    if (body.system.empty()) { continue; }
+    body.x *= localScale;
+    body.y *= localScale;
+  }
+
   // 2. Configure board geometries for all three scales.
   MapGeometry sector = catalog.map;
   sector.w = authoredW * kSectorBoardScale;
@@ -976,8 +998,17 @@ void ExpandChart(Catalog& catalog) {
         continue;
       }
     }
-    const double sx = std::clamp(region.x * (sector.w / galaxy.w), 260.0, sector.w - 260.0);
-    const double sy = std::clamp(region.y * (sector.h / galaxy.h), 150.0, sector.h - 150.0);
+    // The sector is a disc, not a rectangle: each region's territory is pulled onto
+    // one ellipse centred on the board, so the outermost regions sit on the rim and
+    // no system is left in a corner.
+    const double rx = (sector.w * 0.5) - 420.0;
+    const double ry = (sector.h * 0.5) - 420.0;
+    const double nx = (region.x - galaxy.w * 0.5) / std::max(1.0, galaxy.w * 0.5);
+    const double ny = (region.y - galaxy.h * 0.5) / std::max(1.0, galaxy.h * 0.5);
+    const double len = std::sqrt(nx * nx + ny * ny);
+    const double squeeze = len > 1.0 ? (1.0 / len) : len;
+    const double sx = std::clamp(sector.w * 0.5 + nx * squeeze * rx, 300.0, sector.w - 300.0);
+    const double sy = std::clamp(sector.h * 0.5 + ny * squeeze * ry, 220.0, sector.h - 220.0);
     regionAnchor[region.id] = {sx, sy};
   }
 
@@ -1009,13 +1040,15 @@ void ExpandChart(Catalog& catalog) {
       bool found = false;
       // Keep every system within ~390x185 px of its regional anchor so any pair
       // inside the same region stays within ~850 px (<= 41 fuel/actions).
-      for (double minGap = 46.0; minGap >= 20.0 && !found; minGap -= 4.0) {
+      for (double minGap = 138.0; minGap >= 60.0 && !found; minGap -= 12.0) {
         Spacer test(minGap, placed);
         for (int attempt = 0; attempt < 180; ++attempt) {
           const double angle = rng.Range(0.0, 6.283185307179586);
           const double radial = std::sqrt(rng.Next());
-          const double spreadX = 370.0;
-          const double spreadY = 175.0;
+          // A disc around the anchor, three times the radius the six-times board
+          // used, so sixty-four systems per region still have chart between them.
+          const double spreadX = 1110.0;
+          const double spreadY = 525.0;
           const double cx = std::round(std::clamp(
               anchor.first + std::cos(angle) * radial * spreadX, margin, sector.w - margin));
           const double cy = std::round(std::clamp(

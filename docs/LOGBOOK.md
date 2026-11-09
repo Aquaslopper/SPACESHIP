@@ -1146,3 +1146,32 @@ writing down rather than leaving to luck.
 
 The hard part was not the code. It was refusing to be confident about anything that
 had not been measured, and refusing to be loyal to code the owner did not write.
+
+## 081 — The boards tripled, and the sector became a disc
+
+The reference 638x278 is a paper size, not the size of the world. Changed, at the
+owner's instruction:
+
+  system board   638 x 278  ->  1914 x 834   (kSystemBoardScale = 3)
+  sector board   3828 x 1668 -> 11484 x 5004 (kSectorBoardScale = 6 -> 18)
+  galaxy board   2552 x 1112 -> 7656 x 3336  (kGalaxyBoardScale = 4 -> 12)
+
+Every authored body inside a system is multiplied by kSystemBoardScale so nothing is
+left at the old edge, and the local orbital rings, their separation and their insets
+scale with them.
+
+More objects, not only more board:
+  systems per region   24 -> 64  (48 authored + 24 regions x 64 = 1584 systems)
+  bodies per system    13..19 -> 39..59 extra per system, Kessler 11 -> 33
+
+The sector is a disc: each region's territory is pulled onto one ellipse centred on
+the board, so the outer regions sit on the rim and no system lands in a corner.
+Territories grew to match (spread 370x175 -> 1110x525, spacing 46..20 -> 138..60), and
+galaxies keep their distance on the wider board (210..120 -> 630..360).
+
+Zoom ladders opened to reach the new sizes: sector/galaxy 0.3..30, local 0.6..7.5.
+
+CHECKED: cpp/data/ChartExpansion.cpp, cpp/core/Action.cpp, cpp/core/SaveSystem.cpp all
+compile clean with -Wall -Wextra against the pinned raylib/imgui/nlohmann headers.
+NOT CHECKED: generation cost and the drawn result. 1584 systems at three times the
+bodies is about 7.5 times the work of the old chart; start-up time is unmeasured.

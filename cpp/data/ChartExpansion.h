@@ -31,22 +31,26 @@ constexpr int kNewGalaxies = 17;
 
 // Procedural star systems drafted per galactic region
 // (48 authored + 24 * 24 = 624 star systems across the universe).
-constexpr int kNewSystemsPerRegion = 24;
+constexpr int kNewSystemsPerRegion = 64;
 
 // Board multipliers relative to the 638x278 reference viewport.
 // Authored core regions and systems are translated to the board centre so
 // pairwise distances between authored destinations remain unchanged.
-constexpr double kSectorBoardScale = 6.0;
-constexpr double kGalaxyBoardScale = 4.0;
+constexpr double kSectorBoardScale = 18.0;
+constexpr double kGalaxyBoardScale = 12.0;
+
+// The local chart is not the 638x278 the data was written against. Three times
+// that in each direction, with everything authored inside a system moving with it.
+constexpr double kSystemBoardScale = 3.0;
 
 // Zoom ladder for the wide sector and galaxy boards.
 constexpr double kZoomMin = 0.3;
-constexpr double kZoomMax = 10.0;
+constexpr double kZoomMax = 30.0;
 constexpr double kZoomStep = 0.2;
 
 // Zoom ladder for the local system chart.
 constexpr double kSystemZoomMin = 0.6;
-constexpr double kSystemZoomMax = 2.5;
+constexpr double kSystemZoomMax = 7.5;
 
 void ExpandChart(Catalog& catalog);
 void PopulateGalaxies(Catalog& catalog, double coreDx, double coreDy);
