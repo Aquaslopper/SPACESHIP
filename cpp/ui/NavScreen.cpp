@@ -80,19 +80,19 @@ std::vector<const Body*> LayerBodies(const Simulation& sim) {
 
 double BodySize(const Body& body, const std::string& layer) {
   double size = 16;
-  if (body.type == "station") { size = 18; }
-  if (body.type == "origin") { size = 14; }
-  if (body.type == "moon") { size = 12; }
-  if (body.subtype == "gas") { size = 20; }
-  if (body.type == "system") { size = 18; }
-  if (body.type == "region") { size = 22; }
+  if (body.type == "station") { size = 28; }
+  if (body.type == "origin") { size = 34; }
+  if (body.type == "moon") { size = 22; }
+  if (body.subtype == "gas") { size = 30; }
+  if (body.type == "system") { size = 38; }
+  if (body.type == "region") { size = 32; }
   // The local chart is drawn on a board three times the old one, so a world that was
   // sixteen pixels there is a third of the size it used to be. The wide scales keep
   // their sizes; the worlds of a system grow with the board they sit on.
   if (layer == "system") {
-    size *= 1.75;
-    if (body.type == "moon") { size = 20; }
-    if (body.subtype == "gas") { size = 34; }
+    size *= 2.75;
+    if (body.type == "moon") { size = 30; }
+    if (body.subtype == "gas") { size = 44; }
   }
   return size;
 }
