@@ -882,27 +882,6 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
         sim, "Dock at " + port->name, true, std::string(), "space", 0));
   }
 
-  // The band's two notes: what standing watch costs, then why a button may be
-  // off.
-  model.notes.push_back(
-      "Standing watch spends one click and needs no item; work and survival "
-      "clocks advance, with normal resource use.");
-  if (energy <= 0) {
-    model.notes.push_back("Restore energy to use navigation and sensors.");
-  } else if (sim.State().engineCondition <= 0) {
-    model.notes.push_back("The drive needs maintenance before travel.");
-  } else if (reach && !hereTarget && target != nullptr &&
-             fuel < sim.MetricsFor(*target).fuel) {
-    model.notes.push_back("Insufficient fuel. Right-click the fuel gauge to refuel.");
-  } else if (running != nullptr) {
-    model.notes.push_back("A crossing is already under way.");
-  } else {
-    model.notes.push_back(
-        "Committing costs one click now, then the distance in clicks spent "
-        "elsewhere aboard the ship. A deep scan costs one click now and " +
-        Num(SimScanCost(sim)) + " spent elsewhere.");
-  }
-  for (const std::string& note : model.notes) { actions.Dim(note); }
   screen.band = {actions};
 
   screen.hasStage = true;
