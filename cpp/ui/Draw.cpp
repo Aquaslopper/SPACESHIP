@@ -2543,28 +2543,38 @@ void ShellView::PaintSettingsControls(Simulation& sim, const PopupModel& model) 
         if (button(model.fullscreenLabel, "fullscreen")) { action("fullscreen"); }
       }
       {
-        // A dial reports when the hand lets go of it: every step of a drag would
-        // otherwise draw a new sky, and the last one is the only one that lasts. The
-        // report is a plain deactivation rather than an edit, because SetChartDials()
-        // compares the four numbers itself and does nothing when they did not move.
-        int galaxies = model.outerGalaxies;
-        ImGui::SetNextItemWidth(-1);
-        ImGui::SliderInt("##outer-galaxies", &galaxies, 0, 64, "Outer galaxies: %d");
-        if (ImGui::IsItemDeactivated()) { action("galaxies", std::to_string(galaxies)); }
-        int systems = model.systemsPerRegion;
-        ImGui::SetNextItemWidth(-1);
-        ImGui::SliderInt("##systems-per-region", &systems, 8, 96, "Systems per region: %d");
-        if (ImGui::IsItemDeactivated()) {
-          action("systems-per-region", std::to_string(systems));
+        // A dial reports when the hand lets go of it, and it reports the number the
+        // hand left it on. The value the row is handed back on the release frame is
+        // the model's again - ImGui has stopped writing to it by then - so the number
+        // is remembered while it is being dragged and read back on release.
+        ImGuiStorage* storage = ImGui::GetStateStorage();
+        struct Dial {
+          const char* id;
+          const char* action;
+          const char* label;
+          int value;
+          int lo;
+          int hi;
+        };
+        const Dial dials[] = {
+            {"##outer-galaxies", "galaxies", "Outer galaxies: %d", model.outerGalaxies, 0, 64},
+            {"##systems-per-region", "systems-per-region", "Systems per region: %d",
+             model.systemsPerRegion, 8, 96},
+            {"##chaos", "chaos", "Chaos: %d%%", model.chaosPercent, 0, 100},
+            {"##stations", "stations", "Stations: %d%%", model.stations, 0, 100},
+        };
+        for (const Dial& dial : dials) {
+          const ImGuiID key = ImGui::GetID(dial.id);
+          int value = dial.value;
+          ImGui::SetNextItemWidth(-1);
+          if (ImGui::SliderInt(dial.id, &value, dial.lo, dial.hi, dial.label)) {
+            storage->SetInt(key, value);
+          }
+          if (ImGui::IsItemDeactivated()) {
+            const int pending = storage->GetInt(key, dial.value);
+            if (pending != dial.value) { action(dial.action, std::to_string(pending)); }
+          }
         }
-        int chaos = model.chaosPercent;
-        ImGui::SetNextItemWidth(-1);
-        ImGui::SliderInt("##chaos", &chaos, 0, 100, "Chaos: %d%%");
-        if (ImGui::IsItemDeactivated()) { action("chaos", std::to_string(chaos)); }
-        int stations = model.stations;
-        ImGui::SetNextItemWidth(-1);
-        ImGui::SliderInt("##stations", &stations, 0, 100, "Stations: %d%%");
-        if (ImGui::IsItemDeactivated()) { action("stations", std::to_string(stations)); }
       }
 }
 

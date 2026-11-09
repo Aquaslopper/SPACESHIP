@@ -1416,3 +1416,34 @@ branch only removed rows and prose from that screen, never added one.
 CHECKED: cpp/ui/{Draw,Popups}.cpp compile clean with -Wall -Wextra -fsyntax-only (one
 pre-existing unused-variable warning in PaintTaskScreen, untouched).
 NOT CHECKED: the picture.
+
+## 091 - the sliders snapped back because they reported the wrong number
+
+Reproduced with a headless ImGui context and synthetic mouse input, driving the exact row
+the settings sheet draws:
+
+  frame: x=5   down=0 local=34 active=0 deact=0    settle
+  frame: x=200 down=1 local=32 active=1            press on the track
+  frame: x=240 down=1 local=39 active=1            drag
+  frame: x=290 down=1 local=48 active=1            drag
+  frame: x=290 down=0 local=34 active=0 deact=1    release
+
+The row committed, on release, with 34 - the model's own value. By the release frame ImGui
+has stopped writing into the row's local variable, so the local is re-initialised from the
+model; the drag is gone by then. `IsItemDeactivatedAfterEdit()` was therefore reported as
+true and carried no news, and `SetChartDials()` saw "no change" and drew nothing, which is
+the thumb returning to where it started.
+
+The row now remembers the number while the hand is on it, in ImGui's own per-item state
+storage, and reads that back on release. Same probe, after:
+
+  frame: x=290 down=0 local=34 active=0 deact=1 afterEdit=1
+  committed yes, value 48 (stored 34)
+
+Four rows are now one loop over a small table, so the pattern cannot drift between them.
+
+CHECKED: cpp/ui/Draw.cpp compiles clean with -Wall -Wextra -fsyntax-only (one pre-existing
+unused-variable warning, untouched); the commit value was proved with the headless ImGui
+probe above, not by reading the code.
+NOT CHECKED: the real window. Whether the redraw freeze that follows a release is short
+enough to feel like a dial rather than a stall.
