@@ -2,19 +2,19 @@
   "comment": "Handbook, palettes, layout and pacing constants.",
   "cooldownRules": {
     "critical": {
-      "actions": 20,
+      "actions": 1,
       "label": "Critical"
     },
     "routine": {
-      "actions": 5,
+      "actions": 1,
       "label": "Routine"
     },
     "space": {
-      "actions": 15,
+      "actions": 1,
       "label": "Space operations"
     },
     "systems": {
-      "actions": 10,
+      "actions": 1,
       "label": "Ship systems"
     }
   },
