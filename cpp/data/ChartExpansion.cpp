@@ -888,19 +888,19 @@ void ExpandChart(Catalog& catalog) {
   BuildGalaxyFromRows(AuthoredStarCatalog(), 0, catalog, /*linkHubs=*/true);
   ExpandLocalCharts(catalog, 0);
 
-  const double authoredW = catalog.map.w;
-  const double authoredH = catalog.map.h;
+  const double baseW = catalog.map.w;
+  const double baseH = catalog.map.h;
 
   // 2. Configure board geometries for all three scales.
   MapGeometry sector = catalog.map;
-  sector.w = authoredW * kSectorBoardScale;
-  sector.h = authoredH * kSectorBoardScale;
+  sector.w = baseW * kSectorBoardScale;
+  sector.h = baseH * kSectorBoardScale;
   sector.cx = sector.w / 2.0;
   sector.cy = sector.h / 2.0;
 
   MapGeometry galaxy = catalog.map;
-  galaxy.w = authoredW * kGalaxyBoardScale;
-  galaxy.h = authoredH * kGalaxyBoardScale;
+  galaxy.w = baseW * kGalaxyBoardScale;
+  galaxy.h = baseH * kGalaxyBoardScale;
   galaxy.cx = galaxy.w / 2.0;
   galaxy.cy = galaxy.h / 2.0;
 
@@ -915,18 +915,16 @@ void ExpandChart(Catalog& catalog) {
   catalog.layerBoards["system"].zmin = kSystemZoomMin;
   catalog.layerBoards["system"].zmax = kSystemZoomMax;
 
-  // 3. Expand the galaxy layer: translate the 7 authored regions to the central
-  //    core (preserving all authored inter-region distances) and generate outer
-  //    galactic clusters/dwarf galaxies around them.
-  const std::size_t authoredRegionCount = catalog.regions.size();
-  const double galDx = (galaxy.w - authoredW) / 2.0;
-  const double galDy = (galaxy.h - authoredH) / 2.0;
+  // 3. Expand the galaxy layer: place every region on the galaxy board by one rule,
+  //    the ones that came in the file and the generated ones alike.
+  const double galDx = (galaxy.w - baseW) / 2.0;
+  const double galDy = (galaxy.h - baseH) / 2.0;
   PopulateGalaxies(catalog, galDx, galDy);
 
-  // 4. Translate authored systems to the centre of the wide sector board and
+  // 4. Translate the systems to the centre of the wide sector board and
   //    separate stacked positions.
-  const double secDx = (sector.w - authoredW) / 2.0;
-  const double secDy = (sector.h - authoredH) / 2.0;
+  const double secDx = (sector.w - baseW) / 2.0;
+  const double secDy = (sector.h - baseH) / 2.0;
   for (Body& system : catalog.systems) {
     system.x += secDx;
     system.y += secDy;
@@ -960,22 +958,8 @@ void ExpandChart(Catalog& catalog) {
   std::unordered_map<std::string, std::pair<double, double>> regionAnchor;
   for (std::size_t ri = 0; ri < catalog.regions.size(); ++ri) {
     const Body& region = catalog.regions[ri];
-    if (ri < authoredRegionCount) {
-      double sumX = 0.0;
-      double sumY = 0.0;
-      int n = 0;
-      for (const Body& sys : catalog.systems) {
-        if (sys.region == region.id) {
-          sumX += sys.x;
-          sumY += sys.y;
-          ++n;
-        }
-      }
-      if (n > 0) {
-        regionAnchor[region.id] = {sumX / static_cast<double>(n), sumY / static_cast<double>(n)};
-        continue;
-      }
-    }
+    // Every region is placed by this one rule, whether it came from the file or was
+    // generated: no region is the centre and none is exempt.
     const double sx = std::clamp(region.x * (sector.w / galaxy.w), 260.0, sector.w - 260.0);
     const double sy = std::clamp(region.y * (sector.h / galaxy.h), 150.0, sector.h - 150.0);
     regionAnchor[region.id] = {sx, sy};
