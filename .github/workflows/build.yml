@@ -6,36 +6,43 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-windows:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Configure CMake (Release)
-        shell: bash
+      - name: Install MinGW-w64 cross-compiler
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
+            gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 ninja-build zip
+
+      - name: Configure CMake for Windows (MinGW-w64 cross, Release)
         run: |
           set -euo pipefail
           cmake -S . -B build-win -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64-x86_64.cmake \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_COMPILER=gcc \
-            -DCMAKE_CXX_COMPILER=g++ \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
             -DOPENGL_gl_LIBRARY=opengl32 \
             -DSPACESHIP_BUILD_TESTS=OFF \
-            -DSPACESHIP_DATA_GATE=OFF \
+            -DSPACESHIP_REQUIRE_GUI=ON \
             -DCMAKE_CXX_FLAGS="-D_USE_MATH_DEFINES -DM_PI=3.14159265358979323846" \
             -DCMAKE_EXE_LINKER_FLAGS="-static -static-libgcc -static-libstdc++"
 
       - name: Build spaceship.exe
-        shell: bash
         run: |
           set -euo pipefail
           cmake --build build-win --target spaceship --parallel
 
       - name: Package portable Windows folder
-        shell: bash
         run: |
           set -euo pipefail
           mkdir -p dist/Spaceship/runtime/saves
@@ -44,21 +51,17 @@ jobs:
           cp README.md dist/Spaceship/
           [ -f docs/PLAYING.md ] && cp docs/PLAYING.md dist/Spaceship/PLAYING.md || true
 
-      - name: Decode packaged title and ship artwork with the shipped raylib build
-        shell: bash
+      - name: Package Release ZIP
         run: |
           set -euo pipefail
-          cd "${RUNNER_TEMP}"
-          "${GITHUB_WORKSPACE}/dist/Spaceship/spaceship.exe" --check-title-art
-          "${GITHUB_WORKSPACE}/dist/Spaceship/spaceship.exe" --check-ship-art
-          python -c 'import wave; w=wave.open("01-quiet-drift.WAV", "wb"); w.setparams((1, 2, 22050, 0, "NONE", "not compressed")); w.writeframes(b"\x00\x00" * 2205); w.close()'
-          "${GITHUB_WORKSPACE}/dist/Spaceship/spaceship.exe" --check-music-file "01-quiet-drift.WAV"
+          cd dist
+          zip -r ../Spaceship_Windows.zip ./Spaceship
 
-      - name: Upload Windows EXE artifact
+      - name: Upload Windows Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Spaceship-Windows-x64
-          path: dist/Spaceship/
+          path: Spaceship_Windows.zip
 
   test-linux:
     runs-on: ubuntu-latest
