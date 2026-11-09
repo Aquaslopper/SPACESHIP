@@ -251,6 +251,7 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
   // Every scale is drawn on the authored board until ExpandChart() widens the
   // sector one. Keeping the entry here means a catalogue that is never expanded
   // still answers for all three layers.
+  catalog.paper = catalog.map;
   for (const std::string& layer : catalog.layerOrder) {
     catalog.layerBoards[layer] = catalog.map;
   }

@@ -1466,3 +1466,30 @@ What the navigation screen still draws is labels, not prose:
 
 CHECKED: cpp/ui/NavScreen.cpp compiles clean with -Wall -Wextra -fsyntax-only.
 NOT CHECKED: the picture.
+
+## 093 - the board is multiplied from the paper, not from itself
+
+After a dial moved, every star and planet gathered into one ball. The boards were growing
+under the redraw: `ExpandChart()` took `authoredW = catalog.map.w`, and on a redraw
+`catalog.map` is already the board the last pass produced - 1914x834 instead of the chart
+file's 638x278 - so the next pass multiplied its own result: local 5742x2502, sector
+34452x15012. The window did not change, so at zoom 1 it was showing a 1600 px slice of a
+board three times too wide: one cluster of stars filling the frame.
+
+`Catalog::paper` is the board `chart.json` wrote, recorded once by the loader. Every layer
+board is now `paper` multiplied, and `catalog.map` is reset from it at the top of a pass,
+so a redraw is the same redraw however many times it runs.
+
+Measured through the real settings action, three dial moves:
+
+  start    systems 2246 regions 41 | local 1914x834 sector 11484x5004 galaxy 7656x3336
+  galaxies 34 -> 50     3270    57 | local 1914x834 sector 11484x5004 galaxy 7656x3336
+  chaos 50 -> 80        3270    57 | local 1914x834 sector 11484x5004 galaxy 7656x3336
+  systems/region 64 -> 32  1635  57 | local 1914x834 sector 11484x5004 galaxy 7656x3336
+
+The boards do not move; the counts follow the dials.
+
+CHECKED: cpp/data/{Catalog,ChartExpansion}.cpp compile clean with -fsyntax-only; the numbers
+are the output of a probe that drives `PressPopupAction` against a real Simulation.
+NOT CHECKED: the picture. Whether the view is where it was is his to see - the board no
+longer moves under the camera, which is the part that made it a ball.

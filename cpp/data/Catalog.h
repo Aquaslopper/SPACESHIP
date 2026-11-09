@@ -62,6 +62,11 @@ class Catalog {
 
   MapGeometry map;
 
+  // The board as the chart file wrote it, before any scale is applied. Every board
+  // in `layerBoards` is this board multiplied, so a second pass multiplies this and
+  // not its own result.
+  MapGeometry paper;
+
   // The board each scale is drawn on. The system chart keeps the reference's
   // 638x278 board exactly; ChartExpansion() widens the sector board so every
   // system can own a position instead of six of them sharing one dot. A layer

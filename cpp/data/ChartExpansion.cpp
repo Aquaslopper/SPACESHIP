@@ -962,13 +962,18 @@ void ExpandChart(Catalog& catalog) {
   // 1. Start from the regions alone. Every system, world and dock below is drawn.
   StripGeneratedChart(catalog);
 
-  const double authoredW = catalog.map.w;
-  const double authoredH = catalog.map.h;
+  // The paper the chart file drew, not whatever the last pass left behind: a redraw
+  // that multiplied its own result would grow the board by nine every time, and a
+  // window that never changed would end up looking at one ball of stars.
+  if (catalog.paper.w <= 0.0 || catalog.paper.h <= 0.0) { catalog.paper = catalog.map; }
+  const double authoredW = catalog.paper.w;
+  const double authoredH = catalog.paper.h;
 
   // The reference 638x278 is a paper size, not a limit. The local chart is drawn on
   // kSystemBoardScale times it, and everything authored inside a system moves with
   // it so nothing is left stranded at the old edge.
   const double localScale = kSystemBoardScale;
+  catalog.map = catalog.paper;
   catalog.map.w = authoredW * localScale;
   catalog.map.h = authoredH * localScale;
   catalog.map.cx = catalog.map.w / 2.0;
