@@ -2544,8 +2544,15 @@ void ShellView::PaintSettingsControls(Simulation& sim, const PopupModel& model) 
       heading("The sky");
       text("The words below draw the whole chart: the same words always draw the same "
            "stars. Changing the words, the count or the density starts a new voyage.");
+      // The buffer belongs to the reader's fingers, not to the model. Refreshed only
+      // when the sky changes underneath it - otherwise every frame rewrote what had
+      // just been typed, and a seed could never be entered at all.
       static char seedWords[32] = "";
-      std::snprintf(seedWords, sizeof seedWords, "%s", model.universeSeed.c_str());
+      static std::string seedSeen;
+      if (seedSeen != model.universeSeed) {
+        std::snprintf(seedWords, sizeof seedWords, "%s", model.universeSeed.c_str());
+        seedSeen = model.universeSeed;
+      }
       ImGui::SetNextItemWidth(-1);
       if (ImGui::InputText("##sky-seed", seedWords, sizeof seedWords,
                            ImGuiInputTextFlags_EnterReturnsTrue)) {

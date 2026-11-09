@@ -1688,3 +1688,22 @@ NOT VERIFIED: the painting of that card (cpp/ui/Draw.cpp) cannot be compiled her
 raylib and imgui are absent - so the glow, the transparency and the click were
 checked by reading only. Everything in the model and the generator above was run.
 The Catch2 suite was not run; nav_tests.cpp now asks for the card instead of the row.
+
+## 079 — The nav band speaks only when it has a reason
+
+Two lines of tutorial were back under the command row: "Standing watch spends one
+click and needs no item..." and "Committing costs one click now, then the distance in
+clicks spent elsewhere aboard the ship...". Both were pushed unconditionally by
+BuildNavScreen. Removed, with the stale comment that described them.
+
+What is left is a reason for a disabled button and nothing else: no energy, dead
+drive, not enough fuel, a crossing already running.
+
+Measured (/home/user/probe/notes, exit 0):
+  idle nav band, target none: 0 notes, 1 commands
+  with a world selected: 0 notes
+  no energy: 1 notes -> "Restore energy to use navigation and sensors."
+
+Check run: tools/check-gui-syntax.sh with the pinned raylib 6.0 / imgui 1.92.7 /
+rlImGui headers fetched into /tmp/gui - Draw.cpp, AudioDevice.cpp, main.cpp and
+NavScreen.cpp clean under -Wall -Wextra -Wpedantic.
