@@ -204,11 +204,9 @@ bool PressTitleAction(Simulation& sim, const std::string& action, const std::str
   if (fromVoyage == nullptr || panel == nullptr || slot == nullptr) { return false; }
 
   if (action == "new-voyage" || action == "start-voyage") {
-    sim.RestartVoyage();
     *fromVoyage = false;
-    *panel = TitlePanel::None;
-    if (titleActive != nullptr) { *titleActive = false; }
-    if (message != nullptr) { *message = "A new voyage has begun."; }
+    *panel = TitlePanel::Setup;
+    if (message != nullptr) { *message = std::string(); }
     return true;
   }
   if (action == "load") { *panel = TitlePanel::Load; return true; }
@@ -337,8 +335,8 @@ bool PressLossAction(Simulation& sim, const std::string& action, const std::stri
     return true;
   }
   if (action == "new-voyage") {
-    sim.RestartVoyage();
-    if (message != nullptr) { *message = "A new voyage has begun."; }
+    *toTitle = true;
+    if (message != nullptr) { *message = std::string(); }
     return true;
   }
   if (action == "main-menu") {

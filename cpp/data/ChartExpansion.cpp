@@ -277,23 +277,26 @@ void PopulateGalaxies(Catalog& catalog, double coreDx, double coreDy) {
     taken.emplace_back(region.x, region.y);
   }
 
-  Rng rng(0x47414C4158593234ULL);  // "GALAXY24"
+  const ChartSettings& settings = catalog.chartSettings;
+  const int galaxyCount = std::max(0, settings.galaxies);
+  Rng rng(settings.seed ^ 0x47414C4158593234ULL);
   const auto& archetypes = GalaxyArchetypes();
   const double marginX = 120.0;
   const double marginY = 82.0;
+  const double spread = settings.spread <= 0.0 ? 1.0 : settings.spread;
 
   // Arrange outer galaxies on two elliptical rings around the core disc so
   // every quadrant of the galaxy board has reachable clusters without crowding.
-  for (int i = 0; i < kNewGalaxies; ++i) {
+  for (int i = 0; i < galaxyCount; ++i) {
     const GalaxyArchetype& arch = archetypes[static_cast<std::size_t>(i) % archetypes.size()];
     const bool outerRing = (i >= 8);
     const int ringIndex = outerRing ? (i - 8) : i;
-    const int ringCount = outerRing ? (kNewGalaxies - 8) : std::min(8, kNewGalaxies);
+    const int ringCount = outerRing ? (std::max(1, galaxyCount - 8)) : std::min(8, galaxyCount);
     const double baseAngle =
         6.283185307179586 * (static_cast<double>(ringIndex) / static_cast<double>(ringCount)) +
         (outerRing ? 0.34 : 0.11);
-    const double rx = outerRing ? (galaxyBoard.w * 0.43) : (galaxyBoard.w * 0.28);
-    const double ry = outerRing ? (galaxyBoard.h * 0.40) : (galaxyBoard.h * 0.27);
+    const double rx = (outerRing ? (galaxyBoard.w * 0.43) : (galaxyBoard.w * 0.28)) * spread;
+    const double ry = (outerRing ? (galaxyBoard.h * 0.40) : (galaxyBoard.h * 0.27)) * spread;
 
     double gx = galaxyBoard.cx;
     double gy = galaxyBoard.cy;
@@ -878,8 +881,11 @@ void EntangleGalaxy(Catalog& catalog) {
   }
 }
 
-void ExpandChart(Catalog& catalog) {
+void ExpandChart(Catalog& catalog) { ExpandChart(catalog, catalog.chartSettings); }
+
+void ExpandChart(Catalog& catalog, const ChartSettings& settings) {
   if (catalog.chartExpanded) { return; }
+  catalog.chartSettings = settings;
   catalog.chartExpanded = true;
   if (catalog.regions.empty() || catalog.systems.empty()) { return; }
 
@@ -887,17 +893,18 @@ void ExpandChart(Catalog& catalog) {
   // the generator below; the places themselves are discarded.
   const double baseW = catalog.map.w;
   const double baseH = catalog.map.h;
+  const double mapScale = settings.mapScale <= 0.0 ? 1.0 : settings.mapScale;
 
   // 1. Configure board geometries for all three scales.
   MapGeometry sector = catalog.map;
-  sector.w = baseW * kSectorBoardScale;
-  sector.h = baseH * kSectorBoardScale;
+  sector.w = baseW * kSectorBoardScale * mapScale;
+  sector.h = baseH * kSectorBoardScale * mapScale;
   sector.cx = sector.w / 2.0;
   sector.cy = sector.h / 2.0;
 
   MapGeometry galaxy = catalog.map;
-  galaxy.w = baseW * kGalaxyBoardScale;
-  galaxy.h = baseH * kGalaxyBoardScale;
+  galaxy.w = baseW * kGalaxyBoardScale * mapScale;
+  galaxy.h = baseH * kGalaxyBoardScale * mapScale;
   galaxy.cx = galaxy.w / 2.0;
   galaxy.cy = galaxy.h / 2.0;
 
@@ -988,8 +995,9 @@ void ExpandChart(Catalog& catalog) {
                  static_cast<std::size_t>(kNewSystemsPerRegion) * catalog.regions.size());
   for (const Body& system : catalog.systems) { placed.emplace_back(system.x, system.y); }
 
-  Rng rng(0x5350414345534849ULL);
+  Rng rng(settings.seed);
   const double margin = 42.0;
+  const double spread = settings.spread <= 0.0 ? 1.0 : settings.spread;
   const std::size_t baseIndex = catalog.systems.size();
   std::vector<StarRow> rows;
   rows.reserve(static_cast<std::size_t>(kNewSystemsPerRegion) * catalog.regions.size());
@@ -1008,8 +1016,8 @@ void ExpandChart(Catalog& catalog) {
         for (int attempt = 0; attempt < 180; ++attempt) {
           const double angle = rng.Range(0.0, 6.283185307179586);
           const double radial = std::sqrt(rng.Next());
-          const double spreadX = 370.0;
-          const double spreadY = 175.0;
+          const double spreadX = 370.0 * spread;
+          const double spreadY = 175.0 * spread;
           const double cx = std::round(std::clamp(
               anchor.first + std::cos(angle) * radial * spreadX, margin, sector.w - margin));
           const double cy = std::round(std::clamp(
@@ -1113,6 +1121,108 @@ void ExpandChart(Catalog& catalog) {
   catalog.counts.ports = static_cast<int>(catalog.ports.size());
   catalog.counts.lanes = static_cast<int>(catalog.sectorLanes.size());
   catalog.RebuildIndex();
+}
+
+ChartPreview BuildChartPreview(const Catalog& catalog, const ChartSettings& settings) {
+  ChartPreview preview;
+  preview.settings = settings;
+  const double baseW = catalog.map.w <= 0 ? 638.0 : catalog.map.w;
+  const double baseH = catalog.map.h <= 0 ? 278.0 : catalog.map.h;
+  const double mapScale = settings.mapScale <= 0.0 ? 1.0 : settings.mapScale;
+  preview.galaxyW = baseW * kGalaxyBoardScale * mapScale;
+  preview.galaxyH = baseH * kGalaxyBoardScale * mapScale;
+  preview.sectorW = baseW * kSectorBoardScale * mapScale;
+  preview.sectorH = baseH * kSectorBoardScale * mapScale;
+
+  Catalog scratch;
+  scratch.map = catalog.map;
+  scratch.chartSettings = settings;
+  scratch.layerBoards["galaxy"].w = preview.galaxyW;
+  scratch.layerBoards["galaxy"].h = preview.galaxyH;
+  scratch.layerBoards["galaxy"].cx = preview.galaxyW / 2.0;
+  scratch.layerBoards["galaxy"].cy = preview.galaxyH / 2.0;
+  scratch.layerBoards["sector"].w = preview.sectorW;
+  scratch.layerBoards["sector"].h = preview.sectorH;
+  scratch.layerBoards["sector"].cx = preview.sectorW / 2.0;
+  scratch.layerBoards["sector"].cy = preview.sectorH / 2.0;
+  PopulateGalaxies(scratch, 0.0, 0.0);
+
+  MapGeometry sector = scratch.layerBoards["sector"];
+  MapGeometry galaxy = scratch.layerBoards["galaxy"];
+  std::unordered_map<std::string, std::pair<double, double>> regionAnchor;
+  for (const Body& region : scratch.regions) {
+    ChartPreviewDot dot;
+    dot.id = region.id;
+    dot.name = region.name;
+    dot.x = region.x;
+    dot.y = region.y;
+    preview.galaxies.push_back(dot);
+    const double sx = std::clamp(region.x * (sector.w / galaxy.w), 260.0, sector.w - 260.0);
+    const double sy = std::clamp(region.y * (sector.h / galaxy.h), 150.0, sector.h - 150.0);
+    regionAnchor[region.id] = {sx, sy};
+  }
+
+  std::set<std::string> systemNames;
+  std::vector<std::string> profiles;
+  for (const auto& entry : catalog.portPrices) { profiles.push_back(entry.first); }
+  std::sort(profiles.begin(), profiles.end());
+  std::vector<std::pair<double, double>> placed;
+  Rng rng(settings.seed);
+  const double margin = 42.0;
+  const double spread = settings.spread <= 0.0 ? 1.0 : settings.spread;
+  int serial = 0;
+  for (const Body& region : scratch.regions) {
+    const auto anchor = regionAnchor[region.id];
+    for (int n = 0; n < kNewSystemsPerRegion; ++n) {
+      double x = 0.0;
+      double y = 0.0;
+      bool found = false;
+      for (double minGap = 46.0; minGap >= 20.0 && !found; minGap -= 4.0) {
+        Spacer test(minGap, placed);
+        for (int attempt = 0; attempt < 180; ++attempt) {
+          const double angle = rng.Range(0.0, 6.283185307179586);
+          const double radial = std::sqrt(rng.Next());
+          const double spreadX = 370.0 * spread;
+          const double spreadY = 175.0 * spread;
+          const double cx = std::round(std::clamp(
+              anchor.first + std::cos(angle) * radial * spreadX, margin, sector.w - margin));
+          const double cy = std::round(std::clamp(
+              anchor.second + std::sin(angle) * radial * spreadY, margin, sector.h - margin));
+          if (test.Fits(cx, cy)) {
+            x = cx;
+            y = cy;
+            found = true;
+            break;
+          }
+        }
+      }
+      if (!found) { continue; }
+      ++serial;
+      const std::string systemName =
+          UniqueName(Pick(Adjectives(), rng) + " " + Pick(Nouns(), rng), systemNames);
+      (void)Pick(StarSuffixes(), rng);
+      const bool belt = rng.Next() < 0.24;
+      if (belt) {
+        (void)Pick(WorldStems(), rng);
+      } else {
+        (void)Pick(WorldStems(), rng);
+        (void)Pick(WorldSuffixes(), rng);
+      }
+      (void)Pick(Adjectives(), rng);
+      (void)Pick(Nouns(), rng);
+      if (!profiles.empty() && rng.Next() < 0.62) { (void)Pick(profiles, rng); }
+      (void)Pick(Observations(), rng);
+      ChartPreviewDot dot;
+      dot.id = "sec-gen-" + std::to_string(serial);
+      dot.name = systemName;
+      dot.parent = region.id;
+      dot.x = x;
+      dot.y = y;
+      preview.systems.push_back(dot);
+      placed.emplace_back(x, y);
+    }
+  }
+  return preview;
 }
 
 }  // namespace ship

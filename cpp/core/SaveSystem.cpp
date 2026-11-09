@@ -17,6 +17,7 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdio>
 #include <fstream>
 #include <filesystem>
@@ -78,6 +79,36 @@ const Json* At(const Json& object, const char* key) {
 bool TruthyMap(const Json& map, const std::string& key) {
   auto it = map.find(key);
   return it != map.end() && it->is_boolean() && it->get<bool>();
+}
+
+ChartSettings ReadChartSettings(const Json& root, const ChartSettings& fallback) {
+  ChartSettings settings = fallback;
+  const Json* chart = At(root, "chart");
+  if (chart == nullptr || !chart->is_object()) { return settings; }
+  const Json* seed = At(*chart, "seed");
+  if (seed != nullptr) {
+    if (seed->is_string()) {
+      try {
+        settings.seed = std::stoull(seed->get<std::string>(), nullptr, 0);
+      } catch (...) {
+      }
+    } else if (seed->is_number()) {
+      settings.seed = static_cast<std::uint64_t>(seed->get<double>());
+    }
+  }
+  const Json* galaxies = At(*chart, "galaxies");
+  if (galaxies != nullptr && galaxies->is_number()) {
+    settings.galaxies = static_cast<int>(galaxies->get<double>());
+  }
+  const Json* mapScale = At(*chart, "mapScale");
+  if (mapScale != nullptr && mapScale->is_number()) {
+    settings.mapScale = mapScale->get<double>();
+  }
+  const Json* spread = At(*chart, "spread");
+  if (spread != nullptr && spread->is_number()) {
+    settings.spread = spread->get<double>();
+  }
+  return settings;
 }
 
 }  // namespace
@@ -444,6 +475,13 @@ std::string Simulation::SaveJson() const {
   map["lyPerAction"] = Num(map_.lyPerAction);
   root["map"] = map;
 
+  root["chart"] = Json{
+      {"seed", std::to_string(chartSettings_.seed)},
+      {"galaxies", chartSettings_.galaxies},
+      {"mapScale", Num(chartSettings_.mapScale)},
+      {"spread", Num(chartSettings_.spread)},
+  };
+
   Json views = Json::object();
   for (const std::string& layer : catalog_.layerOrder) {
     auto it = views_.find(layer);
@@ -480,35 +518,38 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
     return false;
   };
 
-  static std::string cachedKey;
-  static Catalog cachedExpanded;
-  Catalog adHocExpanded;
-  const Catalog* catalogPtr = &catalogIn;
-  if (!catalogIn.chartExpanded && !catalogIn.regions.empty() && !catalogIn.systems.empty()) {
-    const std::string key =
-        catalogIn.sourceSha256 + ":" + std::to_string(catalogIn.bodies.size()) + ":" +
-        std::to_string(catalogIn.systems.size()) + ":" + std::to_string(catalogIn.regions.size());
-    if (!catalogIn.sourceSha256.empty()) {
-      if (cachedKey != key) {
-        cachedExpanded = catalogIn;
-        ExpandChart(cachedExpanded);
-        cachedKey = key;
-      }
-      catalogPtr = &cachedExpanded;
-    } else {
-      adHocExpanded = catalogIn;
-      ExpandChart(adHocExpanded);
-      catalogPtr = &adHocExpanded;
-    }
-  }
-  const Catalog& catalog = *catalogPtr;
-
   Json d;
   try {
     d = Json::parse(text);
   } catch (const std::exception& error) {
     return fail(std::string("not JSON: ") + error.what());
   }
+
+  static std::string cachedKey;
+  static Catalog cachedExpanded;
+  Catalog adHocExpanded;
+  const Catalog* catalogPtr = &catalogIn;
+  const ChartSettings saveChart = ReadChartSettings(d, catalogIn.chartSettings);
+  if (!catalogIn.chartExpanded && !catalogIn.regions.empty() && !catalogIn.systems.empty()) {
+    const std::string key =
+        catalogIn.sourceSha256 + ":" + std::to_string(catalogIn.bodies.size()) + ":" +
+        std::to_string(catalogIn.systems.size()) + ":" + std::to_string(catalogIn.regions.size()) +
+        ":" + std::to_string(saveChart.seed) + ":" + std::to_string(saveChart.galaxies) + ":" +
+        std::to_string(saveChart.mapScale) + ":" + std::to_string(saveChart.spread);
+    if (!catalogIn.sourceSha256.empty()) {
+      if (cachedKey != key) {
+        cachedExpanded = catalogIn;
+        ExpandChart(cachedExpanded, saveChart);
+        cachedKey = key;
+      }
+      catalogPtr = &cachedExpanded;
+    } else {
+      adHocExpanded = catalogIn;
+      ExpandChart(adHocExpanded, saveChart);
+      catalogPtr = &adHocExpanded;
+    }
+  }
+  const Catalog& catalog = *catalogPtr;
   if (!d.is_object()) { return fail("the file is not a save object"); }
   if (GetString(d, "format") != "spaceship-command-1") { return fail("unsupported format"); }
 
@@ -1049,7 +1090,8 @@ void Simulation::ApplySnapshotDefaults() {
 
 bool Simulation::LoadJson(const std::string& text, std::string* error) {
   std::string why;
-  if (!ValidSave(text, catalog_, &why)) {
+  const Catalog& source = sourceCatalog_.regions.empty() ? catalog_ : sourceCatalog_;
+  if (!ValidSave(text, source, &why)) {
     if (error != nullptr) { *error = "The save is incomplete or has an unsupported format: " + why; }
     return false;
   }
@@ -1059,6 +1101,12 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
 
   try {
     const Json d = Json::parse(text);
+    chartSettings_ = ReadChartSettings(d, chartSettings_);
+    if (!source.chartExpanded) {
+      catalog_ = source;
+      catalog_.chartExpanded = false;
+      ExpandChart(catalog_, chartSettings_);
+    }
     const Json& s = d.at("state");
 
     actionCounter_ = d.at("actions").get<double>();

@@ -23,7 +23,7 @@
 namespace ship {
 
 // The dialog the menu can have open, in the order the reference offers it.
-enum class TitlePanel { None, Load, Settings, Guide, Quit, Tutorial };
+enum class TitlePanel { None, Load, Settings, Guide, Quit, Tutorial, Setup };
 
 // Six illustrated guide cards, opened by HOW TO PLAY. Captions clarify where
 // the concept artwork differs from the current simulation.

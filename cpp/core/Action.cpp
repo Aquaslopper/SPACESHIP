@@ -61,13 +61,22 @@ CrewMember MakeCrew(const CrewDefinition& def) {
 }
 
 Simulation Simulation::NewVoyage(const Catalog& catalog) {
+  return NewVoyage(catalog, catalog.chartSettings, std::string());
+}
+
+Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& settings,
+                                 const std::string& startSystemId) {
   Simulation sim;
-  sim.catalog_ = catalog;
+  if (!catalog.chartExpanded) { sim.sourceCatalog_ = catalog; }
+  else { sim.sourceCatalog_ = catalog; }
+  sim.chartSettings_ = settings;
+  sim.catalog_ = sim.sourceCatalog_;
+  sim.catalog_.chartExpanded = false;
   // Grow the charted galaxy before anything reads the chart. The
   // catalogue is never touched: this works on the voyage's own copy, and a
   // catalogue that has already been grown is left exactly as it is.
-  ExpandChart(sim.catalog_);
-  sim.rules_ = catalog.rules;
+  ExpandChart(sim.catalog_, settings);
+  sim.rules_ = sim.catalog_.rules;
   sim.scanCost_ = catalog.rules.scanCost;
 
   // ---- crew --------------------------------------------------------------
@@ -199,6 +208,20 @@ Simulation Simulation::NewVoyage(const Catalog& catalog) {
   // Nobody waits his turn: the clocks are dealt before the watch begins.
   sim.StaggerHungerClocks();
 
+  if (!startSystemId.empty()) {
+    const Body* system = sim.catalog_.FindSystem(startSystemId);
+    for (const Port& port : sim.catalog_.ports) {
+      const Body* body = sim.catalog_.FindBody(port.id);
+      if (body == nullptr) { continue; }
+      if (sim.catalog_.BodySystem(*body) != startSystemId) { continue; }
+      sim.map_.here = port.id;
+      sim.state_.docked = true;
+      if (system != nullptr) { sim.map_.sector = system->region; }
+      sim.map_.layer = "system";
+      break;
+    }
+  }
+
   return sim;
 }
 
@@ -218,12 +241,16 @@ Simulation Simulation::ReferenceVoyage(const Catalog& catalog) {
 }
 
 void Simulation::RestartVoyage() {
-  // The reference re-applies its boot snapshot and then puts the preferences
-  // back; a fresh intentional voyage is the same thing from the outside.
+  BeginVoyage(chartSettings_, std::string());
+}
+
+void Simulation::BeginVoyage(const ChartSettings& settings, const std::string& startSystemId) {
   const Options options = state_.options;
   const bool motion = state_.reducedMotion;
-  const Catalog catalog = catalog_;
-  *this = referenceFit_ ? Simulation::ReferenceVoyage(catalog) : Simulation::NewVoyage(catalog);
+  const Catalog source = sourceCatalog_.regions.empty() ? catalog_ : sourceCatalog_;
+  const bool reference = referenceFit_;
+  *this = reference ? Simulation::ReferenceVoyage(source)
+                    : Simulation::NewVoyage(source, settings, startSystemId);
   state_.options = options;
   state_.reducedMotion = motion;
 }

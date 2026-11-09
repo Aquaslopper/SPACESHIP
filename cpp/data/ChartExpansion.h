@@ -33,6 +33,9 @@ constexpr int kNewGalaxies = 17;
 // (17 * 24 = 408 star systems across the universe).
 constexpr int kNewSystemsPerRegion = 24;
 
+// Galaxy counts at or above this were measured to exhaust RAM and CPU.
+constexpr int kGalaxyRamWarning = 25;
+
 // Board multipliers relative to the 638x278 reference viewport.
 constexpr double kSectorBoardScale = 6.0;
 constexpr double kGalaxyBoardScale = 4.0;
@@ -47,6 +50,28 @@ constexpr double kSystemZoomMin = 0.6;
 constexpr double kSystemZoomMax = 2.5;
 
 void ExpandChart(Catalog& catalog);
+void ExpandChart(Catalog& catalog, const ChartSettings& settings);
+
+struct ChartPreviewDot {
+  std::string id;
+  std::string name;
+  std::string parent;
+  double x = 0;
+  double y = 0;
+};
+
+struct ChartPreview {
+  ChartSettings settings;
+  double galaxyW = 1;
+  double galaxyH = 1;
+  double sectorW = 1;
+  double sectorH = 1;
+  std::vector<ChartPreviewDot> galaxies;
+  std::vector<ChartPreviewDot> systems;
+};
+
+ChartPreview BuildChartPreview(const Catalog& catalog, const ChartSettings& settings);
+
 void PopulateGalaxies(Catalog& catalog, double coreDx, double coreDy);
 void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem);
 void PlaceGalaxyDots(Catalog& catalog);
