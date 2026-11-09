@@ -243,6 +243,12 @@ struct Options {
   // window. Both are free preferences, saved with the voyage like the rest.
   int fontStep = 0;        // 0..3 -> 18, 19, 20, 21 px
   bool fullscreen = false;
+  // The four numbers the chart is drawn from. Same four, same chart; a save keeps
+  // them so a voyage reopens on the sky it was flown on.
+  int outerGalaxies = 34;
+  int systemsPerRegion = 64;
+  double chaos = 0.5;
+  int stations = 100;
 };
 
 // A cooldown belongs to one control and is counted in actions, never seconds.
@@ -296,8 +302,8 @@ struct SurveyRecord {
 // ---------------------------------------------------------------------------
 struct MapView {
   std::string layer = "system";
-  std::string here = "kessler";
-  std::string sector = "gal-inner";
+  std::string here;      // the drawn home system, set when the voyage starts
+  std::string sector;    // the region the ship is in, set when the voyage starts
   double zoom = 1;
   double cx = 319;
   double cy = 139;

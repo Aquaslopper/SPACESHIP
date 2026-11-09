@@ -204,6 +204,15 @@ PopupModel BuildPopup(const Simulation& sim, const std::string& key,
   model.fullscreen = options.fullscreen;
   model.fullscreenLabel = options.fullscreen ? "Window: Borderless fullscreen"
                                              : "Window: Windowed";
+
+  // ---- the chart --------------------------------------------------------
+  // Four numbers draw the frontier. Changing any of them draws a new sky and
+  // starts the voyage again on it, which is why they are not under Preferences.
+  model.outerGalaxies = options.outerGalaxies;
+  model.systemsPerRegion = options.systemsPerRegion;
+  model.chaosPercent = static_cast<int>(std::lround(std::clamp(options.chaos, 0.0, 1.0) * 100.0));
+  model.stations = options.stations;
+  model.dialNote = "Changing one draws the whole chart again and starts the voyage over.";
   return model;
 }
 
@@ -270,6 +279,32 @@ bool PressPopupAction(Simulation& sim, const std::string& key,
     if (action == "fullscreen") {
       options.fullscreen = !options.fullscreen;
       return true;
+    }
+    if (action == "galaxies" || action == "systems-per-region" || action == "chaos" ||
+        action == "stations") {
+      // The four dials are clamped where they are applied; a value that is not a
+      // number changes nothing at all.
+      try {
+        std::size_t parsed = 0;
+        const double value = std::stod(arg, &parsed);
+        if (parsed != arg.size() || !std::isfinite(value)) { return false; }
+        int galaxies = options.outerGalaxies;
+        int systems = options.systemsPerRegion;
+        double chaos = options.chaos;
+        int stations = options.stations;
+        if (action == "galaxies") { galaxies = static_cast<int>(value); }
+        if (action == "systems-per-region") { systems = static_cast<int>(value); }
+        if (action == "chaos") { chaos = value / 100.0; }
+        if (action == "stations") { stations = static_cast<int>(value); }
+        const bool changed = sim.SetChartDials(galaxies, systems, chaos, stations);
+        if (message != nullptr) {
+          message->clear();
+          if (changed) { *message = "The chart has been drawn again."; }
+        }
+        return changed;
+      } catch (...) {
+        return false;
+      }
     }
     return false;
   }

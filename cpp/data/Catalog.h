@@ -73,6 +73,18 @@ class Catalog {
   // does not grow a second galaxy.
   bool chartExpanded = false;
 
+  // ---- the four dials the player turns ----------------------------------
+  // The chart is drawn from these numbers and nothing else, so the same four
+  // always draw the same chart. The authored core (48 systems, 7 regions) is not
+  // drawn and is the same under every setting.
+  // The system the ship starts in. Every system is drawn, so this is not a
+  // constant: ExpandChart() names the first one it laid down.
+  std::string homeSystem;
+  int outerGalaxies = 34;       // galaxies drawn beyond the authored ones
+  int systemsPerRegion = 64;    // star systems drawn in every region
+  double chaos = 0.5;           // 0 = every system alike, 1 = no two alike
+  int stations = 100;           // per cent of drawn systems that keep a dock
+
   // Where each system sits on the galaxy board (ChartExpansion::PlaceGalaxyDots).
   // A system has one position, in its own region's cluster; the galaxy scale
   // reads this, the sector scale reads Body::x/y. Empty until the chart is

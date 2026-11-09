@@ -54,7 +54,6 @@ struct StarRow {
 // The forty-seven rows of the reference's STAR_CATALOG, in its order. The order
 // is load bearing: it decides each row's coordinates within its system
 // (i % 3 and i % 2) and each system's outer-world profile (i % 4).
-const std::vector<StarRow>& AuthoredStarCatalog();
 
 // buildGalaxyContent(): systems, local bodies and ports from rows.
 //
@@ -89,13 +88,11 @@ void ExpandLocalCharts(Catalog& catalog, std::size_t firstSystem);
 // authored one carries the designer's "Traffic" row too.
 bool IsGeneratedSystem(const Body& system);
 
-// Removes everything BuildGalaxyFromRows() and ExpandLocalCharts() compute: the
-// forty-two created systems, every body that belongs to a system, and the ports
-// on those bodies. The authored shell - regions, Kessler's six hand-written
-// bodies and the two ports on them, the five systems with a designer's klass -
-// is left alone, because the reference authored it too. ChartExpansion strips
-// before it rebuilds, so a catalogue is always the product of the current
-// generator rather than a mix of two.
+// Removes everything BuildGalaxyFromRows() and ExpandLocalCharts() compute: every
+// system, every body that belongs to a system, and the ports on those bodies. The
+// regions are left alone - they are the galaxy's shape, not its contents.
+// ChartExpansion strips before it rebuilds, so a catalogue is always the product
+// of the current generator rather than a mix of two.
 void StripGeneratedChart(Catalog& catalog);
 
 }  // namespace ship

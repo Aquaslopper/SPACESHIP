@@ -1175,3 +1175,58 @@ CHECKED: cpp/data/ChartExpansion.cpp, cpp/core/Action.cpp, cpp/core/SaveSystem.c
 compile clean with -Wall -Wextra against the pinned raylib/imgui/nlohmann headers.
 NOT CHECKED: generation cost and the drawn result. 1584 systems at three times the
 bodies is about 7.5 times the work of the old chart; start-up time is unmeasured.
+
+## 082 - the old core joins the mix, and the four dials
+
+The forty-eight systems and seven regions in `assets/data/chart.json` were the layout
+of an older game. They had no hand behind them and no authority over this one, so they
+are not read any more: `sectorBodies` and `bodies` are skipped by the loader, the star
+table (`AuthoredStarCatalog()`) is gone, and every system, world, dock and lane is
+drawn. Regions, the name pools and the market stay - they are what the generator draws
+from.
+
+Consequences, all of them in the code:
+  - the home system is the first system drawn, not a name in the source
+    (`Catalog::homeSystem`); the voyage opens there and in that system's region
+  - a region's hub is whichever of its systems was laid down first
+  - `Navigation`, `Catalog::BodySystem` and the save's fallback all answer with
+    `homeSystem` instead of "sec-kessler"
+
+The regions did not survive the cut as anchors. All seven sit within about thirty pixels
+of the galaxy centre - they are a knot, because their positions are the old 638x278
+layout - so forty-one territories piled onto the centre and the late ones could not place
+their systems (`gal-halo` got six of sixty-four, `gal-rift` eleven). Territories are now
+laid out by the disc itself: ordered by distance from the galaxy centre, then placed on a
+sunflower spiral (golden angle, square-root radius) stretched onto the board's ellipse.
+The core keeps the middle, the outer galaxies take the rim.
+
+The four dials live in `Catalog` and in `Options`, are saved with the voyage, and are
+drawn as four rows under "The chart" in the settings sheet. A dial reports when the hand
+lets go of it, not on every step of a drag: `Simulation::SetChartDials()` redraws the
+frontier and starts the voyage again on the new sky, which cannot be done in place
+because every drawn id names a different place afterwards.
+
+  outer galaxies       0..64      default 34
+  systems per region   8..96      default 64
+  chaos                0..100     default 50, fully left = chaos
+  stations             0..100     default 100, the share of systems that keep a dock
+
+MEASURED with a probe of the data layer alone (`Catalog::LoadFromAssets`, then
+`ExpandChart`):
+
+  loaded   0 systems, 0 bodies, 7 regions, 30 ports (the old ports are pruned with
+           their bodies)
+  drawn    2624 systems (64 in each of 41 regions), 141344 bodies, 3102 ports,
+           3102 stations, 4840 sector lanes
+  home     sec-gen-1 "Nocturne Ladder" in gal-core, 52 local bodies
+  0 ports without a body, 0 systems without a body, 0 systems left undrawn
+
+CHECKED: cpp/data/{Catalog,ChartExpansion,GalaxyGen}.cpp, cpp/core/{Action,Navigation,
+SaveSystem}.cpp, cpp/ui/{Popups,Draw}.cpp all compile clean with -fsyntax-only.
+NOT CHECKED: the drawn result (cannot see it), start-up cost of 141344 bodies, and the
+test suite - `cpp/tests/galaxy_gen_tests.cpp` still calls `ship::AuthoredStarCatalog()`
+and the nav/catalog tests still name `sec-kessler` and `sec-vance`; they will not build
+until someone says what they should assert now.
+TWO BEATS LEFT DEAD: the scan lines keyed to "halvan" and "echo-site" in
+`Navigation.cpp` were bodies of the old core, so the two signal steps can no longer fire.
+Left in place rather than rerouted or deleted.

@@ -2542,6 +2542,30 @@ void ShellView::PaintSettingsControls(Simulation& sim, const PopupModel& model) 
         }
         if (button(model.fullscreenLabel, "fullscreen")) { action("fullscreen"); }
       }
+      if (!model.dialNote.empty()) {
+        heading("The chart");
+        text(model.dialNote);
+        // A dial reports when the hand lets go of it: every step of a drag would
+        // otherwise draw a new sky, and the last one is the only one that lasts.
+        int galaxies = model.outerGalaxies;
+        ImGui::SetNextItemWidth(-1);
+        ImGui::SliderInt("##outer-galaxies", &galaxies, 0, 64, "Outer galaxies: %d");
+        if (ImGui::IsItemDeactivatedAfterEdit()) { action("galaxies", std::to_string(galaxies)); }
+        int systems = model.systemsPerRegion;
+        ImGui::SetNextItemWidth(-1);
+        ImGui::SliderInt("##systems-per-region", &systems, 8, 96, "Systems per region: %d");
+        if (ImGui::IsItemDeactivatedAfterEdit()) {
+          action("systems-per-region", std::to_string(systems));
+        }
+        int chaos = model.chaosPercent;
+        ImGui::SetNextItemWidth(-1);
+        ImGui::SliderInt("##chaos", &chaos, 0, 100, "Chaos: %d%%");
+        if (ImGui::IsItemDeactivatedAfterEdit()) { action("chaos", std::to_string(chaos)); }
+        int stations = model.stations;
+        ImGui::SetNextItemWidth(-1);
+        ImGui::SliderInt("##stations", &stations, 0, 100, "Stations: %d%%");
+        if (ImGui::IsItemDeactivatedAfterEdit()) { action("stations", std::to_string(stations)); }
+      }
 }
 
 void ShellView::PageTutorial(int direction, double nowMs) {

@@ -284,11 +284,12 @@ void PopulateGalaxies(Catalog& catalog, double coreDx, double coreDy) {
 
   // Arrange outer galaxies on two elliptical rings around the core disc so
   // every quadrant of the galaxy board has reachable clusters without crowding.
-  for (int i = 0; i < kNewGalaxies; ++i) {
+  const int galaxies = std::max(0, catalog.outerGalaxies);
+  for (int i = 0; i < galaxies; ++i) {
     const GalaxyArchetype& arch = archetypes[static_cast<std::size_t>(i) % archetypes.size()];
     const bool outerRing = (i >= 8);
     const int ringIndex = outerRing ? (i - 8) : i;
-    const int ringCount = outerRing ? (kNewGalaxies - 8) : std::min(8, kNewGalaxies);
+    const int ringCount = outerRing ? std::max(1, galaxies - 8) : std::min(8, galaxies);
     const double baseAngle =
         6.283185307179586 * (static_cast<double>(ringIndex) / static_cast<double>(ringCount)) +
         (outerRing ? 0.34 : 0.11);
@@ -567,9 +568,12 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
       return false;
     };
 
-    // Three times the bodies a system used to hold: more worlds, more moons, more
-    // debris, on a chart with room for them.
-    const int targetExtra = isKessler ? 33 : (39 + rng.Below(21));
+    // Three times the bodies a system used to hold, and the dial decides how far
+    // apart systems may fall: aligned, every system holds the same eleven; chaotic,
+    // one is a rock and the next is a swarm.
+    const double chaos = std::clamp(catalog.chaos, 0.0, 1.0);
+    const int extra = 39 + static_cast<int>(std::lround(rng.Below(21) * (0.05 + 1.55 * chaos)));
+    const int targetExtra = isKessler ? 33 : extra;
     std::vector<std::pair<std::string, std::pair<double, double>>> hostPlanets;
 
     for (int k = 0; k < targetExtra; ++k) {
@@ -718,6 +722,10 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
     // draws are untouched; only the berth is added.
     if (systemHasPort.find(system.id) == systemHasPort.end()) {
       Rng berth(HashOf(system.id + "-berth"));
+      // The dial, not a quota: at 100 every drawn system keeps a dock, at 0 none
+      // does. Authored berths above are untouched.
+      const int roll = static_cast<int>(berth.Next() * 100.0);
+      if (roll >= std::clamp(catalog.stations, 0, 100)) { continue; }
       double bx = 0.0;
       double by = 0.0;
       bool placed = false;
@@ -730,10 +738,12 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
               phaseOffset + 0.61 * static_cast<double>(band) +
               6.283185307179586 * (static_cast<double>(slot) / static_cast<double>(slots)) +
               berth.Range(-0.10, 0.10);
-          const double x =
-              std::round(std::clamp(cx + std::cos(angle) * kRings[band], 20.0, boardW - 20.0));
-          const double y = std::round(
-              std::clamp(cy + std::sin(angle) * kRings[band] * 0.45, 20.0, boardH - 20.0));
+          const double inset = 20.0 * kSystemBoardScale;
+          const double x = std::round(std::clamp(
+              cx + std::cos(angle) * kRings[band] * kSystemBoardScale, inset, boardW - inset));
+          const double y = std::round(std::clamp(
+              cy + std::sin(angle) * kRings[band] * 0.45 * kSystemBoardScale, inset,
+              boardH - inset));
           if (!fits(x, y, sep)) { continue; }
           bx = x;
           by = y;
@@ -888,12 +898,10 @@ void EntangleGalaxy(Catalog& catalog) {
 void ExpandChart(Catalog& catalog) {
   if (catalog.chartExpanded) { return; }
   catalog.chartExpanded = true;
-  if (catalog.regions.empty() || catalog.systems.empty()) { return; }
+  if (catalog.regions.empty()) { return; }
 
-  // 1. Rebuild the authored baseline from its star table.
+  // 1. Start from the regions alone. Every system, world and dock below is drawn.
   StripGeneratedChart(catalog);
-  BuildGalaxyFromRows(AuthoredStarCatalog(), 0, catalog, /*linkHubs=*/true);
-  ExpandLocalCharts(catalog, 0);
 
   const double authoredW = catalog.map.w;
   const double authoredH = catalog.map.h;
@@ -979,6 +987,29 @@ void ExpandChart(Catalog& catalog) {
   // Compute each region's territory anchor on the sector board so systems of a
   // galactic region form a navigable cluster with intra-region jump distances
   // well within a single fuel tank.
+  // The territories are laid out by the disc, not by where a region sits on the
+  // galaxy board: at that scale the seven old regions are a knot at the centre, and
+  // a knot cannot hold forty-one territories. Order them by how far they are from
+  // the galaxy centre (the core first, the outer galaxies last) and give each one a
+  // slot on a golden-angle spiral across the disc, so no two territories share a
+  // place and the core still reads as the middle.
+  std::vector<std::size_t> discOrder(catalog.regions.size());
+  for (std::size_t i = 0; i < discOrder.size(); ++i) { discOrder[i] = i; }
+  {
+    const auto galaxyDistance = [&catalog, &galaxy](const Body& region) {
+      const double dx = region.x - galaxy.w * 0.5;
+      const double dy = region.y - galaxy.h * 0.5;
+      return dx * dx + dy * dy;
+    };
+    std::stable_sort(discOrder.begin(), discOrder.end(),
+                     [&catalog, &galaxyDistance](std::size_t a, std::size_t b) {
+                       return galaxyDistance(catalog.regions[a]) <
+                              galaxyDistance(catalog.regions[b]);
+                     });
+  }
+  std::vector<std::size_t> discSlot(catalog.regions.size(), 0);
+  for (std::size_t k = 0; k < discOrder.size(); ++k) { discSlot[discOrder[k]] = k; }
+
   std::unordered_map<std::string, std::pair<double, double>> regionAnchor;
   for (std::size_t ri = 0; ri < catalog.regions.size(); ++ri) {
     const Body& region = catalog.regions[ri];
@@ -998,17 +1029,19 @@ void ExpandChart(Catalog& catalog) {
         continue;
       }
     }
-    // The sector is a disc, not a rectangle: each region's territory is pulled onto
-    // one ellipse centred on the board, so the outermost regions sit on the rim and
-    // no system is left in a corner.
+    // The sector is a disc, not a rectangle. Territory k sits on a sunflower spiral:
+    // the golden angle walks the ring, the square root of k walks outward, and the
+    // whole thing is stretched onto one ellipse centred on the board.
     const double rx = (sector.w * 0.5) - 420.0;
     const double ry = (sector.h * 0.5) - 420.0;
-    const double nx = (region.x - galaxy.w * 0.5) / std::max(1.0, galaxy.w * 0.5);
-    const double ny = (region.y - galaxy.h * 0.5) / std::max(1.0, galaxy.h * 0.5);
-    const double len = std::sqrt(nx * nx + ny * ny);
-    const double squeeze = len > 1.0 ? (1.0 / len) : len;
-    const double sx = std::clamp(sector.w * 0.5 + nx * squeeze * rx, 300.0, sector.w - 300.0);
-    const double sy = std::clamp(sector.h * 0.5 + ny * squeeze * ry, 220.0, sector.h - 220.0);
+    const std::size_t slots = std::max<std::size_t>(1, catalog.regions.size());
+    const double k = static_cast<double>(discSlot[ri]) + 0.5;
+    const double radius = std::sqrt(k / static_cast<double>(slots));
+    const double angle = k * 2.39996322972865;
+    const double sx = std::clamp(sector.w * 0.5 + std::cos(angle) * radius * rx, 300.0,
+                                 sector.w - 300.0);
+    const double sy = std::clamp(sector.h * 0.5 + std::sin(angle) * radius * ry, 220.0,
+                                 sector.h - 220.0);
     regionAnchor[region.id] = {sx, sy};
   }
 
@@ -1022,19 +1055,21 @@ void ExpandChart(Catalog& catalog) {
 
   std::vector<std::pair<double, double>> placed;
   placed.reserve(catalog.systems.size() +
-                 static_cast<std::size_t>(kNewSystemsPerRegion) * catalog.regions.size());
+                 static_cast<std::size_t>(std::max(0, catalog.systemsPerRegion)) *
+                     catalog.regions.size());
   for (const Body& system : catalog.systems) { placed.emplace_back(system.x, system.y); }
 
   Rng rng(0x5350414345534849ULL);
   const double margin = 42.0;
-  const std::size_t baseIndex = AuthoredStarCatalog().size();
+  const std::size_t baseIndex = catalog.systems.size();
   std::vector<StarRow> rows;
-  rows.reserve(static_cast<std::size_t>(kNewSystemsPerRegion) * catalog.regions.size());
+  rows.reserve(static_cast<std::size_t>(std::max(0, catalog.systemsPerRegion)) *
+               catalog.regions.size());
 
   int serial = 0;
   for (const Body& region : catalog.regions) {
     const auto anchor = regionAnchor[region.id];
-    for (int n = 0; n < kNewSystemsPerRegion; ++n) {
+    for (int n = 0; n < catalog.systemsPerRegion; ++n) {
       double x = 0.0;
       double y = 0.0;
       bool found = false;
@@ -1094,6 +1129,11 @@ void ExpandChart(Catalog& catalog) {
   const std::size_t firstNewSystem = catalog.systems.size();
   BuildGalaxyFromRows(rows, baseIndex, catalog, /*linkHubs=*/false);
   ExpandLocalCharts(catalog, firstNewSystem);
+
+  // The ship starts in the first system laid down. Nothing else is the "home"
+  // system, so the name is a consequence of the draw rather than an exception
+  // carved into the code.
+  if (!catalog.systems.empty()) { catalog.homeSystem = catalog.systems.front().id; }
 
   // 6. Connect intra-region sector lanes in O(R * S_r^2) using regional buckets.
   {

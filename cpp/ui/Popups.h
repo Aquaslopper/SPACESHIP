@@ -72,6 +72,12 @@ struct PopupModel {
   std::string fontStepLine;    // "Reading size: +5% (19 px)"
   bool fullscreen = false;
   std::string fullscreenLabel; // "Window: Borderless fullscreen"
+  // The four dials the chart is drawn from.
+  int outerGalaxies = 34;
+  int systemsPerRegion = 64;
+  int chaosPercent = 50;
+  int stations = 100;
+  std::string dialNote;   // what the four together mean right now
   std::vector<PopupSlot> slots;
   std::string message;
   std::vector<DescribeAct> acts;

@@ -258,12 +258,10 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
   for (const Json& region : Field(chart, "galaxyBodies", "chart.json")) {
     catalog.regions.push_back(ReadBody(region, "chart.json/galaxyBodies"));
   }
-  for (const Json& system : Field(chart, "sectorBodies", "chart.json")) {
-    catalog.systems.push_back(ReadBody(system, "chart.json/sectorBodies"));
-  }
-  for (const Json& body : Field(chart, "bodies", "chart.json")) {
-    catalog.bodies.push_back(ReadBody(body, "chart.json/bodies"));
-  }
+  // The chart's own sector table and its local bodies are not read. They are the
+  // layout of an older game: no system here is privileged, and every one of them
+  // is drawn with the rest. The regions, the name pools and the market stay, because
+  // the generator draws from them.
   for (const Json& lane : Field(chart, "sectorLinks", "chart.json")) {
     catalog.sectorLanes.push_back({lane.at(0).get<std::string>(), lane.at(1).get<std::string>()});
   }
@@ -748,7 +746,7 @@ const std::vector<std::size_t>& Catalog::SystemsInRegion(const std::string& regi
 }
 
 std::string Catalog::BodySystem(const Body& body) const {
-  return body.system.empty() ? std::string("sec-kessler") : body.system;
+  return body.system.empty() ? homeSystem : body.system;
 }
 
 std::vector<std::string> Catalog::Validate() const {

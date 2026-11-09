@@ -236,6 +236,9 @@ class Simulation {
   bool ZoomMap(int dir);                    // free: one step on the zoom ladder
   void PanMap(double dx, double dy);        // free: clamped per layer
   bool ViewSector(const std::string& regionId);
+  // Redraws the frontier from the four dials and starts the voyage again on it.
+  bool SetChartDials(int galaxies, int systems, double chaos, int stations);
+
   bool Dock();                              // Dock at <port>
   bool Undock();
 

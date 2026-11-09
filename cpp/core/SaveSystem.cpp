@@ -122,7 +122,11 @@ std::string Simulation::SaveJson() const {
                       {"displayBrightness", Num(DisplayBrightness(state_.options.displayBrightness))},
                       // Phase 9: the reading size and the window travel too.
                       {"fontStep", Num(static_cast<double>(state_.options.fontStep))},
-                      {"fullscreen", state_.options.fullscreen}};
+                      {"fullscreen", state_.options.fullscreen},
+                      {"outerGalaxies", Num(state_.options.outerGalaxies)},
+                      {"systemsPerRegion", Num(state_.options.systemsPerRegion)},
+                      {"chaos", Num(state_.options.chaos)},
+                      {"stations", Num(state_.options.stations)}};
 
   Json chronicle = Json::object();
   chronicle["version"] = state_.chronicle.version;
@@ -484,7 +488,7 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
   static Catalog cachedExpanded;
   Catalog adHocExpanded;
   const Catalog* catalogPtr = &catalogIn;
-  if (!catalogIn.chartExpanded && !catalogIn.regions.empty() && !catalogIn.systems.empty()) {
+  if (!catalogIn.chartExpanded && !catalogIn.regions.empty()) {
     const std::string key =
         catalogIn.sourceSha256 + ":" + std::to_string(catalogIn.bodies.size()) + ":" +
         std::to_string(catalogIn.systems.size()) + ":" + std::to_string(catalogIn.regions.size());
@@ -1193,6 +1197,12 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
       state_.options.displayBrightness = DisplayBrightness(GetNumber(*it, "displayBrightness", 1.0));
       const double step = GetNumber(*it, "fontStep", 0.0);
       state_.options.fontStep = step < 0 ? 0 : (step > 3 ? 3 : static_cast<int>(step));
+      state_.options.outerGalaxies =
+          static_cast<int>(GetNumber(*it, "outerGalaxies", 34.0));
+      state_.options.systemsPerRegion =
+          static_cast<int>(GetNumber(*it, "systemsPerRegion", 64.0));
+      state_.options.chaos = GetNumber(*it, "chaos", 0.5);
+      state_.options.stations = static_cast<int>(GetNumber(*it, "stations", 100.0));
       state_.options.fullscreen = GetBool(*it, "fullscreen", false);
     }
 
@@ -1376,7 +1386,7 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     map_.zmin = GetNumber(map, "zmin", 0.6);
     map_.zmax = GetNumber(map, "zmax", 2.0);
     map_.zstep = GetNumber(map, "zstep", 0.2);
-    map_.here = GetString(map, "here", "kessler");
+    map_.here = GetString(map, "here", catalog_.homeSystem);
     map_.layer = GetString(map, "layer", "system");
     map_.sector = GetString(map, "sector");
     map_.grid = GetNumber(map, "grid", 45);

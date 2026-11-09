@@ -60,13 +60,51 @@ CrewMember MakeCrew(const CrewDefinition& def) {
   return crew;
 }
 
+bool Simulation::SetChartDials(int galaxies, int systems, double chaos, int stations) {
+  // The chart is drawn from four numbers. Changing one redraws the whole frontier
+  // around the authored core - which cannot be done to a voyage in place, because
+  // every id past the core names a different place afterwards - so this starts the
+  // voyage again on the redrawn chart and keeps the four numbers with it.
+  const int clampedGalaxies = std::clamp(galaxies, 0, 64);
+  const int clampedSystems = std::clamp(systems, 8, 96);
+  const double clampedChaos = std::clamp(chaos, 0.0, 1.0);
+  const int clampedStations = std::clamp(stations, 0, 100);
+  const Options options = state_.options;
+  if (clampedGalaxies == options.outerGalaxies && clampedSystems == options.systemsPerRegion &&
+      std::abs(clampedChaos - options.chaos) < 1e-9 && clampedStations == options.stations) {
+    return false;
+  }
+  Catalog drawn = catalog_;
+  drawn.chartExpanded = false;
+  drawn.outerGalaxies = clampedGalaxies;
+  drawn.systemsPerRegion = clampedSystems;
+  drawn.chaos = clampedChaos;
+  drawn.stations = clampedStations;
+  *this = NewVoyage(drawn);
+  state_.options = options;
+  state_.options.outerGalaxies = clampedGalaxies;
+  state_.options.systemsPerRegion = clampedSystems;
+  state_.options.chaos = clampedChaos;
+  state_.options.stations = clampedStations;
+  return true;
+}
+
 Simulation Simulation::NewVoyage(const Catalog& catalog) {
   Simulation sim;
   sim.catalog_ = catalog;
+  sim.catalog_.outerGalaxies = catalog.outerGalaxies;
+  sim.catalog_.systemsPerRegion = catalog.systemsPerRegion;
+  sim.catalog_.chaos = catalog.chaos;
+  sim.catalog_.stations = catalog.stations;
   // Grow the charted galaxy before anything reads the chart. The authored
   // catalogue is never touched: this works on the voyage's own copy, and a
   // catalogue that has already been grown is left exactly as it is.
   ExpandChart(sim.catalog_);
+  // The chart is drawn now, so where the ship starts is part of the draw.
+  sim.map_.here = sim.catalog_.homeSystem;
+  if (const Body* home = sim.catalog_.FindSystem(sim.catalog_.homeSystem)) {
+    sim.map_.sector = home->region;
+  }
   sim.rules_ = catalog.rules;
   sim.scanCost_ = catalog.rules.scanCost;
 
