@@ -1317,3 +1317,40 @@ the floor is a decision, not a bug.
 
 CHECKED: cpp/ui/NavScreen.cpp compiles clean with -fsyntax-only.
 NOT CHECKED: the frame rate; nobody has seen this run.
+
+## 086 - a redraw draws again, it does not stack
+
+Pulling a dial rebuilt the sky on top of the sky. `SetChartDials()` asks `ExpandChart()` to
+run again by clearing `chartExpanded`, and `ExpandChart()` starts by stripping what the
+previous pass made - but `StripGeneratedChart()` only ever removed bodies, ports and
+systems. The galaxies `PopulateGalaxies()` draws were left standing and drawn again
+around the core on every pass, and the lanes of the removed systems and galaxies were
+left dangling.
+
+Measured through the real settings action (`PressPopupAction("settings", ...)`), before:
+
+  start                 systems 2246   regions  41
+  galaxies 34 -> 50     systems 3610   regions  91
+  stations 100 -> 40    systems 4110   regions 141
+
+and after:
+
+  start                 systems 2246   regions  41
+  galaxies 34 -> 50     systems 3270   regions  57
+  stations 100 -> 40    systems 3270   regions  57
+
+57 is seven blobs and fifty galaxies - the number the dial asks for - and it stays there.
+`StripGeneratedChart()` now also removes the drawn galaxies (`gal-gen-*`) and prunes any
+sector or galaxy lane whose end no longer exists.
+
+The four sliders also commit on a plain `IsItemDeactivated()` rather than
+`IsItemDeactivatedAfterEdit()`: a release that ImGui does not count as an edit can no
+longer be swallowed, and `SetChartDials()` compares the four numbers itself, so a click
+that moved nothing still draws nothing.
+
+CHECKED: cpp/ui/{Draw,NavScreen,Popups}.cpp, cpp/data/GalaxyGen.cpp and cpp/core/Action.cpp
+compile clean with -fsyntax-only against the pinned raylib 6.0 / imgui 1.92.7 / rlImGui
+Raylib_6_0 headers; the settings action was exercised headlessly with the data and core
+layers and the numbers above are its output.
+NOT CHECKED: whether that was the snap he saw. The value was always stored; what was not
+stored was a sky of a fixed size.

@@ -15,6 +15,7 @@
 #include "data/GalaxyGen.h"
 
 #include <algorithm>
+#include <set>
 #include <cstdio>
 #include <map>
 #include <utility>
@@ -267,6 +268,36 @@ void StripGeneratedChart(Catalog& catalog) {
   catalog.systems.erase(std::remove_if(catalog.systems.begin(), catalog.systems.end(),
                                        [](const Body& system) { return IsGeneratedSystem(system); }),
                         catalog.systems.end());
+
+  // The galaxies PopulateGalaxies lays around the core are drawn again from scratch
+  // on the next pass, so they go with the systems. Left behind, every redraw would
+  // stack another set of them around the core.
+  catalog.regions.erase(std::remove_if(catalog.regions.begin(), catalog.regions.end(),
+                                       [](const Body& region) {
+                                         return region.id.rfind("gal-gen-", 0) == 0;
+                                       }),
+                        catalog.regions.end());
+
+  // A lane whose ends are gone is a lane to nowhere: the pass that follows draws the
+  // lanes again, so these only survive if they are pruned here.
+  {
+    std::set<std::string> systemIds;
+    for (const Body& system : catalog.systems) { systemIds.insert(system.id); }
+    catalog.sectorLanes.erase(
+        std::remove_if(catalog.sectorLanes.begin(), catalog.sectorLanes.end(),
+                       [&systemIds](const Lane& lane) {
+                         return systemIds.count(lane.from) == 0 || systemIds.count(lane.to) == 0;
+                       }),
+        catalog.sectorLanes.end());
+    std::set<std::string> regionIds;
+    for (const Body& region : catalog.regions) { regionIds.insert(region.id); }
+    catalog.galaxyLanes.erase(
+        std::remove_if(catalog.galaxyLanes.begin(), catalog.galaxyLanes.end(),
+                       [&regionIds](const Lane& lane) {
+                         return regionIds.count(lane.from) == 0 || regionIds.count(lane.to) == 0;
+                       }),
+        catalog.galaxyLanes.end());
+  }
 }
 
 }  // namespace ship
