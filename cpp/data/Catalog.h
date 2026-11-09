@@ -51,7 +51,7 @@ class Catalog {
   const std::vector<std::size_t>& SystemsInRegion(const std::string& regionId) const;
   void RebuildIndex() const;
 
-  // Local bodies authored before systems existed belong to Kessler, exactly as
+  // Local bodies before systems existed belong to Kessler, exactly as
   // bodySystem() does in the reference.
   std::string BodySystem(const Body& body) const;
 
@@ -81,9 +81,9 @@ class Catalog {
 
   DeckPlan wren;
   DeckPlan kestrel;
-  // ROOM_SCENES, by room id. Authored, never computed.
+  // ROOM_SCENES, by room id., never computed.
   std::map<std::string, RoomScene> roomScenes;
-  // WORLD_HISTORY: two authored lines per region. The first is what the
+  // WORLD_HISTORY: two lines per region. The first is what the
   // observation deck and the comms relay read out; the second is the traffic
   // report a relay will hand over for the price of two percent energy.
   std::map<std::string, std::vector<std::string>> worldHistory;
@@ -102,7 +102,7 @@ class Catalog {
   std::vector<Contract> contracts;
 
   // The reference builds the chart from these tables rather than shipping the
-  // result (see data/GalaxyGen.h). They are authored data, exported as-is:
+  // result (see data/GalaxyGen.h). They are data, exported as-is:
   //   portPrices  PORT_PRICES: trade profile -> commodity kind -> multiplier
   //   portHints   PORT_HINTS: trade profile -> the line appended to a port's tip
   //   orbitalWorlds / orbitalPlanetNames / orbitalMoonNames: the local-chart
@@ -120,7 +120,7 @@ class Catalog {
   std::map<std::string, std::map<std::string, std::string>> shipFields;  // by class
   std::map<std::string, std::vector<double>> cargoByClass;  // refit levels 0..2
 
-  // Authored starting values and definitions (Phase 1).
+  // starting values and definitions (Phase 1).
   std::vector<CrewDefinition> startingCrew;
   std::vector<StatDefinition> startingStats;
   std::vector<IncidentType> incidentTypes;
@@ -147,7 +147,7 @@ class Catalog {
   };
   std::vector<OrderDefinition> orderDefs;
 
-  // The quarters art. Authored, never computed.
+  // The quarters art., never computed.
   int spritePx = 4;
   double floorY = 230;
   SpriteFrame sprite, lie, sit;

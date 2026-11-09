@@ -58,7 +58,7 @@ TEST_CASE("a new voyage opens where the reference opens", "[simulation]") {
   REQUIRE(sim.State().shiplets == 340);
   REQUIRE(sim.State().feed.empty());
 
-  // The archive starts with one authored memory, not an earned one.
+  // The archive starts with one memory, not an earned one.
   REQUIRE(sim.State().sim.memories.size() == 1);
   REQUIRE(sim.State().sim.memories[0].kind == "Watch");
   REQUIRE(sim.State().sim.memories[0].at == 0);
@@ -175,13 +175,13 @@ TEST_CASE("payday pays the dearest job first and lays off the rest", "[simulatio
   REQUIRE(FeedContains(sim, "Payday. 15 sh to 1 hand. 5 sh left."));
   REQUIRE(FeedContains(sim, "The purse came up short. 2 hands are off the payroll."));
   REQUIRE(sim.FindCrew("bo")->job == "filters");
-  REQUIRE(sim.FindCrew("bo")->wallet == 45);  // 30 authored + 15 paid
+  REQUIRE(sim.FindCrew("bo")->wallet == 45);  // 30 + 15 paid
   REQUIRE(sim.FindCrew("jax")->job.empty());
   REQUIRE(sim.FindCrew("suri")->job.empty());
 
   // Off the payroll is not off the ship: the hand stays aboard, poorer in morale.
   REQUIRE(sim.Crew().size() == 4);
-  // 64 authored, minus a point per ten actions for working untrained, minus
+  // 64, minus a point per ten actions for working untrained, minus
   // the twelve-point hit for coming off the payroll.
   REQUIRE(sim.FindCrew("jax")->morale == 42);
 }

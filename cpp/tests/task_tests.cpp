@@ -76,7 +76,7 @@ TEST_CASE("the engine is a 225-part machine on a 650x390 stage", "[ui][machine]"
   CHECK(stage.height == 390.0f);
   CHECK(stage.parts.size() == 225);
 
-  // The authored counts, one line each.
+  // The counts, one line each.
   CHECK(CountClass(stage, "mach-brk") == 8);      // four brackets, two arms each
   CHECK(CountClass(stage, "mach-rivet") == 20);   // five valves' worth of pipe
   CHECK(CountClass(stage, "mach-valve") == 5);
@@ -682,7 +682,7 @@ TEST_CASE("nine room archetypes, with their authored words", "[ui][vignette]") {
   CHECK(bridge.meter.size() == 8);
   CHECK(bridge.statusValue == "ONLINE");
 
-  // A room with no authored scene still gets the house default.
+  // A room with no scene still gets the house default.
   const ship::Vignette unknown = ship::BuildVignette(sim, "no-such-room");
   CHECK(unknown.glyph == "network");
   CHECK(unknown.accent == "#8c6f4e");

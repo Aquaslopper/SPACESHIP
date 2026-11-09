@@ -63,7 +63,7 @@ CrewMember MakeCrew(const CrewDefinition& def) {
 Simulation Simulation::NewVoyage(const Catalog& catalog) {
   Simulation sim;
   sim.catalog_ = catalog;
-  // Grow the charted galaxy before anything reads the chart. The authored
+  // Grow the charted galaxy before anything reads the chart. The
   // catalogue is never touched: this works on the voyage's own copy, and a
   // catalogue that has already been grown is left exactly as it is.
   ExpandChart(sim.catalog_);
@@ -187,7 +187,7 @@ Simulation Simulation::NewVoyage(const Catalog& catalog) {
   state.gameOver.clear();
   state.contracts["arrival"] = "active";
 
-  // The archive begins a new watch; the first memory is authored, not earned.
+  // The archive begins a new watch; the first memory is, not earned.
   Memory first;
   first.id = 1;
   first.kind = "Watch";

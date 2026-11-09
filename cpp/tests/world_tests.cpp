@@ -251,7 +251,7 @@ TEST_CASE("commissions are deterministic and never point at the current port", "
   REQUIRE(commission.origin == "tolme");
   REQUIRE(commission.target != "tolme");
   // The port the commission names is on the voyage's chart, which is the grown
-  // one; the authored catalogue alone no longer knows every station.
+  // one; the catalogue alone no longer knows every station.
   REQUIRE(sim.World().FindPort(commission.target) != nullptr);
 
   // Delivering on it completes the objective, and it pays once.

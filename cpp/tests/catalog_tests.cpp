@@ -19,7 +19,7 @@
 
 namespace {
 
-// Loaded once for the whole binary: the catalogue is immutable authored data.
+// Loaded once for the whole binary: the catalogue is immutable data.
 const ship::Catalog& Reference() {
   static const ship::Catalog catalog =
       ship::Catalog::LoadFromAssets(ship::Catalog::DefaultAssetDir());
@@ -49,7 +49,7 @@ TEST_CASE("the catalogue matches the reference edition's totals", "[catalog][cou
   CHECK(c.counts.fittedRooms == 14);
   CHECK(c.contracts.size() == 18u);
   CHECK(c.sectorLanes.size() == 43u);
-  CHECK(c.galaxyLanes.size() == 9u);   // 5 authored + 4 added by region expansion
+  CHECK(c.galaxyLanes.size() == 9u);   // 5 + 4 added by region expansion
   CHECK(c.taskTypes.size() == 12u);
   CHECK(c.counts.incidents == 5);
   CHECK(c.counts.projects == 10);
@@ -154,7 +154,7 @@ TEST_CASE("ports trade in the seven authored commodity kinds", "[catalog][ports]
     }
   }
 
-  // The two hand-authored ports keep their exact margins: this pair is what
+  // The two hand-ports keep their exact margins: this pair is what
   // makes the opening trade route profitable.
   CHECK(c.FindPort("tolme")->prices.at("Bulk metal") == 1.20);
   CHECK(c.FindPort("tolme")->prices.at("Components") == 0.85);

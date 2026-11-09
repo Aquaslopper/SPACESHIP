@@ -600,7 +600,7 @@ NavFxFrame BuildNavFx(const Simulation& sim, double tick, bool reducedMotion) {
   const LayerView& view = ViewOf(sim);
   const std::vector<const Body*> bodies = LayerBodies(sim);
 
-  // Nine drifting rocks, authored from a fixed seed rather than Math.random so
+  // Nine drifting rocks, from a fixed seed rather than Math.random so
   // the same sky greys out in the same places every time.
   Seeded rnd(4242);
   const double t = reducedMotion ? 0.0 : tick;

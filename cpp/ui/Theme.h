@@ -70,7 +70,7 @@ struct Theme {
   // The compact deck: a Wren is drawn at 600x365, a Kestrel at 1160x460.
   bool stageCompact = false;
 
-  // The five authored themes, in the reference's order.
+  // The five themes, in the reference's order.
   static const std::vector<ThemeSpec>& Specs();
   static Theme ById(const std::string& id);
 

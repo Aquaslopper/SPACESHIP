@@ -7,7 +7,7 @@
 //  commitChange() does it in the reference.
 //
 //  Prices are a multiplier per commodity KIND, per port. A lot's worth is its
-//  authored value; what a port pays for it is the port's opinion.
+//  value; what a port pays for it is the port's opinion.
 // ============================================================================
 #include "core/JsNumber.h"
 #include "core/Simulation.h"
@@ -403,10 +403,10 @@ bool Simulation::TalkToPatron(const std::string& patronId) {
 // ---------------------------------------------------------------------------
 // Trade contracts
 // ---------------------------------------------------------------------------
-// A station's board is drawn, not authored, and it is drawn out of the same
+// A station's board is drawn, not, and it is drawn out of the same
 // chart the station's starmap prints: a body's role is what that page already
 // says about it -- the planet's sub-type, the moon's surface line, the kind line
-// an authored world carries -- and a run carries to it one of the commodities it
+// an world carries -- and a run carries to it one of the commodities it
 // wants. A system's board is one seeded draw, the same for every berth in it;
 // each berth shows the runs that start where the player is standing.
 //
@@ -493,7 +493,7 @@ std::string TradeRole(const Body& body) {
   }
   if (body.type != "planet") { return std::string(); }  // stars, stations, systems
   if (!body.subtype.empty()) { return body.subtype; }   // rock / ocean / ice / gas
-  // An authored world carries its nature in the kind line instead.
+  // An world carries its nature in the kind line instead.
   if (body.klass.find("ocean") != std::string::npos) { return "ocean"; }
   if (body.klass.find("ice") != std::string::npos) { return "ice"; }
   if (body.klass.find("gas") != std::string::npos) { return "gas"; }

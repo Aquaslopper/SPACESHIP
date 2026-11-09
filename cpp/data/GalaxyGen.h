@@ -2,7 +2,7 @@
 //  GalaxyGen.h — the generator, not its output.
 //  ---------------------------------------------------------------------------
 //  The reference does not ship a finished galaxy. Spaceship.hta lays out seven
-//  regions and one authored system, then builds the rest at load time from a
+//  regions and one system, then builds the rest at load time from a
 //  table of forty-seven rows (STAR_CATALOG) and a second pass that gives every
 //  system an outer world and a moon (expandLocalCharts). assets/data/chart.json
 //  is the *result* of those two passes, exported once by tools/export-data.cjs.
@@ -25,7 +25,7 @@
 //  cpp/tests/galaxy_gen_tests.cpp checks field by field. That check is what
 //  lets the rest of the port treat generated and exported content as the same
 //  thing, and it is what makes it honest to grow the chart: a generated system
-//  is built by the same function that built the authored forty-seven.
+//  is built by the same function that built the forty-seven.
 // ============================================================================
 #pragma once
 
@@ -63,7 +63,7 @@ const std::vector<StarRow>& AuthoredStarCatalog();
 //              count so its local charts differ from the first batch's.
 //   linkHubs   join each region's first new system to its hub. Off when the
 //              lanes are already in the catalogue, which is the case for the
-//              authored rows (the export carries the lanes they produce) and
+//              rows (the export carries the lanes they produce) and
 //              for a generated batch, whose lanes ChartExpansion draws.
 void BuildGalaxyFromRows(const std::vector<StarRow>& rows, std::size_t baseIndex, Catalog& catalog,
                          bool linkHubs);
@@ -71,7 +71,7 @@ void BuildGalaxyFromRows(const std::vector<StarRow>& rows, std::size_t baseIndex
 // addSystemBody(): the reference's one way of creating a local body - klass by
 // type, System and Region rows, the observation plus the type's fixed reading,
 // and the matching locked scan. Everything that adds a local body goes through
-// here, so a generated world says what an authored one says.
+// here, so a generated world says what an one says.
 Body& AddLocalBody(Catalog& catalog, const std::string& id, const std::string& type,
                    const std::string& name, double x, double y, const Body& system,
                    const std::string& text);
@@ -86,14 +86,14 @@ void ExpandLocalCharts(Catalog& catalog, std::size_t firstSystem);
 // SECTOR_BODIES already holds (Kessler and the five with a hand-written klass),
 // and creates the other forty-two. The export shows which is which - a created
 // system carries only the "Charted bodies" row the pass gives it, while an
-// authored one carries the designer's "Traffic" row too.
+// one carries the designer's "Traffic" row too.
 bool IsGeneratedSystem(const Body& system);
 
 // Removes everything BuildGalaxyFromRows() and ExpandLocalCharts() compute: the
 // forty-two created systems, every body that belongs to a system, and the ports
-// on those bodies. The authored shell - regions, Kessler's six hand-written
+// on those bodies. The shell - regions, Kessler's six hand-written
 // bodies and the two ports on them, the five systems with a designer's klass -
-// is left alone, because the reference authored it too. ChartExpansion strips
+// is left alone, because the reference it too. ChartExpansion strips
 // before it rebuilds, so a catalogue is always the product of the current
 // generator rather than a mix of two.
 void StripGeneratedChart(Catalog& catalog);

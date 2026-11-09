@@ -704,9 +704,9 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
       ++localCount;
     }
 
-    // Every system keeps a station: authored and generated alike, with no quota
+    // Every system keeps a station: and generated alike, with no quota
     // and no exceptions. A system that already carries a port keeps the berth
-    // and the layout it was authored with; one that does not is given a station
+    // and the layout it was with; one that does not is given a station
     // here. The station is placed after the planets so their rings, names and
     // draws are untouched; only the berth is added.
     if (systemHasPort.find(system.id) == systemHasPort.end()) {
@@ -883,7 +883,7 @@ void ExpandChart(Catalog& catalog) {
   catalog.chartExpanded = true;
   if (catalog.regions.empty() || catalog.systems.empty()) { return; }
 
-  // 1. Rebuild the authored baseline from its star table.
+  // 1. Rebuild the baseline from its star table.
   StripGeneratedChart(catalog);
   BuildGalaxyFromRows(AuthoredStarCatalog(), 0, catalog, /*linkHubs=*/true);
   ExpandLocalCharts(catalog, 0);
