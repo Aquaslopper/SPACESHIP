@@ -1170,19 +1170,3 @@ not in the code.
 CHECKED: cpp/data/ChartExpansion.cpp compiles clean with -Wall -Wextra -fsyntax-only; the
 numbers are the probe's, before and after, same formula for both.
 NOT CHECKED: the picture, and the frame cost of the bigger board.
-
-## 099 - the "core" claim removed from the galaxy count
-
-Two comment lines in `cpp/data/ChartExpansion.h` claimed that the galaxies in the data
-file are "the 7 authored core regions" and that the count is "7 + 17 = 24". Nothing is
-authored by the owner and no group of seven has authority. The two lines are deleted.
-
-Nothing was put in their place. The count `kNewGalaxies = 17` is left exactly as it was,
-because giving it a source needs a setting that this branch does not have - `outerGalaxies`
-is referenced nowhere outside the tests - and inventing one is not a removal.
-
-An earlier attempt in the same turn replaced the hard-coded ring split with a half-and-half
-split. That was a change of design dressed as a removal; it was thrown away before commit.
-
-CHECKED: cpp/data/ChartExpansion.cpp compiles clean with -Wall -Wextra -fsyntax-only.
-NOT CHECKED: nothing else - a comment change moves nothing.

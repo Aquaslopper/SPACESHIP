@@ -25,6 +25,8 @@
 
 namespace ship {
 
+// Procedural galactic regions added around the 7 authored core regions
+// (7 + 17 = 24 galactic regions/clusters on the galaxy layer).
 constexpr int kNewGalaxies = 17;
 
 // Procedural star systems drafted per galactic region
