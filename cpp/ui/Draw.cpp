@@ -2542,9 +2542,7 @@ void ShellView::PaintSettingsControls(Simulation& sim, const PopupModel& model) 
         }
         if (button(model.fullscreenLabel, "fullscreen")) { action("fullscreen"); }
       }
-      if (!model.dialNote.empty()) {
-        heading("The chart");
-        text(model.dialNote);
+      {
         // A dial reports when the hand lets go of it: every step of a drag would
         // otherwise draw a new sky, and the last one is the only one that lasts. The
         // report is a plain deactivation rather than an edit, because SetChartDials()

@@ -77,7 +77,6 @@ struct PopupModel {
   int systemsPerRegion = 64;
   int chaosPercent = 50;
   int stations = 100;
-  std::string dialNote;   // what the four together mean right now
   std::vector<PopupSlot> slots;
   std::string message;
   std::vector<DescribeAct> acts;

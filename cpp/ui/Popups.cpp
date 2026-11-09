@@ -212,7 +212,6 @@ PopupModel BuildPopup(const Simulation& sim, const std::string& key,
   model.systemsPerRegion = options.systemsPerRegion;
   model.chaosPercent = static_cast<int>(std::lround(std::clamp(options.chaos, 0.0, 1.0) * 100.0));
   model.stations = options.stations;
-  model.dialNote = "Changing one draws the whole chart again and starts the voyage over.";
   return model;
 }
 
@@ -296,12 +295,7 @@ bool PressPopupAction(Simulation& sim, const std::string& key,
         if (action == "systems-per-region") { systems = static_cast<int>(value); }
         if (action == "chaos") { chaos = value / 100.0; }
         if (action == "stations") { stations = static_cast<int>(value); }
-        const bool changed = sim.SetChartDials(galaxies, systems, chaos, stations);
-        if (message != nullptr) {
-          message->clear();
-          if (changed) { *message = "The chart has been drawn again."; }
-        }
-        return changed;
+        return sim.SetChartDials(galaxies, systems, chaos, stations);
       } catch (...) {
         return false;
       }

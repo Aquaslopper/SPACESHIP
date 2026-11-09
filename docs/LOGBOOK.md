@@ -1394,3 +1394,25 @@ itself (`stand-watch`) and its handler are untouched; nothing in the UI offers i
 
 CHECKED: cpp/ui/NavScreen.cpp compiles clean with -Wall -Wextra -fsyntax-only.
 NOT CHECKED: the picture.
+
+## 090 - every sentence I wrote into the UI is out
+
+Added up what I put on screen on this branch. Every string literal I added under `cpp/ui`:
+
+  the four dial names     "Outer galaxies: %d"  "Systems per region: %d"  "Chaos: %d%%"
+                          "Stations: %d%%"    (the names were his)
+  a heading               "The chart"
+  a sentence              "Changing one draws the whole chart again and starts the voyage over."
+  a confirmation          "The chart has been drawn again."
+
+The heading, the sentence and the confirmation are gone. The four dial names are what is
+left, because a slider with no name is not a dial.
+
+Nothing else in `cpp/ui` was added by this branch. The rows the navigation screen can
+still push - "View <region> sector chart", "Dock at <port>", and the Start Travel / Run
+Deep Scan buttons - are not mine; they were there before, and the last two commits on this
+branch only removed rows and prose from that screen, never added one.
+
+CHECKED: cpp/ui/{Draw,Popups}.cpp compile clean with -Wall -Wextra -fsyntax-only (one
+pre-existing unused-variable warning in PaintTaskScreen, untouched).
+NOT CHECKED: the picture.
