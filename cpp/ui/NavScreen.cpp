@@ -942,3 +942,22 @@ bool PressNavActionRaw(Simulation& sim, const std::string& action, const std::st
   }
   return false;
 }
+
+}  // namespace
+
+// The press. Progress controls answer first, because acknowledging a finished
+// crossing is not a command row; everything else is dispatched straight to the
+// action table. No row has to exist for an action to run - the berth is a card in
+// the event slot now, not a command - and the actions themselves are what spend a
+// click, so nothing here can spend one twice.
+bool PressNavAction(Simulation& sim, const std::string& action, const std::string& arg) {
+  if (action == "travel" || action == "scan" || action == "extract") {
+    for (const auto& button : BuildNavScreen(sim).screen.progress) {
+      if (button.taskId == action) { return PressProgressButton(sim, button); }
+    }
+    return false;
+  }
+  return PressNavActionRaw(sim, action, arg);
+}
+
+}  // namespace ship
