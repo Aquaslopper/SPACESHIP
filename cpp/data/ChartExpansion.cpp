@@ -918,7 +918,6 @@ void ExpandChart(Catalog& catalog) {
   // 3. Expand the galaxy layer: translate the 7 authored regions to the central
   //    core (preserving all authored inter-region distances) and generate outer
   //    galactic clusters/dwarf galaxies around them.
-  const std::size_t authoredRegionCount = catalog.regions.size();
   const double galDx = (galaxy.w - authoredW) / 2.0;
   const double galDy = (galaxy.h - authoredH) / 2.0;
   PopulateGalaxies(catalog, galDx, galDy);
@@ -960,22 +959,8 @@ void ExpandChart(Catalog& catalog) {
   std::unordered_map<std::string, std::pair<double, double>> regionAnchor;
   for (std::size_t ri = 0; ri < catalog.regions.size(); ++ri) {
     const Body& region = catalog.regions[ri];
-    if (ri < authoredRegionCount) {
-      double sumX = 0.0;
-      double sumY = 0.0;
-      int n = 0;
-      for (const Body& sys : catalog.systems) {
-        if (sys.region == region.id) {
-          sumX += sys.x;
-          sumY += sys.y;
-          ++n;
-        }
-      }
-      if (n > 0) {
-        regionAnchor[region.id] = {sumX / static_cast<double>(n), sumY / static_cast<double>(n)};
-        continue;
-      }
-    }
+    // Every region is placed by this one rule, whether it came from the file or was
+    // generated: no region is the centre and none is exempt.
     const double sx = std::clamp(region.x * (sector.w / galaxy.w), 260.0, sector.w - 260.0);
     const double sy = std::clamp(region.y * (sector.h / galaxy.h), 150.0, sector.h - 150.0);
     regionAnchor[region.id] = {sx, sy};
