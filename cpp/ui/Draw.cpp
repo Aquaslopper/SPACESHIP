@@ -2622,11 +2622,171 @@ void ShellView::PaintTutorial(const Simulation& sim, double nowMs) {
   }
 }
 
+void ShellView::RebuildSetupPreview(const Simulation& sim) {
+  setupPreview_ = BuildChartPreview(sim.SourceWorld(), setupSettings_);
+  setupPreviewDirty_ = false;
+}
+
+void ShellView::PaintSetup(Simulation& sim) {
+  const Palette& p = theme_.palette;
+  if (setupPreviewDirty_) { RebuildSetupPreview(sim); }
+
+  DrawRectangle(0, 0, static_cast<int>(width_), static_cast<int>(height_), ToRay(p.titleBackground));
+  const float ratio = 1672.0f / 941.0f;
+  float cardW = std::min(width_ - 24.0f, 1672.0f);
+  float cardH = cardW / ratio;
+  if (cardH > height_ - 24.0f) { cardH = height_ - 24.0f; cardW = cardH * ratio; }
+  const Area card{(width_ - cardW) * 0.5f, (height_ - cardH) * 0.5f, cardW, cardH};
+  const Texture2D* texture = static_cast<const Texture2D*>(setupArt_);
+  const bool hasArt = texture != nullptr && texture->id != 0 && texture->width > 0;
+  if (hasArt) {
+    DrawTexturePro(*texture,
+                   Rectangle{0, 0, static_cast<float>(texture->width), static_cast<float>(texture->height)},
+                   Rectangle{card.x, card.y, card.w, card.h}, Vector2{0, 0}, 0, ToRay(p.white));
+  } else {
+    DrawRectangle(static_cast<int>(card.x), static_cast<int>(card.y),
+                  static_cast<int>(card.w), static_cast<int>(card.h), ToRay(p.panel));
+    DrawRectangleLines(static_cast<int>(card.x), static_cast<int>(card.y),
+                       static_cast<int>(card.w), static_cast<int>(card.h), ToRay(p.borderDark));
+  }
+
+  const float pad = card.w * 0.035f;
+  const float leftW = card.w * 0.42f;
+  const float mapX = card.x + leftW;
+  const float mapY = card.y + pad;
+  const float mapW = card.w - leftW - pad;
+  const float mapH = card.h * 0.72f;
+  const float barY = card.Bottom() - card.h * 0.11f;
+  const int textPx = TypePx(12);
+
+  Text("VOYAGE SETTINGS", static_cast<int>(card.x + pad), static_cast<int>(card.y + pad),
+       TypePx(16), ToRay(p.titleInk));
+
+  float y = card.y + pad + 36.0f;
+  auto row = [&](const char* label, const std::string& value, const char* dec, const char* inc) {
+    Text(label, static_cast<int>(card.x + pad), static_cast<int>(y), textPx, ToRay(p.muted));
+    y += 18.0f;
+    const Area minus{card.x + pad, y, 28.0f, 28.0f};
+    const Area plus{card.x + pad + leftW - pad * 2.0f - 28.0f, y, 28.0f, 28.0f};
+    DrawRectangle(static_cast<int>(minus.x), static_cast<int>(minus.y), 28, 28, ToRay(p.titleMenu));
+    DrawRectangle(static_cast<int>(plus.x), static_cast<int>(plus.y), 28, 28, ToRay(p.titleMenu));
+    Text("-", static_cast<int>(minus.x + 10), static_cast<int>(minus.y + 6), textPx, ToRay(p.titleMenuInk));
+    Text("+", static_cast<int>(plus.x + 8), static_cast<int>(plus.y + 6), textPx, ToRay(p.titleMenuInk));
+    const float tw = TextWidth(value.c_str(), textPx, false);
+    Text(value.c_str(), static_cast<int>(minus.x + 36.0f + (plus.x - minus.x - 64.0f - tw) * 0.5f),
+         static_cast<int>(y + 6), textPx, ToRay(p.titleInk));
+    titleHits_.push_back({minus, dec, ""});
+    titleHits_.push_back({plus, inc, ""});
+    y += 40.0f;
+  };
+
+  char seedBuf[32];
+  std::snprintf(seedBuf, sizeof(seedBuf), "%016llX", static_cast<unsigned long long>(setupSettings_.seed));
+  row("Seed", seedBuf, "setup-seed-dec", "setup-seed-inc");
+  titleHits_.push_back({Area{card.x + pad + 36.0f, y - 40.0f, leftW - 100.0f, 28.0f}, "setup-seed-rand", ""});
+  row("Galaxies (1-100)", std::to_string(setupSettings_.galaxies), "setup-gal-dec", "setup-gal-inc");
+  if (setupSettings_.galaxies >= kGalaxyRamWarning) {
+    for (const auto& line : WrapText("Warning: 25+ galaxies exhaust RAM and CPU.",
+                                     leftW - pad, TypePx(10), SelectFont(TypePx(10), false))) {
+      Text(line.c_str(), static_cast<int>(card.x + pad), static_cast<int>(y), TypePx(10), ToRay(p.terracotta));
+      y += 14.0f;
+    }
+  }
+  row("Map size", MapSizeLabel(setupSettings_.mapSize), "setup-scale-dec", "setup-scale-inc");
+  char spreadBuf[32];
+  std::snprintf(spreadBuf, sizeof(spreadBuf), "%.2f", setupSettings_.spread);
+  row("Spread (distance)", spreadBuf, "setup-spread-dec", "setup-spread-inc");
+
+  Text("Layer", static_cast<int>(card.x + pad), static_cast<int>(y), textPx, ToRay(p.muted));
+  y += 20.0f;
+  const char* layers[] = {"galaxy", "sector", "system"};
+  const char* layerLabels[] = {"GALAXY", "SECTOR", "SYSTEM"};
+  const float lw = (leftW - pad * 2.0f - 16.0f) / 3.0f;
+  for (int i = 0; i < 3; ++i) {
+    const Area box{card.x + pad + i * (lw + 8.0f), y, lw, 28.0f};
+    const bool on = setupLayer_ == layers[i];
+    DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.w),
+                  static_cast<int>(box.h), ToRay(on ? p.titleMenuHover : p.titleMenu));
+    const float tw = TextWidth(layerLabels[i], TypePx(10), false);
+    Text(layerLabels[i], static_cast<int>(box.x + (box.w - tw) * 0.5f), static_cast<int>(box.y + 7),
+         TypePx(10), ToRay(p.titleMenuInk));
+    titleHits_.push_back({box, std::string("setup-layer:") + layers[i], ""});
+  }
+
+  DrawRectangle(static_cast<int>(mapX), static_cast<int>(mapY), static_cast<int>(mapW),
+                static_cast<int>(mapH), ToRay(p.ink, 18));
+  const float side = std::min(mapW, mapH) - 8.0f;
+  const float discX = mapX + (mapW - side) * 0.5f;
+  const float discY = mapY + (mapH - side) * 0.5f;
+  DrawCircle(static_cast<int>(discX + side * 0.5f), static_cast<int>(discY + side * 0.5f),
+             side * 0.5f, ToRay(p.ink, 28));
+  DrawCircleLines(static_cast<int>(discX + side * 0.5f), static_cast<int>(discY + side * 0.5f),
+                  side * 0.5f, ToRay(p.titleBorder));
+
+  auto plot = [&](double x, double yv, double bw, double bh) {
+    const float px = static_cast<float>(discX + (x / bw) * side);
+    const float py = static_cast<float>(discY + (yv / bh) * side);
+    return Vector2{px, py};
+  };
+
+  if (setupLayer_ == "galaxy") {
+    for (const auto& dot : setupPreview_.galaxies) {
+      const Vector2 pt = plot(dot.x, dot.y, setupPreview_.galaxyW, setupPreview_.galaxyH);
+      const bool sel = dot.id == setupGalaxyId_;
+      DrawCircle(static_cast<int>(pt.x), static_cast<int>(pt.y), sel ? 5.0f : 3.0f,
+                 ToRay(sel ? p.terracotta : p.coffee));
+      titleHits_.push_back({Area{pt.x - 8, pt.y - 8, 16, 16}, "setup-pick-galaxy", dot.id});
+    }
+  } else {
+    const double bw = setupPreview_.sectorW;
+    const double bh = setupPreview_.sectorH;
+    for (const auto& dot : setupPreview_.systems) {
+      if (!setupGalaxyId_.empty() && dot.parent != setupGalaxyId_) { continue; }
+      if (setupLayer_ == "system" && !setupSystemId_.empty() && dot.id != setupSystemId_) { continue; }
+      const Vector2 pt = plot(dot.x, dot.y, bw, bh);
+      const bool sel = dot.id == setupSystemId_;
+      DrawCircle(static_cast<int>(pt.x), static_cast<int>(pt.y), sel ? 4.5f : 2.5f,
+                 ToRay(sel ? p.terracotta : p.coffee));
+      titleHits_.push_back({Area{pt.x - 7, pt.y - 7, 14, 14}, "setup-pick-system", dot.id});
+    }
+  }
+
+  const bool canLaunch = !setupSystemId_.empty();
+  const Area launch{mapX, barY, std::min(180.0f, mapW * 0.4f), 36.0f};
+  DrawRectangle(static_cast<int>(launch.x), static_cast<int>(launch.y),
+                static_cast<int>(launch.w), static_cast<int>(launch.h),
+                ToRay(canLaunch ? p.titleMenuHover : p.titleMenu, canLaunch ? 255 : 140));
+  const float ltw = TextWidth("LAUNCH", TypePx(14), false);
+  Text("LAUNCH", static_cast<int>(launch.x + (launch.w - ltw) * 0.5f),
+       static_cast<int>(launch.y + 8), TypePx(14),
+       ToRay(canLaunch ? p.titleMenuInk : p.muted));
+  if (canLaunch) { titleHits_.push_back({launch, "setup-launch", ""}); }
+
+  const Area back{card.x + pad, barY, 120.0f, 36.0f};
+  DrawRectangle(static_cast<int>(back.x), static_cast<int>(back.y), 120, 36, ToRay(p.titleMenu));
+  const float btw = TextWidth("BACK", textPx, false);
+  Text("BACK", static_cast<int>(back.x + (120 - btw) * 0.5f), static_cast<int>(back.y + 10),
+       textPx, ToRay(p.titleMenuInk));
+  titleHits_.push_back({back, "back", ""});
+
+  if (!setupSystemId_.empty()) {
+    Text(("Start: " + setupSystemId_).c_str(), static_cast<int>(launch.x + launch.w + 12),
+         static_cast<int>(barY + 10), TypePx(10), ToRay(p.titleInk));
+  } else {
+    Text("Choose a starting system on the map.", static_cast<int>(launch.x + launch.w + 12),
+         static_cast<int>(barY + 10), TypePx(10), ToRay(p.muted));
+  }
+}
+
 void ShellView::PaintTitle(Simulation& sim, double nowMs) {
   const Palette& p = theme_.palette;
   titleHits_.clear();
   title_ = BuildTitleScreen(sim, fromVoyage_, titlePanel_, saveDir_, titleSlot_,
                             titleMessage_, titleCard_);
+  if (!titleConfirm_ && titlePanel_ == TitlePanel::Setup) {
+    PaintSetup(sim);
+    return;
+  }
   if (!titleConfirm_ && (titlePanel_ == TitlePanel::Guide || titlePanel_ == TitlePanel::Tutorial)) {
     PaintTutorial(sim, nowMs);
     return;
@@ -2719,7 +2879,11 @@ void ShellView::PaintTitle(Simulation& sim, double nowMs) {
       ImGui::TextWrapped("%s", titleMessage_.c_str());
       if (ImGui::Button("OK")) {
         PressTitleAction(sim, "new-voyage", "", &fromVoyage_, &titlePanel_, &titleSlot_, saveDir_, &titleMessage_, &titleActive_);
-        HideTitle();
+        titleConfirm_ = false;
+        setupPreviewDirty_ = true;
+        setupSystemId_.clear();
+        setupGalaxyId_.clear();
+        setupLayer_ = "galaxy";
       }
       ImGui::SameLine();
       if (ImGui::Button("Cancel")) { titleConfirm_ = false; titleMessage_.clear(); }
@@ -3147,7 +3311,16 @@ void ShellView::PaintPopup(Simulation& sim) {
   ImGui::PopStyleVar(2);
   ImGui::PopStyleColor(10);
   for (int serial : closed) { floating_.Close(serial); }
-  if (restarted) { floating_.Clear(); ResetContentScroll(); }
+  if (restarted) {
+    floating_.Clear();
+    ResetContentScroll();
+    ShowTitle(false);
+    titlePanel_ = TitlePanel::Setup;
+    setupPreviewDirty_ = true;
+    setupSystemId_.clear();
+    setupGalaxyId_.clear();
+    setupLayer_ = "galaxy";
+  }
   if (showMenu) { ShowTitle(true); }
   popupKey_ = floating_.Panels().empty() ? "" : floating_.Panels().back().key;
 }
@@ -3349,7 +3522,10 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         titleConfirm_ = false;
         PressTitleAction(sim, "new-voyage", "", &fromVoyage_, &titlePanel_, &titleSlot_,
                          saveDir_, &titleMessage_, &titleActive_);
-        HideTitle();
+        setupPreviewDirty_ = true;
+        setupSystemId_.clear();
+        setupGalaxyId_.clear();
+        setupLayer_ = "galaxy";
         return;
       }
       if (hit.action == "cancel-new-voyage") {
@@ -3367,7 +3543,10 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         titleConfirm_ = false;
         PressTitleAction(sim, hit.action, "", &fromVoyage_, &titlePanel_, &titleSlot_,
                          saveDir_, &titleMessage_, &titleActive_);
-        HideTitle();
+        setupPreviewDirty_ = true;
+        setupSystemId_.clear();
+        setupGalaxyId_.clear();
+        setupLayer_ = "galaxy";
         return;
       }
       if (hit.action == "load-slot") {
@@ -3393,6 +3572,84 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         tutorialDirection_ = 1;
         tutorialTransitionMs_ = nowMs;
       }
+      if (hit.action == "setup-seed-inc") {
+        setupSettings_.seed += 1;
+        setupPreviewDirty_ = true;
+        setupSystemId_.clear();
+        return;
+      }
+      if (hit.action == "setup-seed-dec") {
+        setupSettings_.seed -= 1;
+        setupPreviewDirty_ = true;
+        setupSystemId_.clear();
+        return;
+      }
+      if (hit.action == "setup-seed-rand") {
+        setupSettings_.seed = setupSettings_.seed * 6364136223846793005ULL + 1ULL;
+        setupPreviewDirty_ = true;
+        setupSystemId_.clear();
+        return;
+      }
+      if (hit.action == "setup-gal-inc") {
+        setupSettings_.galaxies = ClampGalaxies(setupSettings_.galaxies + 1);
+        setupPreviewDirty_ = true;
+        setupSystemId_.clear();
+        setupGalaxyId_.clear();
+        return;
+      }
+      if (hit.action == "setup-gal-dec") {
+        setupSettings_.galaxies = ClampGalaxies(setupSettings_.galaxies - 1);
+        setupPreviewDirty_ = true;
+        setupSystemId_.clear();
+        setupGalaxyId_.clear();
+        return;
+      }
+      if (hit.action == "setup-scale-inc") {
+        setupSettings_.mapSize = ClampMapSize(setupSettings_.mapSize + 1);
+        setupSettings_.mapScale = MapSizeScale(setupSettings_.mapSize);
+        setupPreviewDirty_ = true;
+        return;
+      }
+      if (hit.action == "setup-scale-dec") {
+        setupSettings_.mapSize = ClampMapSize(setupSettings_.mapSize - 1);
+        setupSettings_.mapScale = MapSizeScale(setupSettings_.mapSize);
+        setupPreviewDirty_ = true;
+        return;
+      }
+      if (hit.action == "setup-spread-inc") {
+        setupSettings_.spread = std::min(3.0, setupSettings_.spread + 0.1);
+        setupPreviewDirty_ = true;
+        return;
+      }
+      if (hit.action == "setup-spread-dec") {
+        setupSettings_.spread = std::max(0.4, setupSettings_.spread - 0.1);
+        setupPreviewDirty_ = true;
+        return;
+      }
+      if (hit.action.rfind("setup-layer:", 0) == 0) {
+        setupLayer_ = hit.action.substr(12);
+        return;
+      }
+      if (hit.action == "setup-pick-galaxy") {
+        setupGalaxyId_ = hit.arg;
+        setupLayer_ = "sector";
+        setupSystemId_.clear();
+        return;
+      }
+      if (hit.action == "setup-pick-system") {
+        setupSystemId_ = hit.arg;
+        for (const auto& dot : setupPreview_.systems) {
+          if (dot.id == setupSystemId_) { setupGalaxyId_ = dot.parent; break; }
+        }
+        return;
+      }
+      if (hit.action == "setup-launch") {
+        if (setupSystemId_.empty()) { return; }
+        sim.BeginVoyage(setupSettings_, setupSystemId_);
+        fromVoyage_ = false;
+        HideTitle();
+        return;
+      }
       PressTitleAction(sim, hit.action, "", &fromVoyage_, &titlePanel_, &titleSlot_,
                        saveDir_, &titleMessage_, &titleActive_);
       return;
@@ -3408,7 +3665,15 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
                                           saveDir_, &lossMessage_);
       if (hit.action == "main-menu" || toTitle) {
         lossDismissed_ = true;
-        ShowTitle(true);
+        ShowTitle(false);
+        if (hit.action == "new-voyage") {
+          titlePanel_ = TitlePanel::Setup;
+          setupPreviewDirty_ = true;
+          setupSystemId_.clear();
+          setupGalaxyId_.clear();
+          setupLayer_ = "galaxy";
+        }
+        return;
       } else if (changed && sim.State().gameOver.empty()) {
         lossDismissed_ = true;
       }

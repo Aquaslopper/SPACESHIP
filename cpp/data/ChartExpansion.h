@@ -33,20 +33,70 @@ constexpr int kNewGalaxies = 17;
 // (17 * 24 = 408 star systems across the universe).
 constexpr int kNewSystemsPerRegion = 24;
 
+constexpr int kMinGalaxies = 1;
+constexpr int kMaxGalaxies = 100;
+// Galaxy counts at or above this were measured to exhaust RAM and CPU.
+constexpr int kGalaxyRamWarning = 25;
+
+constexpr int kMapSizeCount = 4;
+constexpr double kMapSizeStep = 1.20;
+
+inline int ClampGalaxies(int n) {
+  return n < kMinGalaxies ? kMinGalaxies : (n > kMaxGalaxies ? kMaxGalaxies : n);
+}
+inline int ClampMapSize(int size) {
+  return size < 0 ? 0 : (size >= kMapSizeCount ? kMapSizeCount - 1 : size);
+}
+inline double MapSizeScale(int size) {
+  double scale = 1.0;
+  for (int i = 0; i < ClampMapSize(size); ++i) { scale *= kMapSizeStep; }
+  return scale;
+}
+inline const char* MapSizeLabel(int size) {
+  switch (ClampMapSize(size)) {
+    case 0: return "SMALL";
+    case 1: return "NORMAL";
+    case 2: return "MEDIUM";
+    default: return "BIG";
+  }
+}
+
 // Board multipliers relative to the 638x278 reference viewport.
 constexpr double kSectorBoardScale = 6.0;
 constexpr double kGalaxyBoardScale = 4.0;
 
 // Zoom ladder for the wide sector and galaxy boards.
-constexpr double kZoomMin = 0.3;
-constexpr double kZoomMax = 10.0;
+constexpr double kZoomMin = 0.25;
+constexpr double kZoomMax = 16.0;
 constexpr double kZoomStep = 0.2;
 
 // Zoom ladder for the local system chart.
-constexpr double kSystemZoomMin = 0.6;
-constexpr double kSystemZoomMax = 2.5;
+constexpr double kSystemZoomMin = 0.5;
+constexpr double kSystemZoomMax = 12.0;
 
 void ExpandChart(Catalog& catalog);
+void ExpandChart(Catalog& catalog, const ChartSettings& settings);
+
+struct ChartPreviewDot {
+  std::string id;
+  std::string name;
+  std::string parent;
+  double x = 0;
+  double y = 0;
+};
+
+struct ChartPreview {
+  ChartSettings settings;
+  double galaxyW = 1;
+  double galaxyH = 1;
+  double sectorW = 1;
+  double sectorH = 1;
+  std::vector<ChartPreviewDot> galaxies;
+  std::vector<ChartPreviewDot> systems;
+};
+
+ChartPreview BuildChartPreview(const Catalog& catalog, const ChartSettings& settings);
+
 void PopulateGalaxies(Catalog& catalog, double coreDx, double coreDy);
 void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem);
 void PlaceGalaxyDots(Catalog& catalog);

@@ -12,6 +12,7 @@
 // ============================================================================
 #include "core/JsNumber.h"
 #include "core/Simulation.h"
+#include "data/ChartExpansion.h"
 
 #include <algorithm>
 #include <cmath>
@@ -257,6 +258,16 @@ void Simulation::ApplyChartBoard() {
   map_.zmin = board.zmin;
   map_.zmax = board.zmax;
   map_.zstep = board.zstep;
+  {
+    const double scale = MapSizeScale(catalog_.chartSettings.mapSize);
+    if (map_.layer == "system") {
+      map_.zmax = std::max(map_.zmax, kSystemZoomMax * scale);
+      map_.zmin = std::min(map_.zmin, kSystemZoomMin);
+    } else {
+      map_.zmax = std::max(map_.zmax, kZoomMax * scale);
+      map_.zmin = std::min(map_.zmin, kZoomMin);
+    }
+  }
   map_.grid = board.grid;
   map_.vpy = board.vpy;
   map_.rungs = board.rungs;

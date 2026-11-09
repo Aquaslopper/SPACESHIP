@@ -17,6 +17,7 @@
 #include "raylib.h"
 
 #include "core/Simulation.h"
+#include "data/ChartExpansion.h"
 #include "ui/AwardsScreen.h"
 #include "ui/CrewRecord.h"
 #include "ui/Describe.h"
@@ -53,6 +54,7 @@ class ShellView {
     monoFont_ = mono;
   }
   void SetTitleTexture(void* texture) { titleArt_ = texture; }
+  void SetSetupTexture(void* texture) { setupArt_ = texture; }
   void SetAudioStatus(std::string status) { audioStatus_ = std::move(status); }
   void SetWrenExteriorTexture(void* texture) { wrenExteriorArt_ = texture; }
   void SetDisplayAdjustmentAvailable(bool available) { displayAdjustmentAvailable_ = available; }
@@ -329,6 +331,17 @@ class ShellView {
   TitleModel title_;
   std::vector<NavHit> titleHits_;
   void* titleArt_ = nullptr;
+  void* setupArt_ = nullptr;
+  ChartSettings setupSettings_{};
+  ChartPreview setupPreview_{};
+  std::string setupLayer_ = "galaxy";
+  std::string setupGalaxyId_;
+  std::string setupSystemId_;
+  char setupSeed_[21] = "SPACESHI";
+  bool setupPreviewDirty_ = true;
+
+  void PaintSetup(Simulation& sim);
+  void RebuildSetupPreview(const Simulation& sim);
   bool displayAdjustmentAvailable_ = true;
   std::array<void*, 6> tutorialArt_{};
   double tutorialTransitionMs_ = 0.0;

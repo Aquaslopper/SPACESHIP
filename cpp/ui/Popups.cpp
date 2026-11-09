@@ -290,8 +290,7 @@ bool PressPopupAction(Simulation& sim, const std::string& key,
       return true;
     }
     if (action == "new-voyage") {
-      sim.RestartVoyage();
-      if (message != nullptr) { *message = "A new voyage has begun."; }
+      if (message != nullptr) { *message = std::string(); }
       return true;
     }
     if (action == "main-menu") {

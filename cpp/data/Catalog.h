@@ -13,6 +13,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <map>
 #include <stdexcept>
@@ -24,6 +25,17 @@
 #include "data/Types.h"
 
 namespace ship {
+
+// Voyage-generation knobs. Defaults match the current generator (17 galaxies).
+// More than 25 galaxies is known to exhaust RAM and CPU on the author's machine.
+struct ChartSettings {
+  std::uint64_t seed = 0x5350414345534849ULL;
+  int galaxies = 17;
+  // 0 small (current), 1 normal (+20%), 2 medium (+20% again), 3 big (+20% again).
+  int mapSize = 0;
+  double mapScale = 1.0;
+  double spread = 1.0;
+};
 
 class CatalogError : public std::runtime_error {
  public:
@@ -72,6 +84,7 @@ class Catalog {
   // started from an already-grown catalogue (or restarted from its own copy)
   // does not grow a second galaxy.
   bool chartExpanded = false;
+  ChartSettings chartSettings;
 
   // Where each system sits on the galaxy board (ChartExpansion::PlaceGalaxyDots).
   // A system has one position, in its own region's cluster; the galaxy scale

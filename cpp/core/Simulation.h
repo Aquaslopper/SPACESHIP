@@ -72,6 +72,8 @@ class Simulation {
   // A voyage in the state the reference reaches the moment its script has
   // finished loading: full stores, three canisters in the rack, three jobs.
   static Simulation NewVoyage(const Catalog& catalog);
+  static Simulation NewVoyage(const Catalog& catalog, const ChartSettings& settings,
+                              const std::string& startSystemId);
   // Historical fully fitted HTA state, for legacy-save and differential tests.
   // The playable client always uses NewVoyage, never this reference fixture.
   static Simulation ReferenceVoyage(const Catalog& catalog);
@@ -89,6 +91,9 @@ class Simulation {
   // player's preferences carried across. Free - it is the new-voyage command,
   // not a turn.
   void RestartVoyage();
+  void BeginVoyage(const ChartSettings& settings, const std::string& startSystemId);
+  const ChartSettings& VoyageChart() const { return chartSettings_; }
+  const Catalog& SourceWorld() const { return sourceCatalog_.regions.empty() ? catalog_ : sourceCatalog_; }
 
   // A burst of work that is NOT an action: the filter bank's reward.
   void ProAction(double n);
@@ -492,6 +497,8 @@ class Simulation {
   void AutoMess();
 
   Catalog catalog_;
+  Catalog sourceCatalog_;
+  ChartSettings chartSettings_;
   Rules rules_;
   GameState state_;
   std::vector<CrewMember> crew_;
