@@ -1576,3 +1576,21 @@ The small radius is a blob; the range and the arrangement are what move.
 CHECKED: cpp/data/ChartExpansion.cpp compiles clean with -Wall -Wextra -fsyntax-only; the
 numbers are the probe's output.
 NOT CHECKED: the picture. He is the confirmation.
+
+## 097 - the two size dials get a floor and a ceiling
+
+His numbers: outer galaxies 2 to 24, systems per region 8 to 32, and both rows read in per
+cent like chaos and stations - 0 is the floor, 100 the ceiling.
+
+  Catalog.h          the four range constants, held in one place
+  ChartExpansion.cpp a chart cannot be drawn outside the range, whatever number arrives
+  Action.cpp         the dial is clamped to the range instead of 0..64 and 8..96
+  Popups.h/.cpp      the row carries a percentage; the action turns it into the count
+  Draw.cpp           "Outer galaxies: 45%", "Systems per region: 45%", both 0..100
+
+His defaults are untouched (24 and 34). 34 is above the new ceiling of 32, so until either
+dial is moved the row reads 100 per cent while the chart draws 32 - the clamp is what holds
+it. Nothing else was touched.
+
+CHECKED: the five files compile clean with -Wall -Wextra -fsyntax-only.
+NOT CHECKED: the rows on screen, and the percentage-to-count mapping end to end.

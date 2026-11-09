@@ -65,8 +65,8 @@ bool Simulation::SetChartDials(int galaxies, int systems, double chaos, int stat
   // around the authored core - which cannot be done to a voyage in place, because
   // every id past the core names a different place afterwards - so this starts the
   // voyage again on the redrawn chart and keeps the four numbers with it.
-  const int clampedGalaxies = std::clamp(galaxies, 0, 64);
-  const int clampedSystems = std::clamp(systems, 8, 96);
+  const int clampedGalaxies = std::clamp(galaxies, Catalog::kGalaxiesMin, Catalog::kGalaxiesMax);
+  const int clampedSystems = std::clamp(systems, Catalog::kSystemsMin, Catalog::kSystemsMax);
   const double clampedChaos = std::clamp(chaos, 0.0, 1.0);
   const int clampedStations = std::clamp(stations, 0, 100);
   const Options options = state_.options;

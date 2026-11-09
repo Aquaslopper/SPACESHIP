@@ -2557,9 +2557,10 @@ void ShellView::PaintSettingsControls(Simulation& sim, const PopupModel& model) 
           int hi;
         };
         const Dial dials[] = {
-            {"##outer-galaxies", "galaxies", "Outer galaxies: %d", model.outerGalaxies, 0, 64},
-            {"##systems-per-region", "systems-per-region", "Systems per region: %d",
-             model.systemsPerRegion, 8, 96},
+            {"##outer-galaxies", "galaxies", "Outer galaxies: %d%%",
+             model.outerGalaxiesPercent, 0, 100},
+            {"##systems-per-region", "systems-per-region", "Systems per region: %d%%",
+             model.systemsPerRegionPercent, 0, 100},
             {"##chaos", "chaos", "Chaos: %d%%", model.chaosPercent, 0, 100},
             {"##stations", "stations", "Stations: %d%%", model.stations, 0, 100},
         };

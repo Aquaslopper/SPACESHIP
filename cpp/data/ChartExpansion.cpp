@@ -326,7 +326,11 @@ void PopulateGalaxies(Catalog& catalog, double coreDx, double coreDy) {
 
   // Arrange outer galaxies on two elliptical rings around the core disc so
   // every quadrant of the galaxy board has reachable clusters without crowding.
-  const int galaxies = std::max(0, catalog.outerGalaxies);
+  catalog.outerGalaxies =
+      std::clamp(catalog.outerGalaxies, Catalog::kGalaxiesMin, Catalog::kGalaxiesMax);
+  catalog.systemsPerRegion =
+      std::clamp(catalog.systemsPerRegion, Catalog::kSystemsMin, Catalog::kSystemsMax);
+  const int galaxies = catalog.outerGalaxies;
   for (int i = 0; i < galaxies; ++i) {
     const GalaxyArchetype& arch = archetypes[static_cast<std::size_t>(i) % archetypes.size()];
     const bool outerRing = (i >= 8);

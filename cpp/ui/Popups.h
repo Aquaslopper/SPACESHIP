@@ -73,8 +73,10 @@ struct PopupModel {
   bool fullscreen = false;
   std::string fullscreenLabel; // "Window: Borderless fullscreen"
   // The four dials the chart is drawn from.
-  int outerGalaxies = 34;
-  int systemsPerRegion = 64;
+  int outerGalaxies = 0;          // count, kept for the world builder
+  int systemsPerRegion = 0;
+  int outerGalaxiesPercent = 0;   // what the row shows: position inside the range
+  int systemsPerRegionPercent = 0;
   int chaosPercent = 50;
   int stations = 100;
   std::vector<PopupSlot> slots;

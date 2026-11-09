@@ -15,6 +15,20 @@ namespace ship {
 
 namespace {
 
+// The two size dials are read in per cent of their range, like chaos and stations:
+// 0 is the floor, 100 the ceiling.
+static int PercentInside(int value, int lo, int hi) {
+  if (hi <= lo) { return 0; }
+  const int held = std::clamp(value, lo, hi);
+  return static_cast<int>(std::lround((held - lo) * 100.0 / (hi - lo)));
+}
+
+static int CountInside(double percent, int lo, int hi) {
+  const double held = std::clamp(percent, 0.0, 100.0);
+  return lo + static_cast<int>(std::lround(held / 100.0 * (hi - lo)));
+}
+
+
 // The same five themes the renderer knows, so the settings sheet can never
 // offer a palette the ship has not got (Phase 9 replaced the literal table that
 // used to drift from Theme::Specs()).
@@ -210,6 +224,10 @@ PopupModel BuildPopup(const Simulation& sim, const std::string& key,
   // starts the voyage again on it, which is why they are not under Preferences.
   model.outerGalaxies = options.outerGalaxies;
   model.systemsPerRegion = options.systemsPerRegion;
+  model.outerGalaxiesPercent = PercentInside(options.outerGalaxies, Catalog::kGalaxiesMin,
+                                             Catalog::kGalaxiesMax);
+  model.systemsPerRegionPercent = PercentInside(options.systemsPerRegion, Catalog::kSystemsMin,
+                                                Catalog::kSystemsMax);
   model.chaosPercent = static_cast<int>(std::lround(std::clamp(options.chaos, 0.0, 1.0) * 100.0));
   model.stations = options.stations;
   return model;
@@ -291,8 +309,12 @@ bool PressPopupAction(Simulation& sim, const std::string& key,
         int systems = options.systemsPerRegion;
         double chaos = options.chaos;
         int stations = options.stations;
-        if (action == "galaxies") { galaxies = static_cast<int>(value); }
-        if (action == "systems-per-region") { systems = static_cast<int>(value); }
+        if (action == "galaxies") {
+          galaxies = CountInside(value, Catalog::kGalaxiesMin, Catalog::kGalaxiesMax);
+        }
+        if (action == "systems-per-region") {
+          systems = CountInside(value, Catalog::kSystemsMin, Catalog::kSystemsMax);
+        }
         if (action == "chaos") { chaos = value / 100.0; }
         if (action == "stations") { stations = static_cast<int>(value); }
         return sim.SetChartDials(galaxies, systems, chaos, stations);
