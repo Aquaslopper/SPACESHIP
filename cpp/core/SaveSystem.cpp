@@ -149,6 +149,11 @@ std::string Simulation::SaveJson() const {
   }
   s["chronicle"] = chronicle;
 
+  Json serials = Json::object();
+  for (const auto& entry : state_.systemSerials) { serials[entry.first] = Num(entry.second); }
+  s["systemSerials"] = serials;
+  s["nextSystemSerial"] = Num(state_.nextSystemSerial);
+  
   Json commissions = Json::object();
   commissions["version"] = state_.commissions.version;
   commissions["serial"] = Num(state_.commissions.serial);
@@ -1202,6 +1207,26 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
       if (auto regions = it->find("regions"); regions != it->end()) { readBoolMap(*regions, &state_.chronicle.regions); }
       if (auto earned = it->find("earned"); earned != it->end()) { readBoolMap(*earned, &state_.chronicle.earned); }
       if (auto claimed = it->find("claimed"); claimed != it->end()) { readBoolMap(*claimed, &state_.chronicle.claimed); }
+    }
+
+    state_.systemSerials.clear();
+    if (auto it = s.find("systemSerials"); it != s.end() && it->is_object()) {
+      for (auto entry = it->begin(); entry != it->end(); ++entry) {
+        if (entry.value().is_number()) {
+          state_.systemSerials[entry.key()] = static_cast<int>(entry.value().get<double>());
+        }
+      }
+    }
+    state_.nextSystemSerial = static_cast<int>(GetNumber(s, "nextSystemSerial", 1.0));
+    if (state_.nextSystemSerial < 1) { state_.nextSystemSerial = 1; }
+    // A save written before this existed still knows which systems were visited:
+    // number them in the order the chronicle holds them, so the tag is never empty
+    // on a voyage that has arrived somewhere.
+    for (const auto& entry : state_.chronicle.systems) {
+      if (!entry.second) { continue; }
+      if (state_.systemSerials.find(entry.first) == state_.systemSerials.end()) {
+        state_.systemSerials[entry.first] = state_.nextSystemSerial++;
+      }
     }
 
     state_.commissions = Commissions();
