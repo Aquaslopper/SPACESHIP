@@ -1380,3 +1380,17 @@ CHECKED: cpp/ui/NavScreen.cpp compiles clean with -Wall -Wextra -fsyntax-only.
 NOT CHECKED: the picture.
 NOT TOUCHED: the station windows have notes of their own (`StationScreen.cpp`); they are
 a different area and were left as they were.
+
+## 089 - the stand watch row is out of the tail
+
+The row is gone from the navigation tail. The tail is sized from the rows it holds
+(`tailH = screen.commands.size() * (LineHeight + 12)`), so with no target selected it is
+now nothing at all and the Target Actions band moves up under the panels. What a row can
+still be: "View <region> sector chart" when a region is the target, and "Dock at <port>"
+when the ship is undocked beside one.
+
+Standing watch is therefore no longer reachable from the navigation tail. The action
+itself (`stand-watch`) and its handler are untouched; nothing in the UI offers it now.
+
+CHECKED: cpp/ui/NavScreen.cpp compiles clean with -Wall -Wextra -fsyntax-only.
+NOT CHECKED: the picture.

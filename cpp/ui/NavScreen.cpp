@@ -877,10 +877,6 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
         sim, "View " + target->name + " sector chart", true, "free", std::string(),
         0));
   }
-  screen.commands.push_back(BuildCommandRow(
-      sim, "Stand watch - advance ongoing work", sim.State().gameOver.empty(),
-      std::string(), "space", 0));
-
   const Port* port = sim.World().FindPort(sim.Map().here);
   if (port != nullptr && !sim.State().docked && running == nullptr) {
     screen.commands.push_back(BuildCommandRow(
