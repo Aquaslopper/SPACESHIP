@@ -503,7 +503,7 @@ bool Simulation::StartScan() {
   if (FindOngoing("scan") != nullptr || StatValue("energy") <= 0) { return false; }
 
   // Same ordering rule as a crossing: the initiating action first.
-  const double cost = EffectiveScanCost(*body);
+  double cost = EffectiveScanCost(*body);
   state_.sim.sensor = 0;
   const bool remote = body->type == "system" || body->type == "region" ||
                       catalog_.BodySystem(*body) != CurrentSystemId();
