@@ -1521,3 +1521,28 @@ CHECKED: cpp/ui/NavScreen.cpp compiles clean with -Wall -Wextra -fsyntax-only.
 NOT CHECKED: the frame rate and the drawn size. The dot counts above are arithmetic from
 the code (lanes x dots per lane), not a timing; the timing probe was interrupted and needs
 about three minutes to build before it can say milliseconds.
+
+## 095 - one budget behind two dials
+
+His reading, from running it: outer galaxies and systems per region are the two that eat
+RAM, and both up is what hurts; chaos has no effect on it; the stations dial has none
+either. That is not a coincidence - the two dials multiply into the same number:
+
+  systems = outer galaxies x systems per region
+
+so they are now two ends of one budget (`Catalog::kChartSystemBudget`, 34 x 64 = 2176).
+Moving either one moves the other: more galaxies means fewer systems in each, and the
+chart stays about the same size in memory whichever end is dragged.
+
+Measured through the real settings action:
+
+  start                  galaxies 34  systems/region 64  product 2176 | chart systems 2246
+  galaxies -> 60         galaxies 60  systems/region 36  product 2160 | chart systems 2202
+  systems/region -> 96   galaxies 22  systems/region 96  product 2112 | chart systems 2224
+  galaxies -> 8          galaxies  8  systems/region 96  product  768 | chart systems  880
+
+Chaos and stations are left exactly as they are: neither changes how much is drawn.
+
+CHECKED: cpp/data/Catalog.h, cpp/ui/Popups.cpp compile clean with -Wall -Wextra
+-fsyntax-only; the numbers are a probe driving `PressPopupAction` against a real Simulation.
+NOT CHECKED: the picture, and the frame rate on his machine.
