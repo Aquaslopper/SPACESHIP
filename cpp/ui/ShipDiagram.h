@@ -8,7 +8,7 @@
 //  hold, and one dot per hand. The compact Wren is the same recipe at 600x365
 //  with two nozzles and a smaller hull.
 //
-//  The rectangles here are STAGE-LOCAL, exactly as authored. The renderer adds
+//  The rectangles here are STAGE-LOCAL, exactly as in the reference. The renderer adds
 //  the stage origin; that keeps the reference's pixel numbers checkable.
 // ============================================================================
 #pragma once

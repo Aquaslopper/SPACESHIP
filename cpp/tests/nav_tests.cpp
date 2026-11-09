@@ -91,7 +91,7 @@ TEST_CASE("the chart projects through the reference's mapX and mapY", "[nav]") {
   ship::Simulation sim = Fresh();
   const ship::MapView& map = sim.Map();
 
-  // The authored world and the live box agree at zoom 1, so projection is the
+  // The world and the live box agree at zoom 1, so projection is the
   // identity: the dot lands exactly on its coordinate.
   ship::NavPoint kessler = ship::NavProject(map, 210, 150);
   CHECK(kessler.x == 210);
@@ -330,7 +330,7 @@ TEST_CASE("routes are dot trails that radiate from where the ship is", "[nav]") 
   CHECK(station->selected);
   CHECK(station->classes.find("mapdot-sel") != std::string::npos);
 
-  // The wide layers draw authored lanes faintly, and the ship's ring still
+  // The wide layers draw lanes faintly, and the ship's ring still
   // marks where the ship is inside them.
   sim.SetLayer("sector");
   const ship::NavChartView sector = ship::BuildNavChart(sim);
@@ -392,7 +392,7 @@ TEST_CASE("a reachable target reads out distance, transit and cost", "[nav]") {
                 "Independent station, class C"));
   CHECK(HasText(*Panel(nav.screen.left, "nav-status"), "Reachable"));
 
-  // Details are the authored fields, with the origin appended.
+  // Details are the fields, with the origin appended.
   const ship::NavPanel& details = *Panel(nav.screen.under, "nav-details");
   REQUIRE(Line(details, "Origin") != nullptr);
   CHECK(Line(details, "Origin")->value == "Kessler Drift");
@@ -423,7 +423,7 @@ TEST_CASE("a reachable target reads out distance, transit and cost", "[nav]") {
   REQUIRE(sim.SelectTarget("gal-inner"));
   const ship::NavScreenModel region = ship::BuildNavScreen(sim);
   CHECK(HasText(*Panel(region.screen.left, "nav-status"), "Current region"));
-  // Inner Rim keeps its authored eight and gains the generated systems of its
+  // Inner Rim keeps its eight and gains the generated systems of its
   // own region, so the count is read off the voyage's chart rather than fixed.
   std::size_t innerSystems = 0;
   for (const ship::Body& system : sim.World().systems) {
@@ -749,7 +749,7 @@ TEST_CASE("powered work pauses without energy while other work and the action cl
 //  ---------------------------------------------------------------------------
 //  Owner report, 2026-11-07: "the nav screen and the planets are fake - I want
 //  to see them and not let a filter hide them; more stars and more systems."
-//  The authored catalogue packs 48 systems into seven shared positions (41 of
+//  The catalogue packs 48 systems into seven shared positions (41 of
 //  them stacked six deep), and both the sector and the galaxy scale filtered
 //  their bodies by region. These cases hold the grown chart to what it promises.
 TEST_CASE("the charted galaxy is grown once, deterministically, and every system owns its dot",
@@ -759,7 +759,7 @@ TEST_CASE("the charted galaxy is grown once, deterministically, and every system
   ship::Simulation first = ship::Simulation::NewVoyage(authored);
   const ship::Catalog& grown = first.World();
 
-  // Every region is expanded, outer galactic regions are added, and nothing authored is lost.
+  // Every region is expanded, outer galactic regions are added, and nothing is lost.
   CHECK(grown.regions.size() ==
         authored.regions.size() + static_cast<std::size_t>(ship::kNewGalaxies));
   CHECK(grown.systems.size() ==
@@ -768,7 +768,7 @@ TEST_CASE("the charted galaxy is grown once, deterministically, and every system
   CHECK(grown.bodies.size() > authored.bodies.size());
   CHECK(grown.ports.size() > authored.ports.size());
 
-  // The authored rows survive byte for byte by id and name...
+  // The rows survive byte for byte by id and name...
   for (const ship::Body& body : authored.bodies) {
     const ship::Body* kept = grown.FindBody(body.id);
     REQUIRE(kept != nullptr);
@@ -834,8 +834,8 @@ TEST_CASE("the charted galaxy is grown once, deterministically, and every system
   CHECK(again.World().bodies.size() == grown.bodies.size());
 
   // The system chart keeps the reference's board; the sector chart is the wide
-  // one the galaxy is laid out on, and the authored crossings still cost the
-  // same because the authored systems only moved.
+  // one the galaxy is laid out on, and the crossings still cost the
+  // same because the systems only moved.
   CHECK(first.Map().w == 638);
   CHECK(first.Map().h == 278);
   first.SetLayer("sector");
@@ -891,7 +891,7 @@ TEST_CASE("the charted galaxy is grown once, deterministically, and every system
 }
 
 // The rule the station pass answers: every system keeps a space station, in the
-// authored core and the generated sky alike, with no quota and no exceptions.
+// core and the generated sky alike, with no quota and no exceptions.
 TEST_CASE("every system keeps a space station", "[nav][chart][expansion]") {
   ship::Simulation sim = Fresh();
   const ship::Catalog& world = sim.World();
@@ -1078,7 +1078,7 @@ TEST_CASE("procedural map events fire on exploration, resolve cleanly, and round
   CHECK(sim.State().fuelCells == cellsBefore + 1.0);
 
   // Spawn a map-tied incident, verify save validation against the unexpanded
-  // authored catalogue, load it back, and resolve it with a repair kit.
+  // catalogue, load it back, and resolve it with a repair kit.
   REQUIRE(sim.SpawnMapIncident("map-ion-squall", "Entered charged filament."));
   std::string why;
   const std::string saved = sim.SaveJson();
@@ -1278,7 +1278,7 @@ TEST_CASE("each system draws its own trade board out of its own chart", "[statio
   CHECK_FALSE(sim.AcceptTrade("delivery", "no-such-body", "ore"));
   CHECK_FALSE(sim.AcceptTrade("nonsense", run.to, run.good));
 
-  // The left-hand panel carries the run, and only the run: the authored mission
+  // The left-hand panel carries the run, and only the run: the mission
   // board has no card of its own any more, so its missions are not listed there
   // even though the voyage still holds one.
   const ship::SideBlock* contracts = nullptr;
@@ -1340,8 +1340,8 @@ TEST_CASE("each system draws its own trade board out of its own chart", "[statio
 }
 
 // Every station writes its own starmap of the system it sits in, out of the
-// chart: the system's reading, then its bodies, planets first. Nothing is
-// authored per port, so a station that exists cannot be missing its page.
+// chart: the system's reading, then its bodies, planets first. So a station
+// that exists cannot be missing its page.
 TEST_CASE("every station writes its own starmap of its own system", "[station][starmap]") {
   ship::Simulation sim = Fresh();
   const ship::Catalog& world = sim.World();
@@ -1420,7 +1420,7 @@ TEST_CASE("staged sensor upgrades unlock scanLocked tiers and deep-region scanni
   ship::Simulation sim = Fresh();
   sim.MutableState().shiplets = 5000;
 
-  // Park and dock at the first authored port to inspect Shipyard staging first.
+  // Park and dock at the first port to inspect Shipyard staging first.
   REQUIRE_FALSE(sim.World().ports.empty());
   sim.MutableMap().here = sim.World().ports.front().id;
   sim.MutableState().docked = false;

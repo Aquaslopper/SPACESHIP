@@ -46,7 +46,7 @@ struct CrewMember {
 
   std::string traits;
 
-  // Biographical record: authored once, never computed at render time.
+  // Biographical record: never computed at render time.
   std::string race;
   int age = 0;
   std::string homeworld;
@@ -291,7 +291,7 @@ struct SurveyRecord {
 };
 
 // ---------------------------------------------------------------------------
-// The chart's live view. The authored geometry lives in the catalogue; this is
+// The chart's live view. The geometry lives in the catalogue; this is
 // where the ship is, which layer is on screen, and how each layer was left.
 // ---------------------------------------------------------------------------
 struct MapView {
@@ -324,7 +324,7 @@ struct LayerView {
   std::string sel;
 };
 
-// The hull the crew are standing in. Authored display fields are kept verbatim
+// The hull the crew are standing in. Display fields are kept verbatim
 // so a save round-trips what the reference wrote.
 struct ShipDef {
   std::map<std::string, std::string> fields;

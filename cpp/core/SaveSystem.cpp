@@ -705,7 +705,7 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
     if (!contractId.empty()) {
       bool found = false;
       if (contractId.compare(0, 6, "trade:") == 0) {
-        // A trade consignment names its run, not an authored contract, so it has
+        // A trade consignment names its run, not a contract, so it has
         // to match one of the runs this save is carrying.
         const std::string key = contractId.substr(6);
         const Json* trades = At(*state, "trades");

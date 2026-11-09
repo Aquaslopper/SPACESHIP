@@ -72,7 +72,7 @@ PopupModel BuildBriefPopup(const Simulation& sim, const std::string& kind,
   model.acts = description.acts;
   model.footer.push_back("Right-click to open the " + description.title +
       " window. It waits in the tab bar - you are not taken there.");
-  if (kind == "nav") { // navBrief is authored separately from describeTarget
+  if (kind == "nav") { // navBrief is separate from describeTarget
     model.notice = "The ship chart. Everything that is only LOOKING at it is free.";
     details.rows = {{"Scales", "System, Sector and Galaxy"},
         {"Switching", "The three buttons on the chart - free"},

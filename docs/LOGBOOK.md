@@ -1146,3 +1146,16 @@ writing down rather than leaving to luck.
 
 The hard part was not the code. It was refusing to be confident about anything that
 had not been measured, and refusing to be loyal to code the owner did not write.
+
+### Entry #045
+- **Timestamp:** 2026-11-09 00:00 UTC
+- **Task:** owner instruction — remove the single word "Authored" from all commentary in the game code; no other file class to be touched; no whole sentence to be removed.
+- **Scope as decided with the owner:** comments in `cpp/` only (sources, headers and `cpp/tests`). `AGENTS.md`, `Legacy code_Spaceship.txt`, `rescue/`, `docs/`, `assets/` and identifiers were declared off-limits.
+- **Counted before the change:** 141 occurrences of the word inside `cpp/` comments across 30 files; 4 in `TEST_CASE` name strings; 37 in identifiers (`AuthoredStarCatalog()`, local `authored`, `kesslerAuthored`).
+- **Method:** deletions only, no synonym substituted. Where the word was the whole phrase, the neighbouring article, comma or clause fragment went with it; where it was a verb, the clause was dropped rather than the sentence. Six places needed a neutral glue word to stay grammatical (`there`, `its`, `exist`, `left`, `carries`, `from`); no word was chosen to stand in for "Authored".
+- **Result:** 0 occurrences of the word remain in any `cpp/` comment, verified by parsing comment text separately from code.
+- **Code untouched, measured:** comments stripped from both `HEAD` and the working tree, then whitespace-collapsed and compared — identical in all 33 modified files. No identifier, string literal or expression changed.
+- **Preserved on purpose:** `TEST_CASE` names ("ports trade in the seven authored commodity kinds", "bodies authored before systems existed still belong to Kessler", "the filter room retains its authored housing and three live slots", "nine room archetypes, with their authored words") and the `AuthoredStarCatalog()` symbol — these are not commentary, and renaming tests is not a change any check asked for.
+- **Rewraps:** two lines rewritten past 100 columns were rewrapped; one phrase in `WikiScreen.h` that read "Its story entry is carries" was corrected to "Its story entry / carries" by dropping the orphan `is`.
+- **Checks run:** comment-stripping equality against `HEAD` (33/33 files identical code); comment-parser scan for residual occurrences (0); `git diff --check` for whitespace damage. **No build and no test was run** — the owner's approval is required for tests, and comments do not affect compilation, so nothing was inferred about runtime or visual parity from this change.
+- **Deliberately left untouched:** `assets/data/content.json:325` (a handbook line, player-facing content, not commentary), `docs/LOGBOOK.md` history and `rescue/` (records), `AGENTS.md` (its own wording), `Legacy code_Spaceship.txt` (reference).

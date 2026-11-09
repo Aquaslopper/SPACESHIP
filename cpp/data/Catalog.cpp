@@ -248,7 +248,7 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
   catalog.map.pxPerAction = Number(map, "pxPerAction", "chart.json/map", 16);
   catalog.map.lyPerAction = Number(map, "lyPerAction", "chart.json/map", 0.42);
 
-  // Every scale is drawn on the authored board until ExpandChart() widens the
+  // Every scale is drawn on the board until ExpandChart() widens the
   // sector one. Keeping the entry here means a catalogue that is never expanded
   // still answers for all three layers.
   for (const std::string& layer : catalog.layerOrder) {
@@ -287,8 +287,8 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
 
   // ---- the tables the generator reads ------------------------------------
   // BUILD reads these before it builds anything (see data/GalaxyGen.h):
-  // PORT_PRICES, PORT_HINTS, ORBITAL_WORLDS and the two name tables. They are
-  // authored, so they stay data; only the chart is computed from them.
+  // PORT_PRICES, PORT_HINTS, ORBITAL_WORLDS and the two name tables. They
+  // stay data; only the chart is computed from them.
   const Json& prices = Field(chart, "portPrices", "chart.json");
   for (auto it = prices.begin(); it != prices.end(); ++it) {
     if (!it.value().is_object()) { continue; }

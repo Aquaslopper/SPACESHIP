@@ -63,7 +63,7 @@ struct TradeRun {
   bool accepted = false;
 };
 
-// Builds a live crew member from an authored definition. Shared by the new
+// Builds a live crew member from a definition. Shared by the new
 // voyage and by a hiring at a port.
 CrewMember MakeCrew(const CrewDefinition& def);
 
@@ -253,7 +253,7 @@ class Simulation {
   bool SellGood(const std::string& lotId);
   bool SellSurvey(const std::string& recordId);
   // The station bar: one action, once per patron, and the words they say are a
-  // read-out of the data they were authored with (see StationScreen.cpp).
+  // read-out of the data (see StationScreen.cpp).
   bool TalkToPatron(const std::string& patronId);
   std::string PatronName(const std::string& patronId) const;
   bool Jettison(const std::string& lotId);

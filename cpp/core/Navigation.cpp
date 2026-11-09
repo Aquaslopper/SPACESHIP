@@ -6,7 +6,7 @@
 //  cost: plotting a crossing (one action now, then the distance in actions spent
 //  elsewhere) and asking the sensors for more than the chart already shows.
 //
-//  Distances are DERIVED, never authored. They are measured from MAP.here at the
+//  Distances are DERIVED. They are measured from MAP.here at the
 //  moment of the question, which is why the ship can relocate on arrival without
 //  invalidating a single route.
 // ============================================================================
@@ -570,7 +570,7 @@ void Simulation::RevealScan(const std::string& bodyId) {
   const bool first = state_.scanned.count(body->id) == 0 || !state_.scanned.at(body->id);
   state_.scanned[body->id] = true;
 
-  // simOnScan(): the two authored signal beats.
+  // simOnScan(): the two signal beats.
   if (first) {
     SimRemember("Discovery", "The crew scanned " + body->name + ".");
   }

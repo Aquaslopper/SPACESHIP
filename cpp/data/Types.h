@@ -1,5 +1,5 @@
 // ============================================================================
-//  Types.h — the authored catalogues, as plain data.
+//  Types.h — the catalogues, as plain data.
 //  ---------------------------------------------------------------------------
 //  Every struct here corresponds to a table in the reference edition
 //  (Spaceship.hta). They hold *content*: coordinates, names, prices, prose.
@@ -39,7 +39,7 @@ struct HullPart {
   Rect box;
 };
 
-// A compartment. `tone` is the authored background hex; `small` marks the
+// A compartment. `tone` is the background hex; `small` marks the
 // compartments that get the compact treatment inside the dorsal spine,
 // the ventral pod and the command lens.
 struct Room {
@@ -59,7 +59,7 @@ struct RoomScene {
   std::string code;         // "PROPULSION / 01"
   std::string label;        // "Primary drive manifold"
   std::string description;  // the caption
-  std::string accent;       // authored hex
+  std::string accent;       // hex
 };
 
 struct DeckPlan {
@@ -86,7 +86,7 @@ struct Body {
   double y = 0.0;
 
   // Local destinations carry the id of their system. The Kessler bodies were
-  // authored before systems existed and leave it empty; BodySystem() supplies
+  // there before systems existed and leave it empty; BodySystem() supplies
   // the reference's default ("sec-kessler").
   std::string system;
 
@@ -160,8 +160,8 @@ struct Contract {
   bool recognizePrior = false;
 };
 
-// The chart's own drawing board. Distances are derived from these numbers and
-// never authored, so they must not be adjusted for the port's window size.
+// The chart's own drawing board. Distances are derived from these numbers,
+// so they must not be adjusted for the port's window size.
 struct MapGeometry {
   double w = 638, h = 278;
   double cx = 319, cy = 139;
@@ -200,7 +200,7 @@ struct Counts {
 
 
 // ---------------------------------------------------------------------------
-// Authored starting values. These are content: the crew a new voyage begins
+// Starting values. These are content: the crew a new voyage begins
 // with, the hull readouts it begins at, and the definitions every subsystem
 // reads. Live state lives in core/GameState.h and is built from these.
 // ---------------------------------------------------------------------------
@@ -268,7 +268,7 @@ struct Commendation {
   Reward reward;
 };
 
-// One handbook entry, exactly as authored in content.json. `link` names the tab
+// One handbook entry, exactly as in content.json. `link` names the tab
 // the entry can open; it is free, like every other read in the reference.
 struct WikiEntry {
   std::string id, group, title, text, link, linkLabel;

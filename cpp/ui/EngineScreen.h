@@ -22,7 +22,7 @@ namespace ship {
 
 struct EngineScreenModel {
   TaskScreenModel screen;
-  std::string tone;        // the condition colour, as authored
+  std::string tone;        // the condition colour
   std::string word;        // NOMINAL / SERVICEABLE / DEGRADED / CRITICAL
   float meterWidth = 420.0f;  // round(420 * condition/100)
   int condition = 100;

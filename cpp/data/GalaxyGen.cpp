@@ -362,7 +362,7 @@ void StripGeneratedChart(Catalog& catalog) {
                      }),
       catalog.ports.end());
 
-  // The systems the row pass created go back to the row pass; the authored six
+  // The systems the row pass created go back to the row pass; the six
   // stay, and the pass only annotates them when it meets them again.
   catalog.systems.erase(std::remove_if(catalog.systems.begin(), catalog.systems.end(),
                                        [](const Body& system) { return IsGeneratedSystem(system); }),

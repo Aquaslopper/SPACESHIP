@@ -77,7 +77,7 @@ std::string ContractStatus(const Simulation& sim, const std::string& contractId)
   return it == contracts.end() ? std::string("available") : it->second;
 }
 
-// The region this station sits in, for the two authored lines the bar repeats.
+// The region this station sits in, for the two lines the bar repeats.
 std::vector<std::string> LocalRumors(const Simulation& sim, const std::string& portId) {
   std::string regionId;
   const Body* portBody = sim.FindBodyById(portId);
@@ -119,7 +119,7 @@ double GoodSellPrice(const Simulation& sim, const Good& good) {
   return sim.LotPrice(probe);
 }
 
-// The trader's tip: the port's own authored line, then what this counter pays
+// The trader's tip: the port's own line, then what this counter pays
 // best and worst for, read straight off the price basket in play.
 std::vector<std::string> TraderSpeech(const Simulation& sim, const std::string& tip) {
   std::vector<std::string> said;
@@ -144,7 +144,7 @@ std::vector<std::string> TraderSpeech(const Simulation& sim, const std::string& 
   return said;
 }
 
-// What a candidate says when spoken to: their own authored fields, then the
+// What a candidate says when spoken to: their own fields, then the
 // two lines the region was written with. Nothing here is composed.
 std::vector<std::string> PatronSpeech(const Simulation& sim, const CandidateDefinition& person) {
   const CrewDefinition& crew = person.crew;
@@ -171,7 +171,7 @@ std::vector<std::string> PatronSpeech(const Simulation& sim, const CandidateDefi
 // ---------------------------------------------------------------------------
 //  Every station writes a page for the system it stands in, out of the chart
 //  itself: the system's own reading, then every charted body of that system,
-//  grouped and ordered so the page reads like a wiki entry. There is no authored
+//  grouped and ordered so the page reads like a wiki entry. There is no
 //  page anywhere and no per-port table to keep in step - a station that exists
 //  has its page, because the page is the system it sits in.
 StarmapPage BuildStarmapPage(const Simulation& sim, const std::string& portId) {
@@ -225,7 +225,7 @@ StarmapPage BuildStarmapPage(const Simulation& sim, const std::string& portId) {
     entry.group = kGroups[group];
     entry.reading = body.scan;
     if (entry.reading.empty()) {
-      // A body the chart authored without prose still has its own facts.
+      // A body the chart left without prose still has its own facts.
       for (const auto& detail : body.details) {
         entry.reading.push_back(detail.first + ": " + detail.second);
       }
@@ -349,9 +349,9 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   }
 
   // ---- 2. the starmap -----------------------------------------------------
-  // The station's own page for the system it sits in. Nothing here is authored
-  // per station and nothing is bought: every station the voyage can reach
-  // writes its page from the system it stands in, the moment its window opens.
+  // The station's own page for the system it sits in. Nothing is bought:
+  // every station the voyage can reach writes its page from the system it
+  // stands in, the moment its window opens.
   StationColumn starmap;
   starmap.id = "starmap";
   starmap.title = "Starmap";
@@ -392,7 +392,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
 
   // ---- 3. trade contracts --------------------------------------------------
   // Three buttons in the middle column, and the list each one opens on the
-  // right. Nothing here is authored per station: delivery and freelance are the
+  // right. Delivery and freelance are the
   // system's own draw (Simulation::TradeBoard) laid over the bodies this
   // station's starmap prints, and station-to-station is the roll of stations the
   // player has docked at.
