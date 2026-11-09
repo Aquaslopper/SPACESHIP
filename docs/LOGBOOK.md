@@ -1354,3 +1354,18 @@ Raylib_6_0 headers; the settings action was exercised headlessly with the data a
 layers and the numbers above are its output.
 NOT CHECKED: whether that was the snap he saw. The value was always stored; what was not
 stored was a sky of a fixed size.
+
+## 087 - the action band explains nothing
+
+Two paragraphs sat under the target panels and ran across them: what standing watch
+costs, and what committing and a deep scan cost in clicks. They were not written on this
+branch - my only edits to `NavScreen.cpp` here are the culling and the third layer - but
+they are prose in a place that wants one line, they overlap the panels above and below,
+and they are gone.
+
+What stays is the note that says why a button is off: no energy, no drive, not enough
+fuel, a crossing already under way. Those are answers to "why can I not press this", and
+they are one line each.
+
+CHECKED: cpp/ui/NavScreen.cpp compiles clean with -Wall -Wextra -fsyntax-only.
+NOT CHECKED: the picture. Whether the band now sits in its box is his to see.
