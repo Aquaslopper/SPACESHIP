@@ -2684,7 +2684,7 @@ void ShellView::PaintSetup(Simulation& sim) {
   std::snprintf(seedBuf, sizeof(seedBuf), "%016llX", static_cast<unsigned long long>(setupSettings_.seed));
   row("Seed", seedBuf, "setup-seed-dec", "setup-seed-inc");
   titleHits_.push_back({Area{card.x + pad + 36.0f, y - 40.0f, leftW - 100.0f, 28.0f}, "setup-seed-rand", ""});
-  row("Galaxies", std::to_string(setupSettings_.galaxies), "setup-gal-dec", "setup-gal-inc");
+  row("Galaxies (1-100)", std::to_string(setupSettings_.galaxies), "setup-gal-dec", "setup-gal-inc");
   if (setupSettings_.galaxies >= kGalaxyRamWarning) {
     for (const auto& line : WrapText("Warning: 25+ galaxies exhaust RAM and CPU.",
                                      leftW - pad, TypePx(10), SelectFont(TypePx(10), false))) {
@@ -2692,12 +2692,10 @@ void ShellView::PaintSetup(Simulation& sim) {
       y += 14.0f;
     }
   }
-  char scaleBuf[32];
-  std::snprintf(scaleBuf, sizeof(scaleBuf), "%.2f", setupSettings_.mapScale);
-  row("Map size", scaleBuf, "setup-scale-dec", "setup-scale-inc");
+  row("Map size", MapSizeLabel(setupSettings_.mapSize), "setup-scale-dec", "setup-scale-inc");
   char spreadBuf[32];
   std::snprintf(spreadBuf, sizeof(spreadBuf), "%.2f", setupSettings_.spread);
-  row("Galaxy spread", spreadBuf, "setup-spread-dec", "setup-spread-inc");
+  row("Spread (distance)", spreadBuf, "setup-spread-dec", "setup-spread-inc");
 
   Text("Layer", static_cast<int>(card.x + pad), static_cast<int>(y), textPx, ToRay(p.muted));
   y += 20.0f;
@@ -2717,12 +2715,17 @@ void ShellView::PaintSetup(Simulation& sim) {
 
   DrawRectangle(static_cast<int>(mapX), static_cast<int>(mapY), static_cast<int>(mapW),
                 static_cast<int>(mapH), ToRay(p.ink, 18));
-  DrawRectangleLines(static_cast<int>(mapX), static_cast<int>(mapY), static_cast<int>(mapW),
-                     static_cast<int>(mapH), ToRay(p.titleBorder));
+  const float side = std::min(mapW, mapH) - 8.0f;
+  const float discX = mapX + (mapW - side) * 0.5f;
+  const float discY = mapY + (mapH - side) * 0.5f;
+  DrawCircle(static_cast<int>(discX + side * 0.5f), static_cast<int>(discY + side * 0.5f),
+             side * 0.5f, ToRay(p.ink, 28));
+  DrawCircleLines(static_cast<int>(discX + side * 0.5f), static_cast<int>(discY + side * 0.5f),
+                  side * 0.5f, ToRay(p.titleBorder));
 
   auto plot = [&](double x, double yv, double bw, double bh) {
-    const float px = static_cast<float>(mapX + 8.0f + (x / bw) * (mapW - 16.0f));
-    const float py = static_cast<float>(mapY + 8.0f + (yv / bh) * (mapH - 16.0f));
+    const float px = static_cast<float>(discX + (x / bw) * side);
+    const float py = static_cast<float>(discY + (yv / bh) * side);
     return Vector2{px, py};
   };
 
@@ -3575,26 +3578,28 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         return;
       }
       if (hit.action == "setup-gal-inc") {
-        setupSettings_.galaxies += 1;
+        setupSettings_.galaxies = ClampGalaxies(setupSettings_.galaxies + 1);
         setupPreviewDirty_ = true;
         setupSystemId_.clear();
         setupGalaxyId_.clear();
         return;
       }
       if (hit.action == "setup-gal-dec") {
-        if (setupSettings_.galaxies > 1) { setupSettings_.galaxies -= 1; }
+        setupSettings_.galaxies = ClampGalaxies(setupSettings_.galaxies - 1);
         setupPreviewDirty_ = true;
         setupSystemId_.clear();
         setupGalaxyId_.clear();
         return;
       }
       if (hit.action == "setup-scale-inc") {
-        setupSettings_.mapScale = std::min(4.0, setupSettings_.mapScale + 0.25);
+        setupSettings_.mapSize = ClampMapSize(setupSettings_.mapSize + 1);
+        setupSettings_.mapScale = MapSizeScale(setupSettings_.mapSize);
         setupPreviewDirty_ = true;
         return;
       }
       if (hit.action == "setup-scale-dec") {
-        setupSettings_.mapScale = std::max(0.5, setupSettings_.mapScale - 0.25);
+        setupSettings_.mapSize = ClampMapSize(setupSettings_.mapSize - 1);
+        setupSettings_.mapScale = MapSizeScale(setupSettings_.mapSize);
         setupPreviewDirty_ = true;
         return;
       }

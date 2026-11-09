@@ -31,6 +31,8 @@ namespace ship {
 struct ChartSettings {
   std::uint64_t seed = 0x5350414345534849ULL;
   int galaxies = 17;
+  // 0 small (current), 1 normal (+20%), 2 medium (+20% again), 3 big (+20% again).
+  int mapSize = 0;
   double mapScale = 1.0;
   double spread = 1.0;
 };

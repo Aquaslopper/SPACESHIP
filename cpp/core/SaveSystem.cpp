@@ -100,9 +100,22 @@ ChartSettings ReadChartSettings(const Json& root, const ChartSettings& fallback)
   if (galaxies != nullptr && galaxies->is_number()) {
     settings.galaxies = static_cast<int>(galaxies->get<double>());
   }
-  const Json* mapScale = At(*chart, "mapScale");
-  if (mapScale != nullptr && mapScale->is_number()) {
-    settings.mapScale = mapScale->get<double>();
+  const Json* mapSize = At(*chart, "mapSize");
+  if (mapSize != nullptr && mapSize->is_number()) {
+    settings.mapSize = ClampMapSize(static_cast<int>(mapSize->get<double>()));
+    settings.mapScale = MapSizeScale(settings.mapSize);
+  } else {
+    const Json* mapScale = At(*chart, "mapScale");
+    if (mapScale != nullptr && mapScale->is_number()) {
+      settings.mapScale = mapScale->get<double>();
+      int size = 0;
+      double scale = 1.0;
+      while (size < kMapSizeCount - 1 && settings.mapScale + 0.001 >= scale * kMapSizeStep) {
+        scale *= kMapSizeStep;
+        ++size;
+      }
+      settings.mapSize = size;
+    }
   }
   const Json* spread = At(*chart, "spread");
   if (spread != nullptr && spread->is_number()) {
@@ -478,6 +491,7 @@ std::string Simulation::SaveJson() const {
   root["chart"] = Json{
       {"seed", std::to_string(chartSettings_.seed)},
       {"galaxies", chartSettings_.galaxies},
+      {"mapSize", chartSettings_.mapSize},
       {"mapScale", Num(chartSettings_.mapScale)},
       {"spread", Num(chartSettings_.spread)},
   };

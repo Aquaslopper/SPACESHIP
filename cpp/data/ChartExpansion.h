@@ -33,8 +33,33 @@ constexpr int kNewGalaxies = 17;
 // (17 * 24 = 408 star systems across the universe).
 constexpr int kNewSystemsPerRegion = 24;
 
+constexpr int kMinGalaxies = 1;
+constexpr int kMaxGalaxies = 100;
 // Galaxy counts at or above this were measured to exhaust RAM and CPU.
 constexpr int kGalaxyRamWarning = 25;
+
+constexpr int kMapSizeCount = 4;
+constexpr double kMapSizeStep = 1.20;
+
+inline int ClampGalaxies(int n) {
+  return n < kMinGalaxies ? kMinGalaxies : (n > kMaxGalaxies ? kMaxGalaxies : n);
+}
+inline int ClampMapSize(int size) {
+  return size < 0 ? 0 : (size >= kMapSizeCount ? kMapSizeCount - 1 : size);
+}
+inline double MapSizeScale(int size) {
+  double scale = 1.0;
+  for (int i = 0; i < ClampMapSize(size); ++i) { scale *= kMapSizeStep; }
+  return scale;
+}
+inline const char* MapSizeLabel(int size) {
+  switch (ClampMapSize(size)) {
+    case 0: return "SMALL";
+    case 1: return "NORMAL";
+    case 2: return "MEDIUM";
+    default: return "BIG";
+  }
+}
 
 // Board multipliers relative to the 638x278 reference viewport.
 constexpr double kSectorBoardScale = 6.0;
