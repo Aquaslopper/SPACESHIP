@@ -85,11 +85,11 @@ class Catalog {
   // The system the ship starts in. Every system is drawn, so this is not a
   // constant: ExpandChart() names the first one it laid down.
   std::string homeSystem;
-  int outerGalaxies = 34;       // galaxies drawn beyond the authored ones
+  int outerGalaxies = 24;       // galaxies drawn beyond the authored ones
   // Outer galaxies and systems per region are two ends of one number: the chart holds
   // about this many systems, and the dials decide the split. Both up is what fills RAM.
-  static constexpr int kChartSystemBudget = 34 * 64;
-  int systemsPerRegion = 64;    // star systems drawn in every region
+  static constexpr int kChartSystemBudget = 24 * 34;
+  int systemsPerRegion = 34;    // star systems drawn in every region
   double chaos = 0.5;           // 0 = every system alike, 1 = no two alike
   int stations = 100;           // per cent of drawn systems that keep a dock
 
