@@ -1230,3 +1230,38 @@ until someone says what they should assert now.
 TWO BEATS LEFT DEAD: the scan lines keyed to "halvan" and "echo-site" in
 `Navigation.cpp` were bodies of the old core, so the two signal steps can no longer fire.
 Left in place rather than rerouted or deleted.
+
+## 083 - the old regions become blobs between the galaxies
+
+Entry 082 gave the seven old regions a territory on the disc like every drawn galaxy,
+and they filled it badly: two of them could not place their sixty-four systems. They
+are not territories. A territory belongs to a galaxy that was drawn; the seven are
+leftovers, so they hang in the gaps instead.
+
+  territories   34 drawn galaxies, one each, on the golden-angle spiral across the disc
+  blobs         7 old regions, `systemsPerRegion / 6` systems each (ten at the default),
+                spread 200x95 around their anchor, packed from a 96 px separation
+                rather than a territory's 138 px
+
+Where a blob hangs is decided after the territories are laid down, because the gaps are
+only real once the systems are: a candidate grid over the ellipse takes the point
+furthest from every drawn system, then the next, and so on - widest gap first. The same
+rule runs on the galaxy board in `PopulateGalaxies`, so the seven are small clusters
+hanging between the galaxies there as well, not a knot at the centre. Territories are
+drafted before blobs, so the first system drawn is still the ship's home and it now
+belongs to a galaxy.
+
+MEASURED (data layer only):
+
+  systems   2246 over 41 regions - 34 territories at 64 each, 7 blobs at 10 each
+  bodies    120970, ports 2657, stations 2657, no orphaned port, no system without a body
+  home      sec-gen-1 "Nocturne Ladder" in gal-gen-3
+  blobs     radius 161..204 px; nearest other system 86..130 px from a blob centre
+  blob placement on the galaxy board: 553..932 px from the nearest galaxy centre
+  drawing the whole chart took 1.63 s wall clock in a -O2 probe of the data layer alone
+
+CHECKED: cpp/data/{Catalog,ChartExpansion,GalaxyGen}.cpp, cpp/core/{Action,Navigation,
+SaveSystem}.cpp compile clean with -fsyntax-only.
+NOT CHECKED: the drawn result. The disc is crowded enough that a territory's fringe can
+reach into a blob; the closest two systems anywhere are 48 px apart, which is the floor,
+not a collision. Test suite still not building - unchanged from 082.

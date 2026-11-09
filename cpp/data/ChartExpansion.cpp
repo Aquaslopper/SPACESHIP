@@ -261,10 +261,52 @@ const MapGeometry& BoardOrDefault(const Catalog& catalog, const std::string& lay
   return it == catalog.layerBoards.end() ? catalog.map : it->second;
 }
 
+// The empty places between a set of anchors: a candidate grid over the ellipse,
+// and each gap takes the point furthest from every anchor already chosen. Small
+// clusters hang there instead of claiming a territory of their own.
+std::vector<std::pair<double, double>> WidestGaps(
+    const std::vector<std::pair<double, double>>& anchors, int count, double cx, double cy,
+    double rx, double ry) {
+  std::vector<std::pair<double, double>> candidates;
+  const int steps = 44;
+  for (int iy = 0; iy <= steps; ++iy) {
+    for (int ix = 0; ix <= steps; ++ix) {
+      const double nx = -1.0 + 2.0 * static_cast<double>(ix) / steps;
+      const double ny = -1.0 + 2.0 * static_cast<double>(iy) / steps;
+      if (nx * nx + ny * ny > 0.9) { continue; }
+      candidates.emplace_back(cx + nx * rx, cy + ny * ry);
+    }
+  }
+
+  std::vector<std::pair<double, double>> blocked = anchors;
+  std::vector<std::pair<double, double>> picks;
+  for (int k = 0; k < count && !candidates.empty(); ++k) {
+    std::size_t best = 0;
+    double bestGap = -1.0;
+    for (std::size_t ci = 0; ci < candidates.size(); ++ci) {
+      double nearest = 1e18;
+      for (const auto& b : blocked) {
+        const double dx = candidates[ci].first - b.first;
+        const double dy = candidates[ci].second - b.second;
+        nearest = std::min(nearest, dx * dx + dy * dy);
+      }
+      if (nearest > bestGap) {
+        bestGap = nearest;
+        best = ci;
+      }
+    }
+    picks.push_back(candidates[best]);
+    blocked.push_back(candidates[best]);
+    candidates.erase(candidates.begin() + static_cast<std::ptrdiff_t>(best));
+  }
+  return picks;
+}
+
 }  // namespace
 
 void PopulateGalaxies(Catalog& catalog, double coreDx, double coreDy) {
   const MapGeometry& galaxyBoard = BoardOrDefault(catalog, "galaxy");
+  const std::size_t authoredCount = catalog.regions.size();
   for (Body& region : catalog.regions) {
     region.x += coreDx;
     region.y += coreDy;
@@ -341,6 +383,23 @@ void PopulateGalaxies(Catalog& catalog, double coreDx, double coreDy) {
     catalog.regions.push_back(region);
 
     catalog.worldHistory[region.id] = {arch.history, arch.traffic};
+  }
+
+  // The regions that came with the chart are not a core any more: they are small
+  // clusters hanging in the gaps between the galaxies, worst gap first.
+  const std::size_t blobCount = authoredCount;
+  if (blobCount > 0 && catalog.regions.size() > blobCount) {
+    std::vector<std::pair<double, double>> anchors;
+    for (std::size_t i = blobCount; i < catalog.regions.size(); ++i) {
+      anchors.emplace_back(catalog.regions[i].x, catalog.regions[i].y);
+    }
+    const std::vector<std::pair<double, double>> gaps =
+        WidestGaps(anchors, static_cast<int>(blobCount), galaxyBoard.cx, galaxyBoard.cy,
+                   galaxyBoard.w * 0.44, galaxyBoard.h * 0.42);
+    for (std::size_t i = 0; i < blobCount && i < gaps.size(); ++i) {
+      catalog.regions[i].x = std::round(gaps[i].first);
+      catalog.regions[i].y = std::round(gaps[i].second);
+    }
   }
 }
 
@@ -987,14 +1046,26 @@ void ExpandChart(Catalog& catalog) {
   // Compute each region's territory anchor on the sector board so systems of a
   // galactic region form a navigable cluster with intra-region jump distances
   // well within a single fuel tank.
-  // The territories are laid out by the disc, not by where a region sits on the
-  // galaxy board: at that scale the seven old regions are a knot at the centre, and
-  // a knot cannot hold forty-one territories. Order them by how far they are from
-  // the galaxy centre (the core first, the outer galaxies last) and give each one a
-  // slot on a golden-angle spiral across the disc, so no two territories share a
-  // place and the core still reads as the middle.
-  std::vector<std::size_t> discOrder(catalog.regions.size());
-  for (std::size_t i = 0; i < discOrder.size(); ++i) { discOrder[i] = i; }
+  // The disc belongs to the drawn galaxies: one territory each, on a golden-angle
+  // spiral stretched onto the ellipse, core first and rim last.
+  const double rx = (sector.w * 0.5) - 420.0;
+  const double ry = (sector.h * 0.5) - 420.0;
+
+  std::unordered_map<std::string, std::pair<double, double>> regionAnchor;
+  std::unordered_map<std::string, std::pair<double, double>> regionSpread;
+  std::unordered_map<std::string, int> regionSystems;
+  std::unordered_map<std::string, double> regionGap;
+  for (const Body& region : catalog.regions) {
+    regionAnchor[region.id] = {sector.w * 0.5, sector.h * 0.5};
+    regionSpread[region.id] = {1110.0, 525.0};
+    regionSystems[region.id] = std::max(0, catalog.systemsPerRegion);
+    regionGap[region.id] = 138.0;
+  }
+
+  std::vector<std::size_t> discOrder;
+  for (std::size_t i = authoredRegionCount; i < catalog.regions.size(); ++i) {
+    discOrder.push_back(i);
+  }
   {
     const auto galaxyDistance = [&catalog, &galaxy](const Body& region) {
       const double dx = region.x - galaxy.w * 0.5;
@@ -1007,42 +1078,19 @@ void ExpandChart(Catalog& catalog) {
                               galaxyDistance(catalog.regions[b]);
                      });
   }
-  std::vector<std::size_t> discSlot(catalog.regions.size(), 0);
-  for (std::size_t k = 0; k < discOrder.size(); ++k) { discSlot[discOrder[k]] = k; }
-
-  std::unordered_map<std::string, std::pair<double, double>> regionAnchor;
-  for (std::size_t ri = 0; ri < catalog.regions.size(); ++ri) {
-    const Body& region = catalog.regions[ri];
-    if (ri < authoredRegionCount) {
-      double sumX = 0.0;
-      double sumY = 0.0;
-      int n = 0;
-      for (const Body& sys : catalog.systems) {
-        if (sys.region == region.id) {
-          sumX += sys.x;
-          sumY += sys.y;
-          ++n;
-        }
-      }
-      if (n > 0) {
-        regionAnchor[region.id] = {sumX / static_cast<double>(n), sumY / static_cast<double>(n)};
-        continue;
-      }
-    }
-    // The sector is a disc, not a rectangle. Territory k sits on a sunflower spiral:
-    // the golden angle walks the ring, the square root of k walks outward, and the
-    // whole thing is stretched onto one ellipse centred on the board.
-    const double rx = (sector.w * 0.5) - 420.0;
-    const double ry = (sector.h * 0.5) - 420.0;
-    const std::size_t slots = std::max<std::size_t>(1, catalog.regions.size());
-    const double k = static_cast<double>(discSlot[ri]) + 0.5;
-    const double radius = std::sqrt(k / static_cast<double>(slots));
-    const double angle = k * 2.39996322972865;
-    const double sx = std::clamp(sector.w * 0.5 + std::cos(angle) * radius * rx, 300.0,
-                                 sector.w - 300.0);
-    const double sy = std::clamp(sector.h * 0.5 + std::sin(angle) * radius * ry, 220.0,
-                                 sector.h - 220.0);
+  std::vector<std::pair<double, double>> galaxyAnchors;
+  for (std::size_t k = 0; k < discOrder.size(); ++k) {
+    const Body& region = catalog.regions[discOrder[k]];
+    const double step = static_cast<double>(k) + 0.5;
+    const double radius =
+        std::sqrt(step / static_cast<double>(std::max<std::size_t>(1, discOrder.size())));
+    const double angle = step * 2.39996322972865;
+    const double sx =
+        std::clamp(sector.w * 0.5 + std::cos(angle) * radius * rx, 300.0, sector.w - 300.0);
+    const double sy =
+        std::clamp(sector.h * 0.5 + std::sin(angle) * radius * ry, 220.0, sector.h - 220.0);
     regionAnchor[region.id] = {sx, sy};
+    galaxyAnchors.emplace_back(sx, sy);
   }
 
   // 5. Draft procedural star systems inside each region's sector territory.
@@ -1067,23 +1115,27 @@ void ExpandChart(Catalog& catalog) {
                catalog.regions.size());
 
   int serial = 0;
-  for (const Body& region : catalog.regions) {
+  // One region's systems, laid around its anchor.
+  const auto draftRegion = [&](std::size_t draftIndex) {
+    const Body& region = catalog.regions[draftIndex];
     const auto anchor = regionAnchor[region.id];
-    for (int n = 0; n < catalog.systemsPerRegion; ++n) {
+    const double spreadX = regionSpread[region.id].first;
+    const double spreadY = regionSpread[region.id].second;
+    const int systemCount = regionSystems[region.id];
+    const double gapStart = regionGap[region.id];
+    for (int n = 0; n < systemCount; ++n) {
       double x = 0.0;
       double y = 0.0;
       bool found = false;
       // Keep every system within ~390x185 px of its regional anchor so any pair
       // inside the same region stays within ~850 px (<= 41 fuel/actions).
-      for (double minGap = 138.0; minGap >= 60.0 && !found; minGap -= 12.0) {
+      for (double minGap = gapStart; minGap >= 48.0 && !found; minGap -= 12.0) {
         Spacer test(minGap, placed);
         for (int attempt = 0; attempt < 180; ++attempt) {
           const double angle = rng.Range(0.0, 6.283185307179586);
           const double radial = std::sqrt(rng.Next());
-          // A disc around the anchor, three times the radius the six-times board
-          // used, so sixty-four systems per region still have chart between them.
-          const double spreadX = 1110.0;
-          const double spreadY = 525.0;
+          // A disc around the anchor: wide for a galaxy's territory, narrow for a
+          // cluster hanging between them.
           const double cx = std::round(std::clamp(
               anchor.first + std::cos(angle) * radial * spreadX, margin, sector.w - margin));
           const double cy = std::round(std::clamp(
@@ -1123,6 +1175,27 @@ void ExpandChart(Catalog& catalog) {
       row.note = Pick(Observations(), rng);
       rows.push_back(std::move(row));
       placed.emplace_back(x, y);
+    }
+  };
+
+  // Territories first, so the first system drawn - the one the ship starts in -
+  // belongs to a galaxy and not to a cluster.
+  for (std::size_t ri : discOrder) { draftRegion(ri); }
+
+  // Then the regions that came with the chart. They claim no territory: each one is
+  // a small blob hanging in the widest gap left between the drawn systems, holding a
+  // fraction of a territory's systems.
+  if (authoredRegionCount > 0 && !placed.empty()) {
+    const std::vector<std::pair<double, double>> gaps = WidestGaps(
+        placed, static_cast<int>(authoredRegionCount), sector.w * 0.5, sector.h * 0.5, rx, ry);
+    const int blobSystems = std::max(4, catalog.systemsPerRegion / 6);
+    for (std::size_t i = 0; i < authoredRegionCount && i < catalog.regions.size(); ++i) {
+      const Body& region = catalog.regions[i];
+      if (i < gaps.size()) { regionAnchor[region.id] = gaps[i]; }
+      regionSpread[region.id] = {200.0, 95.0};
+      regionSystems[region.id] = blobSystems;
+      regionGap[region.id] = 96.0;
+      draftRegion(i);
     }
   }
 
