@@ -93,9 +93,8 @@ bool IsGeneratedSystem(const Body& system);
 // forty-two created systems, every body that belongs to a system, and the ports
 // on those bodies. The shell - regions, Kessler's six hand-written
 // bodies and the two ports on them, the five systems with a designer's klass -
-// is left alone, because the reference it too. ChartExpansion strips
-// before it rebuilds, so a catalogue is always the product of the current
-// generator rather than a mix of two.
+// is left alone, because the reference it too. This remains available
+// as code, but ChartExpansion no longer calls it.
 void StripGeneratedChart(Catalog& catalog);
 
 }  // namespace ship

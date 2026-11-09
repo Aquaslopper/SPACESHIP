@@ -2,12 +2,12 @@
 //  ChartExpansion.h — procedural multi-scale chart expansion.
 //  ---------------------------------------------------------------------------
 //  Expands an Catalog copy before a voyage begins:
-//    * rebuilds the star rows and local five-body pass via GalaxyGen
-//    * widens the galaxy board and generates outer galactic regions/clusters
+//    * discards the loaded chart places; the tables loaded with them remain
+//      generator inputs, and the star rows are not rebuilt
+//    * widens the galaxy board and generates galactic regions/clusters
 //      with regional histories, traffic reports, and inter-galactic lanes
-//    * widens the sector board, preserves system offsets at its core,
-//      and populates each galactic region with a coherent territory of star
-//      systems linked by intra-region lanes
+//    * widens the sector board and populates each generated region with a
+//      coherent territory of star systems linked by intra-region lanes
 //    * populates every star system with multi-ring planetary orbits, natural
 //      moons around host worlds, debris belts, derelict anomalies, and ports
 //    * gives every star system a station: a system that arrives with a port
@@ -25,17 +25,15 @@
 
 namespace ship {
 
-// Procedural galactic regions added around the 7 core regions
-// (7 + 17 = 24 galactic regions/clusters on the galaxy layer).
+// Procedural galactic regions generated for a voyage
+// (17 galactic regions/clusters on the galaxy layer).
 constexpr int kNewGalaxies = 17;
 
 // Procedural star systems drafted per galactic region
-// (48 + 24 * 24 = 624 star systems across the universe).
+// (17 * 24 = 408 star systems across the universe).
 constexpr int kNewSystemsPerRegion = 24;
 
 // Board multipliers relative to the 638x278 reference viewport.
-// core regions and systems are translated to the board centre so
-// pairwise distances between destinations remain unchanged.
 constexpr double kSectorBoardScale = 6.0;
 constexpr double kGalaxyBoardScale = 4.0;
 
