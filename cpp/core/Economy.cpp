@@ -746,16 +746,27 @@ bool Simulation::AcceptTrade(const std::string& mode, const std::string& to,
 // place where the click count moves the clock on its own; the trade that can be
 // settled where the ship is standing; and what that settlement pays.
 //
-// A run is settled at its destination and nowhere else. The destination is the
-// body the board named, so arriving is enough: no berth is needed, and a docked
-// station is only required for the station-to-station runs, whose far end is a
-// berth by definition.
+// A run is settled at its destination and nowhere else. Delivery and freelance
+// name a body in the system, not a berth, so the station in that system is the
+// counter; standing on the body still counts. Station-to-station still needs
+// that berth.
+
+bool RunEndsHere(const Catalog& catalog, const std::string& here, bool docked,
+                 const TradeContract& trade) {
+  if (trade.mode == "station") { return docked && trade.to == here; }
+  if (trade.to == here) { return true; }
+  if (!docked) { return false; }
+  const Body* dest = catalog.FindBody(trade.to);
+  const Body* berth = catalog.FindBody(here);
+  if (dest == nullptr || berth == nullptr) { return false; }
+  if (dest->type == "station") { return false; }
+  return catalog.BodySystem(*dest) == catalog.BodySystem(*berth);
+}
 
 std::vector<TradeContract> Simulation::TradesHere() const {
   std::vector<TradeContract> here;
   for (const TradeContract& trade : state_.trades) {
-    if (trade.to != map_.here) { continue; }
-    if (trade.mode == "station" && !state_.docked) { continue; }
+    if (!RunEndsHere(catalog_, map_.here, state_.docked, trade)) { continue; }
     here.push_back(trade);
   }
   return here;
@@ -776,7 +787,6 @@ double Simulation::TradePayout(const TradeContract& trade) const {
 bool Simulation::SettleTrade(const std::string& mode, const std::string& to,
                              const std::string& good) {
   if (!state_.gameOver.empty()) { return false; }
-  if (to != map_.here) { return false; }  // the run ends where it points
   if (mode == "station" && !state_.docked) { return false; }
 
   std::size_t index = state_.trades.size();
@@ -786,6 +796,7 @@ bool Simulation::SettleTrade(const std::string& mode, const std::string& to,
   }
   if (index == state_.trades.size()) { return false; }
   const TradeContract trade = state_.trades[index];
+  if (!RunEndsHere(catalog_, map_.here, state_.docked, trade)) { return false; }
 
   if (mode == "delivery") {
     // The consignment leaves the hold and goes over the counter.

@@ -520,7 +520,25 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   sales.badge = Num(sim.Goods().size()) + " lots, " + Num(sim.Survey().size()) + " surveys";
   sales.notes.push_back("Everything aboard that a counter will take.");
   sales.notes.push_back("Selling pays shiplets and costs one click; the lot is then gone.");
-  if (sim.Goods().empty() && sim.Survey().empty()) {
+  {
+    const std::vector<TradeContract> due = sim.TradesHere();
+    for (const TradeContract& trade : due) {
+      const double pays = sim.TradePayout(trade);
+      const Body* dest = sim.FindBodyById(trade.to);
+      const std::string where = dest == nullptr ? trade.to : dest->name;
+      StationRow row;
+      row.id = "trade-settle:" + trade.mode + ":" + trade.to + ":" + trade.good;
+      row.label = (trade.mode == "freelance" ? "Cash in freelance at " : "Cash in delivery at ") +
+                  where + " - " + Num(pays) + " sh";
+      row.cost = kOneAction;
+      row.commit = "Settle - " + Num(pays) + " sh";
+      row.enabled = model.docked;
+      row.details.push_back(trade.label);
+      row.details.push_back("This station is the counter for that run.");
+      sales.rows.push_back(std::move(row));
+    }
+  }
+  if (sim.Goods().empty() && sim.Survey().empty() && sales.rows.empty()) {
     sales.notes.push_back("Nothing to sell.");
   }
   for (const GoodsLot& lot : sim.Goods()) {
@@ -1020,6 +1038,16 @@ bool PressStationActionRaw(Simulation& sim, const std::string& action,
     sim.FreeCommit("Station repaired the hull");
     return true;
   }
+  if (action.compare(0, 13, "trade-settle:") == 0) {
+    const std::string rest = action.substr(13);
+    const std::size_t cut = rest.find(':');
+    if (cut == std::string::npos) { return false; }
+    const std::string mode = rest.substr(0, cut);
+    const std::string tail = rest.substr(cut + 1);
+    const std::size_t second = tail.find(':');
+    if (second == std::string::npos) { return sim.SettleTrade(mode, tail, std::string()); }
+    return sim.SettleTrade(mode, tail.substr(0, second), tail.substr(second + 1));
+  }
   if (action.compare(0, 13, "trade-accept:") == 0) {
     // mode : destination [: commodity] -- the commodity is only carried by the
     // two in-system modes, and a station-to-station run names a berth instead.
@@ -1053,6 +1081,7 @@ std::string StationActionCategory(const Simulation& sim, const std::string& acti
   // purchase which the HTA explicitly marks critical.
   if (action == "ship-buy") { return "critical"; }
   if (action.compare(0, 13, "trade-accept:") == 0) { return "routine"; }
+  if (action.compare(0, 13, "trade-settle:") == 0) { return "routine"; }
   if (action.compare(0, 5, "sell:") == 0 || action.compare(0, 12, "sell-survey:") == 0) {
     return "routine";  // HTA gives these rows an explicit routine category.
   }
