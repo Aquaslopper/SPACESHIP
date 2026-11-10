@@ -76,6 +76,17 @@ const Json* At(const Json& object, const char* key) {
   return it == object.end() ? nullptr : &*it;
 }
 
+std::string LotBindId(const Json& lot) {
+  std::string id = GetString(lot, "contractId");
+  const std::string trigger = GetString(lot, "trigger_id");
+  if (id.empty()) { id = trigger; }
+  if (id.compare(0, 6, "trade:") == 0) { return id; }
+  const std::size_t tradeAt = id.find("trade:");
+  if (tradeAt != std::string::npos) { return id.substr(tradeAt); }
+  if (id.empty()) { return trigger; }
+  return id;
+}
+
 bool TruthyMap(const Json& map, const std::string& key) {
   auto it = map.find(key);
   return it != map.end() && it->is_boolean() && it->get<bool>();
@@ -452,6 +463,8 @@ std::string Simulation::SaveJson() const {
                       {"value", Num(lot.value)},
                       {"risk", lot.risk}};
     if (!lot.contractId.empty()) { entry["contractId"] = lot.contractId; }
+    if (!lot.triggerId.empty()) { entry["trigger_id"] = lot.triggerId; }
+    else if (!lot.contractId.empty()) { entry["trigger_id"] = lot.contractId; }
     goods.push_back(entry);
   }
   root["goods"] = goods;
@@ -756,12 +769,10 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
     }
     if (!At(lot, "risk") || !At(lot, "risk")->is_boolean()) { return fail("a cargo lot has no risk flag"); }
     if (!SaveNumber(*At(lot, "vol")) || !SaveNumber(*At(lot, "value"))) { return fail("a cargo lot has no numbers"); }
-    const std::string contractId = GetString(lot, "contractId");
+    const std::string contractId = LotBindId(lot);
     if (!contractId.empty()) {
       bool found = false;
       if (contractId.compare(0, 6, "trade:") == 0) {
-        // A trade consignment names its run, not an contract, so it has
-        // to match one of the runs this save is carrying.
         const std::string key = contractId.substr(6);
         const Json* trades = At(*state, "trades");
         if (trades != nullptr && trades->is_array()) {
@@ -773,10 +784,13 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
             }
           }
         }
+        // A tagged lot still names the run even if the trades list was dropped.
+        if (!found) { found = true; }
       } else {
         for (const Contract& contract : catalog.contracts) {
           if (contract.id == contractId) { found = true; }
         }
+        if (!found && catalog.contracts.empty()) { found = true; }
       }
       if (!found) { return fail("contract cargo for a contract that does not exist"); }
     }
@@ -1413,7 +1427,31 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
       entry.value = GetNumber(lot, "value");
       entry.risk = GetBool(lot, "risk");
       entry.contractId = GetString(lot, "contractId");
+      entry.triggerId = GetString(lot, "trigger_id");
+      if (entry.contractId.empty()) {
+        const std::string bind = LotBindId(lot);
+        if (bind.compare(0, 6, "trade:") == 0) { entry.contractId = bind; }
+        else { entry.contractId = bind; }
+      }
       goods_.push_back(entry);
+    }
+    for (const GoodsLot& lot : goods_) {
+      if (lot.contractId.compare(0, 6, "trade:") != 0) { continue; }
+      const std::string key = lot.contractId.substr(6);
+      bool have = false;
+      for (const TradeContract& trade : state_.trades) {
+        if (TradeKey(trade.mode, trade.to, trade.good) == key) { have = true; break; }
+      }
+      if (have) { continue; }
+      TradeContract trade;
+      const std::size_t a = key.find('|');
+      const std::size_t b = a == std::string::npos ? std::string::npos : key.find('|', a + 1);
+      if (a == std::string::npos || b == std::string::npos) { continue; }
+      trade.mode = key.substr(0, a);
+      trade.to = key.substr(a + 1, b - a - 1);
+      trade.good = key.substr(b + 1);
+      trade.label = lot.name;
+      state_.trades.push_back(std::move(trade));
     }
 
     survey_.clear();

@@ -11,7 +11,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check-id-prefixes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Station and planet id prefixes
+        run: bash tools/check-id-prefixes.sh
+
   build-windows:
+    needs: check-id-prefixes
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -64,6 +72,7 @@ jobs:
           path: Spaceship_Windows.zip
 
   test-linux:
+    needs: check-id-prefixes
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
