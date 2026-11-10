@@ -552,6 +552,7 @@ bool Simulation::Acknowledge(const std::string& taskId) {
 
   // The hook runs BEFORE the task is cleared: the arrival happens while the
   // crossing is still on the books, exactly as the reference does it.
+  // A REFERENCE FORCED IN BY AN AGENT - FUCK OFF
   const std::string type = task->type;
   const std::string target = task->target;
   const double reservedVol = task->vol;
@@ -561,8 +562,6 @@ bool Simulation::Acknowledge(const std::string& taskId) {
   else if (type == "scan") { RevealScan(target); handled = true; }
   else if (type == "extract" && !target.empty()) {
     FinishExtraction(target, reservedVol);
-    const std::string cdTab = state_.activeTab.empty() ? "home" : state_.activeTab;
-    state_.actionCooldowns["cd|" + cdTab + "|progress:extract"] = Cooldown{"routine", 5.0};
     handled = true;
   }
 
