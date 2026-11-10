@@ -837,9 +837,17 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
   } else {
     const bool remoteScan = target != nullptr &&
                             (!reach || target->type == "system" || target->type == "region");
+    // A body already deep-scanned has nothing left to reveal: the button is
+    // filed, not live, so a click cannot be spent on an empty scan.
+    auto seen = target == nullptr ? sim.State().scanned.end()
+                                  : sim.State().scanned.find(target->id);
+    const bool scanFiled =
+        target != nullptr && seen != sim.State().scanned.end() && seen->second;
     screen.progress.push_back(BuildProgressButton(
-        sim, "scan", remoteScan ? "Run Long-Range Scan" : "Run Deep Scan",
-        canScanTarget && energy > 0,
+        sim, "scan",
+        scanFiled ? "Deep Scan Filed"
+                  : (remoteScan ? "Run Long-Range Scan" : "Run Deep Scan"),
+        canScanTarget && energy > 0 && !scanFiled,
         "Scan Complete", "space"));
   }
 
@@ -922,15 +930,14 @@ bool PressNavActionRaw(Simulation& sim, const std::string& action, const std::st
 }  // namespace
 
 // ============================================================================
-//  The press, with the anti-spam lock around it (Phase 9).
+//  The press, and the clicks it costs.
 //  ---------------------------------------------------------------------------
-//  One control is one control. The first press spends the action and starts the
-//  tier's lock in ACTION_COOLDOWN_RULES; a second press of the same button
-//  before another action resolves is refused, whether it comes from the window
-//  or from this harness. Free reads spend nothing and therefore lock nothing.
+//  One control is one control. A press spends one of the clicks that control
+//  holds and returns one to every other control, so a button is only refused
+//  once its own green has run out. Free reads spend nothing and return nothing.
 // ============================================================================
 bool PressNavAction(Simulation& sim, const std::string& action, const std::string& arg) {
-  // Progress controls acknowledge before consulting cooldowns (HTA
+  // Progress controls acknowledge before their charge is consulted (HTA
   // onProgressClick). Do not add a second lock around that dispatcher.
   const auto screen = BuildNavScreen(sim).screen;
   if (action == "travel" || action == "scan" || action == "extract") {
@@ -945,8 +952,8 @@ bool PressNavAction(Simulation& sim, const std::string& action, const std::strin
         (action == "dock" && row.label.find("Dock at ") == 0) ||
         (action == "view-sector" && row.label.find("View ") == 0);
     if (!matches) { continue; }
-    if (!row.enabled || row.coolingDown) { return false; }
-    return CommitActionButton(sim, row.cooldownKey, row.category,
+    if (!row.enabled || row.spent) { return false; }
+    return CommitActionButton(sim, row.chargeKey, row.tier,
         [&]() { return PressNavActionRaw(sim, action, arg); });
   }
   if (action == "stand-watch" || action == "dock" || action == "view-sector") {

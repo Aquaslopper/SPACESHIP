@@ -193,11 +193,11 @@ std::string Simulation::TraceJson() const {
   }
 
   {
-    Json cooldowns = Json::object();
-    for (const auto& entry : state_.actionCooldowns) {
-      cooldowns[entry.first] = Num(entry.second.remaining);
+    Json charges = Json::object();
+    for (const auto& entry : state_.charges) {
+      charges[entry.first] = Num(entry.second.left);
     }
-    out["cooldowns"] = cooldowns;
+    out["charges"] = charges;
   }
 
   {

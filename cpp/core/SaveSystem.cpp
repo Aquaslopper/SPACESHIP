@@ -230,12 +230,13 @@ std::string Simulation::SaveJson() const {
   s["freshTabs"] = Json::object();
   for (const auto& entry : state_.freshTabs) { s["freshTabs"][entry.first] = entry.second; }
 
-  Json cooldowns = Json::object();
-  for (const auto& entry : state_.actionCooldowns) {
-    cooldowns[entry.first] = Json{{"category", entry.second.category},
-                                  {"remaining", Num(entry.second.remaining)}};
+  Json charges = Json::object();
+  for (const auto& entry : state_.charges) {
+    charges[entry.first] = Json{{"tier", entry.second.tier},
+                                {"left", Num(entry.second.left)},
+                                {"volume", Num(entry.second.volume)}};
   }
-  s["actionCooldowns"] = cooldowns;
+  s["charges"] = charges;
 
   Json ongoing = Json::array();
   for (const Task& task : state_.ongoing) {
@@ -1239,13 +1240,14 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
       state_.passengers.push_back(Passenger{GetString(passenger, "id"), GetString(passenger, "name")});
     }
 
-    state_.actionCooldowns.clear();
-    if (auto it = s.find("actionCooldowns"); it != s.end() && it->is_object()) {
+    state_.charges.clear();
+    if (auto it = s.find("charges"); it != s.end() && it->is_object()) {
       for (auto entry = it->begin(); entry != it->end(); ++entry) {
-        Cooldown cooldown;
-        cooldown.category = GetString(entry.value(), "category");
-        cooldown.remaining = GetNumber(entry.value(), "remaining");
-        state_.actionCooldowns[entry.key()] = cooldown;
+        Charge charge;
+        charge.tier = GetString(entry.value(), "tier");
+        charge.left = GetNumber(entry.value(), "left");
+        charge.volume = GetNumber(entry.value(), "volume");
+        state_.charges[entry.key()] = charge;
       }
     }
 

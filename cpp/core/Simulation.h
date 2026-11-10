@@ -8,7 +8,7 @@
 //    Survival.cpp     engine wear, the filter bank, the air, the stores
 //    CrewLogic.cpp    crew ticks, hunger, jobs, payroll, the loss check
 //    Tasks.cpp        the ongoing-task engine and its dispatch table
-//    Cooldowns.cpp    per-control action-count cooldowns
+//    Charges.cpp      per-control click charges (spend one, the rest refill)
 //    Incidents.cpp    reports, escalation, dispute pairs
 //    Simulacron.cpp   memories, bonds, desires
 //    Awards.cpp       commendations
@@ -105,10 +105,14 @@ class Simulation {
 
   // ---- commands that exist in Phase 1A -----------------------------------
   // `by` names the hand that made the press; empty means the commander.
-  bool StartCanisterInstall(int slot, const std::string& by = std::string());  // the player carries a canister over
+  // `spendsAction` is false for a hand's own press: the crew works on the
+  // player's clock, so its press must not advance the clock again.
+  bool StartCanisterInstall(int slot, const std::string& by = std::string(),
+                            bool spendsAction = true);  // the player carries a canister over
   bool StartFilterBank();               // the player throws the switch
   bool StartMaintenanceSelf();          // startMaint(e, "maint", "the commander")
-  bool StartCookingSelf(const std::string& by = std::string());              // startCook(e, "cook", "the commander")
+  bool StartCookingSelf(const std::string& by = std::string(),
+                        bool spendsAction = true);              // startCook(e, "cook", "the commander")
   bool ServiceSystem(const std::string& statId);  // buildSystemScreen() service row
   bool ApplyJob(const std::string& crewId, const std::string& jobId);  // scenario setup
 
@@ -279,11 +283,14 @@ class Simulation {
   // board signs it, the hold carries it, and the destination settles it. What
   // the destination pays is the market there plus the freight the leg cost.
   // The machine's button in the engine room. One press is one click of the
-  // clock; the button is live again once twelve clicks have gone by.
+  // clock; its charge is what decides when it can pay again.
   // `by` is who pressed it: the commander, or the engineer acting alone.
   bool EngineClick(const std::string& by = std::string());
-  bool EngineClickReady() const;
-  double EngineClickFill() const;
+
+  // The control a committed press was spent from. The tick reads it to tell the
+  // button that paid from the buttons its click winds back up.
+  void SetPressedButton(const std::string& key);
+  void ClearPressedButton(const std::string& key);
 
   std::vector<TradeContract> TradesHere() const;
   double TradePayout(const TradeContract& trade) const;
@@ -435,8 +442,8 @@ class Simulation {
   void OnTaskDone(Task& task);
   void TickTask(const Task& task, double used);
 
-  // Cooldowns.cpp
-  void TickActionCooldowns();
+  // Charges.cpp
+  void TickButtonCharges();
 
   // Incidents.cpp
   const IncidentType* IncidentSpec(const Incident& incident) const;
@@ -473,6 +480,7 @@ class Simulation {
 
   // The cargo hall's own state. None of it is saved: the arrangement of the hold
   // and the run of loading clicks belong to the session, not to the voyage.
+  std::string pressedButton_;        // the control this click was spent from
   bool engineClicking_ = false;      // one press at a time, while its own click runs
   bool engineClickAtPending_ = false;  // the press still has to arm its bar
   void ServiceDrive(const std::string& by);

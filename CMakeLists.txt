@@ -187,7 +187,7 @@ add_library(spaceship_core STATIC
   cpp/core/Survival.cpp
   cpp/core/CrewLogic.cpp
   cpp/core/Tasks.cpp
-  cpp/core/Cooldowns.cpp
+  cpp/core/Charges.cpp
   cpp/core/Incidents.cpp
   cpp/core/Simulacron.cpp
   cpp/core/Awards.cpp

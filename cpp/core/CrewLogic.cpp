@@ -406,6 +406,8 @@ bool Simulation::TalkToCrew(const std::string& crewId) {
   if (crew == nullptr || crew->health <= 0 || FindOngoing("doc-" + crewId) != nullptr) {
     return false;
   }
+  // Nothing to lift is nothing to click: at full morale the talk spends nothing.
+  if (crew->morale >= 100.0) { return false; }
   // Capture everything needed before the tick: crew may leave or die during
   // the action. Like other committed changes, apply the morale before it ticks.
   const std::string name = crew->name;
@@ -462,10 +464,9 @@ void Simulation::AutoMaint() {
   // level, so the ship is kept further from trouble the better he knows it.
   const double line = std::max(rules_.engine.maintBelow, EffectiveJobAt(*worker));
   if (state_.engineCondition >= line) { return; }
-  if (!EngineClickReady()) { return; }  // the bar comes back round in its own time
 
-  // His press is this action's click, so it arms the bar and lifts the drive
-  // without performing a second action of its own.
+  // His press is this action's click, so it lifts the drive without performing
+  // a second action of its own.
   ServiceDrive(worker->name);
 }
 
@@ -510,7 +511,7 @@ void Simulation::AutoFilters() {
   // made by a hand, so it runs at his rate and carries his name.
   for (std::size_t i = 0; i < life_.slots.size(); ++i) {
     if (life_.slots[i].state != "empty") { continue; }
-    if (StartCanisterInstall(static_cast<int>(i), worker->name)) {
+    if (StartCanisterInstall(static_cast<int>(i), worker->name, false)) {
       LogLine(worker->name + " seated a canister in " + life_.slots[i].name + ".");
     }
     return;
@@ -543,7 +544,7 @@ void Simulation::AutoMess() {
   // batch finishes. A batch that would overshoot the ceiling is still cooked;
   // the landing is clamped, so the counter ends full rather than past its lid.
   // She presses the galley's own control rather than opening work of her own.
-  if (StartCookingSelf(worker->name)) {
+  if (StartCookingSelf(worker->name, false)) {
     LogLine(worker->name + " started cooking without being asked.");
   }
 }

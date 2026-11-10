@@ -353,24 +353,23 @@ bool PressRoomActionRaw(Simulation& sim, const std::string& action, const std::s
 }  // namespace
 
 // ============================================================================
-//  The press, with the anti-spam lock around it (Phase 9).
+//  The press, and the clicks it costs.
 //  ---------------------------------------------------------------------------
-//  One control is one control. The first press spends the action and starts the
-//  tier's lock in ACTION_COOLDOWN_RULES; a second press of the same button
-//  before another action resolves is refused, whether it comes from the window
-//  or from this harness. Free reads spend nothing and therefore lock nothing.
+//  One control is one control. A press spends one of the clicks that control
+//  holds and returns one to every other control, so a button is only refused
+//  once its own green has run out. Free reads spend nothing and return nothing.
 // ============================================================================
 std::string RoomActionCategory(const std::string& action) {
   if (action == "broadcast") { return "space"; }
   if (action.compare(0, 7, "signal:") == 0) { return "critical"; }
   if (action == "fuel-split" || action == "divert-shield" || action == "divert-power" ||
       action.compare(0, 5, "meal:") == 0) { return "systems"; }
-  return ActionCooldownCategory(action);
+  return ButtonChargeTier(action);
 }
 
 bool PressRoomAction(Simulation& sim, const std::string& action, const std::string& arg) {
   return CommitActionButton(
-      sim, ActionCooldownKey(sim, "press:room:" + action + ":" + arg),
+      sim, ButtonChargeKey(sim, "press:room:" + action + ":" + arg),
       RoomActionCategory(action),
       [&]() { return PressRoomActionRaw(sim, action, arg); });
 }

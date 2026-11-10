@@ -31,7 +31,9 @@ void Simulation::ServiceDrive(const std::string& by) {
 bool Simulation::EngineClick(const std::string& by) {
   if (!state_.gameOver.empty()) { return false; }
   if (engineClicking_) { return false; }
-  if (!EngineClickReady()) { return false; }
+  // Nothing to maintain is nothing to click: a drive at full condition refuses
+  // the press instead of spending a click on an empty job.
+  if (state_.engineCondition >= 100.0) { return false; }
   // A maintenance job already in hand owns the drive; the button waits for it.
   if (MaintRunning()) { return false; }
 
@@ -44,17 +46,6 @@ bool Simulation::EngineClick(const std::string& by) {
   engineClickAtPending_ = false;
   return true;
 }
-
-double Simulation::EngineClickFill() const {
-  const double cycle =
-      rules_.engine.engineClickEvery > 0 ? rules_.engine.engineClickEvery : 12.0;
-  const double since = ActionCount() - state_.engineClickAt;
-  if (since >= cycle) { return 100.0; }
-  if (since <= 0.0) { return 0.0; }
-  return since / cycle * 100.0;
-}
-
-bool Simulation::EngineClickReady() const { return EngineClickFill() >= 100.0; }
 
 void Simulation::WearEngine() {
   state_.wearTick += 1;

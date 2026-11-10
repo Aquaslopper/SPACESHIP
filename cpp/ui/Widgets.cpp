@@ -1,5 +1,5 @@
 // ============================================================================
-//  Widgets.cpp — the frame, the button and the lock.
+//  Widgets.cpp — the frame, the button and its charge.
 //  ---------------------------------------------------------------------------
 //  Everything here is a direct reading of Section D-5 and the frame builders at
 //  the end of Section I. 
@@ -71,17 +71,17 @@ bool MentionsAction(const std::string& text) {
 }  // namespace
 
 // ---------------------------------------------------------------------------
-//  Cooldowns
+//  Button charges
 // ---------------------------------------------------------------------------
-std::string ActionCooldownKey(const Simulation& sim, const std::string& id) {
+std::string ButtonChargeKey(const Simulation& sim, const std::string& id) {
   const std::string tab = sim.State().activeTab.empty() ? "home" : sim.State().activeTab;
-  return "cd|" + tab + "|" + (id.empty() ? std::string("action") : id);
+  return "ch|" + tab + "|" + (id.empty() ? std::string("action") : id);
 }
 
-std::string ActionCooldownCategory(const std::string& subject,
-                                   const std::string& preferred) {
+std::string ButtonChargeTier(const std::string& subject,
+                             const std::string& preferred) {
   if (!preferred.empty()) {
-    // The four categories are the only legal values; anything else is guessed.
+    // The four tiers are the only legal values; anything else is guessed.
     if (preferred == "routine" || preferred == "systems" || preferred == "space" ||
         preferred == "critical") {
       return preferred;
@@ -94,7 +94,7 @@ std::string ActionCooldownCategory(const std::string& subject,
   }
   if (ContainsAny(s, {"navigation", "travel", "jump", "course", "dock", "undock",
                       "watch", "crossing", "salvage", "scan", "route", "space",
-                      "traffic report"})) {
+                      "fuel", "traffic report"})) {
     return "space";
   }
   const bool startsBuy = s.compare(0, 4, "buy ") == 0;
@@ -116,19 +116,43 @@ std::string ActionCooldownCategory(const std::string& subject,
   return "routine";
 }
 
-double CooldownRemaining(const Simulation& sim, const std::string& key) {
-  auto it = sim.State().actionCooldowns.find(key);
-  return it == sim.State().actionCooldowns.end() ? 0.0 : it->second.remaining;
+double TierVolume(const Simulation& sim, const std::string& tier) {
+  auto it = sim.World().rules.charges.find(tier);
+  return it == sim.World().rules.charges.end() ? 4.0 : it->second.volume;
 }
 
-std::string RuleLabel(const Simulation& sim, const std::string& category) {
-  auto it = sim.World().rules.cooldowns.find(category);
-  return it == sim.World().rules.cooldowns.end() ? std::string("Action") : it->second.label;
+std::string TierLabel(const Simulation& sim, const std::string& tier) {
+  auto it = sim.World().rules.charges.find(tier);
+  return it == sim.World().rules.charges.end() ? std::string("Action") : it->second.label;
 }
 
-double RuleActions(const Simulation& sim, const std::string& category) {
-  auto it = sim.World().rules.cooldowns.find(category);
-  return it == sim.World().rules.cooldowns.end() ? 5.0 : it->second.actions;
+// A press that is not paid from a charge still has to reach the tick, so it is
+// marked with a key no control owns: everything else gets its step back.
+const char* UnmeteredKey() { return "\x01unmetered"; }
+
+// The air plant and the galley already run their own clocks; a charge on top of
+// them would be a second mechanic on the same button.
+bool KeepsOwnMechanic(const std::string& taskId) {
+  return taskId.compare(0, 2, "o2") == 0 || taskId == "cook";
+}
+
+// An entry that is not in the state yet has never been pressed: it is full.
+double ChargeLeft(const Simulation& sim, const std::string& key, const std::string& tier) {
+  auto it = sim.State().charges.find(key);
+  if (it == sim.State().charges.end()) { return TierVolume(sim, tier); }
+  return it->second.left;
+}
+
+double ChargeVolume(const Simulation& sim, const std::string& key, const std::string& tier) {
+  auto it = sim.State().charges.find(key);
+  if (it == sim.State().charges.end()) { return TierVolume(sim, tier); }
+  return it->second.volume;
+}
+
+double ChargePercent(const Simulation& sim, const std::string& key, const std::string& tier) {
+  const double volume = ChargeVolume(sim, key, tier);
+  if (volume <= 0.0) { return 0.0; }
+  return std::floor(std::clamp(ChargeLeft(sim, key, tier) / volume, 0.0, 1.0) * 100.0);
 }
 
 // The unit of the clock, as it is printed now: a cost that says "click".
@@ -147,42 +171,48 @@ bool MentionsClick(const std::string& text) {
   return false;
 }
 
-bool TakesNoCooldown(const std::string& key) {
-  return key.find("progress:scan") != std::string::npos
-      || key.find("progress:cook") != std::string::npos;
-}
-
 bool IsActionCost(const std::string& cost, bool hasCost) {
   if (!hasCost || cost.empty()) { return true; }
   return MentionsAction(cost) || MentionsClick(cost);
 }
 
-bool CommitActionButton(Simulation& sim, const std::string& key,
-                        const std::string& category,
-                        const std::function<bool()>& action) {
-  const bool unlocked = TakesNoCooldown(key);
-  if (!unlocked && CooldownRemaining(sim, key) > 0.0) { return false; }
- 
-
-  const double before = sim.ActionCount();
+bool PressWithoutCharge(Simulation& sim, const std::function<bool()>& action) {
+  sim.SetPressedButton(UnmeteredKey());
   bool result = false;
   try {
     result = action();
   } catch (...) {
-    // A callback that throws must still leave the clock consistent, exactly as
-    // the reference's finally block does.
-    if (!unlocked && sim.ActionCount() > before) {
-      const std::string chosen = ActionCooldownCategory(key, category);
-      sim.MutableState().actionCooldowns[key] =
-          Cooldown{chosen, RuleActions(sim, chosen)};
-    }
+    sim.ClearPressedButton(UnmeteredKey());
     throw;
   }
-  if (!unlocked && sim.ActionCount() > before) {
-    const std::string chosen = ActionCooldownCategory(key, category);
-    sim.MutableState().actionCooldowns[key] =
-        Cooldown{chosen, RuleActions(sim, chosen)};
+  sim.ClearPressedButton(UnmeteredKey());
+  return result;
+}
+
+bool CommitActionButton(Simulation& sim, const std::string& key,
+                        const std::string& tier,
+                        const std::function<bool()>& action) {
+  // A control nobody has pressed yet is full: open it at its volume.
+  auto& charges = sim.MutableState().charges;
+  if (charges.find(key) == charges.end()) {
+    const double volume = TierVolume(sim, tier);
+    charges[key] = Charge{tier, volume, volume};
   }
+  if (ChargeLeft(sim, key, tier) <= 0.0) { return false; }  // out of clicks
+
+  // The tick inside PerformAction has to know which control paid, so the other
+  // controls can be wound back up by this click.
+  sim.SetPressedButton(key);
+  bool result = false;
+  try {
+    result = action();
+  } catch (...) {
+    // A callback that throws must not leave a press marked as paid.
+    sim.ClearPressedButton(key);
+    throw;
+  }
+  // A free read spends nothing, so its control keeps every click it held.
+  sim.ClearPressedButton(key);
   return result;
 }
 
@@ -197,26 +227,32 @@ double OngoingPercent(const Task& task) {
 ProgressButton BuildProgressButton(const Simulation& sim, const std::string& taskId,
                                    const std::string& idleLabel, bool enabled,
                                    const std::string& doneLabel,
-                                   const std::string& category) {
+                                   const std::string& tier) {
   ProgressButton button;
   button.taskId = taskId;
   button.idleLabel = idleLabel;
   button.doneLabel = doneLabel.empty() ? "Complete" : doneLabel;
   button.enabled = enabled;
-  button.cooldownKey = ActionCooldownKey(sim, "progress:" + taskId);
-  button.category =
-      ActionCooldownCategory(taskId + " " + idleLabel, category);
+  button.chargeKey = ButtonChargeKey(sim, "progress:" + taskId);
+  button.tier = ButtonChargeTier(taskId + " " + idleLabel, tier);
+  const bool charged = !KeepsOwnMechanic(taskId);
+  if (!charged) { button.chargeKey.clear(); }
 
+  const double charge = charged ? ChargePercent(sim, button.chargeKey, button.tier) : 0.0;
   const Task* task = sim.FindOngoing(taskId);
-  const double remaining = CooldownRemaining(sim, button.cooldownKey);
 
   if (task == nullptr) {
-    button.fillPercent = 0.0;
-    if (remaining > 0.0) {
-      button.state = ButtonState::Cooldown;
-      button.text = "Cooldown: " + Num(remaining) + " clicks";
-      button.title = RuleLabel(sim, sim.State().actionCooldowns.at(button.cooldownKey).category) +
-                     " cooldown: " + Num(remaining) + " Loading ";
+    // No process running: the bar is the clicks this control still holds.
+    button.fillPercent = charge;
+    if (!charged) {
+      button.state = enabled ? ButtonState::Idle : ButtonState::Off;
+      button.text = idleLabel;
+      return button;
+    }
+    if (charge <= 0.0) {
+      button.state = ButtonState::Empty;
+      button.text = idleLabel;
+      button.title = TierLabel(sim, button.tier) + " button: out of clicks.";
     } else {
       button.state = enabled ? ButtonState::Idle : ButtonState::Off;
       button.text = idleLabel;
@@ -261,21 +297,42 @@ bool PressProgressButton(Simulation& sim, const std::string& taskId) {
 
 bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
   const std::string& taskId = button.taskId;
-  // The machine's button is a click of the clock gated by its own green bar.
-  if (taskId == "engine-click") { return sim.EngineClick(); }
+  // The machine's button is a click of the clock like any other: the charge it
+  // holds is the only thing that decides whether it can pay.
+  if (taskId == "engine-click") {
+    if (button.state == ButtonState::Off || button.state == ButtonState::Empty) { return false; }
+    return CommitActionButton(sim, button.chargeKey, button.tier,
+                              [&sim]() { return sim.EngineClick(); });
+  }
   const Task* task = sim.FindOngoing(taskId);
   if (task != nullptr && task->state == "running") { return false; }  // inert
-  if (task != nullptr && task->state == "done") { return sim.Acknowledge(taskId); }
+  if (task != nullptr && task->state == "done") {
+    // Reading the result is a click of the hand, not of the clock: it spends no
+    // charge of its own, but every other button feels the click.
+    return PressWithoutCharge(sim, [&sim, &taskId]() { return sim.Acknowledge(taskId); });
+  }
 
-  if (button.state == ButtonState::Cooldown) { return false; }
+  if (button.state == ButtonState::Empty) { return false; }
   if (button.state == ButtonState::Off) { return false; }
   if (button.state == ButtonState::Running) { return false; }
 
-  // One task id per control, and the control's category is the one the button
-  // reported, so a lock and the thing that caused it cannot disagree.
-  const std::string category = button.category;
-  return CommitActionButton(sim, ActionCooldownKey(sim, "progress:" + taskId),
-                            category, [&sim, &taskId]() {
+  // A control that keeps its own mechanic is run without a charge, but its
+  // press is still a click that winds the other buttons back up.
+  if (button.chargeKey.empty()) {
+    return PressWithoutCharge(sim, [&sim, &taskId]() {
+      if (taskId.compare(0, 3, "o2s") == 0 && taskId.size() == 4) {
+        return sim.StartCanisterInstall(taskId[3] - '0');
+      }
+      if (taskId == "o2-run") { return sim.StartFilterBank(); }
+      if (taskId == "cook") { return sim.StartCookingSelf(); }
+      return false;
+    });
+  }
+
+  // One task id per control, and the control's own charge key and tier, so the
+  // bar the player reads and the clicks the gate spends cannot disagree.
+  return CommitActionButton(sim, button.chargeKey, button.tier,
+                            [&sim, &taskId]() {
                               if (taskId.compare(0, 3, "o2s") == 0 && taskId.size() == 4) {
                                 return sim.StartCanisterInstall(taskId[3] - '0');
                               }
@@ -335,39 +392,38 @@ std::string CommandSlug(const std::string& label) {
 
 CommandRowView BuildCommandRow(const Simulation& sim, const std::string& label,
                                bool enabled, const std::string& cost,
-                               const std::string& category, int occurrence) {
+                               const std::string& tier, int occurrence) {
   CommandRowView row;
   row.label = label;
   row.cost = cost;
   row.actionCost = IsActionCost(cost, !cost.empty());
   row.displayCost = cost.empty() ? "1 click" : cost;
   row.enabled = enabled;
-  row.category = ActionCooldownCategory(label, category);
-  row.cooldownKey =
-      ActionCooldownKey(sim, "command:" + CommandSlug(label) + ":" + Num(occurrence));
+  row.tier = ButtonChargeTier(label, tier);
+  row.chargeKey =
+      ButtonChargeKey(sim, "command:" + CommandSlug(label) + ":" + Num(occurrence));
 
-  BindCommandCooldown(sim, row, row.cooldownKey, row.category);
+  BindCommandCharge(sim, row, row.chargeKey, row.tier);
   return row;
 }
 
-void BindCommandCooldown(const Simulation& sim, CommandRowView& row,
-                         const std::string& key, const std::string& category) {
-  row.cooldownKey = key;
-  row.category = category;
-  row.remaining = CooldownRemaining(sim, key);
-  row.coolingDown = row.remaining > 0.0;
-  if (row.coolingDown) {
-    row.displayCost = "COOLDOWN " + Num(row.remaining);
-    row.title = RuleLabel(sim, sim.State().actionCooldowns.at(key).category) +
-        " cooldown: " + Num(row.remaining) +
-        " more clicks. Other committed clicks advance it; waiting does not.";
+// A row that is out of clicks is not locked: it is empty, and the bar says so.
+void BindCommandCharge(const Simulation& sim, CommandRowView& row,
+                       const std::string& key, const std::string& tier) {
+  row.chargeKey = key;
+  row.tier = tier;
+  row.charged = true;
+  row.chargePercent = ChargePercent(sim, key, tier);
+  row.spent = row.chargePercent <= 0.0;
+  if (row.spent) {
     row.enabled = false;
     row.live = false;
+    row.title = TierLabel(sim, tier) + " button: out of clicks.";
   }
 }
 
-std::string ConversationCooldownKey(const std::string& crewId) {
-  return "cd|crew-conversation|" + crewId;
+std::string ConversationChargeKey(const std::string& crewId) {
+  return "ch|crew-conversation|" + crewId;
 }
 
 CommandRowView BuildConversationRow(const Simulation& sim, const std::string& crewId) {
@@ -380,19 +436,19 @@ CommandRowView BuildConversationRow(const Simulation& sim, const std::string& cr
   row.cost = row.displayCost = "1 click";
   row.actionCost = true;
   row.enabled = crew->health > 0 && sim.State().gameOver.empty() &&
-                sim.FindOngoing("doc-" + crewId) == nullptr;
+                sim.FindOngoing("doc-" + crewId) == nullptr && crew->morale < 100.0;
   row.live = row.enabled;
   if (!row.enabled && sim.FindOngoing("doc-" + crewId) != nullptr) {
     row.title = "Crew member is in the medical bay.";
   }
-  BindCommandCooldown(sim, row, ConversationCooldownKey(crewId), "routine");
+  BindCommandCharge(sim, row, ConversationChargeKey(crewId), "routine");
   return row;
 }
 
 bool PressConversation(Simulation& sim, const std::string& crewId) {
   const CommandRowView row = BuildConversationRow(sim, crewId);
   if (!row.enabled) { return false; }
-  return CommitActionButton(sim, row.cooldownKey, row.category,
+  return CommitActionButton(sim, row.chargeKey, row.tier,
                             [&]() { return sim.TalkToCrew(crewId); });
 }
 
@@ -615,8 +671,8 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       return screen;
     }
     case ScreenKind::Station: {
-      // Three columns walked in one direction. Nothing here binds a cooldown:
-      // the station's own state is what stops a second press.
+      // Three columns walked in one direction. Choosing a card and picking an
+      // item are free; the commit rows are charged like every other button.
       StationSelection picked;
       if (station != nullptr) { picked = *station; }
       const StationScreenModel model = BuildStationScreen(sim, tab.id);
@@ -723,6 +779,11 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
             view.enabled = !offer.accepted && offer.fits;
             view.live = view.enabled;
             if (!offer.fits) { view.title = offer.note + " " + offer.blocked; }
+            BindCommandCharge(sim, view,
+                              ButtonChargeKey(sim, std::string("press:station:") +
+                                  "trade-accept:" + offer.mode + ":" + offer.to +
+                                  (offer.good.empty() ? std::string() : ":" + offer.good) + ":"),
+                              ButtonChargeTier(view.label));
             offers.push_back(view);
             offerIds.push_back("trade-accept:" + offer.mode + ":" + offer.to +
                                (offer.good.empty() ? std::string() : ":" + offer.good));
@@ -764,6 +825,11 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         view.confirm = item->confirm;
         view.enabled = item->enabled;
         view.live = item->enabled;
+        // A shiplets-only row is paid in money, not in click time.
+        if (!item->free) {
+          BindCommandCharge(sim, view, ButtonChargeKey(sim, "press:station:" + item->id + ":"),
+                            ButtonChargeTier(view.label));
+        }
         commitRows.push_back(view);
         commitIds.push_back(item->id);
       }
@@ -891,8 +957,8 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         view.enabled = row.enabled;
         view.live = row.enabled;
         view.confirm = row.confirm;
-        BindCommandCooldown(sim, view, ActionCooldownKey(sim, "press:stores:" + row.id + ":"),
-                            ActionCooldownCategory(row.id + " "));
+        BindCommandCharge(sim, view, ButtonChargeKey(sim, "press:stores:" + row.id + ":"),
+                            ButtonChargeTier(row.id + " "));
         rows.push_back(view);
         ids.push_back(row.id);
       }
@@ -917,7 +983,7 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         view.enabled = row.enabled;
         view.live = row.enabled;
         view.confirm = row.confirm;
-        BindCommandCooldown(sim, view, ActionCooldownKey(sim, "press:room:" + row.id + ":"),
+        BindCommandCharge(sim, view, ButtonChargeKey(sim, "press:room:" + row.id + ":"),
                             RoomActionCategory(row.id));
         rows.push_back(view);
         ids.push_back(row.id);
@@ -949,8 +1015,8 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         view.enabled = row.enabled;
         view.live = row.enabled;
         view.confirm = row.confirm;
-        BindCommandCooldown(sim, view, ActionCooldownKey(sim, "press:simcore:" + row.id + ":"),
-                            ActionCooldownCategory(row.id + " "));
+        BindCommandCharge(sim, view, ButtonChargeKey(sim, "press:simcore:" + row.id + ":"),
+                            ButtonChargeTier(row.id + " "));
         rows.push_back(view);
         ids.push_back(row.id);
       }
@@ -1025,8 +1091,8 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         view.enabled = row.enabled;
         view.live = row.enabled;
         view.confirm = row.confirm;
-        BindCommandCooldown(sim, view, ActionCooldownKey(sim, "press:awards:" + row.id + ":"),
-                            ActionCooldownCategory(row.id + " "));
+        BindCommandCharge(sim, view, ButtonChargeKey(sim, "press:awards:" + row.id + ":"),
+                            ButtonChargeTier(row.id + " "));
         rows.push_back(view);
         ids.push_back(row.id);
       }
@@ -1049,7 +1115,7 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         view.enabled = row.enabled;
         view.live = row.enabled;
         view.confirm = row.confirm;
-        BindCommandCooldown(sim, view, ActionCooldownKey(sim, "press:event:" + row.id + ":"),
+        BindCommandCharge(sim, view, ButtonChargeKey(sim, "press:event:" + row.id + ":"),
                             "systems");
         rows.push_back(view);
         ids.push_back(row.id);
@@ -1133,7 +1199,7 @@ bool PressSystemAction(Simulation& sim, const std::string& statId) {
   }
   const CommandRowView row =
       BuildCommandRow(sim, label, true, std::string(), "systems", 0);
-  return CommitActionButton(sim, row.cooldownKey, row.category,
+  return CommitActionButton(sim, row.chargeKey, row.tier,
                             [&sim, &statId]() { return sim.ServiceSystem(statId); });
 }
 

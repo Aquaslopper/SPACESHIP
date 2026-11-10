@@ -10,7 +10,7 @@
 //    buildProgressButton  the three-state button (idle / running / done)
 //
 //  None of that is drawn here. This file produces the data the renderer walks,
-//  which is why the frame, the cooldown locks and the button's exact strings can
+//  which is why the frame, the button charges and the button's exact strings can
 //  all be checked without a window.
 // ============================================================================
 #pragma once
@@ -28,27 +28,38 @@
 namespace ship {
 
 // ---------------------------------------------------------------------------
-//  Action cooldowns (Section D-5). A lock belongs to one control, is counted in
-//  actions, and is scoped to the tab that owns it.
+//  Button charges (Section 9). A charge belongs to one control, is counted in
+//  clicks, and is scoped to the tab that owns it. A control holds `volume`
+//  presses; a press spends one of them and returns one to every other control.
 // ---------------------------------------------------------------------------
-std::string ActionCooldownKey(const Simulation& sim, const std::string& id);
-std::string ActionCooldownCategory(const std::string& subject,
-                                   const std::string& preferred = std::string());
-double CooldownRemaining(const Simulation& sim, const std::string& key);
+std::string ButtonChargeKey(const Simulation& sim, const std::string& id);
+std::string ButtonChargeTier(const std::string& subject,
+                             const std::string& preferred = std::string());
 
-// The rule's own numbers, so a test can hold a lock to them instead of to a
-// literal: routine 5, systems 10, space 15, critical 20 actions.
-double RuleActions(const Simulation& sim, const std::string& category);
-std::string RuleLabel(const Simulation& sim, const std::string& category);
+// A control the player has not pressed yet is full, so the bar reads 100 and an
+// absent entry means "untouched", not "empty".
+double ChargeLeft(const Simulation& sim, const std::string& key, const std::string& tier);
+double ChargeVolume(const Simulation& sim, const std::string& key, const std::string& tier);
+double ChargePercent(const Simulation& sim, const std::string& key, const std::string& tier);
+
+// The rule's own numbers, so a test can hold a charge to them instead of to a
+// literal: routine 8, systems 4, space 2, critical 2 clicks.
+double TierVolume(const Simulation& sim, const std::string& tier);
+std::string TierLabel(const Simulation& sim, const std::string& tier);
 
 // isActionCost(): undefined/null counts as an action cost, otherwise the cost
 // string has to say "action" or "actions".
 bool IsActionCost(const std::string& cost, bool hasCost = true);
 
-// commitActionButton(): refuse while locked, run the callback, and start the
-// lock only when the callback really spent an action.
+// pressWithoutCharge(): the same press for a control that keeps its own mechanic
+// or is paid in shiplets. It spends nothing itself but still winds the rest of
+// the ship back up, because the player did click.
+bool PressWithoutCharge(Simulation& sim, const std::function<bool()>& action);
+
+// commitActionButton(): run the callback while the control still holds a click,
+// and charge it only when the callback really spent an action.
 bool CommitActionButton(Simulation& sim, const std::string& key,
-                        const std::string& category,
+                        const std::string& tier,
                         const std::function<bool()>& action);
 
 // pressProgressButton(): what a click on a progress button does, in the
@@ -63,7 +74,7 @@ bool PressProgressButton(Simulation& sim, const std::string& taskId);
 enum class ButtonState {
   Idle,      // click to commit
   Off,       // nothing to commit, and the button says why
-  Cooldown,  // locked by the action clock
+  Empty,     // out of clicks: the green bar is at zero
   Running,   // a task is under way; inert
   Done,      // finished, waiting to be acknowledged
 };
@@ -74,8 +85,8 @@ struct ProgressButton {
   std::string doneLabel = "Complete";
   std::string text;
   std::string title;
-  std::string cooldownKey;
-  std::string category;
+  std::string chargeKey;
+  std::string tier;
   ButtonState state = ButtonState::Idle;
   double fillPercent = 0.0;
   bool enabled = true;
@@ -88,29 +99,30 @@ bool PressProgressButton(Simulation& sim, const ProgressButton& button);
 ProgressButton BuildProgressButton(const Simulation& sim, const std::string& taskId,
                                    const std::string& idleLabel, bool enabled,
                                    const std::string& doneLabel = "Complete",
-                                   const std::string& category = std::string());
+                                   const std::string& tier = std::string());
 
 // ongoingPercent(): floor of the work done, as a whole percent.
 double OngoingPercent(const Task& task);
 
 // ---------------------------------------------------------------------------
-//  A command row: a label, a cost badge, and its lock.
+//  A command row: a label, a cost badge, and its charge.
 // ---------------------------------------------------------------------------
 struct CommandRowView {
   std::string label;
   std::string cost;         // what the caller asked for
-  std::string displayCost;  // "1 click", "free", or "COOLDOWN 7"
+  std::string displayCost;  // "1 click" or "free"
   std::string title;        // the hover text
-  std::string cooldownKey;
-  std::string category;
+  std::string chargeKey;
+  std::string tier;
   bool enabled = false;
   bool live = false;        // a `live()` action, wired to something
   std::string confirm;      // asked first when the reader keeps confirmations on
   bool actionCost = true;
   bool reading = false;     // non-interactive text interleaved with command rows
   bool selected = false;    // the station's open card / picked item: marked, not pressed
-  bool coolingDown = false;
-  double remaining = 0.0;
+  bool charged = false;     // this row is paid in clicks, not in shiplets
+  bool spent = false;       // no clicks left: the green bar is empty
+  double chargePercent = 100.0;  // the green bar: the clicks this control still holds
   bool plain = false;     // a list line, not a button: no box, no border
   bool hideCost = false;  // no cost badge at all: the button is just a button
 };
@@ -119,7 +131,7 @@ struct CommandRowView {
 // station, the stores, the fitted rooms, the Simulacron, the logbook and the
 // incident reports all speak this shape.
 // Conversation locks are per crew member, shared across quarters and records.
-std::string ConversationCooldownKey(const std::string& crewId);
+std::string ConversationChargeKey(const std::string& crewId);
 CommandRowView BuildConversationRow(const Simulation& sim, const std::string& crewId);
 bool PressConversation(Simulation& sim, const std::string& crewId);
 
@@ -141,7 +153,7 @@ CommandRowView BuildCommandRow(const Simulation& sim, const std::string& label,
                                const std::string& category, int occurrence);
 
 // Use the dispatcher's persistent key, not a second label-derived lock.
-void BindCommandCooldown(const Simulation& sim, CommandRowView& row,
+void BindCommandCharge(const Simulation& sim, CommandRowView& row,
                          const std::string& key, const std::string& category);
 
 // ---------------------------------------------------------------------------
