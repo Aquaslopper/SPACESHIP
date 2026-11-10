@@ -148,8 +148,10 @@ bool MentionsClick(const std::string& text) {
 }
 
 bool TakesNoCooldown(const std::string& key) {
-  return key.find("progress:scan") != std::string::npos
-      || key.find("progress:cook") != std::string::npos;
+  // The bar is a battery, not a padlock. A lock with a click-count is the
+  // inversion of Section 9.
+  (void)key;
+  return true;
 }
 
 bool IsActionCost(const std::string& cost, bool hasCost) {
@@ -208,19 +210,11 @@ ProgressButton BuildProgressButton(const Simulation& sim, const std::string& tas
       ActionCooldownCategory(taskId + " " + idleLabel, category);
 
   const Task* task = sim.FindOngoing(taskId);
-  const double remaining = CooldownRemaining(sim, button.cooldownKey);
 
   if (task == nullptr) {
     button.fillPercent = 0.0;
-    if (remaining > 0.0) {
-      button.state = ButtonState::Cooldown;
-      button.text = "Cooldown: " + Num(remaining) + " clicks";
-      button.title = RuleLabel(sim, sim.State().actionCooldowns.at(button.cooldownKey).category) +
-                     " cooldown: " + Num(remaining) + " Loading ";
-    } else {
-      button.state = enabled ? ButtonState::Idle : ButtonState::Off;
-      button.text = idleLabel;
-    }
+    button.state = enabled ? ButtonState::Idle : ButtonState::Off;
+    button.text = idleLabel;
     return button;
   }
 
@@ -264,12 +258,14 @@ bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
   // The machine's button is a click of the clock gated by its own green bar.
   if (taskId == "engine-click") { return sim.EngineClick(); }
   const Task* task = sim.FindOngoing(taskId);
-  if (task != nullptr && task->state == "running") { return false; }  // inert
   if (task != nullptr && task->state == "done") { return sim.Acknowledge(taskId); }
+  if (task != nullptr && task->state == "running") {
+    if (button.inert) { return false; }
+    sim.PerformAction(task->label);
+    return true;
+  }
 
-  if (button.state == ButtonState::Cooldown) { return false; }
   if (button.state == ButtonState::Off) { return false; }
-  if (button.state == ButtonState::Running) { return false; }
 
   // One task id per control, and the control's category is the one the button
   // reported, so a lock and the thing that caused it cannot disagree.
@@ -354,16 +350,11 @@ void BindCommandCooldown(const Simulation& sim, CommandRowView& row,
                          const std::string& key, const std::string& category) {
   row.cooldownKey = key;
   row.category = category;
-  row.remaining = CooldownRemaining(sim, key);
-  row.coolingDown = row.remaining > 0.0;
-  if (row.coolingDown) {
-    row.displayCost = "COOLDOWN " + Num(row.remaining);
-    row.title = RuleLabel(sim, sim.State().actionCooldowns.at(key).category) +
-        " cooldown: " + Num(row.remaining) +
-        " more clicks. Other committed clicks advance it; waiting does not.";
-    row.enabled = false;
-    row.live = false;
-  }
+  row.remaining = 0.0;
+  row.coolingDown = false;
+  (void)sim;
+  (void)key;
+  (void)category;
 }
 
 std::string ConversationCooldownKey(const std::string& crewId) {
