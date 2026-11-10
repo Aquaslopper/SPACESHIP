@@ -1065,9 +1065,29 @@ std::string StationActionCategory(const Simulation& sim, const std::string& acti
   return ButtonChargeTier(action);
 }
 
+namespace {
+
+const StationRow* FindStationRowById(const StationScreenModel& model, const std::string& id) {
+  for (const StationColumn& section : model.columns) {
+    for (const StationRow& row : section.rows) {
+      if (row.id == id) { return &row; }
+    }
+  }
+  return nullptr;
+}
+
+}  // namespace
+
 bool PressStationAction(Simulation& sim, const std::string& action, const std::string& arg) {
-  // The commit rows hold clicks like every other button. Opening a card and
-  // picking an item are free, and a free pick runs no action, so it spends none.
+  // The shop, the shipyard and a hire are paid in shiplets: money is their whole
+  // gate, so they hold no clicks and start no green. A trade confirmation and
+  // every other commit row is one click of the clock, like the rest of the ship.
+  const StationScreenModel model = BuildStationScreen(sim, sim.Map().here);
+  const StationRow* row = FindStationRowById(model, action);
+  if (row != nullptr && row->free) {
+    // Bought with shiplets: no clicks are spent, but the click still counts.
+    return PressWithoutCharge(sim, [&]() { return PressStationActionRaw(sim, action, arg); });
+  }
   return CommitActionButton(sim, ButtonChargeKey(sim, "press:station:" + action + ":" + arg + ":"),
                             StationActionCategory(sim, action),
                             [&]() { return PressStationActionRaw(sim, action, arg); });

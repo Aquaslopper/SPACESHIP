@@ -51,6 +51,11 @@ std::string TierLabel(const Simulation& sim, const std::string& tier);
 // string has to say "action" or "actions".
 bool IsActionCost(const std::string& cost, bool hasCost = true);
 
+// pressWithoutCharge(): the same press for a control that keeps its own mechanic
+// or is paid in shiplets. It spends nothing itself but still winds the rest of
+// the ship back up, because the player did click.
+bool PressWithoutCharge(Simulation& sim, const std::function<bool()>& action);
+
 // commitActionButton(): run the callback while the control still holds a click,
 // and charge it only when the callback really spent an action.
 bool CommitActionButton(Simulation& sim, const std::string& key,
@@ -115,6 +120,7 @@ struct CommandRowView {
   bool actionCost = true;
   bool reading = false;     // non-interactive text interleaved with command rows
   bool selected = false;    // the station's open card / picked item: marked, not pressed
+  bool charged = false;     // this row is paid in clicks, not in shiplets
   bool spent = false;       // no clicks left: the green bar is empty
   double chargePercent = 100.0;  // the green bar: the clicks this control still holds
   bool plain = false;     // a list line, not a button: no box, no border

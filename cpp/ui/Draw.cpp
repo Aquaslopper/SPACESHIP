@@ -1987,7 +1987,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
              ToRay(row.enabled ? p.ink : p.muted));
     Text((row.displayCost + "  ").c_str(), static_cast<int>(rowBox.x),
              static_cast<int>(rowBox.y + 4.0f), TypePx(9) , ToRay(p.coffee));
-    if (row.live) {
+    if (row.charged && row.live) {
       const float barW = rowBox.w * static_cast<float>(std::clamp(row.chargePercent, 0.0, 100.0)) / 100.0f;
       DrawRectangle(static_cast<int>(rowBox.x), static_cast<int>(rowBox.Bottom() - 2.0f),
                     static_cast<int>(barW), 2, ::Color{126, 198, 63, 255});
@@ -2038,7 +2038,7 @@ void ShellView::PaintCrewRecord(const Simulation& sim) {
     const Area box{left, y, right - left, lines.size() * line + 12.0f};
     DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.w),
                   static_cast<int>(box.h), ToRay(row.enabled ? p.panel : p.panel3));
-    PaintProgressFill(box, row.chargePercent);
+    if (row.charged) { PaintProgressFill(box, row.chargePercent); }
     DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.w),
                        static_cast<int>(box.h), ToRay(p.borderDark));
     float textY = box.y + 6.0f;
@@ -2247,7 +2247,7 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
     const Area talk{hall.x + 8, y, hall.w - 16, lines.size() * line + 12};
     DrawRectangle(static_cast<int>(talk.x), static_cast<int>(talk.y), static_cast<int>(talk.w),
                   static_cast<int>(talk.h), ToRay(row.enabled ? p.panel : p.panel3));
-    PaintProgressFill(talk, row.chargePercent);
+    if (row.charged) { PaintProgressFill(talk, row.chargePercent); }
     DrawRectangleLines(static_cast<int>(talk.x), static_cast<int>(talk.y), static_cast<int>(talk.w), static_cast<int>(talk.h), ToRay(p.borderDark));
     float textY = talk.y + 6;
     for (const auto& text : lines) {
@@ -3106,9 +3106,9 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
                       ToRay(row.selected ? p.panel3
                                          : (row.enabled ? (grouped ? p.control : p.panel2)
                                                         : p.panel3)));
-        // Every pressable row carries its clicks as green, the way a progress
-        // button does: the bar is the only readout, and it never prints a number.
-        PaintProgressFill(box, row.chargePercent);
+        // Every pressable row paid in clicks carries them as green, the way a
+        // progress button does. The shop is paid in shiplets and shows no bar.
+        if (row.charged) { PaintProgressFill(box, row.chargePercent); }
         DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
                            static_cast<int>(box.w), static_cast<int>(box.h),
                            ToRay(row.selected ? p.coffeeLight

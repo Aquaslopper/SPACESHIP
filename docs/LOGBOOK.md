@@ -93,3 +93,17 @@ You must append a compressed summary of **every single reply and action you take
 - Persistence/trace/CLI: save and trace carry `charges` instead of `actionCooldowns`; console PROGRESS prints tier, fill, state, left, text with state "empty" instead of "cooldown". Old saves load (unknown keys are ignored).
 - Checks run: g++ -std=c++17 -fsyntax-only on every cpp/ unit (all clean) and a headless link of the console harness (raylib audio excluded); scripted run shows engine 100-75-50-25-0, a fifth press refused, and one cook press returning engine to 25% while cook drops to 75%.
 - Not verified: no CMake in this environment, so the client/GUI was not built and no screenshot was taken; the draw recorder (tools/check-draw.sh) could not run; parity against the reference is now deliberately broken because the reference still carries the cooldown.
+
+### Entry #009
+- **Timestamp:** 2026-11-10 18:42 UTC
+- Owner clarified the pacing: tiny jobs (talking, confirming a trade) are one click 100-0; small jobs (scan, filling the fuel) are two clicks 100-50-0; real work (maintenance, the drive) is four clicks 100-75-50-25-0.
+- Owner clarified money is its own gate: the shop, the shipyard and a hire are paid in shiplets and are not click time at all.
+- Owner clarified that the air plant and the galley already carry their own mechanic and must not be given a charge.
+- Also confirmed: the crew does the work on its own; the ship runs while maintenance, food and air are handled; a crew action is not a player click.
+- volume table set in assets/data/content.json: routine 1, systems 4, space 2, critical 2; "fuel" moved into the two-click classification so filling the tanks is 100-50-0.
+- Exempt controls: KeepsOwnMechanic() covers every o2 task and cook; they run with no charge key and no green of their own.
+- Added PressWithoutCharge(): an exempt press spends nothing but still reaches the tick, so the other buttons get their step back. Used for o2/cook and for shiplets-only station rows.
+- Station split made explicit: StationRow::free rows (shop, shipyard, hire) hold no charge and draw no bar; trade confirmations and every other commit row are charged (routine = one click).
+- CommandRowView gained `charged`, so Draw paints the green only where clicks are actually spent; shiplets rows stay plain.
+- Checks run: g++ -fsyntax-only on every cpp/ unit (clean); headless console scripted - engine 4,3,2,1,0 and refused after, a cook press (own mechanic) puts the engine back to 1 of 4, scan opens at 2 of 2, cook opens with no charge.
+- Not verified: no CMake in this environment, so the client was not built and no screen was seen; the visual result is still unverified until the owner builds locally.

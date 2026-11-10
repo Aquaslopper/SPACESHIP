@@ -94,7 +94,7 @@ std::string ButtonChargeTier(const std::string& subject,
   }
   if (ContainsAny(s, {"navigation", "travel", "jump", "course", "dock", "undock",
                       "watch", "crossing", "salvage", "scan", "route", "space",
-                      "traffic report"})) {
+                      "fuel", "traffic report"})) {
     return "space";
   }
   const bool startsBuy = s.compare(0, 4, "buy ") == 0;
@@ -124,6 +124,16 @@ double TierVolume(const Simulation& sim, const std::string& tier) {
 std::string TierLabel(const Simulation& sim, const std::string& tier) {
   auto it = sim.World().rules.charges.find(tier);
   return it == sim.World().rules.charges.end() ? std::string("Action") : it->second.label;
+}
+
+// A press that is not paid from a charge still has to reach the tick, so it is
+// marked with a key no control owns: everything else gets its step back.
+const char* UnmeteredKey() { return "\x01unmetered"; }
+
+// The air plant and the galley already run their own clocks; a charge on top of
+// them would be a second mechanic on the same button.
+bool KeepsOwnMechanic(const std::string& taskId) {
+  return taskId.compare(0, 2, "o2") == 0 || taskId == "cook";
 }
 
 // An entry that is not in the state yet has never been pressed: it is full.
@@ -164,6 +174,19 @@ bool MentionsClick(const std::string& text) {
 bool IsActionCost(const std::string& cost, bool hasCost) {
   if (!hasCost || cost.empty()) { return true; }
   return MentionsAction(cost) || MentionsClick(cost);
+}
+
+bool PressWithoutCharge(Simulation& sim, const std::function<bool()>& action) {
+  sim.SetPressedButton(UnmeteredKey());
+  bool result = false;
+  try {
+    result = action();
+  } catch (...) {
+    sim.ClearPressedButton(UnmeteredKey());
+    throw;
+  }
+  sim.ClearPressedButton(UnmeteredKey());
+  return result;
 }
 
 bool CommitActionButton(Simulation& sim, const std::string& key,
@@ -212,13 +235,20 @@ ProgressButton BuildProgressButton(const Simulation& sim, const std::string& tas
   button.enabled = enabled;
   button.chargeKey = ButtonChargeKey(sim, "progress:" + taskId);
   button.tier = ButtonChargeTier(taskId + " " + idleLabel, tier);
+  const bool charged = !KeepsOwnMechanic(taskId);
+  if (!charged) { button.chargeKey.clear(); }
 
-  const double charge = ChargePercent(sim, button.chargeKey, button.tier);
+  const double charge = charged ? ChargePercent(sim, button.chargeKey, button.tier) : 0.0;
   const Task* task = sim.FindOngoing(taskId);
 
   if (task == nullptr) {
     // No process running: the bar is the clicks this control still holds.
     button.fillPercent = charge;
+    if (!charged) {
+      button.state = enabled ? ButtonState::Idle : ButtonState::Off;
+      button.text = idleLabel;
+      return button;
+    }
     if (charge <= 0.0) {
       button.state = ButtonState::Empty;
       button.text = idleLabel;
@@ -280,6 +310,19 @@ bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
   if (button.state == ButtonState::Empty) { return false; }
   if (button.state == ButtonState::Off) { return false; }
   if (button.state == ButtonState::Running) { return false; }
+
+  // A control that keeps its own mechanic is run without a charge, but its
+  // press is still a click that winds the other buttons back up.
+  if (button.chargeKey.empty()) {
+    return PressWithoutCharge(sim, [&sim, &taskId]() {
+      if (taskId.compare(0, 3, "o2s") == 0 && taskId.size() == 4) {
+        return sim.StartCanisterInstall(taskId[3] - '0');
+      }
+      if (taskId == "o2-run") { return sim.StartFilterBank(); }
+      if (taskId == "cook") { return sim.StartCookingSelf(); }
+      return false;
+    });
+  }
 
   // One task id per control, and the control's own charge key and tier, so the
   // bar the player reads and the clicks the gate spends cannot disagree.
@@ -364,6 +407,7 @@ void BindCommandCharge(const Simulation& sim, CommandRowView& row,
                        const std::string& key, const std::string& tier) {
   row.chargeKey = key;
   row.tier = tier;
+  row.charged = true;
   row.chargePercent = ChargePercent(sim, key, tier);
   row.spent = row.chargePercent <= 0.0;
   if (row.spent) {
@@ -776,8 +820,11 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         view.confirm = item->confirm;
         view.enabled = item->enabled;
         view.live = item->enabled;
-        BindCommandCharge(sim, view, ButtonChargeKey(sim, "press:station:" + item->id + ":"),
-                          ButtonChargeTier(view.label));
+        // A shiplets-only row is paid in money, not in click time.
+        if (!item->free) {
+          BindCommandCharge(sim, view, ButtonChargeKey(sim, "press:station:" + item->id + ":"),
+                            ButtonChargeTier(view.label));
+        }
         commitRows.push_back(view);
         commitIds.push_back(item->id);
       }
