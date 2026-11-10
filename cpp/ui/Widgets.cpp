@@ -148,10 +148,9 @@ bool MentionsClick(const std::string& text) {
 }
 
 bool TakesNoCooldown(const std::string& key) {
-  // The bar is a battery, not a padlock. A lock with a click-count is the
-  // inversion of Section 9.
-  (void)key;
-  return true;
+  // Talk and buy have no bar. Progress buttons keep the click-clock as a
+  // fill, not as a numbered lock.
+  return key.find("progress:") == std::string::npos;
 }
 
 bool IsActionCost(const std::string& cost, bool hasCost) {
@@ -210,11 +209,20 @@ ProgressButton BuildProgressButton(const Simulation& sim, const std::string& tas
       ActionCooldownCategory(taskId + " " + idleLabel, category);
 
   const Task* task = sim.FindOngoing(taskId);
+  const double remaining = CooldownRemaining(sim, button.cooldownKey);
+  const double span = std::max(1.0, RuleActions(sim, button.category));
 
   if (task == nullptr) {
-    button.fillPercent = 0.0;
-    button.state = enabled ? ButtonState::Idle : ButtonState::Off;
     button.text = idleLabel;
+    if (remaining > 0.0) {
+      // Charging: other clicks fill the green. No number, no terracotta lock.
+      button.fillPercent = std::floor((1.0 - remaining / span) * 100.0);
+      button.state = ButtonState::Idle;
+      button.enabled = false;
+    } else {
+      button.fillPercent = enabled ? 100.0 : 0.0;
+      button.state = enabled ? ButtonState::Idle : ButtonState::Off;
+    }
     return button;
   }
 
@@ -227,11 +235,12 @@ ProgressButton BuildProgressButton(const Simulation& sim, const std::string& tas
   }
 
   button.state = ButtonState::Running;
-  button.fillPercent = OngoingPercent(*task);
+  // The job drains as clicks happen anywhere. This button does not spam the clock.
+  button.fillPercent = (task->total <= 0.0)
+                           ? 0.0
+                           : std::floor((task->left / task->total) * 100.0);
   button.text = task->label;
-  // The bar stays a button. Any click on it is a click of the clock; other
-  // bars drain from that same click. Inert was the lock by another name.
-  button.inert = false;
+  button.inert = true;
   return button;
 }
 
@@ -257,13 +266,11 @@ bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
   if (taskId == "engine-click") { return sim.EngineClick(); }
   const Task* task = sim.FindOngoing(taskId);
   if (task != nullptr && task->state == "done") { return sim.Acknowledge(taskId); }
-  if (task != nullptr && task->state == "running") {
-    if (button.inert) { return false; }
-    sim.PerformAction(task->label);
-    return true;
-  }
-
+  if (task != nullptr && task->state == "running") { return false; }
   if (button.state == ButtonState::Off) { return false; }
+  if (CooldownRemaining(sim, ActionCooldownKey(sim, "progress:" + taskId)) > 0.0) {
+    return false;
+  }
 
   // One task id per control, and the control's category is the one the button
   // reported, so a lock and the thing that caused it cannot disagree.
