@@ -34,7 +34,7 @@
 //    saveslot <1|2|3> | loadslot <1|2|3>   the HTA's own three slots
 //    crew-set <id> <numeric field> <value>   survival boundary test setup
 //    survival-set <field> <value>            survival boundary test setup
-//    active <tab>         select cooldown scope (UI test setup)
+//    active <tab>         select the tab whose buttons are inspected
 //    progress[-click] <id> <0|1 enabled> <idle label>
 //                         inspect/click the real progress-button model
 //    trace                print the canonical snapshot
@@ -183,14 +183,13 @@ int main(int argc, char** argv) {
           case ship::ButtonState::Off: state = "off"; break;
           case ship::ButtonState::Running: state = "run"; break;
           case ship::ButtonState::Done: state = "done"; break;
-          case ship::ButtonState::Cooldown: state = "cooldown"; break;
+          case ship::ButtonState::Empty: state = "empty"; break;
           case ship::ButtonState::Idle: break;
         }
-        const auto cd = simulation.State().actionCooldowns.find(button.cooldownKey);
-        const double remaining = cd == simulation.State().actionCooldowns.end() ? 0 : cd->second.remaining;
-        std::printf("PROGRESS %s %s %s %s %s %s\n", button.taskId.c_str(), button.category.c_str(),
+        const double left = ship::ChargeLeft(simulation, button.chargeKey, button.tier);
+        std::printf("PROGRESS %s %s %s %s %s %s\n", button.taskId.c_str(), button.tier.c_str(),
             ship::js::NumToString(button.fillPercent).c_str(), state,
-            ship::js::NumToString(remaining).c_str(), button.text.c_str());
+            ship::js::NumToString(left).c_str(), button.text.c_str());
       }
     } else if (command == "action") {
       std::string detail = RestOfLine(line, "action");

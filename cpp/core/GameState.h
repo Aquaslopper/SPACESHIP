@@ -245,10 +245,14 @@ struct Options {
   bool fullscreen = false;
 };
 
-// A cooldown belongs to one control and is counted in actions, never seconds.
-struct Cooldown {
-  std::string category;
-  double remaining = 0;
+// A charge belongs to one control and is counted in clicks, never seconds.
+// `left` is how many presses the control still holds; `volume` is its full
+// capacity. Pressing a control spends one of its own steps and returns one step
+// to every other control, so the total green in the room is the click time left.
+struct Charge {
+  std::string tier;
+  double left = 0;
+  double volume = 0;
 };
 
 struct FeedLine {
@@ -449,7 +453,7 @@ struct GameState {
   // Transient presentation request: never serialized, never a world action.
   std::string tabRevealKey;
   double popups = 0;
-  std::map<std::string, Cooldown> actionCooldowns;
+  std::map<std::string, Charge> charges;
 };
 
 }  // namespace ship

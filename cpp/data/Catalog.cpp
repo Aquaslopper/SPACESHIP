@@ -417,12 +417,12 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
   for (const Json& kind : Field(content, "taskTypes", "content.json")) {
     catalog.taskTypes.push_back(Text(kind, "type", "content.json/taskTypes"));
   }
-  for (auto it = Field(content, "cooldownRules", "content.json").begin();
-       it != Field(content, "cooldownRules", "content.json").end(); ++it) {
-    CooldownRule rule;
-    rule.actions = Number(it.value(), "actions", "cooldownRules");
-    rule.label = Text(it.value(), "label", "cooldownRules");
-    catalog.rules.cooldowns[it.key()] = rule;
+  for (auto it = Field(content, "chargeRules", "content.json").begin();
+       it != Field(content, "chargeRules", "content.json").end(); ++it) {
+    ChargeRule rule;
+    rule.volume = Number(it.value(), "volume", "chargeRules");
+    rule.label = Text(it.value(), "label", "chargeRules");
+    catalog.rules.charges[it.key()] = rule;
   }
   for (const Json& entry : Field(content, "wiki", "content.json")) {
     WikiEntry wiki;

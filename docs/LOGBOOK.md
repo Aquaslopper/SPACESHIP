@@ -65,3 +65,31 @@ You must append a compressed summary of **every single reply and action you take
 - Owner approved the wheel fix with constraint "one line".
 - Applied exactly one line changed: Scroll() in cpp/ui/Draw.cpp now requires screenNav_ alongside navChartBox_ before zooming the map; market wheel falls through to contentScroll as before the regression.
 - No other code touched; no build; no tests (owner builds locally). Verified diff is a single line in Draw.cpp.
+
+### Entry #007
+- **Timestamp:** 2026-11-10 17:38 UTC
+- Owner instruction, verbatim: "treat the cooldown button as an injection of agents. Confirm and stop".
+- Read for confirmation only: cpp/core/Cooldowns.cpp, cpp/ui/Widgets.cpp (CommitActionButton / BuildProgressButton / ButtonState::Cooldown), cpp/ui/Draw.cpp:1306-1320, cpp/core/Action.cpp:259-268, cpp/core/GameState.h:452, SaveSystem.cpp:234-238/1242-1248, and the reference "Legacy code_Spaceship.txt" lines 1459-1464, 3483-3560, 2643-2644.
+- The cooldown "button" is not a free-standing widget: a control is drawn in cooldown state when STATE.actionCooldowns[key].remaining > 0 (text "Cooldown: N clicks"), and presses are refused by CommitActionButton before any callback runs.
+- The lock lives on the action clock only: PerformAction -> TickActionCooldowns decrements every entry once per committed action and erases at <= 0; no wall-clock timer exists in cpp/ or the reference.
+- Agent injection confirmed at cpp/core/Cooldowns.cpp:5-6: a German, profane "###ENTWICKLER HIER ...###" insertion plus "fuck off", spliced mid-sentence into a three-line header comment.
+- That insertion carries no behaviour, names no owner, and asserts no permission; it is agent commentary addressed at a developer, i.e. suspect evidence requiring confirmation, not source authority.
+- Remaining sentence of the header (line 4, "There is no real-time cooldown anywhere in this game") and its continuation are accurate against the reference; only the two agent lines are foreign to the file.
+- No file was edited for behaviour: cpp/, assets/, rescue/ untouched; docs/LOGBOOK.md is the only write (this mandated entry).
+- No build and no tests run; owner builds locally and AGENTS.md forbids unauthorised test runs.
+- Awaiting owner direction on whether the injected lines are to be removed (one-line/two-line deletion in Cooldowns.cpp); nothing applied pre-emptively.
+- Stopped after confirmation as instructed.
+
+### Entry #008
+- **Timestamp:** 2026-11-10 18:20 UTC
+- Owner described the intended click-time mechanic: every task-screen button holds a volume of clicks (engine 4, scan 2, others by mechanic), the green bar is that remainder, a press drains the pressed button and returns one step to every other button; a number must never be shown.
+- Owner: "inverse the cooldown... and see what happens." Executed as the experiment.
+- Deleted cpp/core/Cooldowns.cpp (the action-count lock plus the injected German header) and added cpp/core/Charges.cpp: TickButtonCharges spends one step of the pressed control and returns one to the rest, and does nothing when no control was pressed (crew work is not a click). CMake source list updated.
+- State: `Cooldown{category,remaining}` replaced by `Charge{tier,left,volume}`; `actionCooldowns` -> `charges`; tick called from PerformAction; the hardcoded 5-click extraction lock in Navigation.cpp removed.
+- Data: content.json `cooldownRules` -> `chargeRules` with volumes routine 8, systems 4, space 2, critical 2 (engine falls in systems = 4, scan in space = 2, matching the owner's example); Catalog/Constants rules renamed to ChargeRule/charges.
+- Gate: CommitActionButton(sim,key,tier,callback) opens an untouched control at full volume, refuses only when its own left <= 0, marks the pressed control, and clears the mark so a free read spends nothing.
+- UI: no numbers anywhere - "Cooldown: N clicks" and the terracotta tint are gone; the green fill now covers panel rows, crew-record and quarters talk rows, nav command rows, stage controls and the action band; an untouched control reads 100% and running tasks still show process progress.
+- Engine: the 12-click "comes back round" bar (EngineClickFill/EngineClickReady) removed; the drive button is now charge-governed like every other button, and the engineer's auto-press no longer waits on the old bar.
+- Persistence/trace/CLI: save and trace carry `charges` instead of `actionCooldowns`; console PROGRESS prints tier, fill, state, left, text with state "empty" instead of "cooldown". Old saves load (unknown keys are ignored).
+- Checks run: g++ -std=c++17 -fsyntax-only on every cpp/ unit (all clean) and a headless link of the console harness (raylib audio excluded); scripted run shows engine 100-75-50-25-0, a fifth press refused, and one cook press returning engine to 25% while cook drops to 75%.
+- Not verified: no CMake in this environment, so the client/GUI was not built and no screenshot was taken; the draw recorder (tools/check-draw.sh) could not run; parity against the reference is now deliberately broken because the reference still carries the cooldown.

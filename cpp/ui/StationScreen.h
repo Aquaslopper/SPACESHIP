@@ -7,7 +7,7 @@
 //
 //  Reading and choosing are free. Committing is not one rule but two:
 //
-//    Market, Shipyard and crew   shiplets only. No action, no cooldown. The
+//    Market, Shipyard and crew   shiplets only. No action, no click. The
 //                                button stays live while the purse and the
 //                                hold/rack allow it, and greys out when they
 //                                do not, or once a one-time thing is owned.
@@ -19,7 +19,7 @@
 //                                station's page for its own system, read one
 //                                planet at a time.
 //
-//  Nothing on this window carries an action cooldown: the state the commit
+//  Nothing on this window holds a click charge: the state the commit
 //  itself changes is what stops a second press, not a lock on the button.
 // ============================================================================
 #pragma once
@@ -153,7 +153,7 @@ bool PressStationAction(Simulation& sim, const std::string& action,
                         const std::string& arg = std::string());
 
 // What the rule table would have chosen for this row, kept for the audit that
-// reads the station's labels; the station itself starts no cooldown.
+// reads the station's labels; the station itself spends no click.
 std::string StationActionCategory(const Simulation& sim, const std::string& action);
 
 }  // namespace ship

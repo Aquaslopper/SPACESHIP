@@ -260,9 +260,9 @@ void Simulation::PerformAction(const std::string& detail) {
 
   actionCounter_ += 1;
 
-  // Cooldowns share the same discrete heartbeat as every other countdown: a
-  // committed action ticks the existing ones once, before the world moves.
-  TickActionCooldowns();
+  // One committed click moves the click time once, before the world moves: the
+  // button that paid loses a step, every button it did not pay from gains one.
+  TickButtonCharges();
 
   TickWorld();
 

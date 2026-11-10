@@ -75,8 +75,8 @@ struct PayRules {
   double hit = 12;     // morale lost by a hand nobody could pay
 };
 
-struct CooldownRule {
-  double actions = 0;
+struct ChargeRule {
+  double volume = 0;  // clicks the control holds before it runs dry
   std::string label;
 };
 
@@ -88,7 +88,7 @@ struct Rules {
   PayRules pay;
   double docAway = 7;
   double scanCost = 5;
-  std::map<std::string, CooldownRule> cooldowns;  // routine/systems/space/critical
+  std::map<std::string, ChargeRule> charges;  // routine/systems/space/critical
 };
 
 }  // namespace ship

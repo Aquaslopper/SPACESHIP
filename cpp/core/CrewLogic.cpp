@@ -462,10 +462,9 @@ void Simulation::AutoMaint() {
   // level, so the ship is kept further from trouble the better he knows it.
   const double line = std::max(rules_.engine.maintBelow, EffectiveJobAt(*worker));
   if (state_.engineCondition >= line) { return; }
-  if (!EngineClickReady()) { return; }  // the bar comes back round in its own time
 
-  // His press is this action's click, so it arms the bar and lifts the drive
-  // without performing a second action of its own.
+  // His press is this action's click, so it lifts the drive without performing
+  // a second action of its own.
   ServiceDrive(worker->name);
 }
 

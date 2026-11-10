@@ -561,8 +561,6 @@ bool Simulation::Acknowledge(const std::string& taskId) {
   else if (type == "scan") { RevealScan(target); handled = true; }
   else if (type == "extract" && !target.empty()) {
     FinishExtraction(target, reservedVol);
-    const std::string cdTab = state_.activeTab.empty() ? "home" : state_.activeTab;
-    state_.actionCooldowns["cd|" + cdTab + "|progress:extract"] = Cooldown{"routine", 5.0};
     handled = true;
   }
 

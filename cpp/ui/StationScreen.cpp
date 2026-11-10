@@ -9,7 +9,7 @@
 //    middle    only what the open card holds. Free to pick.
 //    right     everything about the one picked item, and its single button.
 //
-//    Market, Shipyard and crew   shiplets only, 0 actions, no cooldown.
+//    Market, Shipyard and crew   shiplets only, 0 actions, no click spent.
 //    Starmap                     free, and there is nothing to commit: the
 //                                station's page for its system, read planet
 //                                by planet.
@@ -748,7 +748,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
       row.commit = id == "scanner2" ? "Buy - 1,100 sh"
                                     : "Buy - " + Num(price) + " sh";
       row.enabled = available && purse >= price;
-      row.details.push_back("Shiplets only: no click, no cooldown.");
+      row.details.push_back("Shiplets only: no click spent.");
       if (!row.enabled) {
         row.details.push_back(available ? "Not affordable from this purse."
                                         : "Not available yet: an earlier refit is required.");
@@ -862,7 +862,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
       row.free = true;
       row.commit = "Hire - " + Num(candidate.fee) + " sh";
       row.enabled = berth && purse >= candidate.fee;
-      row.details.push_back("Shiplets only: no click, no cooldown.");
+      row.details.push_back("Shiplets only: no click spent.");
       if (!row.enabled) {
         row.details.push_back(berth ? "Not affordable from this purse."
                                     : "No berth free for another hand.");
@@ -1042,7 +1042,7 @@ bool PressStationActionRaw(Simulation& sim, const std::string& action,
 // ============================================================================
 //  The press.
 //  ---------------------------------------------------------------------------
-//  This window starts no cooldown. The money-only counter refuses a press the
+//  This window spends no click. The money-only counter refuses a press the
 //  moment the purse or the hold refuses it, and every row that does cost an
 //  action changes the state that makes a second press impossible: the lot is
 //  gone, the contract is taken, the patron has been spoken to, the berth is
@@ -1059,14 +1059,18 @@ std::string StationActionCategory(const Simulation& sim, const std::string& acti
   const StationScreenModel model = BuildStationScreen(sim, sim.Map().here);
   for (const StationColumn& section : model.columns) {
     for (const StationRow& row : section.rows) {
-      if (row.id == action) { return ActionCooldownCategory(row.label); }
+      if (row.id == action) { return ButtonChargeTier(row.label); }
     }
   }
-  return ActionCooldownCategory(action);
+  return ButtonChargeTier(action);
 }
 
 bool PressStationAction(Simulation& sim, const std::string& action, const std::string& arg) {
-  return PressStationActionRaw(sim, action, arg);
+  // The commit rows hold clicks like every other button. Opening a card and
+  // picking an item are free, and a free pick runs no action, so it spends none.
+  return CommitActionButton(sim, ButtonChargeKey(sim, "press:station:" + action + ":" + arg + ":"),
+                            StationActionCategory(sim, action),
+                            [&]() { return PressStationActionRaw(sim, action, arg); });
 }
 
 }  // namespace ship

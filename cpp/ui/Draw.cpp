@@ -1303,7 +1303,6 @@ void ShellView::PaintStage(const TaskStage& stage, const Area& origin) {
   for (const LiveControl& control : stage.controls) {
     const Area box{origin.x + control.box.x, origin.y + control.box.y,
                    control.box.w, 26.0f};
-    const bool locked = control.button.state == ButtonState::Cooldown;
     DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
                   static_cast<int>(box.w), static_cast<int>(box.h),
                   ToRay(control.button.enabled ? p.panel2 : p.panel3));
@@ -1313,7 +1312,7 @@ void ShellView::PaintStage(const TaskStage& stage, const Area& origin) {
                        ToRay(p.borderDark));
     Text(control.button.text.c_str(), static_cast<int>(box.x + 6.0f),
              static_cast<int>(box.y + 7.0f), TypePx(10) ,
-             ToRay(locked ? p.terracotta : p.ink));
+             ToRay(control.button.state == ButtonState::Empty ? p.muted : p.ink));
     taskButtons_.push_back({box, control.button.taskId});
   }
 }
@@ -1367,7 +1366,7 @@ float ShellView::PaintActionBand(const std::string& title, const std::string& no
       float textY = y + (rowH - cell.text.size() * line) / 2;
       for (const auto& text : cell.text) {
         Text(text.c_str(), static_cast<int>(x + (box.w - TextWidth(text.c_str(), size)) / 2), static_cast<int>(textY), size,
-             ToRay(button.state == ButtonState::Cooldown ? p.terracotta : p.ink));
+             ToRay(button.state == ButtonState::Empty ? p.muted : p.ink));
         textY += line;
       }
       actionBandHits_.push_back({box, button.taskId, ""});
@@ -1988,6 +1987,11 @@ void ShellView::PaintNavScreen(Simulation& sim) {
              ToRay(row.enabled ? p.ink : p.muted));
     Text((row.displayCost + "  ").c_str(), static_cast<int>(rowBox.x),
              static_cast<int>(rowBox.y + 4.0f), TypePx(9) , ToRay(p.coffee));
+    if (row.live) {
+      const float barW = rowBox.w * static_cast<float>(std::clamp(row.chargePercent, 0.0, 100.0)) / 100.0f;
+      DrawRectangle(static_cast<int>(rowBox.x), static_cast<int>(rowBox.Bottom() - 2.0f),
+                    static_cast<int>(barW), 2, ::Color{126, 198, 63, 255});
+    }
     std::string action;
     if (row.label.find("Stand watch") == 0) { action = "stand-watch"; }
     if (row.label.find("Dock at ") == 0) { action = "dock"; }
@@ -2026,7 +2030,7 @@ void ShellView::PaintCrewRecord(const Simulation& sim) {
   if (!record_.crewId.empty()) {
     const auto& row = record_.conversation;
     std::string label = row.label;
-    if (row.coolingDown) { label += " - " + row.displayCost; }
+    if (row.spent) { label += " - out of clicks"; }
     else if (!row.enabled) { label += " - unavailable"; }
     const int size = TypePx(10);
     const float line = theme_.LineHeight();
@@ -2034,6 +2038,7 @@ void ShellView::PaintCrewRecord(const Simulation& sim) {
     const Area box{left, y, right - left, lines.size() * line + 12.0f};
     DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.w),
                   static_cast<int>(box.h), ToRay(row.enabled ? p.panel : p.panel3));
+    PaintProgressFill(box, row.chargePercent);
     DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.w),
                        static_cast<int>(box.h), ToRay(p.borderDark));
     float textY = box.y + 6.0f;
@@ -2236,12 +2241,13 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
     wrapped("The Figure", hall.x + 8, y, hall.w - 16, ToRay(p.coffee));
     const auto& row = quarters_.conversation;
     std::string label = row.label;
-    if (row.coolingDown) { label += " - " + row.displayCost; }
+    if (row.spent) { label += " - out of clicks"; }
     else if (!row.enabled) { label += " - unavailable"; }
     const auto lines = WrapText(label, hall.w - 28, TypePx(10), SelectFont(TypePx(10), false));
     const Area talk{hall.x + 8, y, hall.w - 16, lines.size() * line + 12};
     DrawRectangle(static_cast<int>(talk.x), static_cast<int>(talk.y), static_cast<int>(talk.w),
                   static_cast<int>(talk.h), ToRay(row.enabled ? p.panel : p.panel3));
+    PaintProgressFill(talk, row.chargePercent);
     DrawRectangleLines(static_cast<int>(talk.x), static_cast<int>(talk.y), static_cast<int>(talk.w), static_cast<int>(talk.h), ToRay(p.borderDark));
     float textY = talk.y + 6;
     for (const auto& text : lines) {
@@ -2291,7 +2297,7 @@ bool ShellView::PressPanelRow(Simulation& sim, ScreenKind kind, const std::strin
     case ScreenKind::Info: return PressInfoAction(sim, id);
     case ScreenKind::Station: {
       // The first two columns only choose; the third column commits. Choosing
-      // costs nothing, so it neither spends an action nor locks a control.
+      // costs nothing, so it neither spends an action nor a click.
       if (id.compare(0, 12, "station-cat:") == 0) {
         const std::string card = id.substr(12);
         if (stationSelection_.category != card) {
@@ -3100,6 +3106,9 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
                       ToRay(row.selected ? p.panel3
                                          : (row.enabled ? (grouped ? p.control : p.panel2)
                                                         : p.panel3)));
+        // Every pressable row carries its clicks as green, the way a progress
+        // button does: the bar is the only readout, and it never prints a number.
+        PaintProgressFill(box, row.chargePercent);
         DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
                            static_cast<int>(box.w), static_cast<int>(box.h),
                            ToRay(row.selected ? p.coffeeLight
