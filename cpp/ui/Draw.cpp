@@ -3452,7 +3452,7 @@ void ShellView::Scroll(Simulation& sim, float x, float y, float wheelDelta) {
   Move(x, y);
   if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow)) { return; }
   if (floating_.HasConfirmation()) { return; }
-  if (!titleActive_ && navChartBox_.Contains(x, y + contentScroll_)) {
+  if (!titleActive_ && screenNav_ && navChartBox_.Contains(x, y + contentScroll_)) {
     const int dir = wheelDelta > 0.0f ? 1 : -1;
     sim.ZoomMap(dir);
     return;
