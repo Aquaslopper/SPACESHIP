@@ -57,7 +57,7 @@ double Simulation::OrderCostFor(const std::string& jobId, const std::string& ord
     if (def.id == jobId) { job = &def; }
   }
   if (orderId == "doc") { return 1; }
-  if (orderId == "fire") { return 5; }
+  if (orderId == "fire") { return 1; }
   if (orderId == "learnOn") { return job != nullptr && job->learnOn > 0 ? job->learnOn : 1; }
   if (orderId == "learnSt") { return job != nullptr && job->learnSt > 0 ? job->learnSt : 2; }
   return 1;
@@ -82,6 +82,7 @@ double Simulation::OrderCost(const CrewMember& crew, const std::string& orderId)
 double Simulation::CrewCostOf(const CrewMember& crew) const {
   const OrderSheet* sheet = SheetOf(crew);
   if (sheet == nullptr) { return 0; }
+  if (sheet->Has("fire")) { return OrderCostFor(crew.job, "fire"); }
   double total = sheet->hasJob ? JobCost(sheet->job) : 0.0;
   for (const Catalog::OrderDefinition& order : catalog_.orderDefs) {
     if (sheet->Has(order.id)) { total += OrderCostFor(StagedJob(crew), order.id); }
@@ -91,7 +92,7 @@ double Simulation::CrewCostOf(const CrewMember& crew) const {
 
 double Simulation::CrewFeeOf(const CrewMember& crew) const {
   const OrderSheet* sheet = SheetOf(crew);
-  if (sheet == nullptr) { return 0; }
+  if (sheet == nullptr || sheet->Has("fire")) { return 0; }
   double total = 0;
   for (const Catalog::OrderDefinition& order : catalog_.orderDefs) {
     if (sheet->Has(order.id)) { total += OrderFeeFor(StagedJob(crew), order.id); }
@@ -129,6 +130,13 @@ double Simulation::OrdersFee() const {
 
 int Simulation::OrderedCount() const { return static_cast<int>(orderSheets_.size()); }
 
+bool Simulation::HasPendingLayoff() const {
+  for (const auto& entry : orderSheets_) {
+    if (entry.second.Has("fire")) { return true; }
+  }
+  return false;
+}
+
 bool Simulation::OrdersRunning() const { return FindOngoing("crew-assign") != nullptr; }
 
 bool Simulation::CrewAvailable(const CrewMember& crew) const {
@@ -143,7 +151,7 @@ void Simulation::ClearOrders() {
 
 bool Simulation::StageJob(const std::string& crewId, const std::string& jobId) {
   CrewMember* crew = FindCrew(crewId);
-  if (crew == nullptr || OrdersRunning() || CrewBusy(*crew) != nullptr) { return false; }
+  if (crew == nullptr) { return false; }
   if (FindJobDef(jobId) == nullptr) { return false; }
 
   OrderSheet& sheet = orderSheets_[crewId];
@@ -167,8 +175,6 @@ bool Simulation::ToggleOrder(const std::string& crewId, const std::string& order
       !(existing != nullptr && existing->Has("rest"))) {
     return false;
   }
-  if (OrdersRunning()) { return false; }
-  if (CrewBusy(*crew) != nullptr) { return false; }
   bool known = false;
   for (const Catalog::OrderDefinition& order : catalog_.orderDefs) {
     if (order.id == orderId) { known = true; }
@@ -186,25 +192,49 @@ bool Simulation::ToggleOrder(const std::string& crewId, const std::string& order
 // ---- the commitment -------------------------------------------------------
 bool Simulation::CommitOrders() {
   const double work = OrdersCost();
-  if (work <= 0 || OrdersRunning()) { return false; }
-  for (const auto& entry : orderSheets_) {
-    const CrewMember* crew = FindCrew(entry.first);
-    if (crew != nullptr && !CrewAvailable(*crew)) { return false; }
-  }
-
+  if (work <= 0) { return false; }
   // The schooling is paid for here or the sheet does not go out at all: a
   // half-paid order would teach half a lesson.
   const double fee = OrdersFee();
   if (fee > state_.shiplets) {
-    LogLine("Refused - the sheet needs " + js::NumToString(fee) + " sh in fees and the purse holds " +
-            js::NumToString(state_.shiplets) + ".");
-    return false;
+    if (!HasPendingLayoff()) {
+      LogLine("Refused - the sheet needs " + js::NumToString(fee) + " sh in fees and the purse holds " +
+              js::NumToString(state_.shiplets) + ".");
+      return false;
+    }
+    // Unaffordable training for other hands must not hold up a layoff.
+    std::vector<std::string> dismissed;
+    for (const auto& entry : orderSheets_) {
+      if (entry.second.Has("fire")) { dismissed.push_back(entry.first); }
+    }
+    for (const std::string& id : dismissed) {
+      if (CrewMember* crew = FindCrew(id)) { FireCrew(*crew); }
+      orderSheets_.erase(id);
+      state_.pendingOrders.erase(id);
+    }
+    PerformAction("Crew assignments issued");
+    LogLine("Training fees unavailable; other orders remain staged.");
+    return true;
   }
 
-  const std::map<std::string, OrderSheet> sheet = orderSheets_;
+  std::map<std::string, OrderSheet> sheet = orderSheets_;
+  double remainingWork = work;
+  for (auto it = sheet.begin(); it != sheet.end();) {
+    if (!it->second.Has("fire")) { ++it; continue; }
+    CrewMember* crew = FindCrew(it->first);
+    if (crew != nullptr) {
+      remainingWork -= CrewCostOf(*crew);
+      FireCrew(*crew);
+    }
+    it = sheet.erase(it);
+  }
   orderSheets_.clear();
   state_.pendingOrders.clear();
   state_.shiplets -= fee;
+
+  // New instructions replace an earlier personal order for the same hand;
+  // work belonging to other hands continues untouched.
+  for (const auto& entry : sheet) { ClearOngoing("cw-" + entry.first); }
 
   // ONE CLICK IS ONE ACTION. The price of the orders is not charged here in a
   // lump; it is the WORK, and the crew spend it carrying the sheet out.
@@ -217,16 +247,16 @@ bool Simulation::CommitOrders() {
     LogLine("Training fees paid - " + js::NumToString(fee) + " sh. Purse " +
             js::NumToString(state_.shiplets) + " sh.");
   }
-  QueueOrders(sheet, work);
-  LogLine("Crew assignments updated. " + js::NumToString(work) + " clicks of work.");
+  if (!sheet.empty()) {
+    QueueOrders(sheet, remainingWork);
+    LogLine("Crew assignments updated. " + js::NumToString(remainingWork) + " clicks of work.");
+  }
   return true;
 }
 
-// One task for the whole sheet under the id of the button at the bottom, plus
-// one task per hand sized to what THAT person was asked to do.
+// Each hand carries their own work; no global sheet blocks the next order.
 void Simulation::QueueOrders(const std::map<std::string, OrderSheet>& sheet, double total) {
-  AddOngoing("crew-assign", "Carrying out orders", total, "crewOrder", "crew");
-
+  (void)total;
   for (const auto& entry : sheet) {
     CrewMember* crew = FindCrew(entry.first);
     if (crew == nullptr) { continue; }
@@ -300,11 +330,25 @@ void Simulation::TrainCrew(CrewMember& crew, int steps, const std::string& where
 }
 
 void Simulation::FireCrew(CrewMember& crew) {
-  if (crew.job.empty()) {
-    LogLine(crew.name + " holds no job to be taken off.");
-    return;
+  // A removed hand must not retain work or orders which can act later.
+  const std::string name = crew.name;
+  const std::string id = crew.id;
+  const bool hadJob = !crew.job.empty();
+  orderSheets_.erase(id);
+  state_.pendingOrders.erase(id);
+  crewClaims_.erase(id);
+  ClearOngoing("cw-" + id);
+  for (std::size_t i = state_.ongoing.size(); i-- > 0;) {
+    const Task task = state_.ongoing[i];
+    if (task.by != name && task.who != id && task.other != id) { continue; }
+    if (task.type == "o2slot") {
+      life_.canisters = std::min(life_.capacity, life_.canisters + 1);
+    }
+    if (task.type == "cook") { cookRestock_ = false; }
+    ClearOngoing(task.id);
   }
-  LayOff(crew, "dismissed by the commander");
+  if (hadJob) { LayOff(crew, "dismissed by the commander"); }
+  else { LogLine(name + " holds no job to be taken off."); }
 }
 
 }  // namespace ship

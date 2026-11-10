@@ -525,14 +525,11 @@ void Simulation::AutoMess() {
   if (cookClaim_ || projectClaim_ == "food" || FindOngoing("project-food") != nullptr) { return; }
   if (worker == nullptr || FindOngoing("cook") != nullptr) { return; }
   if (CrewBusy(*worker) != nullptr) { return; }
-  // She starts once the counter is under her own line and does not stop until it
-  // is full: cooking 1 ration, then another, until the rack is stocked. That line
-  // is the untrained one plus a batch per stage of her training, so a taught cook
-  // starts a batch earlier and the rack never gets as low.
-  const double line = std::min(mess_.capacity,
-                               rules_.mess.cookBelow +
-                                   rules_.mess.foodPerRation * std::min(3.0, worker->jobAt));
-  if (!cookRestock_ && mess_.rack >= line) { return; }
+  // She starts once the counter is under cookBelow and does not stop until it
+  // is full: cooking 1 ratio, then another ratio, until the rack is stocked.
+  // A batch started again as soon as the pot is off means a dropping counter
+  // never waits for the player.
+  if (!cookRestock_ && mess_.rack >= rules_.mess.cookBelow) { return; }
   if (mess_.rack >= mess_.capacity) {
     cookRestock_ = false;
     return;
@@ -545,10 +542,14 @@ void Simulation::AutoMess() {
   // One dry ration yields up to foodPerRation cooked food when the five-click
   // batch finishes. A batch that would overshoot the ceiling is still cooked;
   // the landing is clamped, so the counter ends full rather than past its lid.
-  // She presses the galley's own control rather than opening work of her own.
-  if (StartCookingSelf(worker->name, false)) {
-    LogLine(worker->name + " started cooking without being asked.");
+  const double cost = rules_.mess.foodPerRation;
+  Task* task = AddOngoing("cook", "Cooking - " + worker->name, cost, "cook", "mess");
+  if (task != nullptr) {
+    task->by = worker->name;
+    mess_.rations -= 1.0;  // the ration is spent when the batch starts
   }
+  cookRestock_ = true;
+  LogLine(worker->name + " started cooking without being asked.");
 }
 
 // ---------------------------------------------------------------------------

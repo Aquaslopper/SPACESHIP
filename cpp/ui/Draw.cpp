@@ -2246,7 +2246,7 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
     const float h = MeasurePanelHeight(panel, column);
     PaintPanel(panel, {orderX, oy, column, h});
     oy += h + 6;
-    if (panel.id != "cq-orders" || quarters_.closed) { continue; }
+    if (panel.id != "cq-orders" || !quarters_.hasCrew) { continue; }
     // A real select, not an invisible/unwired label. Only this small overlay
     // owns ImGui input; the rest of the screen uses the measured Raylib hits.
     const float comboH = line + 12;

@@ -196,6 +196,7 @@ class Simulation {
   bool ToggleOrder(const std::string& crewId, const std::string& orderId);  // free
   void ClearOrders();
   int OrderedCount() const;
+  bool HasPendingLayoff() const;
   bool OrdersRunning() const;
   bool CrewAvailable(const CrewMember& crew) const;  // ordersAvailable()
   double JobCost(const std::string& jobId) const;

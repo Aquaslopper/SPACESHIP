@@ -239,7 +239,9 @@ ProgressButton BuildProgressButton(const Simulation& sim, const std::string& tas
   if (!charged) { button.chargeKey.clear(); }
 
   const double charge = charged ? ChargePercent(sim, button.chargeKey, button.tier) : 0.0;
-  const Task* task = sim.FindOngoing(taskId);
+  // Old saves may contain a global order-sheet task. It is not a lock on the
+  // assignment button: personal crew tasks continue independently.
+  const Task* task = taskId == "crew-assign" ? nullptr : sim.FindOngoing(taskId);
 
   if (task == nullptr) {
     // No process running: the bar is the clicks this control still holds.
@@ -252,7 +254,7 @@ ProgressButton BuildProgressButton(const Simulation& sim, const std::string& tas
     if (!enabled) {
       button.state = ButtonState::Off;
       button.text = idleLabel;
-    } else if (charge <= 0.0) {
+    } else if (charge <= 0.0 && !(taskId == "crew-assign" && sim.HasPendingLayoff())) {
       button.state = ButtonState::Empty;
       button.text = idleLabel;
       button.title = TierLabel(sim, button.tier) + " button: out of clicks.";
@@ -307,7 +309,9 @@ bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
     return CommitActionButton(sim, button.chargeKey, button.tier,
                               [&sim]() { return sim.EngineClick(); });
   }
-  const Task* task = sim.FindOngoing(taskId);
+  // Old saves may contain a global order-sheet task. It is not a lock on the
+  // assignment button: personal crew tasks continue independently.
+  const Task* task = taskId == "crew-assign" ? nullptr : sim.FindOngoing(taskId);
   if (task != nullptr && task->state == "running") { return false; }  // inert
   if (task != nullptr && task->state == "done") {
     // Reading the result is a click of the hand, not of the clock: it spends no
@@ -318,6 +322,12 @@ bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
   if (button.state == ButtonState::Empty) { return false; }
   if (button.state == ButtonState::Off) { return false; }
   if (button.state == ButtonState::Running) { return false; }
+
+  // Removing a hand from a job must not be delayed by an empty charge.
+  if (taskId == "crew-assign" && sim.HasPendingLayoff() &&
+      ChargePercent(sim, button.chargeKey, button.tier) <= 0.0) {
+    return PressWithoutCharge(sim, [&sim]() { return sim.CommitOrders(); });
+  }
 
   // A control that keeps its own mechanic is run without a charge, but its
   // press is still a click that winds the other buttons back up.
