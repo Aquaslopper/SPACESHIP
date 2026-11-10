@@ -53,7 +53,7 @@ struct LifeRules {
 //   hunger climbs 30 over a hand's 25 clicks; one food drains 10 of it, so a
 //   meal is 3 food - 30 points, 50% back down to 20% - and four fully fed hands
 //   use 12 food per round. The counter holds 24, exactly two rounds, and
-//   automatic cooking starts below 10, but each batch takes five clicks and the
+//   automatic cooking starts at 10 or below, but each batch takes five clicks and the
 //   dry-ration supply is finite; running out is not ruled out.
 struct MessRules {
   double rackStart = 18;    // food on the galley counter at boot
@@ -64,7 +64,7 @@ struct MessRules {
   double rationStart = 21;      // dry rations aboard at boot
   double rationCapacity = 24;   // what the dry larder holds
   double foodPerRation = 5;     // one dry ration yields this much cooked food
-  double cookBelow = 10;        // the cook starts once the counter is under this
+  double cookBelow = 10;        // the cook starts at or below this
   double hungerPerMeal = 30;    // hunger gained over one full 25-click clock
   double hungerPerFood = 10;    // one food drains this much hunger - 3 food is 30%
   double hungerFloor = 5;       // a hand stops eating here - hunger never vanishes

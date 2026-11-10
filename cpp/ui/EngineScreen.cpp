@@ -355,7 +355,7 @@ EngineScreenModel BuildEngineScreen(const Simulation& sim) {
   run.button.text = "Run the drive";
   run.button.title = maintained
       ? "The drive is at full condition; there is nothing to maintain."
-      : "One click of the clock, and the drive is brought back to full.";
+      : "One click of the clock restores up to 25% of the drive.";
   run.button.chargeKey = chargeKey;
   run.button.tier = tier;
   run.button.fillPercent = charge;

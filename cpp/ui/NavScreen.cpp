@@ -829,15 +829,15 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
       travelEnabled, "Complete", "space"));
   if (screen.progress.back().state == ButtonState::Off) {
     auto& button = screen.progress.back();
-    if (target == nullptr) button.title = "Select a destination.";
-    else if (hereTarget) button.title = "You are already here.";
-    else if (!reach) button.title = "Destination is out of range.";
-    else if (sim.State().engineCondition <= 0) button.title = "The drive needs maintenance.";
-    else if (extractTask != nullptr) button.title = "Finish extraction before travelling.";
-    else if (energy <= 0) button.title = "Not enough energy.";
-    else button.title = "Not enough fuel for this course.";
+    if (target == nullptr) button.title = "Select destination";
+    else if (hereTarget) button.title = "Already here";
+    else if (!reach) button.title = "Out of range";
+    else if (sim.State().engineCondition <= 0) button.title = "Drive needs maintenance";
+    else if (extractTask != nullptr) button.title = "Finish extraction";
+    else if (energy <= 0) button.title = "Not enough energy";
+    else button.title = "Not enough fuel";
   } else if (screen.progress.back().state == ButtonState::Empty) {
-    screen.progress.back().title = "Use another work button to recharge this one.";
+    screen.progress.back().title = "Needs recharge";
   }
 
   if (scanTask != nullptr && scanTask->state == "running" && target != nullptr &&
@@ -846,7 +846,7 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
     // one. One set of sensors, one scan at a time.
     screen.progress.push_back(
         BuildProgressButton(sim, "scan-busy", "Sensors busy", false, "Scan Complete", "space"));
-    screen.progress.back().title = "A scan is already running on another target.";
+    screen.progress.back().title = "Sensors busy";
   } else {
     const bool remoteScan = target != nullptr &&
                             (!reach || target->type == "system" || target->type == "region");
@@ -864,12 +864,12 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
         "Scan Complete", "space"));
     if (screen.progress.back().state == ButtonState::Off) {
       auto& button = screen.progress.back();
-      if (target == nullptr) button.title = "Select a target to scan.";
-      else if (scanFiled) button.title = "This scan has already been filed.";
-      else if (energy <= 0) button.title = "Not enough energy.";
-      else button.title = "This target cannot be scanned with the current sensors.";
+      if (target == nullptr) button.title = "Select target";
+      else if (scanFiled) button.title.clear();
+      else if (energy <= 0) button.title = "Not enough energy";
+      else button.title = "Out of sensor range";
     } else if (screen.progress.back().state == ButtonState::Empty) {
-      screen.progress.back().title = "Use another work button to recharge this one.";
+      screen.progress.back().title = "Needs recharge";
     }
   }
 
@@ -880,7 +880,7 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
         extractTask->target != target->id) {
       screen.progress.push_back(BuildProgressButton(
           sim, "extract-busy", "Extraction rig busy", false, "Haul Yield", "routine"));
-      screen.progress.back().title = "Extraction is already running on another target.";
+      screen.progress.back().title = "Extraction rig busy";
     } else {
       const Body* extBody =
           (extractTask != nullptr) ? sim.FindBodyById(extractTask->target) : target;
@@ -900,15 +900,15 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
           sim, "extract", idleLabel, extractEnabled, doneLabel, "routine"));
       if (screen.progress.back().state == ButtonState::Off) {
         auto& button = screen.progress.back();
-        if (target == nullptr || !sim.CanExtractBody(*target)) button.title = "Select a resource target.";
-        else if (!hereTarget) button.title = "Travel to this target first.";
-        else if (sim.State().docked) button.title = "Undock before extracting.";
-        else if (running != nullptr) button.title = "Finish travelling before extracting.";
-        else if (energy <= 0) button.title = "Not enough energy.";
-        else if (!holdFits) button.title = "Not enough cargo space for the yield.";
-        else button.title = "The deposits are depleted.";
+        if (target == nullptr || !sim.CanExtractBody(*target)) button.title = "Select resource target";
+        else if (!hereTarget) button.title = "Travel here first";
+        else if (sim.State().docked) button.title = "Undock first";
+        else if (running != nullptr) button.title = "Finish travelling";
+        else if (energy <= 0) button.title = "Not enough energy";
+        else if (!holdFits) button.title = "Not enough space";
+        else button.title = "Depleted";
       } else if (screen.progress.back().state == ButtonState::Empty) {
-        screen.progress.back().title = "Use another work button to recharge this one.";
+        screen.progress.back().title = "Needs recharge";
       }
     }
   }
@@ -929,7 +929,7 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
     CommandRowView dock = BuildCommandRow(
         sim, "Dock at " + port->name, true, std::string(), "space", 0);
     dock.live = dock.enabled;
-    if (dock.spent) dock.title = "Use another work button to recharge this one.";
+    if (dock.spent) dock.title = "Needs recharge";
     screen.commands.push_back(dock);
   }
 

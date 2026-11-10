@@ -164,3 +164,128 @@ You must append a compressed summary of **every single reply and action you take
 - Correction to #012: the owner did not decide that buying advances the clock. The rule is whether the action implies work and time; purchase logic was not changed in this Navigation pass.
 - Other rooms' action logic and blocked-reason text have not yet been audited; they remain for their own room-by-room passes.
 - No tests or builds were run, in accordance with the owner's instruction. The GUI, layout, glow, and interaction remain for the owner's local playtest.
+
+### Entry #014
+- Owner requested an extremely small Navigation-only text correction after playtesting.
+- Blocked Navigation progress controls now put their short status inside the control.
+- Removed the separate text previously painted underneath those controls.
+- Travel at the current position reads "Already here" inside its button.
+- An already filed scan keeps its existing "Deep Scan Filed" button label.
+- Removed the redundant explanation under the filed scan button.
+- Exhausted deposits read "Depleted" inside the extraction button.
+- Other existing Navigation blocked reasons are shortened to fit the same treatment.
+- The disabled Navigation command row also puts its short reason on the row, not below it.
+- No button availability, charge, clock, engine, or other room logic was changed.
+- No tests or builds were run; the owner will verify the GUI locally.
+
+### Entry #015
+- Owner noticed that Home room callouts darken on hover, but other Home labels with right-click tasks did not.
+- Added the same palette hover background to the upper system/stat cells.
+- Added it to the lower information cells and Navigation strip.
+- Active event and docked-station cards now receive the same feedback.
+- Empty event placeholders stay unchanged because they do not open a task.
+- Deck-plan room areas also show a hover response where they open a room.
+- Crew markers and visible labels get hover feedback where they open a crew task.
+- Crew hit areas take precedence over room areas, matching the existing click handling.
+- Hover checks use the scrolled content position and only respond within the content viewport.
+- Existing click, right-click, clock, and action behavior was left unchanged.
+- No tests or builds were run; the owner will verify the hover visually in his local build.
+
+### Entry #016
+- Owner approved applying the agreed engine-room battery and maintenance logic first, then playtesting it himself.
+- One Run the drive press restores 25 percentage points of engine condition, capped at full.
+- The engineer's existing automatic service uses the same 25-point maintenance amount.
+- The engineer does not also service the drive during the commander's own engine press.
+- That guard prevents one manual press from restoring twice during its own clock tick.
+- Each successful manual press still uses the existing four-step systems charge and one clock click.
+- The green engine battery is again drawn even when the drive is full and cannot be maintained.
+- This preserves the difference between stored button charge and engine condition.
+- The engine button's descriptive text now states the 25-point restoration rather than full restoration.
+- Engine wear remains unchanged at 1% per four clock clicks; no asset or configuration was edited.
+- Other buttons, rooms, and their shared progress rendering were not changed in this pass.
+- The existing crew timing and battery accounting were otherwise left as they were.
+- No tests or builds were run; the owner will check the engine behavior locally.
+
+### Entry #017
+- Owner directed an immediate restoration of the original cooking mechanism from PR #33 and no other changes.
+- Retrieved the original `AutoMess` from the final PR #33 commit `cedf30be6faf62bc9ef1ba5d7460b5fecd4ce3ed`.
+- Restored that function verbatim in `cpp/core/CrewLogic.cpp`.
+- The original starts restocking below the configured `cookBelow` threshold.
+- Removed the later training-based adjustment to that threshold by restoring the original function.
+- The original creates the automatic batch directly and records the assigned cook.
+- It spends one dry ration at batch start and retains the original restock chain.
+- Batch yield, batch duration and completion code were already present and were not changed.
+- Player-triggered cooking, the clock, hunger rules, assets and other rooms were not changed.
+- Crew Quarters assignment visibility was not changed in this restoration-only edit.
+- No tests or builds were run, per the owner's standing instruction.
+
+### Entry #018
+- Owner directed removal of the code hiding the right-hand Crew Quarters controls.
+- The selected crew member's standing job and job options are now built even while busy.
+- The order list is also built while busy instead of being omitted.
+- The right-hand renderer no longer skips those controls because the crew member is busy.
+- The existing busy status remains visible in the Orders panel.
+- Busy controls are displayed disabled rather than appearing usable when the underlying action refuses them.
+- The original job-staging and order-staging restrictions were not changed.
+- No cancellation, interruption or queuing behavior was invented.
+- Empty crew lists still have no job selector.
+- Cooking and other rooms were not changed in this edit.
+- No tests or builds were run; the owner will check the screen locally.
+
+### Entry #019
+- Owner rejected the invented restriction preventing orders to a busy crew member.
+- The job selector and order rows no longer disable merely because the selected hand is working.
+- Staging a job or order no longer refuses a hand merely because that hand is busy.
+- The order sheet no longer refuses to commit solely because a selected hand is busy.
+- Selecting Lay off still stages the instruction; handing over the sheet now applies the layoff immediately.
+- A layoff uses the existing single action for handing over the sheet, not a five-click wait.
+- Layoff takes precedence over other staged instructions for that hand, without charging training fees for them.
+- The dismissed hand stops their ongoing personal work and any old personal order task.
+- An interrupted unseated canister returns to stock, following the existing interruption handling.
+- An interrupted cooking batch stops, and the original auto-restocking chain stops with it.
+- Other staged hands still receive their orders through the existing work mechanism.
+- The separate existing restriction while a whole order sheet is already in progress was not redesigned.
+- No tests or builds were run; the owner will verify the behavior locally.
+
+### Entry #020
+- Owner directed removal of the remaining restriction on issuing a new crew sheet while another is in progress.
+- Staging a job or order no longer checks for an earlier order sheet.
+- Committing the sheet no longer refuses because of an earlier sheet.
+- Crew Quarters no longer disables its controls or replaces the new-sheet note for that reason.
+- New orders are tracked by each person's existing work task instead of creating a global sheet lock.
+- A newer instruction replaces an earlier personal order for the same hand; other hands' work continues.
+- Old saved global sheet tasks are ignored as a button lock and may finish normally.
+- A committed layoff still takes effect immediately and stops that hand's current work.
+- An empty assignment-button charge cannot prevent a layoff; the click still advances the clock once.
+- If other staged training is unaffordable, layoff still proceeds and those other orders remain staged.
+- The existing charge rule for sheets without a layoff was left intact.
+- Cooking's restored PR #33 mechanism and unrelated rooms were not changed in this edit.
+- No tests or builds were run, as instructed; local playtesting remains necessary.
+
+### Entry #021
+- Owner clarified: once a person is removed from their job, nothing they were doing continues.
+- A committed layoff takes effect before its clock step, as in the preceding edit.
+- A removed person's staged sheet entries are cleared.
+- Their pending-order marker is cleared.
+- Their crew claim and personal order task are cleared.
+- Tasks identifying the removed person by name, primary crew ID or second crew ID are cancelled.
+- That includes their cooking batch and its automatic restock chain.
+- An interrupted unseated canister uses the existing return-to-stock rule.
+- Removing the person prevents any old personal order from applying later.
+- Dismissal cleanup also runs if the person is already off a job.
+- The low-funds path uses a snapshot of IDs because dismissal clears staged entries.
+- No tests or builds were run, per the owner's instruction; local verification remains necessary.
+
+### Entry #022
+- Owner clarified the automatic cook starts when cooked food is at 10 or less.
+- The previous strict-below comparison excluded exactly 10.
+- Automatic cooking now starts at or below the configured threshold.
+- A restocking cycle already started still continues to the rack capacity.
+- Each batch still uses one dry ration.
+- Each batch still takes five clock clicks.
+- Each finished batch still adds up to five cooked food.
+- The final batch is still capped by rack capacity.
+- A manually started batch no longer starts an automatic restock cycle above the threshold.
+- An already active automatic restock cycle is not cancelled by a manual batch.
+- Mess Hall text now states the inclusive threshold.
+- No tests or builds were run; the owner playtests locally.

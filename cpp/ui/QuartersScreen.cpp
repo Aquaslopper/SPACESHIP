@@ -194,50 +194,46 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
   stand.Dim(hand.traits);
 
   // --- the pad ------------------------------------------------------------
-  const bool out = sim.OrdersRunning();
   const Task* busy = sim.CrewBusy(hand);
-  if (busy != nullptr || out) {
-    const Task* task = busy != nullptr ? busy : sim.FindOngoing("crew-assign");
-    model.closed = true;
+  ordersPanel.Name(hand.name);
+  if (busy != nullptr) {
+    const Task* task = busy;
     model.closedText =
         (sim.FindOngoing("doc-" + hand.id) != nullptr
              ? std::string("In the medical bay.")
-             : (busy != nullptr ? "Carrying out orders." : "Orders in hand.")) +
+             : "Carrying out orders.") +
         " " + js::NumToString(task == nullptr ? 0 : task->left) + " click" +
         (task != nullptr && task->left == 1 ? "" : "s") + " remaining.";
-    ordersPanel.Dim(hand.name);
     ordersPanel.Dim(model.closedText);
-  } else {
-    ordersPanel.Name(hand.name);
-    ordersPanel.Field("Standing job", JobLabel(sim, sim.StagedJob(hand)));
-    const OrderSheet* staged = sim.SheetOf(hand);
-    model.selectedJob = sim.StagedJob(hand);
-    const double cost = sim.JobCost(model.selectedJob);
-    model.jobCostLine =
-        staged != nullptr && staged->hasJob
-            ? "staged - " + js::NumToString(cost) + " click" + (cost == 1 ? "" : "s")
-            : "costs " + js::NumToString(cost) + " to hand over";
-    ordersPanel.Dim(model.jobCostLine);
-    for (const JobDef& option : sim.Jobs()) {
-      model.jobOptions.push_back(option.id + "\t" + option.label);
-    }
-    for (const Catalog::OrderDefinition& order : sim.World().orderDefs) {
-      OrderLineView line;
-      line.id = order.id;
-      line.label = order.label;
-      line.actions = sim.OrderCost(hand, order.id);
-      line.fee = sim.OrderFeeFor(sim.StagedJob(hand), order.id);
-      const bool on = staged != nullptr && staged->Has(order.id);
-      line.on = on;
-      line.locked = (order.id == "learnSt" && !sim.State().docked) ||
-                    (order.id == "rest" && hand.fatigue < 25 && hand.morale >= 70 && !on);
-      line.cost = js::NumToString(line.actions);
-      if (line.fee > 0) { line.cost += " - " + js::NumToString(line.fee) + " sh"; }
-      line.note = line.locked ? (order.id == "rest" ? "already rested" : "no station in reach")
-                              : order.note;
-      line.state = line.locked ? "off" : (on ? "on" : "");
-      model.orders.push_back(line);
-    }
+  }
+  ordersPanel.Field("Standing job", JobLabel(sim, sim.StagedJob(hand)));
+  const OrderSheet* staged = sim.SheetOf(hand);
+  model.selectedJob = sim.StagedJob(hand);
+  const double cost = sim.JobCost(model.selectedJob);
+  model.jobCostLine =
+      staged != nullptr && staged->hasJob
+          ? "staged - " + js::NumToString(cost) + " click" + (cost == 1 ? "" : "s")
+          : "costs " + js::NumToString(cost) + " to hand over";
+  ordersPanel.Dim(model.jobCostLine);
+  for (const JobDef& option : sim.Jobs()) {
+    model.jobOptions.push_back(option.id + "\t" + option.label);
+  }
+  for (const Catalog::OrderDefinition& order : sim.World().orderDefs) {
+    OrderLineView line;
+    line.id = order.id;
+    line.label = order.label;
+    line.actions = sim.OrderCost(hand, order.id);
+    line.fee = sim.OrderFeeFor(sim.StagedJob(hand), order.id);
+    const bool on = staged != nullptr && staged->Has(order.id);
+    line.on = on;
+    line.locked = (order.id == "learnSt" && !sim.State().docked) ||
+                  (order.id == "rest" && hand.fatigue < 25 && hand.morale >= 70 && !on);
+    line.cost = js::NumToString(line.actions);
+    if (line.fee > 0) { line.cost += " - " + js::NumToString(line.fee) + " sh"; }
+    line.note = line.locked ? (order.id == "rest" ? "already rested" : "no station in reach")
+                            : order.note;
+    line.state = line.locked ? "off" : (on ? "on" : "");
+    model.orders.push_back(line);
   }
 
   // --- the sheet ----------------------------------------------------------
@@ -273,16 +269,9 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
   // --- the band -----------------------------------------------------------
   const double total = sim.OrdersCost();
   const int who = sim.OrderedCount();
-  bool available = true;
-  for (const CrewMember& member : crew) {
-    if (sim.SheetOf(member) != nullptr && !sim.CrewAvailable(member)) { available = false; }
-  }
-  if (out) {
-    model.bandNote = "Orders in hand.";
-  } else if (total > 0) {
+  if (total > 0) {
     model.bandNote = "Orders written for " + js::NumToString(who) + " crew member" +
                      (who == 1 ? "" : "s") + ".";
-    if (!available) { model.bandNote += " A selected crew member is busy."; }
     const double fee = sim.OrdersFee();
     if (fee > 0) {
       model.bandNote += " Training fees " + js::NumToString(fee) + " sh of " +
@@ -296,7 +285,7 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
   screen.progress.push_back(BuildProgressButton(
       sim, "crew-assign",
       "Assign Tasks (" + js::NumToString(total) + " Action" + (total == 1 ? "" : "s") + ")",
-      total > 0 && available, "Complete", std::string()));
+      total > 0, "Complete", std::string()));
 
   screen.left = {roster};
   screen.under = {cond, stand};
