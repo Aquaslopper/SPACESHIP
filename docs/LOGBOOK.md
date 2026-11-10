@@ -164,3 +164,44 @@ You must append a compressed summary of **every single reply and action you take
 - Correction to #012: the owner did not decide that buying advances the clock. The rule is whether the action implies work and time; purchase logic was not changed in this Navigation pass.
 - Other rooms' action logic and blocked-reason text have not yet been audited; they remain for their own room-by-room passes.
 - No tests or builds were run, in accordance with the owner's instruction. The GUI, layout, glow, and interaction remain for the owner's local playtest.
+
+### Entry #014
+- Owner requested an extremely small Navigation-only text correction after playtesting.
+- Blocked Navigation progress controls now put their short status inside the control.
+- Removed the separate text previously painted underneath those controls.
+- Travel at the current position reads "Already here" inside its button.
+- An already filed scan keeps its existing "Deep Scan Filed" button label.
+- Removed the redundant explanation under the filed scan button.
+- Exhausted deposits read "Depleted" inside the extraction button.
+- Other existing Navigation blocked reasons are shortened to fit the same treatment.
+- The disabled Navigation command row also puts its short reason on the row, not below it.
+- No button availability, charge, clock, engine, or other room logic was changed.
+- No tests or builds were run; the owner will verify the GUI locally.
+
+### Entry #015
+- Owner noticed that Home room callouts darken on hover, but other Home labels with right-click tasks did not.
+- Added the same palette hover background to the upper system/stat cells.
+- Added it to the lower information cells and Navigation strip.
+- Active event and docked-station cards now receive the same feedback.
+- Empty event placeholders stay unchanged because they do not open a task.
+- Deck-plan room areas also show a hover response where they open a room.
+- Crew markers and visible labels get hover feedback where they open a crew task.
+- Crew hit areas take precedence over room areas, matching the existing click handling.
+- Hover checks use the scrolled content position and only respond within the content viewport.
+- Existing click, right-click, clock, and action behavior was left unchanged.
+- No tests or builds were run; the owner will verify the hover visually in his local build.
+
+### Entry #016
+- Owner approved applying the agreed engine-room battery and maintenance logic first, then playtesting it himself.
+- One Run the drive press restores 25 percentage points of engine condition, capped at full.
+- The engineer's existing automatic service uses the same 25-point maintenance amount.
+- The engineer does not also service the drive during the commander's own engine press.
+- That guard prevents one manual press from restoring twice during its own clock tick.
+- Each successful manual press still uses the existing four-step systems charge and one clock click.
+- The green engine battery is again drawn even when the drive is full and cannot be maintained.
+- This preserves the difference between stored button charge and engine condition.
+- The engine button's descriptive text now states the 25-point restoration rather than full restoration.
+- Engine wear remains unchanged at 1% per four clock clicks; no asset or configuration was edited.
+- Other buttons, rooms, and their shared progress rendering were not changed in this pass.
+- The existing crew timing and battery accounting were otherwise left as they were.
+- No tests or builds were run; the owner will check the engine behavior locally.

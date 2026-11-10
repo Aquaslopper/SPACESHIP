@@ -923,12 +923,16 @@ void ShellView::PaintWrenExterior(const Simulation& sim) {
 
 void ShellView::PaintIdle(Simulation& sim) {
   const Theme& theme = theme_;
+  const auto hovered = [&](const Area& box) {
+    return layout_.content.Contains(mouseX_, mouseY_) &&
+           box.Contains(mouseX_, mouseY_ + contentScroll_);
+  };
 
   // ---- stat and info rails ----------------------------------------------
   for (const RailCell& cell : idle_.stats) {
     DrawRectangle(static_cast<int>(cell.box.x), static_cast<int>(cell.box.y),
                   static_cast<int>(cell.box.w), static_cast<int>(cell.box.h),
-                  ToRay(theme.palette.panel));
+                  ToRay(hovered(cell.box) ? theme.palette.panel3 : theme.palette.panel));
     DrawRectangleLines(static_cast<int>(cell.box.x), static_cast<int>(cell.box.y),
                        static_cast<int>(cell.box.w), static_cast<int>(cell.box.h),
                        ToRay(theme.palette.border));
@@ -967,10 +971,10 @@ void ShellView::PaintIdle(Simulation& sim) {
     PaintDiagram(idle_.diagram, idle_.stageArea, idleDiagramScale_);
   }
   // ---- info rail, navigation and dock strip -----------------------------
-  auto paintStrip = [this, &theme](const Strip& strip) {
+  auto paintStrip = [this, &theme, &hovered](const Strip& strip) {
     DrawRectangle(static_cast<int>(strip.box.x), static_cast<int>(strip.box.y),
                   static_cast<int>(strip.box.w), static_cast<int>(strip.box.h),
-                  ToRay(theme.palette.panel));
+                  ToRay(hovered(strip.box) ? theme.palette.panel3 : theme.palette.panel));
     DrawRectangleLines(static_cast<int>(strip.box.x), static_cast<int>(strip.box.y),
                        static_cast<int>(strip.box.w), static_cast<int>(strip.box.h),
                        ToRay(theme.palette.border));
@@ -993,7 +997,8 @@ void ShellView::PaintIdle(Simulation& sim) {
     const RailCell& cell = idle_.infos[i];
     const float width = std::max(0.0f, cell.box.w);
     DrawRectangle(static_cast<int>(cell.box.x), static_cast<int>(cell.box.y),
-                  static_cast<int>(width), static_cast<int>(cell.box.h), ToRay(theme.palette.panel));
+                  static_cast<int>(width), static_cast<int>(cell.box.h),
+                  ToRay(hovered(cell.box) ? theme.palette.panel3 : theme.palette.panel));
     DrawRectangleLines(static_cast<int>(cell.box.x), static_cast<int>(cell.box.y),
                        static_cast<int>(width), static_cast<int>(cell.box.h), ToRay(theme.palette.border));
     const float textWidth = std::max(1.0f, width - 20.0f);
@@ -1013,8 +1018,10 @@ void ShellView::PaintIdle(Simulation& sim) {
   paintStrip(idle_.nav);
   for (const HomeEventCard& event : idle_.events) {
     const Area& box = event.box;
+    const bool actionable = event.station || !event.id.empty();
     DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
-                  static_cast<int>(box.w), static_cast<int>(box.h), ToRay(theme.palette.panel));
+                  static_cast<int>(box.w), static_cast<int>(box.h),
+                  ToRay(actionable && hovered(box) ? theme.palette.panel3 : theme.palette.panel));
     DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
                        static_cast<int>(box.w), static_cast<int>(box.h), ToRay(theme.palette.border));
     Text(event.heading.c_str(), static_cast<int>(box.x + 8.0f),
@@ -1321,7 +1328,18 @@ void ShellView::PaintStage(const TaskStage& stage, const Area& origin) {
   for (const LiveControl& control : stage.controls) {
     const Area box{origin.x + control.box.x, origin.y + control.box.y,
                    control.box.w, 26.0f};
-    PaintProgressSurface(box, control.button, p);
+    if (control.button.taskId == "engine-click") {
+      // The engine's battery remains visible even when the drive is full and
+      // there is nothing to maintain. Its charge is not the drive condition.
+      DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                    static_cast<int>(box.w), static_cast<int>(box.h),
+                    ToRay(control.button.enabled ? p.panel2 : p.panel3));
+      PaintProgressFill(box, control.button.fillPercent);
+      DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                         static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.borderDark));
+    } else {
+      PaintProgressSurface(box, control.button, p);
+    }
     Text(control.button.text.c_str(), static_cast<int>(box.x + 6.0f),
              static_cast<int>(box.y + 7.0f), TypePx(10) ,
              ToRay(control.button.state == ButtonState::Empty || control.button.state == ButtonState::Off ? p.muted : p.ink));
@@ -1992,7 +2010,9 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   auto paintNavButton = [&](const ProgressButton& button, float bx, float by, float bw) {
     const int size = TypePx(10);
     const float line = std::max(theme_.LineHeight(), static_cast<float>(size) + 4.0f);
-    const auto label = WrapText(button.text, bw - 20.0f, size, SelectFont(size, false));
+    const bool blocked = button.state == ButtonState::Off || button.state == ButtonState::Empty;
+    const std::string& labelText = blocked && !button.title.empty() ? button.title : button.text;
+    const auto label = WrapText(labelText, bw - 20.0f, size, SelectFont(size, false));
     const float height = std::max(48.0f, static_cast<float>(label.size()) * line + 16.0f);
     const Area control{bx, by, bw, height};
     PaintProgressSurface(control, button, p);
@@ -2006,15 +2026,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     if (button.state != ButtonState::Off && button.state != ButtonState::Empty) {
       navHits_.push_back({control, button.taskId, ""});
     }
-    float bottom = control.Bottom();
-    if ((button.state == ButtonState::Off || button.state == ButtonState::Empty) && !button.title.empty()) {
-      bottom += 5.0f;
-      for (const auto& reason : WrapText(button.title, bw, TypePx(9), SelectFont(TypePx(9), false))) {
-        Text(reason.c_str(), static_cast<int>(bx), static_cast<int>(bottom), TypePx(9), ToRay(p.muted));
-        bottom += theme_.LineHeight();
-      }
-    }
-    return bottom;
+    return control.Bottom();
   };
   const float leftButtonTop = std::max(uy, ly + 8.0f);
   float leftButtonBottom = leftButtonTop;
@@ -2031,7 +2043,8 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   for (const CommandRowView& row : screen.commands) {
     const float costW = TextWidth(row.displayCost.c_str(), TypePx(9)) + 12.0f;
     const Area rowBox{left + 8.0f, ty, right - left - 16.0f, theme_.LineHeight() + 8.0f};
-    Text(row.label.c_str(), static_cast<int>(rowBox.x + costW),
+    const std::string& rowText = !row.enabled && !row.title.empty() ? row.title : row.label;
+    Text(rowText.c_str(), static_cast<int>(rowBox.x + costW),
              static_cast<int>(rowBox.y + 4.0f), TypePx(10) ,
              ToRay(row.enabled ? p.ink : p.muted));
     Text((row.displayCost + "  ").c_str(), static_cast<int>(rowBox.x),
@@ -2053,13 +2066,6 @@ void ShellView::PaintNavScreen(Simulation& sim) {
       navHits_.push_back(NavHit{rowBox, action, arg});
     }
     ty += theme_.LineHeight() + 12.0f;
-    if (!row.enabled && !row.title.empty()) {
-      for (const auto& reason : WrapText(row.title, right - left - 16.0f, TypePx(9), SelectFont(TypePx(9), false))) {
-        Text(reason.c_str(), static_cast<int>(left + 8.0f), static_cast<int>(ty), TypePx(9), ToRay(p.muted));
-        ty += theme_.LineHeight();
-      }
-      ty += 4.0f;
-    }
   }
   for (const std::string& note : navScreen_.notes) {
     for (const auto& line : WrapText(note, right - left - 16.0f, TypePx(9), SelectFont(TypePx(9), false))) {
@@ -3365,13 +3371,25 @@ void ShellView::PaintPopup(Simulation& sim) {
 }
 
 void ShellView::PaintDiagram(const DiagramModel& diagram, const Area& stageBox, float scale) {
-  (void)stageBox;
   (void)scale;
   const ::Color frame = ToRay(theme_.palette.coffee);
   const ::Color hull = ToRay(theme_.palette.white);
   const ::Color spine = ToRay(theme_.palette.panel);
   const float ox = diagram.stage.x;
   const float oy = diagram.stage.y;
+  const bool overStage = layout_.content.Contains(mouseX_, mouseY_) &&
+                         stageBox.Contains(mouseX_, mouseY_ + contentScroll_);
+  const float localX = mouseX_ - ox;
+  const float localY = mouseY_ + contentScroll_ - oy;
+  const auto crewHovered = [&](const DiagramCrew& crew) {
+    const Area dot{crew.dot.x - 6.0f, crew.dot.y - 6.0f, 27.0f, 27.0f};
+    const Area label{crew.label.x, crew.label.y,
+                     crew.labelled ? TextWidth(crew.firstName.c_str(), TypePx(9)) : 0.0f,
+                     crew.labelled ? TypeStep(12.0f) : 0.0f};
+    return overStage && (dot.Contains(localX, localY) || label.Contains(localX, localY));
+  };
+  const auto hoveredCrew = std::find_if(diagram.crew.begin(), diagram.crew.end(), crewHovered);
+  const bool overCrew = hoveredCrew != diagram.crew.end();
 
   for (const HullPart& part : diagram.hull) {
     const int x = static_cast<int>(ox + part.box.x);
@@ -3429,7 +3447,11 @@ void ShellView::PaintDiagram(const DiagramModel& diagram, const Area& stageBox, 
     const int y = static_cast<int>(oy + room.box.y);
     const int w = static_cast<int>(room.box.w);
     const int h = static_cast<int>(room.box.h);
-    DrawRectangle(x, y, w, h, theme_.id == "classic" ? HexColor(room.tone, ToRay(theme_.palette.panel2)) : ToRay(theme_.palette.panel2));
+    const bool hover = overStage && !overCrew && localX >= room.box.x && localY >= room.box.y &&
+                       localX < room.box.x + room.box.w && localY < room.box.y + room.box.h;
+    DrawRectangle(x, y, w, h, hover ? ToRay(theme_.palette.panel3)
+                                   : (theme_.id == "classic" ? HexColor(room.tone, ToRay(theme_.palette.panel2))
+                                                              : ToRay(theme_.palette.panel2)));
     DrawRectangleLines(x, y, w, h, ToRay(theme_.palette.borderDark));
     const auto accent = diagram.roomAccents.find(room.id);
     DrawRectangle(x, y, 3, h, accent == diagram.roomAccents.end() ? ToRay(theme_.palette.coffee) : HexColor(accent->second, ToRay(theme_.palette.coffee)));
@@ -3460,6 +3482,15 @@ void ShellView::PaintDiagram(const DiagramModel& diagram, const Area& stageBox, 
   }
 
   for (const DiagramCrew& crew : diagram.crew) {
+    if (overCrew && &crew == &*hoveredCrew) {
+      DrawRectangle(static_cast<int>(ox + crew.dot.x - 3), static_cast<int>(oy + crew.dot.y - 3),
+                    21, 21, ToRay(theme_.palette.panel3));
+      if (crew.labelled) {
+        DrawRectangle(static_cast<int>(ox + crew.label.x), static_cast<int>(oy + crew.label.y),
+                      static_cast<int>(TextWidth(crew.firstName.c_str(), TypePx(9))),
+                      static_cast<int>(TypeStep(12.0f)), ToRay(theme_.palette.panel3));
+      }
+    }
     DrawRectangle(static_cast<int>(ox + crew.dot.x), static_cast<int>(oy + crew.dot.y),
                   15, 15, HexColor(crew.colour, ToRay(theme_.palette.coffeeDark)));
     if (crew.labelled) {

@@ -14,18 +14,16 @@
 
 namespace ship {
 
-// The machine's button. A press is a click of the clock like any other: the
-// world ages, hunger rises and the drive wears. It also brings the drive back to
-// full, which is all the tending there is, so the press can never outrun the
-// wear it causes - and the button then waits out a whole cycle of clicks.
-// The press itself: the bar is armed to the click that is in flight and the
-// drive comes back up. Called from the commander's own press, and from the
-// engineer's tick, which is already an action of its own.
+// One maintenance press restores one quarter of the drive. The commander
+// spends the click through EngineClick; the engineer works inside an existing
+// player click and uses the same maintenance amount without advancing time again.
 void Simulation::ServiceDrive(const std::string& by) {
   const std::string who = by.empty() ? "The commander" : by;
   state_.engineClickAt = ActionCount();
   LogLine(who + " pressed the maintenance button");
-  if (state_.gameOver.empty()) { state_.engineCondition = 100.0; }
+  if (state_.gameOver.empty()) {
+    state_.engineCondition = std::min(100.0, state_.engineCondition + 25.0);
+  }
 }
 
 bool Simulation::EngineClick(const std::string& by) {

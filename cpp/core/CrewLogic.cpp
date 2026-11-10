@@ -457,7 +457,9 @@ void Simulation::AutoMaint() {
   if (maintClaim_ || projectClaim_ == "cooling" || FindOngoing("project-cooling") != nullptr) {
     return;
   }
-  if (worker == nullptr || MaintRunning()) { return; }
+  // The commander's press already services the drive after this tick. Do not
+  // let the engineer service it a second time on that same press.
+  if (worker == nullptr || engineClicking_ || MaintRunning()) { return; }
   if (CrewBusy(*worker) != nullptr) { return; }
   // How early he takes the button is what his training buys: an untrained hand
   // waits until the drive is under the floor, a trained one presses at his own
