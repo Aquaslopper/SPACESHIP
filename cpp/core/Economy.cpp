@@ -718,6 +718,16 @@ bool Simulation::AcceptTrade(const std::string& mode, const std::string& to,
       lot.value = commodity->value * trade.crates;
       lot.risk = commodity->risk;
       lot.contractId = "trade:" + TradeKey(mode, to, good);
+      {
+        const std::string systemId = catalog_.BodySystem(*destination);
+        if (!systemId.empty() &&
+            state_.systemSerials.find(systemId) == state_.systemSerials.end()) {
+          state_.systemSerials[systemId] = state_.nextSystemSerial++;
+        }
+        const auto serial = state_.systemSerials.find(systemId);
+        const int tag = serial == state_.systemSerials.end() ? 0 : serial->second;
+        lot.triggerId = "#" + std::to_string(tag) + ":" + lot.contractId;
+      }
       goods_.push_back(std::move(lot));
     }
   } else {

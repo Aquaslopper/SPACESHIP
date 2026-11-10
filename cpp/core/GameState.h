@@ -280,6 +280,9 @@ struct GoodsLot {
   double value = 0;
   bool risk = false;
   std::string contractId;
+  // Voyage tag from systemSerials: "#N:trade:..." so a generated chart can
+  // still bind the lot after the old place names are gone.
+  std::string triggerId;
 };
 
 struct SurveyRecord {
