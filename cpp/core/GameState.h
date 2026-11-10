@@ -5,7 +5,7 @@
 //  stores (CREW, LIFE, MESS, STATS, EVENTS, GOODS, SURVEY, MAP) precisely so
 //  that serialising a voyage is trivial. The port keeps the same split and the
 //  same field names, because SaveSystem has to produce a file the HTA can read
-//  and consume one it wrote.
+//  and consume one it wrote. 
 //
 //  Field names are therefore not up for tidying: `rackWarnedMess` stays.
 // ============================================================================
@@ -356,7 +356,7 @@ struct Cargo {
 struct Mess {
   double rack = 18;       // cooked food on the galley counter
   double capacity = 24;   // the counter's ceiling
-  double rations = 21;    // dry rations in the larder - spent one per batch
+  double rations = 10;    // dry rations in the larder - spent one per batch
   double rationCapacity = 24;
 };
 
@@ -401,7 +401,7 @@ struct GameState {
   double wearTick = 0;
   // The clock reading the machine's button was last pressed at, so the green bar
   // knows how much of the twelve has come back round.
-  double engineClickAt = -1e9;
+  double engineClickAt = 4;
 
   // Life support: charge in the bank, and the breathable air in the cabin.
   double filterLife = 0;
