@@ -31,6 +31,9 @@ void Simulation::ServiceDrive(const std::string& by) {
 bool Simulation::EngineClick(const std::string& by) {
   if (!state_.gameOver.empty()) { return false; }
   if (engineClicking_) { return false; }
+  // Nothing to maintain is nothing to click: a drive at full condition refuses
+  // the press instead of spending a click on an empty job.
+  if (state_.engineCondition >= 100.0) { return false; }
   // A maintenance job already in hand owns the drive; the button waits for it.
   if (MaintRunning()) { return false; }
 

@@ -406,6 +406,8 @@ bool Simulation::TalkToCrew(const std::string& crewId) {
   if (crew == nullptr || crew->health <= 0 || FindOngoing("doc-" + crewId) != nullptr) {
     return false;
   }
+  // Nothing to lift is nothing to click: at full morale the talk spends nothing.
+  if (crew->morale >= 100.0) { return false; }
   // Capture everything needed before the tick: crew may leave or die during
   // the action. Like other committed changes, apply the morale before it ticks.
   const std::string name = crew->name;

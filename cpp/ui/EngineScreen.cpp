@@ -345,20 +345,24 @@ EngineScreenModel BuildEngineScreen(const Simulation& sim) {
   const std::string chargeKey = ButtonChargeKey(sim, "progress:engine-click");
   const std::string tier = ButtonChargeTier("engine maintenance run the drive", "systems");
   const double charge = ChargePercent(sim, chargeKey, tier);
-  const bool live = charge > 0.0;
+  const bool maintained = sim.State().engineCondition >= 100.0;
+  const bool live = charge > 0.0 && !maintained;
   LiveControl run;
   run.id = "eng-run";
   run.box = Area{452.0f, 316.0f, 176.0f, 30.0f};
   run.button.taskId = "engine-click";
   run.button.idleLabel = "Run the drive";
   run.button.text = "Run the drive";
-  run.button.title = "One click of the clock, and the drive is brought back to full.";
+  run.button.title = maintained
+      ? "The drive is at full condition; there is nothing to maintain."
+      : "One click of the clock, and the drive is brought back to full.";
   run.button.chargeKey = chargeKey;
   run.button.tier = tier;
   run.button.fillPercent = charge;
   run.button.enabled = live;
   run.button.inert = !live;
-  run.button.state = live ? ButtonState::Idle : ButtonState::Empty;
+  run.button.state = live ? ButtonState::Idle
+                          : (charge > 0.0 ? ButtonState::Off : ButtonState::Empty);
   screen.stage.controls.push_back(run);
   screen.hasStage = true;
   return model;

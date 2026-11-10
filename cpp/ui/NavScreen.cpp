@@ -837,9 +837,17 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
   } else {
     const bool remoteScan = target != nullptr &&
                             (!reach || target->type == "system" || target->type == "region");
+    // A body already deep-scanned has nothing left to reveal: the button is
+    // filed, not live, so a click cannot be spent on an empty scan.
+    auto seen = target == nullptr ? sim.State().scanned.end()
+                                  : sim.State().scanned.find(target->id);
+    const bool scanFiled =
+        target != nullptr && seen != sim.State().scanned.end() && seen->second;
     screen.progress.push_back(BuildProgressButton(
-        sim, "scan", remoteScan ? "Run Long-Range Scan" : "Run Deep Scan",
-        canScanTarget && energy > 0,
+        sim, "scan",
+        scanFiled ? "Deep Scan Filed"
+                  : (remoteScan ? "Run Long-Range Scan" : "Run Deep Scan"),
+        canScanTarget && energy > 0 && !scanFiled,
         "Scan Complete", "space"));
   }
 

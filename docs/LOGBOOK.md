@@ -107,3 +107,16 @@ You must append a compressed summary of **every single reply and action you take
 - CommandRowView gained `charged`, so Draw paints the green only where clicks are actually spent; shiplets rows stay plain.
 - Checks run: g++ -fsyntax-only on every cpp/ unit (clean); headless console scripted - engine 4,3,2,1,0 and refused after, a cook press (own mechanic) puts the engine back to 1 of 4, scan opens at 2 of 2, cook opens with no charge.
 - Not verified: no CMake in this environment, so the client was not built and no screen was seen; the visual result is still unverified until the owner builds locally.
+
+### Entry #010
+- **Timestamp:** 2026-11-10 19:12 UTC
+- Owner reported two logic holes: the drive could be "maintained" at full condition, and a finished deep scan could be run again from the same button.
+- Owner's rule, read from the two examples: a press must either do real work (spend a click, drain, wind the others up) or be visibly unavailable. Nothing may look pressable while doing nothing, and no press that does something may go uncounted.
+- Fixed engine: EngineClick refuses while engineCondition >= 100, and the engine-room button is live only when charge > 0 and the drive is below full; at full it reads Off with the title "The drive is at full condition; there is nothing to maintain".
+- Fixed acknowledge: the done-press now runs through PressWithoutCharge, so reading a finished result spends no charge of its own but still returns a step to every other button.
+- Fixed scan: a body already deep-scanned shows "Deep Scan Filed" and the button is not live, so no click can be paid for a scan with nothing left to reveal.
+- Fixed talk: TalkToCrew refuses at full morale and the conversation row is not live there either.
+- Audited and left as they are, because they already match the rule: travel/scan/extract enable conditions in NavScreen, cook (full counter, empty larder), O2 (ready, running, power), medical (health, medkit, energy), projects (blocked list), station rows (money gate and greying), system service (below 100 and stock > 0).
+- Checks run: g++ -fsyntax-only on every unit (clean); headless console - engine at 100 takes no click (charge stays 4), engine at 55 spends one (4->3) and refuses the second press once the drive is full.
+- Not verified: the scan-filed and acknowledge paths could not be driven through the console harness (SelectTarget does not set navTarget there), so those two rest on the compiler and on reading the call path.
+- No GUI build here; visuals still unverified.

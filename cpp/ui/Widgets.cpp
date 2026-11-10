@@ -300,12 +300,17 @@ bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
   // The machine's button is a click of the clock like any other: the charge it
   // holds is the only thing that decides whether it can pay.
   if (taskId == "engine-click") {
+    if (button.state == ButtonState::Off || button.state == ButtonState::Empty) { return false; }
     return CommitActionButton(sim, button.chargeKey, button.tier,
                               [&sim]() { return sim.EngineClick(); });
   }
   const Task* task = sim.FindOngoing(taskId);
   if (task != nullptr && task->state == "running") { return false; }  // inert
-  if (task != nullptr && task->state == "done") { return sim.Acknowledge(taskId); }
+  if (task != nullptr && task->state == "done") {
+    // Reading the result is a click of the hand, not of the clock: it spends no
+    // charge of its own, but every other button feels the click.
+    return PressWithoutCharge(sim, [&sim, &taskId]() { return sim.Acknowledge(taskId); });
+  }
 
   if (button.state == ButtonState::Empty) { return false; }
   if (button.state == ButtonState::Off) { return false; }
@@ -431,7 +436,7 @@ CommandRowView BuildConversationRow(const Simulation& sim, const std::string& cr
   row.cost = row.displayCost = "1 click";
   row.actionCost = true;
   row.enabled = crew->health > 0 && sim.State().gameOver.empty() &&
-                sim.FindOngoing("doc-" + crewId) == nullptr;
+                sim.FindOngoing("doc-" + crewId) == nullptr && crew->morale < 100.0;
   row.live = row.enabled;
   if (!row.enabled && sim.FindOngoing("doc-" + crewId) != nullptr) {
     row.title = "Crew member is in the medical bay.";
