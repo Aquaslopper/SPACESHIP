@@ -369,7 +369,8 @@ const CrewMember* Simulation::FindCrew(const std::string& id) const {
 // Commands (Phase 1A). Each mirrors the reference function named beside it.
 // ---------------------------------------------------------------------------
 
-bool Simulation::StartCanisterInstall(int slot, const std::string& by) {
+bool Simulation::StartCanisterInstall(int slot, const std::string& by,
+                                     bool spendsAction) {
   // startInstall(e, i): the action is spent FIRST, then the work is registered,
   // so the tick caused by the action cannot eat a step of that work.
   if (slot < 0 || slot >= static_cast<int>(life_.slots.size())) { return false; }
@@ -383,12 +384,17 @@ bool Simulation::StartCanisterInstall(int slot, const std::string& by) {
   life_.canisters -= 1;
 
   const std::string who = by.empty() ? "the commander" : by;
-  o2Claim_ = true;
-  PerformAction(by.empty() ? "Canister carried to " + target.name
-                           : by + " carried a canister to " + target.name);
-  o2Claim_ = false;
-
-  if (!state_.gameOver.empty()) { return true; }
+  if (spendsAction) {
+    o2Claim_ = true;
+    PerformAction(by.empty() ? "Canister carried to " + target.name
+                             : by + " carried a canister to " + target.name);
+    o2Claim_ = false;
+    if (!state_.gameOver.empty()) { return true; }
+  } else {
+    // A hand's own press: it fills its own line and starts the work, but the
+    // click that carries the ship forward is the player's, not his.
+    LogLine(who + " carried a canister to " + target.name);
+  }
 
   // The same press, made by a hand: it works at that hand's rate, not at the
   // commander's.
@@ -440,7 +446,7 @@ bool Simulation::StartMaintenanceSelf() {
   return true;
 }
 
-bool Simulation::StartCookingSelf(const std::string& by) {
+bool Simulation::StartCookingSelf(const std::string& by, bool spendsAction) {
   // Cooking a batch spends one dry ration up front; up to foodPerRation cooked
   // food lands together when the fixed foodPerRation-action timer completes.
   // Refuse a full counter or an empty larder.
@@ -461,11 +467,14 @@ bool Simulation::StartCookingSelf(const std::string& by) {
   const double cost = rules_.mess.foodPerRation;
 
   const std::string who = by.empty() ? "the commander" : by;
-  cookClaim_ = true;
-  PerformAction(by.empty() ? "Cooking begun by the commander" : "Cooking begun by " + by);
-  cookClaim_ = false;
-
-  if (!state_.gameOver.empty()) { return false; }
+  if (spendsAction) {
+    cookClaim_ = true;
+    PerformAction(by.empty() ? "Cooking begun by the commander" : "Cooking begun by " + by);
+    cookClaim_ = false;
+    if (!state_.gameOver.empty()) { return false; }
+  } else {
+    LogLine("Cooking begun by " + who);
+  }
 
   Task* task = AddOngoing("cook", "Cooking - " + who, cost, "cook", "mess");
   if (task != nullptr) {

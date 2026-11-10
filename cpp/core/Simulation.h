@@ -105,10 +105,14 @@ class Simulation {
 
   // ---- commands that exist in Phase 1A -----------------------------------
   // `by` names the hand that made the press; empty means the commander.
-  bool StartCanisterInstall(int slot, const std::string& by = std::string());  // the player carries a canister over
+  // `spendsAction` is false for a hand's own press: the crew works on the
+  // player's clock, so its press must not advance the clock again.
+  bool StartCanisterInstall(int slot, const std::string& by = std::string(),
+                            bool spendsAction = true);  // the player carries a canister over
   bool StartFilterBank();               // the player throws the switch
   bool StartMaintenanceSelf();          // startMaint(e, "maint", "the commander")
-  bool StartCookingSelf(const std::string& by = std::string());              // startCook(e, "cook", "the commander")
+  bool StartCookingSelf(const std::string& by = std::string(),
+                        bool spendsAction = true);              // startCook(e, "cook", "the commander")
   bool ServiceSystem(const std::string& statId);  // buildSystemScreen() service row
   bool ApplyJob(const std::string& crewId, const std::string& jobId);  // scenario setup
 

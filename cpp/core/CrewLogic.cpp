@@ -511,7 +511,7 @@ void Simulation::AutoFilters() {
   // made by a hand, so it runs at his rate and carries his name.
   for (std::size_t i = 0; i < life_.slots.size(); ++i) {
     if (life_.slots[i].state != "empty") { continue; }
-    if (StartCanisterInstall(static_cast<int>(i), worker->name)) {
+    if (StartCanisterInstall(static_cast<int>(i), worker->name, false)) {
       LogLine(worker->name + " seated a canister in " + life_.slots[i].name + ".");
     }
     return;
@@ -544,7 +544,7 @@ void Simulation::AutoMess() {
   // batch finishes. A batch that would overshoot the ceiling is still cooked;
   // the landing is clamped, so the counter ends full rather than past its lid.
   // She presses the galley's own control rather than opening work of her own.
-  if (StartCookingSelf(worker->name)) {
+  if (StartCookingSelf(worker->name, false)) {
     LogLine(worker->name + " started cooking without being asked.");
   }
 }

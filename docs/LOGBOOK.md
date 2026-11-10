@@ -120,3 +120,15 @@ You must append a compressed summary of **every single reply and action you take
 - Checks run: g++ -fsyntax-only on every unit (clean); headless console - engine at 100 takes no click (charge stays 4), engine at 55 spends one (4->3) and refuses the second press once the drive is full.
 - Not verified: the scan-filed and acknowledge paths could not be driven through the console harness (SelectTarget does not set navTarget there), so those two rest on the compiler and on reading the call path.
 - No GUI build here; visuals still unverified.
+
+### Entry #011
+- **Timestamp:** 2026-11-10 20:05 UTC
+- Owner's report: "it takes 3 clicks to seat all tanks but 4 clicks overall before the button for filter running can be clicked. So how can it be that when I do only two clicks the worker was able to do this whole work? It shouldn't." A hand's job must cost what the same job costs the commander.
+- Root cause found: the crew's own presses were re-entering the clock. `AutoFilters` calls `StartCanisterInstall(slot, worker->name)`, and that function spends an action of its own (`PerformAction`) because the commander's press must; made from inside the crew tick, which already runs inside the player's action, it advanced the ship a second time. `AutoMess` had the identical hole through `StartCookingSelf(worker->name)`.
+- What that looked like in the headless console before the fix: one player click often moved the action counter by two (1, 2, 3, 5, 6, 7, 8) and the crew's two-click seating job closed inside a single click, because the extra tick also ran `AdvanceTasks`.
+- Fix: `StartCanisterInstall(slot, by, spendsAction)` and `StartCookingSelf(by, spendsAction)` gained a flag, defaulting to true so every commander path is untouched; the crew passes false. A hand's press now fills its own feed line and registers its work at the hand's rate, but the click that carries the ship forward stays the player's.
+- Audited the other crew-direct calls for the same bypass and left them alone, because they do no work of their own: `RunBank` is a pure effect (slots active, filter life, the +10 Pro-Action line) and starts nothing the player pays for; `ServiceDrive` in the maintenance path makes no action; `TalkToCrew` is the player's own press from the crew row, not a hand's.
+- The bank switch keeps its price for the player: `StartFilterBank` spends one action and then runs the bank, so the commander's 3 seatings plus 1 switch are still four clicks of his own.
+- After the fix, same script: the action counter moves by exactly one per click, 1 through 24 with no jumps; two clicks never produce a running bank, and the bank turns over on click 18 with all three slots active after the untrained hand's own two-click seatings and the third canister waiting for the air to fall to his stage.
+- Checks run: g++ -fsyntax-only on every unit in cpp/ (clean); headless console scripts to /tmp/s18.txt through /tmp/s22.txt.
+- Not verified: no CMake or raylib build here, so nothing was seen on screen; the visual result and the button's own pacing in the GUI stay unverified until the owner builds locally.
