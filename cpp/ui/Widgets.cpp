@@ -229,11 +229,9 @@ ProgressButton BuildProgressButton(const Simulation& sim, const std::string& tas
   button.state = ButtonState::Running;
   button.fillPercent = OngoingPercent(*task);
   button.text = task->label;
-  button.inert = !(taskId == "scan"
-                || taskId == "travel"
-                || taskId == "extract"
-                || taskId == "o2-run"
-                || taskId == "maint");
+  // The bar stays a button. Any click on it is a click of the clock; other
+  // bars drain from that same click. Inert was the lock by another name.
+  button.inert = false;
   return button;
 }
 
