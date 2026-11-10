@@ -51,6 +51,26 @@ void PaintProgressFill(const Area& box, double percent) {
            ::Color{126, 198, 63, 255});
 }
 
+// A finished job is distinct from both a charged button and a blocked one.
+void PaintProgressSurface(const Area& box, const ProgressButton& button, const Palette& p) {
+  const bool blocked = button.state == ButtonState::Off || button.state == ButtonState::Empty;
+  if (button.state == ButtonState::Done) {
+    for (int r = 4; r >= 1; --r) {
+      DrawRectangleLines(static_cast<int>(box.x) - r, static_cast<int>(box.y) - r,
+                         static_cast<int>(box.w) + r * 2, static_cast<int>(box.h) + r * 2,
+                         ::Color{126, 198, 63, static_cast<unsigned char>(20 + (4 - r) * 12)});
+    }
+  }
+  DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                static_cast<int>(box.w), static_cast<int>(box.h),
+                ToRay(blocked ? p.panel3 : p.control));
+  if (!blocked) { PaintProgressFill(box, button.fillPercent); }
+  DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                     static_cast<int>(box.w), static_cast<int>(box.h),
+                     button.state == ButtonState::Done ? ::Color{100, 165, 47, 255}
+                                                       : ToRay(p.borderDark));
+}
+
 ::Color HexColor(const std::string& value, ::Color fallback) {
   if (value.size() != 7 || value[0] != '#') { return fallback; }
   char* end = nullptr;
@@ -527,7 +547,7 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
   std::vector<float> tabWidths;
   float tabsWidth = 4.0f;
   for (const TabView& tab : tabs) {
-    const std::string label = tab.kindLabel + "  " + tab.title;
+    const std::string& label = tab.title;
     const float tabW = ImGui::CalcTextSize(label.c_str()).x + (tab.closable ? 30.0f : 18.0f);
     tabWidths.push_back(tabW);
     tabsWidth += tabW + 4.0f;
@@ -583,8 +603,6 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
     draw->AddRect(ImVec2(x, 3.0f), ImVec2(x + w, Metrics::kTaskbarH - 2.0f), ToIm(p.border), 3.0f);
     const ImU32 ink = ToIm(tab.active ? p.activeInk : p.tabInk);
     float titleX = x + 7.0f;
-    draw->AddText(ImVec2(titleX, 9.0f), ToIm(p.muted), tab.kindLabel.c_str());
-    titleX += ImGui::CalcTextSize((tab.kindLabel + "  ").c_str()).x;
     draw->AddText(ImVec2(titleX, 9.0f), ink, tab.title.c_str());
     if (tab.closable) { draw->AddText(ImVec2(x + w - 13.0f, 9.0f), ToIm(p.muted), "x"); }
     x += w + 4.0f;
@@ -1303,16 +1321,10 @@ void ShellView::PaintStage(const TaskStage& stage, const Area& origin) {
   for (const LiveControl& control : stage.controls) {
     const Area box{origin.x + control.box.x, origin.y + control.box.y,
                    control.box.w, 26.0f};
-    DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
-                  static_cast<int>(box.w), static_cast<int>(box.h),
-                  ToRay(control.button.enabled ? p.panel2 : p.panel3));
-    PaintProgressFill(box, control.button.fillPercent);
-    DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
-                       static_cast<int>(box.w), static_cast<int>(box.h),
-                       ToRay(p.borderDark));
+    PaintProgressSurface(box, control.button, p);
     Text(control.button.text.c_str(), static_cast<int>(box.x + 6.0f),
              static_cast<int>(box.y + 7.0f), TypePx(10) ,
-             ToRay(control.button.state == ButtonState::Empty ? p.muted : p.ink));
+             ToRay(control.button.state == ButtonState::Empty || control.button.state == ButtonState::Off ? p.muted : p.ink));
     taskButtons_.push_back({box, control.button.taskId});
   }
 }
@@ -1360,13 +1372,11 @@ float ShellView::PaintActionBand(const std::string& title, const std::string& no
     for (const auto& cell : row) {
       const auto& button = buttons[cell.index];
       const Area box{x, y, cell.width, rowH};
-      DrawRectangle(static_cast<int>(x), static_cast<int>(y), static_cast<int>(box.w), static_cast<int>(box.h), ToRay(button.enabled ? p.control : p.panel3));
-      PaintProgressFill(box, button.fillPercent);
-      DrawRectangleLines(static_cast<int>(x), static_cast<int>(y), static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.borderDark));
+      PaintProgressSurface(box, button, p);
       float textY = y + (rowH - cell.text.size() * line) / 2;
       for (const auto& text : cell.text) {
         Text(text.c_str(), static_cast<int>(x + (box.w - TextWidth(text.c_str(), size)) / 2), static_cast<int>(textY), size,
-             ToRay(button.state == ButtonState::Empty ? p.muted : p.ink));
+             ToRay(button.state == ButtonState::Empty || button.state == ButtonState::Off ? p.muted : p.ink));
         textY += line;
       }
       actionBandHits_.push_back({box, button.taskId, ""});
@@ -1519,9 +1529,8 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   float tailH = screen.commands.size() * (theme_.LineHeight() + 12);
   for (const auto& note : navScreen_.notes)
     tailH += WrapText(note, right - left - 16, TypePx(9), SelectFont(TypePx(9), false)).size() * theme_.LineHeight() + 4;
-  const float footerH = PaintActionBand("Target Actions", navScreen_.courseNote, screen.progress, "", true);
   const float parkedBody = std::max({240 + 22 + underH, leftH, rightH}) + 12 + tailH;
-  const float otherH = headerH + 8 + parkedBody - 240 + footerH + 8;
+  const float otherH = headerH + 8 + parkedBody - 240 + 8;
   const float availableH = layout_.content.h - otherH - 4;
   // Preserve the existing logical viewport and cap/floor ordering.
   const float chartH = std::min({500.0f, chartW * 0.5f, std::max(240.0f, availableH)});
@@ -1978,7 +1987,47 @@ void ShellView::PaintNavScreen(Simulation& sim) {
                     underH});
   }
 
-  float ty = std::max({ly, rightBottom, uy + underH}) + 12;
+  // Place travel alongside the details, and sensors and extraction on the
+  // opposite side of the chart. These are body controls, not a pinned banner.
+  auto paintNavButton = [&](const ProgressButton& button, float bx, float by, float bw) {
+    const int size = TypePx(10);
+    const float line = std::max(theme_.LineHeight(), static_cast<float>(size) + 4.0f);
+    const auto label = WrapText(button.text, bw - 20.0f, size, SelectFont(size, false));
+    const float height = std::max(48.0f, static_cast<float>(label.size()) * line + 16.0f);
+    const Area control{bx, by, bw, height};
+    PaintProgressSurface(control, button, p);
+    float textY = by + (height - label.size() * line) / 2.0f;
+    for (const auto& text : label) {
+      Text(text.c_str(), static_cast<int>(bx + (bw - TextWidth(text.c_str(), size)) / 2),
+           static_cast<int>(textY), size,
+           ToRay(button.state == ButtonState::Off || button.state == ButtonState::Empty ? p.muted : p.ink));
+      textY += line;
+    }
+    if (button.state != ButtonState::Off && button.state != ButtonState::Empty) {
+      navHits_.push_back({control, button.taskId, ""});
+    }
+    float bottom = control.Bottom();
+    if ((button.state == ButtonState::Off || button.state == ButtonState::Empty) && !button.title.empty()) {
+      bottom += 5.0f;
+      for (const auto& reason : WrapText(button.title, bw, TypePx(9), SelectFont(TypePx(9), false))) {
+        Text(reason.c_str(), static_cast<int>(bx), static_cast<int>(bottom), TypePx(9), ToRay(p.muted));
+        bottom += theme_.LineHeight();
+      }
+    }
+    return bottom;
+  };
+  const float leftButtonTop = std::max(uy, ly + 8.0f);
+  float leftButtonBottom = leftButtonTop;
+  float rightButtonBottom = std::max(uy, rightBottom + 8.0f);
+  for (const ProgressButton& button : screen.progress) {
+    if (button.taskId == "travel") {
+      leftButtonBottom = paintNavButton(button, left, leftButtonTop, leftColumn);
+    } else {
+      rightButtonBottom = paintNavButton(button, right - rightColumn, rightButtonBottom, rightColumn) + 12.0f;
+    }
+  }
+
+  float ty = std::max({ly, rightBottom, uy + underH, leftButtonBottom, rightButtonBottom}) + 12;
   for (const CommandRowView& row : screen.commands) {
     const float costW = TextWidth(row.displayCost.c_str(), TypePx(9)) + 12.0f;
     const Area rowBox{left + 8.0f, ty, right - left - 16.0f, theme_.LineHeight() + 8.0f};
@@ -1996,7 +2045,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     if (row.label.find("Stand watch") == 0) { action = "stand-watch"; }
     if (row.label.find("Dock at ") == 0) { action = "dock"; }
     if (row.label.find("View ") == 0) { action = "view-sector"; }
-    if (!action.empty()) {
+    if (!action.empty() && row.enabled) {
       const std::string arg =
           action == "view-sector"
               ? sim.State().navTarget.value_or(std::string())
@@ -2004,6 +2053,13 @@ void ShellView::PaintNavScreen(Simulation& sim) {
       navHits_.push_back(NavHit{rowBox, action, arg});
     }
     ty += theme_.LineHeight() + 12.0f;
+    if (!row.enabled && !row.title.empty()) {
+      for (const auto& reason : WrapText(row.title, right - left - 16.0f, TypePx(9), SelectFont(TypePx(9), false))) {
+        Text(reason.c_str(), static_cast<int>(left + 8.0f), static_cast<int>(ty), TypePx(9), ToRay(p.muted));
+        ty += theme_.LineHeight();
+      }
+      ty += 4.0f;
+    }
   }
   for (const std::string& note : navScreen_.notes) {
     for (const auto& line : WrapText(note, right - left - 16.0f, TypePx(9), SelectFont(TypePx(9), false))) {
@@ -2013,7 +2069,6 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     ty += 4.0f;
   }
   contentPaintBottom_ = std::max(contentPaintBottom_, ty);
-  PaintActionBand("Target Actions", navScreen_.courseNote, screen.progress);
 
 }
 
@@ -2276,9 +2331,7 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
     const float width = buttonWidth(button);
     const float buttonH = countRows(button.text, width - 16) * line + 12;
     const Area box{(left + right - width) / 2, y + 6, width, buttonH};
-    DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.w), static_cast<int>(box.h), ToRay(button.enabled ? p.panel2 : p.panel3));
-    PaintProgressFill(box, button.fillPercent);
-    DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y), static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.borderDark));
+    PaintProgressSurface(box, button, p);
     float textY = box.y + 6;
     for (const auto& text : WrapText(button.text, width - 16, TypePx(10), SelectFont(TypePx(10), false))) {
       Text(text.c_str(), static_cast<int>(box.x + (width - TextWidth(text.c_str(), TypePx(10))) / 2),
@@ -3795,8 +3848,9 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
     for (auto it = navHits_.rbegin(); it != navHits_.rend(); ++it) {
       const NavHit& hit = *it;
       if (!hit.box.Contains(x, y + scrollY)) { continue; }
-      if (PressNavAction(sim, hit.action, hit.arg) &&
-          (hit.action == "travel" || hit.action == "scan")) {
+      const double actionsBefore = sim.ActionCount();
+      PressNavAction(sim, hit.action, hit.arg);
+      if (sim.ActionCount() > actionsBefore) {
         SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
       }
       return;

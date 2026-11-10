@@ -249,7 +249,10 @@ ProgressButton BuildProgressButton(const Simulation& sim, const std::string& tas
       button.text = idleLabel;
       return button;
     }
-    if (charge <= 0.0) {
+    if (!enabled) {
+      button.state = ButtonState::Off;
+      button.text = idleLabel;
+    } else if (charge <= 0.0) {
       button.state = ButtonState::Empty;
       button.text = idleLabel;
       button.title = TierLabel(sim, button.tier) + " button: out of clicks.";

@@ -147,3 +147,20 @@ You must append a compressed summary of **every single reply and action you take
 - Plan agreed with the owner: settle this room by room rather than in one sweep, after his playtest of the current state.
 - Checks run: none - this entry records an audit of code paths only; no file but this one was touched.
 - Still unverified: the visual behaviour of the mark itself, since no raylib build is possible in this environment.
+
+### Entry #013
+- Owner approved starting the room-by-room pass with Navigation, followed by his playtest before moving on.
+- Task tabs now show the title alone, without prefixes such as NAV and ROOM; tab width and hit boxes follow the shorter title.
+- Removed Navigation's pinned Target Actions banner and put Travel to the left of the target details, with Scan and Extraction on the right.
+- The embedded controls wrap their labels, retain their own hit areas, and make room for the reasons a control is blocked.
+- Navigation controls that cannot start work are grey instead of showing a full green battery.
+- Navigation describes the applicable reason, including current location, range, engine, energy, fuel, full cargo, depleted deposits, or an already filed scan.
+- A button with no charge explains that other work recharges it; its charge is still separate from other blockers.
+- Shared progress surfaces now show running progress in green and finished work with a green glow, including stage and footer controls.
+- The same shared surfaces suppress green and mute text for Off and Empty states; a genuine blocker takes precedence over an empty charge.
+- A completed extraction remains reachable after selecting a different target, rather than appearing as a busy rig.
+- Navigation marks a press only if ActionCount increased, covering work actions such as docking without marking map viewing or a free completion acknowledgment.
+- The sector-view command is explicitly free and uncharged; the docking row displays its own charge and is disabled when empty.
+- Correction to #012: the owner did not decide that buying advances the clock. The rule is whether the action implies work and time; purchase logic was not changed in this Navigation pass.
+- Other rooms' action logic and blocked-reason text have not yet been audited; they remain for their own room-by-room passes.
+- No tests or builds were run, in accordance with the owner's instruction. The GUI, layout, glow, and interaction remain for the owner's local playtest.
