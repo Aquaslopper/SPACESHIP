@@ -149,10 +149,10 @@ bool MentionsClick(const std::string& text) {
 
 bool TakesNoCooldown(const std::string& key) {
   return key.find("progress:scan") != std::string::npos
-      || key.find("progress:cook") != std::string::npos;
-      || key.find("progress:travel") != std::string::npos;
-      || key.find("progress:extract") != std::string::npos;
-      || key.find("progress:o2-run") != std::string::npos;
+      || key.find("progress:cook") != std::string::npos
+      || key.find("progress:travel") != std::string::npos
+      || key.find("progress:extract") != std::string::npos
+      || key.find("progress:o2-run") != std::string::npos
       || key.find("progress:maint") != std::string::npos;
 }
 
@@ -212,9 +212,9 @@ ProgressButton BuildProgressButton(const Simulation& sim, const std::string& tas
       ActionCooldownCategory(taskId + " " + idleLabel, category);
 
   const Task* task = sim.FindOngoing(taskId);
-  const double remaining = CooldownRemaining(sim, button.cooldownKey);
-                             ? 0.0
-                             : CooldownRemaining(sim, button.cooldownKey);
+  const double remaining = TakesNoCooldown(button.cooldownKey)
+                               ? 0.0
+                               : CooldownRemaining(sim, button.cooldownKey);
   if (task == nullptr) {
     button.fillPercent = 0.0;
     if (remaining > 0.0) {
