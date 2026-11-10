@@ -132,3 +132,18 @@ You must append a compressed summary of **every single reply and action you take
 - After the fix, same script: the action counter moves by exactly one per click, 1 through 24 with no jumps; two clicks never produce a running bank, and the bank turns over on click 18 with all three slots active after the untrained hand's own two-click seatings and the third canister waiting for the air to fall to his stage.
 - Checks run: g++ -fsyntax-only on every unit in cpp/ (clean); headless console scripts to /tmp/s18.txt through /tmp/s22.txt.
 - Not verified: no CMake or raylib build here, so nothing was seen on screen; the visual result and the button's own pacing in the GUI stay unverified until the owner builds locally.
+
+### Entry #012
+- **Timestamp:** 2026-11-10 21:10 UTC
+- Owner read the cross that rises after a press as the clock's own marker: "that cross is an indicator for when the time has advanced one click", and reported that presses are mixed - some carry the cross without moving the clock, and some move the clock without carrying it.
+- Mechanism located: the marker is `SpawnMark` in `cpp/ui/Fx.cpp` (220 ms still, 26 px rise, 950 ms fade, five alive at most), spawned from nine places in `Draw.cpp::HandleClick`. It is a cosmetic record of a press, not of a tick: nothing in it consults `ActionCount()`.
+- Reading the two directions gave these mismatches, all confirmed in code:
+- Cross, no tick: purchase rows (shop, shipyard, hire, refit) go through `FreeCommit`, which moves no counter, yet the press spawns a mark.
+- Cross, no tick: the station's free reading rows ("reading is free: nothing on this page costs a click") and the bridge row "Open Navigation", which only opens a window.
+- Cross, no tick: opening a room's briefing from the Home deck plan or from a callout on the hull - pure reading, still marked.
+- Tick, no cross: "Stand watch" (`Navigation.cpp:545`), "Dock at ..." (`:1020`) and "Undock" (`:1033`) each call `PerformAction`, but the chart's hit loop spawns a mark only for `travel` and `scan`.
+- Owner settled the rule for the two disputed classes: reading is never a click - no cross, no tick; a purchase is a real click and may advance the clock, money being its own gate and the reason it carries no green bar.
+- So the invariant to hold from here: a press that calls `PerformAction` exactly once carries exactly one cross; a press that moves no clock carries none.
+- Plan agreed with the owner: settle this room by room rather than in one sweep, after his playtest of the current state.
+- Checks run: none - this entry records an audit of code paths only; no file but this one was touched.
+- Still unverified: the visual behaviour of the mark itself, since no raylib build is possible in this environment.
