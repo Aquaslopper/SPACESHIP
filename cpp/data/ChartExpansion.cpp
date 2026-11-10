@@ -574,7 +574,9 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
 
     for (int k = 0; k < targetExtra; ++k) {
       const bool makeMoon = !hostPlanets.empty() && (k % 3 == 2);
-      const std::string id = side + "-p" + std::to_string(k + 1);
+      const std::string id =
+          (makeMoon ? std::string("mn-") : std::string("pl-")) + side + "-p" +
+          std::to_string(k + 1);
 
       if (makeMoon) {
         const auto& host = hostPlanets[static_cast<std::size_t>(rng.Below(static_cast<int>(hostPlanets.size())))];
@@ -769,7 +771,7 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
               berth.Below(static_cast<int>(kStationSuffixes.size())))];
       const std::string stationName = UniqueName(word + " " + suffix, names);
       Body& station = AddLocalBody(
-          catalog, side + "-station", "station", stationName, bx, by, system,
+          catalog, std::string("st-") + side, "station", stationName, bx, by, system,
           "A permanent orbital station keeps a berth open here for passing ships.");
       station.klass = "Orbital station - " + regionName + " berth";
       station.details.emplace_back("Services", "Dock, market, refit");
