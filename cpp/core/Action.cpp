@@ -480,9 +480,6 @@ bool Simulation::StartCookingSelf(const std::string& by, bool spendsAction) {
   if (task != nullptr) {
     task->by = who;
     mess_.rations -= 1.0;  // the ration is spent when the batch starts
-    // Carrying on to a full rack is allowed: one dry ration per batch, until
-    // the cooked-food counter is stocked.
-    cookRestock_ = true;
   }
   return true;
 }

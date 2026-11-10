@@ -275,3 +275,17 @@ You must append a compressed summary of **every single reply and action you take
 - Dismissal cleanup also runs if the person is already off a job.
 - The low-funds path uses a snapshot of IDs because dismissal clears staged entries.
 - No tests or builds were run, per the owner's instruction; local verification remains necessary.
+
+### Entry #022
+- Owner clarified the automatic cook starts when cooked food is at 10 or less.
+- The previous strict-below comparison excluded exactly 10.
+- Automatic cooking now starts at or below the configured threshold.
+- A restocking cycle already started still continues to the rack capacity.
+- Each batch still uses one dry ration.
+- Each batch still takes five clock clicks.
+- Each finished batch still adds up to five cooked food.
+- The final batch is still capped by rack capacity.
+- A manually started batch no longer starts an automatic restock cycle above the threshold.
+- An already active automatic restock cycle is not cancelled by a manual batch.
+- Mess Hall text now states the inclusive threshold.
+- No tests or builds were run; the owner playtests locally.

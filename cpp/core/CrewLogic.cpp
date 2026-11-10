@@ -525,11 +525,11 @@ void Simulation::AutoMess() {
   if (cookClaim_ || projectClaim_ == "food" || FindOngoing("project-food") != nullptr) { return; }
   if (worker == nullptr || FindOngoing("cook") != nullptr) { return; }
   if (CrewBusy(*worker) != nullptr) { return; }
-  // She starts once the counter is under cookBelow and does not stop until it
+  // She starts once the counter is at or below cookBelow and does not stop until it
   // is full: cooking 1 ratio, then another ratio, until the rack is stocked.
   // A batch started again as soon as the pot is off means a dropping counter
   // never waits for the player.
-  if (!cookRestock_ && mess_.rack >= rules_.mess.cookBelow) { return; }
+  if (!cookRestock_ && mess_.rack > rules_.mess.cookBelow) { return; }
   if (mess_.rack >= mess_.capacity) {
     cookRestock_ = false;
     return;

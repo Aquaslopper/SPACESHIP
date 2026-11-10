@@ -244,7 +244,7 @@ MessScreenModel BuildMessScreen(const Simulation& sim) {
     crewPanel.Field("Skill", cook->skill);
     crewPanel.Field("Batch", JobThreshold(sim, *cook));
     crewPanel.Field("Activity", cook->activity);
-    crewPanel.Note("Cooks below " + Num(messRules.cookBelow) +
+    crewPanel.Note("Cooks at or below " + Num(messRules.cookBelow) +
                    " food, one ration a batch, until the " + Num(capacity) +
                    "-food counter is full.");
   } else {
@@ -275,7 +275,7 @@ MessScreenModel BuildMessScreen(const Simulation& sim) {
         " cooked food after " + Num(messRules.foodPerRation) + " clicks. " +
         Num(static_cast<double>(sim.Crew().size())) + " crew use " +
         Num(crewFoodPerCycle) + " food per " + Num(messRules.every) +
-        "-click cycle; automatic restocking starts below " +
+        "-click cycle; automatic restocking starts at or below " +
         Num(messRules.cookBelow) + " food when the cook is free and a dry "
         "ration is available.";
   }
