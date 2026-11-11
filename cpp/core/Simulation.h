@@ -289,13 +289,17 @@ class Simulation {
 
   std::vector<TradeContract> TradesHere() const;
   double TradePayout(const TradeContract& trade) const;
+  double TradeOfferPayout(const TradeContract& trade, int priceTier) const;
+  int FreelanceRejectMask(const TradeContract& trade) const;
+  bool HasFreelanceGoods(const TradeContract& trade) const;
   bool SettleTrade(const std::string& mode, const std::string& to,
-                   const std::string& good);
-  // Stowing a lot is one click of the loading work. Most of those clicks cost
-  // nothing; one in a run of six to eighteen of them moves the clock, and which
-  // one it is is not something the player can see or plan around.
+                   const std::string& good, int priceTier = 0);
+  // Sorting a lot in the hold takes one click on the green item and moves the
+  // clock by one action; sorted items grey out until periodic mixing every
+  // 5-10 clicks shifts them back out of order.
   bool StowCargo(const std::string& lotId);
   bool CargoStowed(const std::string& lotId) const;
+  void StepCargoMix();
   bool AcceptTrade(const std::string& mode, const std::string& to,
                    const std::string& good = std::string());
   bool TradeAccepted(const std::string& mode, const std::string& to,
@@ -483,8 +487,13 @@ class Simulation {
   std::map<std::string, bool> stowed_;
   int stowClicks_ = 0;
   int stowThreshold_ = 0;
+  int mixClicks_ = 0;
+  int mixThreshold_ = 0;
+  std::string justStowedLot_;
   std::uint64_t stowRng_ = 0x9E3779B97F4A7C15ULL;
+  std::uint64_t NextCargoRng();
   int StowDraw();
+  int MixDraw();
   double SurveyWorth(const std::string& type) const;
   int ProjectLot(const std::string& kind) const;
 

@@ -109,9 +109,10 @@ class ShellView {
     std::string arg;
   };
 
-  // The station's own session view: which card is open and which item is
-  // picked. Choosing costs nothing, so it is kept here and not in the voyage.
+  // The station's and cargo hold's own session selections: choosing costs
+  // nothing, so it is kept here and not in the voyage.
   StationSelection stationSelection_;
+  CargoSelection cargoSelection_;
 
   struct ExteriorCallout {
     Area box;
@@ -170,6 +171,7 @@ class ShellView {
   void PaintWikiSearch(const Area& box);
   void PaintNavScreen(Simulation& sim);
   void PaintQuartersScreen(Simulation& sim);
+  void PaintCargoScreen(Simulation& sim);
   void PaintCrewRecord(const Simulation& sim);
   void PaintPanel(const NavPanel& panel, const Area& box);
   bool PaintScenePart(const MachinePart& part, const Area& origin);
@@ -302,10 +304,12 @@ class ShellView {
   double navFxTick_ = 0.0;
   bool screenNav_ = false;
   bool screenQuarters_ = false;
+  bool screenCargo_ = false;
   bool screenRecord_ = false;
   bool screenPanels_ = false;
   ScreenKind panelsKind_ = ScreenKind::Described;
   QuartersScreenModel quarters_;
+  CargoRoomModel cargoModel_;
   CrewRecordModel record_;
   std::vector<NavHit> navHits_;
 

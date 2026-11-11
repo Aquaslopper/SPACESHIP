@@ -43,32 +43,57 @@ StoresScreenModel BuildStoresScreen(const Simulation& sim, const std::string& ro
 // ---------------------------------------------------------------------------
 //  The cargo hold
 //  ---------------------------------------------------------------------------
-//  Three windows, as the room is laid out: what is aboard on the left, the hold
-//  itself in the middle, and on the right the one thing that can be done where
-//  the ship is standing — hand a run over at its destination, or throw cargo out
-//  of the lock.
-struct CargoLotView {
-  std::string id;       // "lot-7"
-  std::string name;
-  std::string note;     // the commodity's kind, as the manifest reads it
-  double vol = 0;
-  bool stowed = false;  // already clicked into the hold
-  bool contract = false;  // carried for a run, not for sale
+//  Three windows: left inventory cards, center visual hold sized by ship
+//  capacity (select left -> green glow in hold -> click green crate to sort),
+//  and right context-sensitive finalizer (delivery / freelance / station /
+//  jettison).
+struct CargoSelection {
+  std::string lotId;     // selected unsorted lot on the left (glows green in hold)
+  std::string tradeKey;  // selected active run when multiple end at this body
 };
 
-// One block in the hold's picture.
+struct CargoLotView {
+  std::string id;         // "lot-7"
+  std::string name;
+  std::string note;       // the commodity's kind, as the manifest reads it
+  std::string detail;     // contract destination or status detail
+  double vol = 0;
+  int qty = 1;
+  bool stowed = false;    // already sorted cleanly in the hold
+  bool selected = false;  // selected on the left, glowing green in the hold
+  bool contract = false;  // carried for a run, not for sale
+  bool risk = false;
+  std::string contractKey;
+};
+
+// One visual crate in the center hold bay.
 struct CargoHoldLot {
   std::string id;
   std::string label;
+  std::string kind;
   double vol = 0;
+  bool stowed = false;
+  bool selected = false;
   bool contract = false;
+  bool risk = false;
+  float jitterX = 0.0f;
+  float jitterY = 0.0f;
+  float tiltDeg = 0.0f;
 };
 
-// One thing the right-hand window offers.
+struct CargoRunTab {
+  std::string key;
+  std::string mode;
+  std::string label;
+  bool selected = false;
+};
+
+// One thing the right-hand context window offers.
 struct CargoSideRow {
-  std::string id;  // "cargo-settle:<mode>:<to>:<good>" / "cargo-unload:<lot>"
+  std::string id;       // "cargo-settle:<mode>:<to>:<good>[:<tier>]" / "cargo-unload:<lot>"
   std::string label;
   std::string note;
+  std::string confirm;  // asked first when confirmations are on (e.g. jettison)
   bool enabled = true;
 };
 
@@ -77,23 +102,27 @@ struct CargoRoomModel {
   // left: everything aboard
   std::vector<CargoLotView> lots;
   std::string inventoryNote;
+  std::string selectedLotId;
   // middle: the hold itself
   std::vector<CargoHoldLot> hold;
+  std::string shipLabel;
   double used = 0;
   double capacity = 0;
   std::string capacityLine;
   std::string statusLine;
   std::string statusNote;
-  // right: the window that changes with the run in hand
+  // right: context-sensitive finalizer
+  std::string contextKind;  // "delivery", "freelance", "station", "jettison"
+  std::string activeTradeKey;
+  std::vector<CargoRunTab> runTabs;
+  std::vector<std::string> contextDetails;
   std::string sideTitle;
   std::string sideNote;
   std::vector<CargoSideRow> sideRows;
-  // the salvage bays stay reachable from this room while under way, as rows of
-  // the same window rather than a separate bar
-  std::vector<CargoSideRow> salvageRows;
 };
 
-CargoRoomModel BuildCargoRoom(const Simulation& sim);
+void NormalizeCargoSelection(const Simulation& sim, CargoSelection& selection);
+CargoRoomModel BuildCargoRoom(const Simulation& sim, CargoSelection* selection = nullptr);
 
 bool PressCargoRoom(Simulation& sim, const std::string& action,
                     const std::string& arg = std::string());
