@@ -179,7 +179,7 @@ Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& se
   GameState& state = sim.state_;
   state.medkits = 2;
   state.shipClass = "wren";
-  state.engineCondition = 100;
+  state.engineCondition = 80;
   state.wearTick = 0;
   state.filterLife = 0;
   state.airHold = catalog.rules.air.holdMax;
@@ -187,11 +187,11 @@ Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& se
   state.rackWarnedMess = false;
   state.crewSel = "rell";
   state.crewTick = 0;
-  state.shiplets = 340;
+  state.shiplets = 200;
   state.payTick = 0;
   state.docked = false;
-  state.fuelCells = 12;
-  state.repairKits = 3;
+  state.fuelCells = 6;
+  state.repairKits = 0;
   state.lotSerial = 0;
   state.gameOver.clear();
   state.contracts["arrival"] = "active";
@@ -284,7 +284,7 @@ void Simulation::FreeCommit(const std::string& detail) {
 void Simulation::TickWorld() {
   // The order below is normative; see the header comment.
   WearEngine();
-  if (static_cast<long long>(actionCounter_) % 20 == 0) { ClampStat("energy", -1); }
+  if (static_cast<long long>(actionCounter_) % 10 == 0) { ClampStat("energy", -1); }
   TickFilters();
   TickCrew();
   TickCleaner();
@@ -303,7 +303,10 @@ void Simulation::TickWorld() {
 
 void Simulation::ProAction(double n) {
   AdvanceTasks(n);
-  // repaintQueue() in the reference: presentation only, nothing to do here.
+  for (auto& entry : state_.charges) {
+    Charge& charge = entry.second;
+    charge.left = std::min(charge.volume, charge.left + n);
+  }
 }
 
 // ---------------------------------------------------------------------------
