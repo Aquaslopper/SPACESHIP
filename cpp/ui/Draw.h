@@ -9,7 +9,7 @@
 #pragma once
 
 #include <array>
-
+#include <map>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -61,6 +61,8 @@ class ShellView {
   void SetTutorialTexture(std::size_t index, void* texture) {
     if (index < tutorialArt_.size()) { tutorialArt_[index] = texture; }
   }
+  // A picture from assets/art/crew, under its file name without ".png".
+  void SetCrewTexture(const std::string& name, void* texture) { crewArt_[name] = texture; }
   void PageTutorial(int direction, double nowMs);
   void SetOthersHeight(float others) { others_ = others; }
 
@@ -356,6 +358,7 @@ class ShellView {
   void RebuildSetupPreview(const Simulation& sim);
   bool displayAdjustmentAvailable_ = true;
   std::array<void*, 6> tutorialArt_{};
+  std::map<std::string, void*> crewArt_;
   double tutorialTransitionMs_ = 0.0;
   int tutorialDirection_ = 1;
 

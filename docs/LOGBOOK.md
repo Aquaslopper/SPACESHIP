@@ -634,6 +634,58 @@ You must append a compressed summary of **every single reply and action you take
 - This logbook commit starts another workflow run; its result is not known at the time of writing.
 - Awaiting from `@Aquaslopper`: the playtest of PR #69 on Windows, then the decision on what comes next.
 
+### Entry #049
+- **Timestamp:** 2026-11-11 20:19 UTC
+- Owner's requests: the Crew Quarters get a chibi figure and a moe-style portrait for the crew (turn 5); "please continue and make the missing chibi figure too" (turn 6). Turn 5 ended at the tool-call limit with no entry and no reply; this entry covers both turns. Branch `arena/36a89311-spaceship`, from `main` at `9294973`.
+- The owner picked option 1 of 2 for Rell's portrait and for Rell's standing figure; every other picture was generated to match those two and was not shown to the owner before it went in. All pictures are machine-generated.
+- CREATED `assets/art/crew/`: `README.md` and 27 PNG, 3,403,234 bytes. Per hand `<id>-portrait.png` (464x620), `<id>-stand.png`, `<id>-stand-cloth.png` (276-320 high plus a 2 px margin), for rell, jax, bo, suri, nemi, ori, ryn, sol, umi. No sit and no lie picture: an idle hand stands under the zzz; a hand at the doc is drawn from the sprite tables, cot included, as before.
+- Turn 6: seven figures generated (bo, suri, nemi, ori, ryn, sol, umi). The rell and jax figure files were rebuilt with the same cut (jax 9 px taller, uniform layer without green left on cuffs). Heights are set per figure so the bodies are one size. The nine portraits are the files of turn 5. `rell-portrait.png` is a regeneration of the owner's pick without the pseudo-lettering on its shoulder patch.
+- Not in `crew.json` and added by the generator: Bo's glasses and moustache, Ori's beard, one prop per hand taken from the `hobby` line; Nemi's hair is redder than her `hair` value. The README in the folder lists this. The scripts that cut the pictures out and split the uniform layer are outside the repository.
+- CHANGED `cpp/ui/CrewSprites.h/.cpp`, `QuartersScreen.h/.cpp`, `Draw.h/.cpp`: stage 560x330 (was 300 high) and scaled with the reading size; portrait card at the left; figure on a mark before the door; uniform layer multiplied with the job's `cloth` colour. `cpp/app/main.cpp` loads every `assets/art/crew/*.png` at start and unloads it at exit.
+- Differences from `main` on that screen: lockers 8 -> 2, bare wall beside the door, door handle gone, locker numbers higher; the zzz is small and brown (in turn 6 moved 8 px right and 8 px up to clear a high bun); the cross comes from the `cross` prop; a picture figure wears no job hat, the job shows as uniform colour and tool; `floory` in `crew-art.json` is no longer read by the figure code; the panels under the stage sit 30 px lower at the 18 px reading size (old and new frame equal there at that offset, 99.99 % of pixels).
+- Folder missing, empty, or holding unreadable files: sprite-table figure and a card that says "No portrait on file."; no crash (viewer, turn 5).
+- CHANGED `tools/viewer/viewer.cpp`: loads the same folder; `clickhit` / `rclickhit` / `hoverhit` fail the line when the hit lies outside the frame; new verbs `hire ID` and `stagejob CREW JOB`. `tools/viewer/README.md` updated for these. CREATED `tools/viewer/scripts/quarters.txt`, 23 frames.
+- Looked at in the viewer, 1440x940, turn 6: all nine hands idle and in a job colour (nemi and ori hired by the script; ryn, sol and umi through a scratch copy of `crew.json` outside the repository that puts them aboard), learning, doc, crate (job written on the order sheet), nobody aboard. Turn 5, with the first two figures: themes void, ember, aurora, nebula; 19-23 px; DejaVu; talk press (a line appears, morale +5).
+- Counted only in turn 6 (exit code 0, 0 overlapping strings in 6 of 6 checks, frames not looked at again): 19-23 px and the DejaVu run with the final files.
+- Not seen: ryn, sol, umi hired through play at their ports; sit and lie poses (no pictures); at 1180x720 anything but the first hand, because roster and orders lie below the stage there and the script's presses cannot reach them (`quarters.txt` exits 3 at that size).
+- Other screens, a viewer built from `main` against the current one: `s01`-`s15`, `machine`, `machine-states` all exit 0; 24 of 28 frames identical; `13-quarters` differs inside its middle column only; three differ only in the activity feed's clock stamp; the two machine reports are equal line for line.
+- `g++ 12.2.0 -std=c++17 -fsyntax-only -Wall -Wextra -Wpedantic` on `CrewSprites.cpp`, `QuartersScreen.cpp`, `Draw.cpp`, `main.cpp`, `Widgets.cpp`: 0 warnings, 0 errors. A first attempt at this check in turn 6 printed 0 without compiling anything (empty command); the figures here are from the repeat. Not run: the repository's cmake build, `ctest`, `tools/check-*.sh`, any Windows build. The viewer renders in software with stand-in fonts and is not the Windows picture.
+- Inherited, left as it is: with nobody aboard the floor shadow before the door is still painted (`cq-shadow` is unconditional on `main` too).
+- Left untouched: O2 and Mess scenes, `First2000Styles.h`, `CMakeLists.txt`, the workflow, `assets/data/*`, `cpp/core/*`, `cpp/ui/CrewRecord.*`, `tools/viewer/shots/`.
+- Nothing committed, nothing pushed, no PR. Awaiting from `@Aquaslopper`: a look at the nine figures, then whether to commit and push for a Windows build.
+
+### Entry #050
+- **Timestamp:** 2026-11-11 20:56 UTC
+- Owner's message: the work so far is good; a playtest finding on O2 (the filter work is active with nobody assigned to the job; gates in the rules built on literals such as `-1e9`); keep to the game only; "Please create the pr".
+- Read as approval to commit the work of #049, push the branch and open a PR. Not read as a request to change the O2 rules: nothing outside the PR's file list was edited.
+- Commits on `arena/36a89311-spaceship` over `9294973`: `a32997c` (seven `cpp/` files), `1e84ddf` (`assets/art/crew/`, 28 files), `74a1e6a` (`tools/viewer/viewer.cpp`, `README.md`, `scripts/quarters.txt`), `f880587` (logbook #049), then this logbook commit. 39 files, 492 insertions, 78 deletions before this commit. Pushed.
+- PR #70 opened against `main` at `9294973`: "Crew Quarters: portraits and chibi figures for all nine crew". GitHub reports it mergeable, clean. Not merged.
+- `origin/main` was at `9294973` when the PR was opened. The clone here holds one commit, so the history of a line cannot be read from it.
+- CI: runs 43097324921 (push) and 43097329513 (pull_request) on `f880587` were created at 20:39 UTC and were still queued at 20:56 UTC with no job started. There is no build result for this change. This logbook commit starts new runs, which replace the queued ones through the workflow's `cancel-in-progress`; their result is not known at the time of writing.
+- No full compile and link of `cpp/app/main.cpp` with this change has happened anywhere so far. No test and no check script was run locally; the push starts the repository's workflow, whose `test-linux` job runs the check scripts and `ctest`.
+- Baseline: run 43080224269 on `main` at `9294973` ended in failure after 2 min 36 s. Which job failed could not be read: the jobs endpoint answered HTTP 502 at 20:56 UTC.
+- Read, not changed, at `9294973` for the O2 finding: `Simulation::AutoFilters` (`cpp/core/CrewLogic.cpp:462`) returns when no crew member has the job `filters`. `Simulation::StartFilterBank` (`cpp/core/Action.cpp:412`) and the "Turn on Filter" button (`cpp/ui/O2Screen.cpp:194`) ask for a ready bank, a bank that is not running and energy above zero; neither asks for a crew member on the job. Which of the two the owner saw active is not known; asked.
+- Literal `-1e9` in the rules: `engineClickAt` (`cpp/core/GameState.h:408`, default on load `cpp/core/SaveSystem.cpp:1170`); what reads it was not traced. `cpp/ui/Draw.cpp:1886` uses the literal to start a bounding box.
+- The viewer's `job` verb sets a job directly and skips the order sheet. The quarters frames show drawing only and test no job rule; the PR body says so.
+- Left untouched: `cpp/core/*`, `cpp/data/*`, `assets/data/*`, O2 and Mess screens, `CMakeLists.txt`, the workflow, `tools/viewer/shots/`.
+- Awaiting from `@Aquaslopper`: the playtest of PR #70; which O2 behaviour was seen, and whether the filter button is to need a hand on the job.
+
+### Entry #051
+- **Timestamp:** 2026-11-11 21:11 UTC
+- Owner's question on PR 70: why its description linked to an unrelated pull request. Cause: the description named a logbook entry with a hash sign before its number; GitHub turns a hash sign plus a number into a link to the pull request of that number.
+- CHANGED the description of PR 70: that line reworded without the hash sign. The owner had asked why, not for an edit.
+- Owner: stop. Stopped. No entry was written for those two replies; this entry covers them.
+- The same form was in two commit titles of PR 70 and, from turn 4, in the description and one commit title of the merged PR 69. GitHub recorded mentions on the pull requests numbered 45, 48, 49 and 50. Those records cannot be removed from here.
+- Owner: the task failed; start over, faster; the game only.
+- PR 70 was closed without a merge at 21:08 UTC and its branch was deleted on GitHub; neither was done from here.
+- Branch `arena/36a89311-spaceship` built again on `9294973` in four commits with the same file content and no hash sign in any title, pushed under the same name. A new PR is opened from it; its number is not known at the time of writing.
+- File content against the head of the closed PR, `2ad9233`: identical except this entry.
+- The sandbox was reset: `/home/user/crew-art/` (generated originals, cut-out scripts, comparison frames) and the viewer build are gone. The 27 pictures in the repository are unaffected.
+- CI on `2ad9233`, same code: `check-id-prefixes` pass, `build-windows` pass, `test-linux` fail (not looked into; it failed on PR 69 as well). CI on the new commits was not waited for.
+- From here on: no hash sign before a number in a commit title, a PR title or a PR text.
+- Not run in this turn: any build, any test, the viewer. No file under `cpp/`, `assets/` or `tools/` differs from what PR 70 held.
+- Awaiting from `@Aquaslopper`: the playtest of the new PR.
+
 ### Entry #052
 - **Timestamp:** 2026-11-11 21:24 UTC
 - Branch `arena/8cf1c2e1-spaceship` from `main` at `9294973`. Entries 049 to 051 are not on this branch; they are in the open PR 71. This number continues after them.

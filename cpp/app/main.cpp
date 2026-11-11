@@ -13,6 +13,7 @@
 #include <array>
 #include <cstdio>
 #include <filesystem>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -378,6 +379,26 @@ int main(int argc, char** argv) {
     }
     if (tutorialTextures[i].id == 0) { std::fprintf(stderr, "spaceship: tutorial card unavailable: %s\n", path.string().c_str()); }
   }
+  // Crew pictures: every PNG in assets/art/crew, kept under its file name
+  // without the extension. No folder, or an empty one, means no pictures, and
+  // the quarters paint their figures from the sprite tables.
+  std::map<std::string, Texture2D> crewTextures;
+  {
+    std::error_code ec;
+    for (std::filesystem::directory_iterator it(assets / "art" / "crew", ec), end;
+         !ec && it != end; it.increment(ec)) {
+      const std::filesystem::path& path = it->path();
+      if (path.extension() != ".png") { continue; }
+      Texture2D texture = LoadTexture(path.string().c_str());
+      if (texture.id == 0) {
+        std::fprintf(stderr, "spaceship: crew picture unavailable: %s\n", path.string().c_str());
+        continue;
+      }
+      SetTextureFilter(texture, TEXTURE_FILTER_BILINEAR);
+      SetTextureWrap(texture, TEXTURE_WRAP_CLAMP);
+      crewTextures[path.stem().string()] = texture;
+    }
+  }
   ship::ShellView shell;
   shell.SetSaveDir(saveDir.u8string());
   shell.SetFonts(fonts.body, fonts.bold, fonts.mono);
@@ -385,6 +406,7 @@ int main(int argc, char** argv) {
   shell.SetSetupTexture(&setupTexture);
   shell.SetWrenExteriorTexture(&wrenExterior);
   for (std::size_t i = 0; i < tutorialTextures.size(); ++i) { shell.SetTutorialTexture(i, &tutorialTextures[i]); }
+  for (auto& picture : crewTextures) { shell.SetCrewTexture(picture.first, &picture.second); }
   shell.Configure(static_cast<float>(GetScreenWidth()),
                   static_cast<float>(GetScreenHeight()), theme);
 
@@ -515,6 +537,7 @@ int main(int argc, char** argv) {
   if (setupTexture.id != 0) { UnloadTexture(setupTexture); }
   if (wrenExterior.id != 0) { UnloadTexture(wrenExterior); }
   for (auto texture : tutorialTextures) { if (texture.id != 0) { UnloadTexture(texture); } }
+  for (auto& picture : crewTextures) { UnloadTexture(picture.second); }
   if (fonts.body.texture.id != 0) { UnloadFont(fonts.body); }
   if (fonts.bold.texture.id != 0 && fonts.bold.texture.id != fonts.body.texture.id) {
     UnloadFont(fonts.bold);

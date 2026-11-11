@@ -30,37 +30,41 @@ std::string JobLabel(const Simulation& sim, const std::string& id) {
   return job == nullptr ? "None" : job->label;
 }
 
-// The hallway: lockers down both walls, a door at the far end, a light strip
-// overhead. All scenery, all one class, no clicks.
-std::vector<MachinePart> Hallway(const Simulation& sim) {
+// The corridor: a door at the far end, a stretch of bare wall and a locker
+// either side of it, a light strip overhead. All scenery, no clicks. Wall and
+// floor run the width of the stage; the portrait card covers their left part.
+// A box that carries text is as tall as the reading size the stage is laid
+// out for, and stands where no prop is put in front of it.
+std::vector<MachinePart> Hallway() {
   std::vector<MachinePart> parts;
   const auto part = [&parts](const std::string& cls, float x, float y, float w,
                              float h, const std::string& text = std::string()) {
     parts.push_back(MachinePart{"cq-part " + cls, Area{x, y, w, h}, text});
   };
-  part("cq-wall", 0, 0, 560, 230);
-  part("cq-floor", 0, 230, 560, 70);
-  for (int k = 0; k < 4; ++k) {
-    part("cq-board", 0, 236 + k * (8 + k * 4), 560, 1);
+  const float wallFoot = 262;                         // where the wall meets the floor
+  const float doorX = kCrewFigureX - kCrewDoorW / 2;  // the figure stands before the door
+  part("cq-wall", 0, 0, kCrewStageW, wallFoot);
+  part("cq-floor", 0, wallFoot, kCrewStageW, kCrewStageH - wallFoot);
+  for (int k = 0; k < 3; ++k) {
+    part("cq-board", 0, wallFoot + 6 + k * (8 + k * 4), kCrewStageW, 1);
   }
-  part("cq-skirt", 0, 226, 560, 4);
-  part("cq-light", 236, 0, 88, 9);
-  part("cq-glow", 216, 9, 128, 4);
-  part("cq-door", 236, 64, 88, 162);
-  part("cq-dpane", 248, 78, 64, 52);
-  part("cq-dhand", 306, 150, 8, 14);
-  part("cq-mini", 236, 52, 88, 10, "DECK A");
-  for (int k = 0; k < 8; ++k) {
-    const double x = k < 4 ? 16 + k * 40 : 384 + (k - 4) * 40;
-    part("cq-lock", x, 70, 38, 156);
-    part("cq-lvent", x + 8, 80, 22, 2);
-    part("cq-lvent", x + 8, 85, 22, 2);
-    part("cq-lvent", x + 8, 90, 22, 2);
-    part("cq-lhand", x + 28, 140, 4, 16);
-    part("cq-lnum", x + 6, 208, 26, 10, "0" + js::NumToString(k + 1));
+  part("cq-skirt", 0, wallFoot - 4, kCrewStageW, 4);
+  part("cq-light", doorX, 0, kCrewDoorW, 9);
+  part("cq-glow", doorX - 20, 9, kCrewDoorW + 40, 4);
+  part("cq-mini", doorX, 38, kCrewDoorW, 22, "DECK A");
+  part("cq-door", doorX, 64, kCrewDoorW, wallFoot - 4 - 64);
+  part("cq-dpane", doorX + 13, 80, 70, 60);
+  for (int k = 0; k < 2; ++k) {
+    const float lockerW = 44;
+    const float x = k == 0 ? doorX - kCrewBareWall - lockerW : doorX + kCrewDoorW + kCrewBareWall;
+    part("cq-lock", x, 70, lockerW, wallFoot - 4 - 70);
+    part("cq-lvent", x + 8, 80, 28, 2);
+    part("cq-lvent", x + 8, 85, 28, 2);
+    part("cq-lvent", x + 8, 90, 28, 2);
+    part("cq-lnum", x + 6, 100, 32, 20, "0" + js::NumToString(k + 1));
+    part("cq-lhand", x + 32, 154, 4, 18);
   }
-  part("cq-shadow", 248, 222, 64, 10);
-  (void)sim;
+  part("cq-shadow", kCrewFigureX - 40, kCrewDeckY - 6, 80, 12);
   return parts;
 }
 
@@ -75,11 +79,15 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
   screen.head.sub =
       "Shared bunks, lockers, and the only place aboard where orders are written down.";
 
-  model.hall = Hallway(sim);
+  model.hall = Hallway();
+  model.card = Area{10, 10, 232, 310};
+  // The speech bubble: on the bare wall right of the door, at the figure's head.
+  model.talk = Area{kCrewFigureX + (kCrewDoorW + kCrewBareWall) / 2 - 16, kCrewDeckY - 128, 32, 32};
   screen.hasStage = true;
   screen.stage.id = "hallway";
-  screen.stage.width = 560.0f;
-  screen.stage.height = 300.0f;
+  screen.stage.width = kCrewStageW;
+  screen.stage.height = kCrewStageH;
+  screen.stage.typePx = kCrewStageTypePx;
 
   // --- the roster ---------------------------------------------------------
   const std::vector<CrewMember>& crew = sim.Crew();
@@ -165,6 +173,9 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
 
   const CrewMember& hand = *selected;
   model.scene = BuildCrewScene(sim, hand);
+  model.cardName = hand.name;
+  model.cardRole = hand.role;
+  model.cardColour = hand.colour;
 
   // HTA paintCrewPanels -> statLine: numbers AND coloured bars. Hunger and
   // fatigue invert the colour judgement, never the actual bar width.
