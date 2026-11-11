@@ -340,8 +340,8 @@
       "title": "Hull micro-fracture"
     },
     {
-      "every": 120,
-      "first": 75,
+      "every": 80,
+      "first": 40,
       "id": "surge",
       "kind": "Electrical",
       "remedy": "Isolate the damaged circuit",
@@ -390,8 +390,8 @@
       "title": "Crew dispute"
     },
     {
-      "every": 220,
-      "first": 210,
+      "every": 120,
+      "first": 90,
       "id": "radiation",
       "kind": "Environmental",
       "remedy": "Shield the exposed sections",
@@ -415,8 +415,8 @@
       "title": "Radiation front"
     },
     {
-      "every": 260,
-      "first": 265,
+      "every": 200,
+      "first": 165,
       "id": "static",
       "kind": "Contact",
       "remedy": "Filter and acknowledge the signal",
