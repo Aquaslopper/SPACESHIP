@@ -115,6 +115,11 @@ double Simulation::CleanerIntervalOf(const CrewMember& crew) const {
   return CleanerInterval(crew);
 }
 
+double Simulation::CookThreshold(const CrewMember& crew) const {
+  const double threshold = std::max(rules_.mess.cookBelow, crew.jobAt);
+  return std::min(mess_.capacity - 1.0, threshold);
+}
+
 double Simulation::CleanerInterval(const CrewMember& crew) const {
   return std::max(20.0, 40.0 - 4.0 * std::min(5.0, crew.jobAt));
 }
@@ -282,9 +287,9 @@ std::string Simulation::JobThreshold(const CrewMember& crew) const {
     return "Crew morale +1 every " + js::NumToString(CleanerInterval(crew)) + " clicks";
   }
   if (crew.job == "kitchen") {
-    return "1 dry ration -> up to " + js::NumToString(rules_.mess.foodPerRation) +
-           " cooked food in " + js::NumToString(rules_.mess.foodPerRation) +
-           " clicks";
+    return "At <= " + js::NumToString(CookThreshold(crew)) +
+           " food (1 ration -> " + js::NumToString(rules_.mess.foodPerRation) +
+           " food)";
   }
   return "-";
 }
@@ -389,15 +394,14 @@ bool Simulation::TalkToCrew(const std::string& crewId) {
   if (crew == nullptr || crew->health <= 0 || FindOngoing("doc-" + crewId) != nullptr) {
     return false;
   }
-  // Nothing to lift is nothing to click: at full morale the talk spends nothing.
-  if (crew->morale >= 100.0) { return false; }
-  // Capture everything needed before the tick: crew may leave or die during
-  // the action. Like other committed changes, apply the morale before it ticks.
   const std::string name = crew->name;
   const std::string said = AskCrew(*crew);
-  crew->morale = std::min(100.0, crew->morale + kConversationMorale);
+  // First conversation for a new need gently lifts morale; talking is free
+  // and never advances clicks or blocks when morale is already full.
+  if (crew->saidN == 0) {
+    crew->morale = std::min(100.0, crew->morale + kConversationMorale);
+  }
   LogLine(name + ": \"" + said + "\"");
-  PerformAction("Spoke with " + name);
   return true;
 }
 
@@ -508,11 +512,10 @@ void Simulation::AutoMess() {
   if (cookClaim_ || projectClaim_ == "food" || FindOngoing("project-food") != nullptr) { return; }
   if (worker == nullptr || FindOngoing("cook") != nullptr) { return; }
   if (CrewBusy(*worker) != nullptr) { return; }
-  // She starts once the counter is at or below cookBelow and does not stop until it
-  // is full: cooking 1 ratio, then another ratio, until the rack is stocked.
-  // A batch started again as soon as the pot is off means a dropping counter
-  // never waits for the player.
-  if (!cookRestock_ && mess_.rack > rules_.mess.cookBelow) { return; }
+  // She starts once the counter is at or below CookThreshold(*worker) and does
+  // not stop until it is full: cooking 1 ration, then another ration, until
+  // the rack is stocked.
+  if (!cookRestock_ && mess_.rack > CookThreshold(*worker)) { return; }
   if (mess_.rack >= mess_.capacity) {
     cookRestock_ = false;
     return;

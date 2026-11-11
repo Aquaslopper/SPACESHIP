@@ -277,7 +277,7 @@ void Simulation::ApplyOrderPayload(CrewMember& crew, const Task& task) {
             js::NumToString(rules_.docAway) + " clicks.");
   }
   if (learnOn) { TrainCrew(crew, 1, "aboard"); }
-  if (learnSt && state_.docked) { TrainCrew(crew, 2, "at the station"); }
+  if (learnSt) { TrainCrew(crew, 2, "at the station"); }
   if (!docOrder) { crew.activity = "Back on station"; }
 }
 

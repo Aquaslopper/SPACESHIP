@@ -247,7 +247,7 @@
       "hungerTick": 19,
       "id": "suri",
       "job": "kitchen",
-      "jobAt": 1,
+      "jobAt": 10,
       "morale": 78,
       "name": "Suri Tal",
       "race": "Human",
@@ -264,7 +264,7 @@
   "docAway": 7,
   "jobBase": {
     "filters": 1,
-    "kitchen": 1,
+    "kitchen": 10,
     "maintenance": 30,
     "navigation": 1
   },
@@ -366,10 +366,10 @@
       "label": "Cook",
       "learnOn": 4,
       "learnSt": 6,
-      "trainCap": 3,
-      "trainStep": 1,
+      "trainCap": 19,
+      "trainStep": 3,
       "unique": true,
-      "unit": " ration/click",
+      "unit": " food",
       "wage": 15
     }
   ],

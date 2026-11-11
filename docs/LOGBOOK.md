@@ -354,3 +354,28 @@ You must append a compressed summary of **every single reply and action you take
 - Pushed `arena/69b6a32e-spaceship` to `origin` and created a GitHub pull request against `main`.
 - Noted that GUI client compilation, Raylib/ImGui probes, and Windows EXE packaging run in GitHub Actions CI upon push/PR rather than locally in this headless sandbox.
 - Handed back PR URL and branch/CI summary to `@Aquaslopper` for playtesting.
+
+### Entry #028
+- **Timestamp:** 2026-11-11 01:36 UTC
+- Implemented Step 2 gameplay, screen layout, and `SpawnMark` cleanup fixes on active branch `arena/aab01d6b-spaceship` without modifying Navigation, Cargo mechanics, Trade/Sell mechanics, `StationScreen.cpp`, `CMakeLists.txt`, `rescue/`, or `Legacy code_Spaceship.txt`.
+- Cook training (`assets/data/crew.json`, `cpp/core/{Simulation.h,Orders.cpp,Tasks.cpp,CrewLogic.cpp}`, `cpp/ui/MessScreen.cpp`): scaled cook `jobAt` / `jobBase.kitchen` / `trainStep` / `trainCap` to `10 -> 13 -> 16 -> 19` (`+3` per training step), added `CookThreshold()`, normalized legacy `jobAt=1` saves in `TrainCrew()`, aligned `JobThreshold()`/`MessScreen.cpp` labels, and allowed already-started `learnSt` lessons to resolve after undocking.
+- Engine Room (`cpp/core/Survival.cpp`, `cpp/ui/{EngineScreen.cpp,Describe.cpp}`): updated `ServiceDrive()` from `+25.0` to `+10.0` per click and updated Engine Room panels, tooltips, crew note, and `Describe.cpp` text to match `+10%` per press / `1`-click repair behavior.
+- O2 Filter Room (`cpp/ui/{O2Screen.cpp,Widgets.h,Widgets.cpp,Draw.cpp}`): kept all O2 filter mechanics intact; removed `screen.progress`/`screen.band` (`o2-actions`) and moved `"o2-run"` (`Turn on Filter` / `Filters running`) into `System Status` (`NavPanel::buttons`), measured and rendered in `MeasurePanelHeight`/`PaintPanel` and wired in `PressProgressButton`.
+- Mess Hall (`cpp/ui/{MessScreen.cpp,Draw.cpp}`): removed bottom `screen.progress`/`screen.band` (`mess-actions`), moved `"cook"` (`Cook a Batch` / `Cook in progress`) into right-column `Galley Batch`, and removed overflowing `mess-plate-sub` (`"X clicks to next meal"`) text from `BuildMessMachine()`.
+- Crew Quarters & talking (`cpp/core/{Simulation.h,CrewLogic.cpp}`, `cpp/ui/{QuartersScreen.cpp,Widgets.cpp,Draw.h,Draw.cpp}`): removed bottom `cq-band`, `quartersBandTop_`, and `The Figure` bar; moved `"crew-assign"` (`Assign Tasks`) under `Order Sheet` in right column; made `TalkToCrew` / `BuildConversationRow` / `PressConversation` free (`0` clicks, non-green, active at `100` morale, disabled only when dead/game over/medbay, awarding `+5` morale only on first line per need `saidN == 0`); painted a non-green pixel speech-bubble button inside the hallway stage with speech readout beneath.
+- Cleaned up `SpawnMark` in `cpp/ui/Draw.cpp::Click()` to trigger only on real green-charged buttons, affordable Station purchases, and accepted Station trade contracts, removing it from `talk`, deck-plan room briefings, `station-cat:*` / `station-item:*`, and non-charged panel rows (`Info`, `Wiki`).
+- Verified sandbox constraints: no `cmake`, `Xvfb`, or X11/OpenGL development packages (`libgl1-mesa-dev`, `libxrandr-dev`, `libxinerama-dev`, `libxcursor-dev`, `libxi-dev`) are installed here, so the windowed Raylib client `./spaceship` cannot be linked or launched locally.
+- Verified with `python3 -m json.tool assets/data/crew.json`, `tools/check-id-prefixes.sh`, `tools/check-gui-syntax.sh` (parsing `Draw.cpp`, `AudioDevice.cpp`, `main.cpp` against pinned Raylib 6.0 / ImGui 1.92.7 / rlImGui headers cleanly under `-Wall -Wextra -Wpedantic`), compiled `spaceship_core` + `console_main.cpp`, and ran a standalone C++ verification binary checking Step 2 mechanics/screens plus Save/Load with a generated `BuildChartPreview` starting system (`st-` port).
+- Left `StationScreen.cpp` untouched (`board` and `tavern` remain omitted) and cleared `/tmp/spaceship_test` and `/tmp/deps`; ready for owner review and local/CI graphical run.
+
+### Entry #029
+- **Timestamp:** 2026-11-11 02:00 UTC
+- Resumed sandbox recovery verified on active branch `arena/aab01d6b-spaceship` (`gh auth status` authenticated cleanly as `Aquaslopper`).
+- Re-verified `git status --short`, `git diff --check`, and `tools/check-id-prefixes.sh` with all 15 Step 2 code/data edits plus `docs/LOGBOOK.md` intact and zero whitespace or untracked artifacts.
+- Confirmed `CMakeLists.txt`, `cpp/ui/StationScreen.cpp`, `cpp/ui/NavScreen.cpp`, `cpp/core/Navigation.cpp`, `cpp/core/SaveSystem.cpp`, `rescue/`, `assets/art/`, and `Legacy code_Spaceship.txt` remain unmodified.
+- Staged the 16 modified files on `arena/aab01d6b-spaceship` without touching any other branch or creating temporary artifacts.
+- Committed Step 2 implementation (`cook training`, `Engine +10%`, `O2/Mess/Quarters UI`, `0-click talking`, and `SpawnMark` cleanup) to `arena/aab01d6b-spaceship`.
+- Pushed `arena/aab01d6b-spaceship` to `origin`.
+- Opened a GitHub pull request against `main` via `gh pr create --base main --head arena/aab01d6b-spaceship` so GitHub Actions builds the native client and Windows EXE artifact.
+- Confirmed GUI visual rendering and mouse-click feel still require verification on the CI-built Windows artifact or a local desktop build (this sandbox lacks X11/OpenGL dev libs).
+- Reported exact PR URL, changed-file list, and CI check status to `@Aquaslopper` for playtesting.

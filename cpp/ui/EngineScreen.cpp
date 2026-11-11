@@ -275,7 +275,8 @@ EngineScreenModel BuildEngineScreen(const Simulation& sim) {
   screen.left.push_back(drive);
 
   // --- under the machine: maintenance and readings ------------------------
-  const double cost = sim.MaintCostActions();
+  const double missing = std::max(0.0, 100.0 - model.condition);
+  const double presses = std::ceil(missing / 10.0);
   NavPanel maint;
   maint.id = "eng-maint";
   maint.title = "Maintenance";
@@ -283,9 +284,10 @@ EngineScreenModel BuildEngineScreen(const Simulation& sim) {
   if (model.condition >= 100) {
     maint.Dim("Engine is at full condition. Nothing to maintain.");
   } else {
-    maint.Field("Missing", Num(100.0 - model.condition) + "%");
-    maint.Field("Work", Num(cost) + " click" + (cost == 1.0 ? "" : "s"));
-    maint.Field("Restores", "to 100%");
+    maint.Field("Missing", Num(missing) + "%");
+    maint.Field("Per click", "+10%");
+    maint.Field("Presses to full",
+                Num(presses) + " click" + (presses == 1.0 ? "" : "s"));
   }
   screen.under.push_back(maint);
 
@@ -316,11 +318,11 @@ EngineScreenModel BuildEngineScreen(const Simulation& sim) {
                         ? " (air: was " + Num(engineer->jobAt) + ")"
                         : ""));
     crew.Field("Activity", engineer->activity);
-    crew.Note("He holds the maintenance job and will service the drive "
-              "unasked - but not before it falls to " +
-              Num(engineer->jobAt) +
-              "%, which is long past the warning. Training at a station, or a "
-              "better engineer, raises that.");
+    const bool belowWarn = actsAt < sim.GameRules().engine.warnBelow;
+    crew.Note("Holds the maintenance job and services the drive unasked below " +
+              Num(actsAt) + "% (+10% per press)" +
+              (belowWarn ? ", which is past the warning line." : ".") +
+              " Training raises this threshold.");
   } else {
     crew.Dim("Nobody holds the maintenance job. The commander runs it "
              "personally, or nobody does.");
@@ -331,10 +333,13 @@ EngineScreenModel BuildEngineScreen(const Simulation& sim) {
   // Who presses the button, and when: the engineer takes it over under the
   // line, so the room reads out the rule rather than a job of his own.
   if (!sim.Crew().empty()) {
-    const double floor = sim.GameRules().engine.maintBelow;
-    screen.bandNote = "Under " + Num(floor) +
-                      "% the engineer presses this button himself; the better trained he "
-                      "is, the earlier he takes it.";
+    const double line =
+        engineer != nullptr
+            ? std::max(sim.GameRules().engine.maintBelow, EffectiveJobAt(sim, *engineer))
+            : sim.GameRules().engine.maintBelow;
+    screen.bandNote = "Under " + Num(line) +
+                      "% the engineer presses this button himself (+10% per service); "
+                      "the better trained he is, the earlier he takes it.";
   }
 
   screen.stage = BuildEngineMachine(sim);
@@ -355,7 +360,7 @@ EngineScreenModel BuildEngineScreen(const Simulation& sim) {
   run.button.text = "Run the drive";
   run.button.title = maintained
       ? "The drive is at full condition; there is nothing to maintain."
-      : "One click of the clock restores up to 25% of the drive.";
+      : "One click of the clock restores up to 10% of the drive.";
   run.button.chargeKey = chargeKey;
   run.button.tier = tier;
   run.button.fillPercent = charge;

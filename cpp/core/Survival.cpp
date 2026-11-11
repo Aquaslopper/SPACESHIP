@@ -14,7 +14,7 @@
 
 namespace ship {
 
-// One maintenance press restores one quarter of the drive. The commander
+// One maintenance press restores 10% of the drive. The commander
 // spends the click through EngineClick; the engineer works inside an existing
 // player click and uses the same maintenance amount without advancing time again.
 void Simulation::ServiceDrive(const std::string& by) {
@@ -22,7 +22,7 @@ void Simulation::ServiceDrive(const std::string& by) {
   state_.engineClickAt = ActionCount();
   LogLine(who + " pressed the maintenance button");
   if (state_.gameOver.empty()) {
-    state_.engineCondition = std::min(100.0, state_.engineCondition + 25.0);
+    state_.engineCondition = std::min(100.0, state_.engineCondition + 10.0);
   }
 }
 

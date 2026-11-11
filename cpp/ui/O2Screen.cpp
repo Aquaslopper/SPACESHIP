@@ -191,6 +191,10 @@ O2ScreenModel BuildO2Screen(const Simulation& sim) {
   }
   status.Field("Seated", Num(seated) + " of " +
                              Num(static_cast<double>(sim.Life().slots.size())));
+  const bool canRun =
+      model.ready && !model.running && sim.StatValue("energy") > 0.0;
+  status.buttons.push_back(BuildProgressButton(
+      sim, "o2-run", model.running ? "Filters running" : "Turn on Filter", canRun));
   screen.under.push_back(status);
 
   NavPanel burst;
@@ -286,7 +290,7 @@ O2ScreenModel BuildO2Screen(const Simulation& sim) {
     model.slots.push_back(view);
   }
 
-  // --- the commitments band ---------------------------------------------
+  // --- bank status note (no bottom Actions banner; button lives in System Status)
   screen.bandNote =
       model.running
           ? "The bank is running. " + Num(state.filterLife) +
@@ -298,17 +302,6 @@ O2ScreenModel BuildO2Screen(const Simulation& sim) {
                           "one click and advances every running job by ten."
                         : "Seat a canister in all three slots before the bank "
                           "can be started."));
-
-  const bool canRun =
-      model.ready && !model.running && sim.StatValue("energy") > 0.0;
-  screen.progress.push_back(BuildProgressButton(
-      sim, "o2-run", model.running ? "Filters running" : "Turn on Filter", canRun));
-
-  NavPanel actions;
-  actions.id = "o2-actions";
-  actions.title = "Filter Actions";
-  actions.placement = "np-full";
-  screen.band.push_back(actions);
 
   screen.hasStage = true;
   return model;
