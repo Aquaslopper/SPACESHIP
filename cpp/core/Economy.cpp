@@ -164,7 +164,7 @@ bool Simulation::SellGood(const std::string& lotId) {
     if (!goods_[index].contractId.empty()) { return false; }  // contract cargo is not for sale
     const double price = LotPrice(goods_[index]);
     const std::string name = goods_[index].name;
-    stowed_.erase(goods_[index].id);
+    ClearStowLot(goods_[index].id);
     goods_.erase(goods_.begin() + static_cast<std::ptrdiff_t>(index));
     state_.shiplets += price;
     PerformAction("Sold " + name);
@@ -195,7 +195,7 @@ bool Simulation::Jettison(const std::string& lotId) {
     if (goods_[index].id != lotId) { continue; }
     const std::string name = goods_[index].name;
     const std::string contract = goods_[index].contractId;
-    stowed_.erase(goods_[index].id);
+    ClearStowLot(goods_[index].id);
     goods_.erase(goods_.begin() + static_cast<std::ptrdiff_t>(index));
     if (contract.compare(0, 6, "trade:") == 0) {
       // A trade consignment thrown out of the hold takes its run with it: the
@@ -901,7 +901,7 @@ bool Simulation::SettleTrade(const std::string& mode, const std::string& to,
                                      [&](const GoodsLot& lot) { return lot.contractId == key; });
     if (!carried) { return false; }  // nothing to hand over
     for (const GoodsLot& lot : goods_) {
-      if (lot.contractId == key) { stowed_.erase(lot.id); }
+      if (lot.contractId == key) { ClearStowLot(lot.id); }
     }
     goods_.erase(std::remove_if(goods_.begin(), goods_.end(),
                                 [&](const GoodsLot& lot) { return lot.contractId == key; }),
@@ -930,7 +930,7 @@ bool Simulation::SettleTrade(const std::string& mode, const std::string& to,
       if (lot.name != commodity->name || !lot.contractId.empty()) { ++i; continue; }
       if (lot.vol <= owed + 1e-9) {
         owed -= lot.vol;
-        stowed_.erase(lot.id);
+        ClearStowLot(lot.id);
         goods_.erase(goods_.begin() + static_cast<std::ptrdiff_t>(i));
         continue;
       }
@@ -968,8 +968,25 @@ int Simulation::MixDraw() {
   return 5 + static_cast<int>((NextCargoRng() >> 11) % 6ULL);  // 5 to 10 clicks
 }
 
+void Simulation::ClearStowLot(const std::string& lotId) {
+  stowed_.erase(lotId);
+  stowOrder_.erase(std::remove(stowOrder_.begin(), stowOrder_.end(), lotId), stowOrder_.end());
+}
+
 bool Simulation::CargoStowed(const std::string& lotId) const {
   return Truthy(stowed_, lotId);
+}
+
+int Simulation::CargoSortOrder(const std::string& lotId) const {
+  for (std::size_t i = 0; i < stowOrder_.size(); ++i) {
+    if (stowOrder_[i] == lotId) { return static_cast<int>(i + 1); }
+  }
+  return 0;
+}
+
+int Simulation::CargoMixEpoch(const std::string& lotId) const {
+  const auto it = cargoMixGen_.find(lotId);
+  return it == cargoMixGen_.end() ? 0 : it->second;
 }
 
 void Simulation::StepCargoMix() {
@@ -994,7 +1011,9 @@ void Simulation::StepCargoMix() {
   const std::size_t unplace = sorted.size() >= 4 ? 2 : 1;
   for (std::size_t n = 0; n < unplace && !sorted.empty(); ++n) {
     const std::size_t pick = static_cast<std::size_t>(NextCargoRng() % sorted.size());
-    stowed_.erase(sorted[pick]);
+    const std::string pickedId = sorted[pick];
+    ClearStowLot(pickedId);
+    cargoMixGen_[pickedId] += 1;
     sorted.erase(sorted.begin() + static_cast<std::ptrdiff_t>(pick));
   }
 }
@@ -1007,6 +1026,9 @@ bool Simulation::StowCargo(const std::string& lotId) {
   }
   if (lotName.empty() || CargoStowed(lotId)) { return false; }
   stowed_[lotId] = true;
+  if (std::find(stowOrder_.begin(), stowOrder_.end(), lotId) == stowOrder_.end()) {
+    stowOrder_.push_back(lotId);
+  }
   justStowedLot_ = lotId;
   PerformAction("Sorted " + lotName + " in the cargo hold");
   justStowedLot_.clear();

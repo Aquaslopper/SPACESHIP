@@ -489,3 +489,40 @@ You must append a compressed summary of **every single reply and action you take
 - Executed no new test binaries this turn per `AGENTS.md`; prior verification (`Entry #038`) reflects the committed code verbatim.
 - Pushing `arena/5664ef1f-spaceship` to `origin` and opening pull request targeting `main` via `gh pr create`.
 - Graphical `./spaceship` / `spaceship.exe` playtest and feedback on keeping or reverting the non-UI core changes (`StepCargoMix`, 3-tier `freelance` RNG, `station` fee fix) remain with `@Aquaslopper`.
+
+### Entry #040
+- **Timestamp:** 2026-11-11 04:33 UTC
+- New session started on branch `arena/089b090d-spaceship` (branched from `fbed546`, merge of PR `#64`, clean working tree).
+- Read `AGENTS.md`, `docs/LOGBOOK.md`, `Legacy code_Spaceship.txt` (`roomCargo`), and owner's playtest mockup `/tmp/arena-coding-uploads/dfg.png` plus 4-point refinement request.
+- Audited `cpp/ui/{Draw.h,Draw.cpp,StoresScreen.cpp,EngineScreen.cpp,O2Screen.cpp,MessScreen.cpp,QuartersScreen.cpp,RoomsScreen.cpp,SimCoreScreen.cpp,Describe.cpp,Widgets.cpp}` and `cpp/app/main.cpp` (read-only).
+- Confirmed Point 1 root cause: `ShellView::PaintTaskHeader()` (`cpp/ui/Draw.cpp:221`) paints `"ROOM"` (`head.kind`), left-aligned `TypePx(20)` title, and `head.sub` subtitle across all rooms; `boldFont_` is loaded at 48px (`cpp/app/main.cpp`), supporting centered hero room titles cleanly.
+- Confirmed Point 2 root cause: `PaintCargoScreen` / `StoresScreen.cpp` still outputs explanatory/obvious text (`statusNote`, `"lots aboard"`, `"Click to mark"`, `"Click green crate"`, `"BAY A/B"`, `"COMPACT HULL BAY"`, `"[SORT]"`, crate `m3` overlay) and lacks live frame-time animation.
+- Confirmed Point 3 root cause: `Draw.cpp:2538-2646` renders wide horizontal panel cards (`62px` to `54%` width), scatters unsorted items by only `±5px` jitter, registers `navHits_` ONLY for pre-selected crates (making direct clicks in the bay do nothing / appear frozen), and places sorted items at the top instead of sorting left-to-right on the floor.
+- Confirmed Point 4 mockup geometry: outer frame + 4 perspective wall/ceiling/floor trapezoids around gridded back wall + compact 3D boxes (front face, lit top/side edge, floor shadow) sized proportionally by `m3` volume and standing along the floor seam when sorted.
+- Prepared mandatory `AGENTS.md` 5-question Agent Comprehension Check answers and concise fine-tuning confirmation questions (hero header scope across rooms and left-card vs direct box-click behavior).
+- Left all `cpp/`, `assets/`, `rescue/`, `tools/`, `CMakeLists.txt`, and `Legacy code_Spaceship.txt` files untouched and ran zero builds or tests per `AGENTS.md`.
+- Updated `docs/LOGBOOK.md` (`Entry #040`) only; awaiting `@Aquaslopper` answers and explicit approval to edit files.
+
+### Entry #041
+- **Timestamp:** 2026-11-11 04:47 UTC
+- Received owner confirmation (`"we keep it unified, all these"` and `"do not change too much, focus on what is now, no extra — ok, go"`) authorizing implementation and verification.
+- Updated `ShellView::PaintTaskHeader()` (`cpp/ui/Draw.cpp`) to unify headers across all screens (`Cargo Hold`, `Engine Room`, `O2 Filter Room`, `Mess Hall`, `Crew Quarters`, `Science Room`, `Simulacron Core`, `Bridge`, `Navigation`, Stations, cabins, `Ship's Handbook`, `Crew`, `Events`), removing `head.kind` (`"ROOM"`, etc.) and `head.sub` extra text and rendering centered hero titles at `TypePx(28)`.
+- Updated `cpp/core/{Simulation.h,Economy.cpp,SaveSystem.cpp}` to track runtime `stowOrder_` (`CargoSortOrder`) and per-lot `cargoMixGen_` (`CargoMixEpoch`) so sorted crates line up in click order and untouched unsorted crates hold steady random positions until `StepCargoMix()` un-stows one (both cleared on `LoadJson`).
+- Updated `cpp/ui/StoresScreen.{h,cpp}` (`ShortGoodLabel`, `sortOrder`, `mixEpoch`, epoch-keyed `MixHash`) to give crates concise labels matching `dfg.png` (`ore`, `parts`, `crop`, `amps`, `ice`, `meds`, `core`, `salv`).
+- Updated `cpp/ui/Draw.{h,cpp}` (`PaintCargoScreen` + `cargoAnims_`) to remove redundant UI text (`inventoryNote`, `"Click to mark"`, `"Click green crate"`, `statusNote`, `"BAY A/B"`, `"COMPACT HULL BAY"`, `"[SORT]"`, crate `m3` overlay), clear `screenCargo_` cleanly on `"home"`, and render 3D perspective bay walls/floor with capacity scaling.
+- Replaced flat panel-width crate strips with volume-proportional 3D boxes (`sqrt(vol)` sizing, bright top/left bevel faces, floor shadow), scattered unsorted crates across the room with separation & gentle floating drift, enabled direct clicking on every unsorted crate (`cargo-stow:`) alongside left-panel green selection (`cargo-select:`), and animated crates smoothly down onto the 3D floor seam from left to right.
+- Verified `bash tools/check-id-prefixes.sh` (pass), `git diff --check` (clean), zero forbidden authority/ownership comments in `git diff cpp/`, and `CXX=g++ bash tools/check-gui-syntax.sh` (`Draw.cpp`, `AudioDevice.cpp`, `main.cpp` clean with zero warnings under `-Wall -Wextra -Wpedantic` against pinned Raylib 6.0 / ImGui 1.92.7 / rlImGui).
+- Compiled full `spaceship_core` + `spaceship_console` in `/tmp/build_cargo_v2` with zero warnings on all edited files (`NavScreen.cpp:137` pre-existing unused-function warning only) and passed `/tmp/build_cargo_v2/verify_fine_tune` (`lots=7`, sort order `1 -> 2`, anti-farm lock, `mixEpoch` remix, Save/Load clear) + `spaceship_console` smoke run.
+- Graphical `./spaceship` / `spaceship.exe` binary remains unlinked/unlaunched in this headless sandbox (no `cmake`, X11/OpenGL dev libs, or display server); ready for owner visual review and PR creation on request.
+
+### Entry #042
+- **Timestamp:** 2026-11-11 04:50 UTC
+- Received owner instruction to open the pull request (`"Please open a pull request for the changes on this branch."`).
+- Verified branch `arena/089b090d-spaceship` has no prior PR and contains exactly the 7 modified C++ files (`cpp/core/{Economy.cpp,SaveSystem.cpp,Simulation.h}`, `cpp/ui/{Draw.cpp,Draw.h,StoresScreen.cpp,StoresScreen.h}`) plus `docs/LOGBOOK.md`.
+- Re-ran `bash tools/check-id-prefixes.sh` (pass) and `git diff --check` (zero trailing whitespace or merge markers) before staging.
+- Confirmed `Legacy code_Spaceship.txt`, `rescue/`, `assets/`, `CMakeLists.txt`, and all generated ID+prefix files remain untouched, with zero temporary build outputs inside `/home/user/SPACESHIP`.
+- Appended `Entry #042` to `docs/LOGBOOK.md` per `AGENTS.md` mandatory logging rules.
+- Executed no new compiled test runs this turn per `AGENTS.md`; prior verification (`Entry #041`) reflects the committed code verbatim.
+- Staging and committing all 8 files on `arena/089b090d-spaceship`.
+- Pushing `arena/089b090d-spaceship` to `origin` and opening pull request targeting `main` via `gh pr create`.
+- Graphical `./spaceship` / `spaceship.exe` build, visual review of the 3D bay/boxes and hero headers, and mouse-click feel remain ready for `@Aquaslopper` via CI artifacts / local desktop build.

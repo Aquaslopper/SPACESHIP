@@ -11,6 +11,7 @@
 #include <array>
 
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -310,6 +311,16 @@ class ShellView {
   ScreenKind panelsKind_ = ScreenKind::Described;
   QuartersScreenModel quarters_;
   CargoRoomModel cargoModel_;
+  struct CargoCrateAnim {
+    float x = 0.0f;
+    float y = 0.0f;
+    float hop = 0.0f;
+    double settleFxUntilMs = 0.0;
+    bool initialized = false;
+    bool wasStowed = false;
+  };
+  std::unordered_map<std::string, CargoCrateAnim> cargoAnims_;
+  double lastCargoAnimMs_ = 0.0;
   CrewRecordModel record_;
   std::vector<NavHit> navHits_;
 

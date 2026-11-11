@@ -299,6 +299,8 @@ class Simulation {
   // 5-10 clicks shifts them back out of order.
   bool StowCargo(const std::string& lotId);
   bool CargoStowed(const std::string& lotId) const;
+  int CargoSortOrder(const std::string& lotId) const;
+  int CargoMixEpoch(const std::string& lotId) const;
   void StepCargoMix();
   bool AcceptTrade(const std::string& mode, const std::string& to,
                    const std::string& good = std::string());
@@ -485,6 +487,9 @@ class Simulation {
   bool engineClickAtPending_ = false;  // the press still has to arm its bar
   void ServiceDrive(const std::string& by);
   std::map<std::string, bool> stowed_;
+  std::vector<std::string> stowOrder_;
+  std::map<std::string, int> cargoMixGen_;
+  void ClearStowLot(const std::string& lotId);
   int stowClicks_ = 0;
   int stowThreshold_ = 0;
   int mixClicks_ = 0;

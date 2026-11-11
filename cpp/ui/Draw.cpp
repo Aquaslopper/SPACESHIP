@@ -221,26 +221,14 @@ std::string ShellView::FitText(const std::string& text, float maxWidth, int size
 float ShellView::PaintTaskHeader(const TaskHead& head, float left, float top) const {
   const Palette& p = theme_.palette;
   const float width = std::max(1.0f, layout_.content.Right() - left - 8.0f);
-  const int kindSize = TypePx(9);
-  const int titleSize = TypePx(20);
-  const int subSize = TypePx(11);
-  const float smallLine = theme_.LineHeight();
-  const float titleLine = std::max(smallLine, TypeStep(28.0f));
-  float y = top;
-  Text(head.kind.c_str(), static_cast<int>(left), static_cast<int>(y), kindSize,
-       ToRay(p.muted));
-  y += smallLine + TypeStep(3.0f);
+  const int titleSize = TypePx(28);
+  const float titleLine = std::max(theme_.LineHeight(), static_cast<float>(titleSize) + 6.0f);
+  float y = top + TypeStep(4.0f);
   for (const auto& title : WrapText(head.title, width, titleSize, SelectFont(titleSize, false))) {
-    Text(title.c_str(), static_cast<int>(left), static_cast<int>(y), titleSize, ToRay(p.ink));
+    const float lineW = TextWidth(title.c_str(), titleSize);
+    const float tx = left + std::max(0.0f, (width - lineW) * 0.5f);
+    Text(title.c_str(), static_cast<int>(tx), static_cast<int>(y), titleSize, ToRay(p.ink));
     y += titleLine;
-  }
-  y += TypeStep(3.0f);
-  const std::vector<std::string> subtitle =
-      WrapText(head.sub, width, subSize, SelectFont(subSize, false));
-  for (const std::string& line : subtitle) {
-    Text(line.c_str(), static_cast<int>(left), static_cast<int>(y), subSize,
-         ToRay(p.muted));
-    y += smallLine;
   }
   return y - top + TypeStep(4.0f);
 }
@@ -375,6 +363,8 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   ClearBackground(ToRay(theme_.palette.content));
 
   if (titleActive_) {
+    cargoAnims_.clear();
+    lastCargoAnimMs_ = 0.0;
     PaintTitle(sim, nowMs);
     return;
   }
@@ -394,8 +384,11 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
     // return can swallow every click on the ship.
     screenNav_ = false;
     screenQuarters_ = false;
+    screenCargo_ = false;
     screenRecord_ = false;
     screenPanels_ = false;
+    cargoAnims_.clear();
+    lastCargoAnimMs_ = 0.0;
     navHits_.clear();
     taskButtons_.clear();
     PaintIdle(sim);
@@ -415,12 +408,18 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
                     kind == ScreenKind::Wiki || kind == ScreenKind::System ||
                     kind == ScreenKind::Info;
     panelsKind_ = kind;
+    if (!screenCargo_) {
+      cargoAnims_.clear();
+      lastCargoAnimMs_ = 0.0;
+    }
     if (taskTabKey_ != sim.State().activeTab) {
       pendingConfirm_.clear();
       pendingAction_.clear();
       // Another window is being described: the station's walk starts over.
       stationSelection_ = StationSelection();
       cargoSelection_ = CargoSelection();
+      cargoAnims_.clear();
+      lastCargoAnimMs_ = 0.0;
     }
     taskTabKey_ = sim.State().activeTab;
     const Tab* activeTab = FindTab(sim.State(), taskTabKey_);
@@ -2420,8 +2419,7 @@ void ShellView::PaintCargoScreen(Simulation& sim) {
       }
       cm.noteLines = WrapText(sub, std::max(40.0f, cardW - 16.0f),
                               smallPx, SelectFont(smallPx, false));
-      cm.statusText = lot.stowed ? "Sorted"
-                                 : (lot.selected ? "Click green crate" : "Click to mark");
+      cm.statusText = lot.stowed ? "Sorted" : std::string();
       cm.qtyText = "QTY: " + std::to_string(lot.qty);
       cm.height = 8.0f + static_cast<float>(cm.titleLines.size()) * line + 2.0f +
                   static_cast<float>(cm.noteLines.size()) * smallLine + 6.0f + smallLine + 8.0f;
@@ -2431,11 +2429,9 @@ void ShellView::PaintCargoScreen(Simulation& sim) {
   }
 
   // Measure middle hold section height.
-  const auto noteLines = WrapText(cargo.statusNote, std::max(40.0f, midW - 20.0f),
-                                  smallPx, SelectFont(smallPx, false));
-  const float bayH = std::clamp(midW * 0.66f, 220.0f, 320.0f);
-  const float midContentH = TypeStep(28.0f) + static_cast<float>(noteLines.size()) * smallLine +
-                            10.0f + bayH + 14.0f + line + 20.0f + smallLine + 14.0f;
+  const float bayH = std::clamp(midW * 0.68f, 236.0f, 336.0f);
+  const float midContentH =
+      TypeStep(28.0f) + 6.0f + bayH + 14.0f + line + 20.0f + smallLine + 14.0f;
 
   // Measure right context panel height.
   const auto sideNotes = WrapText(cargo.sideNote, std::max(40.0f, rightW - 20.0f),
@@ -2495,10 +2491,6 @@ void ShellView::PaintCargoScreen(Simulation& sim) {
   // ---- Left column: Cargo Inventory cards ---------------------------------
   Text("Cargo Inventory", static_cast<int>(leftX + 10.0f), static_cast<int>(top + 8.0f),
        titlePx, ToRay(p.coffee));
-  const float invCountW = TextWidth(cargo.inventoryNote.c_str(), smallPx);
-  Text(cargo.inventoryNote.c_str(),
-       static_cast<int>(leftX + leftW - 10.0f - invCountW), static_cast<int>(top + 10.0f),
-       smallPx, ToRay(p.muted));
   float ly = top + TypeStep(28.0f) + 4.0f;
   if (cargo.lots.empty()) {
     Text("The hold is empty.", static_cast<int>(leftX + 10.0f), static_cast<int>(ly),
@@ -2548,9 +2540,10 @@ void ShellView::PaintCargoScreen(Simulation& sim) {
         cy += smallLine;
       }
       cy += 5.0f;
-      const ::Color statusInk = lot.selected && !lot.stowed ? ::Color{72, 128, 32, 255} : subInk;
-      Text(cm.statusText.c_str(), static_cast<int>(cardBox.x + 10.0f), static_cast<int>(cy),
-           microPx, statusInk);
+      if (!cm.statusText.empty()) {
+        Text(cm.statusText.c_str(), static_cast<int>(cardBox.x + 10.0f), static_cast<int>(cy),
+             microPx, subInk);
+      }
       const float qtyW = TextWidth(cm.qtyText.c_str(), microPx);
       Text(cm.qtyText.c_str(), static_cast<int>(cardBox.Right() - 8.0f - qtyW),
            static_cast<int>(cy), microPx, titleInk);
@@ -2562,7 +2555,7 @@ void ShellView::PaintCargoScreen(Simulation& sim) {
     }
   }
 
-  // ---- Middle column: Visual Cargo Hold View + Capacity Bar ---------------
+  // ---- Middle column: 3D Visual Cargo Hold + Capacity Bar -----------------
   Text("Cargo Hold View", static_cast<int>(midX + 10.0f), static_cast<int>(top + 8.0f),
        titlePx, ToRay(p.coffee));
   const std::string shipCapTag =
@@ -2571,93 +2564,131 @@ void ShellView::PaintCargoScreen(Simulation& sim) {
   Text(shipCapTag.c_str(), static_cast<int>(midX + midW - 10.0f - tagW),
        static_cast<int>(top + 10.0f), smallPx, ToRay(p.muted));
 
-  float my = top + TypeStep(28.0f);
-  for (const std::string& lineText : noteLines) {
-    Text(lineText.c_str(), static_cast<int>(midX + 10.0f), static_cast<int>(my),
-         smallPx, ToRay(p.muted));
-    my += smallLine;
-  }
-  my += 6.0f;
-
+  const float my = top + TypeStep(28.0f) + 4.0f;
   const Area bayOuter{midX + 10.0f, my, midW - 20.0f, bayH};
-  const ::Color bayCanvas =
-      theme_.id == "classic" ? ::Color{250, 247, 241, 255} : ToRay(p.panel2);
-  DrawRectangle(static_cast<int>(bayOuter.x), static_cast<int>(bayOuter.y),
-                static_cast<int>(bayOuter.w), static_cast<int>(bayOuter.h), bayCanvas);
+  const bool classic = theme_.id == "classic";
+  const ::Color wallTopCol = classic ? ::Color{252, 249, 243, 255} : ToRay(p.content);
+  const ::Color wallSideCol = classic ? ::Color{244, 238, 227, 255} : ToRay(p.panel2);
+  const ::Color wallFloorCol = classic ? ::Color{240, 232, 217, 255} : ToRay(p.panel3);
+
+  auto drawTriCCW = [](Vector2 a, Vector2 b, Vector2 c, ::Color color) {
+    const float cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+    if (cross > 0.0f) {
+      DrawTriangle(a, c, b, color);
+    } else {
+      DrawTriangle(a, b, c, color);
+    }
+  };
+  auto fillQuad = [&](Vector2 q0, Vector2 q1, Vector2 q2, Vector2 q3, ::Color color) {
+    drawTriCCW(q0, q1, q2, color);
+    drawTriCCW(q0, q2, q3, color);
+  };
+
+  // Scale inner back-wall footprint by ship capacity while keeping crisp 3D
+  // ceiling, side walls, and floor perspective.
+  float wallScaleW = 0.80f;
+  float wallScaleH = 0.77f;
+  int bays = 2;
+  int gridCols = 6;
+  int gridRows = 4;
+  if (cargo.capacity > 95.0) {
+    wallScaleW = 0.94f; wallScaleH = 0.85f; bays = 4; gridCols = 12; gridRows = 6;
+  } else if (cargo.capacity > 70.0) {
+    wallScaleW = 0.91f; wallScaleH = 0.83f; bays = 3; gridCols = 12; gridRows = 5;
+  } else if (cargo.capacity > 45.0) {
+    wallScaleW = 0.88f; wallScaleH = 0.81f; bays = 2; gridCols = 10; gridRows = 5;
+  } else if (cargo.capacity > 25.0) {
+    wallScaleW = 0.84f; wallScaleH = 0.79f; bays = 2; gridCols = 8; gridRows = 4;
+  }
+  const float backW = std::floor(bayOuter.w * wallScaleW);
+  const float backH = std::floor(bayOuter.h * wallScaleH);
+  const float sideDrop = std::floor((bayOuter.w - backW) * 0.5f);
+  const float topDrop = std::max(8.0f, std::floor((bayOuter.h - backH) * 0.28f));
+  const Area backWall{bayOuter.x + sideDrop, bayOuter.y + topDrop, backW, backH};
+  const float floorDepth = std::max(14.0f, bayOuter.Bottom() - backWall.Bottom());
+
+  const Vector2 oTL{bayOuter.x, bayOuter.y};
+  const Vector2 oTR{bayOuter.Right(), bayOuter.y};
+  const Vector2 oBR{bayOuter.Right(), bayOuter.Bottom()};
+  const Vector2 oBL{bayOuter.x, bayOuter.Bottom()};
+  const Vector2 bTL{backWall.x, backWall.y};
+  const Vector2 bTR{backWall.Right(), backWall.y};
+  const Vector2 bBR{backWall.Right(), backWall.Bottom()};
+  const Vector2 bBL{backWall.x, backWall.Bottom()};
+
+  fillQuad(oTL, oTR, bTR, bTL, wallTopCol);
+  fillQuad(oTL, bTL, bBL, oBL, wallSideCol);
+  fillQuad(bTR, oTR, oBR, bBR, wallSideCol);
+  fillQuad(bBL, bBR, oBR, oBL, wallFloorCol);
+
+  DrawRectangle(static_cast<int>(backWall.x), static_cast<int>(backWall.y),
+                static_cast<int>(backWall.w), static_cast<int>(backWall.h), ToRay(p.panel));
+
+  // Back-wall grid and vertical bulkhead seam(s).
+  for (int c = 1; c < gridCols; ++c) {
+    const float gx = backWall.x + backWall.w * static_cast<float>(c) / static_cast<float>(gridCols);
+    DrawLine(static_cast<int>(gx), static_cast<int>(backWall.y + 1.0f),
+             static_cast<int>(gx), static_cast<int>(backWall.Bottom() - 1.0f),
+             Fade(ToRay(p.border), 0.48f));
+    const float fgx =
+        bayOuter.x + bayOuter.w * static_cast<float>(c) / static_cast<float>(gridCols);
+    DrawLineEx({gx, backWall.Bottom()}, {fgx, bayOuter.Bottom()}, 1.0f,
+               Fade(ToRay(p.border), 0.30f));
+  }
+  for (int r = 1; r < gridRows; ++r) {
+    const float gy = backWall.y + backWall.h * static_cast<float>(r) / static_cast<float>(gridRows);
+    DrawLine(static_cast<int>(backWall.x + 1.0f), static_cast<int>(gy),
+             static_cast<int>(backWall.Right() - 1.0f), static_cast<int>(gy),
+             Fade(ToRay(p.border), 0.48f));
+  }
+  for (int b = 1; b < bays; ++b) {
+    const float bx = backWall.x + backWall.w * static_cast<float>(b) / static_cast<float>(bays);
+    DrawLineEx({bx, backWall.y + 1.0f}, {bx, backWall.Bottom() - 1.0f}, 1.5f,
+               Fade(ToRay(p.coffee), 0.55f));
+  }
+
+  // Perspective corner lines + room borders.
+  const ::Color cornerLine = Fade(ToRay(p.borderDark), 0.72f);
+  DrawLineEx(oTL, bTL, 1.0f, cornerLine);
+  DrawLineEx(oTR, bTR, 1.0f, cornerLine);
+  DrawLineEx(oBL, bBL, 1.0f, cornerLine);
+  DrawLineEx(oBR, bBR, 1.0f, cornerLine);
+  DrawRectangleLines(static_cast<int>(backWall.x), static_cast<int>(backWall.y),
+                     static_cast<int>(backWall.w), static_cast<int>(backWall.h),
+                     ToRay(p.coffeeDark));
   DrawRectangleLines(static_cast<int>(bayOuter.x), static_cast<int>(bayOuter.y),
                      static_cast<int>(bayOuter.w), static_cast<int>(bayOuter.h),
                      ToRay(p.borderDark));
 
-  // Scale the active cargo deck footprint inside the outer hull frame according
-  // to the ship's current hold capacity (Wren 20/40/60/90 vs Kestrel 60/90/120).
-  float scaleW = 0.56f;
-  float scaleH = 0.60f;
-  int bays = 1;
-  int gridCols = 5;
-  int gridRows = 4;
-  if (cargo.capacity > 95.0) {
-    scaleW = 0.94f; scaleH = 0.90f; bays = 4; gridCols = 12; gridRows = 10;
-  } else if (cargo.capacity > 70.0) {
-    scaleW = 0.86f; scaleH = 0.84f; bays = 3; gridCols = 12; gridRows = 7;
-  } else if (cargo.capacity > 45.0) {
-    scaleW = 0.78f; scaleH = 0.76f; bays = 2; gridCols = 10; gridRows = 6;
-  } else if (cargo.capacity > 25.0) {
-    scaleW = 0.68f; scaleH = 0.68f; bays = 2; gridCols = 8; gridRows = 5;
+  // Advance smooth crate animation delta once per frame and prune removed lots.
+  double animDt = 0.0;
+  if (lastCargoAnimMs_ > 0.0 && frameTimeMs_ > lastCargoAnimMs_) {
+    animDt = std::clamp((frameTimeMs_ - lastCargoAnimMs_) * 0.001, 0.0, 0.08);
   }
-  const float deckW = std::floor((bayOuter.w - 16.0f) * scaleW);
-  const float deckH = std::floor((bayOuter.h - 24.0f) * scaleH);
-  const Area deckBox{bayOuter.x + std::floor((bayOuter.w - deckW) * 0.5f),
-                     bayOuter.y + 14.0f + std::floor((bayOuter.h - 20.0f - deckH) * 0.5f),
-                     deckW, deckH};
-
-  // Structural corner struts from outer frame to deck hull when compact.
-  if (scaleW < 0.90f) {
-    const ::Color strut = Fade(ToRay(p.borderDark), 0.55f);
-    DrawLineEx({bayOuter.x + 4.0f, bayOuter.y + 4.0f}, {deckBox.x, deckBox.y}, 1.0f, strut);
-    DrawLineEx({bayOuter.Right() - 4.0f, bayOuter.y + 4.0f}, {deckBox.Right(), deckBox.y},
-               1.0f, strut);
-    DrawLineEx({bayOuter.x + 4.0f, bayOuter.Bottom() - 4.0f}, {deckBox.x, deckBox.Bottom()},
-               1.0f, strut);
-    DrawLineEx({bayOuter.Right() - 4.0f, bayOuter.Bottom() - 4.0f},
-               {deckBox.Right(), deckBox.Bottom()}, 1.0f, strut);
-    const std::string hullNote =
-        cargo.capacity <= 25.0 ? "COMPACT HULL BAY" : "EXPANDABLE BULKHEAD";
-    const float hnW = TextWidth(hullNote.c_str(), microPx);
-    Text(hullNote.c_str(), static_cast<int>(bayOuter.x + (bayOuter.w - hnW) * 0.5f),
-         static_cast<int>(bayOuter.y + 4.0f), microPx, ToRay(p.muted));
-  }
-
-  DrawRectangle(static_cast<int>(deckBox.x), static_cast<int>(deckBox.y),
-                static_cast<int>(deckBox.w), static_cast<int>(deckBox.h), ToRay(p.panel));
-  DrawRectangleLines(static_cast<int>(deckBox.x), static_cast<int>(deckBox.y),
-                     static_cast<int>(deckBox.w), static_cast<int>(deckBox.h), ToRay(p.coffee));
-
-  // Deck grid + bay dividers inside deckBox.
-  for (int c = 1; c < gridCols; ++c) {
-    const float gx = deckBox.x + deckBox.w * static_cast<float>(c) / static_cast<float>(gridCols);
-    DrawLine(static_cast<int>(gx), static_cast<int>(deckBox.y + 1.0f),
-             static_cast<int>(gx), static_cast<int>(deckBox.Bottom() - 1.0f),
-             Fade(ToRay(p.border), 0.45f));
-  }
-  for (int r = 1; r < gridRows; ++r) {
-    const float gy = deckBox.y + deckBox.h * static_cast<float>(r) / static_cast<float>(gridRows);
-    DrawLine(static_cast<int>(deckBox.x + 1.0f), static_cast<int>(gy),
-             static_cast<int>(deckBox.Right() - 1.0f), static_cast<int>(gy),
-             Fade(ToRay(p.border), 0.45f));
-  }
-  for (int b = 0; b < bays; ++b) {
-    const float bx = deckBox.x + deckBox.w * static_cast<float>(b) / static_cast<float>(bays);
-    if (b > 0) {
-      DrawLineEx({bx, deckBox.y + 2.0f}, {bx, deckBox.Bottom() - 2.0f}, 1.5f,
-                 Fade(ToRay(p.coffee), 0.50f));
+  lastCargoAnimMs_ = frameTimeMs_;
+  for (auto it = cargoAnims_.begin(); it != cargoAnims_.end();) {
+    const bool keep = std::any_of(cargo.hold.begin(), cargo.hold.end(),
+                                  [&](const CargoHoldLot& b) { return b.id == it->first; });
+    if (!keep) {
+      it = cargoAnims_.erase(it);
+    } else {
+      ++it;
     }
-    const std::string bayLbl = std::string("BAY ") + static_cast<char>('A' + b);
-    Text(bayLbl.c_str(), static_cast<int>(bx + 5.0f), static_cast<int>(deckBox.y + 3.0f),
-         microPx, Fade(ToRay(p.muted), 0.85f));
   }
 
-  // Place sorted crates neatly across upper rows, then unsorted crates slightly
-  // shifted in the open bay below so none overlap or bury a glowing green crate.
+  const float sizeBoost = std::clamp(backWall.w / 440.0f, 0.85f, 1.15f);
+  const auto crateBoxSize = [&](const CargoHoldLot* block) {
+    const float rootVol =
+        std::clamp(static_cast<float>(std::sqrt(std::max(1.0, block->vol))), 1.2f, 7.0f);
+    float w = std::round((22.0f + rootVol * 5.6f) * sizeBoost);
+    float h = std::round((22.0f + rootVol * 5.6f) * sizeBoost);
+    const std::string& lbl = block->shortLabel.empty() ? block->label : block->shortLabel;
+    const int labelPx = std::clamp(static_cast<int>(std::round(h * 0.40f)), 12, microPx);
+    const float needW = TextWidth(lbl.c_str(), labelPx) + 8.0f;
+    w = std::max(w, std::min(backWall.w * 0.36f, needW));
+    return std::pair<float, float>{w, h};
+  };
+
   std::vector<const CargoHoldLot*> sortedCrates;
   std::vector<const CargoHoldLot*> unsortedCrates;
   for (const CargoHoldLot& block : cargo.hold) {
@@ -2667,126 +2698,235 @@ void ShellView::PaintCargoScreen(Simulation& sim) {
       unsortedCrates.push_back(&block);
     }
   }
+  std::stable_sort(sortedCrates.begin(), sortedCrates.end(),
+                   [](const CargoHoldLot* a, const CargoHoldLot* b) {
+                     const int ao = a->sortOrder > 0 ? a->sortOrder : 100000;
+                     const int bo = b->sortOrder > 0 ? b->sortOrder : 100000;
+                     return ao < bo;
+                   });
 
-  const auto crateWidthFor = [&](double vol, float maxRowW) {
-    const double cap = std::max(10.0, cargo.capacity);
-    const float frac = static_cast<float>(std::clamp(vol / (cap * 0.42), 0.22, 0.56));
-    return std::clamp(std::floor(maxRowW * frac), 62.0f, std::max(62.0f, maxRowW * 0.54f));
+  struct CrateTarget {
+    const CargoHoldLot* block = nullptr;
+    float tx = 0.0f;
+    float ty = 0.0f;
+    float w = 0.0f;
+    float h = 0.0f;
+    int tier = 0;
   };
+  std::vector<CrateTarget> targets;
+  targets.reserve(cargo.hold.size());
 
-  const float deckPad = 6.0f;
-  const float innerW = std::max(64.0f, deckBox.w - 2.0f * deckPad);
-  const float crateGap = 6.0f;
-  const float crateH = sortedCrates.size() + unsortedCrates.size() > 6 ? 32.0f : 38.0f;
-
-  float sx = deckBox.x + deckPad;
-  float sy = deckBox.y + 18.0f;
+  // Sorted crates: neatly arranged along the 3D floor from left to right.
+  const float floorLeft = backWall.x + 12.0f;
+  const float floorRight = backWall.Right() - 10.0f;
+  const float frontGroundY = backWall.Bottom() + std::max(8.0f, floorDepth * 0.48f);
+  float fx = floorLeft;
+  float groundY = frontGroundY;
+  float rowMaxH = 0.0f;
+  int rowTier = 0;
+  const float crateGap = 8.0f;
   for (const CargoHoldLot* block : sortedCrates) {
-    const float w = std::min(innerW, crateWidthFor(block->vol, innerW));
-    if (sx + w > deckBox.x + deckPad + innerW + 0.5f) {
-      sx = deckBox.x + deckPad;
-      sy += crateH + crateGap;
+    const auto sz = crateBoxSize(block);
+    if (fx > floorLeft && fx + sz.first > floorRight) {
+      ++rowTier;
+      fx = floorLeft + static_cast<float>(rowTier) * 6.0f;
+      groundY = std::max(backWall.y + sz.second + 12.0f,
+                         groundY - std::max(14.0f, rowMaxH * 0.52f));
+      rowMaxH = 0.0f;
     }
-    const float drawY = std::min(sy, deckBox.Bottom() - crateH - 4.0f);
-    const Area box{sx, drawY, w, crateH};
-    DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
-                  static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel3));
-    DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
-                       static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.border));
-    DrawRectangle(static_cast<int>(box.x + 3.0f), static_cast<int>(box.y + 3.0f), 4, 4,
-                  ToRay(p.borderDark));
-    const std::string tag = FitText(block->label, box.w - 10.0f, microPx);
-    const std::string volTag = js::NumToString(block->vol) + " m3";
-    Text(tag.c_str(), static_cast<int>(box.x + 9.0f), static_cast<int>(box.y + 5.0f),
-         microPx, ToRay(p.muted));
-    Text(volTag.c_str(), static_cast<int>(box.x + 9.0f),
-         static_cast<int>(box.y + crateH - smallLine + 1.0f), microPx, ToRay(p.muted));
-    sx += w + crateGap;
+    targets.push_back(CrateTarget{block, fx, groundY - sz.second, sz.first, sz.second, rowTier});
+    fx += sz.first + crateGap;
+    rowMaxH = std::max(rowMaxH, sz.second);
   }
 
-  float ux = deckBox.x + deckPad;
-  float uy = sortedCrates.empty() ? (deckBox.y + 22.0f) : (sy + crateH + 12.0f);
-  uy = std::min(uy, std::max(deckBox.y + 20.0f, deckBox.Bottom() - crateH - 6.0f));
-  struct DrawnCrate {
-    const CargoHoldLot* block;
-    Area box;
-  };
-  std::vector<DrawnCrate> drawnUnsorted;
-  drawnUnsorted.reserve(unsortedCrates.size());
+  // Unsorted crates: randomly distributed through the open room space above the floor.
+  std::vector<CrateTarget> airTargets;
+  airTargets.reserve(unsortedCrates.size());
+  const float airMinX = backWall.x + 14.0f;
+  const float airMaxX = std::max(airMinX + 8.0f, backWall.Right() - 14.0f);
+  const float airMinY = backWall.y + 12.0f;
+  const float airMaxY = std::max(airMinY + 12.0f, backWall.Bottom() - 22.0f);
   for (const CargoHoldLot* block : unsortedCrates) {
-    const float w = std::min(innerW, crateWidthFor(block->vol, innerW));
-    if (ux + w > deckBox.x + deckPad + innerW + 0.5f) {
-      ux = deckBox.x + deckPad;
-      uy += crateH + crateGap + 2.0f;
-    }
-    const float rawX = ux + block->jitterX * 5.0f;
-    const float rawY = uy + block->jitterY * 4.0f;
-    const float clampedX = std::clamp(rawX, deckBox.x + 4.0f, deckBox.Right() - w - 4.0f);
-    const float clampedY =
-        std::clamp(rawY, deckBox.y + 18.0f, deckBox.Bottom() - crateH - 4.0f);
-    drawnUnsorted.push_back(DrawnCrate{block, Area{clampedX, clampedY, w, crateH}});
-    ux += w + crateGap;
+    const auto sz = crateBoxSize(block);
+    const float rx = std::clamp((block->jitterX + 1.0f) * 0.5f, 0.0f, 1.0f);
+    const float ry = std::clamp((block->jitterY + 1.0f) * 0.5f, 0.0f, 1.0f);
+    const float maxX = std::max(airMinX, airMaxX - sz.first);
+    const float maxY = std::max(airMinY, airMaxY - sz.second);
+    const float ux = airMinX + rx * (maxX - airMinX);
+    const float uy = airMinY + ry * (maxY - airMinY);
+    airTargets.push_back(CrateTarget{block, ux, uy, sz.first, sz.second, 0});
   }
-
-  // Paint non-selected unsorted crates first, then the glowing green crate on top.
-  for (int pass = 0; pass < 2; ++pass) {
-    for (const DrawnCrate& item : drawnUnsorted) {
-      const CargoHoldLot* block = item.block;
-      if ((pass == 0) == block->selected) { continue; }
-      const Area& box = item.box;
-      if (block->selected) {
-        const float pulse =
-            sim.State().reducedMotion
-                ? 1.0f
-                : static_cast<float>(0.80 + 0.20 * std::sin(frameTimeMs_ * 0.007));
-        for (int r = 4; r >= 1; --r) {
-          const unsigned char alpha =
-              static_cast<unsigned char>((28 + (4 - r) * 18) * pulse);
-          DrawRectangleLines(static_cast<int>(box.x) - r, static_cast<int>(box.y) - r,
-                             static_cast<int>(box.w) + r * 2, static_cast<int>(box.h) + r * 2,
-                             ::Color{126, 198, 63, alpha});
+  for (int iter = 0; iter < 10; ++iter) {
+    for (std::size_t i = 0; i < airTargets.size(); ++i) {
+      for (std::size_t j = i + 1; j < airTargets.size(); ++j) {
+        CrateTarget& a = airTargets[i];
+        CrateTarget& b = airTargets[j];
+        const float acx = a.tx + a.w * 0.5f;
+        const float acy = a.ty + a.h * 0.5f;
+        const float bcx = b.tx + b.w * 0.5f;
+        const float bcy = b.ty + b.h * 0.5f;
+        const float dx = bcx - acx;
+        const float dy = bcy - acy;
+        const float needX = (a.w + b.w) * 0.5f + 8.0f;
+        const float needY = (a.h + b.h) * 0.5f + 8.0f;
+        if (std::abs(dx) < needX && std::abs(dy) < needY) {
+          const float pushX = (needX - std::abs(dx)) * 0.5f;
+          const float pushY = (needY - std::abs(dy)) * 0.5f;
+          if (pushX < pushY) {
+            const float dir = dx >= 0.0f ? 1.0f : -1.0f;
+            a.tx -= dir * pushX;
+            b.tx += dir * pushX;
+          } else {
+            const float dir = dy >= 0.0f ? 1.0f : -1.0f;
+            a.ty -= dir * pushY;
+            b.ty += dir * pushY;
+          }
+          a.tx = std::clamp(a.tx, airMinX, std::max(airMinX, airMaxX - a.w));
+          a.ty = std::clamp(a.ty, airMinY, std::max(airMinY, airMaxY - a.h));
+          b.tx = std::clamp(b.tx, airMinX, std::max(airMinX, airMaxX - b.w));
+          b.ty = std::clamp(b.ty, airMinY, std::max(airMinY, airMaxY - b.h));
         }
-        DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
-                      static_cast<int>(box.w), static_cast<int>(box.h),
-                      ::Color{216, 242, 190, 255});
-        DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
-                           static_cast<int>(box.w), static_cast<int>(box.h),
-                           ::Color{90, 158, 38, 255});
-        const std::string tag = FitText(block->label, box.w - 10.0f, microPx);
-        const std::string volTag = js::NumToString(block->vol) + " m3  [SORT]";
-        Text(tag.c_str(), static_cast<int>(box.x + 6.0f), static_cast<int>(box.y + 5.0f),
-             microPx, ::Color{38, 66, 20, 255});
-        Text(volTag.c_str(), static_cast<int>(box.x + 6.0f),
-             static_cast<int>(box.y + crateH - smallLine + 1.0f), microPx,
-             ::Color{56, 102, 26, 255});
-        navHits_.push_back(NavHit{box, "row", "cargo-stow:" + block->id});
-      } else {
-        DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
-                      static_cast<int>(box.w), static_cast<int>(box.h), ToRay(p.panel2));
-        DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
-                           static_cast<int>(box.w), static_cast<int>(box.h),
-                           ToRay(p.coffeeDark));
-        // Diagonal crate strap cue for unsorted cargo.
-        DrawLineEx({box.x + 3.0f, box.Bottom() - 3.0f}, {box.x + 12.0f, box.y + 3.0f}, 1.0f,
-                   Fade(ToRay(p.coffee), 0.45f));
-        const std::string tag = FitText(block->label, box.w - 14.0f, microPx);
-        const std::string volTag = js::NumToString(block->vol) + " m3";
-        Text(tag.c_str(), static_cast<int>(box.x + 11.0f), static_cast<int>(box.y + 5.0f),
-             microPx, ToRay(p.ink));
-        Text(volTag.c_str(), static_cast<int>(box.x + 11.0f),
-             static_cast<int>(box.y + crateH - smallLine + 1.0f), microPx, ToRay(p.muted));
       }
     }
   }
+  targets.insert(targets.end(), airTargets.begin(), airTargets.end());
 
-  if (cargo.hold.empty()) {
-    const std::string emptyMsg = "Bay empty";
-    const float emW = TextWidth(emptyMsg.c_str(), smallPx);
-    Text(emptyMsg.c_str(), static_cast<int>(deckBox.x + (deckBox.w - emW) * 0.5f),
-         static_cast<int>(deckBox.y + deckBox.h * 0.5f - 6.0f), smallPx, ToRay(p.muted));
+  struct RenderedCrate {
+    const CargoHoldLot* block = nullptr;
+    Area box{};
+    bool hovered = false;
+    bool settleFlash = false;
+  };
+  std::vector<RenderedCrate> rendered;
+  rendered.reserve(targets.size());
+  for (const CrateTarget& tgt : targets) {
+    CargoCrateAnim& anim = cargoAnims_[tgt.block->id];
+    if (!anim.initialized || sim.State().reducedMotion) {
+      anim.x = tgt.tx;
+      anim.y = tgt.ty;
+      anim.hop = 0.0f;
+    } else {
+      if (!anim.wasStowed && tgt.block->stowed) {
+        anim.hop = 1.0f;
+        anim.settleFxUntilMs = frameTimeMs_ + 550.0;
+      }
+      const float k = 1.0f - std::exp(-12.0f * static_cast<float>(animDt));
+      anim.x += (tgt.tx - anim.x) * k;
+      anim.y += (tgt.ty - anim.y) * k;
+      anim.hop = std::max(0.0f, anim.hop - static_cast<float>(animDt) * 2.8f);
+    }
+    anim.wasStowed = tgt.block->stowed;
+    anim.initialized = true;
+
+    float drawX = anim.x;
+    float drawY = anim.y - std::sin(anim.hop * 3.14159265f) * 14.0f;
+    if (!tgt.block->stowed && !sim.State().reducedMotion) {
+      const float phase = (tgt.block->jitterX + 1.5f) * 3.1f +
+                          static_cast<float>(tgt.block->mixEpoch) * 1.7f;
+      const float tSec = static_cast<float>(frameTimeMs_ * 0.001);
+      drawX += std::sin(tSec * 1.35f + phase) * 2.5f;
+      drawY += std::cos(tSec * 1.85f + phase * 1.4f) * 3.0f;
+    }
+    const Area box{drawX, drawY, tgt.w, tgt.h};
+    const bool hovered =
+        !tgt.block->stowed && box.Contains(mouseX_, mouseY_ + contentScroll_);
+    const bool settleFlash = anim.settleFxUntilMs > frameTimeMs_;
+    rendered.push_back(RenderedCrate{tgt.block, box, hovered, settleFlash});
   }
 
-  // Capacity bar & legend below visual bay (matching mockup).
+  // Painter's order: upper/back boxes first, lower/front and highlighted boxes on top.
+  std::stable_sort(rendered.begin(), rendered.end(),
+                   [](const RenderedCrate& a, const RenderedCrate& b) {
+                     const int ap = a.block->selected ? 2 : (a.hovered ? 1 : 0);
+                     const int bp = b.block->selected ? 2 : (b.hovered ? 1 : 0);
+                     if (ap != bp) { return ap < bp; }
+                     return (a.box.y + a.box.h) < (b.box.y + b.box.h);
+                   });
+
+  for (const RenderedCrate& item : rendered) {
+    const CargoHoldLot* block = item.block;
+    const Area& box = item.box;
+    const float depthX = std::clamp(box.w * 0.16f, 4.0f, 7.0f);
+    const float depthY = std::clamp(box.h * 0.14f, 3.0f, 6.0f);
+    const bool green = block->selected || item.settleFlash;
+
+    // Subtle shadow underneath the box.
+    const ::Color shadowCol = Fade(ToRay(p.coffeeDark), block->stowed ? 0.18f : 0.10f);
+    DrawRectangle(static_cast<int>(box.x - depthX * 0.5f),
+                  static_cast<int>(box.Bottom() - 1.0f),
+                  static_cast<int>(box.w + depthX * 0.7f),
+                  block->stowed ? 5 : 4, shadowCol);
+
+    if (block->selected) {
+      const float pulse =
+          sim.State().reducedMotion
+              ? 1.0f
+              : static_cast<float>(0.80 + 0.20 * std::sin(frameTimeMs_ * 0.007));
+      for (int r = 4; r >= 1; --r) {
+        const unsigned char alpha =
+            static_cast<unsigned char>((28 + (4 - r) * 18) * pulse);
+        DrawRectangleLines(static_cast<int>(box.x - depthX) - r,
+                           static_cast<int>(box.y - depthY) - r,
+                           static_cast<int>(box.w + depthX) + r * 2,
+                           static_cast<int>(box.h + depthY) + r * 2,
+                           ::Color{126, 198, 63, alpha});
+      }
+    }
+
+    const ::Color frontCol = green ? ::Color{202, 236, 168, 255}
+                                   : (item.hovered
+                                          ? (classic ? ::Color{225, 198, 160, 255} : ToRay(p.hover))
+                                          : (classic ? ::Color{204, 170, 130, 255}
+                                                     : ToRay(block->stowed ? p.panel3 : p.coffeeLight)));
+    const ::Color topCol = green ? ::Color{232, 249, 214, 255}
+                                 : (classic ? ::Color{252, 248, 241, 255} : ToRay(p.content));
+    const ::Color sideCol = green ? ::Color{216, 242, 190, 255}
+                                  : (classic ? ::Color{240, 233, 222, 255} : ToRay(p.panel2));
+    const ::Color edgeCol = green ? ::Color{82, 150, 36, 255}
+                                  : (item.hovered ? ToRay(p.coffeeDark) : ToRay(p.borderDark));
+
+    const Vector2 fTL{box.x, box.y};
+    const Vector2 fTR{box.Right(), box.y};
+    const Vector2 fBL{box.x, box.Bottom()};
+    const Vector2 bTL{box.x - depthX, box.y - depthY};
+    const Vector2 bTR{box.Right() - depthX, box.y - depthY};
+    const Vector2 bBL{box.x - depthX, box.Bottom() - depthY};
+
+    fillQuad(bTL, bTR, fTR, fTL, topCol);
+    fillQuad(bTL, fTL, fBL, bBL, sideCol);
+    DrawRectangle(static_cast<int>(box.x), static_cast<int>(box.y),
+                  static_cast<int>(box.w), static_cast<int>(box.h), frontCol);
+    DrawRectangleLines(static_cast<int>(box.x), static_cast<int>(box.y),
+                       static_cast<int>(box.w), static_cast<int>(box.h), edgeCol);
+    DrawLineEx(bTL, bTR, 1.0f, edgeCol);
+    DrawLineEx(bTR, fTR, 1.0f, edgeCol);
+    DrawLineEx(bTL, fTL, 1.0f, edgeCol);
+    DrawLineEx(bTL, bBL, 1.0f, edgeCol);
+    DrawLineEx(bBL, fBL, 1.0f, edgeCol);
+
+    const std::string& crateText =
+        block->shortLabel.empty() ? block->label : block->shortLabel;
+    const int boxPx = std::clamp(static_cast<int>(std::round(box.h * 0.40f)), 12, microPx);
+    const float txtW = TextWidth(crateText.c_str(), boxPx);
+    const ::Color labelInk = green ? ::Color{38, 66, 20, 255} : ToRay(p.ink);
+    Text(crateText.c_str(),
+         static_cast<int>(box.x + std::max(2.0f, (box.w - txtW) * 0.5f)),
+         static_cast<int>(box.y + std::max(2.0f, (box.h - static_cast<float>(boxPx)) * 0.5f)),
+         boxPx, labelInk);
+  }
+
+  // Register clicks on every unsorted crate (front-most drawn crate wins first).
+  for (auto it = rendered.rbegin(); it != rendered.rend(); ++it) {
+    if (!it->block->stowed) {
+      const float depthX = std::clamp(it->box.w * 0.16f, 4.0f, 7.0f);
+      const float depthY = std::clamp(it->box.h * 0.14f, 3.0f, 6.0f);
+      const Area hitBox{it->box.x - depthX, it->box.y - depthY,
+                        it->box.w + depthX, it->box.h + depthY};
+      navHits_.push_back(NavHit{hitBox, "row", "cargo-stow:" + it->block->id});
+    }
+  }
+
+  // Capacity bar & legend below visual bay.
   float capY = bayOuter.Bottom() + 10.0f;
   DrawLine(static_cast<int>(midX + 10.0f), static_cast<int>(capY),
            static_cast<int>(midX + midW - 10.0f), static_cast<int>(capY), ToRay(p.border));
@@ -2990,7 +3130,7 @@ bool ShellView::PressPanelRow(Simulation& sim, ScreenKind kind, const std::strin
       }
       if (id.compare(0, 11, "cargo-stow:") == 0) {
         const bool ok = PressCargoRoom(sim, id, "");
-        if (ok) { cargoSelection_.lotId.clear(); }
+        if (ok && cargoSelection_.lotId == id.substr(11)) { cargoSelection_.lotId.clear(); }
         return ok;
       }
       return PressCargoRoom(sim, id, "");
