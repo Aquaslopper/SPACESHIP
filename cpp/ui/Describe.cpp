@@ -146,16 +146,17 @@ namespace {
 // action spent aboard.
 void RoomEngine(const Simulation& sim, Description& t) {
   const CrewMember* engineer = sim.Engineer();
-  const double cost = sim.MaintCostActions();
+  const double missing = std::max(0.0, 100.0 - sim.State().engineCondition);
+  const double presses = std::ceil(missing / 10.0);
   t.sub = "Propulsion and power - condition " + Num(sim.State().engineCondition) + "%";
   t.rows = {
       {"Condition", Num(sim.State().engineCondition) + "%"},
       {"Wear rate", "1% per " + Num(sim.GameRules().engine.wearEvery) +
                         " clicks spent aboard"},
       {"Maintenance",
-       sim.State().engineCondition >= 100.0
+       missing <= 0.0
            ? std::string("Not needed - drive is perfect")
-           : Plural(cost, "action") + " - restores to 100%"},
+           : "1 click per press - restores +10% (" + Plural(presses, "click") + " to 100%)"},
       {"Warning at", Num(sim.GameRules().engine.warnBelow) +
                          "% - a red line joins the sidebar"},
       {"Engineer", engineer ? engineer->name + " - acts at " +
@@ -163,10 +164,9 @@ void RoomEngine(const Simulation& sim, Description& t) {
                             : std::string("Nobody holds the job")},
   };
   t.acts = {
-      {"Run Maintenance",
-       sim.State().engineCondition >= 100.0
-           ? std::string("refused at 100%")
-           : Num(cost) + " click" + (cost == 1.0 ? "" : "s")},
+      {"Run the drive",
+       missing <= 0.0 ? std::string("refused at 100%")
+                      : std::string("1 click (+10%)")},
       {"The engineer acts alone",
        engineer ? "at " + Num(EffectiveJobAt(sim, *engineer)) + "%"
                 : std::string("nobody assigned")},

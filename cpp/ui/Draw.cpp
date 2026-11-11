@@ -442,8 +442,7 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   }
   EndMode2D();
   paintingContent_ = false;
-  const float readingBottom = screenQuarters_ ? quartersBandTop_ : actionBandTop_;
-  contentMaxScroll_ = std::max(0.0f, contentPaintBottom_ - readingBottom);
+  contentMaxScroll_ = std::max(0.0f, contentPaintBottom_ - actionBandTop_);
   contentScroll_ = std::min(contentScroll_, contentMaxScroll_);
 
   PaintChrome(sim, nowMs);
@@ -1169,6 +1168,28 @@ void ShellView::PaintPanel(const NavPanel& panel, const Area& box) {
       }
     }
   }
+  for (const ProgressButton& button : panel.buttons) {
+    y += TypeStep(4.0f);
+    const auto btnRows = WrapText(button.text, std::max(1.0f, textW - 16.0f),
+                                  small, SelectFont(small, false));
+    const float btnH = std::max(TypeStep(26.0f),
+                                static_cast<float>(btnRows.size()) * line + TypeStep(10.0f));
+    const Area btnBox{box.x + 8.0f, y, textW, btnH};
+    if (btnBox.Bottom() <= box.Bottom() - 2.0f) {
+      PaintProgressSurface(btnBox, button, p);
+      float textY = btnBox.y + (btnH - static_cast<float>(btnRows.size()) * line) * 0.5f;
+      const ::Color ink = ToRay(button.state == ButtonState::Empty || button.state == ButtonState::Off
+                                ? p.muted : p.ink);
+      for (const std::string& row : btnRows) {
+        Text(row.c_str(),
+             static_cast<int>(btnBox.x + (btnBox.w - TextWidth(row.c_str(), small)) * 0.5f),
+             static_cast<int>(textY), small, ink);
+        textY += line;
+      }
+      taskButtons_.push_back({btnBox, button.taskId});
+    }
+    y = btnBox.Bottom() + TypeStep(4.0f);
+  }
   EndScissorMode();
 }
 
@@ -1206,6 +1227,13 @@ float ShellView::MeasurePanelHeight(const NavPanel& panel, float width) const {
         break;
       }
     }
+  }
+  for (const ProgressButton& button : panel.buttons) {
+    const auto btnRows = WrapText(button.text, std::max(1.0f, textWidth - 16.0f),
+                                  textPx, SelectFont(textPx, false));
+    const float btnH = std::max(TypeStep(26.0f),
+                                static_cast<float>(btnRows.size()) * lineHeight + TypeStep(10.0f));
+    y += TypeStep(4.0f) + btnH + TypeStep(4.0f);
   }
   return y + lineHeight + 4.0f;
 }
@@ -1416,7 +1444,6 @@ float ShellView::PaintActionBand(const std::string& title, const std::string& no
 
 void ShellView::PaintTaskScreen(Simulation& sim) {
   taskButtons_.clear();
-  const Palette& p = theme_.palette;
   const TaskScreenModel& screen = taskScreen_;
   const float left = layout_.content.x + 8.0f;
   const float right = layout_.content.Right() - 8.0f;
@@ -2080,6 +2107,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
 
 void ShellView::PaintCrewRecord(const Simulation& sim) {
   navHits_.clear();
+  taskButtons_.clear();
   const Palette& p = theme_.palette;
   const float left = layout_.content.x + 8.0f;
   const float right = layout_.content.Right() - 8.0f;
@@ -2139,6 +2167,7 @@ void ShellView::PaintCrewRecord(const Simulation& sim) {
 
 void ShellView::PaintQuartersScreen(Simulation& sim) {
   navHits_.clear();
+  taskButtons_.clear();
   const auto& p = theme_.palette;
   const auto& screen = quarters_.screen;
   const float left = layout_.content.x + 8;
@@ -2152,23 +2181,6 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
       y += line;
     }
   };
-  // Preserve the complete order sheet at readable type, but reserve the
-  // Assignments band at the viewport bottom. Only the readings scroll: the
-  // sole commit action must not require fullscreen to be reachable.
-  const float bandWidth = right - left - 16;
-  const auto countRows = [&](const std::string& text, float width) {
-    return WrapText(text, width, TypePx(10), SelectFont(TypePx(10), false)).size();
-  };
-  const auto buttonWidth = [&](const ProgressButton& button) {
-    // Leave two pixels beyond the measured text, avoiding float roundoff at
-    // an exact wrap boundary. Measure footer height with this *same* width.
-    return std::min(bandWidth, std::max(220.0f, TextWidth(button.text.c_str(), TypePx(10)) + 18));
-  };
-  float bandHeight = 12 + line + countRows(quarters_.bandNote, bandWidth) * line;
-  for (const auto& button : screen.progress) {
-    bandHeight += 6 + countRows(button.text, buttonWidth(button) - 16) * line + 12 + 8;
-  }
-  quartersBandTop_ = layout_.content.Bottom() - bandHeight;
   // Payroll and roster are separate in paintRoster(). Do not paint the full
   // roster as a table and then overlay clickable copies over its payroll rows.
   const Area hall{(left + right - 560) / 2, panelTop, 560, 300};
@@ -2235,6 +2247,30 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
                         static_cast<unsigned char>(std::stoi(pixel.colour.substr(5, 2), nullptr, 16)),
                         255});
   }
+  if (quarters_.hasCrew) {
+    // Non-green 4x4-pixel-grid speech bubble beside the figure (free to talk, 0 clicks).
+    const Area talkBtn{hall.x + 328.0f, hall.y + 128.0f, 32.0f, 32.0f};
+    const bool enabled = quarters_.conversation.enabled;
+    const bool hovered = enabled && talkBtn.Contains(mouseX_, mouseY_ + contentScroll_);
+    const Color btnBg = ToRay(hovered || !enabled ? p.panel3 : p.panel);
+    DrawRectangle(static_cast<int>(talkBtn.x), static_cast<int>(talkBtn.y),
+                  static_cast<int>(talkBtn.w), static_cast<int>(talkBtn.h), btnBg);
+    DrawRectangleLines(static_cast<int>(talkBtn.x), static_cast<int>(talkBtn.y),
+                       static_cast<int>(talkBtn.w), static_cast<int>(talkBtn.h),
+                       ToRay(enabled ? p.borderDark : p.border));
+    const Color mark = ToRay(enabled ? p.ink : p.muted);
+    // 4px sprite-aligned speech bubble + 3 dots inside the 32x32 frame.
+    const int bx = static_cast<int>(talkBtn.x) + 6;
+    const int by = static_cast<int>(talkBtn.y) + 7;
+    DrawRectangleLines(bx, by, 20, 14, mark);
+    DrawRectangle(bx + 2, by + 13, 4, 4, btnBg);
+    DrawRectangle(bx + 2, by + 14, 2, 4, mark);
+    DrawRectangle(bx + 4, by + 14, 2, 2, mark);
+    DrawRectangle(bx + 5, by + 6, 2, 2, mark);
+    DrawRectangle(bx + 9, by + 6, 2, 2, mark);
+    DrawRectangle(bx + 13, by + 6, 2, 2, mark);
+    if (enabled) { navHits_.push_back({talkBtn, "talk", ""}); }
+  }
   EndScissorMode();
 
 
@@ -2251,7 +2287,7 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
     // owns ImGui input; the rest of the screen uses the measured Raylib hits.
     const float comboH = line + 12;
     const float screenY = oy - contentScroll_;
-    if (screenY >= layout_.content.y && screenY + comboH < quartersBandTop_) {
+    if (screenY >= layout_.content.y && screenY + comboH < actionBandTop_) {
       ImGui::SetNextWindowPos(ImVec2(orderX, screenY), ImGuiCond_Always);
       ImGui::SetNextWindowSize(ImVec2(column, comboH), ImGuiCond_Always);
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
@@ -2293,61 +2329,35 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
     }
   }
   float uy = stacked ? std::max(rowY, oy) + 10 : hall.Bottom() + 10;
+  if (quarters_.hasCrew) {
+    const std::string lineText =
+        !quarters_.conversation.enabled && quarters_.said.empty()
+            ? (quarters_.conversation.title.empty() ? "Crew member is in the medical bay."
+                                                    : quarters_.conversation.title)
+            : (quarters_.said.empty()
+                   ? quarters_.conversation.label + " (click the speech bubble beside them)."
+                   : "\"" + quarters_.said + "\"");
+    const auto speechRows =
+        WrapText(lineText, hall.w - 16, TypePx(10), SelectFont(TypePx(10), false));
+    const float speechH = static_cast<float>(speechRows.size()) * line + 12.0f;
+    DrawRectangle(static_cast<int>(hall.x), static_cast<int>(uy),
+                  static_cast<int>(hall.w), static_cast<int>(speechH), ToRay(p.panel));
+    DrawRectangleLines(static_cast<int>(hall.x), static_cast<int>(uy),
+                       static_cast<int>(hall.w), static_cast<int>(speechH), ToRay(p.border));
+    float sy = uy + 6.0f;
+    const Color speechColor =
+        ToRay(quarters_.said.empty() ? p.muted : p.ink);
+    for (const auto& text : speechRows) {
+      Text(text.c_str(), static_cast<int>(hall.x + 8), static_cast<int>(sy), TypePx(10), speechColor);
+      sy += line;
+    }
+    uy += speechH + 6.0f;
+  }
   for (const auto& panel : screen.under) {
     const float h = MeasurePanelHeight(panel, hall.w);
     PaintPanel(panel, {hall.x, uy, hall.w, h}); uy += h + 6;
   }
-  if (quarters_.hasCrew) {
-    float y = uy + 6;
-    wrapped("The Figure", hall.x + 8, y, hall.w - 16, ToRay(p.coffee));
-    const auto& row = quarters_.conversation;
-    std::string label = row.label;
-    if (row.spent) { label += " - out of clicks"; }
-    else if (!row.enabled) { label += " - unavailable"; }
-    const auto lines = WrapText(label, hall.w - 28, TypePx(10), SelectFont(TypePx(10), false));
-    const Area talk{hall.x + 8, y, hall.w - 16, lines.size() * line + 12};
-    DrawRectangle(static_cast<int>(talk.x), static_cast<int>(talk.y), static_cast<int>(talk.w),
-                  static_cast<int>(talk.h), ToRay(row.enabled ? p.panel : p.panel3));
-    if (row.charged) { PaintProgressFill(talk, row.chargePercent); }
-    DrawRectangleLines(static_cast<int>(talk.x), static_cast<int>(talk.y), static_cast<int>(talk.w), static_cast<int>(talk.h), ToRay(p.borderDark));
-    float textY = talk.y + 6;
-    for (const auto& text : lines) {
-      Text(text.c_str(), static_cast<int>(talk.x + 6), static_cast<int>(textY), TypePx(10),
-           ToRay(row.enabled ? p.ink : p.muted));
-      textY += line;
-    }
-    if (row.enabled) { navHits_.push_back({talk, "talk", ""}); }
-    y = talk.Bottom() + 6;
-    wrapped(quarters_.said.empty() ? "You have not asked them anything yet." : "\"" + quarters_.said + "\"", hall.x + 8, y, hall.w - 16, ToRay(p.muted));
-    uy = y + 8;
-  }
   contentPaintBottom_ = std::max(contentPaintBottom_, std::max({rowY, oy, uy}) + 10);
-  // Footer coordinates are in the camera's content space, while its screen
-  // position is fixed. Exclude its text from the scrolling body's extent.
-  paintingContent_ = false;
-  const float bandY = quartersBandTop_ + contentScroll_;
-  DrawRectangle(static_cast<int>(left - 8), static_cast<int>(bandY),
-                static_cast<int>(right - left + 16), static_cast<int>(bandHeight), ToRay(p.panel));
-  DrawLine(static_cast<int>(left), static_cast<int>(bandY), static_cast<int>(right),
-           static_cast<int>(bandY), ToRay(p.border));
-  float y = bandY + 6;
-  wrapped("Assignments", left + 8, y, bandWidth, ToRay(p.coffee));
-  wrapped(quarters_.bandNote, left + 8, y, bandWidth, ToRay(p.muted));
-  for (const auto& button : screen.progress) {
-    const float width = buttonWidth(button);
-    const float buttonH = countRows(button.text, width - 16) * line + 12;
-    const Area box{(left + right - width) / 2, y + 6, width, buttonH};
-    PaintProgressSurface(box, button, p);
-    float textY = box.y + 6;
-    for (const auto& text : WrapText(button.text, width - 16, TypePx(10), SelectFont(TypePx(10), false))) {
-      Text(text.c_str(), static_cast<int>(box.x + (width - TextWidth(text.c_str(), TypePx(10))) / 2),
-           static_cast<int>(textY), TypePx(10), ToRay(p.ink));
-      textY += line;
-    }
-    navHits_.push_back({box, "commit", ""});
-    y = box.Bottom() + 8;
-  }
-  paintingContent_ = true;
 }
 
 bool ShellView::PressPanelRow(Simulation& sim, ScreenKind kind, const std::string& id) {
@@ -3805,7 +3815,25 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
       if (hit.action == "confirm-yes") {
         const std::string action = pendingAction_;
         pendingConfirm_.clear(); pendingAction_.clear();
-        if (PressPanelRow(sim, panelsKind_, action)) SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
+        bool mark = false;
+        const TaskScreenModel& screen = taskScreen_;
+        for (std::size_t c = 0; c < screen.panelRowIds.size(); ++c) {
+          for (std::size_t r = 0; r < screen.panelRowIds[c].size(); ++r) {
+            if (screen.panelRowIds[c][r] != action) { continue; }
+            if (c < screen.panelRows.size() && r < screen.panelRows[c].size()) {
+              const auto& row = screen.panelRows[c][r];
+              mark = row.charged ||
+                     (panelsKind_ == ScreenKind::Station && !row.plain &&
+                      (action.rfind("buy-", 0) == 0 || action == "ship-buy" ||
+                       action.rfind("upgrade:", 0) == 0 || action == "hull-service" ||
+                       action.rfind("room-buy:", 0) == 0 || action.rfind("hire:", 0) == 0 ||
+                       action.rfind("trade-accept:", 0) == 0));
+            }
+          }
+        }
+        if (PressPanelRow(sim, panelsKind_, action) && mark) {
+          SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
+        }
         return;
       }
       const bool positive = screenNav_ ? PressNavAction(sim, hit.action, hit.arg)
@@ -3816,17 +3844,18 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
     return; // Never activate a body control hidden behind the band.
   }
 
-  // The quarters: a roster row, a job, an order, the sheet, a word.
+  // The quarters: Assign Tasks button (green), roster row, order, or speech bubble (free).
   if (screenQuarters_) {
-    for (const NavHit& hit : navHits_) {
-      // The opaque pinned band occludes body controls, including blank parts
-      // of the band. Never activate an order painted behind that footer.
-      if (y >= quartersBandTop_ && hit.action != "commit") { continue; }
-      if (!hit.box.Contains(x, y + scrollY)) { continue; }
-      if (PressQuartersAction(sim, hit.action, hit.arg) &&
-          (hit.action == "commit" || hit.action == "talk")) {
+    for (const auto& entry : taskButtons_) {
+      if (!entry.first.Contains(x, y + scrollY)) { continue; }
+      if (PressProgressButton(sim, entry.second)) {
         SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
       }
+      return;
+    }
+    for (const NavHit& hit : navHits_) {
+      if (!hit.box.Contains(x, y + scrollY)) { continue; }
+      PressQuartersAction(sim, hit.action, hit.arg);
       return;
     }
     return;
@@ -3834,9 +3863,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
   if (screenRecord_) {
     for (const NavHit& hit : navHits_) {
       if (!hit.box.Contains(x, y + scrollY)) { continue; }
-      if (hit.action == "talk" && PressConversation(sim, hit.arg)) {
-        SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
-      }
+      if (hit.action == "talk") { PressConversation(sim, hit.arg); }
       return;
     }
     return;
@@ -3848,13 +3875,15 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
       if (!hit.box.Contains(x, y + scrollY)) { continue; }
       // Read the row's own question before acting: a purchase that cannot be
       // undone asks first when the reader keeps confirmations on.
+      const CommandRowView* clickedRow = nullptr;
       std::string question;
       const TaskScreenModel& screen = taskScreen_;
       for (std::size_t c = 0; c < screen.panelRowIds.size(); ++c) {
         for (std::size_t r = 0; r < screen.panelRowIds[c].size(); ++r) {
           if (screen.panelRowIds[c][r] != hit.arg) { continue; }
           if (c < screen.panelRows.size() && r < screen.panelRows[c].size()) {
-            question = screen.panelRows[c][r].confirm;
+            clickedRow = &screen.panelRows[c][r];
+            question = clickedRow->confirm;
           }
         }
       }
@@ -3865,9 +3894,15 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         pendingAction_ = hit.arg;
         return;
       }
-      const double actionsBefore = sim.ActionCount();
+      const bool rowCharged = clickedRow != nullptr && clickedRow->charged;
+      const bool stationPurchaseOrTrade =
+          panelsKind_ == ScreenKind::Station && clickedRow != nullptr && !clickedRow->plain &&
+          (hit.arg.rfind("buy-", 0) == 0 || hit.arg == "ship-buy" ||
+           hit.arg.rfind("upgrade:", 0) == 0 || hit.arg == "hull-service" ||
+           hit.arg.rfind("room-buy:", 0) == 0 || hit.arg.rfind("hire:", 0) == 0 ||
+           hit.arg.rfind("trade-accept:", 0) == 0);
       const bool acted = PressPanelRow(sim, panelsKind_, hit.arg);
-      if (acted && (panelsKind_ != ScreenKind::Wiki || sim.ActionCount() > actionsBefore)) {
+      if (acted && (rowCharged || stationPurchaseOrTrade)) {
         SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
       }
       return;
@@ -3914,10 +3949,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
       for (const ExteriorCallout& item : exterior_.callouts) {
         if (!item.box.Contains(x, y + scrollY)) continue;
         if (button == HitButton::Right) { OpenTask(sim, "room", item.id, false); }
-        else {
-          OpenBriefing(sim, "room", item.id);
-          SpawnMark(marks_, x, y, nowMs, sim.State().reducedMotion);
-        }
+        else { OpenBriefing(sim, "room", item.id); }
         return;
       }
       if (exterior_.image.Contains(x, y + scrollY)) {
@@ -3949,8 +3981,6 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
           OpenTask(sim, "room", room.id, false);
         } else {
           OpenBriefing(sim, "room", room.id);
-          SpawnMark(marks_, x, y, nowMs,
-                    sim.State().reducedMotion);
         }
         return;
       }

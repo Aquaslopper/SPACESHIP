@@ -312,18 +312,14 @@ void Simulation::TrainCrew(CrewMember& crew, int steps, const std::string& where
   }
   crew.skill = (crew.skill.empty() || crew.skill == "Untrained") ? "Trained" : "Practised";
   if (job != nullptr && job->trainStep != 0) {
+    // Legacy saves stored kitchen jobAt as 1 instead of cookBelow (10).
+    double current = (crew.jobAt == 0 || crew.jobAt < job->baseAt) ? job->baseAt : crew.jobAt;
     for (int k = 0; k < steps; ++k) {
-      crew.jobAt = std::min(job->trainCap,
-                            (crew.jobAt == 0 ? job->baseAt : crew.jobAt) + job->trainStep);
+      current = std::min(job->trainCap, current + job->trainStep);
     }
-    if (job->id == "kitchen") {
-      LogLine(crew.name + " trained " + where + " - galley batches remain one dry ration "
-              "for up to " + js::NumToString(rules_.mess.foodPerRation) +
-              " cooked food in " + js::NumToString(rules_.mess.foodPerRation) + " clicks.");
-    } else {
-      LogLine(crew.name + " trained " + where + " - now acts at " +
-              js::NumToString(crew.jobAt) + job->unit + ".");
-    }
+    crew.jobAt = current;
+    LogLine(crew.name + " trained " + where + " - now acts at " +
+            js::NumToString(crew.jobAt) + job->unit + ".");
   } else {
     LogLine(crew.name + " trained " + where + ", but holds no job to use it on.");
   }

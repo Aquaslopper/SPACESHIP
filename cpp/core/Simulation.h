@@ -226,7 +226,7 @@ class Simulation {
   std::string NeedLine(const std::string& needKey, int n, const std::string& jobLabel) const;
   std::string AskCrew(CrewMember& crew);
   static constexpr double kConversationMorale = 5.0;
-  bool TalkToCrew(const std::string& crewId);  // one action, up to +5 morale
+  bool TalkToCrew(const std::string& crewId);  // free (0 clicks); reveals need, lifts morale gently
 
   // ---- Phase 1B commands ------------------------------------------------
   // Navigation (Navigation.cpp). Selection is free; only travel and scans cost.
@@ -407,6 +407,7 @@ class Simulation {
   double MaintCostActions() const;
   bool MaintRunningAny() const;   // the commander's spanner or the engineer's
   double CleanerIntervalOf(const CrewMember& crew) const;
+  double CookThreshold(const CrewMember& crew) const;
 
  private:
   void TickWorld();

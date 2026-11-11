@@ -179,6 +179,7 @@ struct NavPanel {
   std::string title;
   std::string placement;  // "", "np-last", "np-half", "np-half-last", "np-full"
   std::vector<PanelLine> lines;
+  std::vector<ProgressButton> buttons;
 
   NavPanel& Name(const std::string& text, const std::string& tone = std::string());
   NavPanel& Sub(const std::string& text);

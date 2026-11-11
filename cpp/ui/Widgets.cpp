@@ -296,6 +296,13 @@ bool PressProgressButton(Simulation& sim, const std::string& taskId) {
     for (const auto& control : screen.stage.controls) {
       if (control.button.taskId == taskId) { return PressProgressButton(sim, control.button); }
     }
+    for (const auto* group : {&screen.left, &screen.under, &screen.right, &screen.panels}) {
+      for (const auto& panel : *group) {
+        for (const auto& button : panel.buttons) {
+          if (button.taskId == taskId) { return PressProgressButton(sim, button); }
+        }
+      }
+    }
   }
   return PressProgressButton(sim, BuildProgressButton(sim, taskId, "action", true));
 }
@@ -444,25 +451,23 @@ CommandRowView BuildConversationRow(const Simulation& sim, const std::string& cr
   CommandRowView row;
   if (crew == nullptr) { return row; }
   const auto space = crew->name.find(' ');
-  row.label = "Talk to " + crew->name.substr(0, space) + " - 1 click, up to +" +
-              Num(Simulation::kConversationMorale) + " morale";
-  row.cost = row.displayCost = "1 click";
-  row.actionCost = true;
+  row.label = "Talk to " + crew->name.substr(0, space);
+  row.cost = row.displayCost = "free";
+  row.actionCost = false;
+  row.charged = false;
   row.enabled = crew->health > 0 && sim.State().gameOver.empty() &&
-                sim.FindOngoing("doc-" + crewId) == nullptr && crew->morale < 100.0;
+                sim.FindOngoing("doc-" + crewId) == nullptr;
   row.live = row.enabled;
   if (!row.enabled && sim.FindOngoing("doc-" + crewId) != nullptr) {
     row.title = "Crew member is in the medical bay.";
   }
-  BindCommandCharge(sim, row, ConversationChargeKey(crewId), "routine");
   return row;
 }
 
 bool PressConversation(Simulation& sim, const std::string& crewId) {
   const CommandRowView row = BuildConversationRow(sim, crewId);
   if (!row.enabled) { return false; }
-  return CommitActionButton(sim, row.chargeKey, row.tier,
-                            [&]() { return sim.TalkToCrew(crewId); });
+  return sim.TalkToCrew(crewId);
 }
 
 // ---------------------------------------------------------------------------

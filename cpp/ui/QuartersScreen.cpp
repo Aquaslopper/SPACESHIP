@@ -139,10 +139,6 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
   stand.id = "cq-stand";
   stand.title = "Standing";
   stand.placement = "np-half-last";
-  NavPanel talk;
-  talk.id = "cq-talk";
-  talk.title = "The Figure";
-  talk.placement = "np-full";
 
   NavPanel ordersPanel;
   ordersPanel.id = "cq-orders";
@@ -150,18 +146,20 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
   NavPanel sheet;
   sheet.id = "cq-sheet";
   sheet.title = "Order Sheet";
-  sheet.placement = "np-last";
 
-  NavPanel band;
-  band.id = "cq-band";
-  band.title = "Assignments";
-  band.placement = "np-full";
+  NavPanel assignPanel;
+  assignPanel.id = "cq-assign";
+  assignPanel.title = "Assignments";
+  assignPanel.placement = "np-last";
 
   if (selected == nullptr) {
     cond.Dim("No crew aboard.");
+    model.bandNote = "No orders written.";
+    assignPanel.Note(model.bandNote);
+    assignPanel.buttons.push_back(BuildProgressButton(
+        sim, "crew-assign", "Assign Tasks (0 Clicks)", false, "Complete", std::string()));
     screen.left = {roster};
-    screen.right = {ordersPanel, sheet};
-    screen.band = {band};
+    screen.right = {ordersPanel, sheet, assignPanel};
     return model;
   }
 
@@ -257,16 +255,11 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
   if (sheet.lines.empty()) { sheet.Dim("Nothing written down yet."); }
   model.sheetText = sheet.lines.empty() ? std::string() : sheet.lines.front().value;
 
-  // --- the figure ---------------------------------------------------------
-  talk.Field("Figure", sim.FindOngoing("doc-" + hand.id) != nullptr
-                           ? FirstName(hand.name) + " is in the medical bay"
-                           : "Talk to " + FirstName(hand.name));
+  // --- the figure's conversation state ------------------------------------
   model.conversation = BuildConversationRow(sim, hand.id);
   model.said = hand.said;
-  talk.Field("Said", hand.said.empty() ? "You have not asked them anything yet."
-                                       : "\"" + hand.said + "\"");
 
-  // --- the band -----------------------------------------------------------
+  // --- right-column assignments commit (no bottom banner) -----------------
   const double total = sim.OrdersCost();
   const int who = sim.OrderedCount();
   if (total > 0) {
@@ -280,18 +273,15 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
   } else {
     model.bandNote = "No orders written.";
   }
-  band.Note(model.bandNote);
-
-  screen.progress.push_back(BuildProgressButton(
+  assignPanel.Note(model.bandNote);
+  assignPanel.buttons.push_back(BuildProgressButton(
       sim, "crew-assign",
-      "Assign Tasks (" + js::NumToString(total) + " Action" + (total == 1 ? "" : "s") + ")",
+      "Assign Tasks (" + js::NumToString(total) + " Click" + (total == 1 ? "" : "s") + ")",
       total > 0, "Complete", std::string()));
 
   screen.left = {roster};
   screen.under = {cond, stand};
-  screen.right = {ordersPanel, sheet};
-  screen.band = {band};
-  (void)talk;
+  screen.right = {ordersPanel, sheet, assignPanel};
   return model;
 }
 
