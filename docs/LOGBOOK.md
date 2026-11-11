@@ -526,3 +526,19 @@ You must append a compressed summary of **every single reply and action you take
 - Staging and committing all 8 files on `arena/089b090d-spaceship`.
 - Pushing `arena/089b090d-spaceship` to `origin` and opening pull request targeting `main` via `gh pr create`.
 - Graphical `./spaceship` / `spaceship.exe` build, visual review of the 3D bay/boxes and hero headers, and mouse-click feel remain ready for `@Aquaslopper` via CI artifacts / local desktop build.
+
+### Entry #043
+- **Timestamp:** 2026-11-11 06:12 UTC
+- Confirmed repository access, clean initial working tree, branch `arena/c14f065a-spaceship`, and base commit `6f7bc0d` in response to the initial Git-access question.
+- Read `AGENTS.md` and logbook rules; answered the five mandatory comprehension questions before editing.
+- Restored the supplied crashed-session UI changes in `cpp/ui/Draw.cpp` and `cpp/ui/Palette.h`; no new gameplay behavior added.
+- Set ImGui rounding to zero and added shared Raylib/ImGui TL/BR chamfered double-border helpers, inset progress clipping, and corner masks.
+- Applied the frames and supplied padding/measurement changes across home cards, chrome, navigation, quarters, cargo controls, panels, setup, tutorial, title, loss, and handbook search.
+- Restored custom draggable/closable popup headers, scrolling child bodies, wrapped action buttons, and the chamfered title sheet; preserved existing popup cleanup and action dispatch.
+- Reviewed the legacy progress-fill CSS and located `roomCargo` / `showPopup` reference functions without editing the legacy file.
+- Compared the entire cargo bay/crate/animation/capacity region against HEAD: unchanged; compared popup content/save/load/confirmation handling ignoring indentation: unchanged.
+- Downloaded pinned Raylib 6.0, ImGui 1.92.7 and rlImGui Raylib_6_0 headers under `/tmp/deps` only, outside version control.
+- Ran the requested `bash tools/check-id-prefixes.sh`, `bash tools/check-gui-syntax.sh`, and `git diff --check`: all passed; Draw.cpp, AudioDevice.cpp and main.cpp parsed without warnings under `-Wall -Wextra -Wpedantic`.
+- Left gameplay/core code, existing tests, artwork, `rescue/`, legacy source, build configuration and generated ID files untouched; no build output or restoration scripts staged.
+- No linked GUI build or graphical playtest performed; syntax validation does not establish visual or gameplay parity.
+- Preparing one restoration commit and push on `arena/c14f065a-spaceship`; no merge or pull request creation requested.

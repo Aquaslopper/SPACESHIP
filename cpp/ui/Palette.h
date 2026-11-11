@@ -31,19 +31,19 @@ inline ImU32 ToImU32(const Rgb& rgb, int alpha = 255) {
   return IM_COL32(rgb.r, rgb.g, rgb.b, alpha);
 }
 
-// Flat surfaces, hairline borders, 3 px rounding: the house look, applied to
-// every widget ImGui owns.
+// Flat surfaces, crisp 0px corners: cassette-futurism styling applied to every
+// widget ImGui owns.
 inline void ApplyPalette(const Theme& theme) {
   const Palette& p = theme.palette;
   ImGuiStyle& style = ImGui::GetStyle();
 
-  style.WindowRounding = 3.0f;
-  style.ChildRounding = 3.0f;
-  style.FrameRounding = 3.0f;
-  style.PopupRounding = 3.0f;
-  style.GrabRounding = 3.0f;
-  style.ScrollbarRounding = 8.0f;
-  style.TabRounding = 3.0f;
+  style.WindowRounding = 0.0f;
+  style.ChildRounding = 0.0f;
+  style.FrameRounding = 0.0f;
+  style.PopupRounding = 0.0f;
+  style.GrabRounding = 0.0f;
+  style.ScrollbarRounding = 0.0f;
+  style.TabRounding = 0.0f;
 
   style.WindowBorderSize = 1.0f;
   style.ChildBorderSize = 1.0f;
