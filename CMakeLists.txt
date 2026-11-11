@@ -189,7 +189,6 @@ add_library(spaceship_core STATIC
   cpp/core/Tasks.cpp
   cpp/core/Charges.cpp
   cpp/core/Incidents.cpp
-  cpp/core/Simulacron.cpp
   cpp/core/Awards.cpp
   cpp/core/Trace.cpp
   cpp/core/Navigation.cpp
@@ -217,10 +216,8 @@ add_library(spaceship_core STATIC
   cpp/ui/CrewRecord.cpp
   cpp/ui/QuartersScreen.cpp
   cpp/ui/Popups.cpp
-  cpp/core/Signal.cpp
   cpp/audio/Audio.cpp
   cpp/ui/RoomsScreen.cpp
-  cpp/ui/SimCoreScreen.cpp
   cpp/ui/AwardsScreen.cpp
   cpp/ui/EventScreen.cpp
   cpp/ui/StationScreen.cpp
