@@ -284,7 +284,7 @@ void Simulation::FreeCommit(const std::string& detail) {
 void Simulation::TickWorld() {
   // The order below is normative; see the header comment.
   WearEngine();
-  if (static_cast<long long>(actionCounter_) % 10 == 0) { ClampStat("energy", -1); }
+  if (static_cast<long long>(actionCounter_) % 4 == 0) { ClampStat("energy", -1); }
   TickFilters();
   TickCrew();
   TickCleaner();
