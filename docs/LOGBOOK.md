@@ -790,3 +790,23 @@ You must append a compressed summary of **every single reply and action you take
 - PR 71 is left open and untouched. Its commits are now part of this branch; if this branch goes into `main` with a merge commit, GitHub marks PR 71 as merged.
 - No PR opened for this branch; not asked.
 - Awaiting from `@Aquaslopper`: the playtest of the package built from this branch; the word to open the PR; the scan discount; the wording of entries 052 to 055.
+- Added after the push, same turn; written here but not committed yet, so that CI is not started a second time. CI run 43117011906 on `7b6a885`: `check-id-prefixes` success, `build-windows` success with the artifact `Spaceship-Windows-x64` (20.9 MB), `test-linux` failure in the same last step as on `main`.
+- After the push a viewer was also built from `main` (`git archive 9294973` into `/tmp`, same dependencies), exit 0. Same script on both builds: voyage from `sec-gen-205`, target `pl-gen-205-p7` in the home system, `scan`, then eight single actions, a frame after each step. All 10 frames are identical between `main` and the merged build, text log and picture byte for byte, and the `STATE` lines are identical. The button read "Run Deep Scan", after the starting action "Deep scan under way.", after one more action "Deep scan complete".
+- Control for that comparison: the Crew Quarters frame, where the two builds are known to differ, compares as different in picture and in text.
+- Correction to what the owner was told about the scan: 5, 3 and 2 are the base work of a scan outside the home system (`EffectiveScanCost`, plus 1 inside the region, plus 2 beyond); `StartScan` sets the work of a scan inside the home system to 1. Both are unchanged against `main`. A scan outside the home system was not played: a system picked on the sector layer answers "Jump to this system, then use the System chart".
+- The three name searches of entry #056 on the pushed tip: 0, 0 and 0 (`main`: 40, 151 and 35). The branch against `main`: 74 files, 27 of them pictures, 768 insertions, 1510 deletions.
+
+### Entry #058
+- **Timestamp:** 2026-11-11 23:12 UTC
+- Owner: "ok, let me test it, please open the pr."
+- The five lines added to entry #057 after the last push are committed together with this entry.
+- A PR from `arena/8cf1c2e1-spaceship` into `main` is opened right after this entry is pushed; its number is not known at the time of writing. Title: "Remove the Simulacron and three rooms; add the Crew Quarters portraits and figures".
+- The PR text lists what the branch does, what changes in play, each check with the state it was compared against, what was not checked, and what was left in place. No hash sign stands before a number anywhere in it.
+- PR 71 is not touched. Its four commits are part of this branch; a merge of this branch with a merge commit lets GitHub close PR 71 as merged.
+- No code or data file changed in this turn; only this logbook.
+- Not run in this turn: any build, the viewer, any check script.
+- The push of this logbook commit starts one CI run on the branch, and opening the PR starts another. Both build the same game files as run 43117011906, whose package the owner is testing. Their results are not known at the time of writing.
+- The branch against `main` before this commit: 74 files, 27 of them pictures, 768 insertions, 1510 deletions.
+- The logbook names the removed system in entries 052 to 055 (15 lines) and in one line of entry 041; entries 056 to 058 do not.
+- Still the owner's decision: whether the scan discount returns; the wording of entries 052 to 055; the `test-linux` job, which cannot pass without the removed test files; a line in `AGENTS.md`; the leftovers of the removed quest on the chart.
+- Awaiting from `@Aquaslopper`: the playtest and the merge.
