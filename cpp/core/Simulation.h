@@ -270,8 +270,8 @@ class Simulation {
   void ContractProgress(const std::string& goal, const std::string& target);
 
   // Trade contracts (Economy.cpp). The board is drawn from the system's own
-  // chart: one seeded draw per system per epoch, and the epoch is the action
-  // clock in blocks of 200, so a berth keeps a board that is the system's and a
+  // chart: one seeded draw per system/berth per epoch, and the epoch is the action
+  // clock in blocks of 100, so a berth keeps a board that is the system's and a
   // list that is its own. Accepting costs one action and greys its own row.
   std::vector<TradeRun> TradeBoard(const std::string& portId) const;
   // The cargo hall (Economy.cpp). Running a trade is two clicks and one leg: the

@@ -657,7 +657,7 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
 
       if (m == 1 && isGeneratedSystem && !profiles.empty() && rng.Next() < 0.35) {
         // Secondary orbital waystation with a working port.
-        const std::string portId = side + "-outpost";
+        const std::string portId = "st-" + side + "-outpost";
         const std::string portName = UniqueName(word + " Outpost", names);
         const std::string profile = Pick(profiles, rng);
         const auto hintIt = catalog.portHints.find(profile);
@@ -687,7 +687,8 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
 
       const bool belt = (m == 0) ? (rng.Next() < 0.5) : false;
       const std::string lid =
-          side + (belt ? "-field" : (m == 0 ? "-wreck" : (m == 1 ? "-anom" : "-beacon")));
+          (belt ? std::string("bt-") : std::string("si-")) + side +
+          (belt ? "-field" : (m == 0 ? "-wreck" : (m == 1 ? "-anom" : "-beacon")));
       const std::string lname = UniqueName(
           belt ? (word + " Debris")
                : (m == 0 ? (word + " Wreck")
