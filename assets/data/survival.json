@@ -130,8 +130,8 @@
     "rationCapacity": 24,
     "foodPerRation": 5,
     "cookBelow": 10,
-    "hungerPerMeal": 30,
-    "hungerPerFood": 10,
+    "hungerPerMeal": 15,
+    "hungerPerFood": 5,
     "hungerFloor": 5
   },
   "messEvery": 25,

@@ -289,3 +289,68 @@ You must append a compressed summary of **every single reply and action you take
 - An already active automatic restock cycle is not cancelled by a manual batch.
 - Mess Hall text now states the inclusive threshold.
 - No tests or builds were run; the owner playtests locally.
+
+### Entry #023
+- **Timestamp:** 2026-11-10 23:22 UTC
+- New session started at commit `4434fbe` (merge of PR #60) on branch `arena/69b6a32e-spaceship`.
+- Read `AGENTS.md`, `README.md`, `docs/LOGBOOK.md`, `docs/ROADMAP_TO_SPACEMAP.md`, `CMakeLists.txt`, `build.sh`, `.github/workflows/build.yml`, and `tools/check-*.sh`.
+- Read `rescue/` historical documents (`Developer Note`, `README.md`, `RESCUE_NOTES.md`, `REPAIR_AND_RESCUE.md`, `RECOVERY_PLAN.md`, `damagcontrol_index.md`, `code_vs_code_audit.md`, `health_source_audit.md`, `first_2000_audit.md`, `lines_2001_4000_repairs.md`).
+- Inspected `cpp/ui/Draw.cpp` around line 1338 confirming the earlier unauthorized comment example cited in `AGENTS.md` is no longer present in its prior wording.
+- Verified sandbox tooling without running builds or tests: `g++` (12.2.0), `node`, `git`, `gh`, and `python3` are present; `cmake` and graphical/Windows runtimes are absent.
+- Observed repository mismatch without modifying files: `CMakeLists.txt` defines `SPACESHIP_BUILD_TESTS` and `.github/workflows/build.yml` / `tools/` reference `cpp/tests/` and `ctest`, while no `cpp/tests/` or `tests/` directory exists in this checkout.
+- No tests, builds, or code checks were executed, complying with `AGENTS.md`.
+- No files under `cpp/`, `assets/`, `rescue/`, `tools/`, `CMakeLists.txt`, or `Legacy code_Spaceship.txt` were created, modified, or deleted.
+- `docs/LOGBOOK.md` is the sole edited file in this turn per the mandatory logging requirement in `AGENTS.md`.
+- Output the five mandatory `AGENTS.md` Comprehension Check answers before performing any task or proposing edits.
+- Awaiting `@Aquaslopper` instructions specifying which defects or agent regressions to trace and explicit approval before any code changes or test runs.
+
+### Entry #024
+- **Timestamp:** 2026-11-10 23:33 UTC
+- Read-only cook, galley, dry-ration, and hunger rule audit comparing PR `#33` (`0cf2aca0`) against current `HEAD` (`4434fbe`, PR `#60`) and intermediate PRs (`#36`, `#58`, `#59`, `#60`).
+- Fetched PR `#33` merge commit (`0cf2aca0`) into `FETCH_HEAD` and inspected GitHub PR diffs `#33`–`#60` without switching off `arena/69b6a32e-spaceship`.
+- Read current `HEAD` implementations in `cpp/core/{Constants.h,CrewLogic.cpp,Action.cpp,Tasks.cpp,Projects.cpp,Orders.cpp,Economy.cpp,Charges.cpp,SaveSystem.cpp}`, `cpp/data/Catalog.cpp`, `cpp/ui/{MessScreen.cpp,Widgets.cpp,RoomsScreen.cpp,StationScreen.cpp,Describe.cpp,Shell.cpp,Draw.cpp}`, and `assets/data/{survival.json,crew.json,content.json,progression.json,ship.json}`.
+- Catalogued core rules preserved from PR `#33` (`rackStart=18`, `capacity=24`, `rationStart=21`, `rationCapacity=24`, `foodPerRation=5`, `cookBelow=10`, `messEvery=25`, `starveAt=90`, `starveEvery=8`, `hungerFloor=5`, 3 food per meal, 12 per 4-hand round, 5-click fixed batch, up-front ration spend, clamped completion yield, Hydroponics interlock, shared-meal cost).
+- Identified post-PR-#33 changes in PR `#36`, PR `#58`, and PR `#60`, including doubled hunger pacing (`15->30` / `5->10`), random `DealHungerClock`/`StaggerHungerClocks` overwriting `crew.json` initial ticks, `<= 10` inclusive auto-cook threshold, removal of manual `cookRestock_ = true` chaining, button charge exemption (`KeepsOwnMechanic`) replacing `TakesNoCooldown`, `400 sh` galley capacity upgrade (`24->34`), `fire` order cost `5->1`, and UI text reductions.
+- Identified rules and artifacts inside PR `#33` itself (`cooldownRules`, `TakesNoCooldown`, `StartCookingSelf` setting `cookRestock_=true`, unsaved `cookRestock_` flag, `Catalog.cpp` fallback vs JSON split, stale `crew.json` `kitchen` training metadata, root `"hungerFloor": 5` duplicate in `survival.json`).
+- Observed `Legacy code_Spaceship.txt` was neither consulted nor modified, complying with owner directive and `AGENTS.md`.
+- No game code, data files, or `CMakeLists.txt` were modified, and no builds or tests were run.
+- Prepared structured comparison report for `@Aquaslopper` and stopped pending owner direction.
+
+### Entry #025
+- **Timestamp:** 2026-11-11 00:07 UTC
+- Read owner-supplied `/tmp/arena-coding-uploads/spaceship concept.pdf` (143 pages) via read-only PDF stream/CMap extraction.
+- Confirmed zero occurrences of `cooldown` in `spaceship concept.pdf` and verified Section 9 / Section D-5 progress-button specification (idle/running/done green fill bar with no numbers) and Engine Room (`wearEvery=4`, `wearStep=1`, 400-click cycle, `perAction=10`).
+- Recorded owner rulings on cook/hunger rules and persistence: restore `hungerPerMeal=15`, `hungerPerFood=5`, original `crew.json` `hunger`/`hungerTick` values without random overwrite, `cookRestock_=true` in `StartCookingSelf`, persist `cookRestock_` in `SaveSystem.cpp`, keep `<= 10` inclusive `AutoMess` trigger, and keep the `galley` rack upgrade (`24->34` for `400 sh`).
+- Audited `cpp/core/SaveSystem.cpp` (`SaveJson`/`LoadJson`/`GetBool`) confirming optional `mess.cookRestock` serialization preserves old-save compatibility.
+- Audited `cpp/core/Charges.cpp`, `cpp/ui/Widgets.cpp`, `cpp/ui/Draw.cpp`, `cpp/ui/StoresScreen.cpp`, `cpp/ui/StationScreen.cpp`, `cpp/ui/RoomsScreen.cpp`, `cpp/ui/EngineScreen.cpp`, `cpp/core/Survival.cpp`, `rescue/damagcontrol_index.md`, `rescue/damagecontrol_report.md`, and GitHub PR list (`#1`–`#60`).
+- Traced engine/green-button drift across PR `#1` (cooldown injection), PR `#36` (`perAction=10` removed, `MaintCost` changed to `4` clicks/`1%`), PR `#58` (`Charges` battery replacement), and PR `#60` (`+25%` per press in `ServiceDrive` while `EngineScreen` panel still displays `MaintCost` `4` clicks/`1%`).
+- Identified concrete `Charges` wiring defects across rooms: `ScreenKind::Cargo` rows omit `BindCommandCharge` while `PressCargoRoom` enforces `CommitActionButton`; `Station` `trade-accept` binds `ButtonChargeTier(view.label)` while `PressStationAction` uses `StationActionCategory`; free link/award rows carry green charge bars despite spending zero clicks.
+- Observed `Legacy code_Spaceship.txt` remained untouched and unread; zero game code or data files were edited and zero builds or tests were run.
+- Prepared complete `SaveSystem.cpp` + cook/hunger patch preview and engine/green-button timeline for owner go-ahead before editing.
+
+### Entry #026
+- **Timestamp:** 2026-11-11 00:19 UTC
+- Applied approved Step 1 cook, hunger, and `cookRestock` save-persistence changes across `assets/data/survival.json`, `cpp/core/Constants.h`, `cpp/core/Simulation.h`, `cpp/core/CrewLogic.cpp`, `cpp/core/Action.cpp`, `cpp/core/Economy.cpp`, and `cpp/core/SaveSystem.cpp`.
+- Restored `hungerPerMeal = 15` and `hungerPerFood = 5` in `assets/data/survival.json` and `cpp/core/Constants.h`.
+- Updated `cpp/core/Constants.h` and `cpp/core/CrewLogic.cpp` comments to reflect `15` hunger per meal and `5` hunger per food.
+- Removed `StaggerHungerClocks()`, `DealHungerClock()`, and `<random>` usage from `cpp/core/CrewLogic.cpp`, `cpp/core/Simulation.h`, `cpp/core/Action.cpp`, and `cpp/core/Economy.cpp`.
+- Preserved exact `assets/data/crew.json` initial `hunger` and `hungerTick` values for starting crew (`rell 22/0`, `jax 41/6`, `bo 28/13`, `suri 15/19`) and hired candidates.
+- Restored `cookRestock_ = true` in `cpp/core/Action.cpp::StartCookingSelf()` so manual cooking continues restocking to capacity when a cook is assigned.
+- Persisted `mess.cookRestock` in `cpp/core/SaveSystem.cpp` (`SaveJson()` writes `"cookRestock"` inside `root["mess"]`; `LoadJson()` reads it safely and defaults older saves without `"cookRestock"` to `false`).
+- Verified `tools/check-id-prefixes.sh` and compiled all 45 `spaceship_core` units plus `cpp/app/console_main.cpp` cleanly under `g++ -std=c++17 -Wall -Wextra -Wpedantic` (with `nlohmann/json` v3.11.3 in `/tmp/spaceship_test`).
+- Ran `spaceship_console` plus a standalone C++ verification binary checking hunger pacing, starting/hired crew values, `AutoMess` `<= 10` threshold, `StartCookingSelf` restock chaining across save/load, legacy save compatibility, `galley` upgrade (`24 -> 34` for `400 sh`), and `FireCrew` cancellation; all passed.
+- Observed `Legacy code_Spaceship.txt` remained unread and untouched, `CMakeLists.txt` was untouched, and `/tmp/spaceship_test` scratch build artifacts were removed outside the repo.
+- Ready for owner playtesting or next direction on Step 2 (Engine Room `+25%` vs `+10%` & stale `EngineScreen.cpp` readout, plus the green-button `Charges` room wiring fixes).
+
+### Entry #027
+- **Timestamp:** 2026-11-11 00:22 UTC
+- Received owner instruction to create a pull request for Step 1 playtesting on branch `arena/69b6a32e-spaceship`.
+- Audited `AGENTS.md`, `docs/LOGBOOK.md`, and `.github/workflows/build.yml` prior to committing.
+- Confirmed zero remaining references to `StaggerHungerClocks` or `DealHungerClock` across `cpp/`.
+- Validated `assets/data/survival.json` JSON syntax via Python `json.tool` and ran `git diff --check`.
+- Confirmed `CMakeLists.txt`, `rescue/`, `assets/art/`, and `Legacy code_Spaceship.txt` remain untouched.
+- Staged all modified Step 1 files plus `docs/LOGBOOK.md` (`Entries #023`–`#027`) on `arena/69b6a32e-spaceship`.
+- Committed changes on `arena/69b6a32e-spaceship` without switching branches or committing temporary build outputs.
+- Pushed `arena/69b6a32e-spaceship` to `origin` and created a GitHub pull request against `main`.
+- Noted that GUI client compilation, Raylib/ImGui probes, and Windows EXE packaging run in GitHub Actions CI upon push/PR rather than locally in this headless sandbox.
+- Handed back PR URL and branch/CI summary to `@Aquaslopper` for playtesting.

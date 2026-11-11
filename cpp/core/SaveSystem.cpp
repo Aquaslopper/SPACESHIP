@@ -452,7 +452,8 @@ std::string Simulation::SaveJson() const {
 
   root["mess"] = Json{{"rack", Num(mess_.rack)}, {"capacity", Num(mess_.capacity)},
                       {"rations", Num(mess_.rations)},
-                      {"rationCapacity", Num(mess_.rationCapacity)}};
+                      {"rationCapacity", Num(mess_.rationCapacity)},
+                      {"cookRestock", cookRestock_}};
   root["cargo"] = Json{{"capacity", Num(cargo_.capacity)}};
 
   Json goods = Json::array();
@@ -1417,6 +1418,7 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     if (At(galley, "rationCapacity") != nullptr) {
       mess_.rationCapacity = GetNumber(galley, "rationCapacity");
     }
+    cookRestock_ = At(galley, "cookRestock") != nullptr && GetBool(galley, "cookRestock");
     cargo_.capacity = GetNumber(d.at("cargo"), "capacity");
 
     goods_.clear();
