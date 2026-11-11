@@ -33,13 +33,17 @@ constexpr int kNewGalaxies = 17;
 // (17 * 24 = 408 star systems across the universe).
 constexpr int kNewSystemsPerRegion = 24;
 
-// Generated chart ids: stations and planets are tagged so the starmap and
-// trade board can tell them from stars, wrecks and systems.
+// Generated chart ids: every body type carries its prefix so the starmap and
+// trade board can tell stations, planets, moons, stars, belts, and sites apart.
 inline bool IsStationId(const std::string& id) {
   return id.rfind("st-", 0) == 0 ||
          (id.size() >= 8 && id.compare(id.size() - 8, 8, "-station") == 0);
 }
 inline bool IsPlanetId(const std::string& id) { return id.rfind("pl-", 0) == 0; }
+inline bool IsMoonId(const std::string& id) { return id.rfind("mn-", 0) == 0; }
+inline bool IsStarId(const std::string& id) { return id.rfind("sr-", 0) == 0; }
+inline bool IsBeltId(const std::string& id) { return id.rfind("bt-", 0) == 0; }
+inline bool IsSiteId(const std::string& id) { return id.rfind("si-", 0) == 0; }
 
 constexpr int kMinGalaxies = 1;
 constexpr int kMaxGalaxies = 100;

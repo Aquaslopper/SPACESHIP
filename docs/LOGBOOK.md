@@ -379,3 +379,66 @@ You must append a compressed summary of **every single reply and action you take
 - Opened a GitHub pull request against `main` via `gh pr create --base main --head arena/aab01d6b-spaceship` so GitHub Actions builds the native client and Windows EXE artifact.
 - Confirmed GUI visual rendering and mouse-click feel still require verification on the CI-built Windows artifact or a local desktop build (this sandbox lacks X11/OpenGL dev libs).
 - Reported exact PR URL, changed-file list, and CI check status to `@Aquaslopper` for playtesting.
+
+### Entry #030
+- **Timestamp:** 2026-11-11 02:19 UTC
+- Read-only code investigation on `arena/0a37ae98-spaceship` (`HEAD` at `caa5909`, merge of PR #62) covering starmap, space stations, ID prefixes, and trade contracts.
+- Inspected `AGENTS.md`, `tools/check-id-prefixes.sh`, `cpp/data/{Catalog.h,Catalog.cpp,GalaxyGen.cpp,ChartExpansion.h,ChartExpansion.cpp}`, `cpp/core/{Action.cpp,Charges.cpp,Economy.cpp,GameState.h,Navigation.cpp,SaveSystem.cpp,Ships.cpp}`, `cpp/ui/{ChartArt.inc,Describe.cpp,Draw.cpp,IdleScreen.cpp,NavScreen.cpp,Shell.cpp,StationScreen.h,StationScreen.cpp,StoresScreen.cpp,Widgets.cpp}`, and `assets/data/{chart.json,crew.json}`.
+- Verified `BuildStarmapPage()` (`cpp/ui/StationScreen.cpp`): every station dynamically builds a free, read-only system wiki page from `sim.World().BodiesInSystem(BodySystem(*berth))` excluding itself, grouped into Star, Planets, Moons, Belts and wrecks, Stations, and Other charted bodies.
+- Verified why all stations share identical structure and why every system gets one: `ExpandChart()` discards `chart.json` places, `PopulateLocalCharts()` guarantees every system without an existing port receives a berth (`st-gen-<serial>`), and `BuildStationScreen()` builds the same five cards (`market`, `starmap`, `trade`, `sales`, `yard`) with only port price baskets, port tips/rumors, `TradeBoard(portId)` berth slicing, and `visitedPorts` differing.
+- Noted port-only crew candidates (`ryn`, `sol`, `umi` in `assets/data/crew.json`) still reference discarded authored ports (`vance-port`, `lorn-port`, `shipgrave-port`), leaving only `nemi` and `ori` across generated stations, and `NewVoyage(..., startSystemId)` docks at the starting berth without adding it to `visitedPorts`.
+- Mapped all chart ID prefixes across `GalaxyGen.cpp`, `ChartExpansion.{h,cpp}`, `Navigation.cpp`, and `tools/check-id-prefixes.sh`: `gal-gen-<n>`, `sec-gen-<serial>`, `gen-<serial>-{star,world,port,site,outer,moon,outpost,field,wreck,anom,beacon}`, `pl-gen-<serial>-p<k>`, `mn-gen-<serial>-p<k>`, and `st-gen-<serial>`.
+- Confirmed `IsStationId()` (`st-*` or `*-station`) and `IsPlanetId()` (`pl-*`) in `ChartExpansion.h` currently have zero C++ callers (only guarded by `tools/check-id-prefixes.sh`), and `gen-<serial>-port`, `gen-<serial>-outpost`, `gen-<serial>-world`, and `gen-<serial>-outer` do not carry `st-` or `pl-`.
+- Traced trade contracts end-to-end: `Simulation::TradeBoard(portId)` (200-action deterministic epoch from `systemId`, 3–5 runs spread across system berths for `delivery` and `freelance`, filtered by `spentTrades`) + `visitedPorts` (`station` survey runs) -> `Widgets.cpp`/`StationScreen.cpp` (`trade-accept:*`) -> `AcceptTrade()` (creates `TradeContract`, loads tagged `contractId = "trade:<mode>|<to>|<good>"` lot with `#<serial>:` `triggerId` for `delivery` only) -> `NavScreen.cpp` green `rdot-trade` trail -> `Cargo Hold` (`TradesHere()`, `cargo-settle:*`) -> `SettleTrade()` (`TradePayout()`, `spentTrades` lock).
+- Noted a UI/charge mismatch on trade acceptance: `Widgets.cpp:804` binds `ButtonChargeTier(view.label)` (label-keyword heuristic) while `StationScreen.cpp:1055` charges `"routine"` for all `trade-accept:*` presses, and `PopulateLocalCharts()` checks `systemHasPort` before `gen-<serial>-outpost` creation so a system can receive both `-outpost` and `st-gen-*`.
+- Left all `cpp/`, `assets/`, `tools/`, `CMakeLists.txt`, `rescue/`, and `Legacy code_Spaceship.txt` files untouched and ran no builds or tests (`docs/LOGBOOK.md` is the sole edited file per `AGENTS.md` mandatory logging).
+
+### Entry #031
+- **Timestamp:** 2026-11-11 02:27 UTC
+- Received owner follow-up requesting a concise, plain-language summary of the four investigated systems so quirks are easy to spot.
+- Re-checked `docs/LOGBOOK.md` tail (`Entry #030`) and verified exact behavior from the already-inspected C++ source files without modifying any code or data.
+- Summarized the four connected areas in plain terms: station starmap ("wiki"), why every system has a station and why stations share one template, generated vs. authored ID prefixes, and end-to-end trade contracts.
+- Highlighted the concrete code-verified quirks: double-station generation (`-outpost` + `st-gen-*` due to early `systemHasPort` snapshot), unreachable port-locked crew hires (`ryn`/`sol`/`umi` on deleted authored ports), starting berth missing from `visitedPorts` in `NewVoyage(..., startSystemId)`, unused `IsStationId`/`IsPlanetId` helpers vs. `-port`/`-outpost`/`-world`/`-outer` IDs, and `Widgets.cpp` vs. `StationScreen.cpp` charge-tier mismatch on `trade-accept:*`.
+- Confirmed `Cargo Hold` displays one `cargo-settle:*` row at a time (`TradesHere().front()`) when multiple trades end at the same body.
+- Confirmed `IsProceduralId()` in `Navigation.cpp` checks `sec-gen-`, `gal-gen-`, and `gen-` prefixes rather than `st-` or `pl-`.
+- Confirmed `Legacy code_Spaceship.txt`, `rescue/`, `assets/`, `tools/`, `CMakeLists.txt`, and all `cpp/` files remain completely untouched.
+- Executed no builds and no tests per `AGENTS.md` read-only rules until explicit owner approval.
+- Only `docs/LOGBOOK.md` was updated (`Entry #031`) per mandatory logging rules in `AGENTS.md`.
+- Ready for `@Aquaslopper` to confirm which quirks or mechanics to change next.
+
+### Entry #032
+- **Timestamp:** 2026-11-11 02:31 UTC
+- Analyzed owner's explanation of why every body needs a unique ID + type prefix and verified the exact pre-build state across `cpp/data/{ChartExpansion.h,ChartExpansion.cpp,GalaxyGen.cpp}`, `cpp/core/{Economy.cpp,Navigation.cpp,SaveSystem.cpp,GameState.h}`, `cpp/ui/{NavScreen.cpp,StationScreen.cpp,StoresScreen.cpp,Widgets.cpp}`, and `tools/check-id-prefixes.sh`.
+- Verified the cross-system trade isolation claim: `TradeContract::to` and `lot.contractId` / `lot.triggerId` stay pinned to the origin system's IDs when jumping to another system because every generated body embeds `gen-<serial>`, preventing `NavScreen.cpp` (`BodySystem(*destination) != systemId`) and `Economy.cpp` (`TradesHere()`) from matching or mutating on system entry.
+- Verified the exact pre-EXE ID prefix gap: only `gal-gen-<n>`, `sec-gen-<serial>`, `pl-gen-<serial>-p<k>`, `mn-gen-<serial>-p<k>`, and fallback `st-gen-<serial>` have type prefixes.
+- Confirmed the majority of generated bodies still lack type prefixes: primary stations (`gen-<serial>-port`), secondary outposts (`gen-<serial>-outpost`), primary/outer worlds (`gen-<serial>-world`, `gen-<serial>-outer`), outer moons (`gen-<serial>-moon`), stars (`gen-<serial>-star`), and belts/sites (`gen-<serial>-field`/`-site`/`-wreck`/`-anom`/`-beacon`).
+- Confirmed `IsStationId()` and `IsPlanetId()` in `ChartExpansion.h` return `false` for `gen-<serial>-port`, `gen-<serial>-outpost`, `gen-<serial>-world`, and `gen-<serial>-outer`, and have zero callers in `cpp/`.
+- Confirmed `tools/check-id-prefixes.sh` only checks that `st-` and `pl-` exist in `ChartExpansion.cpp`, not that every station/planet/body actually carries a prefix.
+- Noted save-load impact: `SaveSystem.cpp` re-expands the chart from the save's seed on load and rejects saves whose `map.here` or docked port ID no longer matches the regenerated IDs.
+- Left all `cpp/`, `assets/`, `tools/`, `CMakeLists.txt`, `rescue/`, and `Legacy code_Spaceship.txt` files untouched; executed no builds or tests.
+- Appended `Entry #032` to `docs/LOGBOOK.md` only, awaiting `@Aquaslopper` approval before making any code edits.
+
+### Entry #033
+- **Timestamp:** 2026-11-11 02:45 UTC
+- Implemented explicit type prefixes across all remaining generated celestial and station IDs in `cpp/data/GalaxyGen.cpp`, `cpp/data/ChartExpansion.cpp`, `cpp/data/ChartExpansion.h`, and `tools/check-id-prefixes.sh` per owner approval.
+- Updated `cpp/data/GalaxyGen.cpp` (`BuildGalaxyFromRows` and `ExpandLocalCharts`) so `sec-gen-<serial>` systems generate `sr-gen-<serial>-star` (stars), `st-gen-<serial>-port` (primary stations), `pl-gen-<serial>-world` / `pl-gen-<serial>-outer` (planets), `mn-gen-<serial>-moon` (outer moons), `bt-gen-<serial>-world` (world belts), and `si-gen-<serial>-site` (primary sites), and updated `IsGeneratedSystem()` to accept `sr-<slug>-star` alongside `<slug>-star`.
+- Updated `cpp/data/ChartExpansion.cpp` (`PopulateLocalCharts`) so secondary outposts use `st-gen-<serial>-outpost`, belt landmarks use `bt-gen-<serial>-field`, and site landmarks use `si-gen-<serial>-{wreck,anom,beacon}`.
+- Updated `cpp/data/ChartExpansion.h` with `IsMoonId`, `IsStarId`, `IsBeltId`, and `IsSiteId` alongside `IsStationId` and `IsPlanetId`, and expanded `tools/check-id-prefixes.sh` to guard all six generated prefixes across `ChartExpansion.{h,cpp}` and `GalaxyGen.cpp`.
+- Left `SaveSystem.cpp`, `NewVoyage` docking/visitedPorts behavior, `crew.json`, `CMakeLists.txt`, `rescue/`, and `Legacy code_Spaceship.txt` untouched per owner direction.
+- Verified by running `bash tools/check-id-prefixes.sh`, running `bash tools/check-gui-syntax.sh` against pinned Raylib 6.0 / ImGui 1.92.7 / rlImGui headers (`Draw.cpp`, `AudioDevice.cpp`, `main.cpp` clean under `-Wall -Wextra -Wpedantic`), building `spaceship_core` + `spaceship_console` headlessly with `g++ -std=c++17`, and executing multi-seed chart audits (`seed=1, 42, 999`: 0 unprefixed bodies, 0 duplicate IDs, 100% `Catalog::Validate()` pass, 100% `Is*Id()` predicate match) plus multi-system interactive playtests (`playtest_prefixes`, `playtest_extra`, `spaceship_console` scripted travel/dock/save-load) confirming trades accepted in `sec-gen-1` stay locked to `sec-gen-1` when flying to `sec-gen-18`, starmap/station screens work across `-port`, `-outpost`, and fallback `st-gen-*` stations, and delivery/freelance/station trades settle cleanly after save/load round-trip.
+- Sandbox lacks `cmake`, X11/OpenGL dev libraries, and a display server, so the graphical `./spaceship` / `spaceship.exe` window binary was syntax-checked against pinned headers rather than linked/launched visually here.
+
+### Entry #034
+- **Timestamp:** 2026-11-11 02:54 UTC
+- Updated trade board generation in `cpp/core/Economy.cpp` (`TradeBoard`, `WantsOf`, `kTradeEpoch`) and its documentation comment in `cpp/core/Simulation.h` per owner request.
+- Lowered `kTradeEpoch` from `200.0` to `100.0` actions so each station's trade board refreshes every `100` clicks instead of `200`.
+- Rebuilt `TradeBoard(portId)` to draw `10–12` `delivery` runs and `10–12` `freelance` runs separately for the docked berth (preferring distinct destination bodies first, then distinct `(to, good)` pairs, with profitable Tier 2/3 fallbacks so even `frontier`/`salvage` ports never dip below `10` offers per mode), and expanded `WantsOf()` so `ore` (`ocean`/`ice`/`gas`), `parts` (`rock`), and `relics` (`site`) participate in system trade economies.
+- Verified `Draw.cpp` (`PaintPanelsScreen`) tracks dynamic column/row height via `panelsBottom` and `contentMaxScroll_` so 10–12+ trade rows remain scrollable/clickable in the station UI without touching Cargo Hall (`StoresScreen.cpp`) yet.
+- Compiled all `spaceship_core` + `console_main.cpp` units cleanly (`g++ -std=c++17`), verified `bash tools/check-gui-syntax.sh` (pinned Raylib 6.0 / ImGui 1.92.7 / rlImGui) and `bash tools/check-id-prefixes.sh`, audited `2,530` ports across 5 seeds (`delivery=[10..12]`, `freelance=[10..12]`, `0` duplicates, `0` unprofitable freelance offers), and playtested epoch rollover (`0 -> 99 -> 100 -> 200` clicks) plus epoch-0 delivery/freelance settlement in Cargo Hall (`PressCargoRoom`).
+- Graphical `./spaceship` / `spaceship.exe` binary remains unlinked/unlaunched in this headless sandbox (ready for owner playtest; Cargo Hall work deferred to the next turn).
+
+### Entry #035
+- **Timestamp:** 2026-11-11 02:57 UTC
+- Preparing pull request from `arena/0a37ae98-spaceship` into `main` per owner request (`"ok, please create the pr."`).
+- Included changes: explicit generated body/station type prefixes (`st-`, `pl-`, `mn-`, `sr-`, `bt-`, `si-`) in `cpp/data/{GalaxyGen.cpp,ChartExpansion.h,ChartExpansion.cpp}` and `tools/check-id-prefixes.sh`, plus 100-click trade board epoch and guaranteed >=10 delivery & >=10 freelance offers per station in `cpp/core/{Economy.cpp,Simulation.h}`.
+- Re-running `tools/check-id-prefixes.sh` and `git diff --check` before committing, pushing `arena/0a37ae98-spaceship`, and creating the PR via `gh pr create`.

@@ -196,8 +196,9 @@ void BuildGalaxyFromRows(const std::vector<StarRow>& rows, std::size_t baseIndex
   for (std::size_t k = 0; k < rows.size(); ++k) {
     const StarRow& row = rows[k];
     const std::size_t i = baseIndex + k;
+    const bool generated = row.system.rfind("sec-gen-", 0) == 0;
     const std::string slug = row.system.substr(4);  // row[0].substring(4)
-    const std::string entry = slug + "-star";
+    const std::string entry = (generated ? "sr-" : "") + slug + "-star";
 
     Body* system = FindSystem(catalog, row.system);
     if (system == nullptr) {
@@ -246,13 +247,16 @@ void BuildGalaxyFromRows(const std::vector<StarRow>& rows, std::size_t baseIndex
     // addSystemBody(slug + "-world", row[6].indexOf("Belt") >= 0 ? "belt" : "planet",
     //               row[6], 390 + (i % 3) * 28, 64 + (i % 2) * 20, sys, row[9]);
     const bool belt = row.world.find("Belt") != std::string::npos;
-    AddLocalBody(catalog, slug + "-world", belt ? "belt" : "planet", row.world,
+    const std::string worldId =
+        (generated ? (belt ? "bt-" : "pl-") : "") + slug + "-world";
+    AddLocalBody(catalog, worldId, belt ? "belt" : "planet", row.world,
                   390.0 + (i % 3) * 28.0, 64.0 + (i % 2) * 20.0, *system, row.note);
 
     // landmark = slug + (row[8] ? "-port" : "-site");
     // addSystemBody(landmark, row[8] ? "station" : "site", row[7], 260 + (i % 3) * 45, 210, sys, row[9]);
     const bool hasPort = !row.profile.empty();
-    const std::string landmark = slug + (hasPort ? "-port" : "-site");
+    const std::string landmark =
+        (generated ? (hasPort ? "st-" : "si-") : "") + slug + (hasPort ? "-port" : "-site");
     AddLocalBody(catalog, landmark, hasPort ? "station" : "site", row.landmark,
                   260.0 + (i % 3) * 45.0, 210.0, *system, row.note);
 
@@ -280,6 +284,8 @@ void ExpandLocalCharts(Catalog& catalog, std::size_t firstSystem) {
 
   for (std::size_t i = firstSystem; i < catalog.systems.size(); ++i) {
     Body& system = catalog.systems[i];
+    const bool generated = system.id.rfind("sec-gen-", 0) == 0;
+    const std::string slug = system.id.size() > 4 ? system.id.substr(4) : system.id;
     // word = sys.name.replace(/[^A-Za-z0-9]+/g, " ").replace(/^\s+|\s+$/g, "").split(" ")[0];
     std::string cleaned;
     for (char c : system.name) {
@@ -294,7 +300,7 @@ void ExpandLocalCharts(Catalog& catalog, std::size_t firstSystem) {
 
     // world = addSystemBody(sys.id.substring(4) + "-outer", "planet",
     //   ORBITAL_PLANET_NAMES[i % 12] + " " + word, 470 + (i % 5) * 28, 88 + (i % 5) * 22, sys, profile.scan);
-    Body& world = AddLocalBody(catalog, system.id.substr(4) + "-outer", "planet",
+    Body& world = AddLocalBody(catalog, (generated ? "pl-" : "") + slug + "-outer", "planet",
                                 planetNames[i % planetNames.size()] + " " + word,
                                 470.0 + (i % 5) * 28.0, 88.0 + (i % 5) * 22.0, system, profile.scan);
     world.subtype = profile.id;
@@ -309,7 +315,7 @@ void ExpandLocalCharts(Catalog& catalog, std::size_t firstSystem) {
     // AddSystemBody appends to catalog.bodies, which may move the vector, so the
     // world's name is copied out before the moon is created.
     const std::string worldName = world.name;
-    Body& moon = AddLocalBody(catalog, system.id.substr(4) + "-moon", "moon",
+    Body& moon = AddLocalBody(catalog, (generated ? "mn-" : "") + slug + "-moon", "moon",
                                moonNames[(i * 5) % moonNames.size()] + " " + word,
                                36.0 + (i % 5) * 24.0, 194.0 + (i % 4) * 16.0, system,
                                "A small satellite traces a quiet path beyond the mapped world.");
@@ -338,7 +344,11 @@ void ExpandLocalCharts(Catalog& catalog, std::size_t firstSystem) {
 }
 
 bool IsGeneratedSystem(const Body& system) {
-  if (system.entry.empty() || system.entry != system.id.substr(4) + "-star") { return false; }
+  if (system.entry.empty() || system.id.size() <= 4) { return false; }
+  const std::string slug = system.id.substr(4);
+  if (system.entry != slug + "-star" && system.entry != "sr-" + slug + "-star") {
+    return false;
+  }
   for (const auto& detail : system.details) {
     if (detail.first == "Traffic") { return false; }
   }

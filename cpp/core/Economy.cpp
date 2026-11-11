@@ -410,13 +410,14 @@ bool Simulation::TalkToPatron(const std::string& patronId) {
 // each berth shows the runs that start where the player is standing.
 //
 // Nothing about the draw is stored. The seed is the system id and the epoch, and
-// the epoch is the action clock in blocks of two hundred, so the board is
+// the epoch is the action clock in blocks of one hundred, so the board is
 // reproducible from the chart alone and refreshes itself as the voyage goes on.
 // What a contract promised is a different matter: once an epoch rolls over the
 // draw no longer knows the run exists, so the record keeps its own numbers.
 
 namespace {
-constexpr double kTradeEpoch = 200.0;  // actions between two draws of a board
+constexpr double kTradeEpoch = 100.0;  // actions between two draws of a board
+constexpr int kTradeMinPerMode = 10;   // minimum delivery and freelance offers per station
 constexpr double kTradeHold = 20.0;    // the cubic metres a voyage starts with
 constexpr double kTradeFloor = 40.0;   // a run that pays less than this is no run
 constexpr double kTradeValue = 1200.0;  // the goods value a single run may commit
@@ -462,13 +463,18 @@ struct Want {
 };
 
 const std::vector<Want>& WantsOf(const std::string& role) {
-  static const std::vector<Want> kRock = {{"water", 1.60}, {"greens", 1.55}, {"medicine", 1.40}};
-  static const std::vector<Want> kOcean = {{"parts", 1.60}, {"medicine", 1.45}, {"amps", 1.50}};
-  static const std::vector<Want> kIce = {{"greens", 1.70}, {"medicine", 1.60}, {"parts", 1.40}};
-  static const std::vector<Want> kGas = {{"greens", 1.75}, {"medicine", 1.65}, {"parts", 1.50}};
+  static const std::vector<Want> kRock = {
+      {"water", 1.60}, {"greens", 1.55}, {"medicine", 1.40}, {"parts", 1.45}};
+  static const std::vector<Want> kOcean = {
+      {"parts", 1.60}, {"medicine", 1.45}, {"amps", 1.50}, {"ore", 1.50}};
+  static const std::vector<Want> kIce = {
+      {"greens", 1.70}, {"medicine", 1.60}, {"parts", 1.40}, {"ore", 1.55}};
+  static const std::vector<Want> kGas = {
+      {"greens", 1.75}, {"medicine", 1.65}, {"parts", 1.50}, {"ore", 1.60}};
   static const std::vector<Want> kBelt = {
       {"water", 1.60}, {"greens", 1.60}, {"medicine", 1.40}, {"parts", 1.30}};
-  static const std::vector<Want> kSite = {{"water", 1.50}, {"medicine", 1.40}, {"parts", 1.30}};
+  static const std::vector<Want> kSite = {
+      {"water", 1.50}, {"medicine", 1.40}, {"parts", 1.30}, {"relics", 1.65}};
   static const std::vector<Want> kNone;
   if (role == "rock") { return kRock; }
   if (role == "ocean") { return kOcean; }
@@ -548,16 +554,6 @@ std::vector<TradeRun> Simulation::TradeBoard(const std::string& portId) const {
   if (port == nullptr || berth == nullptr) { return board; }
   const std::string systemId = catalog_.BodySystem(*berth);
 
-  // Every berth in this system, in chart order: a run starts where the player is
-  // standing, so the draw is laid out across the berths rather than repeated at
-  // each one.
-  std::vector<const Port*> berths;
-  for (const Port& candidate : catalog_.ports) {
-    const Body* body = catalog_.FindBody(candidate.id);
-    if (body != nullptr && catalog_.BodySystem(*body) == systemId) { berths.push_back(&candidate); }
-  }
-  if (berths.empty()) { return board; }
-
   std::vector<const Body*> destinations;
   for (const std::size_t index : catalog_.BodiesInSystem(systemId)) {
     const Body& body = catalog_.bodies[index];
@@ -565,66 +561,132 @@ std::vector<TradeRun> Simulation::TradeBoard(const std::string& portId) const {
   }
 
   const long long epoch = static_cast<long long>(std::floor(ActionCount() / kTradeEpoch));
-  TradeRng rng(TradeHash(systemId + "#trade#" + std::to_string(epoch)));
-  // Three to five runs, and never fewer than there are berths to fill: a station
-  // with a card and nothing behind it is the hole this board exists to close.
-  const int wanted =
-      std::max(3 + rng.Below(3), static_cast<int>(berths.size()));
-  std::set<std::string> drawn;
-  // A draw that would not cover its own fuel is thrown back and drawn again, so
-  // the count is of runs the player could actually take.
-  for (int attempt = 0, built = 0; attempt < wanted * 4 && built < wanted && !destinations.empty();
-       ++attempt) {
-    const Port* from = berths[static_cast<std::size_t>(built) % berths.size()];
-    const Body* to = destinations[static_cast<std::size_t>(rng.Below(
-        static_cast<int>(destinations.size())))];
-    const std::vector<Want>& wants = WantsOf(TradeRole(*to));
-    const Want& want = wants[static_cast<std::size_t>(rng.Below(static_cast<int>(wants.size())))];
-    const Good* good = MarketGood(catalog_, want.good);
-    if (good == nullptr) { continue; }
-    // A lot has to fit the hold a voyage starts with, and it has to stay a
-    // shipment rather than a cargo empire: the volume and the value of the goods
-    // both cap the count. So the best-paid run on a board is one crate of
-    // something expensive and risky, not six crates of ore.
-    const int byVolume =
-        static_cast<int>(kTradeHold / std::max(1.0, static_cast<double>(good->vol)));
-    const int byValue = static_cast<int>(kTradeValue / std::max(1.0, good->value));
-    const int crates = 1 + rng.Below(std::clamp(std::min(byVolume, byValue), 1, 6));
-    const bool delivery = rng.Next() < 0.55;
-    // The destination pays over the market value; the station's own basket
-    // decides what the lot costs if the player has to buy it.
-    const double pays = want.pays + TradeBandBonus(*to);
-    double fee = 0.0;
-    if (delivery) {
-      fee = js::Round(good->value * crates * (0.22 + 0.5 * (pays - 1.2)));
-    } else {
-      const auto it = from->prices.find(good->kind);
-      const double buy = (it == from->prices.end() ? 1.0 : it->second) * 1.2;  // the counter's markup
-      const double rate = pays - buy;
-      if (rate < 0.12) { continue; }  // a run that would not cover its own fuel
-      fee = js::Round(good->value * crates * std::min(rate, 1.0));
+
+  auto drawMode = [&](const std::string& modeName, bool isDelivery) {
+    TradeRng rng(TradeHash(systemId + "#" + portId + "#trade#" + std::to_string(epoch) + "#" +
+                           modeName));
+    const int wanted = kTradeMinPerMode + rng.Below(3);  // 10-12 offers per mode
+
+    std::vector<TradeRun> tier1;
+    std::vector<TradeRun> tier2;
+    std::vector<TradeRun> tier3;
+
+    for (const Body* to : destinations) {
+      for (const Want& want : WantsOf(TradeRole(*to))) {
+        const Good* good = MarketGood(catalog_, want.good);
+        if (good == nullptr) { continue; }
+        if (Truthy(state_.spentTrades, TradeKey(modeName, to->id, good->id))) { continue; }
+
+        const int byVolume =
+            static_cast<int>(kTradeHold / std::max(1.0, static_cast<double>(good->vol)));
+        const int byValue = static_cast<int>(kTradeValue / std::max(1.0, good->value));
+        const int maxCrates = std::clamp(std::min(byVolume, byValue), 1, 6);
+        const double pays = want.pays + TradeBandBonus(*to);
+        const double freight = TradeFreight(*berth, *to);
+
+        auto buildRun = [&](int crates, double fee) {
+          TradeRun run;
+          run.mode = modeName;
+          run.from = port->id;
+          run.to = to->id;
+          run.good = good->id;
+          run.crates = crates;
+          run.fee = fee;
+          run.freight = freight;
+          return run;
+        };
+
+        if (isDelivery) {
+          auto feeFor = [&](int crates) {
+            double fee = js::Round(good->value * crates * (0.22 + 0.5 * (pays - 1.2)));
+            if (good->risk) { fee = js::Round(fee * 1.35); }
+            return fee;
+          };
+          std::vector<int> strictCrates;
+          for (int c = 1; c <= maxCrates; ++c) {
+            if (feeFor(c) >= kTradeFloor) { strictCrates.push_back(c); }
+          }
+          if (!strictCrates.empty()) {
+            const int c = strictCrates[static_cast<std::size_t>(
+                rng.Below(static_cast<int>(strictCrates.size())))];
+            tier1.push_back(buildRun(c, feeFor(c)));
+          } else if (feeFor(maxCrates) > 0.0) {
+            tier2.push_back(buildRun(maxCrates, feeFor(maxCrates)));
+          }
+        } else {
+          const auto it = port->prices.find(good->kind);
+          const double factor = (it == port->prices.end() ? 1.0 : it->second);
+          const double buy = factor * 1.2;  // the counter's markup
+          const double rate = pays - buy;
+          const double counterCost = js::Ceil(js::Round(good->value * factor) * 1.2);
+          auto feeFor = [&](int crates) {
+            double fee = js::Round(good->value * crates * std::min(rate, 1.0));
+            if (good->risk) { fee = js::Round(fee * 1.35); }
+            return fee;
+          };
+
+          if (rate >= 0.12) {
+            std::vector<int> strictCrates;
+            for (int c = 1; c <= maxCrates; ++c) {
+              if (feeFor(c) >= kTradeFloor) { strictCrates.push_back(c); }
+            }
+            if (!strictCrates.empty()) {
+              const int c = strictCrates[static_cast<std::size_t>(
+                  rng.Below(static_cast<int>(strictCrates.size())))];
+              tier1.push_back(buildRun(c, feeFor(c)));
+            } else {
+              const double f = std::max(1.0, feeFor(maxCrates));
+              tier2.push_back(buildRun(maxCrates, f));
+            }
+          } else if (rate >= 0.02) {
+            const double f = std::max(1.0, feeFor(maxCrates));
+            tier2.push_back(buildRun(maxCrates, f));
+          } else {
+            const double payout = js::Round(good->value * maxCrates * pays + freight);
+            const double netProfit = payout - counterCost * maxCrates;
+            if (netProfit >= 10.0) {
+              tier3.push_back(buildRun(maxCrates, netProfit));
+            }
+          }
+        }
+      }
     }
-    if (good->risk) { fee = js::Round(fee * 1.35); }
-    if (fee < kTradeFloor) { continue; }  // not worth the click it costs
-    if (!drawn.insert(to->id + "|" + good->id).second) { continue; }
-    ++built;
-    if (from->id != portId) { continue; }  // another berth in this system lists it
-    // A run that has been settled, or lost with its cargo, is not drawn again for
-    // the rest of the epoch: the same consignment cannot be taken twice.
-    if (Truthy(state_.spentTrades, TradeKey(delivery ? "delivery" : "freelance", to->id, good->id))) {
-      continue;
-    }
-    TradeRun run;
-    run.mode = delivery ? "delivery" : "freelance";
-    run.from = from->id;
-    run.to = to->id;
-    run.good = good->id;
-    run.crates = crates;
-    run.fee = fee;
-    const Body* origin = catalog_.FindBody(from->id);
-    run.freight = origin == nullptr ? 0.0 : TradeFreight(*origin, *to);
-    board.push_back(std::move(run));
-  }
+
+    auto shuffleRuns = [&](std::vector<TradeRun>& pool) {
+      for (int idx = static_cast<int>(pool.size()) - 1; idx > 0; --idx) {
+        const int j = rng.Below(idx + 1);
+        std::swap(pool[static_cast<std::size_t>(idx)], pool[static_cast<std::size_t>(j)]);
+      }
+    };
+    shuffleRuns(tier1);
+    shuffleRuns(tier2);
+    shuffleRuns(tier3);
+
+    std::set<std::string> usedDestinations;
+    std::set<std::string> usedPairs;
+    int picked = 0;
+
+    auto takeFrom = [&](const std::vector<TradeRun>& pool, bool uniqueDestOnly) {
+      for (const TradeRun& run : pool) {
+        if (picked >= wanted) { break; }
+        if (uniqueDestOnly && usedDestinations.count(run.to) != 0) { continue; }
+        if (!usedPairs.insert(run.to + "|" + run.good).second) { continue; }
+        usedDestinations.insert(run.to);
+        board.push_back(run);
+        ++picked;
+      }
+    };
+
+    takeFrom(tier1, true);
+    takeFrom(tier1, false);
+    takeFrom(tier2, true);
+    takeFrom(tier2, false);
+    takeFrom(tier3, true);
+    takeFrom(tier3, false);
+  };
+
+  drawMode("delivery", true);
+  drawMode("freelance", false);
 
   // A run already taken keeps its place: the player is standing on the same
   // board, and the record -- not the draw -- is what it promised.
