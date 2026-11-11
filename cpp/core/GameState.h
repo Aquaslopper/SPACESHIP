@@ -439,6 +439,9 @@ struct GameState {
   // drawing them for the rest of the epoch, so the keys have to be remembered or
   // the same consignment could be taken twice.
   std::map<std::string, bool> spentTrades;
+  // Bitmask of rejected freelance price-markup attempts per TradeKey (bit 0 = +10%,
+  // bit 1 = +20%) so declined RNG asks stay disabled for that run.
+  std::map<std::string, int> freelanceRejects;
   // The station bar keeps its own tally: a patron spoken to once is not
   // spoken to again, exactly as a hired hand is not hired again.
   std::map<std::string, bool> talked;

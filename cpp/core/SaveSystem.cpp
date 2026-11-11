@@ -366,6 +366,10 @@ std::string Simulation::SaveJson() const {
   for (const auto& entry : state_.spentTrades) { spent[entry.first] = entry.second; }
   s["spentTrades"] = spent;
 
+  Json rejects = Json::object();
+  for (const auto& entry : state_.freelanceRejects) { rejects[entry.first] = entry.second; }
+  s["freelanceRejects"] = rejects;
+
   s["gameOver"] = state_.gameOver;
   root["state"] = s;
 
@@ -1226,6 +1230,20 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     if (auto it = s.find("spentTrades"); it != s.end() && it->is_object()) {
       readBoolMap(*it, &state_.spentTrades);
     }
+    state_.freelanceRejects.clear();
+    if (auto it = s.find("freelanceRejects"); it != s.end() && it->is_object()) {
+      for (auto entry = it->begin(); entry != it->end(); ++entry) {
+        if (entry.value().is_number()) {
+          state_.freelanceRejects[entry.key()] = static_cast<int>(entry.value().get<double>());
+        }
+      }
+    }
+    stowed_.clear();
+    stowClicks_ = 0;
+    stowThreshold_ = 0;
+    mixClicks_ = 0;
+    mixThreshold_ = 0;
+    justStowedLot_.clear();
     readBoolMap(s.at("spOpen"), &state_.spOpen);
     readBoolMap(s.at("freshTabs"), &state_.freshTabs);
 

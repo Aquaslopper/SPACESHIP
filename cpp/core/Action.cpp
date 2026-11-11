@@ -262,6 +262,7 @@ void Simulation::PerformAction(const std::string& detail) {
   TickButtonCharges();
 
   TickWorld();
+  if (state_.gameOver.empty()) { StepCargoMix(); }
 
   // Only a real commitment carries a detail line. The tally lives in the
   // status bar; the feed is for things that happened.

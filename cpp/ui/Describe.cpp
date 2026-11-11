@@ -285,7 +285,6 @@ void RoomCargo(const Simulation& sim, Description& t) {
   t.acts = {
       {"Jettison a lot", "1 click"},
       {"Sell a lot", "at a station"},
-      {"Recover route salvage", "1 click + 2 work"},
   };
 }
 

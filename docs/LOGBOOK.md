@@ -442,3 +442,50 @@ You must append a compressed summary of **every single reply and action you take
 - Preparing pull request from `arena/0a37ae98-spaceship` into `main` per owner request (`"ok, please create the pr."`).
 - Included changes: explicit generated body/station type prefixes (`st-`, `pl-`, `mn-`, `sr-`, `bt-`, `si-`) in `cpp/data/{GalaxyGen.cpp,ChartExpansion.h,ChartExpansion.cpp}` and `tools/check-id-prefixes.sh`, plus 100-click trade board epoch and guaranteed >=10 delivery & >=10 freelance offers per station in `cpp/core/{Economy.cpp,Simulation.h}`.
 - Re-running `tools/check-id-prefixes.sh` and `git diff --check` before committing, pushing `arena/0a37ae98-spaceship`, and creating the PR via `gh pr create`.
+
+### Entry #036
+- **Timestamp:** 2026-11-11 03:35 UTC
+- Verified repo state on branch `arena/5664ef1f-spaceship` at commit `4140e81` (`Merge pull request #63`, clean working tree) after reading `AGENTS.md`, `docs/LOGBOOK.md`, and the owner's Cargo Hold mockup (`/tmp/arena-coding-uploads/rr.png`).
+- Audited current Cargo Hold across `cpp/ui/StoresScreen.{h,cpp}`, `cpp/ui/Widgets.cpp`, `cpp/ui/Draw.cpp`, `cpp/core/Economy.cpp`, `cpp/core/Ships.cpp`, `cpp/core/Charges.cpp`, `cpp/core/GameState.h`, and `cpp/core/Simulation.h` (read-only; no code edited, no tests run).
+- Gap 1 (Left column / Cargo Inventory): `Widgets.cpp` renders plain one-line text rows (`name - vol m3`) with `lot.note` hidden in `view.title` instead of structured lot cards showing title, `m3`, description/category, and `QTY`/contract metadata as depicted in `rr.png`.
+- Gap 2 (Center column / Cargo Hold View): `ScreenKind::Cargo` sets `hasStage = false` and renders only a capacity bar plus static text lines (`"Nothing sorted yet."`), lacking an interactive visual cargo room (`PaintStage`/`TaskStage` pattern seen in `O2Screen`/`MessScreen`) scaled by hull/refit capacity (`ShipCargoCapacity`: `wren` 20/40/60/90 vs `kestrel` 60/90/120 m3).
+- Gap 3 (Center mini-game & green-button flow): `Economy.cpp` (`StowCargo`/`StowDraw`) currently stows from left-column clicks and never re-mixes cargo; owner specification requires clicking visual items in the hold room to advance time (`PerformAction` / green charge bars + green click feedback), greying out items once neatly placed to prevent click-farming, and gradually re-mixing cargo every 5-10 clicks with zero gameplay penalty.
+- Gap 4 (Right column / Context-sensitive finalizer): `StoresScreen.cpp` currently surfaces only `here.front()` (blocking extra runs behind `"N more run(s) end here"`) and provides only a single fixed `TradePayout` row for `freelance`.
+- Owner specification requires context-sensitive finalization for `delivery` (arrival finalize button), `freelance` (at least 3 sell options: guaranteed actual price plus two `+10%` options resolved by RNG), and `station` (`station to station` finalize button).
+- Prepared mandatory `AGENTS.md` 5-question Agent Comprehension Check answers alongside full specification confirmation and targeted clarifying questions (freelance `+10%` RNG mechanics/failure handling, multi-contract display, and card/hold interaction split).
+- No source or test files were modified and no test binaries were compiled or executed, honoring `AGENTS.md` owner-permission rules pending explicit approval from `@Aquaslopper`.
+
+### Entry #037
+- **Timestamp:** 2026-11-11 03:46 UTC
+- Received owner answers (`@Aquaslopper`) clarifying all three Cargo Hold questions and requesting final confirmation before implementation (`"ok, are you really ready? please confirm first."`).
+- Confirmed freelance 3-tier sell pricing: base/actual price (guaranteed), `+10%` (`1.1x`, RNG check), and `+20%` (`1.2x`, RNG check — `10% + 10% = 20%`).
+- Confirmed context-sensitive right panel: displays the active run/context (`delivery`, `freelance`, or `station` to station) and its settlement controls when arriving/docking (and fallback unload/salvage when no run settles at the current body).
+- Confirmed left-to-middle 2-step cargo sorting loop: player left-clicks an unsorted lot card in `Cargo Inventory`, the matching item in the center `Cargo Hold View` glows green, and clicking the glowing green item in the visual bay snaps/sorts it into place and emits a green time-advancing ping (`PerformAction` + `SpawnMark`) — intentionally lightweight ("purely a no brainer", not a spatial puzzle mini-game).
+- Confirmed anti-farm and re-mix cycle: sorted items grey out once placed so the player cannot click-farm, and every 5-10 clicks the hold periodically mixes items back up so the ambient sorting loop restarts naturally with zero core gameplay penalty.
+- Audited `PressCargoRoom`, `PressPanelRow`, and `SpawnMark` in `cpp/ui/StoresScreen.cpp` and `cpp/ui/Draw.cpp` (read-only) to verify non-costing selection (`StationSelection` pattern) vs green-mark/clock-advancing action commit (`PerformAction` + `SpawnMark`).
+- Confirmed readiness plan back to owner without editing any code, data, or test files and without compiling/running tests (`AGENTS.md` permission rule preserved).
+- Only `docs/LOGBOOK.md` updated for logbook compliance; awaiting `@Aquaslopper` go-ahead to implement and test.
+
+### Entry #038
+- **Timestamp:** 2026-11-11 04:07 UTC
+- Received owner approval (`"ok, lets go"`) plus two final Cargo Hold instructions: remove `"Recover route salvage"` / bay rows from Cargo Hold and rename `"Out of the lock"` / `"Unload cargo"` to `"Jettison"`.
+- Updated `cpp/ui/{StoresScreen.h,StoresScreen.cpp,Widgets.cpp,Describe.cpp,Draw.h,Draw.cpp}` to implement the 3-column Cargo Hold UI (`PaintCargoScreen`): left `Cargo Inventory` lot cards (`m3`, kind, contract detail, `QTY`, zero-cost selection), center `Cargo Hold View` visual bay scaled by ship capacity (`Wren` 20/40/60/90 vs `Kestrel` 60/90/120 m3) with segmented capacity meter, and right context-sensitive finalizing panel (`Delivery`, 3-option `Freelance`, `Station to Station`, `Jettison Cargo`) with zero route salvage.
+- Implemented the 2-step sorting loop in `Draw.cpp` + `StoresScreen.cpp`: left-clicking an unsorted card selects it (`cargo-select:`) and highlights the matching crate green in the hold; clicking the glowing green crate (`cargo-stow:`) runs `PressWithoutCharge` + `StowCargo`, snaps the crate neatly into place, advances `1` action, winds up other ship green charge bars, and triggers `SpawnMark` green ping; sorted items grey out (`stowed == true`).
+- Updated `cpp/core/{GameState.h,Simulation.h,Economy.cpp,Action.cpp,SaveSystem.cpp}`: `StepCargoMix()` periodically un-stows 1-2 sorted crates every 5-10 clicks with zero gameplay penalty; `SettleTrade` supports `freelance` price tiers (`0` actual, `1` `+10%` 60% RNG, `2` `+20%` 35% RNG) with persistent optional `freelanceRejects` in `SaveSystem.cpp`; and `AcceptTrade("station", ...)` now computes `trade.fee` (`SurveyWorth("station")` + leg distance) instead of leaving it `0`.
+- Confirmed zero modifications to generated ID+prefix files (`GalaxyGen.*`, `ChartExpansion.*`, `Catalog.*`, `Navigation.*`, `tools/check-id-prefixes.sh`), `Legacy code_Spaceship.txt`, `assets/`, `rescue/`, or `CMakeLists.txt`.
+- Verified `bash tools/check-id-prefixes.sh` (pass), `CXX=g++ bash tools/check-gui-syntax.sh` (`Draw.cpp`, `AudioDevice.cpp`, `main.cpp` clean under `-Wall -Wextra -Wpedantic` against pinned Raylib 6.0 / ImGui 1.92.7 / rlImGui), and compiled `spaceship_core` + `spaceship_console` cleanly with zero warnings on all edited files (`NavScreen.cpp:137` pre-existing unused-function warning only).
+- Ran standalone headless verification binaries (`/tmp/build_cargo/verify_cargo`, `/tmp/build_cargo/verify_cargo2`) plus `spaceship_console` smoke run (`watch` / `jettison lot-1` / `trace`), confirming 2-step sort + charge wind-up, anti-farm grey-out, 5-10 click re-mixing across cycles, capacity scaling, Delivery / Freelance (actual, +10%, +20% RNG accept/reject) / Station-to-Station (`+190 sh`) / Jettison flows, and Save/Load round-trip of `freelanceRejects`.
+- Initial failure in `verify_cargo2` was a test-harness selection bug (`BuildCargoRoom` defaulted to `delivery` when both `delivery` and `freelance` shared the same destination); passing `CargoSelection::tradeKey` resolved it and all checks pass.
+- Graphical `./spaceship` binary remains unlinked/unlaunched in this headless sandbox (no `cmake`, X11/OpenGL dev libs, or display server); ready for owner visual playtest on desktop.
+
+### Entry #039
+- **Timestamp:** 2026-11-11 04:11 UTC
+- Received owner direction to open the pull request for playtesting (`"ok, i will playtest it and report, please create the pr."`).
+- Re-ran static checks before staging: `bash tools/check-id-prefixes.sh` (pass across `st-`, `pl-`, `mn-`, `sr-`, `bt-`, `si-`) and `git diff --check` (zero whitespace or conflict issues).
+- Audited `git diff cpp/` for `AGENTS.md` compliance: zero authority/ownership commentary, zero temporary or build files in the repo, and zero edits to `Legacy code_Spaceship.txt`, `assets/`, `rescue/`, `CMakeLists.txt`, or ID-prefix files.
+- Verified standard-library header completeness across `cpp/core/Economy.cpp`, `cpp/ui/StoresScreen.cpp`, and `cpp/ui/Draw.cpp` for `.github/workflows/build.yml` (`build-windows` MinGW-w64 cross-build and `test-linux`).
+- Staging all 11 Cargo Hold C++ files (`cpp/core/{Action,Economy,GameState,SaveSystem,Simulation}.*`, `cpp/ui/{Describe,Draw,StoresScreen,Widgets}.*`) plus `docs/LOGBOOK.md` (`#036`–`#039`) for commit on `arena/5664ef1f-spaceship`.
+- Left all temporary build objects and downloaded GUI headers outside the repository under `/tmp/`.
+- Executed no new test binaries this turn per `AGENTS.md`; prior verification (`Entry #038`) reflects the committed code verbatim.
+- Pushing `arena/5664ef1f-spaceship` to `origin` and opening pull request targeting `main` via `gh pr create`.
+- Graphical `./spaceship` / `spaceship.exe` playtest and feedback on keeping or reverting the non-UI core changes (`StepCargoMix`, 3-tier `freelance` RNG, `station` fee fix) remain with `@Aquaslopper`.

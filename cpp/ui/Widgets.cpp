@@ -856,8 +856,8 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       return screen;
     }
     case ScreenKind::Cargo: {
-      // Three windows: the manifest, the hold itself, and what can be done with
-      // the run in hand. No action bar: every row here is a click on the room.
+      // Three windows: left inventory cards, center visual hold sized by ship
+      // capacity, right context-sensitive finalizer (no route salvage).
       const CargoRoomModel cargo = BuildCargoRoom(sim);
       TaskScreenModel screen;
       screen.head = cargo.head;
@@ -865,14 +865,13 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       NavPanel inventory;
       inventory.id = "cargo-inventory";
       inventory.title = "Cargo Inventory";
-      inventory.Note("Everything aboard, whatever brought it here.");
       inventory.Dim(cargo.inventoryNote);
       screen.panels.push_back(inventory);
 
       NavPanel hold;
       hold.id = "cargo-hold";
       hold.title = "Cargo Hold View";
-      hold.Note("Click a lot on the left to sort it into the hold.");
+      hold.Note(cargo.shipLabel + " - " + cargo.capacityLine);
       const double pct = cargo.capacity > 0 ? cargo.used / cargo.capacity * 100.0 : 0.0;
       const std::string tone = pct > 90.0 ? "#c08a3e" : "#7f9161";
       hold.Bar(pct, tone);
@@ -887,24 +886,27 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       side.id = "cargo-side";
       side.title = cargo.sideTitle;
       side.Note(cargo.sideNote);
+      for (const std::string& detail : cargo.contextDetails) {
+        side.Dim(detail);
+      }
       screen.panels.push_back(side);
       screen.panelColumns = {0, 1, 2};
 
-      // left: one press per lot, and the press is the click that sorts it
       std::vector<CommandRowView> lots;
       std::vector<std::string> lotIds;
       for (const CargoLotView& lot : cargo.lots) {
         CommandRowView view;
-        view.label = lot.name + " - " + js::NumToString(lot.vol) + " m3";
+        view.label = lot.name + " - " + js::NumToString(lot.vol) + " m3 (QTY: " +
+                     js::NumToString(lot.qty) + ")";
         view.title = lot.note;
-        view.hideCost = true;  // the word for the clock is not used in this room
+        view.hideCost = true;
         view.plain = true;
         view.enabled = !lot.stowed;
         view.live = view.enabled;
-        view.selected = lot.stowed;
-        if (lot.contract) { view.label += "  (carried for a run)"; }
+        view.selected = lot.selected;
+        if (lot.contract) { view.label += " [Contract]"; }
         lots.push_back(view);
-        lotIds.push_back("cargo-stow:" + lot.id);
+        lotIds.push_back("cargo-select:" + lot.id);
       }
       if (lots.empty()) {
         CommandRowView view;
@@ -915,36 +917,43 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       screen.panelRows.push_back(lots);
       screen.panelRowIds.push_back(lotIds);
 
-      // middle: what has been sorted in, in the order it went in
       std::vector<CommandRowView> placed;
+      std::vector<std::string> placedIds;
       for (const CargoHoldLot& block : cargo.hold) {
         CommandRowView view;
-        view.label = block.label + " - " + js::NumToString(block.vol) + " m3";
-        view.reading = true;
+        view.label = block.label + " - " + js::NumToString(block.vol) + " m3" +
+                     (block.stowed ? " [Sorted]" : (block.selected ? " [Green]" : " [Mixed]"));
+        view.enabled = !block.stowed;
+        view.live = view.enabled;
+        view.reading = block.stowed;
         placed.push_back(view);
+        placedIds.push_back(block.stowed ? std::string() : ("cargo-stow:" + block.id));
       }
       if (placed.empty()) {
         CommandRowView view;
-        view.label = "Nothing sorted yet.";
+        view.label = "The hold is empty.";
         view.reading = true;
         placed.push_back(view);
       }
       screen.panelRows.push_back(placed);
-      screen.panelRowIds.push_back({});
+      screen.panelRowIds.push_back(placedIds);
 
-      // right: the delivery, the sale, or the lock -- and the bays, if the ship
-      // is under way
       std::vector<CommandRowView> actions;
       std::vector<std::string> actionIds;
-      std::vector<CargoSideRow> offers = cargo.sideRows;
-      offers.insert(offers.end(), cargo.salvageRows.begin(), cargo.salvageRows.end());
-      for (const CargoSideRow& row : offers) {
+      for (const CargoSideRow& row : cargo.sideRows) {
         CommandRowView view;
-        view.label = row.label;
+        view.label = row.label + (row.note.empty() ? "" : (" - " + row.note));
         view.title = row.note;
         view.hideCost = true;
         view.enabled = row.enabled;
         view.live = row.enabled;
+        view.confirm = row.confirm;
+        if (!row.id.empty()) {
+          const std::string tierSubject =
+              row.id.compare(0, 13, "cargo-unload:") == 0 ? ("jettison " + row.id) : ("sell " + row.id);
+          BindCommandCharge(sim, view, ButtonChargeKey(sim, "press:cargo:" + row.id + ":"),
+                            ButtonChargeTier(tierSubject));
+        }
         actions.push_back(view);
         actionIds.push_back(row.enabled ? row.id : std::string());
       }
