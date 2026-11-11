@@ -151,17 +151,17 @@ bool Simulation::ServiceSystem(const std::string& statId) {
     useKit = true;
     delta = 25.0;
   } else if (statId == "shield") {
-    label = "Service shields (+25%)";
+    label = "Service shields (+15%)";
     useKit = true;
-    delta = 25.0;
-  } else if (statId == "energy") {
-    label = "Recharge energy (+20%)";
-    useKit = false;
-    delta = 20.0;
-  } else if (statId == "fuel") {
-    label = "Transfer fuel (+15%)";
-    useKit = false;
     delta = 15.0;
+  } else if (statId == "energy") {
+    label = "Recharge energy (+10%)";
+    useKit = false;
+    delta = 10.0;
+  } else if (statId == "fuel") {
+    label = "Transfer fuel (+10%)";
+    useKit = false;
+    delta = 10.0;
   } else {
     return false;
   }
