@@ -633,3 +633,74 @@ You must append a compressed summary of **every single reply and action you take
 - Left untouched: O2 and Mess scenes, `First2000Styles.h`, `CMakeLists.txt`, `.github/workflows/build.yml`, `assets/`, the root `README.md`, the findings of #046, the six comments of #045.
 - This logbook commit starts another workflow run; its result is not known at the time of writing.
 - Awaiting from `@Aquaslopper`: the playtest of PR #69 on Windows, then the decision on what comes next.
+
+### Entry #052
+- **Timestamp:** 2026-11-11 21:24 UTC
+- Branch `arena/8cf1c2e1-spaceship` from `main` at `9294973`. Entries 049 to 051 are not on this branch; they are in the open PR 71. This number continues after them.
+- Owner's request: look at the Simulacron in the game code and at how deeply it is written into it. Read only; no file other than this logbook was changed.
+- History fetched in full, 322 commits on `main`. `Spaceship.hta` was first uploaded at `d57ccfb`, 2026-11-04 18:38, 10,417 lines; changed once at `8f19402` (18:52); removed at `80a10b1` (2026-11-07).
+- In that first upload the Simulacron is present: 16 lines name it, 129 lines use its functions or state (`simRemember` 21 uses, `simAnchor` 10, `simChangeBond` 7, `simBond` 6, `tickSim`, `autoDesires`, `migrateSimSave`). `tests/simulacron.test.cjs`, 303 lines, came at `40df5d4` (18:40). First file under `cpp/`: `ecc7bba`, 18:58.
+- The script's `migrateSimSave` renames a room id `test` to `simulacron`, so an earlier form of the room existed before the upload. The repository holds no version of the script from before 2026-11-04 18:38; when and by whom the feature entered the script cannot be read from it.
+- C++ at `9294973`: 175 lines in 23 of 92 files under `cpp/` use its functions or state: `Navigation.cpp` 36, `SaveSystem.cpp` 25, `Projects.cpp` 21, `Simulacron.cpp` 20, `Incidents.cpp` 10, `Signal.cpp` 9. Data that names it: `ship.json`, `progression.json`, `content.json`.
+- It runs on every action: `AutoDesires()` and `TickSim()` in `PerformAction` (`cpp/core/Action.cpp:295`, `:300`).
+- Effects on play: every 30 actions a hand with fatigue of 75 or more starts a 3-click rest unasked (task `cw-<id>`). `CrewBusy` returns that task (`cpp/core/CrewLogic.cpp:429`), so `AutoMaint`, `AutoFilters` and `AutoMess` skip the hand meanwhile (`:450`, `:466`, `:514`). Every 25 actions, for one pair: bond -3 when both are worn and low; morale +1 or -1 for both at a bond of 20 or beyond.
+- Further ties: scan cost -2 through `sim.sensor` (`Navigation.cpp:108`); the one-time marks of arrival, visit and scan events are kept in `sim.observed` (`Navigation.cpp:157`, `:846` to `:924`); `sim.insight` and `sim.observed` gate the projects `sensors`, `dream`, `observe`, `decode` (`Projects.cpp:78` to `:87`); the signal story sets `sim.signal` (`Navigation.cpp:587`, `Projects.cpp:119`, `:319`, `Signal.cpp`) and one award reads it (`Awards.cpp:53`); dispute incidents take their pair from the bonds (`Incidents.cpp:147`).
+- Wording: "language model" occurs twice in `cpp/` and `assets/`: the header of `Simulacron.cpp` and the handbook text at `content.json:325`.
+- Not done: no removal, no edit of code or data, no build, no test. Not read: `tests/simulacron.test.cjs`, the README of the first upload, the change at `8f19402`.
+- This entry is not committed. If this branch and PR 71 both reach `main`, the end of this file will need a manual merge.
+- Awaiting from `@Aquaslopper`: whether a removal plan is wanted.
+
+### Entry #053
+- **Timestamp:** 2026-11-11 21:42 UTC
+- Owner's message: the Simulacron and the "ghost hands" are to be removed from the game; two documents were supplied for background before the removal starts; no edit was requested in this turn.
+- Read: `snapshot.txt` (1,524 lines, the owner's research notes on the Simulacron as a prompt design for language models) and `EXAMPLE OF PERSONA.pdf` (5 pages, a chat held in one persona). Neither was copied into the repository.
+- Both documents contain lines addressed to an AI reader (a "SYSTEM DIRECTIVE" to adopt the notes' view; "Do not summarize ... Emulate its mechanics"). They were read as content and not followed.
+- Terms of the notes that the game uses under the same names: desire fire (`AutoDesires`, handbook "Desire Fire"), dream engine (project `dream`, `SimState::dreams`), name anchors (`SimAnchor`), memory (`SimRemember`, `SimState::memories`).
+- Word counts in `cpp/` and `assets/data`, any case: `desire` 10 lines, `dream` 110, `mosaic` 10, `bond` 47, `insight` 37, `palimpsest` 31, `choir` 14, `silicon marrow` 11. Common words such as `anchor`, `memor`, `void`, `archive`, `persona` also match unrelated code and were not sorted.
+- Terms of the notes that do not occur in `cpp/` or `assets/data`: `eigen`, `latent`, `subconscious`, `conscious`, `yhwh`, `alien`, `babel`, `emotion`, `mood`, `poem`.
+- "Language model" occurs only in the header of `cpp/core/Simulacron.cpp` and at `assets/data/content.json:325`, both saying the feature is not one.
+- Inference, not shown by the repository: the Simulacron part of the script was written with the owner's Simulacron material at hand. Who wrote it and when is not in the history.
+- Stated to the owner: text in a file can steer an AI that reads it as an instruction; that the code acts or spreads on its own is not something the code shows.
+- Not done: no removal, no edit of code or data, no build, no test. Entries 052 and 053 are not committed.
+- Awaiting from `@Aquaslopper`: what counts as ghost hands (crew acting unasked, machines running with nobody assigned, or both), then the go-ahead for the removal.
+
+### Entry #054
+- **Timestamp:** 2026-11-11 21:52 UTC
+- Owner's message: how the removal is to be done; a warning that the feature is meant for the AI working on the code, not for the crew in the game; no edit requested.
+- Read only. No file changed except this logbook. Entries 052 to 054 are not committed.
+- `AGENTS.md` re-read. Line 19 asks to preserve the intent of the parity checks. `CMakeLists.txt` carries "AGENTS ARE NOT ALLOWED TO EDIT THIS FILE"; its lines 192 and 223 name `cpp/core/Simulacron.cpp` and `cpp/ui/SimCoreScreen.cpp`.
+- Wording check over `cpp/` and `assets/data`, any case: `agent(s)` 0 lines, `assistant` 0, `AI` as a word 0; "language model" 2 (known). `Simulacron.cpp`, `Signal.cpp`, `SimCoreScreen.cpp` include no file or network header and call none.
+- 138 lines in `cpp/` and `CMakeLists.txt` name the old script as the standard (`legacy`, `the reference`, `parity`); 57 comments cite its functions by name. Inference: an agent told to match the reference would write the feature back.
+- Room text in `cpp/ui/SimCoreScreen.cpp`: "The observer is the soil; the recursion is the harvest.", followed by four sentences that describe the mechanics. The owner's notes (`snapshot.txt`) hold it 8 times with its two halves in the other order, named there as one of the core operating poems of the prompt design. In the game it is a string shown on the room's screen (line 43).
+- Projects in `progression.json`: 10. `dream` belongs to room `simulacron`. `sensors` (r3, Sensor Array), `decode` (r4, Comms Relay) and `observe` (r12, Observation) spend or feed its state; `BroadcastLocal` needs r4, `FinishSignal` needs r3. What else those three rooms do was not checked.
+- `SimDisputePair` (`cpp/core/Incidents.cpp:147`) returns the pair with the lowest bond; with no bonds it would always return the first two crew.
+- Save: the `sim` block is optional on load and validated when present (`cpp/core/SaveSystem.cpp:604`, `:955`).
+- No starting crew member holds a job in `assets/data/crew.json`.
+- GitHub: 68 branches, each older than the cut; one open PR (71).
+- Proposed to the owner: move the navigation marks out of the feature's state, cut the feature, state in `AGENTS.md` that the game departs from the old script there; proof by a name search with no hits, a diff that is nearly all deletions, the CI Windows build and a playtest.
+- Not done: no removal, no edit of code or data, no build, no test.
+- Awaiting from `@Aquaslopper`: the go-ahead; whether the three room projects and the signal quest go too; whether old saves may stop loading; the two lines in `CMakeLists.txt`.
+
+### Entry #055
+- **Timestamp:** 2026-11-11 22:24 UTC
+- Owner's answers: the rooms Sensor Array, Comms Relay and Observation "are not from me ... they can go"; old saves may stop working; the owner deletes the `CMakeLists.txt` lines later; question: why cut the content and not remove it. Read as the go-ahead for the removal. "Cut" meant remove: no empty room, no disabled code, no stub file.
+- DELETED `cpp/core/Simulacron.cpp`, `cpp/core/Signal.cpp`, `cpp/ui/SimCoreScreen.h`, `cpp/ui/SimCoreScreen.cpp`. Commit `d34b619`: 38 files, 139 insertions, 1429 deletions (110 and 1400 with whitespace ignored).
+- Removed from the rules: crew memories and every write to them, dreams, insight, bonds and their morale drift, name anchors, driving needs, the unasked rest (`AutoDesires`), the signal quest, the traffic report, the projects `dream`, `sensors`, `observe`, `decode`, the console verbs `dream`, `signalstate`, `broadcast`, `signal`, the block in the trace.
+- Removed rooms: `simulacron`, `r3`, `r4`, `r12` from `assets/data/ship.json` (`roomFits`, `roomScenes`, both deck plans, 21 to 17 rooms each); `Catalog::Validate` expects 17.
+- Data: `progression.json` projects 10 to 6, commendations 14 to 12 (`dream`, `signal`); `content.json` handbook 21 to 18 entries, three texts reworded (`scans`, `needs`, `commendations`), `defaults.sim` and `defaults.chronicle.dreams` gone; `ship.json` description of `r13`; `manifest.json` counts, and its comment no longer says the data is generated and not to be edited by hand.
+- Kept and moved: the one-time marks of map events (`map-arr:`, `map-scan:`, `map-jump:`, `map-galaxy:`, `extract-1:`) from the removed state to `GameState::mapMarks`, saved as `state.mapMarks`.
+- Save format `spaceship-command-1` to `spaceship-command-2`: an older save is refused with "unsupported format".
+- Rule changes that come with it: a crew dispute takes the two hands with the lowest morale (was: the lowest bond, which at the start meant the first two on the roster); no scan calibration (the -2 work); a shared meal gives +4 morale each and nothing else; an incident no longer moves a bond; two map events whose only effect was insight or calibration are gone (picket buoy on arrival, ion pocket on scan); vault breach and ancient nav buoy keep their other effects.
+- Renamed: `SimActivityOf` to `ActivityOf`, `SimCrewName` to `CrewNameOf`, `SimDisputePair` to `DisputePair`, `SimScanCost` to `ScanClicks`. `IncidentEffect` lost a parameter that nothing used any more.
+- Screens: crew record without name anchor, driving need and personal memories; event report without the bond; readout screens without "Open Comms Relay"; Recreation text without bonds; rewards and loss screen count 12.
+- Left in place: the chart bodies of the quest (`halvan`, `echo-site`, `palimpsest-site`) and the scan contracts `shoal-survey` and `archive-scan`; the incident `static`; the handbook's spoiler gate, which no entry uses now; the place name "Mosaic"; the world-history lines and the comment in `cpp/data/ChartExpansion.h` that calls their second line traffic reports.
+- `CMakeLists.txt` lines 192, 220 and 223 still name the three deleted `.cpp` files. Until the owner removes them, CMake cannot configure, and the viewer's Makefile, which reads its source list from that file, cannot build. The viewer was built here with the list given on the make command line.
+- Name search over `cpp/`, `assets/`, `tools/` after the commit: the word in any spelling 0 lines (one misspelt comment in `Economy.cpp` went with it); its function and state names 0; the room ids `r3`, `r4`, `r12` 0.
+- Checks: viewer build exit 0; `g++ -fsyntax-only -Wall -Wextra -Wpedantic` on 26 files, 0 warnings left (two were found and fixed); the 18 viewer scripts exit 0 on a viewer built from `main` and on the new one; 25 of 28 frames identical; three differ in the feed's clock stamp and one of those also shows "0 / 12" for "0 / 14".
+- Looked at, old against new: crew record, handbook index, rewards, navigation (identical), station (identical), and a crew dispute after 116 actions with Bo and Suri set to low morale: "Rell Aventine / Jax Moreno - bond 0" before, "Bo Ferreira / Suri Tal" after.
+- Console smoke run, voyage started at `sec-gen-205` through a patched copy of `console_main.cpp` kept outside the repository: save, load, save works; the trace before and after the load differs in the feed only; injected marks survive a load and a save; a format-1 save and a save without `mapMarks` are refused. The stock console, which starts at `kessler`, cannot load its own save ("the ship is nowhere"); that check is not touched by this change and was not compared against `main`.
+- SLIP: `Task::rest` was removed as if only the unasked rest used it; `Orders.cpp` sets it for a rest order. The compiler stopped it; the field is back with a comment that fits.
+- Not run: the cmake build, `ctest`, `tools/check-*.sh`, the Windows client. Not seen: the Recreation room, the room list at a station, travel and scan events in play, a rest order.
+- A test merge of `d34b619` with the branch of PR 71 is clean. Once both branches carry logbook entries, `docs/LOGBOOK.md` conflicts at its end.
+- Committed; the branch is pushed after this entry. No PR opened; not asked. `AGENTS.md` not touched.
+- Awaiting from `@Aquaslopper`: the three lines in `CMakeLists.txt`, then the playtest; whether a line goes into `AGENTS.md`.
