@@ -138,7 +138,6 @@ void Simulation::OnTaskDone(Task& task) {
       crew->health = std::min(100.0, crew->health + 12);
       crew->activity = "Back on station";
       LogLine(crew->name + " is back from the medical bay.");
-      SimRemember("Care", crew->name + " recovered in the medical bay.", crew->id);
     }
     return;
   }
@@ -263,7 +262,6 @@ void Simulation::ApplyOrderPayload(CrewMember& crew, const Task& task) {
     crew.fatigue = std::max(0.0, crew.fatigue - 25);
     crew.morale = std::min(100.0, crew.morale + 5);
     LogLine(crew.name + " took a restorative break.");
-    SimRemember("Rest", crew.name + " took a restorative break.", crew.id);
   }
   if (hasJob) { ApplyJobTo(crew, jobId); }
   if (docOrder) {

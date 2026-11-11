@@ -1,5 +1,5 @@
 // ============================================================================
-//  Projects.cpp — the ten things the ship can make for itself.
+//  Projects.cpp — the six things the ship can make for itself.
 //  ---------------------------------------------------------------------------
 //  A project is a draw on the reserve, a cargo lot consumed, and four or five
 //  actions of work that pause the instant the batteries are empty. The block
@@ -14,21 +14,6 @@
 #include <string>
 
 namespace ship {
-
-namespace {
-bool Has(const std::map<std::string, bool>& map, const std::string& key) {
-  auto it = map.find(key);
-  return it != map.end() && it->second;
-}
-}  // namespace
-
-std::vector<Memory> Simulation::SimUnprocessed() const {
-  std::vector<Memory> out;
-  for (const Memory& memory : state_.sim.memories) {
-    if (!memory.processed) { out.push_back(memory); }
-  }
-  return out;
-}
 
 int Simulation::ProjectLot(const std::string& kind) const {
   for (std::size_t index = 0; index < goods_.size(); ++index) {
@@ -75,18 +60,6 @@ std::string Simulation::ProjectBlock(const std::string& id) const {
   if (id == "cooling" && (state_.engineCondition >= 100 || MaintRunning())) {
     return "The drive is sound or already under maintenance.";
   }
-  if (id == "sensors" && (state_.sim.insight < 1 || state_.sim.sensor || FindOngoing("scan") != nullptr)) {
-    return "Needs one insight, no stored calibration and idle sensors.";
-  }
-  if (id == "dream" && (SimUnprocessed().size() < 2 || state_.sim.insight >= 5)) {
-    return "Needs two unconsolidated memories and room for an insight (maximum five).";
-  }
-  if (id == "observe" && (FindOngoing("travel") != nullptr || Has(state_.sim.observed, map_.here))) {
-    return "Stop at an unrecorded location first; each location can be recorded once.";
-  }
-  if (id == "decode" && (state_.sim.signal != "intercepted" || state_.sim.insight < 1)) {
-    return "Needs the intercepted signal and one insight.";
-  }
   return "";
 }
 
@@ -98,29 +71,9 @@ bool Simulation::StartProject(const std::string& id) {
   if (project == nullptr || !state_.gameOver.empty()) { return false; }
   if (!ProjectBlock(id).empty()) { return false; }
 
-  bool hasPayload = false;
-  std::string payload;
-  std::vector<Memory> chosen;
-
   if (!project->lot.empty()) {
     const int lot = ProjectLot(project->lot);
     if (lot >= 0) { goods_.erase(goods_.begin() + lot); }
-  }
-  if (id == "dream") {
-    std::vector<Memory> pending = SimUnprocessed();
-    chosen.push_back(pending[0]);
-    chosen.push_back(pending[1]);
-    for (Memory& memory : state_.sim.memories) {
-      if (memory.id == chosen[0].id || memory.id == chosen[1].id) { memory.processed = true; }
-    }
-    hasPayload = true;
-  }
-  if (id == "sensors" || id == "decode") { state_.sim.insight -= 1; }
-  if (id == "decode") { state_.sim.signal = "decoding"; }
-  if (id == "observe") {
-    payload = map_.here;
-    hasPayload = true;
-    state_.sim.observed[map_.here] = true;
   }
 
   ClampStat("energy", -project->energy);
@@ -129,57 +82,7 @@ bool Simulation::StartProject(const std::string& id) {
   projectClaim_.clear();
   if (!state_.gameOver.empty()) { return true; }
 
-  Task* task = AddOngoing("project-" + id, project->label, project->work, "shipProject", id);
-  if (task != nullptr) {
-    if (hasPayload) { task->payload = payload; }
-    if (id == "dream") {
-      task->dreamIds = {js::NumToString(chosen[0].id), js::NumToString(chosen[1].id)};
-      task->dreamKinds = {chosen[0].kind, chosen[1].kind};
-      task->dreamTexts = {chosen[0].text, chosen[1].text};
-      task->dreamWho = {chosen[0].who, chosen[0].other};
-      task->dreamOther = {chosen[1].who, chosen[1].other};
-    }
-  }
-  return true;
-}
-
-bool Simulation::StartDream(const std::string& firstId, const std::string& secondId) {
-  // The reference's two selects, as a command: the pair must be two distinct
-  // unconsolidated memories. Everything else is StartProject("dream").
-  if (firstId == secondId) { return false; }
-  const std::vector<Memory> pending = SimUnprocessed();
-  const Memory* first = nullptr;
-  const Memory* second = nullptr;
-  for (const Memory& memory : pending) {
-    if (js::NumToString(memory.id) == firstId) { first = &memory; }
-    if (js::NumToString(memory.id) == secondId) { second = &memory; }
-  }
-  if (first == nullptr || second == nullptr) { return false; }
-  if (!ProjectBlock("dream").empty()) { return false; }
-
-  const ProjectDef* project = nullptr;
-  for (const ProjectDef& candidate : catalog_.projects) {
-    if (candidate.id == "dream") { project = &candidate; }
-  }
-  if (project == nullptr || !state_.gameOver.empty()) { return false; }
-
-  for (Memory& memory : state_.sim.memories) {
-    if (memory.id == first->id || memory.id == second->id) { memory.processed = true; }
-  }
-  ClampStat("energy", -project->energy);
-  projectClaim_ = "dream";
-  PerformAction(project->label + " started");
-  projectClaim_.clear();
-  if (!state_.gameOver.empty()) { return true; }
-
-  Task* task = AddOngoing("project-dream", project->label, project->work, "shipProject", "dream");
-  if (task != nullptr) {
-    task->dreamIds = {firstId, secondId};
-    task->dreamKinds = {first->kind, second->kind};
-    task->dreamTexts = {first->text, second->text};
-    task->dreamWho = {first->who, first->other};
-    task->dreamOther = {second->who, second->other};
-  }
+  AddOngoing("project-" + id, project->label, project->work, "shipProject", id);
   return true;
 }
 
@@ -231,7 +134,7 @@ bool Simulation::StartSocial(const std::string& a, const std::string& b) {
 }
 
 // ---------------------------------------------------------------------------
-// shipProject.onDone — the ten outputs, plus medical and shared meals.
+// shipProject.onDone — the six outputs, plus medical and shared meals.
 // ---------------------------------------------------------------------------
 
 void Simulation::ProjectDone(Task& task) {
@@ -253,79 +156,12 @@ void Simulation::ProjectDone(Task& task) {
     state_.engineCondition = std::min(100.0, state_.engineCondition + 15);
     text = "Thermal control stabilized the drive.";
   }
-  if (id == "sensors") { state_.sim.sensor = 1; text = "The sensor array is calibrated for one faster scan."; }
-
-  if (id == "observe") {
-    const Body* body = FindBodyById(task.payload);
-    const bool held = [&] {
-      for (const SurveyRecord& record : survey_) {
-        if (record.id == "obs-" + task.payload) { return true; }
-      }
-      return false;
-    }();
-    if (body != nullptr && !held) {
-      SurveyRecord record;
-      record.id = "obs-" + body->id;
-      record.name = body->name + " - observation";
-      record.src = "Observation";
-      record.value = 65;
-      record.state = "filed";
-      survey_.push_back(record);
-      text = "The observation deck recorded " + body->name + ".";
-    }
-  }
-
-  if (id == "dream") {
-    // dreamPart() turns a memory into {kind, text, who, other}; the pair yields
-    // two insights when both halves are about the world, one otherwise.
-    const bool firstExploring = task.dreamKinds.size() > 0 &&
-                                (task.dreamKinds[0] == "Discovery" || task.dreamKinds[0] == "World" ||
-                                 task.dreamKinds[0] == "Arrival");
-    const bool secondExploring = task.dreamKinds.size() > 1 &&
-                                 (task.dreamKinds[1] == "Discovery" || task.dreamKinds[1] == "World" ||
-                                  task.dreamKinds[1] == "Arrival");
-    state_.sim.insight = std::min(5.0, state_.sim.insight + (firstExploring && secondExploring ? 2 : 1));
-
-    // A shared memory lifts the two people who share it.
-    for (CrewMember& crew : crew_) {
-      const bool inFirst = crew.id == task.dreamWho[0] || crew.id == task.dreamWho[1];
-      const bool inSecond = crew.id == task.dreamOther[0] || crew.id == task.dreamOther[1];
-      if (inFirst && inSecond) { crew.morale = std::min(100.0, crew.morale + 2); }
-    }
-    if (task.dreamKinds.size() > 1) {
-      const bool conflictFirst = task.dreamKinds[0] == "Conflict";
-      const bool connectionFirst = task.dreamKinds[0] == "Connection";
-      const bool conflictSecond = task.dreamKinds[1] == "Conflict";
-      const bool connectionSecond = task.dreamKinds[1] == "Connection";
-      const std::string a1 = task.dreamWho[0];
-      const std::string b1 = task.dreamWho[1];
-      const std::string a2 = task.dreamOther[0];
-      const std::string b2 = task.dreamOther[1];
-      auto key = [](const std::string& a, const std::string& b) { return a < b ? a + "~" + b : b + "~" + a; };
-      if (((conflictFirst && connectionSecond) || (connectionFirst && conflictSecond)) && !a1.empty() &&
-          !b1.empty() && !a2.empty() && !b2.empty() && key(a1, b1) == key(a2, b2)) {
-        SimChangeBond(a1, b1, 4);
-      }
-    }
-    const std::string firstText = task.dreamTexts.empty() ? std::string() : task.dreamTexts[0].substr(0, 48);
-    const std::string secondText = task.dreamTexts.size() > 1 ? task.dreamTexts[1].substr(0, 48) : std::string();
-    text = "A dream joins " + (task.dreamKinds.empty() ? std::string("nothing") : task.dreamKinds[0]) + " with " +
-           (task.dreamKinds.size() > 1 ? task.dreamKinds[1] : std::string("nothing")) + ".";
-    state_.sim.dreams.push_back(Dream{actionCounter_, text + " " + firstText + " / " + secondText});
-    while (state_.sim.dreams.size() > 6) { state_.sim.dreams.erase(state_.sim.dreams.begin()); }
-  }
-
-  if (id == "decode") {
-    state_.sim.signal = Has(state_.scanned, "echo-site") ? "request" : "coordinates";
-    text = "Silicon Marrow's signal points to the Choir Array in Echo Shoal.";
-  }
 
   if (id == "medical") {
     if (CrewMember* patient = FindCrew(task.who)) {
       patient->health = std::min(100.0, patient->health + 25);
       patient->activity = "Back on station";
       text = patient->name + " recovered in the medical bay.";
-      SimRemember("Care", text, patient->id);
     }
   }
 
@@ -333,23 +169,16 @@ void Simulation::ProjectDone(Task& task) {
     CrewMember* one = FindCrew(task.who);
     CrewMember* other = FindCrew(task.other);
     if (one != nullptr && other != nullptr) {
-      const double bonus = SimAnchor(*one) == SimAnchor(*other) ? 2.0 : 0.0;
-      SimChangeBond(one->id, other->id, 12 + bonus);
       one->morale = std::min(100.0, one->morale + 4);
       other->morale = std::min(100.0, other->morale + 4);
       text = one->name + " and " + other->name + " shared a meal and talked.";
-      SimRemember("Connection", text, one->id, other->id);
     }
   }
 
   if (!text.empty()) {
     state_.chronicle.projects += 1;
-    if (id == "dream") { state_.chronicle.dreams += 1; }
     if (id == "social") { state_.chronicle.meals += 1; }
     CheckCommendations();
-    if (id != "medical" && id != "social") {
-      SimRemember(id == "dream" ? "Dream" : "Work", text);
-    }
     LogLine(text);
   }
 }

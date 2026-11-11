@@ -854,9 +854,9 @@ std::vector<std::string> Catalog::Validate() const {
         problems.push_back(std::string(name) + " room '" + room.id + "' has no size");
       }
     }
-    if (plan->rooms.size() != 21) {
+    if (plan->rooms.size() != 17) {
       problems.push_back(std::string(name) + " deck plan has " +
-                         std::to_string(plan->rooms.size()) + " rooms, expected 21");
+                         std::to_string(plan->rooms.size()) + " rooms, expected 17");
     }
   }
 

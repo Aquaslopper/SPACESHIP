@@ -187,7 +187,7 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
   stand.Field("Pay", wage > 0 ? js::NumToString(wage) + " sh each payday"
                               : "Unpaid - holds no job");
   stand.Field("Station", sim.CrewWhere(hand));
-  stand.Field("Doing", sim.SimActivityOf(hand));
+  stand.Field("Doing", sim.ActivityOf(hand));
 
   stand.Dim(hand.traits);
 

@@ -583,7 +583,7 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
     screenCargo_ = kind == ScreenKind::Cargo;
     screenRecord_ = kind == ScreenKind::CrewRecord;
     screenPanels_ = kind == ScreenKind::Station || kind == ScreenKind::Science ||
-                    kind == ScreenKind::Room || kind == ScreenKind::SimCore ||
+                    kind == ScreenKind::Room ||
                     kind == ScreenKind::Awards || kind == ScreenKind::Event ||
                     kind == ScreenKind::Wiki || kind == ScreenKind::System ||
                     kind == ScreenKind::Info;
@@ -1727,10 +1727,9 @@ void ShellView::EnsureNavScreen(const Simulation& sim) {
   key.fuel = sim.StatValue("fuel");
   key.energy = sim.StatValue("energy");
   key.drive = sim.State().engineCondition;
-  key.sensor = sim.State().sim.sensor ? 1 : 0;
   key.sensorTier = sim.SensorTier();
   key.scanCost = sim.ScanCost();
-  key.observedCount = sim.State().sim.observed.size();
+  key.mapMarksCount = sim.State().mapMarks.size();
   key.cargoUsed = sim.CargoUsed();
   key.cargoCap = sim.CargoStore().capacity;
 
@@ -3318,7 +3317,6 @@ bool ShellView::PressPanelRow(Simulation& sim, ScreenKind kind, const std::strin
     }
     case ScreenKind::Science: return PressStoresAction(sim, id, "");
     case ScreenKind::Room: return PressRoomAction(sim, id, "");
-    case ScreenKind::SimCore: return PressSimCoreAction(sim, id, "");
     case ScreenKind::Awards: return PressAwardsAction(sim, id, "");
     case ScreenKind::Event: return PressEventAction(sim, id, "");
     case ScreenKind::Wiki: {

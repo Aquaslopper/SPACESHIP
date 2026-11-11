@@ -289,15 +289,6 @@ int main(int argc, char** argv) {
       simulation.BuyLargerShip();
     } else if (command == "project" && parts.size() >= 2) {
       simulation.StartProject(parts[1]);
-    } else if (command == "dream" && parts.size() >= 3) {
-      simulation.StartDream(parts[1], parts[2]);
-    } else if (command == "signalstate" && parts.size() >= 2) {
-      // Setup only, like `purse`: put the story where a script needs it.
-      simulation.MutableState().sim.signal = parts[1];
-    } else if (command == "broadcast") {
-      simulation.BroadcastLocal();
-    } else if (command == "signal" && parts.size() >= 2) {
-      simulation.FinishSignal(parts[1]);
     } else if (command == "claim" && parts.size() >= 2) {
       simulation.ClaimCommendation(parts[1]);
     } else if (command == "remedy" && parts.size() >= 2) {

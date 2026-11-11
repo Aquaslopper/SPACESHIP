@@ -114,16 +114,7 @@ struct Task {
   double slot = -1;   // o2slot: which of the three slots
   double rate = 0;    // preserved task-rate field for older saved tasks
   double vol = 0;     // salvage: cubic metres held
-  std::string payload;  // observe: the body recorded; dream: unused
-
-  // A dream carries both halves of what the crew consolidated: their ids, kinds,
-  // texts and the two people each half was about.
-  std::vector<std::string> dreamIds;
-  std::vector<std::string> dreamKinds;
-  std::vector<std::string> dreamTexts;
-  std::vector<std::string> dreamWho;
-  std::vector<std::string> dreamOther;
-  bool rest = false;  // crewJob payload: the rest that autoDesires queues
+  bool rest = false;  // crewJob payload: the order sheet asks for a rest
   bool hasOrders = false;
 
   // The order sheet a crewJob carries, applied when the work finishes.
@@ -148,44 +139,12 @@ struct Incident {
   std::string b;
 };
 
-// ---------------------------------------------------------------------------
-// Simulacron: bounded memory, bonds and the signal story.
-// ---------------------------------------------------------------------------
-struct Memory {
-  double id = 0;
-  std::string kind;
-  std::string text;
-  double at = 0;
-  std::string who;
-  std::string other;
-  bool processed = false;
-};
-
-struct Dream {
-  double at = 0;
-  std::string text;
-};
-
-struct SimState {
-  int version = 1;
-  double serial = 1;
-  double insight = 0;
-  double sensor = 0;
-  std::string signal = "dormant";
-  std::map<std::string, double> bonds;   // "a~b" -> -100..100
-  std::map<std::string, bool> observed;
-  std::map<std::string, bool> broadcasts;
-  std::vector<Dream> dreams;
-  std::vector<Memory> memories;
-};
-
 struct Chronicle {
   int version = 1;
   std::map<std::string, bool> systems;
   std::map<std::string, bool> regions;
   double banks = 0;
   double projects = 0;
-  double dreams = 0;
   double meals = 0;
   double incidents = 0;
   std::map<std::string, bool> earned;
@@ -398,7 +357,9 @@ struct GameState {
   std::vector<Task> ongoing;
   std::optional<std::string> navTarget;
   std::map<std::string, bool> scanned;
-  SimState sim = {};
+  // Map events that happen once, by key: "map-arr:<body>", "map-scan:<body>",
+  // "map-jump:<system>", "map-galaxy:<region>", "extract-1:<body>".
+  std::map<std::string, bool> mapMarks;
 
   // The engine. Decays with attention, not with time.
   double engineCondition = 100;

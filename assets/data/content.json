@@ -22,7 +22,6 @@
     "chronicle": {
       "banks": 0,
       "claimed": {},
-      "dreams": 0,
       "earned": {},
       "incidents": 0,
       "meals": 0,
@@ -45,28 +44,6 @@
       "music": true,
       "soundEffects": true,
       "theme": "classic"
-    },
-    "sim": {
-      "bonds": {},
-      "broadcasts": {},
-      "dreams": [],
-      "insight": 0,
-      "memories": [
-        {
-          "at": 0,
-          "id": 1,
-          "kind": "Watch",
-          "other": "",
-          "processed": false,
-          "text": "The ship's memory archive begins a new watch.",
-          "who": ""
-        }
-      ],
-      "observed": {},
-      "sensor": 0,
-      "serial": 1,
-      "signal": "dormant",
-      "version": 1
     }
   },
   "feed": {
@@ -292,8 +269,8 @@
       "id": "scans",
       "link": "science",
       "linkLabel": "Open Science Room",
-      "text": "Deep-scan a local destination, let the work finish, then acknowledge the readout. Unique scanned bodies count toward exploration commendations. Observation records each visited location once. Surveys go to the Science Room, where packaging adds value before sale. The Sensor Array can spend insight to shorten one scan.",
-      "title": "Scans, observation and surveys"
+      "text": "Deep-scan a local destination, let the work finish, then acknowledge the readout. Unique scanned bodies count toward exploration commendations. Surveys go to the Science Room, where packaging adds value before sale.",
+      "title": "Scans and surveys"
     },
     {
       "group": "Exploration",
@@ -314,32 +291,8 @@
       "id": "needs",
       "link": "r13",
       "linkLabel": "Open Recreation",
-      "text": "Health, air, fatigue, hunger, morale and work shape a crew member's outlook. Recreation lets two available hands share a meal, raising their bond and morale. Disputes can hurt a bond; mediation can repair it. A healthy exhausted person may rest on their own. A person already assigned to work cannot be double-booked.",
-      "title": "Needs, bonds and rest"
-    },
-    {
-      "group": "Simulacron",
-      "id": "anchors",
-      "link": "simulacron",
-      "linkLabel": "Open Simulacron Core",
-      "text": "The Simulacron is an offline, bounded simulation, not a language model. Authored biographies give crew stable name anchors such as Wayfinder, Maker, Keeper and Witness. Desire Fire reflects present needs and drives dialogue and voluntary rest. Shared anchors give a small extra bond bonus to a meal.",
-      "title": "Name anchors and Desire Fire"
-    },
-    {
-      "group": "Simulacron",
-      "id": "memory",
-      "link": "simulacron",
-      "linkLabel": "Open Simulacron Core",
-      "text": "Arrivals, discoveries, care, conflicts, work and choices enter the Memory Mosaic; personal records appear on crew profiles. The core retains the latest 32 records. Choose two distinct unconsolidated memories in the Dream Engine to make insight. Exploration pairs give extra insight; shared people recover morale; matched conflict and reconciliation help a bond.",
-      "title": "Memory Mosaic and the Observer"
-    },
-    {
-      "group": "Simulacron",
-      "id": "signal",
-      "link": "r4",
-      "linkLabel": "Open Comms Relay",
-      "text": "Deep-scan Halvan's Reach to intercept the signal. Make insight in the Core, then decode it in Comms. Scan the Choir Array in Echo Shoal to learn the archive's request. At Palimpsest's Archive Hull, shelter it using a repair kit and power, or sell it while docked. These choices are permanent for the voyage.",
-      "title": "Silicon Marrow: story guide (spoilers)"
+      "text": "Health, air, fatigue, hunger, morale and work shape a crew member's outlook. Recreation lets two available hands share a meal, raising their morale. A person already assigned to work cannot be double-booked.",
+      "title": "Needs"
     },
     {
       "group": "Ship systems",
@@ -368,7 +321,7 @@
     {
       "group": "Rewards",
       "id": "commendations",
-      "text": "The Rewards button opens a log of optional milestones for exploration, care, engineering, contracts and the signal. Earn them by playing and claim each listed supply or shiplet reward once, for free. Captain's rank is a cosmetic record of earned commendations. Nothing is awarded merely for opening the screen.",
+      "text": "The Rewards button opens a log of optional milestones for exploration, care, engineering and contracts. Earn them by playing and claim each listed supply or shiplet reward once, for free. Captain's rank is a cosmetic record of earned commendations. Nothing is awarded merely for opening the screen.",
       "title": "Commendations and captain's rank"
     }
   ]

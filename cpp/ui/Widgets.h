@@ -128,8 +128,8 @@ struct CommandRowView {
 };
 
 // A row the player can press, with the id the press path answers to. The
-// station, the stores, the fitted rooms, the Simulacron, the logbook and the
-// incident reports all speak this shape.
+// station, the stores, the fitted rooms, the logbook and the incident reports
+// all speak this shape.
 // Conversation locks are per crew member, shared across quarters and records.
 std::string ConversationChargeKey(const std::string& crewId);
 CommandRowView BuildConversationRow(const Simulation& sim, const std::string& crewId);
@@ -275,8 +275,8 @@ TaskScreenModel BuildDescribedScreen(const Simulation& sim, const Description& d
 
 // Which builder a tab would use. Every window the ship can open has its own
 // builder now: the three machine rooms, the chart, quarters and records, the
-// station and the stores, the fitted bays with the Simulacron, the logbook, the
-// incident reports and the handbook. `Described` is not a placeholder but the
+// station and the stores, the fitted bays, the logbook, the incident reports
+// and the handbook. `Described` is not a placeholder but the
 // reference's own briefing frame, and it is what a hull room that owns no work
 // still uses.
 enum class ScreenKind {
@@ -291,7 +291,6 @@ enum class ScreenKind {
   Cargo,
   Science,
   Room,
-  SimCore,
   Awards,
   Event,
   Wiki,

@@ -174,10 +174,6 @@
       "Damage Control",
       "Emergency hull patching"
     ],
-    "r12": [
-      "Observation",
-      "Local survey / history"
-    ],
     "r13": [
       "Recreation",
       "Crew relationships"
@@ -185,14 +181,6 @@
     "r2": [
       "Workshop",
       "Salvage / repair kits"
-    ],
-    "r3": [
-      "Sensor Array",
-      "Sensor calibration"
-    ],
-    "r4": [
-      "Comms Relay",
-      "Local traffic / signals"
     ],
     "r5": [
       "Thermal Control",
@@ -213,10 +201,6 @@
     "r9": [
       "Recyclers",
       "Salvage / O2 canisters"
-    ],
-    "simulacron": [
-      "Simulacron Core",
-      "Memory mosaic / dream engine"
     ]
   },
   "roomScenes": {
@@ -283,17 +267,10 @@
       "glyph": "cargo",
       "label": "Hull patch station"
     },
-    "r12": {
-      "accent": "#80c8d5",
-      "code": "OBSERVATION / 19",
-      "description": "A clear forward window records each place once.",
-      "glyph": "orbit",
-      "label": "External survey port"
-    },
     "r13": {
       "accent": "#c68eb4",
       "code": "RECREATION / 21",
-      "description": "Two crew can share a meal and repair a strained bond.",
+      "description": "Two crew can share a meal.",
       "glyph": "habitat",
       "label": "Common room"
     },
@@ -303,20 +280,6 @@
       "description": "Recovered alloys become tools and repair kits.",
       "glyph": "cargo",
       "label": "Fabrication bench"
-    },
-    "r3": {
-      "accent": "#55c3d6",
-      "code": "SENSORS / 10",
-      "description": "The array calibrates one scan at a time.",
-      "glyph": "orbit",
-      "label": "Long-range aperture"
-    },
-    "r4": {
-      "accent": "#78a9e8",
-      "code": "COMMS / 11",
-      "description": "Local traffic and old transmissions share a receiver.",
-      "glyph": "network",
-      "label": "Relay and signal desk"
     },
     "r5": {
       "accent": "#e37e57",
@@ -359,13 +322,6 @@
       "description": "Scans, observations and packaged data are filed here.",
       "glyph": "orbit",
       "label": "Survey archive"
-    },
-    "simulacron": {
-      "accent": "#a981d0",
-      "code": "SIMULACRON / 08",
-      "description": "A quiet core turns lived experience into insight.",
-      "glyph": "core",
-      "label": "Memory mosaic"
     }
   },
   "rooms": {
@@ -449,17 +405,6 @@
       },
       {
         "h": 94,
-        "id": "simulacron",
-        "name": "Simulacron Core",
-        "systems": "Memory / dreams",
-        "tag": "DECK B",
-        "tone": "#f7efe9",
-        "w": 90,
-        "x": 584,
-        "y": 240
-      },
-      {
-        "h": 94,
         "id": "r2",
         "name": "Workshop",
         "systems": "Salvage / repair kits",
@@ -468,30 +413,6 @@
         "w": 158,
         "x": 682,
         "y": 240
-      },
-      {
-        "h": 44,
-        "id": "r3",
-        "name": "Sensor Array",
-        "small": true,
-        "systems": "Sensor calibration",
-        "tag": "SPINE",
-        "tone": "#faf7f2",
-        "w": 106,
-        "x": 206,
-        "y": 54
-      },
-      {
-        "h": 44,
-        "id": "r4",
-        "name": "Comms Relay",
-        "small": true,
-        "systems": "Local traffic / signals",
-        "tag": "SPINE",
-        "tone": "#fdfbf7",
-        "w": 106,
-        "x": 320,
-        "y": 54
       },
       {
         "h": 44,
@@ -576,18 +497,6 @@
         "w": 106,
         "x": 594,
         "y": 366
-      },
-      {
-        "h": 32,
-        "id": "r12",
-        "name": "Observation",
-        "small": true,
-        "systems": "Local survey / history",
-        "tag": "LENS",
-        "tone": "#fdfbf7",
-        "w": 110,
-        "x": 940,
-        "y": 160
       },
       {
         "h": 68,
@@ -700,18 +609,6 @@
       },
       {
         "h": 76,
-        "id": "simulacron",
-        "name": "Simulacron Core",
-        "small": false,
-        "systems": "Memory / dreams",
-        "tag": "DECK B",
-        "tone": "#f7efe9",
-        "w": 97,
-        "x": 245,
-        "y": 184
-      },
-      {
-        "h": 76,
         "id": "r2",
         "name": "Workshop",
         "small": false,
@@ -721,30 +618,6 @@
         "w": 100,
         "x": 346,
         "y": 184
-      },
-      {
-        "h": 33,
-        "id": "r3",
-        "name": "Sensor Array",
-        "small": true,
-        "systems": "Sensor calibration",
-        "tag": "SPINE",
-        "tone": "#faf7f2",
-        "w": 67,
-        "x": 70,
-        "y": 41
-      },
-      {
-        "h": 33,
-        "id": "r4",
-        "name": "Comms Relay",
-        "small": true,
-        "systems": "Local traffic / signals",
-        "tag": "SPINE",
-        "tone": "#fdfbf7",
-        "w": 67,
-        "x": 141,
-        "y": 41
       },
       {
         "h": 33,
@@ -829,18 +702,6 @@
         "w": 99,
         "x": 344,
         "y": 270
-      },
-      {
-        "h": 27,
-        "id": "r12",
-        "name": "Observation",
-        "small": true,
-        "systems": "Local survey / history",
-        "tag": "LENS",
-        "tone": "#fdfbf7",
-        "w": 74,
-        "x": 465,
-        "y": 139
       },
       {
         "h": 58,

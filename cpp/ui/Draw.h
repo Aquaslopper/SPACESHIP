@@ -32,7 +32,6 @@
 #include "ui/QuartersScreen.h"
 #include "ui/RoomsScreen.h"
 #include "ui/Shell.h"
-#include "ui/SimCoreScreen.h"
 #include "ui/StationScreen.h"
 #include "ui/StoresScreen.h"
 #include "ui/Theme.h"
@@ -275,10 +274,9 @@ class ShellView {
     double fuel = -1.0;
     double energy = -1.0;
     double drive = -1.0;
-    int sensor = -1;
     int sensorTier = -1;
     double scanCost = -1.0;
-    std::size_t observedCount = 0;
+    std::size_t mapMarksCount = 0;
     double cargoUsed = -1.0;
     double cargoCap = -1.0;
     std::size_t crewSig = 0;
@@ -290,8 +288,8 @@ class ShellView {
              docked == o.docked && reducedMotion == o.reducedMotion &&
              scannedCount == o.scannedCount && ongoingSig == o.ongoingSig &&
              fuel == o.fuel && energy == o.energy && drive == o.drive &&
-             sensor == o.sensor && sensorTier == o.sensorTier &&
-             scanCost == o.scanCost && observedCount == o.observedCount &&
+             sensorTier == o.sensorTier &&
+             scanCost == o.scanCost && mapMarksCount == o.mapMarksCount &&
              cargoUsed == o.cargoUsed && cargoCap == o.cargoCap &&
              crewSig == o.crewSig;
     }

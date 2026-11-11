@@ -61,7 +61,6 @@ const Incident* FindEvent(const Simulation& sim, const std::string& id) {
 
 // ROOM_FITS: rooms that open as real fitted systems rather than as a store.
 bool RoomFits(const std::string& id) {
-  if (id == "simulacron") { return true; }
   if (id.size() < 2 || id[0] != 'r') { return false; }
   for (std::size_t i = 1; i < id.size(); ++i) {
     if (id[i] < '0' || id[i] > '9') { return false; }
@@ -447,7 +446,7 @@ Description DescribeTarget(const Simulation& sim, const std::string& kind,
         {"Updated", "On arrival"},
     };
   }
-  t.acts = {{"Open Navigation", "free"}, {"Open Comms Relay", "free"}};
+  t.acts = {{"Open Navigation", "free"}};
   if (id == "life") { t.acts = {{"Open O2 Filter Room", "free"}}; }
   return t;
 }

@@ -49,12 +49,8 @@ double Simulation::ChronicleValue(const std::string& metric) const {
     const std::string value = it == state_.contracts.end() ? std::string() : it->second;
     return (value == "ready" || value == "complete") ? 1.0 : 0.0;
   }
-  if (metric == "signal") {
-    return (state_.sim.signal == "preserved" || state_.sim.signal == "sold") ? 1.0 : 0.0;
-  }
   if (metric == "banks") { return chronicle.banks; }
   if (metric == "projects") { return chronicle.projects; }
-  if (metric == "dreams") { return chronicle.dreams; }
   if (metric == "meals") { return chronicle.meals; }
   if (metric == "incidents") { return chronicle.incidents; }
   return 0.0;

@@ -20,7 +20,6 @@
 #include "ui/EventScreen.h"
 #include "ui/Popups.h"
 #include "ui/RoomsScreen.h"
-#include "ui/SimCoreScreen.h"
 #include "ui/WikiScreen.h"
 #include "ui/QuartersScreen.h"
 #include "ui/Shell.h"
@@ -94,7 +93,7 @@ std::string ButtonChargeTier(const std::string& subject,
   }
   if (ContainsAny(s, {"navigation", "travel", "jump", "course", "dock", "undock",
                       "watch", "crossing", "salvage", "scan", "route", "space",
-                      "fuel", "traffic report"})) {
+                      "fuel"})) {
     return "space";
   }
   const bool startsBuy = s.compare(0, 4, "buy ") == 0;
@@ -560,13 +559,12 @@ ScreenKind ScreenKindFor(const Tab& tab) {
   if (tab.kind == "room" && tab.id == "cargo") { return ScreenKind::Cargo; }
   if (tab.kind == "room" && tab.id == "science") { return ScreenKind::Science; }
   if (tab.kind == "room" && tab.id == "quarters") { return ScreenKind::Quarters; }
-  // Phase 7: the Simulacron, the fitted bays and the logbook.
+  // Phase 7: the fitted bays and the logbook.
   if (tab.kind == "awards") { return ScreenKind::Awards; }
   if (tab.kind == "wiki") { return ScreenKind::Wiki; }
   if (tab.kind == "event") { return ScreenKind::Event; }
   if (tab.kind == "system") { return ScreenKind::System; }
   if (tab.kind == "info") { return ScreenKind::Info; }
-  if (tab.kind == "room" && tab.id == "simulacron") { return ScreenKind::SimCore; }
   if (tab.kind != "room") { return ScreenKind::Described; }
   if (tab.id == "engine") { return ScreenKind::Engine; }
   if (tab.id == "o2") { return ScreenKind::O2; }
@@ -575,8 +573,8 @@ ScreenKind ScreenKindFor(const Tab& tab) {
   // window of their own in a later phase; until then they open on the house
   // frame rather than on nothing.
 
-  // The fourteen fitted bays and the bridge: r1..r13 and "bridge", which is
-  // exactly the set ROOM_FITS names (the Simulacron left above).
+  // The fitted bays and the bridge: r1..r13 and "bridge", which is exactly the
+  // set ROOM_FITS names.
   if (tab.id == "bridge") { return ScreenKind::Room; }
   if (tab.id.size() > 1 && tab.id[0] == 'r') {
     bool digits = true;
@@ -676,13 +674,8 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         CommandRowView nav =
             BuildCommandRow(sim, "Open Navigation", true, "free", std::string(), 0);
         nav.live = true;
-        CommandRowView comms =
-            BuildCommandRow(sim, "Open Comms Relay", true, "free", std::string(), 1);
-        comms.live = true;
         rows.push_back(nav);
         ids.push_back("nav:main");
-        rows.push_back(comms);
-        ids.push_back("room:r4");
       }
       screen.panelRows.push_back(rows);
       screen.panelRowIds.push_back(ids);
@@ -1019,38 +1012,6 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       screen.panelRowIds.push_back(ids);
       screen.progress = room.buttons;
       screen.hero = BuildVignette(sim, tab.id);
-      screen.hasHero = true;
-      return screen;
-    }
-    case ScreenKind::SimCore: {
-      const SimScreenModel core = BuildSimCoreScreen(sim);
-      TaskScreenModel screen;
-      screen.head = core.head;
-      NavPanel panel = core.body;
-      for (const std::string& line : core.anchors) { panel.Note(line); }
-      if (!core.latestDream.empty()) { panel.Note(core.latestDream); }
-      panel.Sub("Memory mosaic - newest first");
-      for (const std::string& line : core.memories) { panel.Note(line); }
-      screen.panels.push_back(panel);
-      std::vector<CommandRowView> rows;
-      std::vector<std::string> ids;
-      for (const ActionRowView& row : core.rows) {
-        CommandRowView view;
-        view.label = row.label;
-        view.cost = row.cost;
-        view.displayCost = row.cost.empty() ? "1 click" : row.cost;
-        view.enabled = row.enabled;
-        view.live = row.enabled;
-        view.confirm = row.confirm;
-        BindCommandCharge(sim, view, ButtonChargeKey(sim, "press:simcore:" + row.id + ":"),
-                            ButtonChargeTier(row.id + " "));
-        rows.push_back(view);
-        ids.push_back(row.id);
-      }
-      screen.panelRows.push_back(rows);
-      screen.panelRowIds.push_back(ids);
-      screen.progress = core.buttons;
-      screen.hero = BuildVignette(sim, "simulacron");
       screen.hasHero = true;
       return screen;
     }

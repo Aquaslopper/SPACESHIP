@@ -20,14 +20,7 @@ const IncidentType* Simulation::IncidentSpec(const Incident& incident) const {
   return nullptr;
 }
 
-void Simulation::IncidentEffect(const IncidentType::Stage& step, const Incident& incident) {
-  if (incident.type == "crew" && !incident.a.empty() && !incident.b.empty()) {
-    SimChangeBond(incident.a, incident.b, -8);
-    SimRemember("Conflict",
-                SimCrewName(incident.a) + " and " + SimCrewName(incident.b) +
-                    " remain in conflict.",
-                incident.a, incident.b);
-  }
+void Simulation::IncidentEffect(const IncidentType::Stage& step) {
   if (step.hull.has_value()) { ClampStat("hull", *step.hull); }
   if (step.shield.has_value()) { ClampStat("shield", *step.shield); }
   if (step.energy.has_value()) { ClampStat("energy", *step.energy); }
@@ -42,13 +35,6 @@ void Simulation::RemoveIncident(const std::string& id) {
   const Incident* found = nullptr;
   for (const Incident& incident : events_) {
     if (incident.id == id) { found = &incident; }
-  }
-  if (found != nullptr && found->type == "crew" && !found->a.empty() && !found->b.empty()) {
-    const std::string a = found->a;
-    const std::string b = found->b;
-    SimChangeBond(a, b, 12);
-    SimRemember("Connection",
-                SimCrewName(a) + " and " + SimCrewName(b) + " settled their dispute.", a, b);
   }
   const bool hadIncident = found != nullptr;
   for (std::size_t i = events_.size(); i-- > 0;) {
@@ -144,19 +130,20 @@ bool Simulation::AssignIncidentCrew(const std::string& incidentId) {
   return true;
 }
 
-std::pair<std::string, std::string> Simulation::SimDisputePair() const {
-  std::pair<std::string, std::string> pair;
-  double worst = 101;
-  for (std::size_t i = 0; i < crew_.size(); ++i) {
-    for (std::size_t j = i + 1; j < crew_.size(); ++j) {
-      const double bond = SimBond(crew_[i].id, crew_[j].id);
-      if (bond < worst) {
-        worst = bond;
-        pair = {crew_[i].id, crew_[j].id};
-      }
+// The two hands in the lowest spirits; on equal morale, the earlier on the roster.
+std::pair<std::string, std::string> Simulation::DisputePair() const {
+  const CrewMember* low = nullptr;
+  const CrewMember* next = nullptr;
+  for (const CrewMember& crew : crew_) {
+    if (low == nullptr || crew.morale < low->morale) {
+      next = low;
+      low = &crew;
+    } else if (next == nullptr || crew.morale < next->morale) {
+      next = &crew;
     }
   }
-  return pair;
+  if (low == nullptr || next == nullptr) { return {}; }
+  return {low->id, next->id};
 }
 
 void Simulation::TickIncidents() {
@@ -175,7 +162,7 @@ void Simulation::TickIncidents() {
       continue;
     }
     const IncidentType::Stage& step = spec->stages[static_cast<std::size_t>(incident.stage)];
-    IncidentEffect(step, incident);
+    IncidentEffect(step);
     LogLine(step.text);
 
     if (step.ticks <= 0) {
@@ -205,7 +192,7 @@ void Simulation::TickIncidents() {
     incident.stage = 0;
     incident.left = spec.stages.empty() ? 0 : spec.stages[0].ticks;
     if (spec.id == "crew") {
-      const std::pair<std::string, std::string> pair = SimDisputePair();
+      const std::pair<std::string, std::string> pair = DisputePair();
       incident.a = pair.first;
       incident.b = pair.second;
     }
@@ -241,7 +228,7 @@ bool Simulation::SpawnMapIncident(const std::string& typeId, const std::string& 
   incident.stage = 0;
   incident.left = spec->stages[0].ticks;
   if (spec->kind == "Crew" && crew_.size() >= 2) {
-    const std::pair<std::string, std::string> pair = SimDisputePair();
+    const std::pair<std::string, std::string> pair = DisputePair();
     incident.a = pair.first;
     incident.b = pair.second;
   }

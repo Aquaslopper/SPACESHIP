@@ -54,7 +54,6 @@
 #include "ui/QuartersScreen.h"
 #include "ui/RoomsScreen.h"
 #include "ui/Shell.h"
-#include "ui/SimCoreScreen.h"
 #include "ui/StationScreen.h"
 #include "ui/StoresScreen.h"
 #include "ui/Theme.h"

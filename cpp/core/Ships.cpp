@@ -78,7 +78,6 @@ bool Simulation::BuyLargerShip() {
   const Port* port = HerePort();
   if (port == nullptr || state_.shipClass != "wren" || state_.shiplets < price) { return false; }
 
-  const std::string portName = port->name;
   state_.shiplets -= price;
   state_.shipClass = "kestrel";
   auto fields = catalog_.shipFields.find("kestrel");
@@ -86,7 +85,6 @@ bool Simulation::BuyLargerShip() {
   cargo_.capacity = std::max(cargo_.capacity, ShipCargoCapacity("kestrel", CargoRefitLevel()));
   ApplyShipLayout();
 
-  SimRemember("Work", "The crew transferred from SC Wren to SC Tessellate at " + portName + ".");
   FreeCommit("Commissioned SC Tessellate");
   return true;
 }

@@ -157,7 +157,6 @@ void Simulation::LayOff(CrewMember& crew, const std::string& why) {
   crew.morale = std::max(0.0, crew.morale - rules_.pay.hit);
   crew.activity = "Idle in the corridor";
   LogLine(crew.name + " - " + why + " - is off the " + label + " job.");
-  SimRemember("Work", crew.name + " left the " + label + " job: " + why + ".", crew.id);
 }
 
 void Simulation::TickPayroll() {
@@ -305,7 +304,7 @@ std::string Simulation::CrewWhere(const CrewMember& crew) const {
   return "Corridor";
 }
 
-std::string Simulation::SimActivityOf(const CrewMember& crew) const {
+std::string Simulation::ActivityOf(const CrewMember& crew) const {
   const Task* work = CrewBusy(crew);
   if (work != nullptr && work->target == "social") { return "Sharing a meal"; }
   if (FindOngoing("doc-" + crew.id) != nullptr) { return "In medical care"; }
@@ -405,8 +404,10 @@ bool Simulation::TalkToCrew(const std::string& crewId) {
   return true;
 }
 
-std::string Simulation::SimDriveOf(const CrewMember& crew) const { return SimDrive(crew); }
-std::string Simulation::SimAnchorOf(const CrewMember& crew) const { return SimAnchor(crew); }
+std::string Simulation::CrewNameOf(const std::string& id) const {
+  const CrewMember* crew = FindCrew(id);
+  return crew != nullptr ? crew->name : std::string("a former crew member");
+}
 
 const Task* Simulation::CrewBusy(const CrewMember& crew) const {
   if (crewClaims_.count(crew.id) != 0) {

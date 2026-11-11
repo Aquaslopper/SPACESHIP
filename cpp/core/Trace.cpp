@@ -131,7 +131,6 @@ std::string Simulation::TraceJson() const {
       entry["slot"] = Num(task.slot);
       entry["rate"] = Num(task.rate);
       entry["vol"] = Num(task.vol);
-      entry["payload"] = task.payload;
       tasks.push_back(entry);
     }
     out["tasks"] = tasks;
@@ -153,35 +152,9 @@ std::string Simulation::TraceJson() const {
   }
 
   {
-    Json sim = Json::object();
-    sim["signal"] = state_.sim.signal;
-    sim["insight"] = Num(state_.sim.insight);
-    sim["sensor"] = Num(state_.sim.sensor);
-    sim["serial"] = Num(state_.sim.serial);
-    Json memories = Json::array();
-    for (const Memory& memory : state_.sim.memories) {
-      Json entry = Json::object();
-      entry["id"] = Num(memory.id);
-      entry["kind"] = memory.kind;
-      entry["text"] = memory.text;
-      entry["at"] = Num(memory.at);
-      entry["who"] = memory.who;
-      entry["other"] = memory.other;
-      entry["processed"] = memory.processed;
-      memories.push_back(entry);
-    }
-    sim["memories"] = memories;
-    Json bonds = Json::object();
-    for (const auto& entry : state_.sim.bonds) { bonds[entry.first] = Num(entry.second); }
-    sim["bonds"] = bonds;
-    out["sim"] = sim;
-  }
-
-  {
     Json chronicle = Json::object();
     chronicle["banks"] = Num(state_.chronicle.banks);
     chronicle["projects"] = Num(state_.chronicle.projects);
-    chronicle["dreams"] = Num(state_.chronicle.dreams);
     chronicle["meals"] = Num(state_.chronicle.meals);
     chronicle["incidents"] = Num(state_.chronicle.incidents);
     std::vector<std::string> earned;

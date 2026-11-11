@@ -47,9 +47,8 @@ EventScreenModel BuildEventScreen(const Simulation& sim, const std::string& even
     model.report.Field("Next change", Num(incident->left) + " clicks");
   }
   if (incident->type == "crew" && !incident->a.empty() && !incident->b.empty()) {
-    model.report.Field("Involved", sim.SimCrewName(incident->a) + " / " +
-                                       sim.SimCrewName(incident->b) + " - bond " +
-                                       Num(sim.SimBond(incident->a, incident->b)));
+    model.report.Field("Involved", sim.CrewNameOf(incident->a) + " / " +
+                                       sim.CrewNameOf(incident->b));
   }
   model.report.Note("Ignore it and the situation will advance with your other clicks.");
 
