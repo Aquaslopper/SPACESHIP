@@ -126,10 +126,10 @@
   "mess": {
     "capacity": 24,
     "rack": 18,
-    "rations": 21,
+    "rations": 5,
     "rationCapacity": 24,
     "foodPerRation": 5,
-    "cookBelow": 10,
+    "cookBelow": 11,
     "hungerPerMeal": 15,
     "hungerPerFood": 5,
     "hungerFloor": 5
