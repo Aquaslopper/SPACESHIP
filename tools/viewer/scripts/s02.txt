@@ -1,0 +1,10 @@
+# Voyage setup, first page.
+title 0
+frames 3
+clickhit title new-voyage
+frames 3
+textlog on
+frames 1
+shot 02-setup
+hits title
+state

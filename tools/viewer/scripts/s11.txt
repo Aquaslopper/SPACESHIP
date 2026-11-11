@@ -1,0 +1,26 @@
+# Home after 70 actions in flight.
+title 0
+frames 3
+clickhit title new-voyage
+frames 3
+clickhit title setup-pick-galaxy | gal-gen-9
+frames 3
+clickhit title setup-pick-system | sec-gen-205
+frames 3
+clickhit title setup-launch
+frames 5
+move 5 500
+undock
+act 70
+frames 4
+state
+clickhit side events
+frames 2
+clickhit side resources
+frames 2
+move 5 700
+frames 30 50
+textlog on
+frames 1
+shot 14-home-after-70
+hits side

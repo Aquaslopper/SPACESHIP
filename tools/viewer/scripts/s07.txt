@@ -1,0 +1,25 @@
+# The three machine rooms: Engine, O2, Mess.
+title 0
+frames 3
+clickhit title new-voyage
+frames 3
+clickhit title setup-pick-galaxy | gal-gen-9
+frames 3
+clickhit title setup-pick-system | sec-gen-205
+frames 3
+clickhit title setup-launch
+frames 5
+move 5 500
+textlog on
+open room engine
+frames 3
+shot 07-engine
+hits task
+hits band
+hits tabs
+open room o2
+frames 3
+shot 08-o2
+open room mess
+frames 3
+shot 09-mess

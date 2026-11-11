@@ -1,0 +1,23 @@
+# Home with the Vessel, Resources and Crew sections of the sidebar opened.
+title 0
+frames 3
+clickhit title new-voyage
+frames 3
+clickhit title setup-pick-galaxy | gal-gen-9
+frames 3
+clickhit title setup-pick-system | sec-gen-205
+frames 3
+clickhit title setup-launch
+frames 5
+move 5 500
+hits side
+clickhit side vessel
+frames 2
+clickhit side resources
+frames 2
+clickhit side crew
+frames 2
+move 5 700
+frames 2
+shot 06-home-sidebar-open
+hits side

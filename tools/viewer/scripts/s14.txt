@@ -1,0 +1,22 @@
+# Loss screen: hull driven to zero.
+title 0
+frames 3
+clickhit title new-voyage
+frames 3
+clickhit title setup-pick-galaxy | gal-gen-9
+frames 3
+clickhit title setup-pick-system | sec-gen-205
+frames 3
+clickhit title setup-launch
+frames 5
+move 5 500
+undock
+act 40
+stat hull 0
+act 2
+frames 4
+state
+textlog on
+frames 1
+shot 18-loss
+hits loss

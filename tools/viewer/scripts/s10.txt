@@ -1,0 +1,19 @@
+# Cargo hold and crew quarters.
+title 0
+frames 3
+clickhit title new-voyage
+frames 3
+clickhit title setup-pick-galaxy | gal-gen-9
+frames 3
+clickhit title setup-pick-system | sec-gen-205
+frames 3
+clickhit title setup-launch
+frames 5
+move 5 500
+textlog on
+open room cargo
+frames 6
+shot 12-cargo
+open room quarters
+frames 3
+shot 13-quarters

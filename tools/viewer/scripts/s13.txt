@@ -1,0 +1,26 @@
+# Crisis at 131 actions: Home scrolled, O2 room with foul air, an event window.
+title 0
+frames 3
+clickhit title new-voyage
+frames 3
+clickhit title setup-pick-galaxy | gal-gen-9
+frames 3
+clickhit title setup-pick-system | sec-gen-205
+frames 3
+clickhit title setup-launch
+frames 5
+move 5 500
+undock
+act 131
+frames 4
+scroll 800 600 -30
+frames 3
+textlog on
+frames 1
+shot 15-home-crisis-scrolled
+open room o2
+frames 3
+shot 16-o2-foul
+open event surge-120
+frames 3
+shot 17-event

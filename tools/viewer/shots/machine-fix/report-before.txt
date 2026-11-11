@@ -1,0 +1,511 @@
+# main @ 0b586a8, before the fix. scripts/machine.txt, 1440 x 940.
+# ---- Segoe stand-in (Selawik) ----
+shot machine-18px.png 1440x940 (68 text calls)
+STAGE machine  model 650 x 390  painted x1.000 = 650 x 390  225 parts  1 controls
+STAGE origin 478.0,100.1  right edge 1128.0  bottom edge 490.1
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  18  32x10       17.9    0.0    8.0  V1
+STAGE mach-cap       8  18  32x10       17.9    0.0    8.0  V2
+STAGE mach-cap       8  18  32x10       17.9    0.0    8.0  V3
+STAGE mach-cap       8  18  32x10       17.9    0.0    8.0  V4
+STAGE mach-cap       8  18  32x10       17.9    0.0    8.0  V5
+STAGE mach-cap       8  18  164x12     111.1    0.0    6.0  PRIMARY CORE
+STAGE mach-mini      8  18  96x10      114.8   18.8    8.0  TURBINE STAGE
+STAGE mach-mini      8  18  56x10       90.1   34.1    8.0  EXCHANGER
+STAGE mach-mini      8  18  88x10       26.8    0.0    8.0  PRS
+STAGE mach-mini2     8  18  88x10      121.1   33.1    8.0  68 bar - nominal
+STAGE mach-mini      8  18  88x10       30.9    0.0    8.0  TMP
+STAGE mach-mini2     8  18  88x10      120.4   32.4    8.0  41 pct - nominal
+STAGE mach-mini      8  18  88x10       68.8    0.0    8.0  BUS A / B
+STAGE mach-mini      8  18  118x10     130.1   12.1    8.0  DRIVE STATISTICS
+STAGE mach-stat      9  18  118x13     105.6    0.0    5.0  Output|4.21 TJ
+STAGE mach-stat      9  18  118x13      63.5    0.0    5.0  Flux|0.98
+STAGE mach-stat      9  18  118x13     113.9    0.0    5.0  Coolant|STABLE
+STAGE mach-stat      9  18  118x13      82.8    0.0    5.0  Flow|83 pct
+STAGE mach-stat      9  18  118x13     121.6    3.6    5.0  Bearing|0.07 mm
+STAGE mach-stat      9  18  118x13      97.5    0.0    5.0  Cycles|18,402
+STAGE mach-stat      9  18  118x13     111.1    0.0    5.0  Manifold|2 of 2
+STAGE mach-stat      9  18  118x13     138.5   20.5    5.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  18  118x13     106.6    0.0    5.0  Last svc|412 hr
+STAGE mach-mini      8  18  130x10     156.5   26.5    8.0  CYLINDER BANK 1-16
+STAGE mach-mini      8  18  160x10     148.1    0.0    8.0  ENGINE CONDITION
+STAGE mach-fill2    12  18  336x14      98.0    0.0    4.0  engine-meter
+STAGE mach-plate     8  18  340x10     419.0   79.0    8.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  36  158x32      56.0    0.0    4.0  80%
+STAGE mach-word     10  18  158x14      72.0    0.0    4.0  NOMINAL
+STAGE control engine-click           box 176x26  label 18 px, 96.8 wide: inside the button
+STAGE 29 text parts: 9 wider than their box, 29 taller than their box, 0 not painted, 0 outside the stage
+OVERLAP   15 x 6   px  "EXCHANGER"  <->  "Flux|0.98"
+OVERLAP   15 x 16  px  "EXCHANGER"  <->  "Coolant|STABLE"
+OVERLAP   15 x 2   px  "EXCHANGER"  <->  "Flow|83 pct"
+OVERLAP  106 x 4   px  "DRIVE STATISTICS"  <->  "Output|4.21 TJ"
+OVERLAP   64 x 4   px  "Output|4.21 TJ"  <->  "Flux|0.98"
+OVERLAP   64 x 4   px  "Flux|0.98"  <->  "Coolant|STABLE"
+OVERLAP   83 x 4   px  "Coolant|STABLE"  <->  "Flow|83 pct"
+OVERLAP   83 x 4   px  "Flow|83 pct"  <->  "Bearing|0.07 mm"
+OVERLAP   98 x 4   px  "Bearing|0.07 mm"  <->  "Cycles|18,402"
+OVERLAP   98 x 4   px  "Cycles|18,402"  <->  "Manifold|2 of 2"
+OVERLAP  111 x 4   px  "Manifold|2 of 2"  <->  "Tolerance|+/- 0.4%"
+OVERLAP  107 x 4   px  "Tolerance|+/- 0.4%"  <->  "Last svc|412 hr"
+OVERLAP   98 x 4   px  "ENGINE CONDITION"  <->  "engine-meter"
+OVERLAP 13 pair(s) among 68 strings
+shot machine-19px.png 1440x940 (69 text calls)
+STAGE machine  model 650 x 390  painted x1.000 = 650 x 390  225 parts  1 controls
+STAGE origin 478.0,102.7  right edge 1128.0  bottom edge 492.7
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  19  32x10       18.8    0.0    9.0  V1
+STAGE mach-cap       8  19  32x10       18.8    0.0    9.0  V2
+STAGE mach-cap       8  19  32x10       18.8    0.0    9.0  V3
+STAGE mach-cap       8  19  32x10       18.8    0.0    9.0  V4
+STAGE mach-cap       8  19  32x10       18.8    0.0    9.0  V5
+STAGE mach-cap       8  19  164x12     116.7    0.0    7.0  PRIMARY CORE
+STAGE mach-mini      8  19  96x10      120.5   24.5    9.0  TURBINE STAGE
+STAGE mach-mini      8  19  56x10       94.7   38.7    9.0  EXCHANGER
+STAGE mach-mini      8  19  88x10       28.1    0.0    9.0  PRS
+STAGE mach-mini2     8  19  88x10      127.0   39.0    9.0  68 bar - nominal
+STAGE mach-mini      8  19  88x10       32.5    0.0    9.0  TMP
+STAGE mach-mini2     8  19  88x10      126.2   38.2    9.0  41 pct - nominal
+STAGE mach-mini      8  19  88x10       72.1    0.0    9.0  BUS A / B
+STAGE mach-mini      8  19  118x10     136.5   18.5    9.0  DRIVE STATISTICS
+STAGE mach-stat      9  19  118x13     110.8    0.0    6.0  Output|4.21 TJ
+STAGE mach-stat      9  19  118x13      66.6    0.0    6.0  Flux|0.98
+STAGE mach-stat      9  19  118x13     119.5    1.5    6.0  Coolant|STABLE
+STAGE mach-stat      9  19  118x13      86.8    0.0    6.0  Flow|83 pct
+STAGE mach-stat      9  19  118x13     127.6    9.6    6.0  Bearing|0.07 mm
+STAGE mach-stat      9  19  118x13     102.2    0.0    6.0  Cycles|18,402
+STAGE mach-stat      9  19  118x13     116.5    0.0    6.0  Manifold|2 of 2
+STAGE mach-stat      9  19  118x13     145.2   27.2    6.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  19  118x13     111.8    0.0    6.0  Last svc|412 hr
+STAGE mach-mini      8  19  130x10     164.2   34.2    9.0  CYLINDER BANK 1-16
+STAGE mach-mini      8  19  160x10     155.5    0.0    9.0  ENGINE CONDITION
+STAGE mach-fill2    12  19  336x14     102.8    0.0    5.0  engine-meter
+STAGE mach-plate     8  19  340x10     440.0  100.0    9.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  38  158x32      59.0    0.0    6.0  80%
+STAGE mach-word     10  19  158x14      75.7    0.0    5.0  NOMINAL
+STAGE control engine-click           box 176x26  label 19 px, 101.5 wide: inside the button
+STAGE 29 text parts: 10 wider than their box, 29 taller than their box, 0 not painted, 0 outside the stage
+OVERLAP   20 x 7   px  "EXCHANGER"  <->  "Flux|0.98"
+OVERLAP   20 x 17  px  "EXCHANGER"  <->  "Coolant|STABLE"
+OVERLAP   20 x 3   px  "EXCHANGER"  <->  "Flow|83 pct"
+OVERLAP  111 x 5   px  "DRIVE STATISTICS"  <->  "Output|4.21 TJ"
+OVERLAP   67 x 5   px  "Output|4.21 TJ"  <->  "Flux|0.98"
+OVERLAP   67 x 5   px  "Flux|0.98"  <->  "Coolant|STABLE"
+OVERLAP   87 x 5   px  "Coolant|STABLE"  <->  "Flow|83 pct"
+OVERLAP   87 x 5   px  "Flow|83 pct"  <->  "Bearing|0.07 mm"
+OVERLAP  102 x 5   px  "Bearing|0.07 mm"  <->  "Cycles|18,402"
+OVERLAP  102 x 5   px  "Cycles|18,402"  <->  "Manifold|2 of 2"
+OVERLAP  117 x 5   px  "Manifold|2 of 2"  <->  "Tolerance|+/- 0.4%"
+OVERLAP  112 x 5   px  "Tolerance|+/- 0.4%"  <->  "Last svc|412 hr"
+OVERLAP  103 x 5   px  "ENGINE CONDITION"  <->  "engine-meter"
+OVERLAP   59 x 2   px  "80%"  <->  "NOMINAL"
+OVERLAP 14 pair(s) among 69 strings
+shot machine-20px.png 1440x940 (69 text calls)
+STAGE machine  model 650 x 390  painted x1.000 = 650 x 390  225 parts  1 controls
+STAGE origin 478.0,105.3  right edge 1128.0  bottom edge 495.3
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  20  32x10       19.8    0.0   10.0  V1
+STAGE mach-cap       8  20  32x10       19.8    0.0   10.0  V2
+STAGE mach-cap       8  20  32x10       19.8    0.0   10.0  V3
+STAGE mach-cap       8  20  32x10       19.8    0.0   10.0  V4
+STAGE mach-cap       8  20  32x10       19.8    0.0   10.0  V5
+STAGE mach-cap       8  20  164x12     122.2    0.0    8.0  PRIMARY CORE
+STAGE mach-mini      8  20  96x10      126.2   30.2   10.0  TURBINE STAGE
+STAGE mach-mini      8  20  56x10       99.2   43.2   10.0  EXCHANGER
+STAGE mach-mini      8  20  88x10       29.5    0.0   10.0  PRS
+STAGE mach-mini2     8  20  88x10      132.9   44.9   10.0  68 bar - nominal
+STAGE mach-mini      8  20  88x10       34.1    0.0   10.0  TMP
+STAGE mach-mini2     8  20  88x10      132.1   44.1   10.0  41 pct - nominal
+STAGE mach-mini      8  20  88x10       75.5    0.0   10.0  BUS A / B
+STAGE mach-mini      8  20  118x10     142.9   24.9   10.0  DRIVE STATISTICS
+STAGE mach-stat      9  20  118x13     115.9    0.0    7.0  Output|4.21 TJ
+STAGE mach-stat      9  20  118x13      69.7    0.0    7.0  Flux|0.98
+STAGE mach-stat      9  20  118x13     125.1    7.1    7.0  Coolant|STABLE
+STAGE mach-stat      9  20  118x13      90.8    0.0    7.0  Flow|83 pct
+STAGE mach-stat      9  20  118x13     133.6   15.6    7.0  Bearing|0.07 mm
+STAGE mach-stat      9  20  118x13     107.0    0.0    7.0  Cycles|18,402
+STAGE mach-stat      9  20  118x13     121.9    3.9    7.0  Manifold|2 of 2
+STAGE mach-stat      9  20  118x13     152.0   34.0    7.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  20  118x13     116.9    0.0    7.0  Last svc|412 hr
+STAGE mach-mini      8  20  130x10     172.0   42.0   10.0  CYLINDER BANK 1-16
+STAGE mach-mini      8  20  160x10     162.9    2.9   10.0  ENGINE CONDITION
+STAGE mach-fill2    12  20  336x14     107.7    0.0    6.0  engine-meter
+STAGE mach-plate     8  20  340x10     461.0  121.0   10.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  40  158x32      62.0    0.0    8.0  80%
+STAGE mach-word     10  20  158x14      79.3    0.0    6.0  NOMINAL
+STAGE control engine-click           box 176x26  label 20 px, 106.2 wide: RUNS OUT OF THE BUTTON
+STAGE 29 text parts: 12 wider than their box, 29 taller than their box, 0 not painted, 0 outside the stage
+OVERLAP   24 x 8   px  "EXCHANGER"  <->  "Flux|0.98"
+OVERLAP   24 x 18  px  "EXCHANGER"  <->  "Coolant|STABLE"
+OVERLAP   24 x 4   px  "EXCHANGER"  <->  "Flow|83 pct"
+OVERLAP  116 x 6   px  "DRIVE STATISTICS"  <->  "Output|4.21 TJ"
+OVERLAP   70 x 6   px  "Output|4.21 TJ"  <->  "Flux|0.98"
+OVERLAP   70 x 6   px  "Flux|0.98"  <->  "Coolant|STABLE"
+OVERLAP   91 x 6   px  "Coolant|STABLE"  <->  "Flow|83 pct"
+OVERLAP   91 x 6   px  "Flow|83 pct"  <->  "Bearing|0.07 mm"
+OVERLAP  107 x 6   px  "Bearing|0.07 mm"  <->  "Cycles|18,402"
+OVERLAP  107 x 6   px  "Cycles|18,402"  <->  "Manifold|2 of 2"
+OVERLAP  122 x 6   px  "Manifold|2 of 2"  <->  "Tolerance|+/- 0.4%"
+OVERLAP  117 x 6   px  "Tolerance|+/- 0.4%"  <->  "Last svc|412 hr"
+OVERLAP  108 x 6   px  "ENGINE CONDITION"  <->  "engine-meter"
+OVERLAP   61 x 4   px  "80%"  <->  "NOMINAL"
+OVERLAP 14 pair(s) among 69 strings
+shot machine-21px.png 1440x940 (70 text calls)
+STAGE machine  model 650 x 390  painted x1.000 = 650 x 390  225 parts  1 controls
+STAGE origin 478.0,107.9  right edge 1128.0  bottom edge 497.9
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  21  32x10       20.7    0.0   11.0  V1
+STAGE mach-cap       8  21  32x10       20.7    0.0   11.0  V2
+STAGE mach-cap       8  21  32x10       20.7    0.0   11.0  V3
+STAGE mach-cap       8  21  32x10       20.7    0.0   11.0  V4
+STAGE mach-cap       8  21  32x10       20.7    0.0   11.0  V5
+STAGE mach-cap       8  21  164x12     127.8    0.0    9.0  PRIMARY CORE
+STAGE mach-mini      8  21  96x10      131.9   35.9   11.0  TURBINE STAGE
+STAGE mach-mini      8  21  56x10      103.8   47.8   11.0  EXCHANGER
+STAGE mach-mini      8  21  88x10       30.9    0.0   11.0  PRS
+STAGE mach-mini2     8  21  88x10      138.8   50.8   11.0  68 bar - nominal
+STAGE mach-mini      8  21  88x10       35.7    0.0   11.0  TMP
+STAGE mach-mini2     8  21  88x10      137.9   49.9   11.0  41 pct - nominal
+STAGE mach-mini      8  21  88x10       78.9    0.0   11.0  BUS A / B
+STAGE mach-mini      8  21  118x10     149.3   31.3   11.0  DRIVE STATISTICS
+STAGE mach-stat      9  21  118x13     121.1    3.1    8.0  Output|4.21 TJ
+STAGE mach-stat      9  21  118x13      72.8    0.0    8.0  Flux|0.98
+STAGE mach-stat      9  21  118x13     130.7   12.7    8.0  Coolant|STABLE
+STAGE mach-stat      9  21  118x13      94.9    0.0    8.0  Flow|83 pct
+STAGE mach-stat      9  21  118x13     139.6   21.6    8.0  Bearing|0.07 mm
+STAGE mach-stat      9  21  118x13     111.8    0.0    8.0  Cycles|18,402
+STAGE mach-stat      9  21  118x13     127.3    9.3    8.0  Manifold|2 of 2
+STAGE mach-stat      9  21  118x13     158.8   40.8    8.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  21  118x13     122.1    4.1    8.0  Last svc|412 hr
+STAGE mach-mini      8  21  130x10     179.8   49.8   11.0  CYLINDER BANK 1-16
+STAGE mach-mini      8  21  160x10     170.3   10.3   11.0  ENGINE CONDITION
+STAGE mach-fill2    12  21  336x14     112.5    0.0    7.0  engine-meter
+STAGE mach-plate     8  21  340x10     482.0  142.0   11.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  42  158x32      65.0    0.0   10.0  80%
+STAGE mach-word     10  21  158x14      83.0    0.0    7.0  NOMINAL
+STAGE control engine-click           box 176x26  label 21 px, 110.9 wide: RUNS OUT OF THE BUTTON
+STAGE 29 text parts: 14 wider than their box, 29 taller than their box, 0 not painted, 0 outside the stage
+OVERLAP   29 x 9   px  "EXCHANGER"  <->  "Flux|0.98"
+OVERLAP   29 x 19  px  "EXCHANGER"  <->  "Coolant|STABLE"
+OVERLAP   29 x 5   px  "EXCHANGER"  <->  "Flow|83 pct"
+OVERLAP  121 x 7   px  "DRIVE STATISTICS"  <->  "Output|4.21 TJ"
+OVERLAP   73 x 7   px  "Output|4.21 TJ"  <->  "Flux|0.98"
+OVERLAP   73 x 7   px  "Flux|0.98"  <->  "Coolant|STABLE"
+OVERLAP   95 x 7   px  "Coolant|STABLE"  <->  "Flow|83 pct"
+OVERLAP   95 x 7   px  "Flow|83 pct"  <->  "Bearing|0.07 mm"
+OVERLAP  112 x 7   px  "Bearing|0.07 mm"  <->  "Cycles|18,402"
+OVERLAP  112 x 7   px  "Cycles|18,402"  <->  "Manifold|2 of 2"
+OVERLAP  127 x 7   px  "Manifold|2 of 2"  <->  "Tolerance|+/- 0.4%"
+OVERLAP  122 x 7   px  "Tolerance|+/- 0.4%"  <->  "Last svc|412 hr"
+OVERLAP  112 x 7   px  "ENGINE CONDITION"  <->  "engine-meter"
+OVERLAP   65 x 6   px  "80%"  <->  "NOMINAL"
+OVERLAP    8 x 21  px  "80%"  <->  "Run the drive"
+OVERLAP 15 pair(s) among 70 strings
+shot machine-23px.png 1440x940 (70 text calls)
+STAGE machine  model 650 x 390  painted x1.000 = 650 x 390  225 parts  1 controls
+STAGE origin 478.0,114.2  right edge 1128.0  bottom edge 504.2
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  23  32x10       22.6    0.0   13.0  V1
+STAGE mach-cap       8  23  32x10       22.6    0.0   13.0  V2
+STAGE mach-cap       8  23  32x10       22.6    0.0   13.0  V3
+STAGE mach-cap       8  23  32x10       22.6    0.0   13.0  V4
+STAGE mach-cap       8  23  32x10       22.6    0.0   13.0  V5
+STAGE mach-cap       8  23  164x12     138.9    0.0   11.0  PRIMARY CORE
+STAGE mach-mini      8  23  96x10      143.3   47.3   13.0  TURBINE STAGE
+STAGE mach-mini      8  23  56x10      112.9   56.9   13.0  EXCHANGER
+STAGE mach-mini      8  23  88x10       33.6    0.0   13.0  PRS
+STAGE mach-mini2     8  23  88x10      150.6   62.6   13.0  68 bar - nominal
+STAGE mach-mini      8  23  88x10       38.9    0.0   13.0  TMP
+STAGE mach-mini2     8  23  88x10      149.6   61.6   13.0  41 pct - nominal
+STAGE mach-mini      8  23  88x10       85.6    0.0   13.0  BUS A / B
+STAGE mach-mini      8  23  118x10     162.1   44.1   13.0  DRIVE STATISTICS
+STAGE mach-stat      9  23  118x13     131.4   13.4   10.0  Output|4.21 TJ
+STAGE mach-stat      9  23  118x13      78.9    0.0   10.0  Flux|0.98
+STAGE mach-stat      9  23  118x13     141.9   23.9   10.0  Coolant|STABLE
+STAGE mach-stat      9  23  118x13     103.0    0.0   10.0  Flow|83 pct
+STAGE mach-stat      9  23  118x13     151.5   33.5   10.0  Bearing|0.07 mm
+STAGE mach-stat      9  23  118x13     121.2    3.2   10.0  Cycles|18,402
+STAGE mach-stat      9  23  118x13     138.1   20.1   10.0  Manifold|2 of 2
+STAGE mach-stat      9  23  118x13     172.2   54.2   10.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  23  118x13     132.4   14.4   10.0  Last svc|412 hr
+STAGE mach-mini      8  23  130x10     195.2   65.2   13.0  CYLINDER BANK 1-16  (OUTSIDE THE STAGE)
+STAGE mach-mini      8  23  160x10     185.1   25.1   13.0  ENGINE CONDITION
+STAGE mach-fill2    12  23  336x14     122.2    0.0    9.0  engine-meter
+STAGE mach-plate     8  23  340x10     524.0  184.0   13.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  46  158x32      71.0    0.0   14.0  80%
+STAGE mach-word     10  23  158x14      90.3    0.0    9.0  NOMINAL
+STAGE control engine-click           box 176x26  label 23 px, 120.3 wide: RUNS OUT OF THE BUTTON
+STAGE 29 text parts: 15 wider than their box, 29 taller than their box, 0 not painted, 1 outside the stage
+OVERLAP   38 x 11  px  "EXCHANGER"  <->  "Flux|0.98"
+OVERLAP   38 x 21  px  "EXCHANGER"  <->  "Coolant|STABLE"
+OVERLAP   38 x 7   px  "EXCHANGER"  <->  "Flow|83 pct"
+OVERLAP  131 x 9   px  "DRIVE STATISTICS"  <->  "Output|4.21 TJ"
+OVERLAP   79 x 9   px  "Output|4.21 TJ"  <->  "Flux|0.98"
+OVERLAP   79 x 9   px  "Flux|0.98"  <->  "Coolant|STABLE"
+OVERLAP  103 x 9   px  "Coolant|STABLE"  <->  "Flow|83 pct"
+OVERLAP  103 x 9   px  "Flow|83 pct"  <->  "Bearing|0.07 mm"
+OVERLAP  121 x 9   px  "Bearing|0.07 mm"  <->  "Cycles|18,402"
+OVERLAP  121 x 9   px  "Cycles|18,402"  <->  "Manifold|2 of 2"
+OVERLAP  138 x 9   px  "Manifold|2 of 2"  <->  "Tolerance|+/- 0.4%"
+OVERLAP  132 x 9   px  "Tolerance|+/- 0.4%"  <->  "Last svc|412 hr"
+OVERLAP  122 x 9   px  "ENGINE CONDITION"  <->  "engine-meter"
+OVERLAP   11 x 15  px  "DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16"  <->  "NOMINAL"
+OVERLAP   70 x 10  px  "80%"  <->  "NOMINAL"
+OVERLAP   23 x 23  px  "80%"  <->  "Run the drive"
+OVERLAP 16 pair(s) among 70 strings
+
+# ---- DejaVu, the face the repository ships ----
+shot machine-18px.png 1440x940 (70 text calls)
+STAGE machine  model 650 x 390  painted x1.000 = 650 x 390  225 parts  1 controls
+STAGE origin 478.0,100.1  right edge 1128.0  bottom edge 490.1
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  18  32x10       21.2    0.0    8.0  V1
+STAGE mach-cap       8  18  32x10       21.2    0.0    8.0  V2
+STAGE mach-cap       8  18  32x10       21.2    0.0    8.0  V3
+STAGE mach-cap       8  18  32x10       21.2    0.0    8.0  V4
+STAGE mach-cap       8  18  32x10       21.2    0.0    8.0  V5
+STAGE mach-cap       8  18  164x12     126.1    0.0    6.0  PRIMARY CORE
+STAGE mach-mini      8  18  96x10      135.0   39.0    8.0  TURBINE STAGE
+STAGE mach-mini      8  18  56x10      104.0   48.0    8.0  EXCHANGER
+STAGE mach-mini      8  18  88x10       31.2    0.0    8.0  PRS
+STAGE mach-mini2     8  18  88x10      141.0   53.0    8.0  68 bar - nominal
+STAGE mach-mini      8  18  88x10       33.5    0.0    8.0  TMP
+STAGE mach-mini2     8  18  88x10      139.9   51.9    8.0  41 pct - nominal
+STAGE mach-mini      8  18  88x10       80.0    0.0    8.0  BUS A / B
+STAGE mach-mini      8  18  118x10     154.1   36.1    8.0  DRIVE STATISTICS
+STAGE mach-stat      9  18  118x13     124.0    6.0    5.0  Output|4.21 TJ
+STAGE mach-stat      9  18  118x13      78.5    0.0    5.0  Flux|0.98
+STAGE mach-stat      9  18  118x13     134.5   16.5    5.0  Coolant|STABLE
+STAGE mach-stat      9  18  118x13      97.8    0.0    5.0  Flow|83 pct
+STAGE mach-stat      9  18  118x13     146.8   28.8    5.0  Bearing|0.07 mm
+STAGE mach-stat      9  18  118x13     119.6    1.6    5.0  Cycles|18,402
+STAGE mach-stat      9  18  118x13     127.6    9.6    5.0  Manifold|2 of 2
+STAGE mach-stat      9  18  118x13     163.6   45.6    5.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  18  118x13     130.2   12.2    5.0  Last svc|412 hr
+STAGE mach-mini      8  18  130x10     179.4   49.4    8.0  CYLINDER BANK 1-16
+STAGE mach-mini      8  18  160x10     165.0    5.0    8.0  ENGINE CONDITION
+STAGE mach-fill2    12  18  336x14     114.1    0.0    4.0  engine-meter
+STAGE mach-plate     8  18  340x10     419.0   79.0    8.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  36  158x32      56.0    0.0    4.0  80%
+STAGE mach-word     10  18  158x14      76.9    0.0    4.0  NOMINAL
+STAGE control engine-click           box 176x26  label 18 px, 115.1 wide: inside the button
+STAGE 29 text parts: 15 wider than their box, 29 taller than their box, 0 not painted, 0 outside the stage
+OVERLAP   29 x 6   px  "EXCHANGER"  <->  "Flux|0.98"
+OVERLAP   29 x 16  px  "EXCHANGER"  <->  "Coolant|STABLE"
+OVERLAP   29 x 2   px  "EXCHANGER"  <->  "Flow|83 pct"
+OVERLAP  124 x 4   px  "DRIVE STATISTICS"  <->  "Output|4.21 TJ"
+OVERLAP   78 x 4   px  "Output|4.21 TJ"  <->  "Flux|0.98"
+OVERLAP   78 x 4   px  "Flux|0.98"  <->  "Coolant|STABLE"
+OVERLAP   98 x 4   px  "Coolant|STABLE"  <->  "Flow|83 pct"
+OVERLAP   98 x 4   px  "Flow|83 pct"  <->  "Bearing|0.07 mm"
+OVERLAP  120 x 4   px  "Bearing|0.07 mm"  <->  "Cycles|18,402"
+OVERLAP  120 x 4   px  "Cycles|18,402"  <->  "Manifold|2 of 2"
+OVERLAP  128 x 4   px  "Manifold|2 of 2"  <->  "Tolerance|+/- 0.4%"
+OVERLAP  130 x 4   px  "Tolerance|+/- 0.4%"  <->  "Last svc|412 hr"
+OVERLAP  114 x 4   px  "ENGINE CONDITION"  <->  "engine-meter"
+OVERLAP    3 x 18  px  "80%"  <->  "Run the drive"
+OVERLAP 14 pair(s) among 70 strings
+shot machine-19px.png 1440x940 (70 text calls)
+STAGE machine  model 650 x 390  painted x1.000 = 650 x 390  225 parts  1 controls
+STAGE origin 478.0,102.7  right edge 1128.0  bottom edge 492.7
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  19  32x10       22.4    0.0    9.0  V1
+STAGE mach-cap       8  19  32x10       22.4    0.0    9.0  V2
+STAGE mach-cap       8  19  32x10       22.4    0.0    9.0  V3
+STAGE mach-cap       8  19  32x10       22.4    0.0    9.0  V4
+STAGE mach-cap       8  19  32x10       22.4    0.0    9.0  V5
+STAGE mach-cap       8  19  164x12     132.5    0.0    7.0  PRIMARY CORE
+STAGE mach-mini      8  19  96x10      141.8   45.8    9.0  TURBINE STAGE
+STAGE mach-mini      8  19  56x10      109.3   53.3    9.0  EXCHANGER
+STAGE mach-mini      8  19  88x10       32.9    0.0    9.0  PRS
+STAGE mach-mini2     8  19  88x10      148.0   60.0    9.0  68 bar - nominal
+STAGE mach-mini      8  19  88x10       35.2    0.0    9.0  TMP
+STAGE mach-mini2     8  19  88x10      146.8   58.8    9.0  41 pct - nominal
+STAGE mach-mini      8  19  88x10       84.0    0.0    9.0  BUS A / B
+STAGE mach-mini      8  19  118x10     161.9   43.9    9.0  DRIVE STATISTICS
+STAGE mach-stat      9  19  118x13     130.2   12.2    6.0  Output|4.21 TJ
+STAGE mach-stat      9  19  118x13      82.4    0.0    6.0  Flux|0.98
+STAGE mach-stat      9  19  118x13     141.2   23.2    6.0  Coolant|STABLE
+STAGE mach-stat      9  19  118x13     102.6    0.0    6.0  Flow|83 pct
+STAGE mach-stat      9  19  118x13     154.1   36.1    6.0  Bearing|0.07 mm
+STAGE mach-stat      9  19  118x13     125.6    7.6    6.0  Cycles|18,402
+STAGE mach-stat      9  19  118x13     133.9   15.9    6.0  Manifold|2 of 2
+STAGE mach-stat      9  19  118x13     171.8   53.8    6.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  19  118x13     136.7   18.7    6.0  Last svc|412 hr
+STAGE mach-mini      8  19  130x10     188.4   58.4    9.0  CYLINDER BANK 1-16  (OUTSIDE THE STAGE)
+STAGE mach-mini      8  19  160x10     173.3   13.3    9.0  ENGINE CONDITION
+STAGE mach-fill2    12  19  336x14     119.9    0.0    5.0  engine-meter
+STAGE mach-plate     8  19  340x10     440.0  100.0    9.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  38  158x32      59.0    0.0    6.0  80%
+STAGE mach-word     10  19  158x14      80.8    0.0    5.0  NOMINAL
+STAGE control engine-click           box 176x26  label 19 px, 120.9 wide: inside the button
+STAGE 29 text parts: 15 wider than their box, 29 taller than their box, 0 not painted, 1 outside the stage
+OVERLAP   34 x 7   px  "EXCHANGER"  <->  "Flux|0.98"
+OVERLAP   34 x 17  px  "EXCHANGER"  <->  "Coolant|STABLE"
+OVERLAP   34 x 3   px  "EXCHANGER"  <->  "Flow|83 pct"
+OVERLAP  130 x 5   px  "DRIVE STATISTICS"  <->  "Output|4.21 TJ"
+OVERLAP   82 x 5   px  "Output|4.21 TJ"  <->  "Flux|0.98"
+OVERLAP   82 x 5   px  "Flux|0.98"  <->  "Coolant|STABLE"
+OVERLAP  103 x 5   px  "Coolant|STABLE"  <->  "Flow|83 pct"
+OVERLAP  103 x 5   px  "Flow|83 pct"  <->  "Bearing|0.07 mm"
+OVERLAP  126 x 5   px  "Bearing|0.07 mm"  <->  "Cycles|18,402"
+OVERLAP  126 x 5   px  "Cycles|18,402"  <->  "Manifold|2 of 2"
+OVERLAP  134 x 5   px  "Manifold|2 of 2"  <->  "Tolerance|+/- 0.4%"
+OVERLAP  137 x 5   px  "Tolerance|+/- 0.4%"  <->  "Last svc|412 hr"
+OVERLAP  120 x 5   px  "ENGINE CONDITION"  <->  "engine-meter"
+OVERLAP   59 x 2   px  "80%"  <->  "NOMINAL"
+OVERLAP   12 x 19  px  "80%"  <->  "Run the drive"
+OVERLAP 15 pair(s) among 70 strings
+shot machine-20px.png 1440x940 (70 text calls)
+STAGE machine  model 650 x 390  painted x1.000 = 650 x 390  225 parts  1 controls
+STAGE origin 478.0,105.3  right edge 1128.0  bottom edge 495.3
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  20  32x10       23.5    0.0   10.0  V1
+STAGE mach-cap       8  20  32x10       23.5    0.0   10.0  V2
+STAGE mach-cap       8  20  32x10       23.5    0.0   10.0  V3
+STAGE mach-cap       8  20  32x10       23.5    0.0   10.0  V4
+STAGE mach-cap       8  20  32x10       23.5    0.0   10.0  V5
+STAGE mach-cap       8  20  164x12     138.9    0.0    8.0  PRIMARY CORE
+STAGE mach-mini      8  20  96x10      148.7   52.7   10.0  TURBINE STAGE
+STAGE mach-mini      8  20  56x10      114.7   58.7   10.0  EXCHANGER
+STAGE mach-mini      8  20  88x10       34.5    0.0   10.0  PRS
+STAGE mach-mini2     8  20  88x10      155.0   67.0   10.0  68 bar - nominal
+STAGE mach-mini      8  20  88x10       37.0    0.0   10.0  TMP
+STAGE mach-mini2     8  20  88x10      153.8   65.8   10.0  41 pct - nominal
+STAGE mach-mini      8  20  88x10       88.0    0.0   10.0  BUS A / B
+STAGE mach-mini      8  20  118x10     169.6   51.6   10.0  DRIVE STATISTICS
+STAGE mach-stat      9  20  118x13     136.3   18.3    7.0  Output|4.21 TJ
+STAGE mach-stat      9  20  118x13      86.3    0.0    7.0  Flux|0.98
+STAGE mach-stat      9  20  118x13     148.0   30.0    7.0  Coolant|STABLE
+STAGE mach-stat      9  20  118x13     107.5    0.0    7.0  Flow|83 pct
+STAGE mach-stat      9  20  118x13     161.5   43.5    7.0  Bearing|0.07 mm
+STAGE mach-stat      9  20  118x13     131.6   13.6    7.0  Cycles|18,402
+STAGE mach-stat      9  20  118x13     140.2   22.2    7.0  Manifold|2 of 2
+STAGE mach-stat      9  20  118x13     179.9   61.9    7.0  Tolerance|+/- 0.4%  (OUTSIDE THE STAGE)
+STAGE mach-stat      9  20  118x13     143.2   25.2    7.0  Last svc|412 hr
+STAGE mach-mini      8  20  130x10     197.4   67.4   10.0  CYLINDER BANK 1-16  (OUTSIDE THE STAGE)
+STAGE mach-mini      8  20  160x10     181.7   21.7   10.0  ENGINE CONDITION
+STAGE mach-fill2    12  20  336x14     125.6    0.0    6.0  engine-meter
+STAGE mach-plate     8  20  340x10     461.0  121.0   10.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  40  158x32      62.0    0.0    8.0  80%
+STAGE mach-word     10  20  158x14      84.8    0.0    6.0  NOMINAL
+STAGE control engine-click           box 176x26  label 20 px, 126.6 wide: RUNS OUT OF THE BUTTON
+STAGE 29 text parts: 15 wider than their box, 29 taller than their box, 0 not painted, 2 outside the stage
+OVERLAP   40 x 8   px  "EXCHANGER"  <->  "Flux|0.98"
+OVERLAP   40 x 18  px  "EXCHANGER"  <->  "Coolant|STABLE"
+OVERLAP   40 x 4   px  "EXCHANGER"  <->  "Flow|83 pct"
+OVERLAP  136 x 6   px  "DRIVE STATISTICS"  <->  "Output|4.21 TJ"
+OVERLAP   86 x 6   px  "Output|4.21 TJ"  <->  "Flux|0.98"
+OVERLAP   86 x 6   px  "Flux|0.98"  <->  "Coolant|STABLE"
+OVERLAP  108 x 6   px  "Coolant|STABLE"  <->  "Flow|83 pct"
+OVERLAP  108 x 6   px  "Flow|83 pct"  <->  "Bearing|0.07 mm"
+OVERLAP  132 x 6   px  "Bearing|0.07 mm"  <->  "Cycles|18,402"
+OVERLAP  132 x 6   px  "Cycles|18,402"  <->  "Manifold|2 of 2"
+OVERLAP  140 x 6   px  "Manifold|2 of 2"  <->  "Tolerance|+/- 0.4%"
+OVERLAP  143 x 6   px  "Tolerance|+/- 0.4%"  <->  "Last svc|412 hr"
+OVERLAP  126 x 6   px  "ENGINE CONDITION"  <->  "engine-meter"
+OVERLAP   62 x 4   px  "80%"  <->  "NOMINAL"
+OVERLAP   21 x 20  px  "80%"  <->  "Run the drive"
+OVERLAP 15 pair(s) among 70 strings
+shot machine-21px.png 1440x940 (70 text calls)
+STAGE machine  model 650 x 390  painted x1.000 = 650 x 390  225 parts  1 controls
+STAGE origin 478.0,107.9  right edge 1128.0  bottom edge 497.9
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  21  32x10       24.6    0.0   11.0  V1
+STAGE mach-cap       8  21  32x10       24.6    0.0   11.0  V2
+STAGE mach-cap       8  21  32x10       24.6    0.0   11.0  V3
+STAGE mach-cap       8  21  32x10       24.6    0.0   11.0  V4
+STAGE mach-cap       8  21  32x10       24.6    0.0   11.0  V5
+STAGE mach-cap       8  21  164x12     145.3    0.0    9.0  PRIMARY CORE
+STAGE mach-mini      8  21  96x10      155.5   59.5   11.0  TURBINE STAGE
+STAGE mach-mini      8  21  56x10      120.0   64.0   11.0  EXCHANGER
+STAGE mach-mini      8  21  88x10       36.1    0.0   11.0  PRS
+STAGE mach-mini2     8  21  88x10      162.0   74.0   11.0  68 bar - nominal
+STAGE mach-mini      8  21  88x10       38.8    0.0   11.0  TMP
+STAGE mach-mini2     8  21  88x10      160.7   72.7   11.0  41 pct - nominal
+STAGE mach-mini      8  21  88x10       92.0    4.0   11.0  BUS A / B
+STAGE mach-mini      8  21  118x10     177.3   59.3   11.0  DRIVE STATISTICS  (OUTSIDE THE STAGE)
+STAGE mach-stat      9  21  118x13     142.5   24.5    8.0  Output|4.21 TJ
+STAGE mach-stat      9  21  118x13      90.2    0.0    8.0  Flux|0.98
+STAGE mach-stat      9  21  118x13     154.8   36.8    8.0  Coolant|STABLE
+STAGE mach-stat      9  21  118x13     112.4    0.0    8.0  Flow|83 pct
+STAGE mach-stat      9  21  118x13     168.9   50.9    8.0  Bearing|0.07 mm
+STAGE mach-stat      9  21  118x13     137.6   19.6    8.0  Cycles|18,402
+STAGE mach-stat      9  21  118x13     146.6   28.6    8.0  Manifold|2 of 2
+STAGE mach-stat      9  21  118x13     188.1   70.1    8.0  Tolerance|+/- 0.4%  (OUTSIDE THE STAGE)
+STAGE mach-stat      9  21  118x13     149.6   31.6    8.0  Last svc|412 hr
+STAGE mach-mini      8  21  130x10     206.4   76.4   11.0  CYLINDER BANK 1-16  (OUTSIDE THE STAGE)
+STAGE mach-mini      8  21  160x10     190.0   30.0   11.0  ENGINE CONDITION
+STAGE mach-fill2    12  21  336x14     131.3    0.0    7.0  engine-meter
+STAGE mach-plate     8  21  340x10     482.0  142.0   11.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  42  158x32      65.0    0.0   10.0  80%
+STAGE mach-word     10  21  158x14      88.7    0.0    7.0  NOMINAL
+STAGE control engine-click           box 176x26  label 21 px, 132.3 wide: RUNS OUT OF THE BUTTON
+STAGE 29 text parts: 16 wider than their box, 29 taller than their box, 0 not painted, 3 outside the stage
+OVERLAP   45 x 9   px  "EXCHANGER"  <->  "Flux|0.98"
+OVERLAP   45 x 19  px  "EXCHANGER"  <->  "Coolant|STABLE"
+OVERLAP   45 x 5   px  "EXCHANGER"  <->  "Flow|83 pct"
+OVERLAP  142 x 7   px  "DRIVE STATISTICS"  <->  "Output|4.21 TJ"
+OVERLAP   90 x 7   px  "Output|4.21 TJ"  <->  "Flux|0.98"
+OVERLAP   90 x 7   px  "Flux|0.98"  <->  "Coolant|STABLE"
+OVERLAP  112 x 7   px  "Coolant|STABLE"  <->  "Flow|83 pct"
+OVERLAP  112 x 7   px  "Flow|83 pct"  <->  "Bearing|0.07 mm"
+OVERLAP  138 x 7   px  "Bearing|0.07 mm"  <->  "Cycles|18,402"
+OVERLAP  138 x 7   px  "Cycles|18,402"  <->  "Manifold|2 of 2"
+OVERLAP  147 x 7   px  "Manifold|2 of 2"  <->  "Tolerance|+/- 0.4%"
+OVERLAP  150 x 7   px  "Tolerance|+/- 0.4%"  <->  "Last svc|412 hr"
+OVERLAP  131 x 7   px  "ENGINE CONDITION"  <->  "engine-meter"
+OVERLAP   65 x 6   px  "80%"  <->  "NOMINAL"
+OVERLAP   29 x 21  px  "80%"  <->  "Run the drive"
+OVERLAP 15 pair(s) among 70 strings
+shot machine-23px.png 1440x940 (70 text calls)
+STAGE machine  model 650 x 390  painted x1.000 = 650 x 390  225 parts  1 controls
+STAGE origin 478.0,114.2  right edge 1128.0  bottom edge 504.2
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  23  32x10       26.9    0.0   13.0  V1
+STAGE mach-cap       8  23  32x10       26.9    0.0   13.0  V2
+STAGE mach-cap       8  23  32x10       26.9    0.0   13.0  V3
+STAGE mach-cap       8  23  32x10       26.9    0.0   13.0  V4
+STAGE mach-cap       8  23  32x10       26.9    0.0   13.0  V5
+STAGE mach-cap       8  23  164x12     158.1    0.0   11.0  PRIMARY CORE
+STAGE mach-mini      8  23  96x10      169.2   73.2   13.0  TURBINE STAGE
+STAGE mach-mini      8  23  56x10      130.7   74.7   13.0  EXCHANGER
+STAGE mach-mini      8  23  88x10       39.4    0.0   13.0  PRS
+STAGE mach-mini2     8  23  88x10      176.0   88.0   13.0  68 bar - nominal
+STAGE mach-mini      8  23  88x10       42.2    0.0   13.0  TMP
+STAGE mach-mini2     8  23  88x10      174.6   86.6   13.0  41 pct - nominal
+STAGE mach-mini      8  23  88x10      100.0   12.0   13.0  BUS A / B
+STAGE mach-mini      8  23  118x10     192.8   74.8   13.0  DRIVE STATISTICS  (OUTSIDE THE STAGE)
+STAGE mach-stat      9  23  118x13     154.8   36.8   10.0  Output|4.21 TJ
+STAGE mach-stat      9  23  118x13      98.1    0.0   10.0  Flux|0.98
+STAGE mach-stat      9  23  118x13     168.2   50.2   10.0  Coolant|STABLE
+STAGE mach-stat      9  23  118x13     122.1    4.1   10.0  Flow|83 pct
+STAGE mach-stat      9  23  118x13     183.6   65.6   10.0  Bearing|0.07 mm  (OUTSIDE THE STAGE)
+STAGE mach-stat      9  23  118x13     149.5   31.5   10.0  Cycles|18,402
+STAGE mach-stat      9  23  118x13     159.2   41.2   10.0  Manifold|2 of 2
+STAGE mach-stat      9  23  118x13     204.4   86.4   10.0  Tolerance|+/- 0.4%  (OUTSIDE THE STAGE)
+STAGE mach-stat      9  23  118x13     162.5   44.5   10.0  Last svc|412 hr
+STAGE mach-mini      8  23  130x10     224.5   94.5   13.0  CYLINDER BANK 1-16  (OUTSIDE THE STAGE)
+STAGE mach-mini      8  23  160x10     206.7   46.7   13.0  ENGINE CONDITION
+STAGE mach-fill2    12  23  336x14     142.8    0.0    9.0  engine-meter
+STAGE mach-plate     8  23  340x10     524.0  184.0   13.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  46  158x32      71.0    0.0   14.0  80%
+STAGE mach-word     10  23  158x14      96.6    0.0    9.0  NOMINAL
+STAGE control engine-click           box 176x26  label 23 px, 143.8 wide: RUNS OUT OF THE BUTTON
+STAGE 29 text parts: 17 wider than their box, 29 taller than their box, 0 not painted, 4 outside the stage
+OVERLAP   56 x 11  px  "EXCHANGER"  <->  "Flux|0.98"
+OVERLAP   56 x 21  px  "EXCHANGER"  <->  "Coolant|STABLE"
+OVERLAP   56 x 7   px  "EXCHANGER"  <->  "Flow|83 pct"
+OVERLAP  155 x 9   px  "DRIVE STATISTICS"  <->  "Output|4.21 TJ"
+OVERLAP   98 x 9   px  "Output|4.21 TJ"  <->  "Flux|0.98"
+OVERLAP   98 x 9   px  "Flux|0.98"  <->  "Coolant|STABLE"
+OVERLAP  122 x 9   px  "Coolant|STABLE"  <->  "Flow|83 pct"
+OVERLAP  122 x 9   px  "Flow|83 pct"  <->  "Bearing|0.07 mm"
+OVERLAP  150 x 9   px  "Bearing|0.07 mm"  <->  "Cycles|18,402"
+OVERLAP  150 x 9   px  "Cycles|18,402"  <->  "Manifold|2 of 2"
+OVERLAP  159 x 9   px  "Manifold|2 of 2"  <->  "Tolerance|+/- 0.4%"
+OVERLAP  163 x 9   px  "Tolerance|+/- 0.4%"  <->  "Last svc|412 hr"
+OVERLAP  143 x 9   px  "ENGINE CONDITION"  <->  "engine-meter"
+OVERLAP   17 x 15  px  "DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16"  <->  "NOMINAL"
+OVERLAP   71 x 10  px  "80%"  <->  "NOMINAL"
+OVERLAP   47 x 23  px  "80%"  <->  "Run the drive"
+OVERLAP 16 pair(s) among 70 strings

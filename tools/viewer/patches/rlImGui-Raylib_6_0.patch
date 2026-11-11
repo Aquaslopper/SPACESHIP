@@ -1,0 +1,14 @@
+--- a/rlImGui.cpp
++++ b/rlImGui.cpp
+@@ -205,8 +205,10 @@
+ 
+     unsigned int textureId = static_cast<unsigned int>(texturePtr);
+ 
+-    rlBegin(RL_TRIANGLES);
++    // VIEWER PATCH (private copy): an immediate-mode rasterizer rejects a texture
++    // bind between begin and end, so bind first.
+     rlSetTexture(textureId);
++    rlBegin(RL_TRIANGLES);
+ 
+     for (unsigned int i = 0; i <= (count - 3); i += 3)
+     {

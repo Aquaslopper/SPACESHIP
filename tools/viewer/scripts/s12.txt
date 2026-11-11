@@ -1,0 +1,20 @@
+# No frame: prints the voyage state at 30, 70 and 130 actions.
+title 0
+frames 3
+clickhit title new-voyage
+frames 3
+clickhit title setup-pick-galaxy | gal-gen-9
+frames 3
+clickhit title setup-pick-system | sec-gen-205
+frames 3
+clickhit title setup-launch
+frames 5
+move 5 500
+state
+undock
+act 30
+state
+act 40
+state
+act 60
+state

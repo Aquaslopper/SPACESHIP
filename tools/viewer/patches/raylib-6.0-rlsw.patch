@@ -1,0 +1,24 @@
+--- a/src/external/rlsw.h
++++ b/src/external/rlsw.h
+@@ -3863,7 +3863,9 @@
+             if (RLSW.blendFlags & SW_BLEND_FLAG_NOOP) state &= ~SW_STATE_BLEND;
+             else if ((RLSW.blendFlags & SW_BLEND_FLAG_NEEDS_ALPHA) && (!RLSW.primitive.hasColorAlpha))
+             {
+-                if (!(state & SW_STATE_TEXTURE_2D) || (RLSW.boundTexture->alpha == SW_PIXEL_ALPHA_NONE)) state &= ~SW_STATE_BLEND;
++                // VIEWER PATCH (private copy): keep blending for every textured primitive; the
++                // per-texture 'has alpha' flag is not refreshed by same-format glTexSubImage2D.
++                if (!(state & SW_STATE_TEXTURE_2D)) state &= ~SW_STATE_BLEND;
+             }
+         }
+ 
+@@ -4203,6 +4205,10 @@
+         return;
+     }
+ 
++    // VIEWER PATCH (private copy): raylib passes GL bottom-left scissor
++    // coordinates; this rasterizer stores top-left ones. Convert here.
++    if ((RLSW.colorBuffer != NULL) && (RLSW.colorBuffer->height > 0)) y = RLSW.colorBuffer->height - (y + height);
++
+     RLSW.scMin[0] = x;
+     RLSW.scMin[1] = y;
+     RLSW.scMax[0] = x + width;
