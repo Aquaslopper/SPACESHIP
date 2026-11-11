@@ -1,0 +1,104 @@
+# Crew Quarters: the stage through the states an order sheet can put a hand in,
+# for the four hands aboard at the start and the two candidates without a home
+# port, hired where the voyage starts, then at every reading size.
+#   ./run.sh scripts/quarters.txt                    Segoe stand-in, 1440 x 940
+#   ./run.sh scripts/quarters.txt 1440 940 dejavu    the face the repository ships
+# Not for 1180 x 720: there the roster and the orders stand below the stage and
+# most of their rows are past the lower edge, where clickhit does not reach.
+title 0
+frames 3
+clickhit title new-voyage
+frames 3
+clickhit title setup-pick-galaxy | gal-gen-9
+frames 3
+clickhit title setup-pick-system | sec-gen-205
+frames 3
+clickhit title setup-launch
+frames 5
+move 5 500
+textlog on
+open room quarters
+frames 3
+hits nav
+shot quarters-rell-idle
+overlaps
+job rell navigation
+frames 2
+shot quarters-rell-navigation
+job rell maintenance
+frames 2
+shot quarters-rell-engineer
+job rell kitchen
+frames 2
+shot quarters-rell-cook
+job rell cleaner
+frames 2
+shot quarters-rell-cleaner
+job rell filters
+frames 2
+shot quarters-rell-filters
+clickhit nav order | learnOn
+frames 2
+shot quarters-rell-learning
+clickhit nav order | learnOn
+clickhit nav order | doc
+frames 2
+shot quarters-rell-doc
+clickhit nav order | doc
+frames 2
+clickhit nav select | jax
+frames 2
+shot quarters-jax-idle
+job jax maintenance
+frames 2
+shot quarters-jax-engineer
+clickhit nav select | bo
+frames 2
+shot quarters-bo-idle
+job bo filters
+frames 2
+shot quarters-bo-filters
+clickhit nav select | suri
+frames 2
+shot quarters-suri-idle
+job suri kitchen
+frames 2
+shot quarters-suri-cook
+purse 1000
+hire nemi
+hire ori
+frames 2
+clickhit nav select | nemi
+frames 2
+shot quarters-nemi-idle
+job nemi cleaner
+frames 2
+shot quarters-nemi-cleaner
+clickhit nav select | ori
+frames 2
+shot quarters-ori-idle
+job ori navigation
+frames 2
+shot quarters-ori-navigation
+stagejob ori cleaner
+frames 2
+shot quarters-ori-crate
+overlaps
+clickhit nav select | rell
+fontstep 1
+frames 3
+shot quarters-19px
+overlaps
+fontstep 2
+frames 3
+shot quarters-20px
+overlaps
+fontstep 3
+frames 3
+shot quarters-21px
+overlaps
+largetext 1
+frames 3
+shot quarters-23px
+overlaps
+state

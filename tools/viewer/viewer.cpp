@@ -230,6 +230,21 @@ int main(int argc, char** argv) {
     tutorialTextures[i] = LoadTexture(path.c_str());
     if (tutorialTextures[i].id != 0) { SetTextureFilter(tutorialTextures[i], TEXTURE_FILTER_BILINEAR); }
   }
+  // Crew pictures, as the client loads them: every PNG in assets/art/crew.
+  std::map<std::string, Texture2D> crewTextures;
+  {
+    std::error_code ec;
+    for (std::filesystem::directory_iterator it("assets/art/crew", ec), end;
+         !ec && it != end; it.increment(ec)) {
+      const std::filesystem::path& path = it->path();
+      if (path.extension() != ".png") { continue; }
+      Texture2D texture = LoadTexture(path.string().c_str());
+      if (texture.id == 0) { continue; }
+      SetTextureFilter(texture, TEXTURE_FILTER_BILINEAR);
+      SetTextureWrap(texture, TEXTURE_WRAP_CLAMP);
+      crewTextures[path.stem().string()] = texture;
+    }
+  }
 
   ship::ShellView shell;
   shell.SetSaveDir(saveDir.u8string());
@@ -238,6 +253,7 @@ int main(int argc, char** argv) {
   shell.SetSetupTexture(&setupTexture);
   shell.SetWrenExteriorTexture(&wrenExterior);
   for (std::size_t i = 0; i < tutorialTextures.size(); ++i) { shell.SetTutorialTexture(i, &tutorialTextures[i]); }
+  for (auto& picture : crewTextures) { shell.SetCrewTexture(picture.first, &picture.second); }
   shell.Configure(static_cast<float>(width), static_cast<float>(height), theme);
   shell.SetDisplayAdjustmentAvailable(false);
   shell.SetAudioStatus("viewer: no audio device");
@@ -549,6 +565,13 @@ int main(int argc, char** argv) {
       if (!findHit(p[1], Rest(p, 2), &box)) {
         std::printf("line %d: no %s hit matching '%s'\n", lineNo, p[1].c_str(), Rest(p, 2).c_str());
         ++problems;
+      } else if (box.x + box.w / 2.0f >= static_cast<float>(width) ||
+                 box.y + box.h / 2.0f >= static_cast<float>(height)) {
+        // The middle of the box is past the edge of the frame, as a row below
+        // the fold is. A press there reaches nothing, so it is a failed line.
+        std::printf("line %d: %s hit '%s' is outside the frame at %.0f,%.0f\n", lineNo, p[1].c_str(),
+                    Rest(p, 2).c_str(), box.x + box.w / 2.0f, box.y + box.h / 2.0f);
+        ++problems;
       } else {
         mouseX = box.x + box.w / 2.0f; mouseY = box.y + box.h / 2.0f;
         shell.Move(mouseX, mouseY);
@@ -625,6 +648,10 @@ int main(int argc, char** argv) {
     } else if (c == "seat" && p.size() >= 2) { sim.StartCanisterInstall(std::atoi(p[1].c_str()));
     } else if (c == "bank") { sim.StartFilterBank();
     } else if (c == "job" && p.size() >= 3) { sim.ApplyJob(p[1], p[2]);
+    } else if (c == "stagejob" && p.size() >= 3) {
+      if (!sim.StageJob(p[1], p[2])) { std::printf("line %d: no %s order written for %s\n", lineNo, p[2].c_str(), p[1].c_str()); ++problems; }
+    } else if (c == "hire" && p.size() >= 2) {
+      if (!sim.HireCrew(p[1])) { std::printf("line %d: %s was not hired\n", lineNo, p[1].c_str()); ++problems; }
     } else if (c == "ack" && p.size() >= 2) { sim.Acknowledge(p[1]);
     } else if (c == "layer" && p.size() >= 2) { sim.SetLayer(p[1]);
     } else if (c == "state") {
