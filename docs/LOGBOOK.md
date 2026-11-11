@@ -756,3 +756,37 @@ You must append a compressed summary of **every single reply and action you take
 - A test merge of `d34b619` with the branch of PR 71 is clean. Once both branches carry logbook entries, `docs/LOGBOOK.md` conflicts at its end.
 - Committed; the branch is pushed after this entry. No PR opened; not asked. `AGENTS.md` not touched.
 - Awaiting from `@Aquaslopper`: the three lines in `CMakeLists.txt`, then the playtest; whether a line goes into `AGENTS.md`.
+
+### Entry #056
+- **Timestamp:** 2026-11-11 22:54 UTC
+- Covers two turns. The first was stopped by the owner before a reply or an entry was written; no file was changed in it.
+- Owner: "i have removed them". His commit `aabd345` "Update CMakeLists.txt" on this branch deletes the three lines that named the deleted `.cpp` files. Read with `git show aabd345`.
+- The sandbox had been reset: the clone stood at `9294973` with this branch's changes as uncommitted modifications. They were identical to `ab5be51` (`git diff ab5be51` empty), so the clone was set to the pushed tip with `git reset --hard origin/arena/8cf1c2e1-spaceship`. Everything kept outside the repository (viewer builds, comparison frames) is gone.
+- Owner: the scan button "was calibrated by me ... this was hard work ... that button had nothing to do with anything". Read again: the scan's work clicks come from `assets/data/survival.json` (`scanCost` 5) and from the upgrades `scanner` (3) and `scanner2` (2) in `Economy.cpp`. None of these lines is in the diff against `main`.
+- What the removal took from the scan: a one-time discount of 2 work clicks on the next scan. It was a field of the removed state, set by the Sensor Array project `sensors` for 1 insight and by the map feature "Ion pocket" when scanned. `EffectiveScanCost`, `NavScreen.cpp` and `Popups.cpp` lost that subtraction and nothing else that changes the count.
+- My sentence "scan calibration is gone" in the reply before was misleading: it read as if the owner's tuning of the button had gone. Whether the discount returns is the owner's decision; not answered yet.
+- Owner's question this turn: how to go on with PR 71 open "and now we have another one open ??". `gh pr list`: one open PR, 71. This branch has no PR; none was opened.
+- CI run 43112313180 on `aabd345`: `check-id-prefixes` success, `build-windows` success with the artifact `Spaceship-Windows-x64` (17.4 MB), `test-linux` failure in its last step. The run before it, on `ab5be51`, failed at the CMake configure step in both build jobs while the three files were still listed. The build check was red on the broken state and green after the owner's edit.
+- `test-linux` fails in the same last step on `main` (run 43080224269) and on PR 71 (run 43100957302). That step runs `tools/check-imgui-input.sh` and `tools/check-draw.sh`, which compile `cpp/tests/imgui_input_probe.cpp` and `cpp/tests/draw_probe.cpp`; neither file is in the repository, and no tracked path contains "test". The CI log could not be fetched from this sandbox, so this cause is read from the scripts, not from the log.
+- Name search repeated with a control, `git grep` over `cpp/`, `assets/`, `tools/`. On `main`: the word in 40 lines of 15 files, its state and function names in 151 lines, the four room ids in 35 lines. On this branch: 0, 0 and 0. Outside those folders the word is in `docs/LOGBOOK.md` only: 1 line on `main`, 16 on this branch before this entry (entries 052 to 055).
+- PR 71 against this branch, `git merge-tree` in memory, nothing written: `Draw.cpp`, `Draw.h`, `QuartersScreen.cpp` and `viewer.cpp` merge without conflict; `docs/LOGBOOK.md` conflicts at its end. The lines PR 71 adds under `cpp/` and `tools/` use none of the removed names. The two were not built together.
+- Proposed to the owner: one after the other. PR 71 first; then `main` is merged into this branch here, the logbook conflict resolved, CI builds, the owner plays, a PR is opened. Alternative: merge the branch of PR 71 into this one, for one package and one merge.
+- Not run: any build, the viewer, `ctest`, the check scripts. No file changed except this entry. Not committed, not pushed.
+- Awaiting from `@Aquaslopper`: the order of the two merges; whether the scan discount returns; whether entries 052 to 055 should stop naming the removed system.
+
+### Entry #057
+- **Timestamp:** 2026-11-11 23:04 UTC
+- Owner: "i think it would be simpler to merge 71 with this one." Done on this branch: `git merge --no-ff origin/arena/36a89311-spaceship` (tip `52757c4`, the four commits of PR 71), merge commit `395cee0`.
+- One conflict, at the end of `docs/LOGBOOK.md`: both branches had appended entries after #048. Resolved by order: entries 049 to 051 of PR 71, then 052 to 055 of this branch. The resolved file is byte for byte PR 71's logbook followed by this branch's own entries (`cmp`).
+- `cpp/ui/Draw.cpp`, `cpp/ui/Draw.h`, `cpp/ui/QuartersScreen.cpp` and `tools/viewer/viewer.cpp` were changed on both sides and merged without conflict. For each, the lines the merge changes against this branch are exactly the lines PR 71 changed (146, 5, 65, 27), and against PR 71 exactly the lines the removal changed (6, 8, 2, 1).
+- Of the other files: the 34 that only PR 71 changed are identical to PR 71's versions, the 35 that only this branch changed are identical to this branch's versions, and no file that neither changed differs from `main` (blob ids compared).
+- Correction to entry #056: its line that PR 71's added lines use none of the removed names rested on a pattern that left out the four helpers the removal had renamed (`SimActivityOf`, `SimCrewName`, `SimDisputePair`, `SimScanCost`). Checked again and wider: the removal took 178 words out of `cpp/` and `tools/` completely; `main` uses all 178 (the control), the merged tree uses none.
+- Build: the viewer built from the merged tree with `./setup.sh && make -j2`, exit 0; every game source of the `CMakeLists.txt` list compiled and linked. The `CORE_SRC` override is no longer needed.
+- Control for that build check: `QuartersScreen.cpp` with the old name `SimActivityOf` put back on purpose, in a copy outside the repository, same compiler command: error "no member named 'SimActivityOf'", exit 1. The merged file as it is: exit 0.
+- Looked at in the merged build: `scripts/quarters.txt` exit 0, 23 frames; the Crew Quarters show the portrait card and the picture figure, and the row "Doing" is filled through the renamed `ActivityOf`. The navigation chart opens and a deep scan starts. A scratch script for that scan reported one line it could not carry out; which line was not looked up.
+- Not run: the cmake build, `ctest`, the check scripts, the Windows client. Not compared: the merged build against a viewer built from PR 71 alone or from `main`. The number of scan clicks was not seen on a screen.
+- Entry #056 above was written in the turn before and is committed with this one, unchanged.
+- Pushed after this entry: the merge and this logbook commit. The result of the CI run on them is not known at the time of writing.
+- PR 71 is left open and untouched. Its commits are now part of this branch; if this branch goes into `main` with a merge commit, GitHub marks PR 71 as merged.
+- No PR opened for this branch; not asked.
+- Awaiting from `@Aquaslopper`: the playtest of the package built from this branch; the word to open the PR; the scan discount; the wording of entries 052 to 055.
