@@ -653,3 +653,19 @@ You must append a compressed summary of **every single reply and action you take
 - Inherited, left as it is: with nobody aboard the floor shadow before the door is still painted (`cq-shadow` is unconditional on `main` too).
 - Left untouched: O2 and Mess scenes, `First2000Styles.h`, `CMakeLists.txt`, the workflow, `assets/data/*`, `cpp/core/*`, `cpp/ui/CrewRecord.*`, `tools/viewer/shots/`.
 - Nothing committed, nothing pushed, no PR. Awaiting from `@Aquaslopper`: a look at the nine figures, then whether to commit and push for a Windows build.
+
+### Entry #050
+- **Timestamp:** 2026-11-11 20:56 UTC
+- Owner's message: the work so far is good; a playtest finding on O2 (the filter work is active with nobody assigned to the job; gates in the rules built on literals such as `-1e9`); keep to the game only; "Please create the pr".
+- Read as approval to commit the work of #049, push the branch and open a PR. Not read as a request to change the O2 rules: nothing outside the PR's file list was edited.
+- Commits on `arena/36a89311-spaceship` over `9294973`: `a32997c` (seven `cpp/` files), `1e84ddf` (`assets/art/crew/`, 28 files), `74a1e6a` (`tools/viewer/viewer.cpp`, `README.md`, `scripts/quarters.txt`), `f880587` (logbook #049), then this logbook commit. 39 files, 492 insertions, 78 deletions before this commit. Pushed.
+- PR #70 opened against `main` at `9294973`: "Crew Quarters: portraits and chibi figures for all nine crew". GitHub reports it mergeable, clean. Not merged.
+- `origin/main` was at `9294973` when the PR was opened. The clone here holds one commit, so the history of a line cannot be read from it.
+- CI: runs 43097324921 (push) and 43097329513 (pull_request) on `f880587` were created at 20:39 UTC and were still queued at 20:56 UTC with no job started. There is no build result for this change. This logbook commit starts new runs, which replace the queued ones through the workflow's `cancel-in-progress`; their result is not known at the time of writing.
+- No full compile and link of `cpp/app/main.cpp` with this change has happened anywhere so far. No test and no check script was run locally; the push starts the repository's workflow, whose `test-linux` job runs the check scripts and `ctest`.
+- Baseline: run 43080224269 on `main` at `9294973` ended in failure after 2 min 36 s. Which job failed could not be read: the jobs endpoint answered HTTP 502 at 20:56 UTC.
+- Read, not changed, at `9294973` for the O2 finding: `Simulation::AutoFilters` (`cpp/core/CrewLogic.cpp:462`) returns when no crew member has the job `filters`. `Simulation::StartFilterBank` (`cpp/core/Action.cpp:412`) and the "Turn on Filter" button (`cpp/ui/O2Screen.cpp:194`) ask for a ready bank, a bank that is not running and energy above zero; neither asks for a crew member on the job. Which of the two the owner saw active is not known; asked.
+- Literal `-1e9` in the rules: `engineClickAt` (`cpp/core/GameState.h:408`, default on load `cpp/core/SaveSystem.cpp:1170`); what reads it was not traced. `cpp/ui/Draw.cpp:1886` uses the literal to start a bounding box.
+- The viewer's `job` verb sets a job directly and skips the order sheet. The quarters frames show drawing only and test no job rule; the PR body says so.
+- Left untouched: `cpp/core/*`, `cpp/data/*`, `assets/data/*`, O2 and Mess screens, `CMakeLists.txt`, the workflow, `tools/viewer/shots/`.
+- Awaiting from `@Aquaslopper`: the playtest of PR #70; which O2 behaviour was seen, and whether the filter button is to need a hand on the job.
