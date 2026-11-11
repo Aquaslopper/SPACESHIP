@@ -205,9 +205,6 @@ Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& se
   first.processed = false;
   state.sim.memories.push_back(first);
 
-  // Nobody waits his turn: the clocks are dealt before the watch begins.
-  sim.StaggerHungerClocks();
-
   if (!startSystemId.empty()) {
     const Body* system = sim.catalog_.FindSystem(startSystemId);
     for (const Port& port : sim.catalog_.ports) {
@@ -480,6 +477,9 @@ bool Simulation::StartCookingSelf(const std::string& by, bool spendsAction) {
   if (task != nullptr) {
     task->by = who;
     mess_.rations -= 1.0;  // the ration is spent when the batch starts
+    // Carrying on to a full rack is allowed: one dry ration per batch, until
+    // the cooked-food counter is stocked.
+    cookRestock_ = true;
   }
   return true;
 }

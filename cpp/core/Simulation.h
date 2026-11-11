@@ -78,12 +78,6 @@ class Simulation {
   // The playable client always uses NewVoyage, never this reference fixture.
   static Simulation ReferenceVoyage(const Catalog& catalog);
 
-  // Every hand eats on a clock of his own, so the room is never fed in one
-  // mouthful. Dealt once at boot and once for each new signing; the save system
-  // keeps whatever a hand was dealt.
-  void StaggerHungerClocks();
-  void DealHungerClock(CrewMember& crew);
-
   // ---- the clock ---------------------------------------------------------
   // The only function that advances the world. Mirrors performAction(detail).
   void PerformAction(const std::string& detail = std::string());
