@@ -1,0 +1,9 @@
+# Voyage setup, galaxy picked.
+title 0
+frames 3
+clickhit title new-voyage
+frames 3
+clickhit title setup-pick-galaxy | gal-gen-9
+frames 3
+shot 03-setup-sector
+hits title

@@ -1,0 +1,42 @@
+# Engine Room machine at every reading size: one frame each, the caption report
+# (stage) and the strings printed over each other in the whole frame (overlaps).
+#   ./run.sh scripts/machine.txt                    Segoe stand-in, 1440 x 940
+#   ./run.sh scripts/machine.txt 1440 940 dejavu    the face the repository ships
+#   ./run.sh scripts/machine.txt 1180 720           the smallest window
+title 0
+frames 3
+clickhit title new-voyage
+frames 3
+clickhit title setup-pick-galaxy | gal-gen-9
+frames 3
+clickhit title setup-pick-system | sec-gen-205
+frames 3
+clickhit title setup-launch
+frames 5
+move 5 500
+textlog on
+open room engine
+frames 3
+shot machine-18px
+stage
+overlaps
+fontstep 1
+frames 3
+shot machine-19px
+stage
+overlaps
+fontstep 2
+frames 3
+shot machine-20px
+stage
+overlaps
+fontstep 3
+frames 3
+shot machine-21px
+stage
+overlaps
+largetext 1
+frames 3
+shot machine-23px
+stage
+overlaps

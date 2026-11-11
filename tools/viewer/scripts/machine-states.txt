@@ -1,0 +1,48 @@
+# Engine Room machine through its four condition words and a full meter, then
+# two presses of "Run the drive": one at 18 px, one at 23 px.
+title 0
+frames 3
+clickhit title new-voyage
+frames 3
+clickhit title setup-pick-galaxy | gal-gen-9
+frames 3
+clickhit title setup-pick-system | sec-gen-205
+frames 3
+clickhit title setup-launch
+frames 5
+move 5 500
+textlog on
+open room engine
+frames 3
+survival engineCondition 100
+frames 2
+shot machine-100-nominal
+stage
+overlaps
+survival engineCondition 62
+frames 2
+shot machine-062-serviceable
+stage
+overlaps
+survival engineCondition 30
+frames 2
+shot machine-030-degraded
+stage
+overlaps
+survival engineCondition 7
+frames 2
+shot machine-007-critical
+stage
+overlaps
+survival engineCondition 80
+frames 2
+state
+clickhit task engine-click
+frames 3
+state
+fontstep 3
+largetext 1
+frames 3
+clickhit task engine-click
+frames 3
+state

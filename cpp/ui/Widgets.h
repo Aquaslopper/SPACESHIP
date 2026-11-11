@@ -208,6 +208,10 @@ struct TaskStage {
   std::string id;        // "machine", "o2mach", "messmach"
   float width = 0.0f;
   float height = 0.0f;
+  // The reading size, in px, this geometry is laid out for. The painter scales
+  // the stage by the size in use over this one, so the parts grow together with
+  // their captions. Zero: the geometry is painted as given, at every size.
+  float typePx = 0.0f;
   std::vector<MachinePart> parts;
   std::vector<LiveControl> controls;
 };

@@ -1,0 +1,14 @@
+# The launch every later script starts with: new voyage, galaxy gal-gen-9,
+# system sec-gen-205, launch. Leaves a Wren docked at st-gen-205 (Pale Waystation).
+# The viewer has no include command; the scripts carry these lines themselves.
+title 0
+frames 3
+clickhit title new-voyage
+frames 3
+clickhit title setup-pick-galaxy | gal-gen-9
+frames 3
+clickhit title setup-pick-system | sec-gen-205
+frames 3
+clickhit title setup-launch
+frames 5
+move 5 500

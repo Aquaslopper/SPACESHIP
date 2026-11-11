@@ -1461,17 +1461,41 @@ bool ShellView::PaintScenePart(const MachinePart& part, const Area& origin) {
   }
   if (!part.text.empty()) {
     const int size = TypePx(style.fontPx);
+    const std::string ink = part.tone.empty() ? style.ink : part.tone;
+    const std::size_t bar = part.text.find('|');
+    if (bar != std::string::npos && std::string(style.cls) == "mach-stat") {
+      // A statistics row is written "label|value". The label is set at the left
+      // edge in the row's own style, the value at the right edge in mach-sv.
+      const SceneStyle reading = SceneStyleFor("mach-sv");
+      const std::string label = part.text.substr(0, bar);
+      const std::string value = part.text.substr(bar + 1);
+      const int valuePx = TypePx(reading.fontPx);
+      Text(label.c_str(), static_cast<int>(x), static_cast<int>(y), size,
+           HexColor(ink, ToRay(theme_.palette.ink)), style.mono);
+      Text(value.c_str(),
+           static_cast<int>(x + w - TextWidth(value.c_str(), valuePx, reading.mono)),
+           static_cast<int>(y), valuePx,
+           HexColor(reading.ink, ToRay(theme_.palette.ink)), reading.mono);
+      return true;
+    }
     float tx = x;
     if (style.align) {
       const float space = w - TextWidth(part.text.c_str(), size, style.mono);
       tx += style.align == 1 ? space / 2 : space;
     }
-    const std::string ink = part.tone.empty() ? style.ink : part.tone;
     Text(part.text.c_str(), static_cast<int>(tx), static_cast<int>(y), size,
          HexColor(ink, ToRay(theme_.palette.ink)), style.mono);
   }
   return true;
 }
+
+namespace {
+// How much larger than drawn a stage is painted. A stage laid out for one
+// reading size grows with the size in use; every other stage is painted 1:1.
+float StageScale(const TaskStage& stage, const Theme& theme) {
+  return stage.typePx > 0.0f ? theme.FontPx() / stage.typePx : 1.0f;
+}
+}  // namespace
 
 void ShellView::PaintStage(const TaskStage& stage, const Area& origin) {
   const Palette& p = theme_.palette;
@@ -1480,9 +1504,17 @@ void ShellView::PaintStage(const TaskStage& stage, const Area& origin) {
   const bool darkHousing = theme_.id != "classic" && stage.id != "machine";
   const Color housing = darkHousing ? ToRay(p.chrome) : HexColor("#fdfbf7", ToRay(p.panel));
   const Color edge = darkHousing ? ToRay(p.borderDark) : HexColor("#8c6f4e", ToRay(p.borderDark));
-  const Area stageFrame{origin.x, origin.y, stage.width, stage.height};
+  const float scale = StageScale(stage, theme_);
+  const Area stageFrame{origin.x, origin.y, stage.width * scale, stage.height * scale};
   PaintChamferBoxRay(stageFrame, kChamferPanel, housing, edge, ToRay(p.border));
-  for (const MachinePart& part : stage.parts) {
+  MachinePart grown;
+  for (const MachinePart& drawn : stage.parts) {
+    if (scale != 1.0f) {
+      grown = drawn;
+      grown.box = Area{drawn.box.x * scale, drawn.box.y * scale,
+                       drawn.box.w * scale, drawn.box.h * scale};
+    }
+    const MachinePart& part = scale != 1.0f ? grown : drawn;
     if (PaintMessStockIcon(part, origin)) continue;
     if (PaintScenePart(part, origin)) continue;
     const int x = static_cast<int>(origin.x + part.box.x);
@@ -1527,9 +1559,13 @@ void ShellView::PaintStage(const TaskStage& stage, const Area& origin) {
     }
   }
 
+  // A stage laid out for a reading size gives each control its whole box and
+  // sets the label in the middle of it. The other stages keep the 26 px strip.
+  const bool fitted = stage.typePx > 0.0f;
+  const int labelPx = TypePx(10);
   for (const LiveControl& control : stage.controls) {
-    const Area box{origin.x + control.box.x, origin.y + control.box.y,
-                   control.box.w, 26.0f};
+    const Area box{origin.x + control.box.x * scale, origin.y + control.box.y * scale,
+                   control.box.w * scale, fitted ? control.box.h * scale : 26.0f};
     if (control.button.taskId == "engine-click") {
       // The engine's battery remains visible even when the drive is full and
       // there is nothing to maintain. Its charge is not the drive condition.
@@ -1539,8 +1575,8 @@ void ShellView::PaintStage(const TaskStage& stage, const Area& origin) {
     } else {
       PaintProgressSurface(box, control.button, p);
     }
-    Text(control.button.text.c_str(), static_cast<int>(box.x + 8.0f),
-             static_cast<int>(box.y + 7.0f), TypePx(10) ,
+    Text(control.button.text.c_str(), static_cast<int>(box.x + 8.0f * scale),
+             static_cast<int>(fitted ? box.y + (box.h - labelPx) / 2.0f : box.y + 7.0f), labelPx,
              ToRay(control.button.state == ButtonState::Empty || control.button.state == ButtonState::Off ? p.muted : p.ink));
     taskButtons_.push_back({box, control.button.taskId});
   }
@@ -1623,10 +1659,13 @@ void ShellView::PaintTaskScreen(Simulation& sim) {
   const float headerH = PaintTaskHeader(screen.head, left, layout_.content.y);
 
   const float bodyTop = layout_.content.y + headerH + 8;
-  const float stageX = left + (right - left - screen.stage.width) / 2;
+  const float stageScale = StageScale(screen.stage, theme_);
+  const float stageW = screen.stage.width * stageScale;
+  const float stageH = screen.stage.height * stageScale;
+  const float stageX = left + (right - left - stageW) / 2;
   const bool beside = !screen.hasStage ||
-      (stageX >= left + column + 16 && stageX + screen.stage.width <= right - column - 16);
-  const float panelTop = screen.hasStage && !beside ? bodyTop + screen.stage.height + 12 : bodyTop;
+      (stageX >= left + column + 16 && stageX + stageW <= right - column - 16);
+  const float panelTop = screen.hasStage && !beside ? bodyTop + stageH + 12 : bodyTop;
   float y = panelTop;
   for (const NavPanel& panel : screen.left) {
     const float panelW = panel.placement == "np-full" ? right - left : column;
@@ -1642,9 +1681,10 @@ void ShellView::PaintTaskScreen(Simulation& sim) {
   }
   float stageBottom = bodyTop;
   if (screen.hasStage) {
-    // Fixed-size instrument, centered independently of viewport width. When
-    // the side panels cannot fit beside it, they flow beneath, never over it.
-    const Area origin{stageX, bodyTop, screen.stage.width, screen.stage.height};
+    // The instrument keeps its own size, centered independently of viewport
+    // width. When the side panels cannot fit beside it, they flow beneath,
+    // never over it.
+    const Area origin{stageX, bodyTop, stageW, stageH};
     PaintStage(screen.stage, origin);
     const float uy = beside ? origin.Bottom() + 4 : std::max({origin.Bottom(), y, ry}) + 12;
     const float gap = 6;

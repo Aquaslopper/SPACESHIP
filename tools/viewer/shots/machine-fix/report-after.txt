@@ -1,0 +1,678 @@
+# Working tree with the fix. scripts/machine.txt and scripts/machine-states.txt.
+# ---- Segoe stand-in (Selawik), 1440 x 940 ----
+shot machine-18px.png 1440x940 (76 text calls)
+STAGE machine  model 650 x 575  painted x1.000 = 650 x 575  225 parts  1 controls
+STAGE origin 478.0,100.1  right edge 1128.0  bottom edge 675.1
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V1
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V2
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V3
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V4
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V5
+STAGE mach-cap       8  18  164x20     111.1    0.0    0.0  PRIMARY CORE
+STAGE mach-cap       8  18  140x20     114.8    0.0    0.0  TURBINE STAGE
+STAGE mach-mini      8  18  112x20      90.1    0.0    0.0  EXCHANGER
+STAGE mach-mini      8  18  148x20      26.8    0.0    0.0  PRS
+STAGE mach-mini2     8  18  148x20     121.1    0.0    0.0  68 bar - nominal
+STAGE mach-mini      8  18  148x20      30.9    0.0    0.0  TMP
+STAGE mach-mini2     8  18  148x20     120.4    0.0    0.0  41 pct - nominal
+STAGE mach-mini      8  18  148x20      68.8    0.0    0.0  BUS A / B
+STAGE mach-mini      8  18  400x20     130.1    0.0    0.0  DRIVE STATISTICS
+STAGE mach-stat      9  18  186x21     128.1    0.0    0.0  Output|4.21 TJ
+STAGE mach-stat      9  18  186x21      75.5    0.0    0.0  Flux|0.98
+STAGE mach-stat      9  18  186x21     123.2    0.0    0.0  Coolant|STABLE
+STAGE mach-stat      9  18  186x21      99.6    0.0    0.0  Flow|83 pct
+STAGE mach-stat      9  18  186x21     131.4    0.0    0.0  Bearing|0.07 mm
+STAGE mach-stat      9  18  186x21     111.8    0.0    0.0  Cycles|18,402
+STAGE mach-stat      9  18  186x21     131.4    0.0    0.0  Manifold|2 of 2
+STAGE mach-stat      9  18  186x21     156.9    0.0    0.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  18  186x21     122.8    0.0    0.0  Last svc|412 hr
+STAGE mach-mini      8  18  190x20     156.5    0.0    0.0  CYLINDER BANK 1-16
+STAGE mach-mini      8  18  300x20     148.1    0.0    0.0  ENGINE CONDITION
+STAGE mach-plate     8  18  602x20     419.0    0.0    0.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  36  156x38      56.0    0.0    0.0  80%
+STAGE mach-word     10  18  156x20      72.0    0.0    0.0  NOMINAL
+STAGE control engine-click           box 190x34  label 18 px, 96.8 wide: inside the button
+STAGE 28 text parts: 0 wider than their box, 0 taller than their box, 0 not painted, 0 outside the stage
+OVERLAP 0 pair(s) among 76 strings
+shot machine-19px.png 1440x940 (77 text calls)
+STAGE machine  model 650 x 575  painted x1.056 = 686 x 607  225 parts  1 controls
+STAGE origin 459.9,102.7  right edge 1146.1  bottom edge 709.6
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  19  34x21       18.8    0.0    0.0  V1
+STAGE mach-cap       8  19  34x21       18.8    0.0    0.0  V2
+STAGE mach-cap       8  19  34x21       18.8    0.0    0.0  V3
+STAGE mach-cap       8  19  34x21       18.8    0.0    0.0  V4
+STAGE mach-cap       8  19  34x21       18.8    0.0    0.0  V5
+STAGE mach-cap       8  19  173x21     116.7    0.0    0.0  PRIMARY CORE
+STAGE mach-cap       8  19  148x21     120.5    0.0    0.0  TURBINE STAGE
+STAGE mach-mini      8  19  118x21      94.7    0.0    0.0  EXCHANGER
+STAGE mach-mini      8  19  156x21      28.1    0.0    0.0  PRS
+STAGE mach-mini2     8  19  156x21     127.0    0.0    0.0  68 bar - nominal
+STAGE mach-mini      8  19  156x21      32.5    0.0    0.0  TMP
+STAGE mach-mini2     8  19  156x21     126.2    0.0    0.0  41 pct - nominal
+STAGE mach-mini      8  19  156x21      72.1    0.0    0.0  BUS A / B
+STAGE mach-mini      8  19  422x21     136.5    0.0    0.0  DRIVE STATISTICS
+STAGE mach-stat      9  19  196x22     134.2    0.0    0.0  Output|4.21 TJ
+STAGE mach-stat      9  19  196x22      78.9    0.0    0.0  Flux|0.98
+STAGE mach-stat      9  19  196x22     129.0    0.0    0.0  Coolant|STABLE
+STAGE mach-stat      9  19  196x22     104.3    0.0    0.0  Flow|83 pct
+STAGE mach-stat      9  19  196x22     137.6    0.0    0.0  Bearing|0.07 mm
+STAGE mach-stat      9  19  196x22     117.0    0.0    0.0  Cycles|18,402
+STAGE mach-stat      9  19  196x22     137.6    0.0    0.0  Manifold|2 of 2
+STAGE mach-stat      9  19  196x22     164.3    0.0    0.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  19  196x22     128.5    0.0    0.0  Last svc|412 hr
+STAGE mach-mini      8  19  201x21     164.2    0.0    0.0  CYLINDER BANK 1-16
+STAGE mach-mini      8  19  317x21     155.5    0.0    0.0  ENGINE CONDITION
+STAGE mach-plate     8  19  635x21     440.0    0.0    0.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  38  165x40      59.0    0.0    0.0  80%
+STAGE mach-word     10  19  165x21      75.7    0.0    0.0  NOMINAL
+STAGE control engine-click           box 201x36  label 19 px, 101.5 wide: inside the button
+STAGE 28 text parts: 0 wider than their box, 0 taller than their box, 0 not painted, 0 outside the stage
+OVERLAP 0 pair(s) among 77 strings
+shot machine-20px.png 1440x940 (77 text calls)
+STAGE machine  model 650 x 575  painted x1.111 = 722 x 639  225 parts  1 controls
+STAGE origin 441.9,105.3  right edge 1164.1  bottom edge 744.2
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  20  36x22       19.8    0.0    0.0  V1
+STAGE mach-cap       8  20  36x22       19.8    0.0    0.0  V2
+STAGE mach-cap       8  20  36x22       19.8    0.0    0.0  V3
+STAGE mach-cap       8  20  36x22       19.8    0.0    0.0  V4
+STAGE mach-cap       8  20  36x22       19.8    0.0    0.0  V5
+STAGE mach-cap       8  20  182x22     122.2    0.0    0.0  PRIMARY CORE
+STAGE mach-cap       8  20  156x22     126.2    0.0    0.0  TURBINE STAGE
+STAGE mach-mini      8  20  124x22      99.2    0.0    0.0  EXCHANGER
+STAGE mach-mini      8  20  164x22      29.5    0.0    0.0  PRS
+STAGE mach-mini2     8  20  164x22     132.9    0.0    0.0  68 bar - nominal
+STAGE mach-mini      8  20  164x22      34.1    0.0    0.0  TMP
+STAGE mach-mini2     8  20  164x22     132.1    0.0    0.0  41 pct - nominal
+STAGE mach-mini      8  20  164x22      75.5    0.0    0.0  BUS A / B
+STAGE mach-mini      8  20  444x22     142.9    0.0    0.0  DRIVE STATISTICS
+STAGE mach-stat      9  20  207x23     140.2    0.0    0.0  Output|4.21 TJ
+STAGE mach-stat      9  20  207x23      82.3    0.0    0.0  Flux|0.98
+STAGE mach-stat      9  20  207x23     134.8    0.0    0.0  Coolant|STABLE
+STAGE mach-stat      9  20  207x23     108.9    0.0    0.0  Flow|83 pct
+STAGE mach-stat      9  20  207x23     143.8    0.0    0.0  Bearing|0.07 mm
+STAGE mach-stat      9  20  207x23     122.2    0.0    0.0  Cycles|18,402
+STAGE mach-stat      9  20  207x23     143.8    0.0    0.0  Manifold|2 of 2
+STAGE mach-stat      9  20  207x23     171.8    0.0    0.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  20  207x23     134.2    0.0    0.0  Last svc|412 hr
+STAGE mach-mini      8  20  211x22     172.0    0.0    0.0  CYLINDER BANK 1-16
+STAGE mach-mini      8  20  333x22     162.9    0.0    0.0  ENGINE CONDITION
+STAGE mach-plate     8  20  669x22     461.0    0.0    0.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  40  173x42      62.0    0.0    0.0  80%
+STAGE mach-word     10  20  173x22      79.3    0.0    0.0  NOMINAL
+STAGE control engine-click           box 211x38  label 20 px, 106.2 wide: inside the button
+STAGE 28 text parts: 0 wider than their box, 0 taller than their box, 0 not painted, 0 outside the stage
+OVERLAP 0 pair(s) among 77 strings
+shot machine-21px.png 1440x940 (78 text calls)
+STAGE machine  model 650 x 575  painted x1.167 = 758 x 671  225 parts  1 controls
+STAGE origin 423.8,107.9  right edge 1182.2  bottom edge 778.8
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  21  37x23       20.7    0.0    0.0  V1
+STAGE mach-cap       8  21  37x23       20.7    0.0    0.0  V2
+STAGE mach-cap       8  21  37x23       20.7    0.0    0.0  V3
+STAGE mach-cap       8  21  37x23       20.7    0.0    0.0  V4
+STAGE mach-cap       8  21  37x23       20.7    0.0    0.0  V5
+STAGE mach-cap       8  21  191x23     127.8    0.0    0.0  PRIMARY CORE
+STAGE mach-cap       8  21  163x23     131.9    0.0    0.0  TURBINE STAGE
+STAGE mach-mini      8  21  131x23     103.8    0.0    0.0  EXCHANGER
+STAGE mach-mini      8  21  173x23      30.9    0.0    0.0  PRS
+STAGE mach-mini2     8  21  173x23     138.8    0.0    0.0  68 bar - nominal
+STAGE mach-mini      8  21  173x23      35.7    0.0    0.0  TMP
+STAGE mach-mini2     8  21  173x23     137.9    0.0    0.0  41 pct - nominal
+STAGE mach-mini      8  21  173x23      78.9    0.0    0.0  BUS A / B
+STAGE mach-mini      8  21  467x23     149.3    0.0    0.0  DRIVE STATISTICS
+STAGE mach-stat      9  21  217x24     146.3    0.0    0.0  Output|4.21 TJ
+STAGE mach-stat      9  21  217x24      85.8    0.0    0.0  Flux|0.98
+STAGE mach-stat      9  21  217x24     140.6    0.0    0.0  Coolant|STABLE
+STAGE mach-stat      9  21  217x24     113.6    0.0    0.0  Flow|83 pct
+STAGE mach-stat      9  21  217x24     149.9    0.0    0.0  Bearing|0.07 mm
+STAGE mach-stat      9  21  217x24     127.4    0.0    0.0  Cycles|18,402
+STAGE mach-stat      9  21  217x24     149.9    0.0    0.0  Manifold|2 of 2
+STAGE mach-stat      9  21  217x24     179.2    0.0    0.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  21  217x24     139.9    0.0    0.0  Last svc|412 hr
+STAGE mach-mini      8  21  222x23     179.8    0.0    0.0  CYLINDER BANK 1-16
+STAGE mach-mini      8  21  350x23     170.3    0.0    0.0  ENGINE CONDITION
+STAGE mach-plate     8  21  702x23     482.0    0.0    0.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  42  182x44      65.0    0.0    0.0  80%
+STAGE mach-word     10  21  182x23      83.0    0.0    0.0  NOMINAL
+STAGE control engine-click           box 222x40  label 21 px, 110.9 wide: inside the button
+STAGE 28 text parts: 0 wider than their box, 0 taller than their box, 0 not painted, 0 outside the stage
+OVERLAP 0 pair(s) among 78 strings
+shot machine-23px.png 1440x940 (78 text calls)
+STAGE machine  model 650 x 575  painted x1.278 = 831 x 735  225 parts  1 controls
+STAGE origin 387.7,114.2  right edge 1218.3  bottom edge 848.9
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  23  41x26       22.6    0.0    0.0  V1
+STAGE mach-cap       8  23  41x26       22.6    0.0    0.0  V2
+STAGE mach-cap       8  23  41x26       22.6    0.0    0.0  V3
+STAGE mach-cap       8  23  41x26       22.6    0.0    0.0  V4
+STAGE mach-cap       8  23  41x26       22.6    0.0    0.0  V5
+STAGE mach-cap       8  23  210x26     138.9    0.0    0.0  PRIMARY CORE
+STAGE mach-cap       8  23  179x26     143.3    0.0    0.0  TURBINE STAGE
+STAGE mach-mini      8  23  143x26     112.9    0.0    0.0  EXCHANGER
+STAGE mach-mini      8  23  189x26      33.6    0.0    0.0  PRS
+STAGE mach-mini2     8  23  189x26     150.6    0.0    0.0  68 bar - nominal
+STAGE mach-mini      8  23  189x26      38.9    0.0    0.0  TMP
+STAGE mach-mini2     8  23  189x26     149.6    0.0    0.0  41 pct - nominal
+STAGE mach-mini      8  23  189x26      85.6    0.0    0.0  BUS A / B
+STAGE mach-mini      8  23  511x26     162.1    0.0    0.0  DRIVE STATISTICS
+STAGE mach-stat      9  23  238x27     158.4    0.0    0.0  Output|4.21 TJ
+STAGE mach-stat      9  23  238x27      92.6    0.0    0.0  Flux|0.98
+STAGE mach-stat      9  23  238x27     152.2    0.0    0.0  Coolant|STABLE
+STAGE mach-stat      9  23  238x27     122.9    0.0    0.0  Flow|83 pct
+STAGE mach-stat      9  23  238x27     162.3    0.0    0.0  Bearing|0.07 mm
+STAGE mach-stat      9  23  238x27     137.8    0.0    0.0  Cycles|18,402
+STAGE mach-stat      9  23  238x27     162.3    0.0    0.0  Manifold|2 of 2
+STAGE mach-stat      9  23  238x27     194.1    0.0    0.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  23  238x27     151.3    0.0    0.0  Last svc|412 hr
+STAGE mach-mini      8  23  243x26     195.2    0.0    0.0  CYLINDER BANK 1-16
+STAGE mach-mini      8  23  383x26     185.1    0.0    0.0  ENGINE CONDITION
+STAGE mach-plate     8  23  769x26     524.0    0.0    0.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  46  199x49      71.0    0.0    0.0  80%
+STAGE mach-word     10  23  199x26      90.3    0.0    0.0  NOMINAL
+STAGE control engine-click           box 243x43  label 23 px, 120.3 wide: inside the button
+STAGE 28 text parts: 0 wider than their box, 0 taller than their box, 0 not painted, 0 outside the stage
+OVERLAP 0 pair(s) among 78 strings
+
+# ---- DejaVu, 1440 x 940 ----
+shot machine-18px.png 1440x940 (78 text calls)
+STAGE machine  model 650 x 575  painted x1.000 = 650 x 575  225 parts  1 controls
+STAGE origin 478.0,100.1  right edge 1128.0  bottom edge 675.1
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  18  32x20       21.2    0.0    0.0  V1
+STAGE mach-cap       8  18  32x20       21.2    0.0    0.0  V2
+STAGE mach-cap       8  18  32x20       21.2    0.0    0.0  V3
+STAGE mach-cap       8  18  32x20       21.2    0.0    0.0  V4
+STAGE mach-cap       8  18  32x20       21.2    0.0    0.0  V5
+STAGE mach-cap       8  18  164x20     126.1    0.0    0.0  PRIMARY CORE
+STAGE mach-cap       8  18  140x20     135.0    0.0    0.0  TURBINE STAGE
+STAGE mach-mini      8  18  112x20     104.0    0.0    0.0  EXCHANGER
+STAGE mach-mini      8  18  148x20      31.2    0.0    0.0  PRS
+STAGE mach-mini2     8  18  148x20     141.0    0.0    0.0  68 bar - nominal
+STAGE mach-mini      8  18  148x20      33.5    0.0    0.0  TMP
+STAGE mach-mini2     8  18  148x20     139.9    0.0    0.0  41 pct - nominal
+STAGE mach-mini      8  18  148x20      80.0    0.0    0.0  BUS A / B
+STAGE mach-mini      8  18  400x20     154.1    0.0    0.0  DRIVE STATISTICS
+STAGE mach-stat      9  18  186x21     135.2    0.0    0.0  Output|4.21 TJ
+STAGE mach-stat      9  18  186x21      81.5    0.0    0.0  Flux|0.98
+STAGE mach-stat      9  18  186x21     131.5    0.0    0.0  Coolant|STABLE
+STAGE mach-stat      9  18  186x21     104.5    0.0    0.0  Flow|83 pct
+STAGE mach-stat      9  18  186x21     141.9    0.0    0.0  Bearing|0.07 mm
+STAGE mach-stat      9  18  186x21     121.1    0.0    0.0  Cycles|18,402
+STAGE mach-stat      9  18  186x21     138.9    0.0    0.0  Manifold|2 of 2
+STAGE mach-stat      9  18  186x21     170.0    0.0    0.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  18  186x21     135.5    0.0    0.0  Last svc|412 hr
+STAGE mach-mini      8  18  190x20     179.4    0.0    0.0  CYLINDER BANK 1-16
+STAGE mach-mini      8  18  300x20     165.0    0.0    0.0  ENGINE CONDITION
+STAGE mach-plate     8  18  602x20     419.0    0.0    0.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  36  156x38      56.0    0.0    0.0  80%
+STAGE mach-word     10  18  156x20      76.9    0.0    0.0  NOMINAL
+STAGE control engine-click           box 190x34  label 18 px, 115.1 wide: inside the button
+STAGE 28 text parts: 0 wider than their box, 0 taller than their box, 0 not painted, 0 outside the stage
+OVERLAP 0 pair(s) among 78 strings
+shot machine-19px.png 1440x940 (78 text calls)
+STAGE machine  model 650 x 575  painted x1.056 = 686 x 607  225 parts  1 controls
+STAGE origin 459.9,102.7  right edge 1146.1  bottom edge 709.6
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  19  34x21       22.4    0.0    0.0  V1
+STAGE mach-cap       8  19  34x21       22.4    0.0    0.0  V2
+STAGE mach-cap       8  19  34x21       22.4    0.0    0.0  V3
+STAGE mach-cap       8  19  34x21       22.4    0.0    0.0  V4
+STAGE mach-cap       8  19  34x21       22.4    0.0    0.0  V5
+STAGE mach-cap       8  19  173x21     132.5    0.0    0.0  PRIMARY CORE
+STAGE mach-cap       8  19  148x21     141.8    0.0    0.0  TURBINE STAGE
+STAGE mach-mini      8  19  118x21     109.3    0.0    0.0  EXCHANGER
+STAGE mach-mini      8  19  156x21      32.9    0.0    0.0  PRS
+STAGE mach-mini2     8  19  156x21     148.0    0.0    0.0  68 bar - nominal
+STAGE mach-mini      8  19  156x21      35.2    0.0    0.0  TMP
+STAGE mach-mini2     8  19  156x21     146.8    0.0    0.0  41 pct - nominal
+STAGE mach-mini      8  19  156x21      84.0    0.0    0.0  BUS A / B
+STAGE mach-mini      8  19  422x21     161.9    0.0    0.0  DRIVE STATISTICS
+STAGE mach-stat      9  19  196x22     141.7    0.0    0.0  Output|4.21 TJ
+STAGE mach-stat      9  19  196x22      85.2    0.0    0.0  Flux|0.98
+STAGE mach-stat      9  19  196x22     137.8    0.0    0.0  Coolant|STABLE
+STAGE mach-stat      9  19  196x22     109.4    0.0    0.0  Flow|83 pct
+STAGE mach-stat      9  19  196x22     148.6    0.0    0.0  Bearing|0.07 mm
+STAGE mach-stat      9  19  196x22     126.9    0.0    0.0  Cycles|18,402
+STAGE mach-stat      9  19  196x22     145.5    0.0    0.0  Manifold|2 of 2
+STAGE mach-stat      9  19  196x22     178.2    0.0    0.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  19  196x22     141.9    0.0    0.0  Last svc|412 hr
+STAGE mach-mini      8  19  201x21     188.4    0.0    0.0  CYLINDER BANK 1-16
+STAGE mach-mini      8  19  317x21     173.3    0.0    0.0  ENGINE CONDITION
+STAGE mach-plate     8  19  635x21     440.0    0.0    0.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  38  165x40      59.0    0.0    0.0  80%
+STAGE mach-word     10  19  165x21      80.8    0.0    0.0  NOMINAL
+STAGE control engine-click           box 201x36  label 19 px, 120.9 wide: inside the button
+STAGE 28 text parts: 0 wider than their box, 0 taller than their box, 0 not painted, 0 outside the stage
+OVERLAP 0 pair(s) among 78 strings
+shot machine-20px.png 1440x940 (78 text calls)
+STAGE machine  model 650 x 575  painted x1.111 = 722 x 639  225 parts  1 controls
+STAGE origin 441.9,105.3  right edge 1164.1  bottom edge 744.2
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  20  36x22       23.5    0.0    0.0  V1
+STAGE mach-cap       8  20  36x22       23.5    0.0    0.0  V2
+STAGE mach-cap       8  20  36x22       23.5    0.0    0.0  V3
+STAGE mach-cap       8  20  36x22       23.5    0.0    0.0  V4
+STAGE mach-cap       8  20  36x22       23.5    0.0    0.0  V5
+STAGE mach-cap       8  20  182x22     138.9    0.0    0.0  PRIMARY CORE
+STAGE mach-cap       8  20  156x22     148.7    0.0    0.0  TURBINE STAGE
+STAGE mach-mini      8  20  124x22     114.7    0.0    0.0  EXCHANGER
+STAGE mach-mini      8  20  164x22      34.5    0.0    0.0  PRS
+STAGE mach-mini2     8  20  164x22     155.0    0.0    0.0  68 bar - nominal
+STAGE mach-mini      8  20  164x22      37.0    0.0    0.0  TMP
+STAGE mach-mini2     8  20  164x22     153.8    0.0    0.0  41 pct - nominal
+STAGE mach-mini      8  20  164x22      88.0    0.0    0.0  BUS A / B
+STAGE mach-mini      8  20  444x22     169.6    0.0    0.0  DRIVE STATISTICS
+STAGE mach-stat      9  20  207x23     148.2    0.0    0.0  Output|4.21 TJ
+STAGE mach-stat      9  20  207x23      89.0    0.0    0.0  Flux|0.98
+STAGE mach-stat      9  20  207x23     144.0    0.0    0.0  Coolant|STABLE
+STAGE mach-stat      9  20  207x23     114.3    0.0    0.0  Flow|83 pct
+STAGE mach-stat      9  20  207x23     155.4    0.0    0.0  Bearing|0.07 mm
+STAGE mach-stat      9  20  207x23     132.6    0.0    0.0  Cycles|18,402
+STAGE mach-stat      9  20  207x23     152.1    0.0    0.0  Manifold|2 of 2
+STAGE mach-stat      9  20  207x23     186.3    0.0    0.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  20  207x23     148.3    0.0    0.0  Last svc|412 hr
+STAGE mach-mini      8  20  211x22     197.4    0.0    0.0  CYLINDER BANK 1-16
+STAGE mach-mini      8  20  333x22     181.7    0.0    0.0  ENGINE CONDITION
+STAGE mach-plate     8  20  669x22     461.0    0.0    0.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  40  173x42      62.0    0.0    0.0  80%
+STAGE mach-word     10  20  173x22      84.8    0.0    0.0  NOMINAL
+STAGE control engine-click           box 211x38  label 20 px, 126.6 wide: inside the button
+STAGE 28 text parts: 0 wider than their box, 0 taller than their box, 0 not painted, 0 outside the stage
+OVERLAP 0 pair(s) among 78 strings
+shot machine-21px.png 1440x940 (78 text calls)
+STAGE machine  model 650 x 575  painted x1.167 = 758 x 671  225 parts  1 controls
+STAGE origin 423.8,107.9  right edge 1182.2  bottom edge 778.8
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  21  37x23       24.6    0.0    0.0  V1
+STAGE mach-cap       8  21  37x23       24.6    0.0    0.0  V2
+STAGE mach-cap       8  21  37x23       24.6    0.0    0.0  V3
+STAGE mach-cap       8  21  37x23       24.6    0.0    0.0  V4
+STAGE mach-cap       8  21  37x23       24.6    0.0    0.0  V5
+STAGE mach-cap       8  21  191x23     145.3    0.0    0.0  PRIMARY CORE
+STAGE mach-cap       8  21  163x23     155.5    0.0    0.0  TURBINE STAGE
+STAGE mach-mini      8  21  131x23     120.0    0.0    0.0  EXCHANGER
+STAGE mach-mini      8  21  173x23      36.1    0.0    0.0  PRS
+STAGE mach-mini2     8  21  173x23     162.0    0.0    0.0  68 bar - nominal
+STAGE mach-mini      8  21  173x23      38.8    0.0    0.0  TMP
+STAGE mach-mini2     8  21  173x23     160.7    0.0    0.0  41 pct - nominal
+STAGE mach-mini      8  21  173x23      92.0    0.0    0.0  BUS A / B
+STAGE mach-mini      8  21  467x23     177.3    0.0    0.0  DRIVE STATISTICS
+STAGE mach-stat      9  21  217x24     154.6    0.0    0.0  Output|4.21 TJ
+STAGE mach-stat      9  21  217x24      92.8    0.0    0.0  Flux|0.98
+STAGE mach-stat      9  21  217x24     150.2    0.0    0.0  Coolant|STABLE
+STAGE mach-stat      9  21  217x24     119.2    0.0    0.0  Flow|83 pct
+STAGE mach-stat      9  21  217x24     162.2    0.0    0.0  Bearing|0.07 mm
+STAGE mach-stat      9  21  217x24     138.3    0.0    0.0  Cycles|18,402
+STAGE mach-stat      9  21  217x24     158.7    0.0    0.0  Manifold|2 of 2
+STAGE mach-stat      9  21  217x24     194.5    0.0    0.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  21  217x24     154.8    0.0    0.0  Last svc|412 hr
+STAGE mach-mini      8  21  222x23     206.4    0.0    0.0  CYLINDER BANK 1-16
+STAGE mach-mini      8  21  350x23     190.0    0.0    0.0  ENGINE CONDITION
+STAGE mach-plate     8  21  702x23     482.0    0.0    0.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  42  182x44      65.0    0.0    0.0  80%
+STAGE mach-word     10  21  182x23      88.7    0.0    0.0  NOMINAL
+STAGE control engine-click           box 222x40  label 21 px, 132.3 wide: inside the button
+STAGE 28 text parts: 0 wider than their box, 0 taller than their box, 0 not painted, 0 outside the stage
+OVERLAP 0 pair(s) among 78 strings
+shot machine-23px.png 1440x940 (78 text calls)
+STAGE machine  model 650 x 575  painted x1.278 = 831 x 735  225 parts  1 controls
+STAGE origin 387.7,114.2  right edge 1218.3  bottom edge 848.9
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  23  41x26       26.9    0.0    0.0  V1
+STAGE mach-cap       8  23  41x26       26.9    0.0    0.0  V2
+STAGE mach-cap       8  23  41x26       26.9    0.0    0.0  V3
+STAGE mach-cap       8  23  41x26       26.9    0.0    0.0  V4
+STAGE mach-cap       8  23  41x26       26.9    0.0    0.0  V5
+STAGE mach-cap       8  23  210x26     158.1    0.0    0.0  PRIMARY CORE
+STAGE mach-cap       8  23  179x26     169.2    0.0    0.0  TURBINE STAGE
+STAGE mach-mini      8  23  143x26     130.7    0.0    0.0  EXCHANGER
+STAGE mach-mini      8  23  189x26      39.4    0.0    0.0  PRS
+STAGE mach-mini2     8  23  189x26     176.0    0.0    0.0  68 bar - nominal
+STAGE mach-mini      8  23  189x26      42.2    0.0    0.0  TMP
+STAGE mach-mini2     8  23  189x26     174.6    0.0    0.0  41 pct - nominal
+STAGE mach-mini      8  23  189x26     100.0    0.0    0.0  BUS A / B
+STAGE mach-mini      8  23  511x26     192.8    0.0    0.0  DRIVE STATISTICS
+STAGE mach-stat      9  23  238x27     167.5    0.0    0.0  Output|4.21 TJ
+STAGE mach-stat      9  23  238x27     100.2    0.0    0.0  Flux|0.98
+STAGE mach-stat      9  23  238x27     162.8    0.0    0.0  Coolant|STABLE
+STAGE mach-stat      9  23  238x27     129.1    0.0    0.0  Flow|83 pct
+STAGE mach-stat      9  23  238x27     175.7    0.0    0.0  Bearing|0.07 mm
+STAGE mach-stat      9  23  238x27     149.8    0.0    0.0  Cycles|18,402
+STAGE mach-stat      9  23  238x27     171.9    0.0    0.0  Manifold|2 of 2
+STAGE mach-stat      9  23  238x27     210.8    0.0    0.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  23  238x27     167.6    0.0    0.0  Last svc|412 hr
+STAGE mach-mini      8  23  243x26     224.5    0.0    0.0  CYLINDER BANK 1-16
+STAGE mach-mini      8  23  383x26     206.7    0.0    0.0  ENGINE CONDITION
+STAGE mach-plate     8  23  769x26     524.0    0.0    0.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  46  199x49      71.0    0.0    0.0  80%
+STAGE mach-word     10  23  199x26      96.6    0.0    0.0  NOMINAL
+STAGE control engine-click           box 243x43  label 23 px, 143.8 wide: inside the button
+STAGE 28 text parts: 0 wider than their box, 0 taller than their box, 0 not painted, 0 outside the stage
+OVERLAP 0 pair(s) among 78 strings
+
+# ---- Segoe stand-in, 1180 x 720 (the smallest window) ----
+shot machine-18px.png 1180x720 (76 text calls)
+STAGE machine  model 650 x 575  painted x1.000 = 650 x 575  225 parts  1 controls
+STAGE origin 348.0,100.1  right edge 998.0  bottom edge 675.1
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V1
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V2
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V3
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V4
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V5
+STAGE mach-cap       8  18  164x20     111.1    0.0    0.0  PRIMARY CORE
+STAGE mach-cap       8  18  140x20     114.8    0.0    0.0  TURBINE STAGE
+STAGE mach-mini      8  18  112x20      90.1    0.0    0.0  EXCHANGER
+STAGE mach-mini      8  18  148x20      26.8    0.0    0.0  PRS
+STAGE mach-mini2     8  18  148x20     121.1    0.0    0.0  68 bar - nominal
+STAGE mach-mini      8  18  148x20      30.9    0.0    0.0  TMP
+STAGE mach-mini2     8  18  148x20     120.4    0.0    0.0  41 pct - nominal
+STAGE mach-mini      8  18  148x20      68.8    0.0    0.0  BUS A / B
+STAGE mach-mini      8  18  400x20     130.1    0.0    0.0  DRIVE STATISTICS
+STAGE mach-stat      9  18  186x21     128.1    0.0    0.0  Output|4.21 TJ
+STAGE mach-stat      9  18  186x21      75.5    0.0    0.0  Flux|0.98
+STAGE mach-stat      9  18  186x21     123.2    0.0    0.0  Coolant|STABLE
+STAGE mach-stat      9  18  186x21      99.6    0.0    0.0  Flow|83 pct
+STAGE mach-stat      9  18  186x21     131.4    0.0    0.0  Bearing|0.07 mm
+STAGE mach-stat      9  18  186x21     111.8    0.0    0.0  Cycles|18,402
+STAGE mach-stat      9  18  186x21     131.4    0.0    0.0  Manifold|2 of 2
+STAGE mach-stat      9  18  186x21     156.9    0.0    0.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  18  186x21     122.8    0.0    0.0  Last svc|412 hr
+STAGE mach-mini      8  18  190x20     156.5    0.0    0.0  CYLINDER BANK 1-16
+STAGE mach-mini      8  18  300x20     148.1    0.0    0.0  ENGINE CONDITION
+STAGE mach-plate     8  18  602x20     419.0    0.0    0.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  36  156x38      56.0    0.0    0.0  80%
+STAGE mach-word     10  18  156x20      72.0    0.0    0.0  NOMINAL
+STAGE control engine-click           box 190x34  label 18 px, 96.8 wide: inside the button
+STAGE 28 text parts: 0 wider than their box, 0 taller than their box, 0 not painted, 0 outside the stage
+OVERLAP 0 pair(s) among 76 strings
+shot machine-19px.png 1180x720 (77 text calls)
+STAGE machine  model 650 x 575  painted x1.056 = 686 x 607  225 parts  1 controls
+STAGE origin 329.9,102.7  right edge 1016.1  bottom edge 709.6
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  19  34x21       18.8    0.0    0.0  V1
+STAGE mach-cap       8  19  34x21       18.8    0.0    0.0  V2
+STAGE mach-cap       8  19  34x21       18.8    0.0    0.0  V3
+STAGE mach-cap       8  19  34x21       18.8    0.0    0.0  V4
+STAGE mach-cap       8  19  34x21       18.8    0.0    0.0  V5
+STAGE mach-cap       8  19  173x21     116.7    0.0    0.0  PRIMARY CORE
+STAGE mach-cap       8  19  148x21     120.5    0.0    0.0  TURBINE STAGE
+STAGE mach-mini      8  19  118x21      94.7    0.0    0.0  EXCHANGER
+STAGE mach-mini      8  19  156x21      28.1    0.0    0.0  PRS
+STAGE mach-mini2     8  19  156x21     127.0    0.0    0.0  68 bar - nominal
+STAGE mach-mini      8  19  156x21      32.5    0.0    0.0  TMP
+STAGE mach-mini2     8  19  156x21     126.2    0.0    0.0  41 pct - nominal
+STAGE mach-mini      8  19  156x21      72.1    0.0    0.0  BUS A / B
+STAGE mach-mini      8  19  422x21     136.5    0.0    0.0  DRIVE STATISTICS
+STAGE mach-stat      9  19  196x22     134.2    0.0    0.0  Output|4.21 TJ
+STAGE mach-stat      9  19  196x22      78.9    0.0    0.0  Flux|0.98
+STAGE mach-stat      9  19  196x22     129.0    0.0    0.0  Coolant|STABLE
+STAGE mach-stat      9  19  196x22     104.3    0.0    0.0  Flow|83 pct
+STAGE mach-stat      9  19  196x22     137.6    0.0    0.0  Bearing|0.07 mm
+STAGE mach-stat      9  19  196x22     117.0    0.0    0.0  Cycles|18,402
+STAGE mach-stat      9  19  196x22     137.6    0.0    0.0  Manifold|2 of 2
+STAGE mach-stat      9  19  196x22     164.3    0.0    0.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  19  196x22     128.5    0.0    0.0  Last svc|412 hr
+STAGE mach-mini      8  19  201x21     164.2    0.0    0.0  CYLINDER BANK 1-16
+STAGE mach-mini      8  19  317x21     155.5    0.0    0.0  ENGINE CONDITION
+STAGE mach-plate     8  19  635x21     440.0    0.0    0.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  38  165x40      59.0    0.0    0.0  80%
+STAGE mach-word     10  19  165x21      75.7    0.0    0.0  NOMINAL
+STAGE control engine-click           box 201x36  label 19 px, 101.5 wide: inside the button
+STAGE 28 text parts: 0 wider than their box, 0 taller than their box, 0 not painted, 0 outside the stage
+OVERLAP 0 pair(s) among 77 strings
+shot machine-20px.png 1180x720 (77 text calls)
+STAGE machine  model 650 x 575  painted x1.111 = 722 x 639  225 parts  1 controls
+STAGE origin 311.9,105.3  right edge 1034.1  bottom edge 744.2
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  20  36x22       19.8    0.0    0.0  V1
+STAGE mach-cap       8  20  36x22       19.8    0.0    0.0  V2
+STAGE mach-cap       8  20  36x22       19.8    0.0    0.0  V3
+STAGE mach-cap       8  20  36x22       19.8    0.0    0.0  V4
+STAGE mach-cap       8  20  36x22       19.8    0.0    0.0  V5
+STAGE mach-cap       8  20  182x22     122.2    0.0    0.0  PRIMARY CORE
+STAGE mach-cap       8  20  156x22     126.2    0.0    0.0  TURBINE STAGE
+STAGE mach-mini      8  20  124x22      99.2    0.0    0.0  EXCHANGER
+STAGE mach-mini      8  20  164x22      29.5    0.0    0.0  PRS
+STAGE mach-mini2     8  20  164x22     132.9    0.0    0.0  68 bar - nominal
+STAGE mach-mini      8  20  164x22      34.1    0.0    0.0  TMP
+STAGE mach-mini2     8  20  164x22     132.1    0.0    0.0  41 pct - nominal
+STAGE mach-mini      8  20  164x22      75.5    0.0    0.0  BUS A / B
+STAGE mach-mini      8  20  444x22     142.9    0.0    0.0  DRIVE STATISTICS
+STAGE mach-stat      9  20  207x23     140.2    0.0    0.0  Output|4.21 TJ
+STAGE mach-stat      9  20  207x23      82.3    0.0    0.0  Flux|0.98
+STAGE mach-stat      9  20  207x23     134.8    0.0    0.0  Coolant|STABLE
+STAGE mach-stat      9  20  207x23     108.9    0.0    0.0  Flow|83 pct
+STAGE mach-stat      9  20  207x23     143.8    0.0    0.0  Bearing|0.07 mm
+STAGE mach-stat      9  20  207x23     122.2    0.0    0.0  Cycles|18,402
+STAGE mach-stat      9  20  207x23     143.8    0.0    0.0  Manifold|2 of 2
+STAGE mach-stat      9  20  207x23     171.8    0.0    0.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  20  207x23     134.2    0.0    0.0  Last svc|412 hr
+STAGE mach-mini      8  20  211x22     172.0    0.0    0.0  CYLINDER BANK 1-16
+STAGE mach-mini      8  20  333x22     162.9    0.0    0.0  ENGINE CONDITION
+STAGE mach-plate     8  20  669x22     461.0    0.0    0.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  40  173x42      62.0    0.0    0.0  80%
+STAGE mach-word     10  20  173x22      79.3    0.0    0.0  NOMINAL
+STAGE control engine-click           box 211x38  label 20 px, 106.2 wide: inside the button
+STAGE 28 text parts: 0 wider than their box, 0 taller than their box, 0 not painted, 0 outside the stage
+OVERLAP 0 pair(s) among 77 strings
+shot machine-21px.png 1180x720 (78 text calls)
+STAGE machine  model 650 x 575  painted x1.167 = 758 x 671  225 parts  1 controls
+STAGE origin 293.8,107.9  right edge 1052.2  bottom edge 778.8
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  21  37x23       20.7    0.0    0.0  V1
+STAGE mach-cap       8  21  37x23       20.7    0.0    0.0  V2
+STAGE mach-cap       8  21  37x23       20.7    0.0    0.0  V3
+STAGE mach-cap       8  21  37x23       20.7    0.0    0.0  V4
+STAGE mach-cap       8  21  37x23       20.7    0.0    0.0  V5
+STAGE mach-cap       8  21  191x23     127.8    0.0    0.0  PRIMARY CORE
+STAGE mach-cap       8  21  163x23     131.9    0.0    0.0  TURBINE STAGE
+STAGE mach-mini      8  21  131x23     103.8    0.0    0.0  EXCHANGER
+STAGE mach-mini      8  21  173x23      30.9    0.0    0.0  PRS
+STAGE mach-mini2     8  21  173x23     138.8    0.0    0.0  68 bar - nominal
+STAGE mach-mini      8  21  173x23      35.7    0.0    0.0  TMP
+STAGE mach-mini2     8  21  173x23     137.9    0.0    0.0  41 pct - nominal
+STAGE mach-mini      8  21  173x23      78.9    0.0    0.0  BUS A / B
+STAGE mach-mini      8  21  467x23     149.3    0.0    0.0  DRIVE STATISTICS
+STAGE mach-stat      9  21  217x24     146.3    0.0    0.0  Output|4.21 TJ
+STAGE mach-stat      9  21  217x24      85.8    0.0    0.0  Flux|0.98
+STAGE mach-stat      9  21  217x24     140.6    0.0    0.0  Coolant|STABLE
+STAGE mach-stat      9  21  217x24     113.6    0.0    0.0  Flow|83 pct
+STAGE mach-stat      9  21  217x24     149.9    0.0    0.0  Bearing|0.07 mm
+STAGE mach-stat      9  21  217x24     127.4    0.0    0.0  Cycles|18,402
+STAGE mach-stat      9  21  217x24     149.9    0.0    0.0  Manifold|2 of 2
+STAGE mach-stat      9  21  217x24     179.2    0.0    0.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  21  217x24     139.9    0.0    0.0  Last svc|412 hr
+STAGE mach-mini      8  21  222x23     179.8    0.0    0.0  CYLINDER BANK 1-16
+STAGE mach-mini      8  21  350x23     170.3    0.0    0.0  ENGINE CONDITION
+STAGE mach-plate     8  21  702x23     482.0    0.0    0.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  42  182x44      65.0    0.0    0.0  80%
+STAGE mach-word     10  21  182x23      83.0    0.0    0.0  NOMINAL
+STAGE control engine-click           box 222x40  label 21 px, 110.9 wide: inside the button
+STAGE 28 text parts: 0 wider than their box, 0 taller than their box, 0 not painted, 0 outside the stage
+OVERLAP 0 pair(s) among 78 strings
+shot machine-23px.png 1180x720 (78 text calls)
+STAGE machine  model 650 x 575  painted x1.278 = 831 x 735  225 parts  1 controls
+STAGE origin 257.7,114.2  right edge 1088.3  bottom edge 848.9
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  23  41x26       22.6    0.0    0.0  V1
+STAGE mach-cap       8  23  41x26       22.6    0.0    0.0  V2
+STAGE mach-cap       8  23  41x26       22.6    0.0    0.0  V3
+STAGE mach-cap       8  23  41x26       22.6    0.0    0.0  V4
+STAGE mach-cap       8  23  41x26       22.6    0.0    0.0  V5
+STAGE mach-cap       8  23  210x26     138.9    0.0    0.0  PRIMARY CORE
+STAGE mach-cap       8  23  179x26     143.3    0.0    0.0  TURBINE STAGE
+STAGE mach-mini      8  23  143x26     112.9    0.0    0.0  EXCHANGER
+STAGE mach-mini      8  23  189x26      33.6    0.0    0.0  PRS
+STAGE mach-mini2     8  23  189x26     150.6    0.0    0.0  68 bar - nominal
+STAGE mach-mini      8  23  189x26      38.9    0.0    0.0  TMP
+STAGE mach-mini2     8  23  189x26     149.6    0.0    0.0  41 pct - nominal
+STAGE mach-mini      8  23  189x26      85.6    0.0    0.0  BUS A / B
+STAGE mach-mini      8  23  511x26     162.1    0.0    0.0  DRIVE STATISTICS
+STAGE mach-stat      9  23  238x27     158.4    0.0    0.0  Output|4.21 TJ
+STAGE mach-stat      9  23  238x27      92.6    0.0    0.0  Flux|0.98
+STAGE mach-stat      9  23  238x27     152.2    0.0    0.0  Coolant|STABLE
+STAGE mach-stat      9  23  238x27     122.9    0.0    0.0  Flow|83 pct
+STAGE mach-stat      9  23  238x27     162.3    0.0    0.0  Bearing|0.07 mm
+STAGE mach-stat      9  23  238x27     137.8    0.0    0.0  Cycles|18,402
+STAGE mach-stat      9  23  238x27     162.3    0.0    0.0  Manifold|2 of 2
+STAGE mach-stat      9  23  238x27     194.1    0.0    0.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  23  238x27     151.3    0.0    0.0  Last svc|412 hr
+STAGE mach-mini      8  23  243x26     195.2    0.0    0.0  CYLINDER BANK 1-16
+STAGE mach-mini      8  23  383x26     185.1    0.0    0.0  ENGINE CONDITION
+STAGE mach-plate     8  23  769x26     524.0    0.0    0.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  46  199x49      71.0    0.0    0.0  80%
+STAGE mach-word     10  23  199x26      90.3    0.0    0.0  NOMINAL
+STAGE control engine-click           box 243x43  label 23 px, 120.3 wide: inside the button
+STAGE 28 text parts: 0 wider than their box, 0 taller than their box, 0 not painted, 0 outside the stage
+OVERLAP 0 pair(s) among 78 strings
+
+# ---- condition words and two presses of the button, 1440 x 940 ----
+shot machine-100-nominal.png 1440x940 (72 text calls)
+STAGE machine  model 650 x 575  painted x1.000 = 650 x 575  225 parts  1 controls
+STAGE origin 478.0,100.1  right edge 1128.0  bottom edge 675.1
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V1
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V2
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V3
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V4
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V5
+STAGE mach-cap       8  18  164x20     111.1    0.0    0.0  PRIMARY CORE
+STAGE mach-cap       8  18  140x20     114.8    0.0    0.0  TURBINE STAGE
+STAGE mach-mini      8  18  112x20      90.1    0.0    0.0  EXCHANGER
+STAGE mach-mini      8  18  148x20      26.8    0.0    0.0  PRS
+STAGE mach-mini2     8  18  148x20     121.1    0.0    0.0  68 bar - nominal
+STAGE mach-mini      8  18  148x20      30.9    0.0    0.0  TMP
+STAGE mach-mini2     8  18  148x20     120.4    0.0    0.0  41 pct - nominal
+STAGE mach-mini      8  18  148x20      68.8    0.0    0.0  BUS A / B
+STAGE mach-mini      8  18  400x20     130.1    0.0    0.0  DRIVE STATISTICS
+STAGE mach-stat      9  18  186x21     128.1    0.0    0.0  Output|4.21 TJ
+STAGE mach-stat      9  18  186x21      75.5    0.0    0.0  Flux|0.98
+STAGE mach-stat      9  18  186x21     123.2    0.0    0.0  Coolant|STABLE
+STAGE mach-stat      9  18  186x21      99.6    0.0    0.0  Flow|83 pct
+STAGE mach-stat      9  18  186x21     131.4    0.0    0.0  Bearing|0.07 mm
+STAGE mach-stat      9  18  186x21     111.8    0.0    0.0  Cycles|18,402
+STAGE mach-stat      9  18  186x21     131.4    0.0    0.0  Manifold|2 of 2
+STAGE mach-stat      9  18  186x21     156.9    0.0    0.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  18  186x21     122.8    0.0    0.0  Last svc|412 hr
+STAGE mach-mini      8  18  190x20     156.5    0.0    0.0  CYLINDER BANK 1-16
+STAGE mach-mini      8  18  300x20     148.1    0.0    0.0  ENGINE CONDITION
+STAGE mach-plate     8  18  602x20     419.0    0.0    0.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  36  156x38      75.0    0.0    0.0  100%
+STAGE mach-word     10  18  156x20      72.0    0.0    0.0  NOMINAL
+STAGE control engine-click           box 190x34  label 18 px, 96.8 wide: inside the button
+STAGE 28 text parts: 0 wider than their box, 0 taller than their box, 0 not painted, 0 outside the stage
+OVERLAP 0 pair(s) among 72 strings
+shot machine-062-serviceable.png 1440x940 (76 text calls)
+STAGE machine  model 650 x 575  painted x1.000 = 650 x 575  225 parts  1 controls
+STAGE origin 478.0,100.1  right edge 1128.0  bottom edge 675.1
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V1
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V2
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V3
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V4
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V5
+STAGE mach-cap       8  18  164x20     111.1    0.0    0.0  PRIMARY CORE
+STAGE mach-cap       8  18  140x20     114.8    0.0    0.0  TURBINE STAGE
+STAGE mach-mini      8  18  112x20      90.1    0.0    0.0  EXCHANGER
+STAGE mach-mini      8  18  148x20      26.8    0.0    0.0  PRS
+STAGE mach-mini2     8  18  148x20     121.1    0.0    0.0  68 bar - nominal
+STAGE mach-mini      8  18  148x20      30.9    0.0    0.0  TMP
+STAGE mach-mini2     8  18  148x20     120.4    0.0    0.0  41 pct - nominal
+STAGE mach-mini      8  18  148x20      68.8    0.0    0.0  BUS A / B
+STAGE mach-mini      8  18  400x20     130.1    0.0    0.0  DRIVE STATISTICS
+STAGE mach-stat      9  18  186x21     128.1    0.0    0.0  Output|4.21 TJ
+STAGE mach-stat      9  18  186x21      75.5    0.0    0.0  Flux|0.98
+STAGE mach-stat      9  18  186x21     123.2    0.0    0.0  Coolant|STABLE
+STAGE mach-stat      9  18  186x21      99.6    0.0    0.0  Flow|83 pct
+STAGE mach-stat      9  18  186x21     131.4    0.0    0.0  Bearing|0.07 mm
+STAGE mach-stat      9  18  186x21     111.8    0.0    0.0  Cycles|18,402
+STAGE mach-stat      9  18  186x21     131.4    0.0    0.0  Manifold|2 of 2
+STAGE mach-stat      9  18  186x21     156.9    0.0    0.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  18  186x21     122.8    0.0    0.0  Last svc|412 hr
+STAGE mach-mini      8  18  190x20     156.5    0.0    0.0  CYLINDER BANK 1-16
+STAGE mach-mini      8  18  300x20     148.1    0.0    0.0  ENGINE CONDITION
+STAGE mach-plate     8  18  602x20     419.0    0.0    0.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  36  156x38      56.0    0.0    0.0  62%
+STAGE mach-word     10  18  156x20      95.1    0.0    0.0  SERVICEABLE
+STAGE control engine-click           box 190x34  label 18 px, 96.8 wide: inside the button
+STAGE 28 text parts: 0 wider than their box, 0 taller than their box, 0 not painted, 0 outside the stage
+OVERLAP 0 pair(s) among 76 strings
+shot machine-030-degraded.png 1440x940 (76 text calls)
+STAGE machine  model 650 x 575  painted x1.000 = 650 x 575  225 parts  1 controls
+STAGE origin 478.0,100.1  right edge 1128.0  bottom edge 675.1
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V1
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V2
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V3
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V4
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V5
+STAGE mach-cap       8  18  164x20     111.1    0.0    0.0  PRIMARY CORE
+STAGE mach-cap       8  18  140x20     114.8    0.0    0.0  TURBINE STAGE
+STAGE mach-mini      8  18  112x20      90.1    0.0    0.0  EXCHANGER
+STAGE mach-mini      8  18  148x20      26.8    0.0    0.0  PRS
+STAGE mach-mini2     8  18  148x20     121.1    0.0    0.0  68 bar - nominal
+STAGE mach-mini      8  18  148x20      30.9    0.0    0.0  TMP
+STAGE mach-mini2     8  18  148x20     120.4    0.0    0.0  41 pct - nominal
+STAGE mach-mini      8  18  148x20      68.8    0.0    0.0  BUS A / B
+STAGE mach-mini      8  18  400x20     130.1    0.0    0.0  DRIVE STATISTICS
+STAGE mach-stat      9  18  186x21     128.1    0.0    0.0  Output|4.21 TJ
+STAGE mach-stat      9  18  186x21      75.5    0.0    0.0  Flux|0.98
+STAGE mach-stat      9  18  186x21     123.2    0.0    0.0  Coolant|STABLE
+STAGE mach-stat      9  18  186x21      99.6    0.0    0.0  Flow|83 pct
+STAGE mach-stat      9  18  186x21     131.4    0.0    0.0  Bearing|0.07 mm
+STAGE mach-stat      9  18  186x21     111.8    0.0    0.0  Cycles|18,402
+STAGE mach-stat      9  18  186x21     131.4    0.0    0.0  Manifold|2 of 2
+STAGE mach-stat      9  18  186x21     156.9    0.0    0.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  18  186x21     122.8    0.0    0.0  Last svc|412 hr
+STAGE mach-mini      8  18  190x20     156.5    0.0    0.0  CYLINDER BANK 1-16
+STAGE mach-mini      8  18  300x20     148.1    0.0    0.0  ENGINE CONDITION
+STAGE mach-plate     8  18  602x20     419.0    0.0    0.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  36  156x38      56.0    0.0    0.0  30%
+STAGE mach-word     10  18  156x20      81.6    0.0    0.0  DEGRADED
+STAGE control engine-click           box 190x34  label 18 px, 96.8 wide: inside the button
+STAGE 28 text parts: 0 wider than their box, 0 taller than their box, 0 not painted, 0 outside the stage
+OVERLAP 0 pair(s) among 76 strings
+shot machine-007-critical.png 1440x940 (76 text calls)
+STAGE machine  model 650 x 575  painted x1.000 = 650 x 575  225 parts  1 controls
+STAGE origin 478.0,100.1  right edge 1128.0  bottom edge 675.1
+STAGE class        ref  px  box       text.w over.w over.h  text
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V1
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V2
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V3
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V4
+STAGE mach-cap       8  18  32x20       17.9    0.0    0.0  V5
+STAGE mach-cap       8  18  164x20     111.1    0.0    0.0  PRIMARY CORE
+STAGE mach-cap       8  18  140x20     114.8    0.0    0.0  TURBINE STAGE
+STAGE mach-mini      8  18  112x20      90.1    0.0    0.0  EXCHANGER
+STAGE mach-mini      8  18  148x20      26.8    0.0    0.0  PRS
+STAGE mach-mini2     8  18  148x20     121.1    0.0    0.0  68 bar - nominal
+STAGE mach-mini      8  18  148x20      30.9    0.0    0.0  TMP
+STAGE mach-mini2     8  18  148x20     120.4    0.0    0.0  41 pct - nominal
+STAGE mach-mini      8  18  148x20      68.8    0.0    0.0  BUS A / B
+STAGE mach-mini      8  18  400x20     130.1    0.0    0.0  DRIVE STATISTICS
+STAGE mach-stat      9  18  186x21     128.1    0.0    0.0  Output|4.21 TJ
+STAGE mach-stat      9  18  186x21      75.5    0.0    0.0  Flux|0.98
+STAGE mach-stat      9  18  186x21     123.2    0.0    0.0  Coolant|STABLE
+STAGE mach-stat      9  18  186x21      99.6    0.0    0.0  Flow|83 pct
+STAGE mach-stat      9  18  186x21     131.4    0.0    0.0  Bearing|0.07 mm
+STAGE mach-stat      9  18  186x21     111.8    0.0    0.0  Cycles|18,402
+STAGE mach-stat      9  18  186x21     131.4    0.0    0.0  Manifold|2 of 2
+STAGE mach-stat      9  18  186x21     156.9    0.0    0.0  Tolerance|+/- 0.4%
+STAGE mach-stat      9  18  186x21     122.8    0.0    0.0  Last svc|412 hr
+STAGE mach-mini      8  18  190x20     156.5    0.0    0.0  CYLINDER BANK 1-16
+STAGE mach-mini      8  18  300x20     148.1    0.0    0.0  ENGINE CONDITION
+STAGE mach-plate     8  18  602x20     419.0    0.0    0.0  DRIVE UNIT K-4 . SER WN-1083-E . BANK 1-16
+STAGE mach-pct      26  36  156x38      37.0    0.0    0.0  7%
+STAGE mach-word     10  18  156x20      64.8    0.0    0.0  CRITICAL
+STAGE control engine-click           box 190x34  label 18 px, 96.8 wide: inside the button
+STAGE 28 text parts: 0 wider than their box, 0 taller than their box, 0 not painted, 0 outside the stage
+OVERLAP 0 pair(s) among 76 strings
+STATE air: hold=20.0 stage=4 word=OPTIMAL filterLife=0 engine=80 rack=18 rations=5 canisters=6
+clickhit task 'engine-click' at 1017,529
+STATE air: hold=19.0 stage=4 word=OPTIMAL filterLife=0 engine=90 rack=18 rations=5 canisters=6
+clickhit task 'engine-click' at 1076,662
+STATE air: hold=18.0 stage=4 word=OPTIMAL filterLife=0 engine=100 rack=18 rations=5 canisters=6
