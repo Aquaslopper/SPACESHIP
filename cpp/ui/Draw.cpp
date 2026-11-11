@@ -2366,6 +2366,24 @@ void ShellView::PaintCrewRecord(const Simulation& sim) {
   (void)sim;
 }
 
+namespace {
+// A picture from assets/art/crew by name, or null when no such file was loaded.
+const Texture2D* CrewTexture(const std::map<std::string, void*>& art, const std::string& name) {
+  const auto found = art.find(name);
+  if (found == art.end() || found->second == nullptr) { return nullptr; }
+  const Texture2D* texture = static_cast<const Texture2D*>(found->second);
+  return texture->id != 0 ? texture : nullptr;
+}
+
+// One colour moved towards another: 0 leaves `from`, 1 gives `to`.
+Color Blend(Color from, Color to, float amount) {
+  const auto channel = [amount](unsigned char a, unsigned char b) {
+    return static_cast<unsigned char>(std::lround(a + (b - a) * amount));
+  };
+  return Color{channel(from.r, to.r), channel(from.g, to.g), channel(from.b, to.b), 255};
+}
+}  // namespace
+
 void ShellView::PaintQuartersScreen(Simulation& sim) {
   navHits_.clear();
   taskButtons_.clear();
@@ -2384,7 +2402,10 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
   };
   // Payroll and roster are separate in paintRoster(). Do not paint the full
   // roster as a table and then overlay clickable copies over its payroll rows.
-  const Area hall{(left + right - 560) / 2, panelTop, 560, 300};
+  // The stage is laid out for one reading size and grows with the size in use.
+  const float stageScale = StageScale(screen.stage, theme_);
+  const Area hall{(left + right - screen.stage.width * stageScale) / 2, panelTop,
+                  screen.stage.width * stageScale, screen.stage.height * stageScale};
   const bool stacked = hall.x < left + column + 10 || hall.Right() > right - column - 10;
   float rowY = stacked ? hall.Bottom() + 10 : panelTop;
   if (!screen.left.empty()) {
@@ -2421,7 +2442,14 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
                    static_cast<int>(hall.y + kDoubleInset - contentScroll_),
                    std::max(0, static_cast<int>(hall.w - 2.0f * kDoubleInset)),
                    std::max(0, static_cast<int>(hall.h - 2.0f * kDoubleInset)));
-  for (const MachinePart& part : quarters_.hall) {
+  MachinePart grown;
+  for (const MachinePart& drawn : quarters_.hall) {
+    if (stageScale != 1.0f) {
+      grown = drawn;
+      grown.box = Area{drawn.box.x * stageScale, drawn.box.y * stageScale,
+                       drawn.box.w * stageScale, drawn.box.h * stageScale};
+    }
+    const MachinePart& part = stageScale != 1.0f ? grown : drawn;
     if (PaintScenePart(part, hall)) continue;
     const int x = static_cast<int>(hall.x + part.box.x);
     const int y = static_cast<int>(hall.y + part.box.y);
@@ -2438,28 +2466,114 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
       Text(part.text.c_str(), x + 2, y + 1, TypePx(8) , ToRay(p.muted));
     }
   }
-  for (const SpritePixel& pixel : quarters_.scene.pixels) {
-    DrawRectangle(static_cast<int>(hall.x + pixel.box.x),
-                  static_cast<int>(hall.y + pixel.box.y),
-                  std::max(1, static_cast<int>(pixel.box.w)),
-                  std::max(1, static_cast<int>(pixel.box.h)),
-                  Color{static_cast<unsigned char>(std::stoi(pixel.colour.substr(1, 2), nullptr, 16)),
-                        static_cast<unsigned char>(std::stoi(pixel.colour.substr(3, 2), nullptr, 16)),
-                        static_cast<unsigned char>(std::stoi(pixel.colour.substr(5, 2), nullptr, 16)),
-                        255});
+
+  // The portrait card: the selected hand in front of their roster colour, with
+  // name and role on a plate across the foot of the picture.
+  {
+    const Area card{hall.x + quarters_.card.x * stageScale, hall.y + quarters_.card.y * stageScale,
+                    quarters_.card.w * stageScale, quarters_.card.h * stageScale};
+    const Color edge = ToRay(p.borderDark);
+    const int size = TypePx(10);
+    const float pad = 8.0f * stageScale;
+    const float textW = std::max(1.0f, card.w - 2.0f * pad);
+    DrawRectangle(static_cast<int>(card.x), static_cast<int>(card.y), static_cast<int>(card.w),
+                  static_cast<int>(card.h), Blend(hallBg, HexColor(quarters_.cardColour, hallBg), 0.38f));
+    const Texture2D* portrait = CrewTexture(crewArt_, quarters_.scene.portrait);
+    if (portrait != nullptr) {
+      // The whole picture, as large as the card takes it, standing on the lower edge.
+      const float fit = std::min(card.w / static_cast<float>(portrait->width),
+                                 card.h / static_cast<float>(portrait->height));
+      const float w = static_cast<float>(portrait->width) * fit;
+      const float h = static_cast<float>(portrait->height) * fit;
+      DrawTexturePro(*portrait,
+                     Rectangle{0, 0, static_cast<float>(portrait->width),
+                               static_cast<float>(portrait->height)},
+                     Rectangle{std::round(card.x + (card.w - w) / 2.0f),
+                               std::round(card.Bottom() - h), w, h},
+                     Vector2{0, 0}, 0.0f, WHITE);
+    } else {
+      const std::string none = quarters_.hasCrew ? "No portrait on file." : "No crew aboard.";
+      float ty = card.y + card.h * 0.36f;
+      for (const auto& row : WrapText(none, textW, size, SelectFont(size, false))) {
+        Text(row.c_str(), static_cast<int>(card.x + (card.w - TextWidth(row.c_str(), size)) / 2.0f),
+             static_cast<int>(ty), size, ToRay(p.muted));
+        ty += line;
+      }
+    }
+    if (quarters_.hasCrew) {
+      const auto nameRows = WrapText(quarters_.cardName, textW, size, SelectFont(size, false));
+      const auto roleRows = WrapText(quarters_.cardRole, textW, size, SelectFont(size, false));
+      const float plateH = static_cast<float>(nameRows.size() + roleRows.size()) * line + pad;
+      const float plateY = card.Bottom() - plateH;
+      DrawRectangle(static_cast<int>(card.x), static_cast<int>(plateY), static_cast<int>(card.w),
+                    static_cast<int>(plateH) + 1, Fade(hallBg, 0.9f));
+      DrawRectangle(static_cast<int>(card.x), static_cast<int>(plateY), static_cast<int>(card.w), 1, edge);
+      float ty = plateY + pad / 2.0f;
+      for (const auto& row : nameRows) {
+        Text(row.c_str(), static_cast<int>(card.x + pad), static_cast<int>(ty), size, ToRay(p.ink));
+        ty += line;
+      }
+      for (const auto& row : roleRows) {
+        Text(row.c_str(), static_cast<int>(card.x + pad), static_cast<int>(ty), size, ToRay(p.muted));
+        ty += line;
+      }
+    }
+    DrawRectangleLinesEx(Rectangle{card.x, card.y, card.w, card.h}, 2.0f, edge);
+  }
+
+  // The figure is the first of its pictures on file. With none, it is the
+  // rectangles; with one, the rectangles before `figureFrom` are still painted:
+  // the desk, the crate, the tool, the sign.
+  const CrewScene& scene = quarters_.scene;
+  const ScenePicture* shown = nullptr;
+  const Texture2D* figure = nullptr;
+  for (const ScenePicture& candidate : scene.figureArt) {
+    figure = CrewTexture(crewArt_, candidate.name);
+    if (figure != nullptr) { shown = &candidate; break; }
+  }
+  const std::size_t cells =
+      figure != nullptr ? std::min(scene.figureFrom, scene.pixels.size()) : scene.pixels.size();
+  for (std::size_t i = 0; i < cells; ++i) {
+    // Each edge is rounded down on its own, so neighbouring cells meet at every scale.
+    const Area& box = scene.pixels[i].box;
+    const int x0 = static_cast<int>(std::floor(hall.x + box.x * stageScale));
+    const int y0 = static_cast<int>(std::floor(hall.y + box.y * stageScale));
+    const int x1 = static_cast<int>(std::floor(hall.x + (box.x + box.w) * stageScale));
+    const int y1 = static_cast<int>(std::floor(hall.y + (box.y + box.h) * stageScale));
+    DrawRectangle(x0, y0, std::max(1, x1 - x0), std::max(1, y1 - y0),
+                  HexColor(scene.pixels[i].colour, ToRay(p.coffee)));
+  }
+  if (figure != nullptr) {
+    // Half the picture's pixel size at the size the stage is laid out for,
+    // the middle of its lower edge on its mark.
+    const float w = static_cast<float>(figure->width) * 0.5f * stageScale;
+    const float h = static_cast<float>(figure->height) * 0.5f * stageScale;
+    const Rectangle at{std::round(hall.x + static_cast<float>(shown->x) * stageScale - w / 2.0f),
+                       std::round(hall.y + static_cast<float>(shown->base) * stageScale - h), w, h};
+    const auto paint = [&at](const Texture2D& texture, Color tint) {
+      DrawTexturePro(texture,
+                     Rectangle{0, 0, static_cast<float>(texture.width),
+                               static_cast<float>(texture.height)},
+                     at, Vector2{0, 0}, 0.0f, tint);
+    };
+    // The uniform is a separate layer underneath, in the colour of the job.
+    const Texture2D* cloth = CrewTexture(crewArt_, shown->name + "-cloth");
+    if (cloth != nullptr) { paint(*cloth, HexColor(shown->cloth, Color{162, 148, 127, 255})); }
+    paint(*figure, WHITE);
   }
   if (quarters_.hasCrew) {
-    // Non-green 4x4-pixel-grid speech bubble beside the figure (free to talk, 0 clicks).
-    const Area talkBtn{hall.x + 328.0f, hall.y + 128.0f, 32.0f, 32.0f};
+    // The speech bubble beside the figure: the conversation control.
+    const Area talkBtn{hall.x + quarters_.talk.x * stageScale, hall.y + quarters_.talk.y * stageScale,
+                       quarters_.talk.w * stageScale, quarters_.talk.h * stageScale};
     const bool enabled = quarters_.conversation.enabled;
     const bool hovered = enabled && talkBtn.Contains(mouseX_, mouseY_ + contentScroll_);
     const Color btnBg = ToRay(hovered || !enabled ? p.panel3 : p.panel);
     PaintChamferBoxRay(talkBtn, kChamferSmall, btnBg,
                        ToRay(enabled ? p.borderDark : p.border), ToRay(p.border));
     const Color mark = ToRay(enabled ? p.ink : p.muted);
-    // 4px sprite-aligned speech bubble + 3 dots inside the 32x32 frame.
-    const int bx = static_cast<int>(talkBtn.x) + 6;
-    const int by = static_cast<int>(talkBtn.y) + 7;
+    // A 20x18 bubble with three dots, in the middle of the frame.
+    const int bx = static_cast<int>(talkBtn.x + (talkBtn.w - 20.0f) / 2.0f);
+    const int by = static_cast<int>(talkBtn.y + (talkBtn.h - 18.0f) / 2.0f);
     DrawRectangleLines(bx, by, 20, 14, mark);
     DrawRectangle(bx + 2, by + 13, 4, 4, btnBg);
     DrawRectangle(bx + 2, by + 14, 2, 4, mark);

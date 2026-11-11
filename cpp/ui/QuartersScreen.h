@@ -60,7 +60,12 @@ struct QuartersScreenModel {
   std::string said;
   std::string payWages, payEvery, payNext, payPurse;
   CrewScene scene;
-  std::vector<MachinePart> hall;   // 560x300 of scenery
+  std::vector<MachinePart> hall;   // the corridor's scenery, in stage units
+  // The portrait card beside the corridor and the conversation control beside
+  // the figure, in stage units; and whose card it is.
+  Area card;
+  Area talk;
+  std::string cardName, cardRole, cardColour;
   std::string selectedId;
   bool hasCrew = false;
 };
