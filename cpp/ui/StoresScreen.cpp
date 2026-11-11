@@ -36,6 +36,26 @@ std::string GoodDisplayName(const Simulation& sim, const std::string& goodId) {
   return goodId;
 }
 
+std::string ShortGoodLabel(const Simulation& sim, const GoodsLot& lot) {
+  for (const Good& g : sim.World().goods) {
+    if (g.name == lot.name && !g.id.empty()) {
+      if (g.id == "medicine") { return "meds"; }
+      if (g.id == "greens") { return "crop"; }
+      if (g.id == "water") { return "ice"; }
+      if (g.id == "relics") { return "core"; }
+      return g.id;
+    }
+  }
+  if (lot.name.compare(0, 17, "Recovered Salvage") == 0) { return "salv"; }
+  if (lot.name.compare(0, 7, "Medical") == 0) { return "meds"; }
+  std::string out;
+  for (unsigned char c : lot.name) {
+    if (c == ' ' || out.size() >= 5) { break; }
+    out.push_back(static_cast<char>(c >= 'A' && c <= 'Z' ? (c + ('a' - 'A')) : c));
+  }
+  return out.empty() ? std::string("box") : out;
+}
+
 double GoodUnitVolume(const Simulation& sim, const std::string& goodId) {
   for (const Good& g : sim.World().goods) {
     if (g.id == goodId) { return static_cast<double>(g.vol); }
@@ -179,17 +199,21 @@ CargoRoomModel BuildCargoRoom(const Simulation& sim, CargoSelection* selection) 
     CargoHoldLot block;
     block.id = lot.id;
     block.label = lot.name;
+    block.shortLabel = ShortGoodLabel(sim, lot);
     block.kind = lot.kind;
     block.vol = lot.vol;
+    block.sortOrder = sim.CargoSortOrder(lot.id);
+    block.mixEpoch = sim.CargoMixEpoch(lot.id);
     block.stowed = stowed;
     block.selected = selected;
     block.contract = !lot.contractId.empty();
     block.risk = lot.risk;
     if (!stowed) {
-      const std::uint32_t h = MixHash(lot.id, sim.ActionCount() / 5.0);
-      block.jitterX = static_cast<float>(static_cast<int>(h & 0xFFu) - 128) / 128.0f;
-      block.jitterY = static_cast<float>(static_cast<int>((h >> 8) & 0xFFu) - 128) / 128.0f;
-      block.tiltDeg = static_cast<float>(static_cast<int>((h >> 16) % 15u) - 7);
+      const std::uint32_t hx = MixHash(lot.id + ":x", static_cast<double>(block.mixEpoch));
+      const std::uint32_t hy = MixHash(lot.id + ":y", static_cast<double>(block.mixEpoch));
+      block.jitterX = static_cast<float>(static_cast<int>(hx & 0xFFFFu) - 32768) / 32768.0f;
+      block.jitterY = static_cast<float>(static_cast<int>(hy & 0xFFFFu) - 32768) / 32768.0f;
+      block.tiltDeg = static_cast<float>(static_cast<int>((hx >> 16) % 15u) - 7);
     }
     model.hold.push_back(std::move(block));
   }

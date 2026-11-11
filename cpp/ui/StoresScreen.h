@@ -70,8 +70,11 @@ struct CargoLotView {
 struct CargoHoldLot {
   std::string id;
   std::string label;
+  std::string shortLabel;
   std::string kind;
   double vol = 0;
+  int sortOrder = 0;
+  int mixEpoch = 0;
   bool stowed = false;
   bool selected = false;
   bool contract = false;

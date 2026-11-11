@@ -1239,6 +1239,9 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
       }
     }
     stowed_.clear();
+    stowOrder_.clear();
+    cargoMixGen_.clear();
+    justStowedLot_.clear();
     stowClicks_ = 0;
     stowThreshold_ = 0;
     mixClicks_ = 0;
