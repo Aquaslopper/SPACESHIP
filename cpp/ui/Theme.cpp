@@ -154,11 +154,11 @@ int Theme::TextPx(int reference) const {
 }
 
 int Theme::HomeInfoLabelPx() const {
-  return static_cast<int>(std::lround(FontPx())) - 6;
+  return static_cast<int>(std::lround(FontPx()));
 }
 
 int Theme::HomeInfoValuePx() const {
-  return static_cast<int>(std::lround(FontPx())) - 3;
+  return static_cast<int>(std::lround(FontPx()));
 }
 
 float Theme::LineHeightForPx(float px) {
