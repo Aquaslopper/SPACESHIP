@@ -486,7 +486,6 @@ class Simulation {
 
   // Automation that follows the clock
 
-  void AutoMess();
 
   Catalog catalog_;
   Catalog sourceCatalog_;
