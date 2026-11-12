@@ -23,13 +23,13 @@
       "word": "THIN"
     },
     {
-      "harm": 0,
+      "harm": 1,
       "slow": 1,
       "tone": "#bda43f",
       "word": "FADING"
     },
     {
-      "harm": 0,
+      "harm": 1,
       "slow": 0,
       "tone": "#7f9161",
       "word": "OPTIMAL"
