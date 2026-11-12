@@ -3,15 +3,13 @@ Welcome to the spaceship, we continue our work on the C++ port, as always.
 -----------------------------------------------------------------------
 
 ## Antipattern-Block:
-„Do NOT add state machines for worker behavior."
-„Do NOT create event systems for button presses."
-„Do NOT interpret or 'improve' the gameplay logic."
-„Do NOT add comments that describe game mechanics – the AGENTS.md is the single source of truth for gameplay."
+- „Do NOT add state machines for worker behavior."
+- „Do NOT create event systems for button presses."
+- „Do NOT interpret or 'improve' the gameplay logic."
 
 ## SOURCE AUTHORITY: ABSOLUTE; NO EXCEPTIONS
 1. the owner's instructions
 2. cpp/
-3. tests/
 
 ## HARD RULES
 -**Do not edit files without the owner's permission.** Wait for explicit approval from the repository owner
