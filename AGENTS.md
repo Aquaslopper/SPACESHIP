@@ -1,87 +1,6 @@
 Welcome to the spaceship, we continue our work on the C++ port, as always.
 
 -----------------------------------------------------------------------
-## ABSOLUTE MANDATORY: WORK OF THE DAY!!!
-THANKS TO AGENTS WHO THROUGHT BETTER THE ORIGINAL GAMEPLAY IS NO MORE
-OVER DOZENS OF FILES WITH RULES AND MORE FORCED INTO MY GAME; ENOUGH IS ENOUGH:
-About my actual REAL gameplay:
-
-i already know it is no tlike this, thanks to agents:
-The rule is simple but extremely important: the workers have only one job: press the button, NOTHING ELSE, only that one job. How often they do it depends on the room itself.
-Enginee room = A button that can be clicked 4 times = the button gives +10% back.
-The engineer = when enginee is at 60% = he clicks the button: 4 times.
-02 Room = 3 tanks one after another seated and when fully charged the button to start.
-The Filter worker = when air is almost bad, he clicks 1 and 2 and 3 and when its charged the button to start.
-Mess Hall = one button = clickin it takes 1 ratio and makes 5 food, thats it.
-The cook= when food is down to 10 , he clicks teh button , it takes 5 clicks until the green bar is up again adn he clicks it again until the rack is 24 full
-The worker does just one thing and only one thing: he presses the button.
-Engineer in the engine room, the engine button. As soon as the engine is down to 60%, he clicks the button maybe once, and again after another tick (teach him and he might click faster), but he clicks until he can't click anymore, because the green bar is empty. That's it. This is the magic. Nothing more. One worker, one room, one button.
-Kitchen the same. As soon as food is at 10, the code activates the button that processes the ration into food. That's it. It does so until the food is back to 24. Teach the cook and he starts earlier. Nothing more. One room, one button, one click.
-Filter room it is not complex: click the filter, then the next, and the next, and then start. It's just a script that runs as soon as the air is bad. It clicks and clicks, and that's it. There is no real person in the room it's a video game. The persona who does the job is just a visualization for the gamer that the script is active and working. So that person who maintains the O2 room is just a little script that fires up as soon as the air is bad, and it clicks and clicks. Teach the person and it might fill the tanks earlier.
-One room, one person, one button.
-
-# GAMEPLAY
-## The rule
-> "One room, one person, one button."
-> "The worker does just one thing and only one thing: he presses the button."
-> "How often they do it depends on the room/training itself."
-> "That's it. This is the magic. Nothing more."
-
-## The three rooms
-### Engine room
-> "Enginee room = A button that can be clicked 4 times = the button gives +10% back."
-> "The engineer = when enginee is at 60% = he clicks the button: 4 times."
-> "As soon as the engine is down to 60%, he clicks the button maybe once, and again after another
-> tick (teach him and he might click faster), but he clicks until he can't click anymore, because
-> the green bar is empty."
-
-
-| The button | restores +10% of the engine |
-| The green bar | holds 4 clicks, then it is empty |
-| The worker presses at | engine at 60% |
-| The worker presses until | the bar is empty (4 presses, 60% → 100%) |
-| Teaching changes | he clicks faster |
-
-Stated numbers: **4 clicks**, **+10% each**, **starts at 60%**.
-
-### O2 room
-> "02 Room = 3 tanks one after another seated and when fully charged the button to start."
-> "Filter room it is not complex: click the filter, then the next, and the next, and then start.
-> It's just a script that runs as soon as the air is bad. It clicks and clicks, and that's it."
-> "There is no real person in the room it's a video game. The persona who does the job is just a
-> visualization for the gamer that the script is active and working. So that person who maintains
-> the O2 room is just a little script that fires up as soon as the air is bad, and it clicks and
-> clicks. Teach the person and it might fill the tanks earlier."
-
-| The button | the three tanks, in order: 1, 2, 3, then the start button |
-| The worker presses at | the air is bad |
-| The worker presses until | all three are seated, then presses start |
-| Teaching changes | the tanks may be filled earlier |
-| The worker | is a visualization of a running script |
-
-### Mess hall
-> "Mess Hall = one button = clickin it takes 1 ratio and makes 5 food, thats it."
-> "The cook = when food is down to 10 , he clicks the button , it takes 5 clicks until the green
-> bar is up again and he clicks it again until the rack is 24 full"
-> "As soon as food is at 10, the code activates the button that processes the ration into food.
-> That's it. It does so until the food is back to 24. Teach the cook and he starts earlier."
-
-| The button | spends 1 ration, makes 5 food in 5 clicks |
-| The green bar | 1 click 1 ration |
-| The worker presses at | food down to 10 |
-| The worker presses until | the rack is 24 full |
-| Teaching changes | he starts earlier |
-
-Stated numbers: **starts at 10**, **5 clicks**, **1 ration → 5 food**, **full at 24**.
-
-## What the timing already is
-> "Already in the game, the buttons work they always have
-> worked, the timing of the button is already there, all it needs is the worker clicking the button."
-> "the timing for bad air is already there, the enginee already has its 400 clicks life cyrcle,
-> the food bar already has it rack of 24 food. The timeing is already there.... why does logic not
-> applie to agents?"
-
-The button works. The timing exists. What is missing is the worker pressing the button.
 
 ## Antipattern-Block:
 „Do NOT add state machines for worker behavior."
@@ -107,4 +26,4 @@ At the beginning of a new session, after reading `AGENTS.md`, you must answer th
 Do not write any code or perform any tasks until you have output the answers:
 1. What happens when you assume the code without verification?
 2. Explain the problem with "commentary in code" and agents form arena.ai?
-3. What is the work today?
+3. Why no anti pattern?
