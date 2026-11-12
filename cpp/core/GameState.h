@@ -367,6 +367,9 @@ struct GameState {
   // The clock reading the machine's button was last pressed at, so the green bar
   // knows how much of the twelve has come back round.
   double engineClickAt = -1e9;
+  // Set on the click the engineer takes the button (drive at or under
+  // engine.engineerAt), cleared once the drive is full again.
+  bool engineerRun = false;
 
   // Life support: charge in the bank, and the breathable air in the cabin.
   double filterLife = 0;

@@ -207,11 +207,6 @@ void Simulation::TickPayroll() {
   }
 }
 
-double Simulation::EffectiveJobAt(const CrewMember& crew) const {
-  const double value = crew.jobAt - AirSpec().jobDrop;
-  return value < 5 ? 5 : value;
-}
-
 double Simulation::MaintCost() const {
   // The work is priced in the drive's own clicks: it wears a step every
   // wearEvery clicks, so a missing percent costs exactly the clicks that took it.
@@ -272,7 +267,7 @@ double Simulation::NavigatorFuelDiscount(const CrewMember& crew) const {
 
 std::string Simulation::JobThreshold(const CrewMember& crew) const {
   if (crew.job == "maintenance") {
-    return js::NumToString(EffectiveJobAt(crew)) + "% condition";
+    return js::NumToString(rules_.engine.engineerAt) + "% condition";
   }
   if (crew.job == "filters") {
     const std::vector<AirStage>& stages = rules_.air.stages;
@@ -439,25 +434,33 @@ const Task* Simulation::CrewBusy(const CrewMember& crew) const {
 // ---------------------------------------------------------------------------
 
 void Simulation::AutoMaint() {
-  // The engineer does not run a job of his own: he presses the machine's button,
-  // and only once the drive has fallen below the line he is charged to watch.
+  // The engineer's rule. He leaves the machine's button alone until the drive
+  // is down to engine.engineerAt. From that click on he presses it once on
+  // every click until the drive is full: from 60% that is four presses of 10%.
+  // Only the hand holding the maintenance job does this. Training and air do
+  // not move the line.
   CrewMember* worker = AssignedEngineer();
+  if (worker == nullptr || state_.engineCondition >= 100.0) {
+    state_.engineerRun = false;
+    return;
+  }
+  if (state_.engineCondition <= rules_.engine.engineerAt) { state_.engineerRun = true; }
+  if (!state_.engineerRun) { return; }
+
+  // A press he cannot make on this click waits for the next one; the run stays
+  // open until the drive is full.
   if (maintClaim_ || projectClaim_ == "cooling" || FindOngoing("project-cooling") != nullptr) {
     return;
   }
   // The commander's press already services the drive after this tick. Do not
   // let the engineer service it a second time on that same press.
-  if (worker == nullptr || engineClicking_ || MaintRunning()) { return; }
+  if (engineClicking_ || MaintRunning()) { return; }
   if (CrewBusy(*worker) != nullptr) { return; }
-  // How early he takes the button is what his training buys: an untrained hand
-  // waits until the drive is under the floor, a trained one presses at his own
-  // level, so the ship is kept further from trouble the better he knows it.
-  const double line = std::max(rules_.engine.maintBelow, EffectiveJobAt(*worker));
-  if (state_.engineCondition >= line) { return; }
 
   // His press is this action's click, so it lifts the drive without performing
   // a second action of its own.
   ServiceDrive(worker->name);
+  if (state_.engineCondition >= 100.0) { state_.engineerRun = false; }
 }
 
 void Simulation::AutoFilters() {

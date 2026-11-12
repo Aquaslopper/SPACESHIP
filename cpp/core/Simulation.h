@@ -416,7 +416,6 @@ class Simulation {
   CrewMember* AssignedFilterHand();
   CrewMember* AssignedCook();
   double CleanerInterval(const CrewMember& crew) const;
-  double EffectiveJobAt(const CrewMember& crew) const;
   double MaintCost() const;
   bool MaintRunning() const;
   void ApplyOrderPayload(CrewMember& crew, const Task& task);

@@ -55,8 +55,4 @@ Description DescribeTarget(const Simulation& sim, const std::string& kind,
 // The one place that knows what "acts at" means for a crew member's job.
 std::string JobThreshold(const Simulation& sim, const CrewMember& crew);
 
-// effectiveJobAt(): the crew member's own trigger point after the air has had
-// its say, never below 5.
-double EffectiveJobAt(const Simulation& sim, const CrewMember& crew);
-
 }  // namespace ship

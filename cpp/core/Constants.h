@@ -21,7 +21,9 @@ struct EngineRules {
   double wearStep = 1;    // percent lost per step
   double warnBelow = 50;  // sidebar bar appears here
   double engineClickEvery = 12;  // clicks before the machine's button is live again
-  double maintBelow = 30;        // floor: the engineer presses the button under this
+  // The engineer's rule: with the drive at or under this he takes the button
+  // and presses it on every click until the drive is full.
+  double engineerAt = 60;
 };
 
 struct AirStage {

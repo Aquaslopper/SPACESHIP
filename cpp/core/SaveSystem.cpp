@@ -275,6 +275,7 @@ std::string Simulation::SaveJson() const {
   s["engineCondition"] = Num(state_.engineCondition);
   s["wearTick"] = Num(state_.wearTick);
   s["engineClickAt"] = Num(state_.engineClickAt);
+  s["engineerRun"] = state_.engineerRun;
   s["filterLife"] = Num(state_.filterLife);
   s["airHold"] = Num(state_.airHold);
   s["rackWarned"] = state_.rackWarned;
@@ -1068,6 +1069,7 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     state_.engineCondition = GetNumber(s, "engineCondition");
     state_.wearTick = GetNumber(s, "wearTick");
     state_.engineClickAt = GetNumber(s, "engineClickAt", -1e9);
+    state_.engineerRun = GetBool(s, "engineerRun");
     state_.filterLife = GetNumber(s, "filterLife");
     state_.airHold = GetNumber(s, "airHold");
     state_.rackWarned = GetBool(s, "rackWarned");

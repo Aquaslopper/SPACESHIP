@@ -588,7 +588,7 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     catalog.rules.engine.warnBelow = Number(engine, "warnBelow", "engine", 50);
     catalog.rules.engine.engineClickEvery =
         Number(engine, "engineClickEvery", "engine", 12);
-    catalog.rules.engine.maintBelow = Number(engine, "maintBelow", "engine", 30);
+    catalog.rules.engine.engineerAt = Number(engine, "engineerAt", "engine", 60);
 
     const Json& life = Field(survival, "life", "survival.json");
     catalog.rules.life.lifeMax = Number(life, "lifeMax", "life", 200);

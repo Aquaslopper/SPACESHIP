@@ -318,8 +318,13 @@ void Simulation::TrainCrew(CrewMember& crew, int steps, const std::string& where
       current = std::min(job->trainCap, current + job->trainStep);
     }
     crew.jobAt = current;
-    LogLine(crew.name + " trained " + where + " - now acts at " +
-            js::NumToString(crew.jobAt) + job->unit + ".");
+    if (crew.job == "maintenance") {
+      // The engineer's line is the ship's rule (engine.engineerAt), not his own.
+      LogLine(crew.name + " trained " + where + ".");
+    } else {
+      LogLine(crew.name + " trained " + where + " - now acts at " +
+              js::NumToString(crew.jobAt) + job->unit + ".");
+    }
   } else {
     LogLine(crew.name + " trained " + where + ", but holds no job to use it on.");
   }

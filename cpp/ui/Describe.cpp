@@ -93,13 +93,10 @@ int SlotsIn(const Simulation& sim, const std::string& state) {
 
 }  // namespace
 
-double EffectiveJobAt(const Simulation& sim, const CrewMember& crew) {
-  const double value = crew.jobAt - sim.AirSpec().jobDrop;
-  return value < 5.0 ? 5.0 : value;
-}
-
 std::string JobThreshold(const Simulation& sim, const CrewMember& crew) {
-  if (crew.job == "maintenance") { return Num(EffectiveJobAt(sim, crew)) + "% condition"; }
+  if (crew.job == "maintenance") {
+    return Num(sim.GameRules().engine.engineerAt) + "% condition";
+  }
   if (crew.job == "filters") {
     const std::vector<AirStage>& stages = sim.GameRules().air.stages;
     const double stage = crew.jobAt < 0.0 ? 0.0 : crew.jobAt;
@@ -159,7 +156,7 @@ void RoomEngine(const Simulation& sim, Description& t) {
       {"Warning at", Num(sim.GameRules().engine.warnBelow) +
                          "% - a red line joins the sidebar"},
       {"Engineer", engineer ? engineer->name + " - acts at " +
-                                  Num(EffectiveJobAt(sim, *engineer)) + "%"
+                                  Num(sim.GameRules().engine.engineerAt) + "%, until full"
                             : std::string("Nobody holds the job")},
   };
   t.acts = {
@@ -167,7 +164,7 @@ void RoomEngine(const Simulation& sim, Description& t) {
        missing <= 0.0 ? std::string("refused at 100%")
                       : std::string("1 click (+10%)")},
       {"The engineer acts alone",
-       engineer ? "at " + Num(EffectiveJobAt(sim, *engineer)) + "%"
+       engineer ? "at " + Num(sim.GameRules().engine.engineerAt) + "%, until full"
                 : std::string("nobody assigned")},
   };
 }
