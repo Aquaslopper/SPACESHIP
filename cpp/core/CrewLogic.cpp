@@ -463,53 +463,6 @@ void Simulation::AutoMaint() {
   if (state_.engineCondition >= 100.0) { state_.engineerRun = false; }
 }
 
-void Simulation::AutoFilters() {
-  CrewMember* worker = AssignedFilterHand();
-  if (o2Claim_ || state_.filterLife > 0 || StatValue("energy") <= 0) { return; }
-  if (worker == nullptr || BankRunning()) { return; }
-  if (CrewBusy(*worker) != nullptr) { return; }
-
-  if (BankReady()) {
-    RunBank(worker->name + " started the filter bank. Air purified. +10 Pro-Action.");
-    return;
-  }
-  if (life_.canisters <= 0) {
-    if (!state_.rackWarned) {
-      LogLine(worker->name + " went for a canister. The rack is empty.");
-      state_.rackWarned = true;
-    }
-    return;
-  }
-  state_.rackWarned = false;
-
-  // One slot at a time, and only if he is not already on one.
-  for (std::size_t i = 0; i < life_.slots.size(); ++i) {
-    if (FindOngoing("o2s" + std::to_string(i)) != nullptr) { return; }
-  }
-  // Two canisters go in as soon as the rack allows; the third waits for the air
-  // to fall to the stage his training lets him wait for. An untrained hand sits
-  // on it until the air is already bad, a trained one fills while there is still
-  // room to breathe.
-  int seated = 0;
-  for (const CanisterSlot& slot : life_.slots) {
-    if (slot.state == "installed") { ++seated; }
-  }
-  // His training is what lets him fill while there is still room to breathe: an
-  // untrained hand waits for the air to actually fall, a taught one fills as soon
-  // as it leaves perfect.
-  const int line = std::min(3, static_cast<int>(worker->jobAt));
-  if (seated >= 2 && AirStageIndex() > line) { return; }
-
-  // He presses the O2 panel's own control: the same press the commander makes,
-  // made by a hand, so it runs at his rate and carries his name.
-  for (std::size_t i = 0; i < life_.slots.size(); ++i) {
-    if (life_.slots[i].state != "empty") { continue; }
-    if (StartCanisterInstall(static_cast<int>(i), worker->name, false)) {
-      LogLine(worker->name + " seated a canister in " + life_.slots[i].name + ".");
-    }
-    return;
-  }
-}
 
 void Simulation::AutoMess() {
   CrewMember* worker = AssignedCook();
