@@ -283,9 +283,6 @@ void Simulation::TickWorld() {
   if (!state_.gameOver.empty()) { return; }
   TickPayroll();
   TickOngoing();
-  AutoMaint();
-  AutoFilters();
-  AutoMess();
   TickIncidents();
   CheckLoss();
 }
