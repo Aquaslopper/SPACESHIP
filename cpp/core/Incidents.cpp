@@ -145,7 +145,7 @@ void Simulation::TickIncidents() {
     if (actionCounter_ < spec.first) { continue; }
     if (spec.every <= 0) { continue; }
     if (std::fmod(actionCounter_ - spec.first, spec.every) != 0) { continue; }
-    if (spec.id == "crew" && crew_.size() < 2) { continue; }
+    if ((spec.id == "crew" || spec.kind == "Crew") && crew_.size() < 2) { continue; }
 
     Incident incident;
     incident.id = spec.id + "-" + std::to_string(static_cast<long long>(actionCounter_));
@@ -178,6 +178,7 @@ bool Simulation::SpawnMapIncident(const std::string& typeId, const std::string& 
     }
   }
   if (spec == nullptr || spec->stages.empty() || spec->stages[0].ticks <= 0) { return false; }
+  if ((spec->id == "crew" || spec->kind == "Crew") && crew_.size() < 2) { return false; }
   for (const Incident& live : events_) {
     if (live.type == typeId) { return false; }
   }

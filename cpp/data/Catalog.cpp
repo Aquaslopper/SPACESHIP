@@ -587,6 +587,7 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     catalog.rules.engine.wearStep = Number(engine, "wearStep", "engine", 1);
     catalog.rules.engine.warnBelow = Number(engine, "warnBelow", "engine", 50);
     catalog.rules.engine.engineerAt = Number(engine, "engineerAt", "engine", 60);
+    catalog.rules.engine.burnRate = Number(engine, "burnRate", "engine", 1.0);
 
     const Json& life = Field(survival, "life", "survival.json");
     catalog.rules.life.lifeMax = Number(life, "lifeMax", "life", 200);
@@ -608,14 +609,14 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     const Json& mess = Field(survival, "mess", "survival.json");
     catalog.rules.mess.rackStart = Number(mess, "rack", "mess", 18);
     catalog.rules.mess.capacity = Number(mess, "capacity", "mess", 24);
-    catalog.rules.mess.rationStart = Number(mess, "rations", "mess", 21);
+    catalog.rules.mess.rationStart = Number(mess, "rations", "mess", 5);
     catalog.rules.mess.rationCapacity = Number(mess, "rationCapacity", "mess", 24);
     catalog.rules.mess.foodPerRation = Number(mess, "foodPerRation", "mess", 5);
 
     catalog.rules.mess.cookBelow = Number(mess, "cookBelow", "mess", 10);
     catalog.rules.mess.hungerPerMeal = Number(mess, "hungerPerMeal", "mess", 15);
     catalog.rules.mess.hungerPerFood = Number(mess, "hungerPerFood", "mess", 5);
-    catalog.rules.mess.hungerFloor = Number(mess, "hungerFloor", "mess", 5);
+    catalog.rules.mess.hungerFloor = Number(mess, "hungerFloor", "mess", 0);
     catalog.rules.mess.every = Number(survival, "messEvery", "survival.json", 25);
     catalog.rules.mess.starveAt = Number(survival, "messStarve", "survival.json", 90);
     catalog.rules.mess.starveEvery = Number(survival, "messStarveEvery", "survival.json", 8);

@@ -830,14 +830,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     }
   }
 
-  {
-    StationRow heading;
-    heading.label = "Hiring hall";
-    heading.reading = true;
-    yard.rows.push_back(heading);
-  }
-  for (const CandidateDefinition& candidate : sim.World().candidates) {
-    if (!candidate.port.empty() && candidate.port != portId) { continue; }
+  const auto buildHireRow = [&](const CandidateDefinition& candidate) {
     const CrewDefinition& person = candidate.crew;
     const std::string name = person.name;
     const bool already = Hired(sim, person.id);
@@ -846,6 +839,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     StationRow row;
     row.id = "hire:" + person.id;
     row.label = "Hire " + name + " - " + Num(candidate.fee) + " sh";
+    row.free = true;
     row.details.push_back(name + ": " + person.traits + "; health " + Num(person.health) + "%, " +
                           (person.skill.empty() ? std::string("untrained") : person.skill) + ".");
     row.details.push_back("Role: " + person.role + ". Fee: " + Num(candidate.fee) + " sh.");
@@ -859,27 +853,44 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
       row.details.push_back("Already signed aboard; the fee is not asked twice.");
     } else {
       row.cost = kFree;
-      row.free = true;
       row.commit = "Hire - " + Num(candidate.fee) + " sh";
-      row.enabled = berth && purse >= candidate.fee;
+      row.enabled = model.docked && berth && purse >= candidate.fee;
       row.details.push_back("Shiplets only: no click spent.");
       if (!row.enabled) {
-        row.details.push_back(berth ? "Not affordable from this purse."
-                                    : "No berth free for another hand.");
+        row.details.push_back(!model.docked ? "Needs a dock at this station."
+                              : (berth ? "Not affordable from this purse."
+                                       : "No berth free for another hand."));
       }
     }
-    yard.rows.push_back(row);
+    return row;
+  };
+
+  {
+    StationRow heading;
+    heading.label = "Hiring hall";
+    heading.reading = true;
+    yard.rows.push_back(heading);
+  }
+  bool anyStationHands = false;
+  for (const CandidateDefinition& candidate : sim.World().candidates) {
+    if (!candidate.port.empty() && candidate.port != portId) { continue; }
+    anyStationHands = true;
+    yard.rows.push_back(buildHireRow(candidate));
+  }
+  if (!anyStationHands) {
+    StationRow none;
+    none.label = "No hands are looking for a berth at this station.";
+    none.reading = true;
+    yard.rows.push_back(none);
   }
 
-  // ---- 7. the tavern / bar -------------------------------------------------
   StationColumn tavern;
   tavern.id = "tavern";
   tavern.title = "Tavern / Bar";
   tavern.badge = "the people at this station";
   tavern.notes.push_back(tip);
   tavern.notes.push_back("Station training only finishes while docked.");
-  tavern.notes.push_back("Talking costs one click, once per person; the button greys after "
-                         "the first word.");
+  tavern.notes.push_back("Talking costs one click, once per person; hiring costs shiplets only.");
   {
     const bool said = Talked(sim, "trader");
     StationRow row;
@@ -900,7 +911,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   }
   for (const CandidateDefinition& candidate : sim.World().candidates) {
     if (!candidate.port.empty() && candidate.port != portId) { continue; }
-    if (Hired(sim, candidate.crew.id)) { continue; }  // aboard now, not at the bar
+    if (Hired(sim, candidate.crew.id)) { continue; }
     const CrewDefinition& person = candidate.crew;
     const bool said = Talked(sim, person.id);
     StationRow row;
@@ -913,8 +924,8 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     row.details.push_back(person.name + ": " + person.traits + "; health " +
                           Num(person.health) + "%, " +
                           (person.skill.empty() ? std::string("untrained") : person.skill) + ".");
-    row.details.push_back("Waiting at this station; the hiring hall asks " +
-                          Num(candidate.fee) + " sh for them.");
+    row.details.push_back("Waiting at this station; hiring fee " +
+                          Num(candidate.fee) + " sh.");
     if (said) {
       for (const std::string& line : PatronSpeech(sim, candidate)) { row.details.push_back(line); }
     } else {
@@ -923,11 +934,25 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     }
     tavern.rows.push_back(row);
   }
+  {
+    StationRow heading;
+    heading.label = "Crew looking for a berth";
+    heading.reading = true;
+    tavern.rows.push_back(heading);
+  }
+  if (!anyStationHands) {
+    StationRow none;
+    none.label = "No hands are looking for a berth at this station.";
+    none.reading = true;
+    tavern.rows.push_back(none);
+  } else {
+    for (const CandidateDefinition& candidate : sim.World().candidates) {
+      if (!candidate.port.empty() && candidate.port != portId) { continue; }
+      tavern.rows.push_back(buildHireRow(candidate));
+    }
+  }
 
-  // The Mission board and Tavern / Bar cards are not offered. The starmap sits
-  // directly under the shop, the trade board under that, then the sales counter
-  // and the yard.
-  model.columns = {market, starmap, trade, sales, yard};
+  model.columns = {market, starmap, trade, sales, yard, tavern};
   NormalizeStationSelection(model, model.selection);
   return model;
 }

@@ -543,9 +543,9 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       const bool useKit = (tab.id == "hull" || tab.id == "shield");
       const std::string label =
           tab.id == "hull" ? "Patch hull (+25%)"
-          : tab.id == "shield" ? "Service shields (+25%)"
-          : tab.id == "energy" ? "Recharge energy (+20%)"
-                               : "Transfer fuel (+15%)";
+          : tab.id == "shield" ? "Service shields (+15%)"
+          : tab.id == "energy" ? "Recharge energy (+10%)"
+                               : "Transfer fuel (+10%)";
       const double have = useKit ? sim.State().repairKits : sim.State().fuelCells;
 
       TaskScreenModel screen;
@@ -1099,11 +1099,11 @@ bool PressSystemAction(Simulation& sim, const std::string& statId) {
   if (statId == "hull") {
     label = "Patch hull (+25%)";
   } else if (statId == "shield") {
-    label = "Service shields (+25%)";
+    label = "Service shields (+15%)";
   } else if (statId == "energy") {
-    label = "Recharge energy (+20%)";
+    label = "Recharge energy (+10%)";
   } else if (statId == "fuel") {
-    label = "Transfer fuel (+15%)";
+    label = "Transfer fuel (+10%)";
   } else {
     return false;
   }

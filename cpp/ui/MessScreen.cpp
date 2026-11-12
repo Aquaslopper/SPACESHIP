@@ -62,21 +62,41 @@ TaskStage BuildMessMachine(const Simulation& sim) {
 
   parts.push_back(Part("mess-mini", 28, 182, 140, 10, "WHO EATS NEXT"));
   const std::size_t hands = sim.Crew().size();
-  const double every = sim.GameRules().mess.every;
-  for (std::size_t k = 0; k < hands; ++k) {
-    const CrewMember& crew = sim.Crew()[k];
-    const float px = 26.0f + static_cast<float>(k) * 141.0f;
-    parts.push_back(
-        Part("mess-plate", 20.0f + static_cast<float>(k) * 141.0f, 200, 130, 54));
-    parts.push_back(Part("mess-plate-name", px, 208, 118, 14, crew.name));
-    parts.push_back(Part("mess-track", px, 230, 118, 12));
-    const double tickPct =
-        every > 0.0 ? std::round((crew.hungerTick / every) * 100.0) : 0.0;
-    const std::string tickTone = crew.hunger >= 70.0 ? "#b05a42" : "#7f9161";
-    MachinePart tick = Part("mess-fill mess-fill-small", px, 230, 0, 12);
-    tick.box.w = static_cast<float>(std::round(118.0 * (tickPct / 100.0)));
-    tick.tone = tickTone;
-    parts.push_back(tick);
+  if (hands == 0) {
+    parts.push_back(Part("mess-rackbox", 20, 200, 560, 54));
+    parts.push_back(Part("mess-readout", 40, 219, 520, 16, "No crew aboard"));
+  } else {
+    const double every = sim.GameRules().mess.every;
+    const std::size_t cols = std::max<std::size_t>(4, hands);
+    const float gap = cols > 6 ? 4.0f : (cols > 4 ? 6.0f : 10.0f);
+    const float plateW = std::floor(
+        (560.0f - gap * static_cast<float>(cols - 1)) / static_cast<float>(cols));
+    const float step = cols > 1
+                           ? (560.0f - plateW * static_cast<float>(cols)) /
+                                     static_cast<float>(cols - 1) +
+                                 plateW
+                           : 0.0f;
+    const float pad = cols > 5 ? 4.0f : 6.0f;
+    const float innerW = std::max(12.0f, plateW - 2.0f * pad);
+    for (std::size_t k = 0; k < hands; ++k) {
+      const CrewMember& crew = sim.Crew()[k];
+      const float plateX = std::round(20.0f + static_cast<float>(k) * step);
+      const float px = plateX + pad;
+      const std::size_t sp = crew.name.find(' ');
+      const std::string plateName =
+          (plateW < 96.0f && sp != std::string::npos) ? crew.name.substr(0, sp)
+                                                      : crew.name;
+      parts.push_back(Part("mess-plate", plateX, 200, plateW, 54));
+      parts.push_back(Part("mess-plate-name", px, 208, innerW, 14, plateName));
+      parts.push_back(Part("mess-track", px, 230, innerW, 12));
+      const double tickPct =
+          every > 0.0 ? std::round((crew.hungerTick / every) * 100.0) : 0.0;
+      const std::string tickTone = crew.hunger >= 70.0 ? "#b05a42" : "#7f9161";
+      MachinePart tick = Part("mess-fill mess-fill-small", px, 230, 0, 12);
+      tick.box.w = static_cast<float>(std::round(innerW * (tickPct / 100.0)));
+      tick.tone = tickTone;
+      parts.push_back(tick);
+    }
   }
 
   parts.push_back(Part("mess-rackbox", 20, 280, 560, 72));
@@ -154,7 +174,8 @@ MessScreenModel BuildMessScreen(const Simulation& sim) {
                                             std::max(1.0, sim.GameRules().mess.hungerPerFood)) +
                               " food (counter and floor can limit it)");
   cycle.Field("Eating stops at", Num(sim.GameRules().mess.hungerFloor) + " hunger");
-  cycle.Field("An empty counter", "nobody eats, hunger keeps climbing");
+  cycle.Field("An empty counter",
+              "missed meal adds +" + Num(sim.GameRules().mess.hungerPerMeal) + " hunger");
   screen.left.push_back(cycle);
 
   NavPanel starve;
@@ -164,7 +185,9 @@ MessScreenModel BuildMessScreen(const Simulation& sim) {
   starve.Field("Risk begins at", Num(sim.GameRules().mess.starveAt) + "% hunger");
   starve.Field("Cost",
                "1 health every " + Num(sim.GameRules().mess.starveEvery) + " clicks");
-  starve.Note("Slow, like bad air: nobody starves on the spot.");
+  starve.Note("Missing a meal adds +" + Num(sim.GameRules().mess.hungerPerMeal) +
+              " hunger; famine pushes crew past " +
+              Num(sim.GameRules().mess.starveAt) + "% fast.");
   screen.left.push_back(starve);
 
   NavPanel cooking;
@@ -199,17 +222,21 @@ MessScreenModel BuildMessScreen(const Simulation& sim) {
   appetite.id = "mess-appetite";
   appetite.title = "Crew Appetite";
   appetite.placement = "np-half-last";
-  int hungry = 0;
-  double hungerSum = 0.0;
-  for (const CrewMember& crew : sim.Crew()) {
-    if (crew.hunger >= 70.0) { ++hungry; }
-    hungerSum += crew.hunger;
+  if (sim.Crew().empty()) {
+    appetite.Dim("No crew aboard.");
+  } else {
+    int hungry = 0;
+    double hungerSum = 0.0;
+    for (const CrewMember& crew : sim.Crew()) {
+      if (crew.hunger >= 70.0) { ++hungry; }
+      hungerSum += crew.hunger;
+    }
+    appetite.Field("At least 70% hunger",
+                   Num(hungry) + " of " + Num(static_cast<double>(sim.Crew().size())));
+    appetite.Field("Average hunger",
+                   Num(std::round(hungerSum / static_cast<double>(sim.Crew().size()))) +
+                       "%");
   }
-  appetite.Field("At least 70% hunger",
-                 Num(hungry) + " of " + Num(static_cast<double>(sim.Crew().size())));
-  appetite.Field("Average hunger",
-                 Num(std::round(hungerSum / static_cast<double>(sim.Crew().size()))) +
-                     "%");
   screen.under.push_back(appetite);
 
   const double autoAt = cook != nullptr ? sim.CookThreshold(*cook) : messRules.cookBelow;
@@ -246,6 +273,11 @@ MessScreenModel BuildMessScreen(const Simulation& sim) {
   } else if (sim.MessRations() < 1.0) {
     screen.bandNote =
         "The dry-ration larder is empty; the cook cannot start another batch.";
+  } else if (sim.Crew().empty()) {
+    screen.bandNote =
+        "One dry ration yields up to " + Num(messRules.foodPerRation) +
+        " cooked food after " + Num(messRules.foodPerRation) +
+        " clicks. No crew aboard; cooked food waits on the counter.";
   } else {
     screen.bandNote =
         "One dry ration yields up to " + Num(messRules.foodPerRation) +

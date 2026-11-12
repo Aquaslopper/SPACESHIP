@@ -67,6 +67,7 @@ class Simulation {
   bool StartCookingSelf(const std::string& by = std::string(),
                         bool spendsAction = true);
   bool ServiceSystem(const std::string& statId);
+  bool SplitFuelCell();
   bool ApplyJob(const std::string& crewId, const std::string& jobId);
 
   // ---- queries -----------------------------------------------------------
@@ -132,11 +133,13 @@ class Simulation {
   };
   NavMetrics MetricsFor(const Body& body) const;
   CrewMember* AssignedNavigator();
+  const CrewMember* AssignedNavigator() const;
   const Rules& GameRules() const { return rules_; }
   std::vector<std::string> FeedText() const;
 
   const std::vector<JobDef>& Jobs() const { return jobs_; }
   const JobDef* FindJobDef(const std::string& jobId) const;
+  double JobLevelFor(const CrewMember& crew, const std::string& jobId) const;
   const OrderSheet* SheetOf(const CrewMember& crew) const;
   std::string StagedJob(const CrewMember& crew) const;
   bool StageJob(const std::string& crewId, const std::string& jobId);

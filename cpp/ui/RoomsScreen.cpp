@@ -71,20 +71,30 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
 
   // ---- the dedicated rooms ----------------------------------------------
   if (roomId == "bridge") {
-    const CrewMember* navigator = nullptr;
-    for (const CrewMember& crew : sim.Crew()) {
-      if (crew.job == "navigation") { navigator = &crew; if (sim.CrewBusy(crew) == nullptr) { break; } }
+    const CrewMember* navigator = sim.AssignedNavigator();
+    const CrewMember* busyNavigator = nullptr;
+    if (navigator == nullptr) {
+      for (const CrewMember& crew : sim.Crew()) {
+        if (crew.job == "navigation" && crew.health > 0) {
+          busyNavigator = &crew;
+          break;
+        }
+      }
     }
+    const double fuel = sim.StatValue("fuel");
     model.body.Field("Location", sim.FindBodyById(sim.Map().here) == nullptr
                                      ? sim.Map().here
                                      : sim.FindBodyById(sim.Map().here)->name);
     model.body.Field("Drive", Num(sim.State().engineCondition) + "%");
     model.body.Field("Energy", Num(energy) + "%");
-    model.body.Field("Navigator",
-                     navigator == nullptr
-                         ? std::string("None available")
-                         : navigator->name + " (-" + Num(sim.NavigatorFuelDiscount(*navigator)) +
-                               "% fuel at departure)");
+    model.body.Field(
+        "Navigator",
+        navigator != nullptr
+            ? navigator->name + " (-" + Num(sim.NavigatorFuelDiscount(*navigator)) +
+                  "% fuel at departure)"
+            : (busyNavigator != nullptr
+                   ? busyNavigator->name + " (busy - 0% fuel discount)"
+                   : std::string("None available")));
     model.body.Field("Active work", Num(static_cast<double>(sim.State().ongoing.size())) +
                                         " processes");
     ActionRowView nav;
@@ -96,9 +106,10 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
 
     ActionRowView split;
     split.id = "fuel-split";
-    split.label = "Split one fuel cell: up to +10 energy and +7 fuel";
+    split.label = "Split one fuel cell (up to +6% energy and +4% fuel)";
     split.cost = "1 click";
-    split.enabled = sim.State().fuelCells > 0 && energy < 100 && sim.StatValue("fuel") < 100;
+    split.enabled = sim.State().gameOver.empty() && sim.State().fuelCells >= 1 &&
+                    (energy < 100.0 || fuel < 100.0);
     model.rows.push_back(split);
     return model;
   }
@@ -130,6 +141,10 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
         "treatment pauses without power. The ordinary medical order in Crew Quarters "
         "remains available without a medkit.");
     model.body.Dim("Medkits aboard: " + Num(sim.State().medkits));
+    if (sim.Crew().empty()) {
+      model.body.Dim("No crew aboard.");
+      return model;
+    }
     for (const CrewMember& crew : sim.Crew()) {
       const bool busy = sim.CrewBusy(crew) != nullptr;
       const bool ready = crew.health < 100 && !busy && sim.State().medkits > 0 && energy > 2;
@@ -214,17 +229,11 @@ namespace {
 bool PressRoomActionRaw(Simulation& sim, const std::string& action, const std::string& arg) {
   (void)arg;
   if (action == "open-nav") {
-    OpenTask(sim, "nav", "main", true);   // looking at the chart is free
+    OpenTask(sim, "nav", "main", true);
     return true;
   }
   if (action == "fuel-split") {
-    if (sim.State().fuelCells <= 0) { return false; }
-    if (sim.StatValue("energy") >= 100 || sim.StatValue("fuel") >= 100) { return false; }
-    sim.MutableState().fuelCells -= 1;
-    sim.ClampStat("energy", 10);
-    sim.ClampStat("fuel", 7);
-    sim.PerformAction("Fuel cell divided between reserves");
-    return true;
+    return sim.SplitFuelCell();
   }
   if (action == "divert-shield") {
     if (!sim.HasRoom("r6")) return false;
@@ -253,13 +262,6 @@ bool PressRoomActionRaw(Simulation& sim, const std::string& action, const std::s
 
 }  // namespace
 
-// ============================================================================
-//  The press, and the clicks it costs.
-//  ---------------------------------------------------------------------------
-//  One control is one control. A press spends one of the clicks that control
-//  holds and returns one to every other control, so a button is only refused
-//  once its own green has run out. Free reads spend nothing and return nothing.
-// ============================================================================
 std::string RoomActionCategory(const std::string& action) {
   if (action == "fuel-split" || action == "divert-shield" || action == "divert-power" ||
       action.compare(0, 5, "meal:") == 0) { return "systems"; }

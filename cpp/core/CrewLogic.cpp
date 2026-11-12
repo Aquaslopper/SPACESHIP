@@ -12,7 +12,7 @@ void Simulation::TickCrew() {
   const AirStage& air = AirSpec();
   state_.crewTick += 1;
 
-  if (air.harm > 0 && std::fmod(state_.crewTick, air.harm) == 0) {
+  if (!crew_.empty() && air.harm > 0 && std::fmod(state_.crewTick, air.harm) == 0) {
     for (CrewMember& crew : crew_) { crew.health = std::max(0.0, crew.health - 1); }
     LogLine("The air is telling on the crew.");
   }
@@ -35,6 +35,8 @@ void Simulation::TickCrew() {
     crew.hunger = std::min(100.0, crew.hunger + risePerClick);
     if (crew.hungerTick < rules_.mess.every) { continue; }
     crew.hungerTick = 0;
+    crew.saidKey.clear();
+    crew.saidN = 0;
 
     const double spare = crew.hunger - rules_.mess.hungerFloor;
     double wanted = 0.0;
@@ -46,6 +48,9 @@ void Simulation::TickCrew() {
       mess_.rack -= ate;
       crew.hunger = std::max(rules_.mess.hungerFloor,
                              crew.hunger - ate * rules_.mess.hungerPerFood);
+    }
+    if (wanted > ate) {
+      crew.hunger = std::min(100.0, crew.hunger + rules_.mess.hungerPerMeal);
     }
 
     if (ate > 0.0) {
@@ -122,7 +127,11 @@ void Simulation::LayOff(CrewMember& crew, const std::string& why) {
   std::transform(label.begin(), label.end(), label.begin(),
                  [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
+  crew.jobProgress[crew.job] = crew.jobAt;
+  if (!crew.skill.empty()) { crew.jobSkill[crew.job] = crew.skill; }
   crew.job.clear();
+  crew.jobAt = 0.0;
+  crew.skill = "Untrained";
   crew.morale = std::max(0.0, crew.morale - rules_.pay.hit);
   crew.activity = "Idle in the corridor";
   LogLine(crew.name + " - " + why + " - is off the " + label + " job.");
@@ -223,7 +232,7 @@ double Simulation::PayrollDue() const {
 std::string Simulation::AirStageWord() const { return AirSpec().word; }
 
 double Simulation::NavigatorFuelDiscount(const CrewMember& crew) const {
-  const double at = crew.jobAt == 0 ? 1.0 : crew.jobAt;
+  const double at = crew.jobAt <= 0 ? 1.0 : crew.jobAt;
   return 4.0 * std::max(1.0, std::min(5.0, at));
 }
 
@@ -506,6 +515,8 @@ void Simulation::CheckLoss() {
 
     LogLine(crew.name + " has died.");
     state_.pendingOrders.erase(crew.id);
+    orderSheets_.erase(crew.id);
+    crewClaims_.erase(crew.id);
     ClearOngoing("cw-" + crew.id);
     ClearOngoing("doc-" + crew.id);
 
@@ -520,15 +531,30 @@ void Simulation::CheckLoss() {
         if (task.type == "o2slot") {
           life_.canisters = std::min(life_.capacity, life_.canisters + 1);
         }
+        if (task.type == "cook") { cookRestock_ = false; }
         ClearOngoing(task.id);
       }
     }
     crew_.erase(crew_.begin() + static_cast<std::ptrdiff_t>(index));
   }
 
+  if (crew_.size() < 2) {
+    for (std::size_t ev = events_.size(); ev-- > 0;) {
+      if (events_[ev].type == "crew" || events_[ev].kind == "Crew") {
+        events_.erase(events_.begin() + static_cast<std::ptrdiff_t>(ev));
+      }
+    }
+  }
+
+  if (crew_.empty()) {
+    state_.crewSel.clear();
+  } else if (FindCrew(state_.crewSel) == nullptr) {
+    state_.crewSel = crew_.front().id;
+  }
+
   if (!state_.gameOver.empty()) { return; }
-  if (StatValue("hull") <= 0 || crew_.empty()) {
-    state_.gameOver = StatValue("hull") <= 0 ? "The hull has failed." : "The crew have been lost.";
+  if (StatValue("hull") <= 0) {
+    state_.gameOver = "The hull has failed.";
     LogLine("Ship lost. " + state_.gameOver);
   }
 }

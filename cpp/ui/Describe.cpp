@@ -302,9 +302,11 @@ Description DescribeTarget(const Simulation& sim, const std::string& kind,
       if (port.id == id) { t.title = port.name; break; }
     }
     t.kindLabel = "STATION";
-    t.sub = "Docked - market, trade contracts, shipyard and crew";
+    t.sub = "Docked - market, trade contracts, shipyard, crew and tavern";
     t.rows = {{"Berth", "Docked"}, {"Purse", Num(sim.State().shiplets) + " sh"}};
-    t.acts = {{"Trade, hire or accept a contract", "1 click"}, {"Undock", "1 click"}};
+    t.acts = {{"Supplies, yard & hires", "shiplets only"},
+              {"Trade, contracts & tavern", "1 click"},
+              {"Undock", "1 click"}};
     return t;
   }
 
@@ -374,22 +376,52 @@ Description DescribeTarget(const Simulation& sim, const std::string& kind,
     t.kindLabel = "SYSTEM";
     t.title = stat->label;
     t.sub = "Reading " + Num(stat->value) + stat->unit;
-    const CrewMember* engineer = sim.Engineer();
+    const bool kit = id == "hull" || id == "shield";
+    const double have = kit ? sim.State().repairKits : sim.State().fuelCells;
+    const std::string status =
+        kit ? (stat->value > 80.0 ? "Operational"
+               : stat->value > 40.0 ? "Degraded"
+                                    : "Damaged")
+            : (stat->value > 80.0 ? "Full"
+               : stat->value > 40.0 ? "Moderate"
+               : stat->value > 0.0  ? "Low"
+                                    : "Empty");
+    const std::string service =
+        id == "hull" ? "Repair kit (+25%)"
+        : id == "shield" ? "Repair kit (+15%)"
+                         : "Fuel cell (+10%)";
     t.rows = {
         {"Current reading", Num(stat->value) + stat->unit},
-        {"Status", stat->value > 80.0 ? "Operational"
-                   : stat->value > 40.0 ? "Degraded"
-                                        : "Damaged"},
-        {"Trend", "See active reports"},
-        {"Maintained by", engineer ? engineer->name : std::string("Nobody assigned")},
-        {"Last serviced", "Not recorded"},
+        {"Status", status},
+        {"Available", Num(have) + (kit ? " repair kits" : " fuel cells")},
+        {"Service", service},
     };
+    if (id == "fuel") {
+      const CrewMember* navigator = sim.AssignedNavigator();
+      const CrewMember* busyNavigator = nullptr;
+      if (navigator == nullptr) {
+        for (const CrewMember& crew : sim.Crew()) {
+          if (crew.job == "navigation" && crew.health > 0) {
+            busyNavigator = &crew;
+            break;
+          }
+        }
+      }
+      t.rows.push_back(
+          {"Navigator",
+           navigator != nullptr
+               ? navigator->name + " (-" +
+                     Num(sim.NavigatorFuelDiscount(*navigator)) +
+                     "% fuel at departure)"
+               : (busyNavigator != nullptr
+                      ? busyNavigator->name + " (busy - 0% fuel discount)"
+                      : std::string("None available"))});
+    }
     const std::string label =
-        id == "hull" ? "Patch hull"
-        : id == "shield" ? "Service shields"
-        : id == "energy" ? "Recharge energy"
-                          : "Transfer fuel";
-    const bool kit = id == "hull" || id == "shield";
+        id == "hull" ? "Patch hull (+25%)"
+        : id == "shield" ? "Service shields (+15%)"
+        : id == "energy" ? "Recharge energy (+10%)"
+                         : "Transfer fuel (+10%)";
     t.acts = {{label, std::string("1 click - consumes ") + (kit ? "a repair kit" : "a fuel cell")}};
     return t;
   }

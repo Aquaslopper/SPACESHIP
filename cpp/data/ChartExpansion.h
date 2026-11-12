@@ -10,9 +10,6 @@
 //      coherent territory of star systems linked by intra-region lanes
 //    * populates every star system with multi-ring planetary orbits, natural
 //      moons around host worlds, debris belts, derelict anomalies, and ports
-//    * gives every star system a station: a system that arrives with a port
-//      keeps it, and one that does not is given a berth, or generated
-//      alike, with no quota and no exceptions
 //    * registers map-driven incident types triggered by procedural exploration
 //
 //  Deterministic and idempotent: expanding an already-expanded Catalog is a
@@ -88,6 +85,7 @@ constexpr double kSystemZoomMax = 12.0;
 
 void ExpandChart(Catalog& catalog);
 void ExpandChart(Catalog& catalog, const ChartSettings& settings);
+void AssignCandidatePorts(Catalog& catalog, std::uint64_t seed, const std::string& homePort);
 
 struct ChartPreviewDot {
   std::string id;

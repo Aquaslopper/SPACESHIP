@@ -60,7 +60,8 @@ void Simulation::TickFilters() {
   state_.airHold -= 1;
   if (AirStageIndex() != before) {
     if (AirStageIndex() == 0) {
-      LogLine("The cabin air has gone foul. The crew are labouring.");
+      LogLine(crew_.empty() ? "The cabin air has gone foul."
+                            : "The cabin air has gone foul. The crew are labouring.");
     }
   }
 }
@@ -88,8 +89,15 @@ const struct AirStage& Simulation::AirSpec() const {
   const std::vector<AirStage>& stages = rules_.air.stages;
   const int index = AirStageIndex();
   if (stages.empty()) {
-    static const AirStage fallback{"OPTIMAL", "#7f9161", 1.0, 0.0};
-    return fallback;
+    static const AirStage kFallback[5] = {
+        {"FOUL", "#b05a42", 2.0, 2.0},
+        {"BAD", "#b05a42", 1.5, 5.0},
+        {"THIN", "#c08a3e", 1.25, 10.0},
+        {"FADING", "#bda43f", 1.0, 0.0},
+        {"OPTIMAL", "#7f9161", 0.0, 0.0},
+    };
+    const std::size_t clamped = static_cast<std::size_t>(std::max(0, std::min(index, 4)));
+    return kFallback[clamped];
   }
   const std::size_t clamped = static_cast<std::size_t>(
       std::max(0, std::min(index, static_cast<int>(stages.size()) - 1)));
@@ -153,6 +161,17 @@ bool Simulation::ServiceSystem(const std::string& statId) {
   stock -= 1.0;
   ClampStat(statId, delta);
   PerformAction(label);
+  return true;
+}
+
+bool Simulation::SplitFuelCell() {
+  if (!state_.gameOver.empty() || state_.fuelCells < 1.0) { return false; }
+  if (StatValue("energy") >= 100.0 && StatValue("fuel") >= 100.0) { return false; }
+
+  state_.fuelCells -= 1.0;
+  ClampStat("energy", 6.0);
+  ClampStat("fuel", 4.0);
+  PerformAction("Split a fuel cell between energy and fuel");
   return true;
 }
 

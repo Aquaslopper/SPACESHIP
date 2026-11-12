@@ -273,6 +273,7 @@ std::string Simulation::SaveJson() const {
   s["rackWarned"] = state_.rackWarned;
   s["rackWarnedMess"] = state_.rackWarnedMess;
   s["crewSel"] = state_.crewSel;
+  if (!state_.homePort.empty()) { s["homePort"] = state_.homePort; }
 
   Json pending = Json::object();
   for (const auto& entry : state_.pendingOrders) { pending[entry.first] = entry.second; }
@@ -360,32 +361,47 @@ std::string Simulation::SaveJson() const {
 
   Json crew = Json::array();
   for (const CrewMember& member : crew_) {
-    crew.push_back(Json{{"id", member.id},
-                        {"name", member.name},
-                        {"role", member.role},
-                        {"room", member.room},
-                        {"activity", member.activity},
-                        {"colour", member.colour},
-                        {"sex", member.sex},
-                        {"hair", member.hair},
-                        {"hair2", member.hair2},
-                        {"skin", member.skin},
-                        {"hairStyle", member.hairStyle},
-                        {"health", Num(member.health)},
-                        {"morale", Num(member.morale)},
-                        {"fatigue", Num(member.fatigue)},
-                        {"hunger", Num(member.hunger)},
-                        {"wallet", Num(member.wallet)},
-                        {"hungerTick", Num(member.hungerTick)},
-                        {"traits", member.traits},
-                        {"race", member.race},
-                        {"age", member.age},
-                        {"homeworld", member.homeworld},
-                        {"hobby", member.hobby},
-                        {"religion", member.religion},
-                        {"job", member.job},
-                        {"skill", member.skill},
-                        {"jobAt", Num(member.jobAt)}});
+    Json entry = Json{{"id", member.id},
+                      {"name", member.name},
+                      {"role", member.role},
+                      {"room", member.room},
+                      {"activity", member.activity},
+                      {"colour", member.colour},
+                      {"sex", member.sex},
+                      {"hair", member.hair},
+                      {"hair2", member.hair2},
+                      {"skin", member.skin},
+                      {"hairStyle", member.hairStyle},
+                      {"health", Num(member.health)},
+                      {"morale", Num(member.morale)},
+                      {"fatigue", Num(member.fatigue)},
+                      {"hunger", Num(member.hunger)},
+                      {"wallet", Num(member.wallet)},
+                      {"hungerTick", Num(member.hungerTick)},
+                      {"traits", member.traits},
+                      {"race", member.race},
+                      {"age", member.age},
+                      {"homeworld", member.homeworld},
+                      {"hobby", member.hobby},
+                      {"religion", member.religion},
+                      {"job", member.job},
+                      {"skill", member.skill},
+                      {"jobAt", Num(member.jobAt)}};
+    if (!member.jobProgress.empty()) {
+      Json prog = Json::object();
+      for (const auto& kv : member.jobProgress) {
+        if (!kv.first.empty()) { prog[kv.first] = Num(kv.second); }
+      }
+      if (!prog.empty()) { entry["jobProgress"] = prog; }
+    }
+    if (!member.jobSkill.empty()) {
+      Json sk = Json::object();
+      for (const auto& kv : member.jobSkill) {
+        if (!kv.first.empty() && !kv.second.empty()) { sk[kv.first] = kv.second; }
+      }
+      if (!sk.empty()) { entry["jobSkill"] = sk; }
+    }
+    crew.push_back(entry);
   }
   root["crew"] = crew;
 
@@ -594,6 +610,9 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
   }
   if (GetNumber(*state, "engineCondition") > 100) { return fail("engine condition above 100"); }
   if (GetNumber(*state, "airHold") > 20) { return fail("more air than the cabin holds"); }
+  if (const Json* hp = At(*state, "homePort"); hp != nullptr && !hp->is_string()) {
+    return fail("state.homePort");
+  }
 
   const Json* zoom = At(*map, "zoom");
   if (zoom == nullptr || !SaveNumber(*zoom) || zoom->get<double>() <= 0) { return fail("map zoom"); }
@@ -726,6 +745,22 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
       const Json* at = At(member, "jobAt");
       if (at == nullptr || !SaveNumber(*at)) { return fail("a job with no rate"); }
       if (job == "filters" && at->get<double>() > 4) { return fail("a filter hand at an air stage that does not exist"); }
+    }
+    if (const Json* prog = At(member, "jobProgress")) {
+      if (!IsObject(*prog)) { return fail("crew jobProgress unreadable"); }
+      for (auto it = prog->begin(); it != prog->end(); ++it) {
+        if (!jobExists(it.key()) || !SaveNumber(it.value())) {
+          return fail("crew jobProgress invalid");
+        }
+      }
+    }
+    if (const Json* sk = At(member, "jobSkill")) {
+      if (!IsObject(*sk)) { return fail("crew jobSkill unreadable"); }
+      for (auto it = sk->begin(); it != sk->end(); ++it) {
+        if (!jobExists(it.key()) || !it.value().is_string()) {
+          return fail("crew jobSkill invalid");
+        }
+      }
     }
   }
 
@@ -961,6 +996,28 @@ CrewMember ReadCrewMember(const Json& source) {
   crew.job = GetString(source, "job");
   crew.skill = GetString(source, "skill");
   crew.jobAt = GetNumber(source, "jobAt");
+  if (const Json* prog = At(source, "jobProgress"); prog != nullptr && prog->is_object()) {
+    for (auto it = prog->begin(); it != prog->end(); ++it) {
+      if (!it.key().empty() && it.value().is_number()) {
+        crew.jobProgress[it.key()] = it.value().get<double>();
+      }
+    }
+  }
+  if (const Json* sk = At(source, "jobSkill"); sk != nullptr && sk->is_object()) {
+    for (auto it = sk->begin(); it != sk->end(); ++it) {
+      if (!it.key().empty() && it.value().is_string()) {
+        crew.jobSkill[it.key()] = it.value().get<std::string>();
+      }
+    }
+  }
+  if (!crew.job.empty()) {
+    if (crew.jobProgress.find(crew.job) == crew.jobProgress.end()) {
+      crew.jobProgress[crew.job] = crew.jobAt;
+    }
+    if (!crew.skill.empty() && crew.jobSkill.find(crew.job) == crew.jobSkill.end()) {
+      crew.jobSkill[crew.job] = crew.skill;
+    }
+  }
   return crew;
 }
 
@@ -994,6 +1051,11 @@ void Simulation::ApplySnapshotDefaults() {
     if (!seen) { tabs.push_back(tab); }
   }
   state_.tabs = tabs;
+  if (crew_.empty()) {
+    state_.crewSel.clear();
+  } else if (FindCrew(state_.crewSel) == nullptr) {
+    state_.crewSel = crew_.front().id;
+  }
   for (Incident& incident : events_) {
     if (incident.type == "crew" && incident.a.empty() && crew_.size() >= 2) {
       const std::pair<std::string, std::string> pair = DisputePair();
@@ -1062,6 +1124,7 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     state_.rackWarned = GetBool(s, "rackWarned");
     state_.rackWarnedMess = GetBool(s, "rackWarnedMess");
     state_.crewSel = GetString(s, "crewSel");
+    state_.homePort = GetString(s, "homePort");
     state_.crewTick = GetNumber(s, "crewTick");
     state_.shiplets = GetNumber(s, "shiplets");
     state_.payTick = GetNumber(s, "payTick");
@@ -1368,6 +1431,37 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
       const Body* system = CurrentSystem();
       if (system != nullptr) { map_.sector = system->region; }
     }
+    if (state_.homePort.empty() || catalog_.FindPort(state_.homePort) == nullptr) {
+      state_.homePort.clear();
+      if (state_.docked && catalog_.FindPort(map_.here) != nullptr) {
+        state_.homePort = map_.here;
+      }
+      if (state_.homePort.empty()) {
+        const std::string sysId = CurrentSystemId();
+        for (const Port& port : catalog_.ports) {
+          const Body* body = catalog_.FindBody(port.id);
+          if (body != nullptr && catalog_.BodySystem(*body) == sysId) {
+            state_.homePort = port.id;
+            break;
+          }
+        }
+      }
+      if (state_.homePort.empty() && !map_.sector.empty()) {
+        for (const Port& port : catalog_.ports) {
+          const Body* body = catalog_.FindBody(port.id);
+          const Body* sys =
+              body == nullptr ? nullptr : catalog_.FindSystem(catalog_.BodySystem(*body));
+          if (sys != nullptr && sys->region == map_.sector) {
+            state_.homePort = port.id;
+            break;
+          }
+        }
+      }
+      if (state_.homePort.empty() && !catalog_.ports.empty()) {
+        state_.homePort = catalog_.ports.front().id;
+      }
+    }
+    AssignCandidatePorts(catalog_, chartSettings_.seed, state_.homePort);
 
     views_.clear();
     for (const std::string& layer : catalog_.layerOrder) {

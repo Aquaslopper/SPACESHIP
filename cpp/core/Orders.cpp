@@ -23,6 +23,17 @@ const JobDef* Simulation::FindJobDef(const std::string& jobId) const {
   return nullptr;
 }
 
+double Simulation::JobLevelFor(const CrewMember& crew, const std::string& jobId) const {
+  if (jobId.empty()) { return 0.0; }
+  const JobDef* job = FindJobDef(jobId);
+  if (job == nullptr) { return 0.0; }
+  const auto it = crew.jobProgress.find(jobId);
+  if (it != crew.jobProgress.end()) {
+    return std::max(job->baseAt, it->second);
+  }
+  return (crew.job == jobId && crew.jobAt >= job->baseAt) ? crew.jobAt : job->baseAt;
+}
+
 const OrderSheet* Simulation::SheetOf(const CrewMember& crew) const {
   auto it = orderSheets_.find(crew.id);
   return it == orderSheets_.end() ? nullptr : &it->second;
@@ -143,6 +154,13 @@ bool Simulation::StageJob(const std::string& crewId, const std::string& jobId) {
   OrderSheet& sheet = orderSheets_[crewId];
   if (crew->job == jobId) { sheet.hasJob = false; sheet.job.clear(); }
   else { sheet.hasJob = true; sheet.job = jobId; }
+  const std::string effJob = sheet.hasJob ? sheet.job : crew->job;
+  const JobDef* effDef = FindJobDef(effJob);
+  if (effJob.empty() || effDef == nullptr || effDef->trainStep == 0 ||
+      JobLevelFor(*crew, effJob) >= effDef->trainCap) {
+    sheet.Set("learnOn", false);
+    sheet.Set("learnSt", false);
+  }
   if (sheet.Empty()) { orderSheets_.erase(crewId); }
   state_.pendingOrders[crewId] = !orderSheets_.empty() && orderSheets_.count(crewId) != 0;
   if (!state_.pendingOrders[crewId]) { state_.pendingOrders.erase(crewId); }
@@ -157,6 +175,15 @@ bool Simulation::ToggleOrder(const std::string& crewId, const std::string& order
   if (orderId == "rest" && crew->fatigue < 25 && crew->morale >= 70 &&
       !(existing != nullptr && existing->Has("rest"))) {
     return false;
+  }
+  if ((orderId == "learnOn" || orderId == "learnSt") &&
+      !(existing != nullptr && existing->Has(orderId))) {
+    const std::string effJob = StagedJob(*crew);
+    const JobDef* def = FindJobDef(effJob);
+    if (effJob.empty() || def == nullptr || def->trainStep == 0 ||
+        JobLevelFor(*crew, effJob) >= def->trainCap) {
+      return false;
+    }
   }
   bool known = false;
   for (const Catalog::OrderDefinition& order : catalog_.orderDefs) {
@@ -258,43 +285,65 @@ void Simulation::ApplyJobTo(CrewMember& crew, const std::string& jobId) {
   if (job != nullptr && job->unique) {
     for (CrewMember& other : crew_) {
       if (&other != &crew && other.job == jobId) {
+        other.jobProgress[other.job] = other.jobAt;
+        if (!other.skill.empty()) { other.jobSkill[other.job] = other.skill; }
         other.job.clear();
+        other.jobAt = 0.0;
+        other.skill = "Untrained";
         LogLine(other.name + " was relieved of the " + Lower(job->label) + " job.");
       }
     }
   }
+  if (!crew.job.empty()) {
+    crew.jobProgress[crew.job] = crew.jobAt;
+    if (!crew.skill.empty()) { crew.jobSkill[crew.job] = crew.skill; }
+  }
   crew.job = jobId;
   if (job != nullptr && !job->room.empty()) { crew.room = job->room; }
   if (jobId.empty()) {
+    crew.jobAt = 0.0;
+    crew.skill = "Untrained";
     LogLine(crew.name + " has no standing job.");
     return;
   }
-  if (crew.skill.empty()) { crew.skill = "Untrained"; }
-  crew.jobAt = job == nullptr ? 0.0 : job->baseAt;
+  const double baseAt = job == nullptr ? 0.0 : job->baseAt;
+  const auto progIt = crew.jobProgress.find(jobId);
+  crew.jobAt = progIt != crew.jobProgress.end() ? std::max(baseAt, progIt->second) : baseAt;
+  if (job != nullptr && job->trainCap > 0) {
+    crew.jobAt = std::min(job->trainCap, crew.jobAt);
+  }
+  const auto skillIt = crew.jobSkill.find(jobId);
+  crew.skill = (skillIt != crew.jobSkill.end() && !skillIt->second.empty())
+                   ? skillIt->second
+                   : std::string("Untrained");
+  crew.jobProgress[jobId] = crew.jobAt;
+  crew.jobSkill[jobId] = crew.skill;
   LogLine(crew.name + " now holds the " + (job == nullptr ? std::string("job")
                                                           : Lower(job->label)) + " job.");
 }
 
 void Simulation::TrainCrew(CrewMember& crew, int steps, const std::string& where) {
-  const Catalog::JobDefinition* job = nullptr;
-  for (const Catalog::JobDefinition& def : catalog_.jobDefs) {
-    if (def.id == crew.job) { job = &def; }
-  }
-  crew.skill = (crew.skill.empty() || crew.skill == "Untrained") ? "Trained" : "Practised";
-  if (job != nullptr && job->trainStep != 0) {
-    double current = (crew.jobAt == 0 || crew.jobAt < job->baseAt) ? job->baseAt : crew.jobAt;
-    for (int k = 0; k < steps; ++k) {
-      current = std::min(job->trainCap, current + job->trainStep);
-    }
-    crew.jobAt = current;
-    if (crew.job == "maintenance") {
-      LogLine(crew.name + " trained " + where + ".");
-    } else {
-      LogLine(crew.name + " trained " + where + " - now acts at " +
-              js::NumToString(crew.jobAt) + job->unit + ".");
-    }
-  } else {
+  const JobDef* job = FindJobDef(crew.job);
+  if (crew.job.empty() || job == nullptr || job->trainStep == 0) {
     LogLine(crew.name + " trained " + where + ", but holds no job to use it on.");
+    return;
+  }
+  double current = JobLevelFor(crew, crew.job);
+  for (int k = 0; k < steps; ++k) {
+    crew.skill = (crew.skill.empty() || crew.skill == "Untrained") ? "Trained" : "Practised";
+    current = std::min(job->trainCap, current + job->trainStep);
+  }
+  crew.jobAt = current;
+  crew.jobProgress[crew.job] = crew.jobAt;
+  crew.jobSkill[crew.job] = crew.skill;
+  if (crew.job == "maintenance") {
+    LogLine(crew.name + " trained " + where + ".");
+  } else if (crew.job == "navigation") {
+    LogLine(crew.name + " trained " + where + " - now acts at -" +
+            js::NumToString(NavigatorFuelDiscount(crew)) + "% fuel.");
+  } else {
+    LogLine(crew.name + " trained " + where + " - now acts at " +
+            js::NumToString(crew.jobAt) + job->unit + ".");
   }
 }
 

@@ -34,7 +34,7 @@ const std::vector<TutorialCard>& TutorialCards() {
        "The filter bank also grants work progress; completed crossings and scans need acknowledgement.", "assets/art/tutorial/spaceship04.png"},
       {"Systems and indicators", "Actions advance survival systems as well as work. Seat three O2 canisters and start the filter bank to keep the air clean.",
        "The image shows an illustrative cascade, not a fixed sequence.", "assets/art/tutorial/spaceship05.png"},
-      {"Your crew", "The artwork illustrates possible roles; the actual starting roster is in the game. Right-click a crew member to open their task tab.",
+      {"Your crew", "The artwork illustrates possible roles; you begin solo and hire crew at stations. Right-click a crew member to open their task tab.",
        "Talking costs one click and raises that crew member's morale by up to 5 points.", "assets/art/tutorial/spaceship06.png"},
   };
   return cards;

@@ -11,6 +11,7 @@ struct EngineRules {
   double wearStep = 1;
   double warnBelow = 50;
   double engineerAt = 60;
+  double burnRate = 1.0;
 };
 
 struct AirStage {
@@ -38,13 +39,13 @@ struct MessRules {
   double every = 25;
   double starveAt = 90;
   double starveEvery = 8;
-  double rationStart = 21;
+  double rationStart = 5.0;
   double rationCapacity = 24;
   double foodPerRation = 5;
   double cookBelow = 10;
   double hungerPerMeal = 15;
   double hungerPerFood = 5;
-  double hungerFloor = 5;
+  double hungerFloor = 0.0;
 };
 
 struct PayRules {

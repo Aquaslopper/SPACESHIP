@@ -4051,9 +4051,6 @@ void ShellView::PaintTitle(Simulation& sim, double nowMs) {
   ImGui::PopStyleColor(3);
 }
 
-// ============================================================================
-//  The loss overlay: the voyage ended, and the run's own record with it.
-// ============================================================================
 void ShellView::PaintLoss(Simulation& sim) {
   const Palette& p = theme_.palette;
   lossHits_.clear();
@@ -4061,49 +4058,206 @@ void ShellView::PaintLoss(Simulation& sim) {
 
   DrawRectangle(0, 0, static_cast<int>(width_), static_cast<int>(height_),
                 ToRay(p.panel, 226));
-  const float cardW = std::min(420.0f, width_ - 60.0f);
-  const Area card{(width_ - cardW) * 0.5f, 90.0f, cardW, std::min(560.0f, height_ - 120.0f)};
-  PaintChamferBoxRay(card, kChamferPanel, ToRay(p.panel),
-                       ToRay(p.borderDark), ToRay(p.border));
 
-  float y = card.y + 18.0f;
-  Text(loss_.heading.c_str(), static_cast<int>(card.x + 20.0f),
-           static_cast<int>(y), TypePx(24) , ToRay(p.terracotta));
-  y += 34.0f;
-  for (const std::string& line : WrapText(loss_.cause, card.w - 40.0f, TypePx(12), SelectFont(TypePx(12), false))) {
-    Text(line.c_str(), static_cast<int>(card.x + 20.0f), static_cast<int>(y), TypePx(12) ,
-             ToRay(p.ink));
-    y += 16.0f;
+  const float cardW = std::min(480.0f, std::max(320.0f, width_ - 48.0f));
+  const float padX = 24.0f;
+  const float innerW = std::max(120.0f, cardW - 2.0f * padX);
+  const float rowPadX = 12.0f;
+
+  const int headPx = TypePx(24);
+  const int causePx = TypePx(12);
+  const int bodyPx = TypePx(10);
+  const int msgPx = TypePx(9);
+  const Font& causeFont = SelectFont(causePx, false);
+  const Font& bodyFont = SelectFont(bodyPx, false);
+  const Font& msgFont = SelectFont(msgPx, false);
+
+  const std::vector<std::string> causeLines =
+      WrapText(loss_.cause, innerW, causePx, causeFont);
+  const std::vector<std::string> noteLines =
+      WrapText(loss_.note, innerW, bodyPx, bodyFont);
+  const std::vector<std::string> msgLines =
+      lossMessage_.empty() ? std::vector<std::string>{}
+                           : WrapText(lossMessage_, innerW, msgPx, msgFont);
+
+  auto lerpMetric = [](float lo, float hi, float t) {
+    return lo + (hi - lo) * t;
+  };
+  auto evalCardH = [&](float t) {
+    const float padTop = lerpMetric(10.0f, 22.0f, t);
+    const float padBot = lerpMetric(10.0f, 22.0f, t);
+    const float headStep = static_cast<float>(headPx) + lerpMetric(4.0f, 10.0f, t);
+    const float causeLineH = static_cast<float>(causePx) + lerpMetric(2.0f, 6.0f, t);
+    const float afterCauseGap = lerpMetric(2.0f, 6.0f, t);
+    const float noteLineH = static_cast<float>(bodyPx) + lerpMetric(2.0f, 5.0f, t);
+    const float beforeStatsGap = lerpMetric(6.0f, 12.0f, t);
+    const float statPadY = lerpMetric(3.0f, 6.0f, t);
+    const float statRowH = static_cast<float>(bodyPx) + lerpMetric(4.0f, 8.0f, t);
+    const float beforeBtnsGap = lerpMetric(6.0f, 14.0f, t);
+    const float btnMax = std::max(36.0f, static_cast<float>(bodyPx) + 16.0f);
+    const float btnH = lerpMetric(static_cast<float>(bodyPx) + 10.0f, btnMax, t);
+    const float btnGap = lerpMetric(3.0f, 6.0f, t);
+    const float msgGap = lerpMetric(4.0f, 10.0f, t);
+    const float msgLineH = static_cast<float>(msgPx) + lerpMetric(2.0f, 4.0f, t);
+
+    float h = padTop + headStep;
+    h += static_cast<float>(causeLines.size()) * causeLineH;
+    if (!noteLines.empty()) {
+      h += afterCauseGap + static_cast<float>(noteLines.size()) * noteLineH;
+    }
+    if (!loss_.summary.empty()) {
+      h += beforeStatsGap + 2.0f * statPadY +
+           static_cast<float>(loss_.summary.size()) * statRowH;
+    }
+    if (!loss_.actions.empty()) {
+      h += beforeBtnsGap + static_cast<float>(loss_.actions.size()) * btnH +
+           static_cast<float>(loss_.actions.size() - 1) * btnGap;
+    }
+    if (!msgLines.empty()) {
+      h += msgGap + static_cast<float>(msgLines.size()) * msgLineH;
+    }
+    h += padBot;
+    return h;
+  };
+
+  const float availH = std::max(200.0f, height_ - 24.0f);
+  const float hMin = evalCardH(0.0f);
+  const float hMax = evalCardH(1.0f);
+  const float t = (hMax <= availH || hMax <= hMin)
+                      ? 1.0f
+                      : std::clamp((availH - hMin) / (hMax - hMin), 0.0f, 1.0f);
+
+  const float padTop = lerpMetric(10.0f, 22.0f, t);
+  const float headStep = static_cast<float>(headPx) + lerpMetric(4.0f, 10.0f, t);
+  const float causeLineH = static_cast<float>(causePx) + lerpMetric(2.0f, 6.0f, t);
+  const float afterCauseGap = lerpMetric(2.0f, 6.0f, t);
+  const float noteLineH = static_cast<float>(bodyPx) + lerpMetric(2.0f, 5.0f, t);
+  const float beforeStatsGap = lerpMetric(6.0f, 12.0f, t);
+  const float statPadY = lerpMetric(3.0f, 6.0f, t);
+  const float statRowH = static_cast<float>(bodyPx) + lerpMetric(4.0f, 8.0f, t);
+  const float beforeBtnsGap = lerpMetric(6.0f, 14.0f, t);
+  const float btnMax = std::max(36.0f, static_cast<float>(bodyPx) + 16.0f);
+  const float btnH =
+      std::round(lerpMetric(static_cast<float>(bodyPx) + 10.0f, btnMax, t));
+  const float btnGap = std::round(lerpMetric(3.0f, 6.0f, t));
+  const float msgGap = lerpMetric(4.0f, 10.0f, t);
+  const float msgLineH = static_cast<float>(msgPx) + lerpMetric(2.0f, 4.0f, t);
+  const float padBot = lerpMetric(10.0f, 22.0f, t);
+
+  float cardH = padTop + headStep +
+                static_cast<float>(causeLines.size()) * causeLineH;
+  if (!noteLines.empty()) {
+    cardH += afterCauseGap + static_cast<float>(noteLines.size()) * noteLineH;
   }
-  y += 4.0f;
-  for (const std::string& line : WrapText(loss_.note, card.w - 40.0f, TypePx(10), SelectFont(TypePx(10), false))) {
-    Text(line.c_str(), static_cast<int>(card.x + 20.0f), static_cast<int>(y), TypePx(10) ,
-             ToRay(p.muted));
-    y += 13.0f;
+  const float statsH =
+      loss_.summary.empty()
+          ? 0.0f
+          : std::round(2.0f * statPadY +
+                       static_cast<float>(loss_.summary.size()) * statRowH);
+  if (!loss_.summary.empty()) {
+    cardH += beforeStatsGap + statsH;
   }
-  y += 10.0f;
-  for (const PopupRow& row : loss_.summary) {
-    Text(row.key.c_str(), static_cast<int>(card.x + 20.0f), static_cast<int>(y), TypePx(10) ,
-             ToRay(p.muted));
-    const float valueW = static_cast<float>(TextWidth(row.value.c_str(), TypePx(10) ));
-    Text(row.value.c_str(), static_cast<int>(card.Right() - 20.0f - valueW),
-             static_cast<int>(y), TypePx(10) , ToRay(p.ink));
-    y += 14.0f;
+  if (!loss_.actions.empty()) {
+    cardH += beforeBtnsGap + static_cast<float>(loss_.actions.size()) * btnH +
+             static_cast<float>(loss_.actions.size() - 1) * btnGap;
   }
-  y += 10.0f;
-  for (const ActionRowView& action : loss_.actions) {
-    if (y + 28.0f > card.Bottom() - 12.0f) { break; }
-    const Area box{card.x + 20.0f, y, card.w - 40.0f, 26.0f};
-    PaintChamferBoxRay(box, kChamferSmall, ToRay(p.panel2),
+  if (!msgLines.empty()) {
+    cardH += msgGap + static_cast<float>(msgLines.size()) * msgLineH;
+  }
+  cardH = std::round(cardH + padBot);
+
+  const float cardX = std::round((width_ - cardW) * 0.5f);
+  const float cardY = std::max(12.0f, std::round((height_ - cardH) * 0.5f));
+  const Area card{cardX, cardY, cardW, cardH};
+  PaintChamferBoxRay(card, kChamferPanel, ToRay(p.panel),
+                     ToRay(p.borderDark), ToRay(p.border));
+
+  const int leftX = static_cast<int>(std::round(card.x + padX));
+  float y = card.y + padTop;
+  Text(loss_.heading.c_str(), leftX, static_cast<int>(std::round(y)), headPx,
+       ToRay(p.terracotta));
+  y += headStep;
+
+  for (const std::string& line : causeLines) {
+    Text(line.c_str(), leftX, static_cast<int>(std::round(y)), causePx,
+         ToRay(p.ink));
+    y += causeLineH;
+  }
+  if (!noteLines.empty()) {
+    y += afterCauseGap;
+    for (const std::string& line : noteLines) {
+      Text(line.c_str(), leftX, static_cast<int>(std::round(y)), bodyPx,
+           ToRay(p.muted));
+      y += noteLineH;
+    }
+  }
+
+  if (!loss_.summary.empty()) {
+    y += beforeStatsGap;
+    const Area statsBox{card.x + padX, std::round(y), innerW, statsH};
+    PaintChamferBoxRay(statsBox, kChamferCard, ToRay(p.content),
                        ToRay(p.borderDark), ToRay(p.border));
-    Text(action.label.c_str(), static_cast<int>(box.x + 10.0f),
-             static_cast<int>(box.y + 7.0f), TypePx(10) , ToRay(p.ink));
-    lossHits_.push_back(NavHit{box, action.id, ""});
-    y += 30.0f;
+    const float rowLeft = statsBox.x + rowPadX;
+    const float rowRight = statsBox.Right() - rowPadX;
+    float rowY = statsBox.y + statPadY;
+    for (std::size_t i = 0; i < loss_.summary.size(); ++i) {
+      if (i > 0) {
+        const float lineY = std::round(rowY) + 0.5f;
+        DrawLineEx(Vector2{rowLeft, lineY}, Vector2{rowRight, lineY}, 1.0f,
+                   ToRay(p.border, 140));
+      }
+      const PopupRow& row = loss_.summary[i];
+      const Vector2 keySz = MeasureTextEx(
+          bodyFont, row.key.c_str(), static_cast<float>(bodyPx), 1.0f);
+      const Vector2 valSz = MeasureTextEx(
+          bodyFont, row.value.c_str(), static_cast<float>(bodyPx), 1.0f);
+      Text(row.key.c_str(), static_cast<int>(std::round(rowLeft)),
+           static_cast<int>(std::round(rowY + (statRowH - keySz.y) * 0.5f)),
+           bodyPx, ToRay(p.muted));
+      Text(row.value.c_str(),
+           static_cast<int>(std::round(rowRight - valSz.x)),
+           static_cast<int>(std::round(rowY + (statRowH - valSz.y) * 0.5f)),
+           bodyPx, ToRay(p.ink));
+      rowY += statRowH;
+    }
+    y = statsBox.Bottom();
   }
-  if (!lossMessage_.empty()) {
-    Text(lossMessage_.c_str(), static_cast<int>(card.x + 20.0f),
-             static_cast<int>(card.Bottom() - 18.0f), TypePx(9) , ToRay(p.coffee));
+
+  if (!loss_.actions.empty()) {
+    y += beforeBtnsGap;
+    const std::string activeSlotId = "slot:" + std::to_string(lossSlot_);
+    for (std::size_t i = 0; i < loss_.actions.size(); ++i) {
+      const ActionRowView& action = loss_.actions[i];
+      const Area box{card.x + padX, std::round(y), innerW, btnH};
+      const bool selectedSlot = action.id == activeSlotId;
+      const bool hovered = box.Contains(mouseX_, mouseY_);
+      const ::Color fill =
+          (selectedSlot || hovered) ? ToRay(p.panel3) : ToRay(p.panel2);
+      const ::Color outerLine =
+          selectedSlot ? ToRay(p.coffeeDark) : ToRay(p.borderDark);
+      const ::Color innerLine =
+          selectedSlot ? ToRay(p.terracotta)
+                       : (hovered ? ToRay(p.coffee) : ToRay(p.border));
+      PaintChamferBoxRay(box, kChamferSmall, fill, outerLine, innerLine);
+      const Vector2 labelSz = MeasureTextEx(
+          bodyFont, action.label.c_str(), static_cast<float>(bodyPx), 1.0f);
+      const int tx =
+          static_cast<int>(std::round(box.x + (box.w - labelSz.x) * 0.5f));
+      const int ty =
+          static_cast<int>(std::round(box.y + (box.h - labelSz.y) * 0.5f));
+      Text(action.label.c_str(), tx, ty, bodyPx, ToRay(p.ink));
+      lossHits_.push_back(NavHit{box, action.id, ""});
+      y = box.Bottom() + (i + 1 < loss_.actions.size() ? btnGap : 0.0f);
+    }
+  }
+
+  if (!msgLines.empty()) {
+    y += msgGap;
+    for (const std::string& line : msgLines) {
+      Text(line.c_str(), leftX, static_cast<int>(std::round(y)), msgPx,
+           ToRay(p.coffee));
+      y += msgLineH;
+    }
   }
 }
 

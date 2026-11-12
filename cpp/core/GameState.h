@@ -41,6 +41,8 @@ struct CrewMember {
   std::string job;
   std::string skill;
   double jobAt = 0;
+  std::map<std::string, double> jobProgress;
+  std::map<std::string, std::string> jobSkill;
 
   std::string said;
   std::string saidKey;
@@ -257,7 +259,7 @@ struct Cargo {
 struct Mess {
   double rack = 18;
   double capacity = 24;
-  double rations = 21;
+  double rations = 5;
   double rationCapacity = 24;
 };
 
@@ -301,7 +303,8 @@ struct GameState {
   bool rackWarned = false;
   bool rackWarnedMess = false;
 
-  std::string crewSel = "rell";
+  std::string crewSel;
+  std::string homePort;
   std::map<std::string, bool> pendingOrders;
   double crewTick = 0;
   double shiplets = 340;

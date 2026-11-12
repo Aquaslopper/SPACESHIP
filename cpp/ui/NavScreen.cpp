@@ -99,18 +99,6 @@ NavPoint TravelMarker(const Simulation& sim) {
   return NavPoint{at.x + (body->x - at.x) * p, at.y + (body->y - at.y) * p};
 }
 
-const CrewMember* NavigatorOf(const Simulation& sim) {
-  for (const CrewMember& crew : sim.Crew()) {
-    if (crew.job == "navigation" && sim.CrewBusy(crew) == nullptr) { return &crew; }
-  }
-  return nullptr;
-}
-
-double NavigatorDiscount(const CrewMember& navigator) {
-  const double at = navigator.jobAt == 0 ? 1.0 : navigator.jobAt;
-  return 4.0 * std::max(1.0, std::min(5.0, at));
-}
-
 std::vector<PanelLine> ScanReadout(const Simulation& sim, const Body& body) {
   std::vector<PanelLine> lines;
   if (!sim.CanScan(body)) {
@@ -729,7 +717,7 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
     if (sim.AtTarget(*target)) {
       distance.Dim("You are already here.");
     } else {
-      const CrewMember* navigator = NavigatorOf(sim);
+      const CrewMember* navigator = sim.AssignedNavigator();
       distance.Field("Distance", metrics.ly);
       distance.Field("", metrics.km);
       distance.Field("Transit", metrics.transit);
@@ -739,7 +727,7 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
                      navigator == nullptr
                          ? std::string("None available")
                          : navigator->name + " (-" +
-                               Num(NavigatorDiscount(*navigator)) +
+                               Num(sim.NavigatorFuelDiscount(*navigator)) +
                                "% fuel at departure)");
       distance.Field("", "1 to commit, " + Plur(metrics.dist, "action") + " under way");
     }

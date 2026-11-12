@@ -162,11 +162,14 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
 
   if (selected == nullptr) {
     cond.Dim("No crew aboard.");
+    ordersPanel.Dim("No crew aboard.");
+    sheet.Dim("Nothing written down yet.");
     model.bandNote = "No orders written.";
     assignPanel.Note(model.bandNote);
     assignPanel.buttons.push_back(BuildProgressButton(
         sim, "crew-assign", "Assign Tasks (0 Clicks)", false, "Complete", std::string()));
     screen.left = {roster};
+    screen.under = {cond};
     screen.right = {ordersPanel, sheet, assignPanel};
     return model;
   }
@@ -177,8 +180,6 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
   model.cardRole = hand.role;
   model.cardColour = hand.colour;
 
-  // HTA paintCrewPanels -> statLine: numbers AND coloured bars. Hunger and
-  // fatigue invert the colour judgement, never the actual bar width.
   const auto vital = [&](const std::string& label, double value, bool bad) {
     cond.Field(label, js::NumToString(value));
     const double good = bad ? 100 - value : value;
@@ -218,6 +219,7 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
   ordersPanel.Field("Standing job", JobLabel(sim, sim.StagedJob(hand)));
   const OrderSheet* staged = sim.SheetOf(hand);
   model.selectedJob = sim.StagedJob(hand);
+  const JobDef* selectedJobDef = sim.FindJobDef(model.selectedJob);
   const double cost = sim.JobCost(model.selectedJob);
   model.jobCostLine =
       staged != nullptr && staged->hasJob
@@ -232,15 +234,27 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
     line.id = order.id;
     line.label = order.label;
     line.actions = sim.OrderCost(hand, order.id);
-    line.fee = sim.OrderFeeFor(sim.StagedJob(hand), order.id);
+    line.fee = sim.OrderFeeFor(model.selectedJob, order.id);
     const bool on = staged != nullptr && staged->Has(order.id);
     line.on = on;
-    line.locked = (order.id == "learnSt" && !sim.State().docked) ||
-                  (order.id == "rest" && hand.fatigue < 25 && hand.morale >= 70 && !on);
+    const bool isTrain = (order.id == "learnOn" || order.id == "learnSt");
+    const bool noJob =
+        isTrain && (model.selectedJob.empty() || selectedJobDef == nullptr ||
+                    selectedJobDef->trainStep == 0);
+    const bool atCap =
+        isTrain && !noJob &&
+        sim.JobLevelFor(hand, model.selectedJob) >= selectedJobDef->trainCap;
+    const bool noStation = (order.id == "learnSt" && !sim.State().docked);
+    const bool rested = (order.id == "rest" && hand.fatigue < 25 && hand.morale >= 70);
+    line.locked = !on && (rested || noJob || atCap || noStation);
     line.cost = js::NumToString(line.actions);
     if (line.fee > 0) { line.cost += " - " + js::NumToString(line.fee) + " sh"; }
-    line.note = line.locked ? (order.id == "rest" ? "already rested" : "no station in reach")
-                            : order.note;
+    line.note = line.locked
+                    ? (rested ? "already rested"
+                       : noJob ? "assign a job first"
+                       : atCap ? "fully trained"
+                               : "no station in reach")
+                    : order.note;
     line.state = line.locked ? "off" : (on ? "on" : "");
     model.orders.push_back(line);
   }
@@ -296,21 +310,27 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
   return model;
 }
 
-// ---------------------------------------------------------------------------
-// The pad's presses
-// ---------------------------------------------------------------------------
 namespace {
 bool PressQuartersActionRaw(Simulation& sim, const std::string& action,
                          const std::string& arg) {
   if (action == "select") {
-    // FREE: looking at a crew member is free.
     for (const CrewMember& crew : sim.Crew()) {
       if (crew.id == arg) { sim.MutableState().crewSel = arg; return true; }
     }
     return false;
   }
-  if (action == "job") { return sim.StageJob(sim.State().crewSel, arg); }
-  if (action == "order") { return sim.ToggleOrder(sim.State().crewSel, arg); }
+  if (action == "job") {
+    const std::string targetId = BuildQuartersScreen(sim).selectedId;
+    if (targetId.empty()) { return false; }
+    sim.MutableState().crewSel = targetId;
+    return sim.StageJob(targetId, arg);
+  }
+  if (action == "order") {
+    const std::string targetId = BuildQuartersScreen(sim).selectedId;
+    if (targetId.empty()) { return false; }
+    sim.MutableState().crewSel = targetId;
+    return sim.ToggleOrder(targetId, arg);
+  }
   if (action == "commit") { return PressProgressButton(sim, "crew-assign"); }
   if (action == "talk") {
     const auto model = BuildQuartersScreen(sim);
@@ -321,16 +341,7 @@ bool PressQuartersActionRaw(Simulation& sim, const std::string& action,
 
 }  // namespace
 
-// ============================================================================
-//  The press, and the clicks it costs.
-//  ---------------------------------------------------------------------------
-//  One control is one control. A press spends one of the clicks that control
-//  holds and returns one to every other control, so a button is only refused
-//  once its own green has run out. Free reads spend nothing and return nothing.
-// ============================================================================
 bool PressQuartersAction(Simulation& sim, const std::string& action, const std::string& arg) {
-  // select/job/order are free; commit and conversation own their own locks.
-  // Wrapping it again creates an invisible lock and can block acknowledgment.
   return PressQuartersActionRaw(sim, action, arg);
 }
 

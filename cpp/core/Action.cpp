@@ -169,9 +169,9 @@ Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& se
   state.airHold = catalog.rules.air.holdMax;
   state.rackWarned = false;
   state.rackWarnedMess = false;
-  state.crewSel = "rell";
+  state.crewSel = sim.crew_.empty() ? std::string() : sim.crew_.front().id;
   state.crewTick = 0;
-  state.shiplets = 200;
+  state.shiplets = 340;
   state.payTick = 0;
   state.docked = false;
   state.fuelCells = 6;
@@ -192,7 +192,53 @@ Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& se
       sim.map_.layer = "system";
       break;
     }
+    if (!sim.state_.docked && system != nullptr) {
+      if (!system->entry.empty() && sim.catalog_.FindBody(system->entry) != nullptr) {
+        sim.map_.here = system->entry;
+      }
+      sim.map_.sector = system->region;
+      sim.map_.layer = "system";
+    }
+  } else if (sim.catalog_.FindBody(sim.map_.here) == nullptr && !sim.catalog_.systems.empty()) {
+    const Body& firstSys = sim.catalog_.systems.front();
+    if (!firstSys.entry.empty() && sim.catalog_.FindBody(firstSys.entry) != nullptr) {
+      sim.map_.here = firstSys.entry;
+    } else if (!sim.catalog_.bodies.empty()) {
+      sim.map_.here = sim.catalog_.bodies.front().id;
+    }
+    sim.map_.sector = firstSys.region;
+    sim.map_.layer = "system";
   }
+
+  state.homePort.clear();
+  if (state.docked && sim.catalog_.FindPort(sim.map_.here) != nullptr) {
+    state.homePort = sim.map_.here;
+  }
+  if (state.homePort.empty()) {
+    const std::string sysId = !startSystemId.empty() ? startSystemId : sim.CurrentSystemId();
+    for (const Port& port : sim.catalog_.ports) {
+      const Body* body = sim.catalog_.FindBody(port.id);
+      if (body != nullptr && sim.catalog_.BodySystem(*body) == sysId) {
+        state.homePort = port.id;
+        break;
+      }
+    }
+  }
+  if (state.homePort.empty() && !sim.map_.sector.empty()) {
+    for (const Port& port : sim.catalog_.ports) {
+      const Body* body = sim.catalog_.FindBody(port.id);
+      const Body* sys =
+          body == nullptr ? nullptr : sim.catalog_.FindSystem(sim.catalog_.BodySystem(*body));
+      if (sys != nullptr && sys->region == sim.map_.sector) {
+        state.homePort = port.id;
+        break;
+      }
+    }
+  }
+  if (state.homePort.empty() && !sim.catalog_.ports.empty()) {
+    state.homePort = sim.catalog_.ports.front().id;
+  }
+  AssignCandidatePorts(sim.catalog_, settings.seed, state.homePort);
 
   return sim;
 }
@@ -294,7 +340,6 @@ void Simulation::ClampStat(const std::string& id, double delta) {
   stat->value = std::max(0.0, std::min(100.0, stat->value + delta));
 
   if (id == "energy" && before > 0 && stat->value == 0) {
-    if (state_.filterLife > 0) { state_.airHold = rules_.air.holdMax; }
     LogLine("Power exhausted. The filter bank has stopped; restore energy to restart it.");
   } else if (id == "energy" && before == 0 && stat->value > 0) {
     LogLine("Power restored. Any charged filter bank resumes without another bonus.");
@@ -431,30 +476,47 @@ bool Simulation::ApplyJob(const std::string& crewId, const std::string& jobId) {
   CrewMember* crew = FindCrew(crewId);
   if (crew == nullptr) { return false; }
 
-  const JobDef* job = nullptr;
-  for (const JobDef& candidate : jobs_) {
-    if (candidate.id == jobId) { job = &candidate; }
-  }
+  const JobDef* job = FindJobDef(jobId);
   if (!jobId.empty() && job == nullptr) { return false; }
 
   if (job != nullptr && job->unique) {
     for (CrewMember& other : crew_) {
       if (other.id == crew->id || other.job != jobId) { continue; }
+      other.jobProgress[other.job] = other.jobAt;
+      if (!other.skill.empty()) { other.jobSkill[other.job] = other.skill; }
       other.job.clear();
+      other.jobAt = 0.0;
+      other.skill = "Untrained";
       LogLine(other.name + " was relieved of the " + Lower(job->label) + " job.");
     }
+  }
+
+  if (!crew->job.empty()) {
+    crew->jobProgress[crew->job] = crew->jobAt;
+    if (!crew->skill.empty()) { crew->jobSkill[crew->job] = crew->skill; }
   }
 
   crew->job = jobId;
   if (job != nullptr && !job->room.empty()) { crew->room = job->room; }
 
   if (jobId.empty()) {
+    crew->jobAt = 0.0;
+    crew->skill = "Untrained";
     LogLine(crew->name + " has no standing job.");
     return true;
   }
 
-  if (crew->skill.empty()) { crew->skill = "Untrained"; }
-  crew->jobAt = job->baseAt;
+  const auto progIt = crew->jobProgress.find(jobId);
+  crew->jobAt = progIt != crew->jobProgress.end()
+                    ? std::max(job->baseAt, progIt->second)
+                    : job->baseAt;
+  if (job->trainCap > 0) { crew->jobAt = std::min(job->trainCap, crew->jobAt); }
+  const auto skillIt = crew->jobSkill.find(jobId);
+  crew->skill = (skillIt != crew->jobSkill.end() && !skillIt->second.empty())
+                    ? skillIt->second
+                    : std::string("Untrained");
+  crew->jobProgress[jobId] = crew->jobAt;
+  crew->jobSkill[jobId] = crew->skill;
   LogLine(crew->name + " now holds the " + Lower(job->label) + " job.");
   return true;
 }

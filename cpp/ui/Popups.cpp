@@ -100,6 +100,9 @@ PopupModel BuildPopup(const Simulation& sim, const std::string& key,
   if (key == "manifest") {
     PopupSection crew;
     crew.title = "Crew";
+    if (sim.Crew().empty()) {
+      crew.rows.push_back(PopupRow{"Roster", "No crew aboard"});
+    }
     for (const CrewMember& member : sim.Crew()) {
       std::string room = member.room;
       for (const Room& r : sim.Rooms()) {

@@ -382,7 +382,18 @@ bool Simulation::SelectTarget(const std::string& bodyId) {
 
 CrewMember* Simulation::AssignedNavigator() {
   for (CrewMember& crew : crew_) {
-    if (crew.job == "navigation" && CrewBusy(crew) == nullptr) { return &crew; }
+    if (crew.job == "navigation" && crew.health > 0 && CrewBusy(crew) == nullptr) {
+      return &crew;
+    }
+  }
+  return nullptr;
+}
+
+const CrewMember* Simulation::AssignedNavigator() const {
+  for (const CrewMember& crew : crew_) {
+    if (crew.job == "navigation" && crew.health > 0 && CrewBusy(crew) == nullptr) {
+      return &crew;
+    }
   }
   return nullptr;
 }
@@ -426,24 +437,16 @@ Simulation::NavMetrics Simulation::MetricsFor(const Body& body) const {
     if (body.id == map_.here) { distance = 0; }
   }
 
-  // The navigator shortens the crossing itself: a plotted course is fewer clicks
-  // under way, and training buys a shorter one. A busy navigator plots nothing,
-  // so only a free hand counts. Fuel follows the distance, so it is not
-  // discounted a second time.
-  const CrewMember* navigator = nullptr;
-  for (const CrewMember& crew : crew_) {
-    if (crew.job == "navigation" && CrewBusy(crew) == nullptr) { navigator = &crew; break; }
-  }
-  const double saving =
-      navigator == nullptr ? 0.0 : 10.0 * std::max(0.0, std::min(5.0, navigator->jobAt));
-  if (distance > 0.0 && saving > 0.0) {
-    distance = std::max(1.0, js::Round(distance * (100.0 - saving) / 100.0));
-  }
-  const double drivePercent = state_.upgrades.count("drive") != 0 && state_.upgrades.at("drive") ? 80.0 : 100.0;
+  const CrewMember* navigator = AssignedNavigator();
+  const double navPercent =
+      100.0 - (navigator != nullptr ? NavigatorFuelDiscount(*navigator) : 0.0);
+  const double drivePercent =
+      state_.upgrades.count("drive") != 0 && state_.upgrades.at("drive") ? 80.0 : 100.0;
 
   NavMetrics metrics;
   metrics.dist = distance;
-  metrics.fuel = js::Ceil(distance * drivePercent / 100.0);
+  metrics.fuel =
+      js::Ceil(distance * rules_.engine.burnRate * drivePercent * navPercent / 10000.0);
   metrics.total = distance + 1;
 
   const double ly = distance * map_.lyPerAction;
@@ -469,9 +472,6 @@ bool Simulation::StartTravel() {
   if (body == nullptr || !InRange(*body) || AtTarget(*body)) { return false; }
   if (FindOngoing("travel") != nullptr || FindOngoing("extract") != nullptr) { return false; }
   if (state_.engineCondition <= 0 || StatValue("energy") <= 0) { return false; }
-  // Docking never blocks a crossing. A ship that plots a jump from a berth
-  // leaves the berth as part of the same departure: no second action, no
-  // refusal, the location readout follows.
   if (state_.docked) {
     const Port* port = HerePort();
     state_.docked = false;
@@ -484,8 +484,7 @@ bool Simulation::StartTravel() {
 
   const NavMetrics metrics = MetricsFor(*body);
   if (StatValue("fuel") < metrics.fuel) { return false; }
-  Stat* fuel = FindStat("fuel");
-  if (fuel != nullptr) { fuel->value -= metrics.fuel; }
+  ClampStat("fuel", -metrics.fuel);
 
   // Order matters. The initiating action is spent FIRST, so the tick it causes
   // cannot eat a step of the journey it starts.

@@ -714,11 +714,6 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
       ++localCount;
     }
 
-    // Every system keeps a station: and generated alike, with no quota
-    // and no exceptions. A system that already carries a port keeps the berth
-    // and the layout it was with; one that does not is given a station
-    // here. The station is placed after the planets so their rings, names and
-    // draws are untouched; only the berth is added.
     if (systemHasPort.find(system.id) == systemHasPort.end()) {
       Rng berth(HashOf(system.id + "-berth"));
       double bx = 0.0;
@@ -977,9 +972,6 @@ void ExpandChart(Catalog& catalog, const ChartSettings& settings) {
     }
   }
 
-  // Compute each region's territory anchor on the sector board so systems of a
-  // galactic region form a navigable cluster with intra-region jump distances
-  // well within a single fuel tank.
   std::unordered_map<std::string, std::pair<double, double>> regionAnchor;
   for (std::size_t ri = 0; ri < catalog.regions.size(); ++ri) {
     const Body& region = catalog.regions[ri];
@@ -1125,6 +1117,141 @@ void ExpandChart(Catalog& catalog, const ChartSettings& settings) {
   catalog.counts.ports = static_cast<int>(catalog.ports.size());
   catalog.counts.lanes = static_cast<int>(catalog.sectorLanes.size());
   catalog.RebuildIndex();
+}
+
+void AssignCandidatePorts(Catalog& catalog, std::uint64_t seed, const std::string& homePort) {
+  if (catalog.ports.empty() || catalog.candidates.empty()) { return; }
+
+  std::string anchorPort;
+  if (!homePort.empty() && catalog.FindPort(homePort) != nullptr) {
+    anchorPort = homePort;
+  } else if (catalog.FindPort("tolme") != nullptr) {
+    anchorPort = "tolme";
+  } else {
+    anchorPort = catalog.ports.front().id;
+  }
+
+  Rng rng(seed ^ 0x48495245504F4F4CULL);
+  auto shuffleValues = [&rng](auto& vec) {
+    for (std::size_t i = vec.size(); i > 1; --i) {
+      const std::size_t j = static_cast<std::size_t>(rng.Below(static_cast<int>(i)));
+      std::swap(vec[i - 1], vec[j]);
+    }
+  };
+
+  const std::size_t total = catalog.candidates.size();
+  const std::size_t anchorTarget = std::min<std::size_t>(3, total);
+  std::vector<bool> picked(total, false);
+  std::vector<std::size_t> anchorCrew;
+  double anchorFeeSum = 0.0;
+
+  std::vector<std::size_t> lowFee;
+  for (std::size_t i = 0; i < total; ++i) {
+    if (catalog.candidates[i].fee <= 110.0) { lowFee.push_back(i); }
+  }
+  shuffleValues(lowFee);
+
+  const std::size_t lowTarget = std::min<std::size_t>(2, anchorTarget);
+  for (std::size_t i = 0; i < lowFee.size() && anchorCrew.size() < lowTarget; ++i) {
+    const std::size_t idx = lowFee[i];
+    picked[idx] = true;
+    anchorCrew.push_back(idx);
+    anchorFeeSum += catalog.candidates[idx].fee;
+  }
+
+  if (anchorCrew.size() < lowTarget) {
+    std::vector<std::size_t> fallback;
+    for (std::size_t i = 0; i < total; ++i) {
+      if (!picked[i]) { fallback.push_back(i); }
+    }
+    std::sort(fallback.begin(), fallback.end(), [&](std::size_t a, std::size_t b) {
+      if (catalog.candidates[a].fee != catalog.candidates[b].fee) {
+        return catalog.candidates[a].fee < catalog.candidates[b].fee;
+      }
+      return a < b;
+    });
+    for (std::size_t idx : fallback) {
+      if (anchorCrew.size() >= lowTarget) { break; }
+      picked[idx] = true;
+      anchorCrew.push_back(idx);
+      anchorFeeSum += catalog.candidates[idx].fee;
+    }
+  }
+
+  while (anchorCrew.size() < anchorTarget) {
+    std::vector<std::size_t> pool;
+    for (std::size_t i = 0; i < total; ++i) {
+      if (!picked[i] && anchorFeeSum + catalog.candidates[i].fee <= 340.0) {
+        pool.push_back(i);
+      }
+    }
+    if (pool.empty()) {
+      for (std::size_t i = 0; i < total; ++i) {
+        if (!picked[i]) { pool.push_back(i); }
+      }
+      std::sort(pool.begin(), pool.end(), [&](std::size_t a, std::size_t b) {
+        if (catalog.candidates[a].fee != catalog.candidates[b].fee) {
+          return catalog.candidates[a].fee < catalog.candidates[b].fee;
+        }
+        return a < b;
+      });
+      if (pool.empty()) { break; }
+      const std::size_t idx = pool.front();
+      picked[idx] = true;
+      anchorCrew.push_back(idx);
+      anchorFeeSum += catalog.candidates[idx].fee;
+      continue;
+    }
+    shuffleValues(pool);
+    const std::size_t idx = pool.front();
+    picked[idx] = true;
+    anchorCrew.push_back(idx);
+    anchorFeeSum += catalog.candidates[idx].fee;
+  }
+
+  for (std::size_t idx : anchorCrew) {
+    catalog.candidates[idx].port = anchorPort;
+  }
+
+  std::vector<std::size_t> remaining;
+  for (std::size_t i = 0; i < total; ++i) {
+    if (!picked[i]) { remaining.push_back(i); }
+  }
+  shuffleValues(remaining);
+
+  std::string anchorRegion;
+  if (const Body* anchorBody = catalog.FindBody(anchorPort)) {
+    if (const Body* anchorSys = catalog.FindSystem(catalog.BodySystem(*anchorBody))) {
+      anchorRegion = anchorSys->region;
+    }
+  }
+
+  std::vector<std::string> regionalPorts;
+  std::vector<std::string> outerPorts;
+  for (const Port& port : catalog.ports) {
+    if (port.id == anchorPort) { continue; }
+    std::string portRegion;
+    if (const Body* body = catalog.FindBody(port.id)) {
+      if (const Body* sys = catalog.FindSystem(catalog.BodySystem(*body))) {
+        portRegion = sys->region;
+      }
+    }
+    if (!anchorRegion.empty() && portRegion == anchorRegion) {
+      regionalPorts.push_back(port.id);
+    } else {
+      outerPorts.push_back(port.id);
+    }
+  }
+  shuffleValues(regionalPorts);
+  shuffleValues(outerPorts);
+
+  std::vector<std::string> targetPorts = std::move(regionalPorts);
+  targetPorts.insert(targetPorts.end(), outerPorts.begin(), outerPorts.end());
+
+  for (std::size_t k = 0; k < remaining.size(); ++k) {
+    catalog.candidates[remaining[k]].port =
+        targetPorts.empty() ? anchorPort : targetPorts[k % targetPorts.size()];
+  }
 }
 
 ChartPreview BuildChartPreview(const Catalog& catalog, const ChartSettings& settings) {

@@ -5,19 +5,19 @@
   },
   "airStages": [
     {
-      "harm": 10,
+      "harm": 2,
       "slow": 2,
       "tone": "#b05a42",
       "word": "FOUL"
     },
     {
-      "harm": 10,
+      "harm": 5,
       "slow": 1.5,
       "tone": "#b05a42",
       "word": "BAD"
     },
     {
-      "harm": 2,
+      "harm": 10,
       "slow": 1.25,
       "tone": "#c08a3e",
       "word": "THIN"
@@ -40,6 +40,7 @@
   },
   "comment": "Life support, air stages, rations, drive wear and the store definitions.",
   "engine": {
+    "burnRate": 1,
     "engineerAt": 60,
     "warnBelow": 50,
     "wearEvery": 4,
@@ -128,7 +129,7 @@
     "cookBelow": 10,
     "hungerPerMeal": 15,
     "hungerPerFood": 5,
-    "hungerFloor": 5
+    "hungerFloor": 0
   },
   "messEvery": 25,
   "messStarve": 90,
@@ -229,5 +230,5 @@
     "station": 90,
     "system": 0
   },
-  "hungerFloor": 5
+  "hungerFloor": 0
 }
