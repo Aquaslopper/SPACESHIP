@@ -21,7 +21,9 @@ struct EngineRules {
   double wearStep = 1;    // percent lost per step
   double warnBelow = 50;  // sidebar bar appears here
   double engineClickEvery = 12;  // clicks before the machine's button is live again
-  double maintBelow = 30;        // floor: the engineer presses the button under this
+  // The engineer's rule: with the drive at or under this he takes the button
+  // and presses it on every click until the drive is full.
+  double engineerAt = 60;
 };
 
 struct AirStage {
@@ -75,6 +77,14 @@ struct PayRules {
   double hit = 12;     // morale lost by a hand nobody could pay
 };
 
+// Report damage. A hit that leaves the hull at or under hullLine takes the same
+// amount of fuel as well; a hit that leaves the energy at or under energyLine
+// takes the same amount of shield as well.
+struct ReportRules {
+  double hullLine = 60;
+  double energyLine = 60;
+};
+
 struct ChargeRule {
   double volume = 0;  // clicks the control holds before it runs dry
   std::string label;
@@ -86,6 +96,7 @@ struct Rules {
   LifeRules life;
   MessRules mess;
   PayRules pay;
+  ReportRules reports;
   double docAway = 7;
   double scanCost = 5;
   std::map<std::string, ChargeRule> charges;  // routine/systems/space/critical

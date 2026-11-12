@@ -143,7 +143,7 @@ ChartSettings ReadChartSettings(const Json& root, const ChartSettings& fallback)
 
 std::string Simulation::SaveJson() const {
   Json root = Json::object();
-  root["format"] = "spaceship-command-1";
+  root["format"] = "spaceship-command-2";
 
   // ---- STATE -------------------------------------------------------------
   Json s = Json::object();
@@ -191,7 +191,6 @@ std::string Simulation::SaveJson() const {
   }
   chronicle["banks"] = Num(state_.chronicle.banks);
   chronicle["projects"] = Num(state_.chronicle.projects);
-  chronicle["dreams"] = Num(state_.chronicle.dreams);
   chronicle["meals"] = Num(state_.chronicle.meals);
   chronicle["incidents"] = Num(state_.chronicle.incidents);
   chronicle["earned"] = Json::object();
@@ -254,7 +253,6 @@ std::string Simulation::SaveJson() const {
     if (task.slot >= 0) { t["slot"] = Num(task.slot); }
     if (task.rate != 0) { t["rate"] = Num(task.rate); }
     if (task.vol != 0) { t["vol"] = Num(task.vol); }
-    if (!task.payload.empty()) { t["payload"] = task.payload; }
     ongoing.push_back(t);
   }
   s["ongoing"] = ongoing;
@@ -267,44 +265,17 @@ std::string Simulation::SaveJson() const {
   }
   s["scanned"] = scanned;
 
-  Json sim = Json::object();
-  sim["version"] = state_.sim.version;
-  sim["serial"] = Num(state_.sim.serial);
-  sim["insight"] = Num(state_.sim.insight);
-  sim["sensor"] = Num(state_.sim.sensor);
-  sim["signal"] = state_.sim.signal;
-  sim["bonds"] = Json::object();
-  for (const auto& entry : state_.sim.bonds) { sim["bonds"][entry.first] = Num(entry.second); }
-  sim["observed"] = Json::object();
-  for (const auto& entry : state_.sim.observed) {
-    if (entry.second) { sim["observed"][entry.first] = true; }
+  Json mapMarks = Json::object();
+  for (const auto& entry : state_.mapMarks) {
+    if (entry.second) { mapMarks[entry.first] = true; }
   }
-  sim["broadcasts"] = Json::object();
-  for (const auto& entry : state_.sim.broadcasts) {
-    if (entry.second) { sim["broadcasts"][entry.first] = true; }
-  }
-  Json dreams = Json::array();
-  for (const Dream& dream : state_.sim.dreams) {
-    dreams.push_back(Json{{"at", Num(dream.at)}, {"text", dream.text}});
-  }
-  sim["dreams"] = dreams;
-  Json memories = Json::array();
-  for (const Memory& memory : state_.sim.memories) {
-    memories.push_back(Json{{"id", Num(memory.id)},
-                            {"kind", memory.kind},
-                            {"text", memory.text},
-                            {"at", Num(memory.at)},
-                            {"who", memory.who},
-                            {"other", memory.other},
-                            {"processed", memory.processed}});
-  }
-  sim["memories"] = memories;
-  s["sim"] = sim;
+  s["mapMarks"] = mapMarks;
 
   s["medkits"] = Num(state_.medkits);
   s["engineCondition"] = Num(state_.engineCondition);
   s["wearTick"] = Num(state_.wearTick);
   s["engineClickAt"] = Num(state_.engineClickAt);
+  s["engineerRun"] = state_.engineerRun;
   s["filterLife"] = Num(state_.filterLife);
   s["airHold"] = Num(state_.airHold);
   s["rackWarned"] = state_.rackWarned;
@@ -584,7 +555,7 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
   }
   const Catalog& catalog = *catalogPtr;
   if (!d.is_object()) { return fail("the file is not a save object"); }
-  if (GetString(d, "format") != "spaceship-command-1") { return fail("unsupported format"); }
+  if (GetString(d, "format") != "spaceship-command-2") { return fail("unsupported format"); }
 
   const Json* state = At(d, "state");
   const Json* map = At(d, "map");
@@ -602,10 +573,10 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
   if (views == nullptr || !IsObject(*views)) { return fail("no layer views"); }
 
   for (const char* key : {"spOpen", "freshTabs", "pendingOrders", "scanned", "contracts", "upgrades",
-                          "hired", "options", "chronicle", "commissions", "sim"}) {
+                          "hired", "options", "chronicle", "commissions", "mapMarks"}) {
     if (!IsObject(*state)) { break; }
     if (key == std::string("options") || key == std::string("chronicle") ||
-        key == std::string("commissions") || key == std::string("sim")) {
+        key == std::string("commissions")) {
       continue;  // optional in older saves; checked below when present
     }
     const Json* value = At(*state, key);
@@ -863,12 +834,14 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
   auto typeKnown = [&taskTypes](const std::string& type) {
     return std::find(taskTypes.begin(), taskTypes.end(), type) != taskTypes.end();
   };
-  bool decoding = false;
   std::vector<std::string> seen;
   for (const Json& task : *ongoing) {
     if (!IsObject(task)) { return fail("a task is unreadable"); }
     const std::string type = GetString(task, "type");
     const std::string id = GetString(task, "id");
+    // Crew work on a report was removed. A save that still holds such a task
+    // loads without it; the report itself stays open.
+    if (type == "incident") { continue; }
     if (!typeKnown(type)) { return fail("a task of a type that does not exist"); }
     if (id.empty()) { return fail("a task with no id"); }
     if (std::find(seen.begin(), seen.end(), id) != seen.end()) { return fail("two tasks share an id"); }
@@ -927,18 +900,6 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
       if (!known) { return fail("a project that does not exist"); }
       if (target == "medical" && id != "doc-" + GetString(task, "who")) { return fail("medical work for the wrong patient"); }
       if (target == "social" && id != "project-social") { return fail("a shared meal with the wrong id"); }
-      if (target == "decode") { decoding = true; }
-      if (target == "observe") {
-        bool recorded = false;
-        const Json* observed = At(*state, "observed");
-        if (observed != nullptr) { recorded = TruthyMap(*observed, GetString(task, "payload")); }
-        const Json* sim = At(*state, "sim");
-        if (sim != nullptr) {
-          const Json* observedMap = At(*sim, "observed");
-          if (observedMap != nullptr) { recorded = TruthyMap(*observedMap, GetString(task, "payload")); }
-        }
-        if (!recorded) { return fail("an observation of a place that was not recorded"); }
-      }
       if (target == "medical" || target == "social") {
         bool whoThere = false;
         for (const Json& member : *crew) {
@@ -950,44 +911,6 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
         return fail("a meal shared with oneself");
       }
     }
-  }
-
-  const Json* sim = At(*state, "sim");
-  if (sim != nullptr) {
-    if (!IsObject(*sim)) { return fail("the archive is unreadable"); }
-    if (GetNumber(*sim, "version") != 1) { return fail("the archive is from another version"); }
-    for (const char* key : {"serial", "insight", "sensor"}) {
-      if (!SaveNumber(*At(*sim, key))) { return fail(std::string("archive ") + key); }
-    }
-    if (GetNumber(*sim, "insight") > 5) { return fail("more insight than the archive holds"); }
-    const Json* signal = At(*sim, "signal");
-    if (signal == nullptr || !signal->is_string()) { return fail("the archive has no signal state"); }
-    const std::string signalState = signal->get<std::string>();
-    const bool known = signalState == "dormant" || signalState == "intercepted" ||
-                       signalState == "decoding" || signalState == "coordinates" ||
-                       signalState == "request" || signalState == "preserved" || signalState == "sold";
-    if (!known) { return fail("an unknown signal state"); }
-    if (signalState == "decoding" && !decoding) {
-      return fail("a signal decoding without the work to decode it");
-    }
-    const Json* memories = At(*sim, "memories");
-    if (memories == nullptr || !IsArray(*memories) || memories->size() > 32) {
-      return fail("the archive's memories are unreadable");
-    }
-    for (const Json& memory : *memories) {
-      if (!SaveNumber(*At(memory, "id")) || !GetString(memory, "kind").size() ||
-          !At(memory, "text") || !At(memory, "text")->is_string()) {
-        return fail("a memory is unreadable");
-      }
-      if (!At(memory, "processed") || !At(memory, "processed")->is_boolean()) {
-        return fail("a memory does not say whether it was consolidated");
-      }
-      if (GetNumber(memory, "at") > static_cast<double>(actions->get<long long>())) {
-        return fail("a memory from the future");
-      }
-    }
-    const Json* dreams = At(*sim, "dreams");
-    if (dreams == nullptr || !IsArray(*dreams) || dreams->size() > 6) { return fail("dreams"); }
   }
 
   // ---- incidents ---------------------------------------------------------
@@ -1070,28 +993,15 @@ Task ReadTask(const Json& source) {
   if (auto it = source.find("slot"); it != source.end() && it->is_number()) { task.slot = it->get<double>(); }
   task.rate = GetNumber(source, "rate");
   task.vol = GetNumber(source, "vol");
-  task.payload = GetString(source, "payload");
   return task;
 }
 
 }  // namespace
 
 void Simulation::ApplySnapshotDefaults() {
-  // migrateSimSave(): the archive is always present, old room ids are renamed,
-  // tabs are de-duplicated, and a dispute with no pair is given one.
-  if (state_.sim.version == 0) { state_.sim = SimState(); }
-  for (CrewMember& crew : crew_) {
-    if (crew.room == "test") { crew.room = "simulacron"; }
-  }
+  // Tabs are de-duplicated, and a dispute with no pair is given one.
   std::vector<Tab> tabs;
-  for (Tab tab : state_.tabs) {
-    if (tab.key == "room:test") {
-      tab.id = "simulacron";
-      tab.key = "room:simulacron";
-      tab.title = "Simulacron Core";
-      tab.kindLabel = "ROOM";
-      tab.sub = "The ship's bounded memory";
-    }
+  for (const Tab& tab : state_.tabs) {
     bool seen = false;
     for (const Tab& kept : tabs) {
       if (kept.key == tab.key) { seen = true; }
@@ -1099,19 +1009,13 @@ void Simulation::ApplySnapshotDefaults() {
     if (!seen) { tabs.push_back(tab); }
   }
   state_.tabs = tabs;
-  if (state_.activeTab == "room:test") { state_.activeTab = "room:simulacron"; }
-  if (state_.freshTabs.count("room:test") != 0) {
-    state_.freshTabs.erase("room:test");
-    state_.freshTabs["room:simulacron"] = true;
-  }
   for (Incident& incident : events_) {
     if (incident.type == "crew" && incident.a.empty() && crew_.size() >= 2) {
-      const std::pair<std::string, std::string> pair = SimDisputePair();
+      const std::pair<std::string, std::string> pair = DisputePair();
       incident.a = pair.first;
       incident.b = pair.second;
     }
   }
-  if (state_.medkits == 0 && state_.sim.serial == 1) { /* older saves default to two */ }
 
   // migrateProgression(): every later system is present, and the chronicle is
   // rebuilt from what the voyage already knows.
@@ -1168,6 +1072,7 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     state_.engineCondition = GetNumber(s, "engineCondition");
     state_.wearTick = GetNumber(s, "wearTick");
     state_.engineClickAt = GetNumber(s, "engineClickAt", -1e9);
+    state_.engineerRun = GetBool(s, "engineerRun");
     state_.filterLife = GetNumber(s, "filterLife");
     state_.airHold = GetNumber(s, "airHold");
     state_.rackWarned = GetBool(s, "rackWarned");
@@ -1300,7 +1205,6 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     if (auto it = s.find("chronicle"); it != s.end() && it->is_object()) {
       state_.chronicle.banks = GetNumber(*it, "banks");
       state_.chronicle.projects = GetNumber(*it, "projects");
-      state_.chronicle.dreams = GetNumber(*it, "dreams");
       state_.chronicle.meals = GetNumber(*it, "meals");
       state_.chronicle.incidents = GetNumber(*it, "incidents");
       if (auto systems = it->find("systems"); systems != it->end()) { readBoolMap(*systems, &state_.chronicle.systems); }
@@ -1344,44 +1248,14 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
       }
     }
 
-    state_.sim = SimState();
-    if (auto it = s.find("sim"); it != s.end() && it->is_object()) {
-      state_.sim.serial = GetNumber(*it, "serial", 1);
-      state_.sim.insight = GetNumber(*it, "insight");
-      state_.sim.sensor = GetNumber(*it, "sensor");
-      state_.sim.signal = GetString(*it, "signal", "dormant");
-      if (auto bonds = it->find("bonds"); bonds != it->end() && bonds->is_object()) {
-        for (auto entry = bonds->begin(); entry != bonds->end(); ++entry) {
-          if (entry.value().is_number()) { state_.sim.bonds[entry.key()] = entry.value().get<double>(); }
-        }
-      }
-      if (auto observed = it->find("observed"); observed != it->end()) { readBoolMap(*observed, &state_.sim.observed); }
-      if (auto broadcasts = it->find("broadcasts"); broadcasts != it->end()) { readBoolMap(*broadcasts, &state_.sim.broadcasts); }
-      state_.sim.dreams.clear();
-      if (auto dreams = it->find("dreams"); dreams != it->end() && dreams->is_array()) {
-        for (const Json& dream : *dreams) {
-          if (!dream.is_object()) { continue; }
-          state_.sim.dreams.push_back(Dream{GetNumber(dream, "at"), GetString(dream, "text")});
-        }
-      }
-      state_.sim.memories.clear();
-      if (auto memories = it->find("memories"); memories != it->end() && memories->is_array()) {
-        for (const Json& memory : *memories) {
-          Memory entry;
-          entry.id = GetNumber(memory, "id");
-          entry.kind = GetString(memory, "kind");
-          entry.text = GetString(memory, "text");
-          entry.at = GetNumber(memory, "at");
-          entry.who = GetString(memory, "who");
-          entry.other = GetString(memory, "other");
-          entry.processed = GetBool(memory, "processed");
-          state_.sim.memories.push_back(entry);
-        }
-      }
-    }
+    state_.mapMarks.clear();
+    if (auto it = s.find("mapMarks"); it != s.end()) { readBoolMap(*it, &state_.mapMarks); }
 
     state_.ongoing.clear();
-    for (const Json& task : s.at("ongoing")) { state_.ongoing.push_back(ReadTask(task)); }
+    for (const Json& task : s.at("ongoing")) {
+      if (GetString(task, "type") == "incident") { continue; }  // removed; see the check above
+      state_.ongoing.push_back(ReadTask(task));
+    }
 
     ship_.fields.clear();
     for (auto it = d.at("ship").begin(); it != d.at("ship").end(); ++it) {

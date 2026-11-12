@@ -71,16 +71,6 @@
       "title": "Working Hands"
     },
     {
-      "detail": "Complete two dreams in the Core.",
-      "goal": 2,
-      "id": "dream",
-      "metric": "dreams",
-      "reward": {
-        "med": 1
-      },
-      "title": "Thread and Loom"
-    },
-    {
       "detail": "Complete two shared meals.",
       "goal": 2,
       "id": "table",
@@ -130,16 +120,6 @@
         "kits": 1
       },
       "title": "Long Watch"
-    },
-    {
-      "detail": "Reach a conclusion to the Silicon Marrow story.",
-      "goal": 1,
-      "id": "signal",
-      "metric": "signal",
-      "reward": {
-        "cash": 200
-      },
-      "title": "Signal Witness"
     }
   ],
   "comment": "Contracts, incidents, ship projects, commendations, commissions and world history.",
@@ -352,8 +332,8 @@
           "ticks": 9
         },
         {
-          "shield": -12,
-          "text": "The surge is stressing the shield generator.",
+          "energy": -12,
+          "text": "The surge is pulling power out of the reserve.",
           "ticks": 9
         },
         {
@@ -455,18 +435,6 @@
       "room": "r5",
       "work": 4
     },
-    "decode": {
-      "energy": 4,
-      "label": "Decode the Silicon Marrow signal",
-      "room": "r4",
-      "work": 4
-    },
-    "dream": {
-      "energy": 3,
-      "label": "Consolidate two memories into an insight",
-      "room": "simulacron",
-      "work": 4
-    },
     "food": {
       "energy": 3,
       "label": "Process produce into eight dry rations",
@@ -488,24 +456,12 @@
       "room": "r2",
       "work": 4
     },
-    "observe": {
-      "energy": 3,
-      "label": "Record the present location",
-      "room": "r12",
-      "work": 4
-    },
     "oxygen": {
       "energy": 3,
       "label": "Recycle salvage into an O2 canister",
       "lot": "Salvage",
       "room": "r9",
       "work": 4
-    },
-    "sensors": {
-      "energy": 4,
-      "label": "Calibrate the next deep scan",
-      "room": "r3",
-      "work": 3
     }
   },
   "worldHistory": {

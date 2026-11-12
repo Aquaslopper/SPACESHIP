@@ -10,7 +10,6 @@
 //    Tasks.cpp        the ongoing-task engine and its dispatch table
 //    Charges.cpp      per-control click charges (spend one, the rest refill)
 //    Incidents.cpp    reports, escalation, dispute pairs
-//    Simulacron.cpp   memories, bonds, desires
 //    Awards.cpp       commendations
 //    Trace.cpp        the canonical snapshot used for parity testing
 //
@@ -215,10 +214,8 @@ class Simulation {
   double PayrollDue() const;
   std::string JobThreshold(const CrewMember& crew) const;
   std::string CrewWhere(const CrewMember& crew) const;
-  std::string SimActivityOf(const CrewMember& crew) const;
+  std::string ActivityOf(const CrewMember& crew) const;
   std::string NeedKeyFor(const CrewMember& crew) const;
-  std::string SimDriveOf(const CrewMember& crew) const;
-  std::string SimAnchorOf(const CrewMember& crew) const;
   double NavigatorFuelDiscount(const CrewMember& crew) const;
   // The scene the quarters draws for one hand: pose and props.
   std::string AirStageWord() const;
@@ -355,12 +352,8 @@ class Simulation {
   double AirPercent() const;
 
   void LogLine(const std::string& text);
-  void SimRemember(const std::string& kind, const std::string& text,
-                   const std::string& who = std::string(),
-                   const std::string& other = std::string());
-  double SimBond(const std::string& a, const std::string& b) const;
-  void SimChangeBond(const std::string& a, const std::string& b, double amount);
-  std::string SimCrewName(const std::string& id) const;
+  // The name of a crew member by id; "a former crew member" once they have left.
+  std::string CrewNameOf(const std::string& id) const;
 
   Task* FindOngoing(const std::string& id);
   const Task* FindOngoing(const std::string& id) const;
@@ -389,20 +382,10 @@ class Simulation {
   std::string RewardTextOf(const Commendation& commendation) const;
   bool ClaimCommendation(const std::string& id);   // free, once only
 
-  // ---- Phase 7: the signal story ------------------------------------------
-  const std::vector<std::string>& WorldHistory(const std::string& regionId) const;
-  bool BroadcastLocal();                       // the comms relay's traffic report
-  bool FinishSignal(const std::string& choice);  // "preserved" or "sold"
-
   // ---- Phase 7: incidents -------------------------------------------------
   bool RemedyIncident(const std::string& incidentId);       // quick fix, maybe a kit
-  bool AssignIncidentCrew(const std::string& incidentId);   // six actions of work
   bool SpawnMapIncident(const std::string& typeId, const std::string& contextNote = std::string());
-  const CrewMember* IncidentHand(const Incident& incident) const;
   const IncidentType::Stage* IncidentStage(const Incident& incident) const;
-
-  // ---- Phase 7: the dream engine with a chosen pair ------------------------
-  bool StartDream(const std::string& firstId, const std::string& secondId);
 
   // ---- read-only job lookups for the interface --------------------------
   // The briefing and the sidebar ask "who is holding this job" and "what does
@@ -431,7 +414,6 @@ class Simulation {
   CrewMember* AssignedFilterHand();
   CrewMember* AssignedCook();
   double CleanerInterval(const CrewMember& crew) const;
-  double EffectiveJobAt(const CrewMember& crew) const;
   double MaintCost() const;
   bool MaintRunning() const;
   void ApplyOrderPayload(CrewMember& crew, const Task& task);
@@ -449,15 +431,9 @@ class Simulation {
 
   // Incidents.cpp
   const IncidentType* IncidentSpec(const Incident& incident) const;
-  void IncidentEffect(const IncidentType::Stage& step, const Incident& incident);
+  void IncidentEffect(const IncidentType::Stage& step);
   void TickIncidents();
-  std::pair<std::string, std::string> SimDisputePair() const;
-
-  // Simulacron.cpp
-  void TickSim();
-  void AutoDesires();
-  std::string SimDrive(const CrewMember& crew) const;
-  std::string SimAnchor(const CrewMember& crew) const;
+  std::pair<std::string, std::string> DisputePair() const;
 
   // Awards.cpp
   double ChronicleValue(const std::string& metric) const;
@@ -504,7 +480,6 @@ class Simulation {
 
   // Projects.cpp
   void ProjectDone(Task& task);
-  std::vector<Memory> SimUnprocessed() const;
 
   // SaveSystem.cpp
   void ApplySnapshotDefaults();

@@ -588,7 +588,7 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     catalog.rules.engine.warnBelow = Number(engine, "warnBelow", "engine", 50);
     catalog.rules.engine.engineClickEvery =
         Number(engine, "engineClickEvery", "engine", 12);
-    catalog.rules.engine.maintBelow = Number(engine, "maintBelow", "engine", 30);
+    catalog.rules.engine.engineerAt = Number(engine, "engineerAt", "engine", 60);
 
     const Json& life = Field(survival, "life", "survival.json");
     catalog.rules.life.lifeMax = Number(life, "lifeMax", "life", 200);
@@ -628,6 +628,11 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     catalog.rules.pay.hit = Number(pay, "hit", "pay", 12);
     catalog.rules.docAway = Number(crew, "docAway", "crew.json", 7);
     catalog.rules.scanCost = Number(survival, "scanCost", "survival.json", 5);
+    if (auto reports = survival.find("reports");
+        reports != survival.end() && reports->is_object()) {
+      catalog.rules.reports.hullLine = Number(*reports, "hullLine", "reports", 60);
+      catalog.rules.reports.energyLine = Number(*reports, "energyLine", "reports", 60);
+    }
   }
 
   // ---- totals ------------------------------------------------------------
@@ -854,9 +859,9 @@ std::vector<std::string> Catalog::Validate() const {
         problems.push_back(std::string(name) + " room '" + room.id + "' has no size");
       }
     }
-    if (plan->rooms.size() != 21) {
+    if (plan->rooms.size() != 17) {
       problems.push_back(std::string(name) + " deck plan has " +
-                         std::to_string(plan->rooms.size()) + " rooms, expected 21");
+                         std::to_string(plan->rooms.size()) + " rooms, expected 17");
     }
   }
 

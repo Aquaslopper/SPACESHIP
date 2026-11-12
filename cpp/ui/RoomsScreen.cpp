@@ -1,6 +1,5 @@
 // ============================================================================
-//  RoomsScreen.cpp — the fourteen fitted bays, the bridge and the Simulacron's
-//  neighbours. The sentences are the reference's; the ids are this port's.
+//  RoomsScreen.cpp — the fitted bays and the bridge.
 // ============================================================================
 #include "ui/RoomsScreen.h"
 
@@ -32,7 +31,7 @@ double CountLots(const Simulation& sim, const std::string& kind) {
 }  // namespace
 
 bool RoomHasScreen(const Simulation& sim, const std::string& roomId) {
-  if ((roomId == "bridge" || roomId == "simulacron") && sim.HasRoom(roomId)) { return true; }
+  if (roomId == "bridge" && sim.HasRoom(roomId)) { return true; }
   for (const Room& room : sim.Rooms()) {
     if (room.id != roomId) { continue; }
     auto fit = sim.World().roomScenes.find(roomId);
@@ -144,9 +143,7 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
   if (roomId == "r13") {
     model.body.Note(
         "A shared meal uses two units of cooked food from the galley counter and one click; it "
-        "takes three more clicks. It strengthens the bond by 12 (+2 for a shared name "
-        "anchor) and gives each person 4 morale. Strong bonds help morale; strained bonds "
-        "hurt it.");
+        "takes three more clicks. It gives each person 4 morale.");
     if (sim.Crew().size() < 2) {
       model.body.Dim("At least two crew members are needed.");
       return model;
@@ -158,10 +155,7 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
         const CrewMember& two = sim.Crew()[j];
         ActionRowView row;
         row.id = "meal:" + one.id + ":" + two.id;
-        const double bond = sim.SimBond(one.id, two.id);
         row.label = "Share a meal: " + one.name + " and " + two.name;
-        row.note = "Bond " + Num(bond) + " / 100 - " + sim.SimAnchorOf(one) + " / " +
-                   sim.SimAnchorOf(two) + ".";
         row.cost = "1 click + 3 work";
         row.enabled = !mealBusy && sim.CrewBusy(one) == nullptr &&
                       sim.CrewBusy(two) == nullptr && sim.MessRack() >= 2;
@@ -171,128 +165,37 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
     return model;
   }
 
-  if (roomId == "r4") {
-    const Body* system = sim.CurrentSystem();
-    const std::string region = system == nullptr ? std::string() : system->region;
-    const std::vector<std::string>& history = sim.WorldHistory(region);
-    model.body.Field("Local system", system == nullptr ? std::string() : system->name);
-    if (!history.empty()) { model.body.Field("History", history[0]); }
-    auto heard = sim.State().sim.broadcasts.find(system == nullptr ? std::string() : system->id);
-    const bool hasReport = heard != sim.State().sim.broadcasts.end() && heard->second;
-    if (hasReport && history.size() > 1) { model.body.Field("Traffic report", history[1]); }
-
-    ActionRowView broadcast;
-    broadcast.id = "broadcast";
-    broadcast.label = "Request local traffic report (2% energy)";
-    broadcast.cost = "1 click";
-    broadcast.enabled = !hasReport && energy > 2;
-    model.rows.push_back(broadcast);
-
-    model.body.Sub("The Silicon Marrow signal");
-    const std::string signal = sim.State().sim.signal;
-    if (signal == "dormant") {
-      model.body.Dim(
-          "No unusual signal logged. A deep scan of Halvan's Reach may reveal one.");
-    }
-    if (signal == "intercepted" || signal == "decoding") {
-      model.body.Dim(
-          "An old relay repeats a name and an incomplete request. The Dream Engine can "
-          "supply the insight needed to decode it.");
-      // The decode project belongs to this room, and only exists while there is
-      // a signal to work on.
-      for (const ProjectDef& project : sim.World().projects) {
-        if (project.id != "decode") { continue; }
-        model.body.Dim(Num(project.energy) + "% energy; 1 click to begin, then " +
-                       Num(project.work) + " clicks of work. Pauses without power.");
-        model.buttons.push_back(BuildProgressButton(
-            sim, "project-decode", project.label, sim.ProjectBlock("decode").empty()));
-      }
-    }
-    if (signal == "coordinates") {
-      model.body.Note(
-          "The decoded coordinates point to the Choir Array in Echo Shoal, in Cradle "
-          "Shoal. Jump to Echo Shoal and deep-scan the array.");
-    }
-    if (signal == "request") {
-      model.body.Note(
-          "The array carries an archive called Silicon Marrow. Its recorded request is "
-          "not to be copied for sale. The Archive Hull in Palimpsest can shelter it; a "
-          "buyer at any station offers 900 shiplets instead.");
-      ActionRowView shelter;
-      shelter.id = "signal:preserved";
-      shelter.label = "Shelter the archive at the Archive Hull (1 repair kit, 5% energy)";
-      shelter.cost = "1 click";
-      shelter.enabled = sim.Map().here == "palimpsest-site" && sim.State().repairKits > 0 &&
-                        energy > 5;
-      shelter.confirm = "Shelter the archive? This choice is permanent.";
-      model.rows.push_back(shelter);
-
-      ActionRowView sell;
-      sell.id = "signal:sold";
-      sell.label = "Sell the signal at this station (+900 sh, crew morale -8)";
-      sell.cost = "1 click";
-      sell.enabled = sim.State().docked;
-      sell.confirm = "Sell the signal? This choice is permanent.";
-      model.rows.push_back(sell);
-    }
-    if (signal == "preserved") {
-      model.body.Note("The archive rests in the Palimpsest hull. The crew kept its request.");
-    }
-    if (signal == "sold") {
-      model.body.Note("The archive was sold. The crew remembers the decision.");
-    }
-    return model;
+  model.body.Field("Energy", Num(energy) + "%");
+  if (roomId == "r2") {
+    model.body.Field("Repair kits", Num(sim.State().repairKits));
+    model.body.Field("Salvage lots", Num(CountLots(sim, "Salvage")));
   }
-
-  if (roomId == "r12") {
-    const Body* system = sim.CurrentSystem();
-    const std::vector<std::string>& history =
-        sim.WorldHistory(system == nullptr ? std::string() : system->region);
-    const Body* here = sim.FindBodyById(sim.Map().here);
-    model.body.Field("Location", here == nullptr ? sim.Map().here : here->name);
-    const Body* region = system == nullptr ? nullptr : sim.FindBodyById(system->region);
-    model.body.Field("Region", region == nullptr ? std::string() : region->name);
-    if (!history.empty()) { model.body.Field("History", history[0]); }
-    model.body.Note(
-        "Each location can produce one 65-shiplet observation for the Science Room.");
-  } else {
-    model.body.Field("Energy", Num(energy) + "%");
-    if (roomId == "r2") {
-      model.body.Field("Repair kits", Num(sim.State().repairKits));
-      model.body.Field("Salvage lots", Num(CountLots(sim, "Salvage")));
-    }
-    if (roomId == "r3") {
-      model.body.Field("Insight", Num(sim.State().sim.insight));
-      model.body.Field("Calibration", sim.State().sim.sensor ? "Stored" : "None");
-      model.body.Field("Next scan", Num(sim.ScanCost()) + " work clicks");
-    }
-    if (roomId == "r5") {
-      model.body.Field("Drive", Num(sim.State().engineCondition) + "%");
-      model.body.Field("Maintenance", sim.MaintRunningAny() ? "In progress" : "Available");
-    }
-    if (roomId == "r8") {
-      model.body.Field("Dry rations", Num(sim.MessRations()) + " / " +
-                                           Num(sim.MessRationCapacity()));
-      model.body.Field("Cooked food", Num(sim.MessRack()) + " / " +
-                                          Num(sim.MessCapacity()));
-      model.body.Field("Produce lots", Num(CountLots(sim, "Perishable")));
-    }
-    if (roomId == "r9") {
-      model.body.Field("O2 canisters", Num(sim.Life().canisters) + " / " + Num(sim.Life().capacity));
-      model.body.Field("Salvage lots", Num(CountLots(sim, "Salvage")));
-    }
-    if (roomId == "r10") {
-      model.body.Field("Fuel cells", Num(sim.State().fuelCells));
-      model.body.Field("Salvage lots", Num(CountLots(sim, "Salvage")));
-    }
-    if (roomId == "r11") {
-      model.body.Field("Hull", Num(hull) + "%");
-      model.body.Field("Salvage lots", Num(CountLots(sim, "Salvage")));
-    }
-    model.body.Note(
-        "Inputs are consumed at the start. Work advances through clicks elsewhere and "
-        "pauses without power.");
+  if (roomId == "r5") {
+    model.body.Field("Drive", Num(sim.State().engineCondition) + "%");
+    model.body.Field("Maintenance", sim.MaintRunningAny() ? "In progress" : "Available");
   }
+  if (roomId == "r8") {
+    model.body.Field("Dry rations", Num(sim.MessRations()) + " / " +
+                                         Num(sim.MessRationCapacity()));
+    model.body.Field("Cooked food", Num(sim.MessRack()) + " / " +
+                                        Num(sim.MessCapacity()));
+    model.body.Field("Produce lots", Num(CountLots(sim, "Perishable")));
+  }
+  if (roomId == "r9") {
+    model.body.Field("O2 canisters", Num(sim.Life().canisters) + " / " + Num(sim.Life().capacity));
+    model.body.Field("Salvage lots", Num(CountLots(sim, "Salvage")));
+  }
+  if (roomId == "r10") {
+    model.body.Field("Fuel cells", Num(sim.State().fuelCells));
+    model.body.Field("Salvage lots", Num(CountLots(sim, "Salvage")));
+  }
+  if (roomId == "r11") {
+    model.body.Field("Hull", Num(hull) + "%");
+    model.body.Field("Salvage lots", Num(CountLots(sim, "Salvage")));
+  }
+  model.body.Note(
+      "Inputs are consumed at the start. Work advances through clicks elsewhere and "
+      "pauses without power.");
 
   // Every project whose own room this is, in the catalogue's order.
   for (const ProjectDef& project : sim.World().projects) {
@@ -339,8 +242,6 @@ bool PressRoomActionRaw(Simulation& sim, const std::string& action, const std::s
     sim.PerformAction("Power diverted to shields");
     return true;
   }
-  if (action == "broadcast") { return sim.BroadcastLocal(); }
-  if (action.compare(0, 7, "signal:") == 0) { return sim.FinishSignal(action.substr(7)); }
   if (action.compare(0, 5, "meal:") == 0) {
     const std::string rest = action.substr(5);
     const std::size_t cut = rest.find(':');
@@ -360,8 +261,6 @@ bool PressRoomActionRaw(Simulation& sim, const std::string& action, const std::s
 //  once its own green has run out. Free reads spend nothing and return nothing.
 // ============================================================================
 std::string RoomActionCategory(const std::string& action) {
-  if (action == "broadcast") { return "space"; }
-  if (action.compare(0, 7, "signal:") == 0) { return "critical"; }
   if (action == "fuel-split" || action == "divert-shield" || action == "divert-power" ||
       action.compare(0, 5, "meal:") == 0) { return "systems"; }
   return ButtonChargeTier(action);

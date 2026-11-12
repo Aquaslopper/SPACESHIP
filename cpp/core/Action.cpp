@@ -196,15 +196,6 @@ Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& se
   state.gameOver.clear();
   state.contracts["arrival"] = "active";
 
-  // The archive begins a new watch; the first memory is, not earned.
-  Memory first;
-  first.id = 1;
-  first.kind = "Watch";
-  first.text = "The ship's memory archive begins a new watch.";
-  first.at = 0;
-  first.processed = false;
-  state.sim.memories.push_back(first);
-
   if (!startSystemId.empty()) {
     const Body* system = sim.catalog_.FindSystem(startSystemId);
     for (const Port& port : sim.catalog_.ports) {
@@ -292,12 +283,10 @@ void Simulation::TickWorld() {
   if (!state_.gameOver.empty()) { return; }
   TickPayroll();
   TickOngoing();
-  AutoDesires();
   AutoMaint();
   AutoFilters();
   AutoMess();
   TickIncidents();
-  TickSim();
   CheckLoss();
 }
 

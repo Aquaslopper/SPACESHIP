@@ -45,6 +45,7 @@
   },
   "comment": "Life support, air stages, rations, drive wear and the store definitions.",
   "engine": {
+    "engineerAt": 60,
     "warnBelow": 50,
     "wearEvery": 4,
     "wearStep": 1
@@ -137,6 +138,10 @@
   "messEvery": 25,
   "messStarve": 90,
   "messStarveEvery": 8,
+  "reports": {
+    "energyLine": 60,
+    "hullLine": 60
+  },
   "resources": [
     {
       "from": "purse",

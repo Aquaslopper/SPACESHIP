@@ -103,7 +103,7 @@ One command per line. `#` starts a comment.
 | --- | --- |
 | `move x y` | Place the pointer. |
 | `click x y`, `rclick x y` | Press at a point. |
-| `clickhit LIST TEXT` | Press the first hit box in LIST whose label contains TEXT. Also `rclickhit`, `hoverhit`. |
+| `clickhit LIST TEXT` | Press the first hit box in LIST whose label contains TEXT. Also `rclickhit`, `hoverhit`. The press goes to the middle of the box as listed by `hits`; the view is not scrolled to it, and a box past the edge of the frame is a failed line. |
 | `scroll x y delta` | Mouse wheel. |
 | `imclick x y` | A press and release delivered to Dear ImGui (popups, combos). |
 
@@ -123,7 +123,7 @@ One command per line. `#` starts a comment.
 | `survival FIELD VALUE` | `airHold`, `filterLife`, `engineCondition`, `rack`, `canisters`. |
 | `crewset ID FIELD VALUE` | `health`, `hunger`, `morale`, `fatigue`. |
 | `purse N`, `job CREW JOB`, `ack ID`, `layer ID` | Shiplets, a crew job, acknowledge, chart layer. |
-| `target ID`, `travel`, `scan`, `dock`, `undock`, `cook`, `maint`, `seat N`, `bank` | The simulation's own verbs. |
+| `target ID`, `travel`, `scan`, `dock`, `undock`, `cook`, `maint`, `seat N`, `bank`, `hire ID`, `stagejob CREW JOB` | The simulation's own verbs. `hire` follows the game's rules: docked at a port, the candidate's own port if one is named, a free berth, the fee in the purse. `stagejob` writes a job on the hand's order sheet, as the job list in the Crew Quarters does; `job` sets it at once. |
 | `theme ID`, `fontstep 0-3`, `largetext 0\|1` | `classic`, `void`, `aurora`, `nebula`, `ember`; reading size. |
 
 Every scenario after the title screen starts with the lines in

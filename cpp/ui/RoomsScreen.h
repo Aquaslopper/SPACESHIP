@@ -1,10 +1,9 @@
 // ============================================================================
 //  RoomsScreen.h — the fitted compartments (Sections I and M).
 //  ---------------------------------------------------------------------------
-//  Fourteen bays, one bridge and the Simulacron are real rooms rather than
-//  store cupboards: each opens on its own vignette, its own fields and
-//  the work that belongs to it — a project, a treatment, a transfer, a meal, a
-//  traffic report, or the two permanent answers to a signal.
+//  The fitted bays and the bridge are real rooms rather than store cupboards:
+//  each opens on its own vignette, its own fields and the work that belongs to
+//  it — a project, a treatment, a transfer or a meal.
 //
 //  Every row is data, so the layout, the sentences and the press ids can be
 //  checked without a window.
@@ -32,7 +31,7 @@ struct RoomScreenModel {
   std::vector<ProgressButton> buttons;
 };
 
-// ROOM_FITS: the fitted bays (r1..r13) and the bridge.
+// ROOM_FITS: the fitted bays and the bridge.
 bool RoomHasScreen(const Simulation& sim, const std::string& roomId);
 
 RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId);

@@ -9,7 +9,7 @@
 #pragma once
 
 #include <array>
-
+#include <map>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -32,7 +32,6 @@
 #include "ui/QuartersScreen.h"
 #include "ui/RoomsScreen.h"
 #include "ui/Shell.h"
-#include "ui/SimCoreScreen.h"
 #include "ui/StationScreen.h"
 #include "ui/StoresScreen.h"
 #include "ui/Theme.h"
@@ -62,6 +61,8 @@ class ShellView {
   void SetTutorialTexture(std::size_t index, void* texture) {
     if (index < tutorialArt_.size()) { tutorialArt_[index] = texture; }
   }
+  // A picture from assets/art/crew, under its file name without ".png".
+  void SetCrewTexture(const std::string& name, void* texture) { crewArt_[name] = texture; }
   void PageTutorial(int direction, double nowMs);
   void SetOthersHeight(float others) { others_ = others; }
 
@@ -275,10 +276,9 @@ class ShellView {
     double fuel = -1.0;
     double energy = -1.0;
     double drive = -1.0;
-    int sensor = -1;
     int sensorTier = -1;
     double scanCost = -1.0;
-    std::size_t observedCount = 0;
+    std::size_t mapMarksCount = 0;
     double cargoUsed = -1.0;
     double cargoCap = -1.0;
     std::size_t crewSig = 0;
@@ -290,8 +290,8 @@ class ShellView {
              docked == o.docked && reducedMotion == o.reducedMotion &&
              scannedCount == o.scannedCount && ongoingSig == o.ongoingSig &&
              fuel == o.fuel && energy == o.energy && drive == o.drive &&
-             sensor == o.sensor && sensorTier == o.sensorTier &&
-             scanCost == o.scanCost && observedCount == o.observedCount &&
+             sensorTier == o.sensorTier &&
+             scanCost == o.scanCost && mapMarksCount == o.mapMarksCount &&
              cargoUsed == o.cargoUsed && cargoCap == o.cargoCap &&
              crewSig == o.crewSig;
     }
@@ -358,6 +358,7 @@ class ShellView {
   void RebuildSetupPreview(const Simulation& sim);
   bool displayAdjustmentAvailable_ = true;
   std::array<void*, 6> tutorialArt_{};
+  std::map<std::string, void*> crewArt_;
   double tutorialTransitionMs_ = 0.0;
   int tutorialDirection_ = 1;
 

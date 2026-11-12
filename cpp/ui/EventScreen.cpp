@@ -1,5 +1,5 @@
 // ============================================================================
-//  EventScreen.cpp — the report, its stage, and the two remedies.
+//  EventScreen.cpp — the report, its stage, and its remedy.
 // ============================================================================
 #include "ui/EventScreen.h"
 
@@ -47,36 +47,43 @@ EventScreenModel BuildEventScreen(const Simulation& sim, const std::string& even
     model.report.Field("Next change", Num(incident->left) + " clicks");
   }
   if (incident->type == "crew" && !incident->a.empty() && !incident->b.empty()) {
-    model.report.Field("Involved", sim.SimCrewName(incident->a) + " / " +
-                                       sim.SimCrewName(incident->b) + " - bond " +
-                                       Num(sim.SimBond(incident->a, incident->b)));
+    model.report.Field("Involved", sim.CrewNameOf(incident->a) + " / " +
+                                       sim.CrewNameOf(incident->b));
   }
-  model.report.Note("Ignore it and the situation will advance with your other clicks.");
+  // What leaving it open costs, read from the report's own stages.
+  bool hitsHull = false;
+  bool hitsEnergy = false;
+  if (spec != nullptr) {
+    for (const IncidentType::Stage& step : spec->stages) {
+      hitsHull = hitsHull || (step.hull.has_value() && *step.hull < 0);
+      hitsEnergy = hitsEnergy || (step.energy.has_value() && *step.energy < 0);
+    }
+  }
+  std::string leftOpen = "Left open it gets worse each time the count runs out.";
+  if (hitsHull) {
+    leftOpen += " It damages the hull; with the hull at " +
+                Num(sim.GameRules().reports.hullLine) +
+                "% or less the same damage also hits the fuel.";
+  }
+  if (hitsEnergy) {
+    leftOpen += " It drains the energy; with the energy at " +
+                Num(sim.GameRules().reports.energyLine) +
+                "% or less the same loss also hits the shields.";
+  }
+  model.report.Note(leftOpen);
 
   const bool needsKit = spec != nullptr && spec->requiresKit.value_or(spec->kind != "Crew");
   ActionRowView remedy;
   remedy.id = "remedy:" + eventId;
   remedy.label = spec == nullptr ? std::string("Resolve the report") : spec->remedy;
-  if (needsKit) { remedy.label += " - use one repair kit"; }
+  if (needsKit) {
+    remedy.label += sim.State().repairKits > 0 ? " - use one repair kit"
+                                               : " - needs a repair kit, none aboard";
+  }
   remedy.cost = "1 click";
   remedy.enabled = (spec != nullptr) && (!needsKit || sim.State().repairKits > 0);
   model.rows.push_back(remedy);
 
-  const CrewMember* hand = sim.IncidentHand(*incident);
-  const bool running = sim.FindOngoing("incident-" + eventId) != nullptr;
-  ActionRowView assign;
-  assign.id = "assign:" + eventId;
-  assign.label = "Assign crew to resolve - 6 clicks of work" +
-                 (hand == nullptr ? std::string(" (none available)")
-                                  : " (" + hand->name + ")");
-  assign.cost = "1 click + 6 work";
-  assign.enabled = !running && hand != nullptr;
-  model.rows.push_back(assign);
-
-  if (running) {
-    model.buttons.push_back(BuildProgressButton(
-        sim, "incident-" + eventId, "Crew working the report", false));
-  }
   return model;
 }
 
@@ -84,7 +91,6 @@ namespace {
 bool PressEventActionRaw(Simulation& sim, const std::string& action, const std::string& arg) {
   (void)arg;
   if (action.compare(0, 7, "remedy:") == 0) { return sim.RemedyIncident(action.substr(7)); }
-  if (action.compare(0, 7, "assign:") == 0) { return sim.AssignIncidentCrew(action.substr(7)); }
   return false;
 }
 
@@ -100,7 +106,7 @@ bool PressEventActionRaw(Simulation& sim, const std::string& action, const std::
 bool PressEventAction(Simulation& sim, const std::string& action, const std::string& arg) {
   return CommitActionButton(
       sim, ButtonChargeKey(sim, "press:event:" + action + ":" + arg),
-      "systems",  // HTA explicitly marks remedy as systems; assignment also classifies there.
+      "systems",  // HTA explicitly marks remedy as systems.
       [&]() { return PressEventActionRaw(sim, action, arg); });
 }
 

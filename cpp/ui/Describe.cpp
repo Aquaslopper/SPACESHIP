@@ -61,7 +61,6 @@ const Incident* FindEvent(const Simulation& sim, const std::string& id) {
 
 // ROOM_FITS: rooms that open as real fitted systems rather than as a store.
 bool RoomFits(const std::string& id) {
-  if (id == "simulacron") { return true; }
   if (id.size() < 2 || id[0] != 'r') { return false; }
   for (std::size_t i = 1; i < id.size(); ++i) {
     if (id[i] < '0' || id[i] > '9') { return false; }
@@ -94,13 +93,10 @@ int SlotsIn(const Simulation& sim, const std::string& state) {
 
 }  // namespace
 
-double EffectiveJobAt(const Simulation& sim, const CrewMember& crew) {
-  const double value = crew.jobAt - sim.AirSpec().jobDrop;
-  return value < 5.0 ? 5.0 : value;
-}
-
 std::string JobThreshold(const Simulation& sim, const CrewMember& crew) {
-  if (crew.job == "maintenance") { return Num(EffectiveJobAt(sim, crew)) + "% condition"; }
+  if (crew.job == "maintenance") {
+    return Num(sim.GameRules().engine.engineerAt) + "% condition";
+  }
   if (crew.job == "filters") {
     const std::vector<AirStage>& stages = sim.GameRules().air.stages;
     const double stage = crew.jobAt < 0.0 ? 0.0 : crew.jobAt;
@@ -160,7 +156,7 @@ void RoomEngine(const Simulation& sim, Description& t) {
       {"Warning at", Num(sim.GameRules().engine.warnBelow) +
                          "% - a red line joins the sidebar"},
       {"Engineer", engineer ? engineer->name + " - acts at " +
-                                  Num(EffectiveJobAt(sim, *engineer)) + "%"
+                                  Num(sim.GameRules().engine.engineerAt) + "%, until full"
                             : std::string("Nobody holds the job")},
   };
   t.acts = {
@@ -168,7 +164,7 @@ void RoomEngine(const Simulation& sim, Description& t) {
        missing <= 0.0 ? std::string("refused at 100%")
                       : std::string("1 click (+10%)")},
       {"The engineer acts alone",
-       engineer ? "at " + Num(EffectiveJobAt(sim, *engineer)) + "%"
+       engineer ? "at " + Num(sim.GameRules().engine.engineerAt) + "%, until full"
                 : std::string("nobody assigned")},
   };
 }
@@ -356,9 +352,7 @@ Description DescribeTarget(const Simulation& sim, const std::string& kind,
         {"Detail", "Not yet established"},
     };
     t.acts = {
-        {"Examine the report", "1 click"},
-        {"Send a crew member", "varies"},
-        {"Log and ignore", "1 click"},
+        {"Resolve it in the report", "1 click"},
     };
     return t;
   }
@@ -447,7 +441,7 @@ Description DescribeTarget(const Simulation& sim, const std::string& kind,
         {"Updated", "On arrival"},
     };
   }
-  t.acts = {{"Open Navigation", "free"}, {"Open Comms Relay", "free"}};
+  t.acts = {{"Open Navigation", "free"}};
   if (id == "life") { t.acts = {{"Open O2 Filter Room", "free"}}; }
   return t;
 }

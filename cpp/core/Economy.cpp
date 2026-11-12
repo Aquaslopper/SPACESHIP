@@ -381,7 +381,6 @@ bool Simulation::HireCrew(const std::string& candidateId) {
   state_.hired[candidateId] = true;
   crew_.push_back(MakeCrew(candidate->crew));
   const std::string name = candidate->crew.name;
-  SimRemember("Arrival", name + " joined the crew at " + HerePort()->name + ".", candidateId);
   FreeCommit(name + " joined the crew");
   return true;
 }
@@ -1136,18 +1135,6 @@ void Simulation::CommissionProgress(const std::string& kind, const std::string& 
   commission.progress += 1;
   if (commission.progress != CommissionGoal(kind)) { return; }
 
-  // The description is a sentence, not an id: the Samacron's memory keeps it.
-  std::string text;
-  if (commission.kind == "visit") {
-    const Body* body = FindBodyById(commission.target);
-    text = "Visit " + (body == nullptr ? commission.target : body->name);
-  } else if (commission.kind == "scan") {
-    const Body* body = FindBodyById(commission.target);
-    text = "Read a deep scan of " + (body == nullptr ? commission.target : body->name);
-  } else {
-    text = "Recover two salvage lots while under way";
-  }
-  SimRemember("Work", "The crew completed a commission: " + text + ".");
   LogLine("Commission objective complete. Collect at any station.");
 }
 

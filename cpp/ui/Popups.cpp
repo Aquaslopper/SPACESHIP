@@ -80,7 +80,7 @@ PopupModel BuildBriefPopup(const Simulation& sim, const std::string& kind,
         {"Selecting", "Click any marker to read it - free"},
         {"Galaxy", "Select a region, then open its sector chart - free"},
         {"Sector", "Select a system and jump to its entry star"}};
-    const double cost = std::max(1.0, sim.ScanCost() - (sim.State().sim.sensor ? 2.0 : 0.0));
+    const double cost = std::max(1.0, sim.ScanCost());
     model.acts = {{"Start Travel", "varies", true},
                   {"Run Deep Scan", js::NumToString(cost) + " clicks", true}};
     model.footer = {

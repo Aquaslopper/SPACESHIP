@@ -96,9 +96,7 @@ class Catalog {
   DeckPlan kestrel;
   // ROOM_SCENES, by room id., never computed.
   std::map<std::string, RoomScene> roomScenes;
-  // WORLD_HISTORY: two lines per region. The first is what the
-  // observation deck and the comms relay read out; the second is the traffic
-  // report a relay will hand over for the price of two percent energy.
+  // WORLD_HISTORY: two lines per region: its history, then its traffic.
   std::map<std::string, std::vector<std::string>> worldHistory;
 
   // WIKI: twenty-one handbook entries, in the reference's order.

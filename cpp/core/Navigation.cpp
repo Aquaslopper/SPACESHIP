@@ -105,7 +105,7 @@ bool Simulation::CanScan(const Body& body) const {
 }
 
 double Simulation::EffectiveScanCost(const Body& body) const {
-  const double base = std::max(1.0, scanCost_ - (state_.sim.sensor ? 2.0 : 0.0));
+  const double base = std::max(1.0, scanCost_);
   const std::string curSysId = CurrentSystemId();
   if (body.type != "region" && body.type != "system" && catalog_.BodySystem(body) == curSysId) {
     return base;
@@ -154,8 +154,8 @@ int Simulation::ExtractionMaxPasses(const Body& body) const {
 int Simulation::ExtractionPassesUsed(const Body& body) const {
   for (int i = 1; i <= 3; ++i) {
     const std::string key = "extract-" + std::to_string(i) + ":" + body.id;
-    auto it = state_.sim.observed.find(key);
-    if (it != state_.sim.observed.end() && it->second) { return 1; }
+    auto it = state_.mapMarks.find(key);
+    if (it != state_.mapMarks.end() && it->second) { return 1; }
   }
   return 0;
 }
@@ -181,7 +181,7 @@ std::string Simulation::ExtractionScanSummary(const Body& body) const {
     const std::uint64_t pick = (h + 1ULL) % 4ULL;
     if (pick == 0ULL) { return "Lootable: 3 m3 Derelict Salvage and 1 field repair kit."; }
     if (pick == 1ULL) { return "Lootable: 2 m3 Recovered Components."; }
-    if (pick == 2ULL) { return "Lootable: 2 m3 Sealed Relic Cask (+1 insight)."; }
+    if (pick == 2ULL) { return "Lootable: 2 m3 Sealed Relic Cask."; }
     return "Lootable: 2 m3 Unregistered Strongbox and 55 sh chits.";
   }
   if (IsVolatileIceBody(body)) {
@@ -504,7 +504,6 @@ bool Simulation::StartScan() {
 
   // Same ordering rule as a crossing: the initiating action first.
   double cost = EffectiveScanCost(*body);
-  state_.sim.sensor = 0;
   const bool remote = body->type == "system" || body->type == "region" ||
                       catalog_.BodySystem(*body) != CurrentSystemId();
   if (!remote) { cost = 1.0; } 
@@ -566,6 +565,13 @@ bool Simulation::Acknowledge(const std::string& taskId) {
 
   ClearOngoing(taskId);
   LogLine("Process acknowledged and cleared.");
+  // The scan button is two clicks on the clock: one starts the scan, one takes
+  // the finished readout.
+  if (type == "scan") {
+    const Body* scanned = FindBodyById(target);
+    PerformAction(scanned == nullptr ? std::string("Scan readout taken")
+                                     : "Scan readout taken - " + scanned->name);
+  }
   return handled;
 }
 
@@ -579,21 +585,6 @@ void Simulation::RevealScan(const std::string& bodyId) {
 
   const bool first = state_.scanned.count(body->id) == 0 || !state_.scanned.at(body->id);
   state_.scanned[body->id] = true;
-
-  // simOnScan(): the two signal beats.
-  if (first) {
-    SimRemember("Discovery", "The crew scanned " + body->name + ".");
-  }
-  if (body->id == "halvan" && state_.sim.signal == "dormant") {
-    state_.sim.signal = "intercepted";
-    SimRemember("Signal", "An old relay at Halvan's Reach repeats a name.");
-    LogLine("An unusual signal was intercepted. Open the Comms Relay.");
-  }
-  if (body->id == "echo-site" && state_.sim.signal == "coordinates") {
-    state_.sim.signal = "request";
-    SimRemember("Signal", "The Choir Array carries a request from Silicon Marrow.");
-    LogLine("The Choir Array answered. Open the Comms Relay.");
-  }
 
   FileSurvey(*body);
   ResolveMapScanEvents(*body, first);
@@ -619,9 +610,6 @@ void Simulation::RevealScan(const std::string& bodyId) {
   }
   if (body->type == "region") {
     const auto& sysIdx = catalog_.SystemsInRegion(body->id);
-    if (first) {
-      SimRemember("World", "Deep-array telemetry mapped cluster " + body->name + ".");
-    }
     LogLine("Deep-region cluster survey filed: " + body->name + " (" +
             std::to_string(sysIdx.size()) + " star systems catalogued in Science).");
     return;
@@ -665,7 +653,7 @@ void Simulation::FinishExtraction(const std::string& bodyId, double reservedVol)
   if (body == nullptr || !CanExtractBody(*body)) { return; }
 
   const int pass = 1;
-  state_.sim.observed["extract-1:" + body->id] = true;
+  state_.mapMarks["extract-1:" + body->id] = true;
 
   const std::uint64_t h = MapEventHash(body->id + "#extract#1");
   const bool jackpot = (h % 5ULL) == 0ULL;
@@ -693,7 +681,6 @@ void Simulation::FinishExtraction(const std::string& bodyId, double reservedVol)
       state_.shiplets += 35;
       LogLine("Atmospheric skim at " + body->name +
               " hit a helium-3 band: +20% fuel, +2 fuel cells, and +35 sh condensate.");
-      SimRemember("Discovery", "Skimmed a rich helium-3 pocket at " + body->name + ".");
     } else {
       LogLine("Atmospheric skim at " + body->name +
               " condensed +14% drive fuel and 1 fuel cell.");
@@ -709,7 +696,6 @@ void Simulation::FinishExtraction(const std::string& bodyId, double reservedVol)
       state_.shiplets += 40;
       LogLine("Debris jackpot at " + body->name +
               ": stripped 1 intact repair kit and 40 sh in transponder cores.");
-      SimRemember("Discovery", "Cracked an intact hull section inside " + body->name + ".");
     }
   } else if (body->type == "site") {
     const std::uint64_t pick = (h + static_cast<std::uint64_t>(pass)) % 4ULL;
@@ -726,10 +712,7 @@ void Simulation::FinishExtraction(const std::string& bodyId, double reservedVol)
               ": extracted 2 m3 intact shipboard components.");
     } else if (pick == 2ULL) {
       addLot("Sealed Relic Cask (" + body->name + ")", "Relics", 2.0, 195.0, false);
-      state_.sim.insight += 1;
-      LogLine("Vault breach at " + body->name +
-              ": stowed 2 m3 pre-collapse relics and logged +1 insight.");
-      SimRemember("Discovery", "Opened a sealed vault inside " + body->name + ".");
+      LogLine("Vault breach at " + body->name + ": stowed 2 m3 pre-collapse relics.");
     } else {
       addLot("Unregistered Strongbox (" + body->name + ")", "Unregistered", 2.0, 210.0, true);
       state_.shiplets += 55;
@@ -743,7 +726,6 @@ void Simulation::FinishExtraction(const std::string& bodyId, double reservedVol)
       mess_.rations = std::min(mess_.rationCapacity, mess_.rations + 2.0);
       LogLine("Deep ice core at " + body->name + ": recovered 2 m3 subglacial relics and " +
               js::NumToString(mess_.rations - rationStock) + " dry rations.");
-      SimRemember("Discovery", "Extracted a preserved subglacial core on " + body->name + ".");
     } else {
       const double val = 70.0 + static_cast<double>(h % 25ULL);
       addLot("Cryo-Volatile Ice (" + body->name + ")", "Water", 4.0, val, false);
@@ -758,7 +740,6 @@ void Simulation::FinishExtraction(const std::string& bodyId, double reservedVol)
       LogLine("Rich vein tapped on " + body->name +
               ": refined 3 m3 rare-earth components" +
               (body->type == "moon" ? " and 1 He-3 fuel cell." : "."));
-      SimRemember("Discovery", "Tapped a rich rare-earth motherlode on " + body->name + ".");
     } else {
       const double val = (body->type == "moon" ? 84.0 : 80.0) + static_cast<double>(h % 26ULL);
       addLot(tag + " (" + body->name + ")", "Bulk metal", 4.0, val, false);
@@ -830,7 +811,6 @@ void Simulation::ArriveAt(const std::string& bodyId) {
 
   LogLine("Arrived at " + body->name +
           (state_.docked ? " - docked. Right-click the docked indicator to open the station" : "") + ".");
-  SimRemember("Arrival", "The ship arrived at " + body->name + ".");
   ChronicleVisit(CurrentSystem());
   ResolveMapArrivalEvents(*body, system, prevRegion);
   CommissionProgress("visit", body->id);
@@ -843,8 +823,8 @@ void Simulation::ResolveMapArrivalEvents(const Body& localBody, const Body* jump
   //    navigation hazards or relay telemetry bursts on first entry.
   if (jumpedSystem != nullptr && IsProceduralId(jumpedSystem->id)) {
     const std::string visitKey = "map-jump:" + jumpedSystem->id;
-    if (!state_.sim.observed[visitKey]) {
-      state_.sim.observed[visitKey] = true;
+    if (!state_.mapMarks[visitKey]) {
+      state_.mapMarks[visitKey] = true;
       const Body* region = catalog_.FindRegion(jumpedSystem->region);
       const std::string hazard = region == nullptr ? std::string() : DetailValue(*region, "Dominant hazard");
       const std::string auth = region == nullptr ? std::string() : DetailValue(*region, "Authority");
@@ -853,10 +833,9 @@ void Simulation::ResolveMapArrivalEvents(const Body& localBody, const Body* jump
 
       if (crossGalaxy && IsProceduralId(jumpedSystem->region)) {
         const std::string galKey = "map-galaxy:" + jumpedSystem->region;
-        if (!state_.sim.observed[galKey]) {
-          state_.sim.observed[galKey] = true;
+        if (!state_.mapMarks[galKey]) {
+          state_.mapMarks[galKey] = true;
           const std::string rname = region == nullptr ? jumpedSystem->region : region->name;
-          SimRemember("World", "Crossed into outer cluster " + rname + ".");
           LogLine("Chart milestone: entered " + rname + ". Regional beacons logged.");
         }
       }
@@ -881,11 +860,6 @@ void Simulation::ResolveMapArrivalEvents(const Body& localBody, const Body* jump
           SpawnMapIncident("map-pirate-toll",
                            "An unflagged picket sweeps the approach into " + jumpedSystem->name + ".");
         }
-      } else if (roll >= 82ULL) {
-        // Calm survey beacon packet on arrival.
-        state_.sim.insight += 1;
-        LogLine("Arrival telemetry: an automated picket buoy in " + jumpedSystem->name +
-                " transmitted +1 Simulacron insight.");
       }
     }
   }
@@ -895,15 +869,14 @@ void Simulation::ResolveMapArrivalEvents(const Body& localBody, const Body* jump
   const std::string feature = DetailValue(localBody, "Map feature");
   if (feature.empty()) { return; }
   const std::string arriveKey = "map-arr:" + localBody.id;
-  if (state_.sim.observed[arriveKey]) { return; }
-  state_.sim.observed[arriveKey] = true;
+  if (state_.mapMarks[arriveKey]) { return; }
+  state_.mapMarks[arriveKey] = true;
 
   if (feature == "Fuel skimmer depot") {
     ClampStat("fuel", 10.0);
     state_.fuelCells += 1;
     LogLine("Orbital skimmer at " + localBody.name +
             " transferred +10% fuel and 1 condensed fuel cell.");
-    SimRemember("Discovery", "Recovered condensed fuel from an automated depot at " + localBody.name + ".");
   } else if (feature == "Ion pocket") {
     SpawnMapIncident("map-ion-squall",
                      "Local magnetosphere pocket around " + localBody.name + " surged.");
@@ -920,8 +893,8 @@ void Simulation::ResolveMapScanEvents(const Body& body, bool firstScan) {
   const std::string feature = DetailValue(body, "Map feature");
   if (feature.empty()) { return; }
   const std::string scanKey = "map-scan:" + body.id;
-  if (state_.sim.observed[scanKey]) { return; }
-  state_.sim.observed[scanKey] = true;
+  if (state_.mapMarks[scanKey]) { return; }
+  state_.mapMarks[scanKey] = true;
 
   if (feature == "Salvage cache") {
     state_.lotSerial += 1;
@@ -941,9 +914,7 @@ void Simulation::ResolveMapScanEvents(const Body& body, bool firstScan) {
       LogLine("Map discovery at " + body.name +
               ": hold full, stripped 1 field repair kit from the cache.");
     }
-    SimRemember("Discovery", "Recovered a charted salvage cache at " + body.name + ".");
   } else if (feature == "Ancient nav buoy") {
-    state_.sim.insight += 1;
     const auto& peers = catalog_.BodiesInSystem(catalog_.BodySystem(body));
     int revealed = 0;
     for (std::size_t idx : peers) {
@@ -955,8 +926,7 @@ void Simulation::ResolveMapScanEvents(const Body& body, bool firstScan) {
       ++revealed;
     }
     LogLine("Ancient nav buoy at " + body.name + " unlocked " + std::to_string(revealed) +
-            " local telemetry chart" + (revealed == 1 ? "" : "s") + " and +1 insight.");
-    SimRemember("Discovery", "Decoded an ancient navigation buoy near " + body.name + ".");
+            " local telemetry chart" + (revealed == 1 ? "" : "s") + ".");
   } else if (feature == "Rich mineral seam") {
     const std::string bonusId = "sv-seam-" + body.id;
     bool exists = false;
@@ -973,11 +943,6 @@ void Simulation::ResolveMapScanEvents(const Body& body, bool firstScan) {
       survey_.push_back(std::move(bonus));
       LogLine("Rich mineral assay filed at " + body.name + " (worth 110 sh in Science).");
     }
-  } else if (feature == "Ion pocket") {
-    state_.sim.insight += 1;
-    state_.sim.sensor = 1;
-    LogLine("Magnetospheric pocket at " + body.name +
-            " calibrated the sensor array (+1 insight, next scan -2 work).");
   }
 }
 

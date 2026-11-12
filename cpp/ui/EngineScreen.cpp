@@ -319,21 +319,15 @@ EngineScreenModel BuildEngineScreen(const Simulation& sim) {
   crew.title = "Engineering Crew";
   crew.placement = "np-last";
   if (engineer != nullptr) {
-    const double actsAt = EffectiveJobAt(sim, *engineer);
+    const double startsAt = sim.GameRules().engine.engineerAt;
     crew.Name(engineer->name);
     crew.Sub(engineer->role + " - maintenance job");
     crew.Field("Skill", engineer->skill);
-    crew.Field("Acts at",
-               Num(actsAt) + "% condition" +
-                   (actsAt != engineer->jobAt
-                        ? " (air: was " + Num(engineer->jobAt) + ")"
-                        : ""));
+    crew.Field("Acts at", Num(startsAt) + "% condition");
     crew.Field("Activity", engineer->activity);
-    const bool belowWarn = actsAt < sim.GameRules().engine.warnBelow;
-    crew.Note("Holds the maintenance job and services the drive unasked below " +
-              Num(actsAt) + "% (+10% per press)" +
-              (belowWarn ? ", which is past the warning line." : ".") +
-              " Training raises this threshold.");
+    crew.Note("Holds the maintenance job. At " + Num(startsAt) +
+              "% he takes the button and presses it on every click until the "
+              "drive is full (+10% per press).");
   } else {
     crew.Dim("Nobody holds the maintenance job. The commander runs it "
              "personally, or nobody does.");
@@ -344,13 +338,9 @@ EngineScreenModel BuildEngineScreen(const Simulation& sim) {
   // Who presses the button, and when: the engineer takes it over under the
   // line, so the room reads out the rule rather than a job of his own.
   if (!sim.Crew().empty()) {
-    const double line =
-        engineer != nullptr
-            ? std::max(sim.GameRules().engine.maintBelow, EffectiveJobAt(sim, *engineer))
-            : sim.GameRules().engine.maintBelow;
-    screen.bandNote = "Under " + Num(line) +
-                      "% the engineer presses this button himself (+10% per service); "
-                      "the better trained he is, the earlier he takes it.";
+    screen.bandNote = "At " + Num(sim.GameRules().engine.engineerAt) +
+                      "% the engineer takes this button and presses it on every "
+                      "click until the drive is full (+10% per press).";
   }
 
   screen.stage = BuildEngineMachine(sim);
