@@ -1,12 +1,3 @@
-// ============================================================================
-//  Orders.cpp — the order sheet: staging, pricing, and handing it over.
-//  ---------------------------------------------------------------------------
-//  THE PRICE IS THE POINT. A cleaner is a word and a mop; an engineer is a week
-//  of somebody's attention. An order's price is also how long it takes to carry
-//  out, so the bottom button counts the whole sheet down as one bar. Staging is
-//  free; giving the order costs the commander one action, like every other
-//  commitment in the game.
-// ============================================================================
 #include "core/JsNumber.h"
 #include "core/Simulation.h"
 
@@ -37,8 +28,6 @@ const OrderSheet* Simulation::SheetOf(const CrewMember& crew) const {
   return it == orderSheets_.end() ? nullptr : &it->second;
 }
 
-// The trade the sheet is about: the STAGED job if there is one, otherwise the
-// one the hand already holds.
 std::string Simulation::StagedJob(const CrewMember& crew) const {
   const OrderSheet* sheet = SheetOf(crew);
   if (sheet != nullptr && sheet->hasJob) { return sheet->job; }
@@ -50,7 +39,6 @@ double Simulation::JobCost(const std::string& jobId) const {
   return job == nullptr ? 1.0 : job->cost;
 }
 
-// What one order costs in actions, priced against a job.
 double Simulation::OrderCostFor(const std::string& jobId, const std::string& orderId) const {
   const Catalog::JobDefinition* job = nullptr;
   for (const Catalog::JobDefinition& def : catalog_.jobDefs) {
@@ -63,7 +51,6 @@ double Simulation::OrderCostFor(const std::string& jobId, const std::string& ord
   return 1;
 }
 
-// What one order costs in shiplets, priced against a job.
 double Simulation::OrderFeeFor(const std::string& jobId, const std::string& orderId) const {
   const Catalog::JobDefinition* job = nullptr;
   for (const Catalog::JobDefinition& def : catalog_.jobDefs) {
@@ -143,7 +130,6 @@ bool Simulation::CrewAvailable(const CrewMember& crew) const {
   return CrewBusy(crew) == nullptr;
 }
 
-// ---- staging (free) -------------------------------------------------------
 void Simulation::ClearOrders() {
   orderSheets_.clear();
   state_.pendingOrders.clear();
@@ -155,7 +141,6 @@ bool Simulation::StageJob(const std::string& crewId, const std::string& jobId) {
   if (FindJobDef(jobId) == nullptr) { return false; }
 
   OrderSheet& sheet = orderSheets_[crewId];
-  // No change, no charge: staging the job they already hold clears the line.
   if (crew->job == jobId) { sheet.hasJob = false; sheet.job.clear(); }
   else { sheet.hasJob = true; sheet.job = jobId; }
   if (sheet.Empty()) { orderSheets_.erase(crewId); }
@@ -165,8 +150,6 @@ bool Simulation::StageJob(const std::string& crewId, const std::string& jobId) {
 }
 
 bool Simulation::ToggleOrder(const std::string& crewId, const std::string& orderId) {
-  // The rule belongs with the data, not with the button: a station lesson
-  // needs a dock, and a rest is refused to a hand that does not need one.
   if (orderId == "learnSt" && !state_.docked) { return false; }
   CrewMember* crew = FindCrew(crewId);
   if (crew == nullptr) { return false; }
@@ -189,12 +172,9 @@ bool Simulation::ToggleOrder(const std::string& crewId, const std::string& order
   return true;
 }
 
-// ---- the commitment -------------------------------------------------------
 bool Simulation::CommitOrders() {
   const double work = OrdersCost();
   if (work <= 0) { return false; }
-  // The schooling is paid for here or the sheet does not go out at all: a
-  // half-paid order would teach half a lesson.
   const double fee = OrdersFee();
   if (fee > state_.shiplets) {
     if (!HasPendingLayoff()) {
@@ -202,7 +182,6 @@ bool Simulation::CommitOrders() {
               js::NumToString(state_.shiplets) + ".");
       return false;
     }
-    // Unaffordable training for other hands must not hold up a layoff.
     std::vector<std::string> dismissed;
     for (const auto& entry : orderSheets_) {
       if (entry.second.Has("fire")) { dismissed.push_back(entry.first); }
@@ -232,12 +211,8 @@ bool Simulation::CommitOrders() {
   state_.pendingOrders.clear();
   state_.shiplets -= fee;
 
-  // New instructions replace an earlier personal order for the same hand;
-  // work belonging to other hands continues untouched.
   for (const auto& entry : sheet) { ClearOngoing("cw-" + entry.first); }
 
-  // ONE CLICK IS ONE ACTION. The price of the orders is not charged here in a
-  // lump; it is the WORK, and the crew spend it carrying the sheet out.
   for (const auto& entry : sheet) { crewClaims_[entry.first] = true; }
   PerformAction("Crew assignments issued");
   crewClaims_.clear();
@@ -248,15 +223,13 @@ bool Simulation::CommitOrders() {
             js::NumToString(state_.shiplets) + " sh.");
   }
   if (!sheet.empty()) {
-    QueueOrders(sheet, remainingWork);
+    QueueOrders(sheet);
     LogLine("Crew assignments updated. " + js::NumToString(remainingWork) + " clicks of work.");
   }
   return true;
 }
 
-// Each hand carries their own work; no global sheet blocks the next order.
-void Simulation::QueueOrders(const std::map<std::string, OrderSheet>& sheet, double total) {
-  (void)total;
+void Simulation::QueueOrders(const std::map<std::string, OrderSheet>& sheet) {
   for (const auto& entry : sheet) {
     CrewMember* crew = FindCrew(entry.first);
     if (crew == nullptr) { continue; }
@@ -280,11 +253,8 @@ void Simulation::QueueOrders(const std::map<std::string, OrderSheet>& sheet, dou
   }
 }
 
-// ---- applying a finished sheet -------------------------------------------
 void Simulation::ApplyJobTo(CrewMember& crew, const std::string& jobId) {
   const JobDef* job = FindJobDef(jobId);
-  // A unique job belongs to one pair of hands. Handing it over takes it off
-  // whoever had it.
   if (job != nullptr && job->unique) {
     for (CrewMember& other : crew_) {
       if (&other != &crew && other.job == jobId) {
@@ -312,14 +282,12 @@ void Simulation::TrainCrew(CrewMember& crew, int steps, const std::string& where
   }
   crew.skill = (crew.skill.empty() || crew.skill == "Untrained") ? "Trained" : "Practised";
   if (job != nullptr && job->trainStep != 0) {
-    // Legacy saves stored kitchen jobAt as 1 instead of cookBelow (10).
     double current = (crew.jobAt == 0 || crew.jobAt < job->baseAt) ? job->baseAt : crew.jobAt;
     for (int k = 0; k < steps; ++k) {
       current = std::min(job->trainCap, current + job->trainStep);
     }
     crew.jobAt = current;
     if (crew.job == "maintenance") {
-      // The engineer's line is the ship's rule (engine.engineerAt), not his own.
       LogLine(crew.name + " trained " + where + ".");
     } else {
       LogLine(crew.name + " trained " + where + " - now acts at " +
@@ -331,7 +299,6 @@ void Simulation::TrainCrew(CrewMember& crew, int steps, const std::string& where
 }
 
 void Simulation::FireCrew(CrewMember& crew) {
-  // A removed hand must not retain work or orders which can act later.
   const std::string name = crew.name;
   const std::string id = crew.id;
   const bool hadJob = !crew.job.empty();

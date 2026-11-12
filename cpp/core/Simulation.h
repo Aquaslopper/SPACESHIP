@@ -1,22 +1,3 @@
-// ============================================================================
-//  Simulation.h — the voyage: one clock, one state, no window.
-//  ---------------------------------------------------------------------------
-//  Everything the reference does between performAction() and setStatus() lives
-//  here, split across translation units by subsystem:
-//
-//    Action.cpp       performAction, tickWorld and its exact 13-step order
-//    Survival.cpp     engine wear, the filter bank, the air, the stores
-//    CrewLogic.cpp    crew ticks, hunger, jobs, payroll, the loss check
-//    Tasks.cpp        the ongoing-task engine and its dispatch table
-//    Charges.cpp      per-control click charges (spend one, the rest refill)
-//    Incidents.cpp    reports, escalation, dispute pairs
-//    Awards.cpp       commendations
-//    Trace.cpp        the canonical snapshot used for parity testing
-//
-//  Nothing in this class touches a renderer, a file or a clock. That is what
-//  makes the differential harness possible: the same command script produces
-//  the same numbers here and in the Node VM.
-// ============================================================================
 #pragma once
 
 #include <cstdint>
@@ -37,77 +18,56 @@ struct JobDef {
   std::string label;
   bool unique = false;
   double wage = 0;
-  double baseAt = 0;  // jobBase(): the rate a hand starts at
-  std::string room;   // where the job is worked
-  double cost = 1;    // what handing the trade over costs, in actions
-  double learnOn = 0, learnSt = 0;    // the price of a lesson, in actions
-  double feeOn = 0, feeSt = 0;        // ...and in shiplets
+  double baseAt = 0;
+  std::string room;
+  double cost = 1;
+  double learnOn = 0, learnSt = 0;
+  double feeOn = 0, feeSt = 0;
   double trainStep = 0, trainCap = 0;
-  std::string unit;                   // "%" / " air" / " ration/click"
-  std::string cloth, dark;            // what the sprite in the quarters wears
+  std::string unit;
+  std::string cloth, dark;
 };
 
-// One run on a station's trade board. The board is drawn from the system's own
-// chart, so every run names a body that is really there, and the commodity is
-// one that body wants. A run keeps the numbers the board promised: the epoch
-// can roll over and the accepted record still has to stand on its own.
 struct TradeRun {
-  std::string mode;   // "delivery" or "freelance"
-  std::string from;   // the station the run starts at
-  std::string to;     // the body that receives it
-  std::string good;   // the commodity's id in the market table
+  std::string mode;
+  std::string from;
+  std::string to;
+  std::string good;
   int crates = 0;
-  double fee = 0.0;     // delivery: paid on hand-over. freelance: margin over cost.
-  double freight = 0.0;  // what the leg itself costs, by chart distance
+  double fee = 0.0;
+  double freight = 0.0;
   bool accepted = false;
 };
 
-// Builds a live crew member from an definition. Shared by the new
-// voyage and by a hiring at a port.
 CrewMember MakeCrew(const CrewDefinition& def);
 
 class Simulation {
  public:
-  // A voyage in the state the reference reaches the moment its script has
-  // finished loading: full stores, three canisters in the rack, three jobs.
+  static constexpr const char* kEngineButtonChargeKey =
+      "ch|room:engine|progress:engine-click";
+
   static Simulation NewVoyage(const Catalog& catalog);
   static Simulation NewVoyage(const Catalog& catalog, const ChartSettings& settings,
                               const std::string& startSystemId);
-  // Historical fully fitted HTA state, for legacy-save and differential tests.
-  // The playable client always uses NewVoyage, never this reference fixture.
   static Simulation ReferenceVoyage(const Catalog& catalog);
 
-  // ---- the clock ---------------------------------------------------------
-  // The only function that advances the world. Mirrors performAction(detail).
   void PerformAction(const std::string& detail = std::string());
-  // restartVoyage(): a fresh voyage in the state NewVoyage produces, with the
-  // player's preferences carried across. Free - it is the new-voyage command,
-  // not a turn.
   void RestartVoyage();
   void BeginVoyage(const ChartSettings& settings, const std::string& startSystemId);
   const ChartSettings& VoyageChart() const { return chartSettings_; }
   const Catalog& SourceWorld() const { return sourceCatalog_.regions.empty() ? catalog_ : sourceCatalog_; }
 
-  // A burst of work that is NOT an action: the filter bank's reward.
   void ProAction(double n);
-
-  // A transaction that is NOT an action either: the station's money-only
-  // counter. It moves shiplets and goods, writes its feed line, and leaves the
-  // clock, the world tick and every countdown exactly where they were.
   void FreeCommit(const std::string& detail = std::string());
 
-  // ---- commands that exist in Phase 1A -----------------------------------
-  // `by` names the hand that made the press; empty means the commander.
-  // `spendsAction` is false for a hand's own press: the crew works on the
-  // player's clock, so its press must not advance the clock again.
   bool StartCanisterInstall(int slot, const std::string& by = std::string(),
-                            bool spendsAction = true);  // the player carries a canister over
-  bool StartFilterBank();               // the player throws the switch
-  bool StartMaintenanceSelf();          // startMaint(e, "maint", "the commander")
+                            bool spendsAction = true);
+  bool StartFilterBank();
+  bool StartMaintenanceSelf();
   bool StartCookingSelf(const std::string& by = std::string(),
-                        bool spendsAction = true);              // startCook(e, "cook", "the commander")
-  bool ServiceSystem(const std::string& statId);  // buildSystemScreen() service row
-  bool ApplyJob(const std::string& crewId, const std::string& jobId);  // scenario setup
+                        bool spendsAction = true);
+  bool ServiceSystem(const std::string& statId);
+  bool ApplyJob(const std::string& crewId, const std::string& jobId);
 
   // ---- queries -----------------------------------------------------------
   double ActionCount() const { return actionCounter_; }
@@ -119,7 +79,6 @@ class Simulation {
   const GameState& State() const { return state_; }
   GameState& MutableState() { return state_; }
   const std::vector<CrewMember>& Crew() const { return crew_; }
-  // The quarters needs to write down what a hand just said; nothing else does.
   std::vector<CrewMember>& MutableCrew() { return crew_; }
   const std::vector<Stat>& Stats() const { return stats_; }
   const LifeStore& Life() const { return life_; }
@@ -163,7 +122,6 @@ class Simulation {
   const Body* CurrentSystem() const;
   const Body* FindBodyById(const std::string& id) const;
   const Body* HomeBody() const;
-  // navMetrics() — distance, fuel, and the strings the panel prints.
   struct NavMetrics {
     double dist = 0;
     double fuel = 0;
@@ -177,38 +135,31 @@ class Simulation {
   const Rules& GameRules() const { return rules_; }
   std::vector<std::string> FeedText() const;
 
-  // ---- Phase 5: the order sheet (Quarters) -------------------------------
-  // Staging is free: selecting a hand, a trade and a set of orders moves no
-  // clock. Handing the sheet over is one action, and the work it names is the
-  // price - the crew spend it carrying orders out while the ship runs on.
   const std::vector<JobDef>& Jobs() const { return jobs_; }
   const JobDef* FindJobDef(const std::string& jobId) const;
   const OrderSheet* SheetOf(const CrewMember& crew) const;
   std::string StagedJob(const CrewMember& crew) const;
-  bool StageJob(const std::string& crewId, const std::string& jobId);  // free
-  bool ToggleOrder(const std::string& crewId, const std::string& orderId);  // free
+  bool StageJob(const std::string& crewId, const std::string& jobId);
+  bool ToggleOrder(const std::string& crewId, const std::string& orderId);
   void ClearOrders();
   int OrderedCount() const;
   bool HasPendingLayoff() const;
   bool OrdersRunning() const;
-  bool CrewAvailable(const CrewMember& crew) const;  // ordersAvailable()
+  bool CrewAvailable(const CrewMember& crew) const;
   double JobCost(const std::string& jobId) const;
   double OrderCostFor(const std::string& jobId, const std::string& orderId) const;
   double OrderCost(const CrewMember& crew, const std::string& orderId) const;
-  double CrewCostOf(const CrewMember& crew) const;   // crewCostOf()
+  double CrewCostOf(const CrewMember& crew) const;
   double OrderFeeFor(const std::string& jobId, const std::string& orderId) const;
   double CrewFeeOf(const CrewMember& crew) const;
-  double OrdersCost() const;   // the work, in actions
-  double OrdersFee() const;    // the schooling, in shiplets
+  double OrdersCost() const;
+  double OrdersFee() const;
   double SheetCost(const CrewMember& crew, const OrderSheet& sheet) const;
-  bool CommitOrders();         // fireAction + queueOrders()
+  bool CommitOrders();
   void ApplyJobTo(CrewMember& crew, const std::string& jobId);
   void TrainCrew(CrewMember& crew, int steps, const std::string& where);
   void FireCrew(CrewMember& crew);
 
-  // ---- Phase 5: the read-only views the crew windows share --------------
-  // Everything a crew window prints is derived at paint time, never cached,
-  // so a tab left open can never go stale.
   double CrewWage(const CrewMember& crew) const;
   double PayrollBill() const;
   double PayrollDue() const;
@@ -217,44 +168,34 @@ class Simulation {
   std::string ActivityOf(const CrewMember& crew) const;
   std::string NeedKeyFor(const CrewMember& crew) const;
   double NavigatorFuelDiscount(const CrewMember& crew) const;
-  // The scene the quarters draws for one hand: pose and props.
   std::string AirStageWord() const;
-  // NEED_LINES and the quote cycle behind "Talk to <name>".
   std::string NeedLine(const std::string& needKey, int n, const std::string& jobLabel) const;
   std::string AskCrew(CrewMember& crew);
   static constexpr double kConversationMorale = 5.0;
-  bool TalkToCrew(const std::string& crewId);  // free (0 clicks); reveals need, lifts morale gently
+  bool TalkToCrew(const std::string& crewId);
 
-  // ---- Phase 1B commands ------------------------------------------------
-  // Navigation (Navigation.cpp). Selection is free; only travel and scans cost.
   bool SelectTarget(const std::string& bodyId);
-  bool StartTravel();                       // startTravel()
-  bool StartScan();                         // startScan()
-  bool StartExtraction();                   // surface ore, moon regolith, debris & wreck salvage
-  bool StandWatch();                        // standWatch()
-  bool Acknowledge(const std::string& taskId);  // the finished button
-  void SetLayer(const std::string& key);    // free: looking never costs
-  bool ZoomMap(int dir);                    // free: one step on the zoom ladder
-  void PanMap(double dx, double dy);        // free: clamped per layer
+  bool StartTravel();
+  bool StartScan();
+  bool StartExtraction();
+  bool StandWatch();
+  bool Acknowledge(const std::string& taskId);
+  void SetLayer(const std::string& key);
+  bool ZoomMap(int dir);
+  void PanMap(double dx, double dy);
   bool ViewSector(const std::string& regionId);
-  bool Dock();                              // Dock at <port>
+  bool Dock();
   bool Undock();
 
-  // Economy (Economy.cpp)
   double LotPrice(const GoodsLot& lot) const;
   double CargoUsed() const;
-
-  // What this port's counter charges for one crate right now, computed the way
-  // BuyGood charges it, so a label and a purchase can never disagree.
   double GoodCounterPrice(const std::string& goodId) const;
   double CargoCapacity() const;
   double CargoReserved() const;
-  bool BuySupply(const std::string& id);     // fuel cell, kit, medkit, canister, rations
+  bool BuySupply(const std::string& id);
   bool BuyGood(const std::string& goodId);
   bool SellGood(const std::string& lotId);
   bool SellSurvey(const std::string& recordId);
-  // The station bar: one action, once per patron, and the words they say are a
-  // read-out of the data they were with (see StationScreen.cpp).
   bool TalkToPatron(const std::string& patronId);
   std::string PatronName(const std::string& patronId) const;
   bool Jettison(const std::string& lotId);
@@ -263,24 +204,14 @@ class Simulation {
   bool AcceptContract(const std::string& contractId);
   bool CollectContract(const std::string& contractId);
   bool HireCrew(const std::string& candidateId);
-  bool BuyUpgrade(const std::string& upgradeId);   // bay, bay2, drive, rack, scanner, hull
+  bool BuyUpgrade(const std::string& upgradeId);
   void ContractProgress(const std::string& goal, const std::string& target);
 
-  // Trade contracts (Economy.cpp). The board is drawn from the system's own
-  // chart: one seeded draw per system/berth per epoch, and the epoch is the action
-  // clock in blocks of 100, so a berth keeps a board that is the system's and a
-  // list that is its own. Accepting costs one action and greys its own row.
   std::vector<TradeRun> TradeBoard(const std::string& portId) const;
-  // The cargo hall (Economy.cpp). Running a trade is two clicks and one leg: the
-  // board signs it, the hold carries it, and the destination settles it. What
-  // the destination pays is the market there plus the freight the leg cost.
-  // The machine's button in the engine room. One press is one click of the
-  // clock; its charge is what decides when it can pay again.
-  // `by` is who pressed it: the commander, or the engineer acting alone.
   bool EngineClick(const std::string& by = std::string());
+  double EngineButtonChargeLeft() const;
+  bool TrySpendEngineButton();
 
-  // The control a committed press was spent from. The tick reads it to tell the
-  // button that paid from the buttons its click winds back up.
   void SetPressedButton(const std::string& key);
   void ClearPressedButton(const std::string& key);
 
@@ -291,9 +222,6 @@ class Simulation {
   bool HasFreelanceGoods(const TradeContract& trade) const;
   bool SettleTrade(const std::string& mode, const std::string& to,
                    const std::string& good, int priceTier = 0);
-  // Sorting a lot in the hold takes one click on the green item and moves the
-  // clock by one action; sorted items grey out until periodic mixing every
-  // 5-10 clicks shifts them back out of order.
   bool StowCargo(const std::string& lotId);
   bool CargoStowed(const std::string& lotId) const;
   int CargoSortOrder(const std::string& lotId) const;
@@ -304,8 +232,6 @@ class Simulation {
   bool TradeAccepted(const std::string& mode, const std::string& to,
                      const std::string& good = std::string()) const;
   void CommissionProgress(const std::string& kind, const std::string& target);
-  // commissionOffer(): the same deterministic draw the board shows before the
-  // player accepts it, so the offer and the acceptance can never disagree.
   std::optional<Commission> CommissionOffer(const std::string& kind) const;
   bool AcceptCommission(const std::string& kind);
   bool CollectCommission();
@@ -321,11 +247,8 @@ class Simulation {
   double ShipCargoCapacity(const std::string& kind, int level) const;
   int CargoRefitLevel() const;
 
-  // Persistence (SaveSystem.cpp)
-  std::string SaveJson() const;                       // saveSnapshot(), pretty
-  bool LoadJson(const std::string& text, std::string* error);   // validSave + apply
-  // Slot 1 is written as UTF-16LE with a BOM, because that is the file the HTA
-  // writes beside itself; slots 2 and 3 are UTF-8. The names match the original.
+  std::string SaveJson() const;
+  bool LoadJson(const std::string& text, std::string* error);
   static std::string SlotFilename(int slot);
   static bool SlotIsUtf16(int slot);
   bool SaveSlot(int slot, const std::string& directory, std::string* error) const;
@@ -334,11 +257,8 @@ class Simulation {
   bool LoadFromFile(const std::string& path, std::string* error);
   static bool ValidSave(const std::string& text, const Catalog& catalog, std::string* why);
 
-  // Canonical snapshot, sorted keys, JS number formatting. Used by the
-  // console harness and by the parity tests.
   std::string TraceJson() const;
 
-  // ---- subsystems, public so the tick files and the tests can share them --
   double StatValue(const std::string& id) const;
   Stat* FindStat(const std::string& id);
   void ClampStat(const std::string& id, double delta);
@@ -352,7 +272,6 @@ class Simulation {
   double AirPercent() const;
 
   void LogLine(const std::string& text);
-  // The name of a crew member by id; "a former crew member" once they have left.
   std::string CrewNameOf(const std::string& id) const;
 
   Task* FindOngoing(const std::string& id);
@@ -371,41 +290,33 @@ class Simulation {
   void RemoveIncident(const std::string& id);
   void CheckCommendations(bool silent = false);
 
-  // ---- Phase 7: the logbook ----------------------------------------------
   const Commendation* FindCommendation(const std::string& id) const;
-  // The public face of the chronicle metric, for the logbook's own lines.
   double ChronicleValueFor(const std::string& metric) const { return ChronicleValue(metric); }
-  double ReadyCommendations() const;      // earned and not yet claimed
+  double ReadyCommendations() const;
   double EarnedCommendations() const;
-  std::string CaptainRank() const;        // cosmetic, fed by the log itself
+  std::string CaptainRank() const;
   std::string RewardText(const std::string& commendationId) const;
   std::string RewardTextOf(const Commendation& commendation) const;
-  bool ClaimCommendation(const std::string& id);   // free, once only
+  bool ClaimCommendation(const std::string& id);
 
-  // ---- Phase 7: incidents -------------------------------------------------
-  bool RemedyIncident(const std::string& incidentId);       // quick fix, maybe a kit
+  bool RemedyIncident(const std::string& incidentId);
   bool SpawnMapIncident(const std::string& typeId, const std::string& contextNote = std::string());
   const IncidentType::Stage* IncidentStage(const Incident& incident) const;
 
-  // ---- read-only job lookups for the interface --------------------------
-  // The briefing and the sidebar ask "who is holding this job" and "what does
-  // that job act at" without starting anything, so these are const and free.
   const CrewMember* Engineer() const;
   const CrewMember* FilterHand() const;
   const CrewMember* Cook() const;
   double MaintCostActions() const;
-  bool MaintRunningAny() const;   // the commander's spanner or the engineer's
+  bool MaintRunningAny() const;
   double CleanerIntervalOf(const CrewMember& crew) const;
   double CookThreshold(const CrewMember& crew) const;
 
  private:
   void TickWorld();
 
-  // Survival.cpp
   void WearEngine();
   void TickFilters();
 
-  // CrewLogic.cpp
   void TickCrew();
   void TickCleaner();
   void TickPayroll();
@@ -417,28 +328,22 @@ class Simulation {
   double MaintCost() const;
   bool MaintRunning() const;
   void ApplyOrderPayload(CrewMember& crew, const Task& task);
-  void QueueOrders(const std::map<std::string, OrderSheet>& sheet, double total);
+  void QueueOrders(const std::map<std::string, OrderSheet>& sheet);
 
-  // Tasks.cpp
-  double AdvanceTasks(double n);
+  void AdvanceTasks(double n);
   void TickOngoing();
   void SweepAutoTasks();
   void OnTaskDone(Task& task);
-  void TickTask(const Task& task, double used);
 
-  // Charges.cpp
   void TickButtonCharges();
 
-  // Incidents.cpp
   const IncidentType* IncidentSpec(const Incident& incident) const;
   void IncidentEffect(const IncidentType::Stage& step);
   void TickIncidents();
   std::pair<std::string, std::string> DisputePair() const;
 
-  // Awards.cpp
   double ChronicleValue(const std::string& metric) const;
 
-  // Navigation.cpp
   void ArriveAt(const std::string& bodyId);
   void ResolveMapArrivalEvents(const Body& localBody, const Body* jumpedSystem,
                                const std::string& prevRegion);
@@ -449,42 +354,30 @@ class Simulation {
   void FileSurvey(const Body& body);
   void ChronicleVisit(const Body* system);
   std::vector<const Body*> CurBodies() const;
-  // Puts the live MapView on the board its scale is drawn on. The system chart
-  // keeps the reference's 638x278 board; the sector chart is the wide one.
   void ApplyChartBoard();
 
-  // Economy.cpp
   const Port* HerePort() const;
 
-  // The cargo hall's own state. None of it is saved: the arrangement of the hold
-  // and the run of loading clicks belong to the session, not to the voyage.
-  std::string pressedButton_;        // the control this click was spent from
-  bool engineClicking_ = false;      // one press at a time, while its own click runs
-  bool engineClickAtPending_ = false;  // the press still has to arm its bar
+  std::string pressedButton_;
+  bool engineClicking_ = false;
   void ServiceDrive(const std::string& by);
   std::map<std::string, bool> stowed_;
   std::vector<std::string> stowOrder_;
   std::map<std::string, int> cargoMixGen_;
   void ClearStowLot(const std::string& lotId);
-  int stowClicks_ = 0;
-  int stowThreshold_ = 0;
   int mixClicks_ = 0;
   int mixThreshold_ = 0;
   std::string justStowedLot_;
   std::uint64_t stowRng_ = 0x9E3779B97F4A7C15ULL;
   std::uint64_t NextCargoRng();
-  int StowDraw();
   int MixDraw();
   double SurveyWorth(const std::string& type) const;
   int ProjectLot(const std::string& kind) const;
 
-  // Projects.cpp
   void ProjectDone(Task& task);
 
-  // SaveSystem.cpp
   void ApplySnapshotDefaults();
 
-  // Automation that follows the clock
   void AutoMaint();
   void AutoFilters();
   void AutoMess();
@@ -501,13 +394,11 @@ class Simulation {
   std::vector<GoodsLot> goods_;
   std::vector<SurveyRecord> survey_;
   std::vector<JobDef> jobs_;
-  // The staged sheets, by crew id. STATE.pendingOrders mirrors which ids have
-  // one, so a save written here still reads as the reference expects.
   std::map<std::string, OrderSheet> orderSheets_;
 
   ShipDef ship_;
   std::vector<Room> rooms_;
-  bool referenceFit_ = false;  // explicit parity fixture; not a saved gameplay setting
+  bool referenceFit_ = false;
   std::vector<InfoRow> infos_;
   Cargo cargo_;
   Mess mess_;
@@ -516,23 +407,16 @@ class Simulation {
   double scanCost_ = 5;
 
   double actionCounter_ = 0;
-  std::uint64_t feedRevision_ = 0; // presentation invalidation, not saved game time
+  std::uint64_t feedRevision_ = 0;
 
-  // Re-entry guards. A command spends its action BEFORE it registers the work
-  // it starts, and the tick inside that action must not let a crew member grab
-  // the same job twice.
   bool maintClaim_ = false;
   bool o2Claim_ = false;
   bool cookClaim_ = false;
   std::string projectClaim_;
-  // The cook keeps going: once a batch is off the pot she starts the next one
-  // until the counter is full, without waiting for the player to press again.
-  bool cookRestock_ = false;  // a chain the cook herself started
+  bool cookRestock_ = false;
   std::map<std::string, bool> crewClaims_;
 };
 
-// The commission board's own words: the goal is a count, the description is a
-// sentence naming the body. Both editions share one spelling of each.
 double CommissionGoal(const std::string& kind);
 std::string CommissionDescription(const Simulation& sim, const Commission& commission);
 

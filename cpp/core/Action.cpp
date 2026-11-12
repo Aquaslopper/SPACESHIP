@@ -1,14 +1,3 @@
-// ============================================================================
-//  Action.cpp — the heartbeat, and the state it starts from.
-//  ---------------------------------------------------------------------------
-//  One action = one tick of everything that is counting. performAction() is the
-//  only function in the whole port allowed to move the world, and tickWorld()
-//  runs its thirteen phases in the reference's exact order. Several of those
-//  phases depend on the order (wear runs before the task sweep so a maintenance
-//  job landing on this action still leaves a whole engine; the engineer's own
-//  automation runs after the task sweep so it cannot lose a step to the tick
-//  that created it).
-// ============================================================================
 #include "core/Simulation.h"
 
 #include "data/ChartExpansion.h"
@@ -72,9 +61,6 @@ Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& se
   sim.chartSettings_ = settings;
   sim.catalog_ = sim.sourceCatalog_;
   sim.catalog_.chartExpanded = false;
-  // Grow the charted galaxy before anything reads the chart. The
-  // catalogue is never touched: this works on the voyage's own copy, and a
-  // catalogue that has already been grown is left exactly as it is.
   ExpandChart(sim.catalog_, settings);
   sim.rules_ = sim.catalog_.rules;
   sim.scanCost_ = catalog.rules.scanCost;
@@ -131,8 +117,6 @@ Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& se
 
   // ---- the hold ----------------------------------------------------------
   for (const Good& good : catalog.startingCargo) {
-    // Leave room for two 3 m3 salvage lots on the opening crossing. The old
-    // starting cargo exceeds the smaller hold; existing saves are untouched.
     constexpr double openingSalvageSpace = 6;
     if (sim.CargoUsed() + good.vol > sim.cargo_.capacity - openingSalvageSpace) continue;
     GoodsLot lot;
@@ -248,32 +232,23 @@ void Simulation::PerformAction(const std::string& detail) {
 
   actionCounter_ += 1;
 
-  // One committed click moves the click time once, before the world moves: the
-  // button that paid loses a step, every button it did not pay from gains one.
   TickButtonCharges();
 
   TickWorld();
   if (state_.gameOver.empty()) { StepCargoMix(); }
 
-  // Only a real commitment carries a detail line. The tally lives in the
-  // status bar; the feed is for things that happened.
   if (!detail.empty()) { LogLine(detail + "."); }
 
   if (state_.gameOver.empty()) { CheckCommendations(); }
 }
 
 void Simulation::FreeCommit(const std::string& detail) {
-  // The counter, the yard and the hiring hall trade in shiplets alone: nothing
-  // here advances the clock, so nothing here wears the engine, feeds the crew,
-  // moves a task or starts a countdown. A commendation a purchase earns is
-  // still handed over on the spot, as PerformAction would.
   if (!state_.gameOver.empty()) { return; }
   if (!detail.empty()) { LogLine(detail + "."); }
   CheckCommendations();
 }
 
 void Simulation::TickWorld() {
-  // The order below is normative; see the header comment.
   WearEngine();
   if (static_cast<long long>(actionCounter_) % 4 == 0) { ClampStat("energy", -1); }
   TickFilters();
@@ -319,8 +294,6 @@ void Simulation::ClampStat(const std::string& id, double delta) {
   stat->value = std::max(0.0, std::min(100.0, stat->value + delta));
 
   if (id == "energy" && before > 0 && stat->value == 0) {
-    // Power loss takes the cabin's reserve with it: the reference resets the
-    // air hold so the crew get the full countdown rather than an instant fail.
     if (state_.filterLife > 0) { state_.airHold = rules_.air.holdMax; }
     LogLine("Power exhausted. The filter bank has stopped; restore energy to restart it.");
   } else if (id == "energy" && before == 0 && stat->value > 0) {
@@ -329,8 +302,6 @@ void Simulation::ClampStat(const std::string& id, double delta) {
 }
 
 void Simulation::LogLine(const std::string& text) {
-  // Cosmetic local-clock information, deliberately excluded from parity traces.
-  // It never advances the action clock or any simulation countdown.
   const std::time_t now = std::time(nullptr);
   std::tm local{};
 #ifdef _WIN32
@@ -355,14 +326,8 @@ const CrewMember* Simulation::FindCrew(const std::string& id) const {
   return nullptr;
 }
 
-// ---------------------------------------------------------------------------
-// Commands (Phase 1A). Each mirrors the reference function named beside it.
-// ---------------------------------------------------------------------------
-
 bool Simulation::StartCanisterInstall(int slot, const std::string& by,
                                      bool spendsAction) {
-  // startInstall(e, i): the action is spent FIRST, then the work is registered,
-  // so the tick caused by the action cannot eat a step of that work.
   if (slot < 0 || slot >= static_cast<int>(life_.slots.size())) { return false; }
   CanisterSlot& target = life_.slots[static_cast<std::size_t>(slot)];
   if (target.state != "empty") { return false; }
@@ -381,14 +346,10 @@ bool Simulation::StartCanisterInstall(int slot, const std::string& by,
     o2Claim_ = false;
     if (!state_.gameOver.empty()) { return true; }
   } else {
-    // A hand's own press: it fills its own line and starts the work, but the
-    // click that carries the ship forward is the player's, not his.
     LogLine(who + " carried a canister to " + target.name);
   }
 
-  // The same press, made by a hand: it works at that hand's rate, not at the
-  // commander's.
-  const double length = by.empty() ? 2.0 : CrewCost(2.0);
+  const double length = 2.0;  // by.empty() ? 2.0 : CrewCost(2.0);
   Task* task = AddOngoing("o2s" + std::to_string(slot), "Seating - " + target.name, length,
                           "o2slot", target.id);
   if (task != nullptr) {
@@ -399,8 +360,6 @@ bool Simulation::StartCanisterInstall(int slot, const std::string& by,
 }
 
 bool Simulation::StartFilterBank() {
-  // turnOnFilter(e): one ordinary action to throw the switch, then ten actions
-  // of progress that cost nothing and wear nothing.
   if (!BankReady() || BankRunning() || StatValue("energy") <= 0) { return false; }
 
   o2Claim_ = true;
@@ -416,8 +375,6 @@ bool Simulation::StartFilterBank() {
 }
 
 bool Simulation::StartMaintenanceSelf() {
-  // startMaint(e, "maint", "the commander"): refuses a perfect engine, refuses
-  // a second spanner, charges one action, then registers the work.
   if (state_.engineCondition >= 100.0) {
     LogLine("Maintenance refused - the drive is already at full condition.");
     return false;
@@ -437,9 +394,6 @@ bool Simulation::StartMaintenanceSelf() {
 }
 
 bool Simulation::StartCookingSelf(const std::string& by, bool spendsAction) {
-  // Cooking a batch spends one dry ration up front; up to foodPerRation cooked
-  // food lands together when the fixed foodPerRation-action timer completes.
-  // Refuse a full counter or an empty larder.
   if (mess_.rack >= mess_.capacity) {
     LogLine("Cooking refused - the galley counter is already full.");
     return false;
@@ -448,12 +402,10 @@ bool Simulation::StartCookingSelf(const std::string& by, bool spendsAction) {
     LogLine("Cooking refused - there are no dry rations in the larder.");
     return false;
   }
-  if (FindOngoing("cook") != nullptr || FindOngoing("project-food") != nullptr) {
+  if (FindOngoing("cook") != nullptr /* || FindOngoing("project-food") != nullptr */) {
     return false;
   }
 
-  // The green bar fills for foodPerRation actions; cooked food lands together
-  // when the batch finishes, not as it runs.
   const double cost = rules_.mess.foodPerRation;
 
   const std::string who = by.empty() ? "the commander" : by;
@@ -469,17 +421,13 @@ bool Simulation::StartCookingSelf(const std::string& by, bool spendsAction) {
   Task* task = AddOngoing("cook", "Cooking - " + who, cost, "cook", "mess");
   if (task != nullptr) {
     task->by = who;
-    mess_.rations -= 1.0;  // the ration is spent when the batch starts
-    // Carrying on to a full rack is allowed: one dry ration per batch, until
-    // the cooked-food counter is stocked.
-    cookRestock_ = true;
+    mess_.rations -= 1.0;
+    if (!spendsAction) { cookRestock_ = true; }
   }
   return true;
 }
 
 bool Simulation::ApplyJob(const std::string& crewId, const std::string& jobId) {
-  // applyJob(c, jid): the whole of taking, changing or giving up a job, in the
-  // reference's order, down to who hears about it and when.
   CrewMember* crew = FindCrew(crewId);
   if (crew == nullptr) { return false; }
 

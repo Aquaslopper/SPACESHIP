@@ -1,9 +1,3 @@
-// ============================================================================
-//  Widgets.cpp — the frame, the button and its charge.
-//  ---------------------------------------------------------------------------
-//  Everything here is a direct reading of Section D-5 and the frame builders at
-//  the end of Section I. 
-// ============================================================================
 #include "ui/Widgets.h"
 
 #include <algorithm>
@@ -69,10 +63,8 @@ bool MentionsAction(const std::string& text) {
 
 }  // namespace
 
-// ---------------------------------------------------------------------------
-//  Button charges
-// ---------------------------------------------------------------------------
 std::string ButtonChargeKey(const Simulation& sim, const std::string& id) {
+  if (id == "progress:engine-click") { return Simulation::kEngineButtonChargeKey; }
   const std::string tab = sim.State().activeTab.empty() ? "home" : sim.State().activeTab;
   return "ch|" + tab + "|" + (id.empty() ? std::string("action") : id);
 }
@@ -80,7 +72,6 @@ std::string ButtonChargeKey(const Simulation& sim, const std::string& id) {
 std::string ButtonChargeTier(const std::string& subject,
                              const std::string& preferred) {
   if (!preferred.empty()) {
-    // The four tiers are the only legal values; anything else is guessed.
     if (preferred == "routine" || preferred == "systems" || preferred == "space" ||
         preferred == "critical") {
       return preferred;
@@ -125,17 +116,12 @@ std::string TierLabel(const Simulation& sim, const std::string& tier) {
   return it == sim.World().rules.charges.end() ? std::string("Action") : it->second.label;
 }
 
-// A press that is not paid from a charge still has to reach the tick, so it is
-// marked with a key no control owns: everything else gets its step back.
 const char* UnmeteredKey() { return "\x01unmetered"; }
 
-// The air plant and the galley already run their own clocks; a charge on top of
-// them would be a second mechanic on the same button.
 bool KeepsOwnMechanic(const std::string& taskId) {
   return taskId.compare(0, 2, "o2") == 0 || taskId == "cook";
 }
 
-// An entry that is not in the state yet has never been pressed: it is full.
 double ChargeLeft(const Simulation& sim, const std::string& key, const std::string& tier) {
   auto it = sim.State().charges.find(key);
   if (it == sim.State().charges.end()) { return TierVolume(sim, tier); }
@@ -154,7 +140,6 @@ double ChargePercent(const Simulation& sim, const std::string& key, const std::s
   return std::floor(std::clamp(ChargeLeft(sim, key, tier) / volume, 0.0, 1.0) * 100.0);
 }
 
-// The unit of the clock, as it is printed now: a cost that says "click".
 bool MentionsClick(const std::string& text) {
   const std::string lower = Lower(text);
   std::size_t at = lower.find("click");
@@ -191,33 +176,25 @@ bool PressWithoutCharge(Simulation& sim, const std::function<bool()>& action) {
 bool CommitActionButton(Simulation& sim, const std::string& key,
                         const std::string& tier,
                         const std::function<bool()>& action) {
-  // A control nobody has pressed yet is full: open it at its volume.
   auto& charges = sim.MutableState().charges;
   if (charges.find(key) == charges.end()) {
     const double volume = TierVolume(sim, tier);
-    charges[key] = Charge{tier, volume, volume};
+    charges[key] = Charge{volume, volume};
   }
-  if (ChargeLeft(sim, key, tier) <= 0.0) { return false; }  // out of clicks
+  if (ChargeLeft(sim, key, tier) <= 0.0) { return false; }
 
-  // The tick inside PerformAction has to know which control paid, so the other
-  // controls can be wound back up by this click.
   sim.SetPressedButton(key);
   bool result = false;
   try {
     result = action();
   } catch (...) {
-    // A callback that throws must not leave a press marked as paid.
     sim.ClearPressedButton(key);
     throw;
   }
-  // A free read spends nothing, so its control keeps every click it held.
   sim.ClearPressedButton(key);
   return result;
 }
 
-// ---------------------------------------------------------------------------
-//  The progress button
-// ---------------------------------------------------------------------------
 double OngoingPercent(const Task& task) {
   if (task.total <= 0.0) { return 0.0; }
   return std::floor(((task.total - task.left) / task.total) * 100.0);
@@ -238,12 +215,9 @@ ProgressButton BuildProgressButton(const Simulation& sim, const std::string& tas
   if (!charged) { button.chargeKey.clear(); }
 
   const double charge = charged ? ChargePercent(sim, button.chargeKey, button.tier) : 0.0;
-  // Old saves may contain a global order-sheet task. It is not a lock on the
-  // assignment button: personal crew tasks continue independently.
   const Task* task = taskId == "crew-assign" ? nullptr : sim.FindOngoing(taskId);
 
   if (task == nullptr) {
-    // No process running: the bar is the clicks this control still holds.
     button.fillPercent = charge;
     if (!charged) {
       button.state = enabled ? ButtonState::Idle : ButtonState::Off;
@@ -284,8 +258,6 @@ ProgressButton BuildProgressButton(const Simulation& sim, const std::string& tas
 }
 
 bool PressProgressButton(Simulation& sim, const std::string& taskId) {
-  // Resolve the actual rendered control, including its label/category and
-  // enabled condition; a synthetic "action" label loses e.g. Maintenance's tier.
   const Tab* tab = FindTab(sim.State(), sim.State().activeTab);
   if (tab != nullptr) {
     const auto screen = BuildTabScreen(sim, *tab);
@@ -308,21 +280,14 @@ bool PressProgressButton(Simulation& sim, const std::string& taskId) {
 
 bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
   const std::string& taskId = button.taskId;
-  // The machine's button is a click of the clock like any other: the charge it
-  // holds is the only thing that decides whether it can pay.
   if (taskId == "engine-click") {
     if (button.state == ButtonState::Off || button.state == ButtonState::Empty) { return false; }
     return CommitActionButton(sim, button.chargeKey, button.tier,
                               [&sim]() { return sim.EngineClick(); });
   }
-  // Old saves may contain a global order-sheet task. It is not a lock on the
-  // assignment button: personal crew tasks continue independently.
   const Task* task = taskId == "crew-assign" ? nullptr : sim.FindOngoing(taskId);
-  if (task != nullptr && task->state == "running") { return false; }  // inert
+  if (task != nullptr && task->state == "running") { return false; }
   if (task != nullptr && task->state == "done") {
-    // Taking a result spends no charge of this control. A finished scan is
-    // still a click on the clock: Simulation::Acknowledge performs one action
-    // for it, and that action gives every charged control one click back.
     return PressWithoutCharge(sim, [&sim, &taskId]() { return sim.Acknowledge(taskId); });
   }
 
@@ -330,14 +295,11 @@ bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
   if (button.state == ButtonState::Off) { return false; }
   if (button.state == ButtonState::Running) { return false; }
 
-  // Removing a hand from a job must not be delayed by an empty charge.
   if (taskId == "crew-assign" && sim.HasPendingLayoff() &&
       ChargePercent(sim, button.chargeKey, button.tier) <= 0.0) {
     return PressWithoutCharge(sim, [&sim]() { return sim.CommitOrders(); });
   }
 
-  // A control that keeps its own mechanic is run without a charge, but its
-  // press is still a click that winds the other buttons back up.
   if (button.chargeKey.empty()) {
     return PressWithoutCharge(sim, [&sim, &taskId]() {
       if (taskId.compare(0, 3, "o2s") == 0 && taskId.size() == 4) {
@@ -349,8 +311,6 @@ bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
     });
   }
 
-  // One task id per control, and the control's own charge key and tier, so the
-  // bar the player reads and the clicks the gate spends cannot disagree.
   return CommitActionButton(sim, button.chargeKey, button.tier,
                             [&sim, &taskId]() {
                               if (taskId.compare(0, 3, "o2s") == 0 && taskId.size() == 4) {
@@ -363,17 +323,11 @@ bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
                               if (taskId == "scan") { return sim.StartScan(); }
                               if (taskId == "extract") { return sim.StartExtraction(); }
                               if (taskId == "crew-assign") { return sim.CommitOrders(); }
-                              // Phase 7: projects, the medical bay and the shared
-                              // meal all live behind this one button, exactly as
-                              // they do in the reference.
                               if (taskId.compare(0, 8, "project-") == 0) {
                                 const std::string id = taskId.substr(8);
-                                if (id == "social") { return false; }  // needs a pair
+                                if (id == "social") { return false; }
                                 return sim.StartProject(id);
                               }
-                              // Science packaging: the Science Room's own
-                              // progress button (Phase 9 audit found it had no
-                              // dispatch at all, so the button was dead).
                               if (taskId.compare(0, 4, "pkg-") == 0) {
                                 return sim.PackageSurvey(taskId.substr(4));
                               }
@@ -424,7 +378,6 @@ CommandRowView BuildCommandRow(const Simulation& sim, const std::string& label,
   return row;
 }
 
-// A row that is out of clicks is not locked: it is empty, and the bar says so.
 void BindCommandCharge(const Simulation& sim, CommandRowView& row,
                        const std::string& key, const std::string& tier) {
   row.chargeKey = key;
@@ -543,21 +496,13 @@ TaskScreenModel BuildDescribedScreen(const Simulation& sim,
   return screen;
 }
 
-// ---------------------------------------------------------------------------
-//  Routing
-// ---------------------------------------------------------------------------
 ScreenKind ScreenKindFor(const Tab& tab) {
-  // The chart is not a room: it is its own window, and it is the first one the
-  // player can open from the taskbar.
   if (tab.kind == "nav") { return ScreenKind::Nav; }
-  // A crew tab is a read-only record, and a room tab for the quarters is the
-  // order sheet. Neither is a room screen in the machine sense.
   if (tab.kind == "crew") { return ScreenKind::CrewRecord; }
   if (tab.kind == "station") { return ScreenKind::Station; }
   if (tab.kind == "room" && tab.id == "cargo") { return ScreenKind::Cargo; }
   if (tab.kind == "room" && tab.id == "science") { return ScreenKind::Science; }
   if (tab.kind == "room" && tab.id == "quarters") { return ScreenKind::Quarters; }
-  // Phase 7: the fitted bays and the logbook.
   if (tab.kind == "awards") { return ScreenKind::Awards; }
   if (tab.kind == "wiki") { return ScreenKind::Wiki; }
   if (tab.kind == "event") { return ScreenKind::Event; }
@@ -567,12 +512,6 @@ ScreenKind ScreenKindFor(const Tab& tab) {
   if (tab.id == "engine") { return ScreenKind::Engine; }
   if (tab.id == "o2") { return ScreenKind::O2; }
   if (tab.id == "mess") { return ScreenKind::Mess; }
-  // Cargo, science, the fitted systems, the bridge and the quarters each have a
-  // window of their own in a later phase; until then they open on the house
-  // frame rather than on nothing.
-
-  // The fitted bays and the bridge: r1..r13 and "bridge", which is exactly the
-  // set ROOM_FITS names.
   if (tab.id == "bridge") { return ScreenKind::Room; }
   if (tab.id.size() > 1 && tab.id[0] == 'r') {
     bool digits = true;
@@ -680,8 +619,6 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       return screen;
     }
     case ScreenKind::Station: {
-      // Three columns walked in one direction. Choosing a card and picking an
-      // item are free; the commit rows are charged like every other button.
       StationSelection picked;
       if (station != nullptr) { picked = *station; }
       const StationScreenModel model = BuildStationScreen(sim, tab.id);
@@ -692,7 +629,6 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       screen.head = model.head;
       screen.panelColumns = {0, 1, 2};
 
-      // ---- left: the category cards, free to open -------------------------
       NavPanel cards;
       cards.id = "station-cards";
       cards.title = model.portName;
@@ -707,8 +643,8 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         view.title = column.badge;
         view.enabled = true;
         view.live = true;
-        view.plain = true;       // the cards are list lines, not buttons
-        view.hideCost = true;    // and they carry no badge: choosing is free
+        view.plain = true;
+        view.hideCost = true;
         view.selected = column.id == picked.category;
         cardRows.push_back(view);
         cardIds.push_back("station-cat:" + column.id);
@@ -716,7 +652,6 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       screen.panelRows.push_back(cardRows);
       screen.panelRowIds.push_back(cardIds);
 
-      // ---- middle: only what the open card holds, free to pick ------------
       const StationColumn* open = FindStationCategory(model, picked.category);
       NavPanel items;
       items.id = "station-items";
@@ -733,10 +668,10 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
           CommandRowView view;
           view.label = row.label;
           view.reading = row.reading;
-          view.enabled = !row.reading;   // picking is free, even for a greyed commit
-          view.live = row.enabled;       // a greyed commit reads muted in the list
-          view.plain = !row.reading;     // list lines, not buttons
-          view.hideCost = true;          // the cost lives in the inspector, not here
+          view.enabled = !row.reading;
+          view.live = row.enabled;
+          view.plain = !row.reading;
+          view.hideCost = true;
           view.selected = !row.reading && row.id == picked.item;
           itemRows.push_back(view);
           itemIds.push_back(row.reading ? std::string() : "station-item:" + row.id);
@@ -745,10 +680,6 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       screen.panelRows.push_back(itemRows);
       screen.panelRowIds.push_back(itemIds);
 
-      // ---- right: the trade list ------------------------------------------
-      // On the trade card the middle column is the three mode buttons and the
-      // right column is the list behind the chosen one; every row in it is its
-      // own button, so there is no single commit here.
       if (open != nullptr && open->id == "trade") {
         const TradeMode* mode = nullptr;
         const std::string chosen = picked.item.compare(0, 11, "trade-mode:") == 0
@@ -803,12 +734,10 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         return screen;
       }
 
-      // ---- right: the inspector, and the one commit button ----------------
       const StationRow* item =
           open == nullptr ? nullptr : FindStationItem(model, picked.category, picked.item);
       NavPanel inspector;
       inspector.id = "station-inspector";
-      // A starmap entry is a page, not a purchase: it is read, never pressed.
       const bool pageItem = item != nullptr && item->page;
       inspector.title = item == nullptr ? "Inspector"
                         : (pageItem ? "Starmap page" : "Inspector and commit");
@@ -829,12 +758,11 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         CommandRowView view;
         view.label = item->commit.empty() ? item->label : item->commit;
         view.cost = item->cost;
-        view.hideCost = true;            // one simple button, no badge
+        view.hideCost = true;
         view.title = item->label;
         view.confirm = item->confirm;
         view.enabled = item->enabled;
         view.live = item->enabled;
-        // A shiplets-only row is paid in money, not in click time.
         if (!item->free) {
           BindCommandCharge(sim, view, ButtonChargeKey(sim, "press:station:" + item->id + ":"),
                             ButtonChargeTier(view.label));
@@ -847,8 +775,6 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       return screen;
     }
     case ScreenKind::Cargo: {
-      // Three windows: left inventory cards, center visual hold sized by ship
-      // capacity, right context-sensitive finalizer (no route salvage).
       const CargoRoomModel cargo = BuildCargoRoom(sim);
       TaskScreenModel screen;
       screen.head = cargo.head;
@@ -1111,7 +1037,6 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       return screen;
     }
     case ScreenKind::CrewRecord: {
-      // Reading the record is free; its conversation is an explicit action.
       const CrewRecordModel record = BuildCrewRecord(sim, tab.id);
       TaskScreenModel screen;
       screen.head = record.head;

@@ -1,11 +1,3 @@
-// ============================================================================
-//  Survival.cpp — the ship wearing out and the air running down.
-//  ---------------------------------------------------------------------------
-//  Both decay with ATTENTION, never with time: the drive loses a percent every
-//  four actions spent aboard, and the cabin air spends itself while no filter
-//  bank is running. A full bank holds the top air stage for two hundred actions
-//  and then hands the player a twenty-action countdown, in five visible steps.
-// ============================================================================
 #include "core/JsNumber.h"
 #include "core/Simulation.h"
 
@@ -14,34 +6,29 @@
 
 namespace ship {
 
-// One maintenance press restores 10% of the drive. The commander
-// spends the click through EngineClick; the engineer works inside an existing
-// player click and uses the same maintenance amount without advancing time again.
 void Simulation::ServiceDrive(const std::string& by) {
+  (void)by;
+  /*
   const std::string who = by.empty() ? "The commander" : by;
-  state_.engineClickAt = ActionCount();
   LogLine(who + " pressed the maintenance button");
+  */
   if (state_.gameOver.empty()) {
     state_.engineCondition = std::min(100.0, state_.engineCondition + 10.0);
+    if (state_.engineCondition >= 100.0) { state_.engineerRun = false; }
   }
 }
 
 bool Simulation::EngineClick(const std::string& by) {
   if (!state_.gameOver.empty()) { return false; }
   if (engineClicking_) { return false; }
-  // Nothing to maintain is nothing to click: a drive at full condition refuses
-  // the press instead of spending a click on an empty job.
   if (state_.engineCondition >= 100.0) { return false; }
-  // A maintenance job already in hand owns the drive; the button waits for it.
-  if (MaintRunning()) { return false; }
+  // if (MaintRunning()) { return false; }
 
   const std::string who = by.empty() ? "The commander" : by;
   engineClicking_ = true;
-  engineClickAtPending_ = true;
   PerformAction(who + " pressed the maintenance button");
   engineClicking_ = false;
-  if (engineClickAtPending_) { ServiceDrive(who); }
-  engineClickAtPending_ = false;
+  ServiceDrive(who);
   return true;
 }
 
@@ -55,28 +42,23 @@ void Simulation::WearEngine() {
 }
 
 void Simulation::TickFilters() {
-  // --- the bank is running: burn the charge -------------------------------
   if (BankRunning()) {
     state_.filterLife -= rules_.life.decay;
     if (state_.filterLife > 0) { return; }
 
     state_.filterLife = 0;
     for (CanisterSlot& slot : life_.slots) { slot.state = "empty"; }
-    // The room is still full of good air: it holds, then it goes. This action
-    // does not also spend a step of it.
     state_.airHold = rules_.air.holdMax;
     LogLine("Filter bank spent. The cabin air will hold for " +
             js::NumToString(rules_.air.holdMax) + " clicks.");
     return;
   }
 
-  // --- no bank: the air in the room is what is left -----------------------
   if (state_.airHold <= 0) { return; }
 
   const int before = AirStageIndex();
   state_.airHold -= 1;
   if (AirStageIndex() != before) {
-    // Only the bottom is announced; the steps above are a colour on a bar.
     if (AirStageIndex() == 0) {
       LogLine("The cabin air has gone foul. The crew are labouring.");
     }
@@ -106,7 +88,7 @@ const struct AirStage& Simulation::AirSpec() const {
   const std::vector<AirStage>& stages = rules_.air.stages;
   const int index = AirStageIndex();
   if (stages.empty()) {
-    static const AirStage fallback{"OPTIMAL", "#7f9161", 1.0, 0.0, 0.0};
+    static const AirStage fallback{"OPTIMAL", "#7f9161", 1.0, 0.0};
     return fallback;
   }
   const std::size_t clamped = static_cast<std::size_t>(

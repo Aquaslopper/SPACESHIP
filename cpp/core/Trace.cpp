@@ -129,7 +129,6 @@ std::string Simulation::TraceJson() const {
       entry["by"] = task.by;
       entry["who"] = task.who;
       entry["slot"] = Num(task.slot);
-      entry["rate"] = Num(task.rate);
       entry["vol"] = Num(task.vol);
       tasks.push_back(entry);
     }

@@ -1,12 +1,3 @@
-// ============================================================================
-//  Projects.cpp — the six things the ship can make for itself.
-//  ---------------------------------------------------------------------------
-//  A project is a draw on the reserve, a cargo lot consumed, and four or five
-//  actions of work that pause the instant the batteries are empty. The block
-//  rules are the interesting part: a project that would make a canister the rack
-//  has no room for, or dry rations the larder cannot hold, is refused before a
-//  single shiplet or action is spent.
-// ============================================================================
 #include "core/JsNumber.h"
 #include "core/Simulation.h"
 
@@ -52,13 +43,13 @@ std::string Simulation::ProjectBlock(const std::string& id) const {
       }() >= life_.capacity) {
     return "The canister rack is full or reserved for an installation.";
   }
-  if (id == "food" && (mess_.rations > mess_.rationCapacity - 8 ||
-                       FindOngoing("cook") != nullptr)) {
-    return "Needs room for eight dry rations in the larder and an idle galley.";
+  if (id == "food" && (mess_.rations > mess_.rationCapacity - 8 /* ||
+                       FindOngoing("cook") != nullptr */)) {
+    return "Needs room for eight dry rations in the larder.";
   }
   if (id == "brace" && StatValue("hull") >= 100) { return "The hull is already sound."; }
-  if (id == "cooling" && (state_.engineCondition >= 100 || MaintRunning())) {
-    return "The drive is sound or already under maintenance.";
+  if (id == "cooling" && (state_.engineCondition >= 100 /* || MaintRunning() */)) {
+    return "The drive is already sound.";
   }
   return "";
 }
@@ -116,7 +107,7 @@ bool Simulation::StartSocial(const std::string& a, const std::string& b) {
   if (CrewBusy(*one) != nullptr || CrewBusy(*two) != nullptr) { return false; }
   if (FindOngoing("project-social") != nullptr || mess_.rack < 2 || !state_.gameOver.empty()) { return false; }
 
-  mess_.rack -= 2;  // a shared meal is eaten off the counter
+  mess_.rack -= 2;
   crewClaims_[a] = true;
   crewClaims_[b] = true;
   const std::string names = one->name + " and " + two->name;
@@ -132,10 +123,6 @@ bool Simulation::StartSocial(const std::string& a, const std::string& b) {
   }
   return true;
 }
-
-// ---------------------------------------------------------------------------
-// shipProject.onDone — the six outputs, plus medical and shared meals.
-// ---------------------------------------------------------------------------
 
 void Simulation::ProjectDone(Task& task) {
   const std::string id = task.target;

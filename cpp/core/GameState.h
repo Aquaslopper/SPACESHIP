@@ -1,14 +1,3 @@
-// ============================================================================
-//  GameState.h — everything the voyage remembers.
-//  ---------------------------------------------------------------------------
-//  The reference keeps one global STATE object plus a handful of parallel
-//  stores (CREW, LIFE, MESS, STATS, EVENTS, GOODS, SURVEY, MAP) precisely so
-//  that serialising a voyage is trivial. The port keeps the same split and the
-//  same field names, because SaveSystem has to produce a file the HTA can read
-//  and consume one it wrote.
-//
-//  Field names are therefore not up for tidying: `rackWarnedMess` stays.
-// ============================================================================
 #pragma once
 
 #include <map>
@@ -20,9 +9,6 @@
 
 namespace ship {
 
-// ---------------------------------------------------------------------------
-// Crew
-// ---------------------------------------------------------------------------
 struct CrewMember {
   std::string id;
   std::string name;
@@ -46,28 +32,21 @@ struct CrewMember {
 
   std::string traits;
 
-  // Biographical record: once, never computed at render time.
   std::string race;
   int age = 0;
   std::string homeworld;
   std::string hobby;
   std::string religion;
 
-  // Standing assignment. `jobAt` is read BY THE JOB: a condition percentage
-  // for the engineer, an air stage for the filter hand, a rate for the cook.
   std::string job;
   std::string skill;
   double jobAt = 0;
 
-  // What the quarters last heard them say, and where in the cycle they are.
   std::string said;
   std::string saidKey;
   int saidN = 0;
 };
 
-// ---------------------------------------------------------------------------
-// Hull readouts (STATS). Right-clickable in the reference; clamped 0..100.
-// ---------------------------------------------------------------------------
 struct Stat {
   std::string id;
   std::string label;
@@ -76,13 +55,6 @@ struct Stat {
   std::string colour;
 };
 
-// ---------------------------------------------------------------------------
-// Ongoing work. The payload fields are optional by type, exactly as the
-// reference hangs them on the object.
-// ---------------------------------------------------------------------------
-// What the commander has staged for ONE hand. Staging is free; handing the
-// sheet over is the single action. The job is staged separately from the
-// orders because a job is a trade, not a chore.
 struct OrderSheet {
   bool hasJob = false;
   std::string job;
@@ -103,31 +75,24 @@ struct Task {
   std::string label;
   double total = 0;
   double left = 0;
-  std::string state = "running";  // running | done
+  std::string state = "running";
   std::string type;
   std::string target;
 
-  std::string by;     // crew name credited with the work
-  std::string who;    // crew id, where the task is about a person
-  std::string other;  // second person (shared meals)
+  std::string by;
+  std::string who;
+  std::string other;
 
-  double slot = -1;   // o2slot: which of the three slots
-  double rate = 0;    // preserved task-rate field for older saved tasks
-  double vol = 0;     // salvage: cubic metres held
-  bool rest = false;  // crewJob payload: the order sheet asks for a rest
+  double slot = -1;
+  double vol = 0;
+  bool rest = false;
   bool hasOrders = false;
 
-  // The order sheet a crewJob carries, applied when the work finishes.
   bool sheetHasJob = false;
   std::string sheetJob;
   std::map<std::string, bool> sheetFlags;
-  // The whole sheet, on the crewOrder bar: one task per person, one bar for all.
-  std::string sheetOwner;
 };
 
-// ---------------------------------------------------------------------------
-// Incidents. Definitions live in progression.json; these are live instances.
-// ---------------------------------------------------------------------------
 struct Incident {
   std::string id;
   std::string type;
@@ -166,26 +131,20 @@ struct Commissions {
   std::optional<Commission> active;
 };
 
-// The identity of a trade run: its mode, its destination and its commodity. The
-// board greys a run by this key, the hold marks a consignment with it, and a
-// settled run is remembered by it.
 inline std::string TradeKey(const std::string& mode, const std::string& to,
                             const std::string& good) {
   return mode + "|" + to + "|" + good;
 }
 
-// One accepted trade contract. The board draws its offers fresh from the
-// system's own chart, so the record has to keep everything the run promised:
-// once an epoch rolls over the draw no longer knows this contract exists.
 struct TradeContract {
-  std::string mode;   // "delivery", "freelance", "station"
-  std::string from;   // the station it was accepted at
-  std::string to;     // the destination port or body it points at
-  std::string good;   // the commodity carried; empty for a data survey trade
-  int crates = 0;     // how many lots of it
-  double fee = 0.0;   // what the run pays on hand-over, or its margin
-  double freight = 0.0;  // what carrying it there costs, priced when drawn
-  std::string label;  // the sentence the board showed when it was taken
+  std::string mode;
+  std::string from;
+  std::string to;
+  std::string good;
+  int crates = 0;
+  double fee = 0.0;
+  double freight = 0.0;
+  std::string label;
 };
 
 struct Options {
@@ -198,35 +157,24 @@ struct Options {
   double audioLevel = 0.4;
   double displayGamma = 1.0;
   double displayBrightness = 1.0;
-  // Phase 9: typography floor and the four steps above it, plus the borderless
-  // window. Both are free preferences, saved with the voyage like the rest.
-  int fontStep = 0;        // 0..3 -> 18, 19, 20, 21 px
+  int fontStep = 0;
   bool fullscreen = false;
 };
 
-// A charge belongs to one control and is counted in clicks, never seconds.
-// `left` is how many presses the control still holds; `volume` is its full
-// capacity. Pressing a control spends one of its own steps and returns one step
-// to every other control, so the total green in the room is the click time left.
 struct Charge {
-  std::string tier;
-  double left = 0;
-  double volume = 0;
+  double volume = 0.0;
+  double left = 0.0;
 };
 
 struct FeedLine {
-  std::string stamp;  // wall clock in the reference; excluded from parity
+  std::string stamp;
   std::string text;
 };
 
-// ---------------------------------------------------------------------------
-// Stores. These are mutable game state, not constants: LIFE.canisters is the
-// rack, MESS.rack is the counter.
-// ---------------------------------------------------------------------------
 struct CanisterSlot {
   std::string id;
   std::string name;
-  std::string state = "empty";  // empty | installed | active
+  std::string state = "empty";
 };
 
 struct LifeStore {
@@ -243,8 +191,6 @@ struct GoodsLot {
   double value = 0;
   bool risk = false;
   std::string contractId;
-  // Voyage tag from systemSerials: "#N:trade:..." so a generated chart can
-  // still bind the lot after the old place names are gone.
   std::string triggerId;
 };
 
@@ -253,13 +199,9 @@ struct SurveyRecord {
   std::string name;
   std::string src;
   double value = 0;
-  std::string state;  // filed | packaged
+  std::string state;
 };
 
-// ---------------------------------------------------------------------------
-// The chart's live view. The geometry lives in the catalogue; this is
-// where the ship is, which layer is on screen, and how each layer was left.
-// ---------------------------------------------------------------------------
 struct MapView {
   std::string layer = "system";
   std::string here = "kessler";
@@ -282,7 +224,6 @@ struct MapView {
   double rungPow = 2.1;
 };
 
-// One scale's remembered pan, zoom and selection.
 struct LayerView {
   double zoom = 1;
   double px = 0;
@@ -290,8 +231,6 @@ struct LayerView {
   std::string sel;
 };
 
-// The hull the crew are standing in. display fields are kept verbatim
-// so a save round-trips what the reference wrote.
 struct ShipDef {
   std::map<std::string, std::string> fields;
 
@@ -305,7 +244,6 @@ struct ShipDef {
   }
 };
 
-// A right-clickable readout in the side panel.
 struct InfoRow {
   std::string id;
   std::string label;
@@ -317,14 +255,12 @@ struct Cargo {
 };
 
 struct Mess {
-  double rack = 18;       // cooked food on the galley counter
-  double capacity = 24;   // the counter's ceiling
-  double rations = 21;    // dry rations in the larder - spent one per batch
+  double rack = 18;
+  double capacity = 24;
+  double rations = 21;
   double rationCapacity = 24;
 };
 
-// An open task tab. The reference keeps these as objects so a restored voyage
-// reopens exactly what the player had on screen.
 struct Tab {
   std::string key;
   std::string id;
@@ -339,9 +275,6 @@ struct Passenger {
   std::string name;
 };
 
-// ---------------------------------------------------------------------------
-// STATE itself.
-// ---------------------------------------------------------------------------
 struct GameState {
   double medkits = 2;
 
@@ -357,21 +290,12 @@ struct GameState {
   std::vector<Task> ongoing;
   std::optional<std::string> navTarget;
   std::map<std::string, bool> scanned;
-  // Map events that happen once, by key: "map-arr:<body>", "map-scan:<body>",
-  // "map-jump:<system>", "map-galaxy:<region>", "extract-1:<body>".
   std::map<std::string, bool> mapMarks;
 
-  // The engine. Decays with attention, not with time.
   double engineCondition = 100;
   double wearTick = 0;
-  // The clock reading the machine's button was last pressed at, so the green bar
-  // knows how much of the twelve has come back round.
-  double engineClickAt = -1e9;
-  // Set on the click the engineer takes the button (drive at or under
-  // engine.engineerAt), cleared once the drive is full again.
   bool engineerRun = false;
 
-  // Life support: charge in the bank, and the breathable air in the cabin.
   double filterLife = 0;
   double airHold = 20;
   bool rackWarned = false;
@@ -386,38 +310,24 @@ struct GameState {
   double fuelCells = 12;
   double repairKits = 3;
   double lotSerial = 0;
-  std::map<std::string, std::string> contracts;  // contract id -> active/ready/complete/failed
+  std::map<std::string, std::string> contracts;
   std::vector<Passenger> passengers;
   std::map<std::string, bool> upgrades;
   std::map<std::string, bool> hired;
-  // Every station the player has docked at. The station-to-station trade list
-  // is exactly this set, less the station the player is standing in.
   std::map<std::string, bool> visitedPorts;
-   // A system keeps the id the chart gave it; the voyage gives it a number the first
-  // time the ship arrives there. The id says which place this is, the number says
-  // when this voyage met it, and neither is ever handed out twice while it lives.
   std::map<std::string, int> systemSerials;
   int nextSystemSerial = 1;
   std::vector<TradeContract> trades;
-  // Runs that have been settled, or lost with their cargo. The board keeps
-  // drawing them for the rest of the epoch, so the keys have to be remembered or
-  // the same consignment could be taken twice.
   std::map<std::string, bool> spentTrades;
-  // Bitmask of rejected freelance price-markup attempts per TradeKey (bit 0 = +10%,
-  // bit 1 = +20%) so declined RNG asks stay disabled for that run.
   std::map<std::string, int> freelanceRejects;
-  // The station bar keeps its own tally: a patron spoken to once is not
-  // spoken to again, exactly as a hired hand is not hired again.
   std::map<std::string, bool> talked;
   std::string gameOver;
 
   std::vector<FeedLine> feed;
 
-  // UI-only in the reference, kept here because they are saved with the voyage.
   std::string activeTab = "home";
   std::vector<Tab> tabs;
   std::map<std::string, bool> freshTabs;
-  // Transient presentation request: never serialized, never a world action.
   std::string tabRevealKey;
   double popups = 0;
   std::map<std::string, Charge> charges;
