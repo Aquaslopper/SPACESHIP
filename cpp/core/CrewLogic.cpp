@@ -433,35 +433,6 @@ const Task* Simulation::CrewBusy(const CrewMember& crew) const {
 // Automation: the three jobs that act on their own initiative.
 // ---------------------------------------------------------------------------
 
-void Simulation::AutoMaint() {
-  // The engineer's rule. He leaves the machine's button alone until the drive
-  // is down to engine.engineerAt. From that click on he presses it once on
-  // every click until the drive is full: from 60% that is four presses of 10%.
-  // Only the hand holding the maintenance job does this. Training and air do
-  // not move the line.
-  CrewMember* worker = AssignedEngineer();
-  if (worker == nullptr || state_.engineCondition >= 100.0) {
-    state_.engineerRun = false;
-    return;
-  }
-  if (state_.engineCondition <= rules_.engine.engineerAt) { state_.engineerRun = true; }
-  if (!state_.engineerRun) { return; }
-
-  // A press he cannot make on this click waits for the next one; the run stays
-  // open until the drive is full.
-  if (maintClaim_ || projectClaim_ == "cooling" || FindOngoing("project-cooling") != nullptr) {
-    return;
-  }
-  // The commander's press already services the drive after this tick. Do not
-  // let the engineer service it a second time on that same press.
-  if (engineClicking_ || MaintRunning()) { return; }
-  if (CrewBusy(*worker) != nullptr) { return; }
-
-  // His press is this action's click, so it lifts the drive without performing
-  // a second action of its own.
-  ServiceDrive(worker->name);
-  if (state_.engineCondition >= 100.0) { state_.engineerRun = false; }
-}
 
 void Simulation::AutoFilters() {
   CrewMember* worker = AssignedFilterHand();
