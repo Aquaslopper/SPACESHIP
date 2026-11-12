@@ -485,7 +485,6 @@ class Simulation {
   void ApplySnapshotDefaults();
 
   // Automation that follows the clock
-  void AutoMaint();
   void AutoFilters();
   void AutoMess();
 
