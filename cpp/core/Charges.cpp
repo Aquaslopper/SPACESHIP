@@ -15,8 +15,8 @@ namespace ship {
 void Simulation::TickButtonCharges() {
   const std::string pressed = pressedButton_;
   pressedButton_.clear();
-  // Only a press of a control is a click. Work the ship does by itself - a hand
-  // carrying a canister, the clock turning - moves no green.
+  // Only a press of a control is a click.
+  // PLAYER CLICKS ON BUTTON ADVANCED THE TIME PLUS ONE CLICK
   if (pressed.empty()) { return; }
   for (auto& entry : state_.charges) {
     Charge& charge = entry.second;
