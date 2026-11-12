@@ -135,19 +135,16 @@ bool Simulation::ClaimCommendation(const std::string& id) {
 }
 
 void Simulation::CheckCommendations(bool silent) {
-  bool changed = false;
   for (const Commendation& award : catalog_.commendations) {
     auto earned = state_.chronicle.earned.find(award.id);
     const bool already = earned != state_.chronicle.earned.end() && earned->second;
     if (already) { continue; }
     if (ChronicleValue(award.metric) < award.goal) { continue; }
     state_.chronicle.earned[award.id] = true;
-    changed = true;
     if (!silent) {
       LogLine("Commendation earned: " + award.title + ". Claim its reward in Rewards.");
     }
   }
-  (void)changed;
 }
 
 }  // namespace ship

@@ -104,8 +104,7 @@ class Simulation {
                             bool spendsAction = true);  // the player carries a canister over
   bool StartFilterBank();               // the player throws the switch
   bool StartMaintenanceSelf();          // startMaint(e, "maint", "the commander")
-  bool StartCookingSelf(const std::string& by = std::string(),
-                        bool spendsAction = true);              // startCook(e, "cook", "the commander")
+  bool StartCookingSelf(const std::string& by = std::string());
   bool ServiceSystem(const std::string& statId);  // buildSystemScreen() service row
   bool ApplyJob(const std::string& crewId, const std::string& jobId);  // scenario setup
 
@@ -417,14 +416,13 @@ class Simulation {
   double MaintCost() const;
   bool MaintRunning() const;
   void ApplyOrderPayload(CrewMember& crew, const Task& task);
-  void QueueOrders(const std::map<std::string, OrderSheet>& sheet, double total);
+  void QueueOrders(const std::map<std::string, OrderSheet>& sheet);
 
   // Tasks.cpp
-  double AdvanceTasks(double n);
+  void AdvanceTasks(double n);
   void TickOngoing();
   void SweepAutoTasks();
   void OnTaskDone(Task& task);
-  void TickTask(const Task& task, double used);
 
   // Charges.cpp
   void TickButtonCharges();
@@ -460,20 +458,16 @@ class Simulation {
   // and the run of loading clicks belong to the session, not to the voyage.
   std::string pressedButton_;        // the control this click was spent from
   bool engineClicking_ = false;      // one press at a time, while its own click runs
-  bool engineClickAtPending_ = false;  // the press still has to arm its bar
   void ServiceDrive(const std::string& by);
   std::map<std::string, bool> stowed_;
   std::vector<std::string> stowOrder_;
   std::map<std::string, int> cargoMixGen_;
   void ClearStowLot(const std::string& lotId);
-  int stowClicks_ = 0;
-  int stowThreshold_ = 0;
   int mixClicks_ = 0;
   int mixThreshold_ = 0;
   std::string justStowedLot_;
   std::uint64_t stowRng_ = 0x9E3779B97F4A7C15ULL;
   std::uint64_t NextCargoRng();
-  int StowDraw();
   int MixDraw();
   double SurveyWorth(const std::string& type) const;
   int ProjectLot(const std::string& kind) const;

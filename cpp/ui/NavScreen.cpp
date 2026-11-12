@@ -134,10 +134,6 @@ double NavigatorDiscount(const CrewMember& navigator) {
   return 4.0 * std::max(1.0, std::min(5.0, at));
 }
 
-double ScanClicks(const Simulation& sim) {
-  return std::max(1.0, sim.ScanCost());
-}
-
 // scanReadout(): a reward, not a description. Blank until a deep scan has been
 // run AND the player has gone back to read it.
 std::vector<PanelLine> ScanReadout(const Simulation& sim, const Body& body) {

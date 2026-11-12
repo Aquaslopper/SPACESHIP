@@ -248,15 +248,14 @@ bool Simulation::CommitOrders() {
             js::NumToString(state_.shiplets) + " sh.");
   }
   if (!sheet.empty()) {
-    QueueOrders(sheet, remainingWork);
+    QueueOrders(sheet);
     LogLine("Crew assignments updated. " + js::NumToString(remainingWork) + " clicks of work.");
   }
   return true;
 }
 
 // Each hand carries their own work; no global sheet blocks the next order.
-void Simulation::QueueOrders(const std::map<std::string, OrderSheet>& sheet, double total) {
-  (void)total;
+void Simulation::QueueOrders(const std::map<std::string, OrderSheet>& sheet) {
   for (const auto& entry : sheet) {
     CrewMember* crew = FindCrew(entry.first);
     if (crew == nullptr) { continue; }
@@ -312,14 +311,15 @@ void Simulation::TrainCrew(CrewMember& crew, int steps, const std::string& where
   }
   crew.skill = (crew.skill.empty() || crew.skill == "Untrained") ? "Trained" : "Practised";
   if (job != nullptr && job->trainStep != 0) {
-    // Legacy saves stored kitchen jobAt as 1 instead of cookBelow (10).
-    double current = (crew.jobAt == 0 || crew.jobAt < job->baseAt) ? job->baseAt : crew.jobAt;
-    for (int k = 0; k < steps; ++k) {
-      current = std::min(job->trainCap, current + job->trainStep);
+    if (crew.job != "maintenance") {
+      // Legacy saves stored kitchen jobAt as 1 instead of cookBelow (10).
+      double current = (crew.jobAt == 0 || crew.jobAt < job->baseAt) ? job->baseAt : crew.jobAt;
+      for (int k = 0; k < steps; ++k) {
+        current = std::min(job->trainCap, current + job->trainStep);
+      }
+      crew.jobAt = current;
     }
-    crew.jobAt = current;
     if (crew.job == "maintenance") {
-      // The engineer's line is the ship's rule (engine.engineerAt), not his own.
       LogLine(crew.name + " trained " + where + ".");
     } else {
       LogLine(crew.name + " trained " + where + " - now acts at " +

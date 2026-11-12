@@ -216,8 +216,7 @@ double Simulation::MaintCost() const {
 }
 
 bool Simulation::MaintRunning() const {
-  return FindOngoing("maint") != nullptr || FindOngoing("maint-eng") != nullptr ||
-         FindOngoing("project-cooling") != nullptr;
+  return FindOngoing("maint") != nullptr || FindOngoing("project-cooling") != nullptr;
 }
 
 CrewMember* Simulation::AssignedEngineer() {
@@ -547,7 +546,6 @@ void Simulation::AutoMess() {
 // ---------------------------------------------------------------------------
 
 void Simulation::CheckLoss() {
-  bool lost = false;
   for (std::size_t index = crew_.size(); index-- > 0;) {
     CrewMember& crew = crew_[index];
     if (crew.health > 0) { continue; }
@@ -572,7 +570,6 @@ void Simulation::CheckLoss() {
       }
     }
     crew_.erase(crew_.begin() + static_cast<std::ptrdiff_t>(index));
-    lost = true;
   }
 
   if (!state_.gameOver.empty()) { return; }
@@ -580,7 +577,6 @@ void Simulation::CheckLoss() {
     state_.gameOver = StatValue("hull") <= 0 ? "The hull has failed." : "The crew have been lost.";
     LogLine("Ship lost. " + state_.gameOver);
   }
-  (void)lost;
 }
 
 }  // namespace ship

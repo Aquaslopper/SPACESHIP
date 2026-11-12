@@ -20,7 +20,6 @@ struct EngineRules {
   double wearEvery = 4;   // actions per step of wear
   double wearStep = 1;    // percent lost per step
   double warnBelow = 50;  // sidebar bar appears here
-  double engineClickEvery = 12;  // clicks before the machine's button is live again
   // The engineer's rule: with the drive at or under this he takes the button
   // and presses it on every click until the drive is full.
   double engineerAt = 60;
@@ -30,7 +29,6 @@ struct AirStage {
   std::string word;
   std::string tone;
   double slow = 1;     // multiplier on work done by the crew
-  double jobDrop = 0;  // how far a job threshold slips
   double harm = 0;     // one health point every N actions, 0 = none
 };
 

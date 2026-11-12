@@ -19,7 +19,6 @@ namespace ship {
 // player click and uses the same maintenance amount without advancing time again.
 void Simulation::ServiceDrive(const std::string& by) {
   const std::string who = by.empty() ? "The commander" : by;
-  state_.engineClickAt = ActionCount();
   LogLine(who + " pressed the maintenance button");
   if (state_.gameOver.empty()) {
     state_.engineCondition = std::min(100.0, state_.engineCondition + 10.0);
@@ -37,11 +36,9 @@ bool Simulation::EngineClick(const std::string& by) {
 
   const std::string who = by.empty() ? "The commander" : by;
   engineClicking_ = true;
-  engineClickAtPending_ = true;
   PerformAction(who + " pressed the maintenance button");
   engineClicking_ = false;
-  if (engineClickAtPending_) { ServiceDrive(who); }
-  engineClickAtPending_ = false;
+  ServiceDrive(who);
   return true;
 }
 
@@ -106,7 +103,7 @@ const struct AirStage& Simulation::AirSpec() const {
   const std::vector<AirStage>& stages = rules_.air.stages;
   const int index = AirStageIndex();
   if (stages.empty()) {
-    static const AirStage fallback{"OPTIMAL", "#7f9161", 1.0, 0.0, 0.0};
+    static const AirStage fallback{"OPTIMAL", "#7f9161", 1.0, 0.0};
     return fallback;
   }
   const std::size_t clamped = static_cast<std::size_t>(

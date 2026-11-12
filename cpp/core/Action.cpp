@@ -436,7 +436,7 @@ bool Simulation::StartMaintenanceSelf() {
   return true;
 }
 
-bool Simulation::StartCookingSelf(const std::string& by, bool spendsAction) {
+bool Simulation::StartCookingSelf(const std::string& by) {
   // Cooking a batch spends one dry ration up front; up to foodPerRation cooked
   // food lands together when the fixed foodPerRation-action timer completes.
   // Refuse a full counter or an empty larder.
@@ -457,14 +457,10 @@ bool Simulation::StartCookingSelf(const std::string& by, bool spendsAction) {
   const double cost = rules_.mess.foodPerRation;
 
   const std::string who = by.empty() ? "the commander" : by;
-  if (spendsAction) {
-    cookClaim_ = true;
-    PerformAction(by.empty() ? "Cooking begun by the commander" : "Cooking begun by " + by);
-    cookClaim_ = false;
-    if (!state_.gameOver.empty()) { return false; }
-  } else {
-    LogLine("Cooking begun by " + who);
-  }
+  cookClaim_ = true;
+  PerformAction(by.empty() ? "Cooking begun by the commander" : "Cooking begun by " + by);
+  cookClaim_ = false;
+  if (!state_.gameOver.empty()) { return false; }
 
   Task* task = AddOngoing("cook", "Cooking - " + who, cost, "cook", "mess");
   if (task != nullptr) {

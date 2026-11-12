@@ -195,7 +195,7 @@ bool CommitActionButton(Simulation& sim, const std::string& key,
   auto& charges = sim.MutableState().charges;
   if (charges.find(key) == charges.end()) {
     const double volume = TierVolume(sim, tier);
-    charges[key] = Charge{tier, volume, volume};
+    charges[key] = Charge{volume, volume};
   }
   if (ChargeLeft(sim, key, tier) <= 0.0) { return false; }  // out of clicks
 

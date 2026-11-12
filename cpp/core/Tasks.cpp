@@ -96,11 +96,6 @@ void Simulation::SweepAutoTasks() {
   state_.ongoing.swap(keep);
 }
 
-void Simulation::TickTask(const Task&, double) {
-  // Nothing lands mid-batch. A cook's five clicks are the bar filling; the
-  // food appears on completion, in OnTaskDone.
-}
-
 void Simulation::OnTaskDone(Task& task) {
   if (task.type == "maint") {
     state_.engineCondition = 100;
@@ -175,8 +170,7 @@ void Simulation::OnTaskDone(Task& task) {
 
 void Simulation::TickOngoing() { AdvanceTasks(1); }
 
-double Simulation::AdvanceTasks(double n) {
-  double done = 0;
+void Simulation::AdvanceTasks(double n) {
   double quiet = 0;
 
   // Walk a SNAPSHOT: a hook is allowed to queue work, and a task created half
@@ -194,10 +188,6 @@ double Simulation::AdvanceTasks(double n) {
     if (needsDrive && (state_.engineCondition <= 0 || StatValue("energy") <= 0)) { continue; }
     if (needsPower && StatValue("energy") <= 0) { continue; }
 
-    const double used = (n < task->left) ? n : task->left;
-    const Task view = *task;  // hooks read the task as it stood this tick
-    TickTask(view, used);
-
     task->left -= n;
     if (task->left <= 0) {
       task->left = 0;
@@ -207,7 +197,6 @@ double Simulation::AdvanceTasks(double n) {
       // task->type afterwards was reading freed storage.
       const Task finished = *task;
       OnTaskDone(*FindOngoing(original.id));
-      done += 1;
       if (!IsQuiet(finished.type)) { quiet += 1; }
     }
   }
@@ -217,7 +206,6 @@ double Simulation::AdvanceTasks(double n) {
   // Deliberately vague: the main screen never says what finished, the player
   // goes and looks.
   for (double k = 0; k < quiet; k += 1) { LogLine("A ship process has completed."); }
-  return done;
 }
 
 void Simulation::ApplyOrderPayload(CrewMember& crew, const Task& task) {

@@ -112,7 +112,6 @@ struct Task {
   std::string other;  // second person (shared meals)
 
   double slot = -1;   // o2slot: which of the three slots
-  double rate = 0;    // preserved task-rate field for older saved tasks
   double vol = 0;     // salvage: cubic metres held
   bool rest = false;  // crewJob payload: the order sheet asks for a rest
   bool hasOrders = false;
@@ -121,8 +120,6 @@ struct Task {
   bool sheetHasJob = false;
   std::string sheetJob;
   std::map<std::string, bool> sheetFlags;
-  // The whole sheet, on the crewOrder bar: one task per person, one bar for all.
-  std::string sheetOwner;
 };
 
 // ---------------------------------------------------------------------------
@@ -209,7 +206,6 @@ struct Options {
 // capacity. Pressing a control spends one of its own steps and returns one step
 // to every other control, so the total green in the room is the click time left.
 struct Charge {
-  std::string tier;
   double left = 0;
   double volume = 0;
 };
@@ -364,9 +360,6 @@ struct GameState {
   // The engine. Decays with attention, not with time.
   double engineCondition = 100;
   double wearTick = 0;
-  // The clock reading the machine's button was last pressed at, so the green bar
-  // knows how much of the twelve has come back round.
-  double engineClickAt = -1e9;
   // Set on the click the engineer takes the button (drive at or under
   // engine.engineerAt), cleared once the drive is full again.
   bool engineerRun = false;

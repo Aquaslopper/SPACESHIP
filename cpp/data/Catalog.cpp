@@ -586,8 +586,6 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     catalog.rules.engine.wearEvery = Number(engine, "wearEvery", "engine", 4);
     catalog.rules.engine.wearStep = Number(engine, "wearStep", "engine", 1);
     catalog.rules.engine.warnBelow = Number(engine, "warnBelow", "engine", 50);
-    catalog.rules.engine.engineClickEvery =
-        Number(engine, "engineClickEvery", "engine", 12);
     catalog.rules.engine.engineerAt = Number(engine, "engineerAt", "engine", 60);
 
     const Json& life = Field(survival, "life", "survival.json");
@@ -603,7 +601,6 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
       parsed.word = Text(stage, "word", "airStages");
       parsed.tone = Text(stage, "tone", "airStages");
       parsed.slow = Number(stage, "slow", "airStages", 1);
-      parsed.jobDrop = Number(stage, "jobDrop", "airStages");
       parsed.harm = Number(stage, "harm", "airStages");
       catalog.rules.air.stages.push_back(parsed);
     }

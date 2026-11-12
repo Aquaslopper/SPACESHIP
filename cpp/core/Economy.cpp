@@ -259,7 +259,6 @@ bool Simulation::PackageSurvey(const std::string& recordId) {
 // ---------------------------------------------------------------------------
 
 void Simulation::ContractProgress(const std::string& goal, const std::string& target) {
-  bool changed = false;
   for (const Contract& contract : catalog_.contracts) {
     auto state = state_.contracts.find(contract.id);
     if (state == state_.contracts.end() || state->second != "active") { continue; }
@@ -288,10 +287,8 @@ void Simulation::ContractProgress(const std::string& goal, const std::string& ta
     }
 
     state_.contracts[contract.id] = "ready";
-    changed = true;
     LogLine("Contract ready to collect: " + contract.title + ".");
   }
-  (void)changed;
 }
 
 bool Simulation::AcceptContract(const std::string& contractId) {
@@ -957,10 +954,6 @@ std::uint64_t Simulation::NextCargoRng() {
   stowRng_ ^= stowRng_ << 25;
   stowRng_ ^= stowRng_ >> 27;
   return stowRng_ * 2685821657736338717ULL;
-}
-
-int Simulation::StowDraw() {
-  return 6 + static_cast<int>((NextCargoRng() >> 11) % 13ULL);
 }
 
 int Simulation::MixDraw() {
