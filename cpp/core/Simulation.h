@@ -485,7 +485,7 @@ class Simulation {
   void ApplySnapshotDefaults();
 
   // Automation that follows the clock
-  void AutoFilters();
+
   void AutoMess();
 
   Catalog catalog_;
