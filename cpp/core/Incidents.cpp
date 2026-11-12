@@ -6,6 +6,7 @@
 //  hull, the shields, the reserve or the crew's morale. Resolving one is worth
 //  a commendation tick; leaving one alone costs the ship.
 // ============================================================================
+#include "core/JsNumber.h"
 #include "core/Simulation.h"
 
 #include <algorithm>
@@ -21,9 +22,27 @@ const IncidentType* Simulation::IncidentSpec(const Incident& incident) const {
 }
 
 void Simulation::IncidentEffect(const IncidentType::Stage& step) {
-  if (step.hull.has_value()) { ClampStat("hull", *step.hull); }
+  // Report damage reaches further on a weakened ship: a hit that leaves the
+  // hull at or under reports.hullLine takes the same amount of fuel, and a hit
+  // that leaves the energy at or under reports.energyLine takes the same
+  // amount of shield.
+  if (step.hull.has_value()) {
+    ClampStat("hull", *step.hull);
+    if (*step.hull < 0 && StatValue("hull") <= rules_.reports.hullLine) {
+      ClampStat("fuel", *step.hull);
+      LogLine("Hull at " + js::NumToString(StatValue("hull")) +
+              "%: the same damage also hit the fuel.");
+    }
+  }
   if (step.shield.has_value()) { ClampStat("shield", *step.shield); }
-  if (step.energy.has_value()) { ClampStat("energy", *step.energy); }
+  if (step.energy.has_value()) {
+    ClampStat("energy", *step.energy);
+    if (*step.energy < 0 && StatValue("energy") <= rules_.reports.energyLine) {
+      ClampStat("shield", *step.energy);
+      LogLine("Energy at " + js::NumToString(StatValue("energy")) +
+              "%: the same loss also hit the shields.");
+    }
+  }
   if (step.morale.has_value()) {
     for (CrewMember& crew : crew_) {
       crew.morale = std::max(0.0, crew.morale + *step.morale);
@@ -40,7 +59,6 @@ void Simulation::RemoveIncident(const std::string& id) {
   for (std::size_t i = events_.size(); i-- > 0;) {
     if (events_[i].id == id) { events_.erase(events_.begin() + static_cast<std::ptrdiff_t>(i)); }
   }
-  ClearOngoing("incident-" + id);
   if (hadIncident) {
     state_.chronicle.incidents += 1;
     CheckCommendations();
@@ -53,27 +71,6 @@ const IncidentType::Stage* Simulation::IncidentStage(const Incident& incident) c
   const std::size_t index = static_cast<std::size_t>(
       std::max(0, std::min(incident.stage, static_cast<int>(spec->stages.size()) - 1)));
   return &spec->stages[index];
-}
-
-// incidentHand(): the best available hand for the report. Trade, then morale.
-const CrewMember* Simulation::IncidentHand(const Incident& incident) const {
-  const IncidentType* spec = IncidentSpec(incident);
-  if (spec == nullptr) { return nullptr; }
-  const CrewMember* best = nullptr;
-  double bestScore = -1e18;
-  for (const CrewMember& crew : crew_) {
-    if (CrewBusy(crew) != nullptr) { continue; }
-    if (state_.pendingOrders.count(crew.id) != 0) { continue; }
-    double score = crew.morale;
-    if ((spec->kind == "Mechanical" || spec->kind == "Electrical") &&
-        crew.job == "maintenance") {
-      score += 100;
-    }
-    if (spec->kind == "Environmental" && crew.job == "filters") { score += 100; }
-    if (spec->kind == "Crew" && crew.id != incident.a && crew.id != incident.b) { score += 100; }
-    if (score > bestScore) { best = &crew; bestScore = score; }
-  }
-  return best;
 }
 
 bool Simulation::RemedyIncident(const std::string& incidentId) {
@@ -93,40 +90,6 @@ bool Simulation::RemedyIncident(const std::string& incidentId) {
   // commitChange() removes the report before the action advances the world.
   RemoveIncident(id);
   PerformAction(remedy);
-  return true;
-}
-
-bool Simulation::AssignIncidentCrew(const std::string& incidentId) {
-  const Incident* found = nullptr;
-  for (const Incident& incident : events_) {
-    if (incident.id == incidentId) { found = &incident; }
-  }
-  if (found == nullptr || !state_.gameOver.empty()) { return false; }
-  if (FindOngoing("incident-" + incidentId) != nullptr) { return false; }
-  const IncidentType* spec = IncidentSpec(*found);
-  const CrewMember* worker = IncidentHand(*found);
-  if (spec == nullptr || worker == nullptr) { return false; }
-
-  const std::string workerId = worker->id;
-  const std::string workerName = worker->name;
-  const std::string title = spec->title;
-  crewClaims_[workerId] = true;
-  PerformAction(workerName + " assigned to " + title);
-  crewClaims_.erase(workerId);
-  if (!state_.gameOver.empty()) { return true; }
-
-  bool stillHere = false;
-  for (const Incident& incident : events_) {
-    if (incident.id == incidentId) { stillHere = true; }
-  }
-  if (!stillHere || FindCrew(workerId) == nullptr) { return true; }
-
-  Task* task = AddOngoing("incident-" + incidentId, "Resolving " + title, 6, "incident",
-                          incidentId);
-  if (task != nullptr) {
-    task->by = workerName;
-    task->who = workerId;
-  }
   return true;
 }
 

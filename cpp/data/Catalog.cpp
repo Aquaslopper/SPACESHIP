@@ -628,6 +628,11 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     catalog.rules.pay.hit = Number(pay, "hit", "pay", 12);
     catalog.rules.docAway = Number(crew, "docAway", "crew.json", 7);
     catalog.rules.scanCost = Number(survival, "scanCost", "survival.json", 5);
+    if (auto reports = survival.find("reports");
+        reports != survival.end() && reports->is_object()) {
+      catalog.rules.reports.hullLine = Number(*reports, "hullLine", "reports", 60);
+      catalog.rules.reports.energyLine = Number(*reports, "energyLine", "reports", 60);
+    }
   }
 
   // ---- totals ------------------------------------------------------------

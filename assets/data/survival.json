@@ -138,6 +138,10 @@
   "messEvery": 25,
   "messStarve": 90,
   "messStarveEvery": 8,
+  "reports": {
+    "energyLine": 60,
+    "hullLine": 60
+  },
   "resources": [
     {
       "from": "purse",

@@ -839,6 +839,9 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
     if (!IsObject(task)) { return fail("a task is unreadable"); }
     const std::string type = GetString(task, "type");
     const std::string id = GetString(task, "id");
+    // Crew work on a report was removed. A save that still holds such a task
+    // loads without it; the report itself stays open.
+    if (type == "incident") { continue; }
     if (!typeKnown(type)) { return fail("a task of a type that does not exist"); }
     if (id.empty()) { return fail("a task with no id"); }
     if (std::find(seen.begin(), seen.end(), id) != seen.end()) { return fail("two tasks share an id"); }
@@ -1249,7 +1252,10 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     if (auto it = s.find("mapMarks"); it != s.end()) { readBoolMap(*it, &state_.mapMarks); }
 
     state_.ongoing.clear();
-    for (const Json& task : s.at("ongoing")) { state_.ongoing.push_back(ReadTask(task)); }
+    for (const Json& task : s.at("ongoing")) {
+      if (GetString(task, "type") == "incident") { continue; }  // removed; see the check above
+      state_.ongoing.push_back(ReadTask(task));
+    }
 
     ship_.fields.clear();
     for (auto it = d.at("ship").begin(); it != d.at("ship").end(); ++it) {

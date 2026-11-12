@@ -293,8 +293,6 @@ int main(int argc, char** argv) {
       simulation.ClaimCommendation(parts[1]);
     } else if (command == "remedy" && parts.size() >= 2) {
       simulation.RemedyIncident(parts[1]);
-    } else if (command == "assign" && parts.size() >= 2) {
-      simulation.AssignIncidentCrew(parts[1]);
     } else if (command == "medical" && parts.size() >= 2) {
       simulation.StartMedical(parts[1]);
     } else if (command == "social" && parts.size() >= 3) {

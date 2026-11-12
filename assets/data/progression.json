@@ -332,8 +332,8 @@
           "ticks": 9
         },
         {
-          "shield": -12,
-          "text": "The surge is stressing the shield generator.",
+          "energy": -12,
+          "text": "The surge is pulling power out of the reserve.",
           "ticks": 9
         },
         {

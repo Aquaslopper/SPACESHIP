@@ -38,8 +38,7 @@ bool IsQuiet(const std::string& type) {
   // "A ship process has completed." line.
   return type == "crewOrder" || type == "crewJob" || type == "crewDoc" ||
          type == "o2slot" || type == "maint" || type == "cook" ||
-         type == "incident" || type == "salvage" || type == "surveyPackage" ||
-         type == "shipProject";
+         type == "salvage" || type == "surveyPackage" || type == "shipProject";
 }
 
 bool IsAutoClear(const std::string& type) {
@@ -47,8 +46,7 @@ bool IsAutoClear(const std::string& type) {
   // Unknown types must not silently lose a finished readout.
   return type == "crewOrder" || type == "crewJob" || type == "crewDoc" ||
          type == "o2slot" || type == "maint" || type == "cook" ||
-         type == "incident" || type == "salvage" || type == "surveyPackage" ||
-         type == "shipProject";
+         type == "salvage" || type == "surveyPackage" || type == "shipProject";
 }
 
 }  // namespace
@@ -143,18 +141,6 @@ void Simulation::OnTaskDone(Task& task) {
   }
   if (task.type == "crewOrder") {
     LogLine("The order sheet is discharged.");
-    return;
-  }
-  if (task.type == "incident") {
-    if (FindOngoing(task.id) != nullptr) { /* still live */ }
-    bool exists = false;
-    for (const Incident& incident : events_) {
-      if (incident.id == task.target) { exists = true; }
-    }
-    if (exists) {
-      RemoveIncident(task.target);
-      LogLine("Crew resolved the report.");
-    }
     return;
   }
   if (task.type == "salvage") {

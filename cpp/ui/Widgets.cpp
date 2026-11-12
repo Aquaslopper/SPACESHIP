@@ -363,9 +363,9 @@ bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
                               if (taskId == "scan") { return sim.StartScan(); }
                               if (taskId == "extract") { return sim.StartExtraction(); }
                               if (taskId == "crew-assign") { return sim.CommitOrders(); }
-                              // Phase 7: projects, the medical bay, the shared meal
-                              // and the incident work all live behind this one
-                              // button, exactly as they do in the reference.
+                              // Phase 7: projects, the medical bay and the shared
+                              // meal all live behind this one button, exactly as
+                              // they do in the reference.
                               if (taskId.compare(0, 8, "project-") == 0) {
                                 const std::string id = taskId.substr(8);
                                 if (id == "social") { return false; }  // needs a pair
@@ -382,9 +382,6 @@ bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
                               }
                               if (taskId.compare(0, 4, "doc-") == 0) {
                                 return sim.StartMedical(taskId.substr(4));
-                              }
-                              if (taskId.compare(0, 9, "incident-") == 0) {
-                                return sim.AssignIncidentCrew(taskId.substr(9));
                               }
                               return false;
                             });
@@ -1111,7 +1108,6 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       }
       screen.panelRows.push_back(rows);
       screen.panelRowIds.push_back(ids);
-      screen.progress = event.buttons;
       return screen;
     }
     case ScreenKind::CrewRecord: {

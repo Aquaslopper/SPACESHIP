@@ -20,7 +20,6 @@ struct EventScreenModel {
   TaskHead head;
   NavPanel report;
   std::vector<ActionRowView> rows;
-  std::vector<ProgressButton> buttons;
   bool known = false;
 };
 

@@ -384,9 +384,7 @@ class Simulation {
 
   // ---- Phase 7: incidents -------------------------------------------------
   bool RemedyIncident(const std::string& incidentId);       // quick fix, maybe a kit
-  bool AssignIncidentCrew(const std::string& incidentId);   // six actions of work
   bool SpawnMapIncident(const std::string& typeId, const std::string& contextNote = std::string());
-  const CrewMember* IncidentHand(const Incident& incident) const;
   const IncidentType::Stage* IncidentStage(const Incident& incident) const;
 
   // ---- read-only job lookups for the interface --------------------------

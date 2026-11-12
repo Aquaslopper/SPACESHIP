@@ -153,13 +153,6 @@
       "hasOnAcknowledge": false,
       "hasOnDone": true,
       "quiet": true,
-      "type": "incident"
-    },
-    {
-      "autoClear": true,
-      "hasOnAcknowledge": false,
-      "hasOnDone": true,
-      "quiet": true,
       "type": "salvage"
     },
     {
@@ -253,7 +246,7 @@
     {
       "group": "Survival",
       "id": "hazards",
-      "text": "Reports appear in Events as clicks pass and can escalate if ignored. Open a report to resolve it with supplies or assign an available crew member for six clicks of work. Hull failure or the loss of all crew ends the voyage. Load a saved slot or start a new voyage after a loss.",
+      "text": "Reports appear in Events as clicks pass. Left open, a report gets worse and damages the ship: a mechanical report the hull, an electrical report the energy. With the hull at 60% or less the same damage also hits the fuel; with the energy at 60% or less the same loss also hits the shields. Resolve a report from its page for one click. Most need a repair kit; without one the report runs its course. Hull failure or the loss of all crew ends the voyage. Load a saved slot or start a new voyage after a loss.",
       "title": "Incidents and loss"
     },
     {
@@ -303,7 +296,7 @@
     {
       "group": "Ship systems",
       "id": "interlocks",
-      "text": "Cargo recovery reserves hold space while it runs. Canister and dry-ration production reserve their output space. Hydroponics cannot overlap Galley cooking, and Thermal Control cannot overlap engine maintenance. Crew cannot be assigned to simultaneous medical, social, incident or order work. Check the room's status when a click is unavailable.",
+      "text": "Cargo recovery reserves hold space while it runs. Canister and dry-ration production reserve their output space. Hydroponics cannot overlap Galley cooking, and Thermal Control cannot overlap engine maintenance. Crew cannot be assigned to simultaneous medical, social or order work. Check the room's status when a click is unavailable.",
       "title": "Reservations and space"
     },
     {

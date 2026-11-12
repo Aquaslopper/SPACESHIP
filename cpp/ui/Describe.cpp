@@ -352,9 +352,7 @@ Description DescribeTarget(const Simulation& sim, const std::string& kind,
         {"Detail", "Not yet established"},
     };
     t.acts = {
-        {"Examine the report", "1 click"},
-        {"Send a crew member", "varies"},
-        {"Log and ignore", "1 click"},
+        {"Resolve it in the report", "1 click"},
     };
     return t;
   }
