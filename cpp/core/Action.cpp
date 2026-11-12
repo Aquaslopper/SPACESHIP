@@ -284,8 +284,8 @@ void Simulation::TickWorld() {
   TickPayroll();
   TickOngoing();
   AutoMaint();
-  // AutoFilters();
-  // AutoMess();
+  AutoFilters();
+  AutoMess();
   TickIncidents();
   CheckLoss();
 }
