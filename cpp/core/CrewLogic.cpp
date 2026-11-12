@@ -433,67 +433,6 @@ const Task* Simulation::CrewBusy(const CrewMember& crew) const {
 // Automation: the three jobs that act on their own initiative.
 // ---------------------------------------------------------------------------
 
-void Simulation::AutoMaint() {
-  // The engineer's rule. He leaves the machine's button alone until the drive
-  // is down to engine.engineerAt. From that click on he presses it once on
-  // every click until the drive is full: from 60% that is four presses of 10%.
-  // Only the hand holding the maintenance job does this. Training and air do
-  // not move the line.
-  CrewMember* worker = AssignedEngineer();
-  if (worker == nullptr || state_.engineCondition >= 100.0) {
-    state_.engineerRun = false;
-    return;
-  }
-  if (state_.engineCondition <= rules_.engine.engineerAt) { state_.engineerRun = true; }
-  if (!state_.engineerRun) { return; }
-
-  // A press he cannot make on this click waits for the next one; the run stays
-  // open until the drive is full.
-  if (maintClaim_ || projectClaim_ == "cooling" || FindOngoing("project-cooling") != nullptr) {
-    return;
-  }
-  // The commander's press already services the drive after this tick. Do not
-  // let the engineer service it a second time on that same press.
-  if (engineClicking_ || MaintRunning()) { return; }
-  if (CrewBusy(*worker) != nullptr) { return; }
-
-  // His press is this action's click, so it lifts the drive without performing
-  // a second action of its own.
-  ServiceDrive(worker->name);
-  if (state_.engineCondition >= 100.0) { state_.engineerRun = false; }
-}
-
-
-void Simulation::AutoMess() {
-  CrewMember* worker = AssignedCook();
-  if (cookClaim_ || projectClaim_ == "food" || FindOngoing("project-food") != nullptr) { return; }
-  if (worker == nullptr || FindOngoing("cook") != nullptr) { return; }
-  if (CrewBusy(*worker) != nullptr) { return; }
-  // She starts once the counter is at or below CookThreshold(*worker) and does
-  // not stop until it is full: cooking 1 ration, then another ration, until
-  // the rack is stocked.
-  if (!cookRestock_ && mess_.rack > CookThreshold(*worker)) { return; }
-  if (mess_.rack >= mess_.capacity) {
-    cookRestock_ = false;
-    return;
-  }
-  if (mess_.rations < 1.0) {
-    cookRestock_ = false;
-    return;
-  }
-
-  // One dry ration yields up to foodPerRation cooked food when the five-click
-  // batch finishes. A batch that would overshoot the ceiling is still cooked;
-  // the landing is clamped, so the counter ends full rather than past its lid.
-  const double cost = rules_.mess.foodPerRation;
-  Task* task = AddOngoing("cook", "Cooking - " + worker->name, cost, "cook", "mess");
-  if (task != nullptr) {
-    task->by = worker->name;
-    mess_.rations -= 1.0;  // the ration is spent when the batch starts
-  }
-  cookRestock_ = true;
-  LogLine(worker->name + " started cooking without being asked.");
-}
 
 // ---------------------------------------------------------------------------
 // Loss
