@@ -223,7 +223,7 @@
     {
       "group": "Getting started",
       "id": "actions",
-      "text": "One committed click advances the ship clock once. Starting a process costs one click, then its remaining work progresses on later clicks. Completed crossings and scans must be acknowledged. Use Stand watch in Navigation to spend one click advancing work and survival clocks, even with a full hold. The filter bank grants ten units of work progress without advancing the world clock. Opening tabs, reading and selecting map targets never cost a click.",
+      "text": "One committed click advances the ship clock once. Starting a process costs one click, then its remaining work progresses on later clicks. Completed crossings and scans must be acknowledged; acknowledging a scan costs one click. Use Stand watch in Navigation to spend one click advancing work and survival clocks, even with a full hold. The filter bank grants ten units of work progress without advancing the world clock. Opening tabs, reading and selecting map targets never cost a click.",
       "title": "Actions and ongoing work"
     },
     {
@@ -269,7 +269,7 @@
       "id": "scans",
       "link": "science",
       "linkLabel": "Open Science Room",
-      "text": "Deep-scan a local destination, let the work finish, then acknowledge the readout. Unique scanned bodies count toward exploration commendations. Surveys go to the Science Room, where packaging adds value before sale.",
+      "text": "Deep-scan a local destination: starting the scan costs one click, the work finishes on a later click, and taking the readout costs one click. Unique scanned bodies count toward exploration commendations. Surveys go to the Science Room, where packaging adds value before sale.",
       "title": "Scans and surveys"
     },
     {

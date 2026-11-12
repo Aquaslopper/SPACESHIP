@@ -320,8 +320,9 @@ bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
   const Task* task = taskId == "crew-assign" ? nullptr : sim.FindOngoing(taskId);
   if (task != nullptr && task->state == "running") { return false; }  // inert
   if (task != nullptr && task->state == "done") {
-    // Reading the result is a click of the hand, not of the clock: it spends no
-    // charge of its own, but every other button feels the click.
+    // Taking a result spends no charge of this control. A finished scan is
+    // still a click on the clock: Simulation::Acknowledge performs one action
+    // for it, and that action gives every charged control one click back.
     return PressWithoutCharge(sim, [&sim, &taskId]() { return sim.Acknowledge(taskId); });
   }
 

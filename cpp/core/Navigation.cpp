@@ -565,6 +565,13 @@ bool Simulation::Acknowledge(const std::string& taskId) {
 
   ClearOngoing(taskId);
   LogLine("Process acknowledged and cleared.");
+  // The scan button is two clicks on the clock: one starts the scan, one takes
+  // the finished readout.
+  if (type == "scan") {
+    const Body* scanned = FindBodyById(target);
+    PerformAction(scanned == nullptr ? std::string("Scan readout taken")
+                                     : "Scan readout taken - " + scanned->name);
+  }
   return handled;
 }
 
