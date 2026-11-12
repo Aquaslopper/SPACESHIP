@@ -1,6 +1,3 @@
-// ============================================================================
-//  NavScreen.cpp — the chart, its raster, its panels and its two commitments.
-// ============================================================================
 #include "ui/NavScreen.h"
 
 #include "core/JsNumber.h"
@@ -24,7 +21,6 @@ std::string Num(double value) { return js::NumToString(value); }
 
 std::string OneDecimal(double value) { return js::ToFixed(value, 1); }
 
-// seeded(seed) from the reference: the same seed draws the same sky forever.
 struct Seeded {
   double s = 0;
   explicit Seeded(double seed) : s(seed * 9301 + 49297) {}
@@ -36,34 +32,17 @@ struct Seeded {
 
 std::string BodyLayer(const Simulation& sim) { return sim.Map().layer; }
 
-// The layer's remembered pan. NewVoyage seeds all three, but a caller that
-// built a bare MapView still gets a sane zero.
 const LayerView& ViewOf(const Simulation& sim) {
   static const LayerView kZero{};
   auto it = sim.Views().find(sim.Map().layer);
   return it == sim.Views().end() ? kZero : it->second;
 }
 
-// curBodies(), as pointers so the panels can ask each body its own questions.
-//
-// Every body of the scale is here - nothing is held back by a region or a
-// sensor filter. The sector chart used to show only the systems of the region
-// being read, which is seven of forty-eight; with the galaxy generated, that
-// filter would hide a hundred and fifty stars behind a button. What a body can
-// be *used for* is a separate question, and InRange() still answers it.
-//
-// The system chart is the one place a filter is not a filter: every system's
-// local bodies live in one coordinate space, so "this system's bodies" is the
-// only set that is spatially meaningful at that scale.
 std::vector<const Body*> LayerBodies(const Simulation& sim) {
   std::vector<const Body*> out;
   const Catalog& catalog = sim.World();
   const std::string layer = BodyLayer(sim);
   if (layer == "galaxy") {
-    // The regions, and then every star inside them. The galaxy scale used to
-    // carry seven named blobs; the systems have positions of their own now
-    // (Catalog::galaxyPositions), so the third layer shows the same two hundred
-    // stars the other two layers are drawing.
     for (const Body& body : catalog.regions) { out.push_back(&body); }
     for (const Body& body : catalog.systems) {
       if (catalog.galaxyPositions.count(body.id) != 0) { out.push_back(&body); }
@@ -109,8 +88,6 @@ std::string BodyClasses(const Body& body, bool selected) {
   return cls;
 }
 
-// travelMarker(): where the green ring sits, part way along the course in
-// proportion to the work the player has actually paid for.
 NavPoint TravelMarker(const Simulation& sim) {
   const Body* here = sim.FindBodyById(sim.Map().here);
   NavPoint at{here == nullptr ? 0.0 : here->x, here == nullptr ? 0.0 : here->y};
@@ -134,12 +111,6 @@ double NavigatorDiscount(const CrewMember& navigator) {
   return 4.0 * std::max(1.0, std::min(5.0, at));
 }
 
-double ScanClicks(const Simulation& sim) {
-  return std::max(1.0, sim.ScanCost());
-}
-
-// scanReadout(): a reward, not a description. Blank until a deep scan has been
-// run AND the player has gone back to read it.
 std::vector<PanelLine> ScanReadout(const Simulation& sim, const Body& body) {
   std::vector<PanelLine> lines;
   if (!sim.CanScan(body)) {
@@ -394,11 +365,7 @@ NavChartView BuildNavChart(const Simulation& sim) {
 
   const std::string target = sim.State().navTarget.value_or(std::string());
 
-  // --- bodies -------------------------------------------------------------
   const std::vector<const Body*> bodies = LayerBodies(sim);
-  // A system has two positions: its own on the sector board, and its place in
-  // its region's cluster on the galaxy board. Everything that projects a body
-  // asks this, so the two wide scales cannot disagree about where a star is.
   const auto layerPoint = [&sim, &chart](const Body& body) -> std::pair<double, double> {
     if (chart.layer == "galaxy" && body.type == "system") {
       const auto it = sim.World().galaxyPositions.find(body.id);
@@ -420,8 +387,6 @@ NavChartView BuildNavChart(const Simulation& sim) {
     bodyView.at = NavProjectPanned(map, view, at.first, at.second);
     const double mapGrow = MapSizeScale(sim.World().chartSettings.mapSize);
     bodyView.size = BodySize(*body) * mapGrow;
-    // A star is a star on its own chart; on the galaxy scale it is one point of
-    // light in a cluster of thirty, so it is drawn at the size that reads.
     if (chart.layer == "galaxy" && body->type == "system") { bodyView.size = 15.0 * mapGrow; }
     bodyView.selected = !target.empty() && target == body->id;
     bodyView.classes = BodyClasses(*body, bodyView.selected);
@@ -451,8 +416,6 @@ NavChartView BuildNavChart(const Simulation& sim) {
   };
 
   if (chart.layer == "system") {
-    // Routes are derived: they radiate from wherever the ship actually is, so
-    // they stay honest after it moves.
     const Body* here = sim.FindBodyById(map.here);
     for (const Body* body : bodies) {
       if (body->id == map.here || here == nullptr) { continue; }
@@ -460,13 +423,10 @@ NavChartView BuildNavChart(const Simulation& sim) {
                           target == body->id, false));
     }
 
-    // The trade pathfinder: every trade taken with a destination in this system
-    // gets a green trail from wherever the ship is, so the board and the chart
-    // say the same thing without the player digging through a list.
     if (here != nullptr) {
       const std::string systemId = sim.CurrentSystemId();
       for (const TradeContract& trade : sim.State().trades) {
-        if (trade.mode == "station") { continue; }  // its route is a sector one
+        if (trade.mode == "station") { continue; }
         const Body* destination = sim.FindBodyById(trade.to);
         if (destination == nullptr || destination->id == here->id) { continue; }
         if (sim.World().BodySystem(*destination) != systemId) { continue; }
@@ -842,16 +802,12 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
 
   if (scanTask != nullptr && scanTask->state == "running" && target != nullptr &&
       scanTask->target != target->id) {
-    // A scan running on a DIFFERENT body must not look like it belongs to this
-    // one. One set of sensors, one scan at a time.
     screen.progress.push_back(
         BuildProgressButton(sim, "scan-busy", "Sensors busy", false, "Scan Complete", "space"));
     screen.progress.back().title = "Sensors busy";
   } else {
     const bool remoteScan = target != nullptr &&
                             (!reach || target->type == "system" || target->type == "region");
-    // A body already deep-scanned has nothing left to reveal: the button is
-    // filed, not live, so a click cannot be spent on an empty scan.
     auto seen = target == nullptr ? sim.State().scanned.end()
                                   : sim.State().scanned.find(target->id);
     const bool scanFiled =
@@ -916,7 +872,6 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
   if (target != nullptr && target->type == "region") {
     CommandRowView view = BuildCommandRow(
         sim, "View " + target->name + " sector chart", true, "free", std::string(), 0);
-    // Reading the chart is not work and has no click charge.
     view.charged = false;
     view.spent = false;
     view.enabled = true;
@@ -962,7 +917,6 @@ bool PressNavActionRaw(Simulation& sim, const std::string& action, const std::st
   if (action == "zoom-in") { return sim.ZoomMap(1); }
   if (action == "zoom-out") { return sim.ZoomMap(-1); }
   if (action == "pan") {
-    // "pan:<dx>,<dy>" — free, and clamped per layer.
     const std::size_t comma = arg.find(',');
     if (comma == std::string::npos) { return false; }
     sim.PanMap(std::stod(arg.substr(0, comma)), std::stod(arg.substr(comma + 1)));
@@ -973,16 +927,7 @@ bool PressNavActionRaw(Simulation& sim, const std::string& action, const std::st
 
 }  // namespace
 
-// ============================================================================
-//  The press, and the clicks it costs.
-//  ---------------------------------------------------------------------------
-//  One control is one control. A press spends one of the clicks that control
-//  holds and returns one to every other control, so a button is only refused
-//  once its own green has run out. Free reads spend nothing and return nothing.
-// ============================================================================
 bool PressNavAction(Simulation& sim, const std::string& action, const std::string& arg) {
-  // Progress controls acknowledge before their charge is consulted (HTA
-  // onProgressClick). Do not add a second lock around that dispatcher.
   const auto screen = BuildNavScreen(sim).screen;
   if (action == "travel" || action == "scan" || action == "extract") {
     for (const auto& button : screen.progress) {

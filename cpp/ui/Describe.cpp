@@ -1,11 +1,3 @@
-// ============================================================================
-//  Describe.cpp — describeTarget(), word for word.
-//  ---------------------------------------------------------------------------
-//  Read this beside the reference's Section I. Every row is in the reference's
-//  order, every sentence keeps its hyphens and its trailing full stops, and
-//  every number goes through the JavaScript formatter - a briefing that says
-//  "18 of 24" in one edition and "18 of 24.0" in the other is not a port.
-// ============================================================================
 #include "ui/Describe.h"
 
 #include <algorithm>
@@ -59,7 +51,6 @@ const Incident* FindEvent(const Simulation& sim, const std::string& id) {
   return nullptr;
 }
 
-// ROOM_FITS: rooms that open as real fitted systems rather than as a store.
 bool RoomFits(const std::string& id) {
   if (id.size() < 2 || id[0] != 'r') { return false; }
   for (std::size_t i = 1; i < id.size(); ++i) {
@@ -94,29 +85,7 @@ int SlotsIn(const Simulation& sim, const std::string& state) {
 }  // namespace
 
 std::string JobThreshold(const Simulation& sim, const CrewMember& crew) {
-  if (crew.job == "maintenance") {
-    return Num(sim.GameRules().engine.engineerAt) + "% condition";
-  }
-  if (crew.job == "filters") {
-    const std::vector<AirStage>& stages = sim.GameRules().air.stages;
-    const double stage = crew.jobAt < 0.0 ? 0.0 : crew.jobAt;
-    const std::size_t index = static_cast<std::size_t>(stage);
-    if (index < stages.size()) { return stages[index].word + " air"; }
-    return " air";
-  }
-  if (crew.job == "navigation") {
-    const double rate = std::max(1.0, std::min(crew.jobAt, 5.0)) * 4.0;
-    return "Fuel use -" + Num(rate) + "% when plotting";
-  }
-  if (crew.job == "cleaner") {
-    return "Crew morale +1 every " + Num(sim.CleanerIntervalOf(crew)) + " clicks";
-  }
-  if (crew.job == "kitchen") {
-    const MessRules& mess = sim.GameRules().mess;
-    return "1 dry ration -> up to " + Num(mess.foodPerRation) +
-           " cooked food in " + Num(mess.foodPerRation) + " clicks";
-  }
-  return "-";
+  return sim.JobThreshold(crew);
 }
 
 bool DescribeTargetExists(const Simulation& sim, const std::string& kind,
@@ -138,8 +107,6 @@ bool DescribeTargetExists(const Simulation& sim, const std::string& kind,
 
 namespace {
 
-// ENGINE ROOM. Leads with the number that matters: the drive wears with every
-// action spent aboard.
 void RoomEngine(const Simulation& sim, Description& t) {
   const CrewMember* engineer = sim.Engineer();
   const double missing = std::max(0.0, 100.0 - sim.State().engineCondition);
@@ -156,7 +123,8 @@ void RoomEngine(const Simulation& sim, Description& t) {
       {"Warning at", Num(sim.GameRules().engine.warnBelow) +
                          "% - a red line joins the sidebar"},
       {"Engineer", engineer ? engineer->name + " - acts at " +
-                                  Num(sim.GameRules().engine.engineerAt) + "%, until full"
+                                  JobThreshold(sim, *engineer) +
+                                  ", until full or 4-click bar empty"
                             : std::string("Nobody holds the job")},
   };
   t.acts = {
@@ -164,7 +132,8 @@ void RoomEngine(const Simulation& sim, Description& t) {
        missing <= 0.0 ? std::string("refused at 100%")
                       : std::string("1 click (+10%)")},
       {"The engineer acts alone",
-       engineer ? "at " + Num(sim.GameRules().engine.engineerAt) + "%, until full"
+       engineer ? "at " + JobThreshold(sim, *engineer) +
+                      ", until full or 4-click bar empty"
                 : std::string("nobody assigned")},
   };
 }
@@ -205,7 +174,7 @@ void RoomMess(const Simulation& sim, Description& t) {
   const double mealFood = rules.hungerPerMeal / std::max(1.0, rules.hungerPerFood);
   const double crewFoodPerCycle = mealFood * static_cast<double>(sim.Crew().size());
   const Task* cookTask = sim.FindOngoing("cook");
-  const bool hydroponicsBusy = sim.FindOngoing("project-food") != nullptr;
+  // const bool hydroponicsBusy = sim.FindOngoing("project-food") != nullptr;
   const bool full = rack >= capacity;
 
   std::string cookingStatus;
@@ -213,8 +182,8 @@ void RoomMess(const Simulation& sim, Description& t) {
     cookingStatus = "Batch in progress - " + Num(cookTask->left) +
                     " clicks remaining; up to " + Num(rules.foodPerRation) +
                     " cooked food will land";
-  } else if (hydroponicsBusy) {
-    cookingStatus = "Paused while Hydroponics processes produce";
+  /* } else if (hydroponicsBusy) {
+    cookingStatus = "Paused while Hydroponics processes produce"; */
   } else if (full) {
     cookingStatus = "Cooked-food counter is full";
   } else if (rations < 1.0) {
@@ -227,8 +196,8 @@ void RoomMess(const Simulation& sim, Description& t) {
   std::string cookAction;
   if (cookTask != nullptr) {
     cookAction = "already in progress";
-  } else if (hydroponicsBusy) {
-    cookAction = "unavailable while Hydroponics processes produce";
+  /* } else if (hydroponicsBusy) {
+    cookAction = "unavailable while Hydroponics processes produce"; */
   } else if (full) {
     cookAction = "refused - cooked-food counter full";
   } else if (rations < 1.0) {
@@ -253,8 +222,8 @@ void RoomMess(const Simulation& sim, Description& t) {
       {"Cooking", cookingStatus},
       {"Starvation", "1 health every " + Num(rules.starveEvery) +
                          " clicks at " + Num(rules.starveAt) + "+ hunger"},
-      {"Cook", cook ? cook->name + " - kitchen duty" :
-                       std::string("No automatic cook assigned")},
+      {"Cook", cook ? cook->name + " - " + JobThreshold(sim, *cook)
+                    : std::string("No automatic cook assigned")},
   };
   t.acts = {{"Cook a batch", cookAction}};
 }
@@ -312,7 +281,6 @@ Description DescribeTarget(const Simulation& sim, const std::string& kind,
   t.kind = kind;
   t.id = id;
 
-  // A tab can outlive what it watches. One guard, all five lookups.
   if (!DescribeTargetExists(sim, kind, id)) {
     t.gone = true;
     t.kindLabel = "GONE";
@@ -334,7 +302,7 @@ Description DescribeTarget(const Simulation& sim, const std::string& kind,
       if (port.id == id) { t.title = port.name; break; }
     }
     t.kindLabel = "STATION";
-    t.sub = "Docked - market, mission board, shipyard and crew";
+    t.sub = "Docked - market, trade contracts, shipyard and crew";
     t.rows = {{"Berth", "Docked"}, {"Purse", Num(sim.State().shiplets) + " sh"}};
     t.acts = {{"Trade, hire or accept a contract", "1 click"}, {"Undock", "1 click"}};
     return t;
@@ -394,9 +362,6 @@ Description DescribeTarget(const Simulation& sim, const std::string& kind,
   }
 
   if (kind == "crew") {
-    // Purely informational on purpose: the crew window reads the record itself
-    // on every paint, so a tab left open across a shift never shows a stale
-    // number. This branch only sets the header.
     const CrewMember* crew = Find(sim, id);
     t.kindLabel = "CREW";
     t.title = crew->name;
@@ -429,7 +394,6 @@ Description DescribeTarget(const Simulation& sim, const std::string& kind,
     return t;
   }
 
-  // Everything else is a readout: a side-panel line, described.
   const InfoRow* info = FindInfo(sim, id);
   t.kindLabel = "READOUT";
   if (info != nullptr) {

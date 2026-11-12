@@ -1,6 +1,3 @@
-// ============================================================================
-//  MessScreen.cpp — the counter, the rack and the four clocks.
-// ============================================================================
 #include "ui/MessScreen.h"
 
 #include <algorithm>
@@ -25,7 +22,7 @@ MachinePart Part(const std::string& cls, float x, float y, float w, float h,
 TaskStage BuildMessMachine(const Simulation& sim) {
   TaskStage stage;
   stage.id = "messmach";
-  stage.width = 600.0f;  // STAGE.mess
+  stage.width = 600.0f;
   stage.height = 360.0f;
   std::vector<MachinePart>& parts = stage.parts;
 
@@ -44,20 +41,13 @@ TaskStage BuildMessMachine(const Simulation& sim) {
     }
   };
 
-  // --- the serving counter ----------------------------------------------
   parts.push_back(Part("mess-counter", 20, 14, 560, 40));
   parts.push_back(Part("mess-mini", 26, 19, 70, 10, "GALLEY"));
 
-  // --- the cooked-food shelf and its live stock --------------------------
-  // The bottles are one-per-food and follow the same store that drives the
-  // fill bar, so cooking adds visible stock and meals remove it.
   parts.push_back(Part("mess-rackbox", 20, 70, 560, 90));
   parts.push_back(Part("mess-mini", 28, 76, 150, 10, "GALLEY STORE"));
   parts.push_back(Part("mess-mini", 420, 76, 140, 10, "COOKED FOOD"));
   addStockRow("mess-food-bottle", sim.MessRack(), sim.MessCapacity(), 88, 18);
-  // paintMess(): the fill width, its tone and the readout are read off
-  // MESS.rack/capacity at paint time, so the gauge can never disagree with
-  // the panel beside it.
   parts.push_back(Part("mess-track", 40, 110, 520, 22));
   const double pct = sim.MessCapacity() > 0.0
                          ? std::round((sim.MessRack() / sim.MessCapacity()) * 100.0)
@@ -70,11 +60,6 @@ TaskStage BuildMessMachine(const Simulation& sim) {
                        Num(sim.MessRack()) + " of " + Num(sim.MessCapacity()) +
                            " food in the galley"));
 
-  // --- one plate per crew member, each its own hunger clock --------------
-  // paintMess(): tp = round(hungerTick / MESS_EVERY * 100); the bar is
-  // 118 * tp/100 wide and reads red at hunger >= 70, and the caption counts
-  // the actions left on that person's clock. A hungerTick of 0 means a whole
-  // cycle is left, so the bar starts empty and fills as the clock runs.
   parts.push_back(Part("mess-mini", 28, 182, 140, 10, "WHO EATS NEXT"));
   const std::size_t hands = sim.Crew().size();
   const double every = sim.GameRules().mess.every;
@@ -94,7 +79,6 @@ TaskStage BuildMessMachine(const Simulation& sim) {
     parts.push_back(tick);
   }
 
-  // --- the dry-ration input shelf, below the crew's meal clocks ------------
   parts.push_back(Part("mess-rackbox", 20, 280, 560, 72));
   parts.push_back(Part("mess-mini", 28, 286, 150, 10, "RATION RACK"));
   parts.push_back(Part(
@@ -127,9 +111,8 @@ MessScreenModel BuildMessScreen(const Simulation& sim) {
   const double crewFoodPerCycle =
       mealFood * static_cast<double>(sim.Crew().size());
   const Task* cookTask = sim.FindOngoing("cook");
-  const bool hydroponicsBusy = sim.FindOngoing("project-food") != nullptr;
+  // const bool hydroponicsBusy = sim.FindOngoing("project-food") != nullptr;
 
-  // --- the four plates ---------------------------------------------------
   for (const CrewMember& crew : sim.Crew()) {
     PlateView plate;
     plate.id = crew.id;
@@ -147,7 +130,6 @@ MessScreenModel BuildMessScreen(const Simulation& sim) {
                          "Hunger does not knock - it is on a clock, same as "
                          "everything else aboard."};
 
-  // --- left column -------------------------------------------------------
   NavPanel rackPanel;
   rackPanel.id = "mess-rack-p";
   rackPanel.title = "Galley Stock";
@@ -185,7 +167,6 @@ MessScreenModel BuildMessScreen(const Simulation& sim) {
   starve.Note("Slow, like bad air: nobody starves on the spot.");
   screen.left.push_back(starve);
 
-  // --- under the machine -------------------------------------------------
   NavPanel cooking;
   cooking.id = "mess-cook-p";
   cooking.title = "Cooking";
@@ -196,8 +177,8 @@ MessScreenModel BuildMessScreen(const Simulation& sim) {
                                       " cooked food");
     cooking.Field("Larder", Num(sim.MessRations()) + " of " +
                                 Num(sim.MessRationCapacity()) + " dry rations");
-  } else if (hydroponicsBusy) {
-    cooking.Dim("Hydroponics is processing produce; cooking is paused.");
+  /* } else if (hydroponicsBusy) {
+    cooking.Dim("Hydroponics is processing produce; cooking is paused."); */
   } else if (model.full) {
     cooking.Dim("The cooked-food rack is full; cooking waits for space.");
   } else if (sim.MessRations() < 1.0) {
@@ -231,7 +212,6 @@ MessScreenModel BuildMessScreen(const Simulation& sim) {
                      "%");
   screen.under.push_back(appetite);
 
-  // --- right column ------------------------------------------------------
   const double autoAt = cook != nullptr ? sim.CookThreshold(*cook) : messRules.cookBelow;
   NavPanel crewPanel;
   crewPanel.id = "mess-crew";
@@ -251,11 +231,10 @@ MessScreenModel BuildMessScreen(const Simulation& sim) {
   }
   screen.right.push_back(crewPanel);
 
-  // --- right-column cook control (no bottom Actions banner) --------------
-  if (hydroponicsBusy) {
+  /* if (hydroponicsBusy) {
     screen.bandNote =
         "Hydroponics is processing produce into dry rations; galley cooking is paused.";
-  } else if (cookTask != nullptr) {
+  } else */ if (cookTask != nullptr) {
     screen.bandNote =
         "Batch in progress: one dry ration was spent; up to " +
         Num(messRules.foodPerRation) + " cooked food lands after " +
@@ -274,12 +253,12 @@ MessScreenModel BuildMessScreen(const Simulation& sim) {
         Num(static_cast<double>(sim.Crew().size())) + " crew use " +
         Num(crewFoodPerCycle) + " food per " + Num(messRules.every) +
         "-click cycle; automatic restocking starts at or below " +
-        Num(autoAt) + " food when the cook is free and a dry ration is "
-        "available.";
+        Num(autoAt) + " food and runs until the " + Num(capacity) +
+        "-food counter is full while dry rations last.";
   }
   const bool canUseCookButton =
       cookTask != nullptr ||
-      (!model.full && sim.MessRations() >= 1.0 && !hydroponicsBusy);
+      (!model.full && sim.MessRations() >= 1.0 /* && !hydroponicsBusy */);
   NavPanel cookPanel;
   cookPanel.id = "mess-cook-action";
   cookPanel.title = "Galley Batch";

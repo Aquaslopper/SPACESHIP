@@ -1,10 +1,3 @@
-// ============================================================================
-//  Awards.cpp — commendations are earned by playing, never by looking.
-//  ---------------------------------------------------------------------------
-//  Each commendation names a metric and a goal; the chronicle holds the history
-//  that answers it. Earning one only marks it: the reward waits in the log until
-//  the player claims it, and claiming is free and once-only.
-// ============================================================================
 #include "core/Simulation.h"
 
 #include <string>
@@ -84,7 +77,6 @@ double Simulation::EarnedCommendations() const {
 }
 
 std::string Simulation::CaptainRank() const {
-  // Cosmetic, as the reference says: a name for how much of the log is filled.
   const double earned = EarnedCommendations();
   const double total = static_cast<double>(catalog_.commendations.size());
   if (earned >= total && total > 0) { return "Constellation"; }
@@ -101,8 +93,6 @@ std::string Simulation::RewardText(const std::string& id) const {
 std::string Simulation::RewardTextOf(const Commendation& award) const {
   const Reward& reward = award.reward;
   std::vector<std::string> parts;
-  // The reference says "shiplets" even for one; the stores' words are plural
-  // only when the count is.
   if (reward.cash > 0) { parts.push_back(js::NumToString(reward.cash) + " shiplets"); }
   const auto push = [&parts](double amount, const std::string& word) {
     if (amount <= 0) { return; }
@@ -129,25 +119,21 @@ bool Simulation::ClaimCommendation(const std::string& id) {
   state_.fuelCells += award->reward.fuel;
   state_.repairKits += award->reward.kits;
   state_.medkits += award->reward.med;
-  // Free: a reward for work already done is not another turn of work.
   LogLine("Reward claimed: " + award->title + " - " + RewardTextOf(*award) + ".");
   return true;
 }
 
 void Simulation::CheckCommendations(bool silent) {
-  bool changed = false;
   for (const Commendation& award : catalog_.commendations) {
     auto earned = state_.chronicle.earned.find(award.id);
     const bool already = earned != state_.chronicle.earned.end() && earned->second;
     if (already) { continue; }
     if (ChronicleValue(award.metric) < award.goal) { continue; }
     state_.chronicle.earned[award.id] = true;
-    changed = true;
     if (!silent) {
       LogLine("Commendation earned: " + award.title + ". Claim its reward in Rewards.");
     }
   }
-  (void)changed;
 }
 
 }  // namespace ship

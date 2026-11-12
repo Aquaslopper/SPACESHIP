@@ -1,12 +1,3 @@
-// ============================================================================
-//  EngineScreen.cpp — the machine, part for part.
-//  ---------------------------------------------------------------------------
-//  The stage is laid out for 18 px type: every caption has a box that holds it
-//  at that size, and the painter scales the whole stage with the reading size.
-//  The loops are kept as loops: twenty rivets on a 28px pitch, five valves on
-//  114, twenty-four encoder ticks, twelve bolts, eight blades, six turbine
-//  ticks, nine exchanger fins, eleven scale marks, sixteen cylinders.
-// ============================================================================
 #include "ui/EngineScreen.h"
 
 #include <cmath>
@@ -221,9 +212,6 @@ TaskStage BuildEngineMachine(const Simulation& sim) {
                          (k % 2 ? 34.0f : 44.0f)));
   }
 
-  // --- THE ONE LIVE READING ----------------------------------------------
-  // Left: name, meter, scale. Right: the percentage over its word. The serial
-  // plate has the bottom line to itself.
   const int condition = static_cast<int>(sim.State().engineCondition);
   parts.push_back(Part("mach-box", 16, 475, 618, 84));
   parts.push_back(Part("mach-mini", 24, 479, 300, 20, "ENGINE CONDITION"));
@@ -312,7 +300,6 @@ EngineScreenModel BuildEngineScreen(const Simulation& sim) {
                  Num(std::round((100.0 - model.condition) * 0.7) / 10.0) + " mm");
   screen.under.push_back(readings);
 
-  // --- right: who is in here ---------------------------------------------
   const CrewMember* engineer = sim.Engineer();
   NavPanel crew;
   crew.id = "eng-crew";
@@ -323,32 +310,26 @@ EngineScreenModel BuildEngineScreen(const Simulation& sim) {
     crew.Name(engineer->name);
     crew.Sub(engineer->role + " - maintenance job");
     crew.Field("Skill", engineer->skill);
-    crew.Field("Acts at", Num(startsAt) + "% condition");
+    crew.Field("Acts at", JobThreshold(sim, *engineer));
     crew.Field("Activity", engineer->activity);
     crew.Note("Holds the maintenance job. At " + Num(startsAt) +
-              "% he takes the button and presses it on every click until the "
-              "drive is full (+10% per press).");
+              "% he presses Run the drive (+10% per press) at his trained pace "
+              "until the drive is full or the 4-click green bar is empty.");
   } else {
     crew.Dim("Nobody holds the maintenance job. The commander runs it "
              "personally, or nobody does.");
   }
   screen.right.push_back(crew);
 
-  // --- the commitments band ----------------------------------------------
-  // Who presses the button, and when: the engineer takes it over under the
-  // line, so the room reads out the rule rather than a job of his own.
   if (!sim.Crew().empty()) {
     screen.bandNote = "At " + Num(sim.GameRules().engine.engineerAt) +
-                      "% the engineer takes this button and presses it on every "
-                      "click until the drive is full (+10% per press).";
+                      "% the engineer presses this button (+10% per press) "
+                      "until the drive is full or the 4-click green bar is empty.";
   }
 
   screen.stage = BuildEngineMachine(sim);
 
-  // The button, set into the machine under the cylinder bank: one press is one
-  // click of the clock and a service of the drive. The green bar is the clicks
-  // the drive still holds, and it winds back up as the rest of the ship is worked.
-  const std::string chargeKey = ButtonChargeKey(sim, "progress:engine-click");
+  const std::string chargeKey = Simulation::kEngineButtonChargeKey;
   const std::string tier = ButtonChargeTier("engine maintenance run the drive", "systems");
   const double charge = ChargePercent(sim, chargeKey, tier);
   const bool maintained = sim.State().engineCondition >= 100.0;

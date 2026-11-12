@@ -6,35 +6,30 @@
   "airStages": [
     {
       "harm": 10,
-      "jobDrop": 10,
       "slow": 2,
       "tone": "#b05a42",
       "word": "FOUL"
     },
     {
       "harm": 10,
-      "jobDrop": 10,
       "slow": 1.5,
       "tone": "#b05a42",
       "word": "BAD"
     },
     {
       "harm": 2,
-      "jobDrop": 5,
       "slow": 1.25,
       "tone": "#c08a3e",
       "word": "THIN"
     },
     {
       "harm": 0,
-      "jobDrop": 1,
       "slow": 1,
       "tone": "#bda43f",
       "word": "FADING"
     },
     {
       "harm": 0,
-      "jobDrop": 0,
       "slow": 0,
       "tone": "#7f9161",
       "word": "OPTIMAL"
@@ -130,7 +125,7 @@
     "rations": 5,
     "rationCapacity": 24,
     "foodPerRation": 5,
-    "cookBelow": 11,
+    "cookBelow": 10,
     "hungerPerMeal": 15,
     "hungerPerFood": 5,
     "hungerFloor": 5

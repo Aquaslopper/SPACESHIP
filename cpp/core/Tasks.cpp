@@ -1,22 +1,3 @@
-// ============================================================================
-//  Tasks.cpp — the ongoing-task engine.
-//  ---------------------------------------------------------------------------
-//  A committed process does not run on a clock. It runs on the player's
-//  attention: it advances only when an action is spent somewhere else.
-//
-//  The engine knows nothing about meaning. It counts down and then asks the
-//  dispatch table what that meant, exactly as TASK_TYPES does in the reference:
-//
-//    autoClear       retire the task the moment it lands
-//    quiet           the task names itself, so no vague "completed" line
-//    onTick(n)       produce something WHILE the work runs (the galley)
-//    onDone(t)       the counter hit zero; nobody has looked yet
-//    onAcknowledge   the player clicked the finished button
-//
-//  Phase 1A implements every hook that the action clock can reach on its own.
-//  travel, scan and shipProject are registered but only fire in Phase 1B, when
-//  the Navigation commands that create them exist.
-// ============================================================================
 #include "core/JsNumber.h"
 #include "core/Simulation.h"
 
@@ -27,26 +8,21 @@ namespace ship {
 
 namespace {
 
-// "Rell Voss" -> "Rell": the sheet names a hand by the name the roster uses.
 std::string FirstName(const std::string& name) {
   const std::size_t space = name.find(' ');
   return space == std::string::npos ? name : name.substr(0, space);
 }
 
 bool IsQuiet(const std::string& type) {
-  // Types that announce themselves by name; they do not also emit the vague
-  // "A ship process has completed." line.
   return type == "crewOrder" || type == "crewJob" || type == "crewDoc" ||
-         type == "o2slot" || type == "maint" || type == "cook" ||
-         type == "salvage" || type == "surveyPackage" || type == "shipProject";
+          type == "o2slot" || type == "maint" || type == "cook" ||
+          type == "salvage" || type == "surveyPackage" || type == "shipProject";
 }
 
 bool IsAutoClear(const std::string& type) {
-  // HTA TASK_TYPES: automatic completion is explicitly opted into by type.
-  // Unknown types must not silently lose a finished readout.
   return type == "crewOrder" || type == "crewJob" || type == "crewDoc" ||
-         type == "o2slot" || type == "maint" || type == "cook" ||
-         type == "salvage" || type == "surveyPackage" || type == "shipProject";
+          type == "o2slot" || type == "maint" || type == "cook" ||
+          type == "salvage" || type == "surveyPackage" || type == "shipProject";
 }
 
 }  // namespace
@@ -96,11 +72,6 @@ void Simulation::SweepAutoTasks() {
   state_.ongoing.swap(keep);
 }
 
-void Simulation::TickTask(const Task&, double) {
-  // Nothing lands mid-batch. A cook's five clicks are the bar filling; the
-  // food appears on completion, in OnTaskDone.
-}
-
 void Simulation::OnTaskDone(Task& task) {
   if (task.type == "maint") {
     state_.engineCondition = 100;
@@ -120,10 +91,8 @@ void Simulation::OnTaskDone(Task& task) {
     return;
   }
   if (task.type == "cook") {
-    // One dry ration yields cooked food on the counter, clamped to the ceiling.
     mess_.rack = std::min(mess_.capacity, mess_.rack + rules_.mess.foodPerRation);
     LogLine((task.by.empty() ? "Someone" : task.by) + " finished cooking a fresh batch.");
-    // The counter is full, or the larder is empty: the cook's chain is done.
     if (mess_.rack >= mess_.capacity || mess_.rations < 1.0) { cookRestock_ = false; }
     return;
   }
@@ -169,18 +138,13 @@ void Simulation::OnTaskDone(Task& task) {
     ProjectDone(task);
     return;
   }
-  // travel and scan do nothing when the counter lands: the player must come back
-  // and press the finished button, which is acknowledged in Navigation.
 }
 
 void Simulation::TickOngoing() { AdvanceTasks(1); }
 
-double Simulation::AdvanceTasks(double n) {
-  double done = 0;
+void Simulation::AdvanceTasks(double n) {
   double quiet = 0;
 
-  // Walk a SNAPSHOT: a hook is allowed to queue work, and a task created half
-  // way through this loop must not be docked a step by the tick that made it.
   std::vector<Task> snapshot = state_.ongoing;
 
   for (const Task& original : snapshot) {
@@ -194,30 +158,19 @@ double Simulation::AdvanceTasks(double n) {
     if (needsDrive && (state_.engineCondition <= 0 || StatValue("energy") <= 0)) { continue; }
     if (needsPower && StatValue("energy") <= 0) { continue; }
 
-    const double used = (n < task->left) ? n : task->left;
-    const Task view = *task;  // hooks read the task as it stood this tick
-    TickTask(view, used);
-
     task->left -= n;
     if (task->left <= 0) {
       task->left = 0;
       task->state = "done";
-      // A hook may queue new work, which can reallocate the vector this pointer
-      // walks into. Copy what the hook and the quiet count need first - reading
-      // task->type afterwards was reading freed storage.
       const Task finished = *task;
       OnTaskDone(*FindOngoing(original.id));
-      done += 1;
       if (!IsQuiet(finished.type)) { quiet += 1; }
     }
   }
 
   SweepAutoTasks();
 
-  // Deliberately vague: the main screen never says what finished, the player
-  // goes and looks.
   for (double k = 0; k < quiet; k += 1) { LogLine("A ship process has completed."); }
-  return done;
 }
 
 void Simulation::ApplyOrderPayload(CrewMember& crew, const Task& task) {
@@ -226,10 +179,6 @@ void Simulation::ApplyOrderPayload(CrewMember& crew, const Task& task) {
     auto it = task.sheetFlags.find(id);
     return it != task.sheetFlags.end() && it->second;
   };
-  // Read every flag BEFORE creating anything: AddOngoing pushes onto the same
-  // vector `task` lives in, and a reallocation would leave that reference
-  // pointing at dead storage - which silently turned a patient's sheet into a
-  // discharged one.
   const bool rest = task.rest || flag("rest");
   const bool fireOrder = flag("fire");
   const bool docOrder = flag("doc");
@@ -238,8 +187,6 @@ void Simulation::ApplyOrderPayload(CrewMember& crew, const Task& task) {
   const bool hasJob = task.sheetHasJob;
   const std::string jobId = task.sheetJob;
 
-  // FIRST, because nothing else on the sheet means anything to somebody who is
-  // being put off the ship.
   if (fireOrder) {
     FireCrew(crew);
     return;
@@ -251,8 +198,6 @@ void Simulation::ApplyOrderPayload(CrewMember& crew, const Task& task) {
   }
   if (hasJob) { ApplyJobTo(crew, jobId); }
   if (docOrder) {
-    // The sheet is done; the doctor is not. This is the one order whose
-    // consequence outlives the order itself.
     Task* doc = AddOngoing("doc-" + crew.id, "Medical - " + FirstName(crew.name),
                            rules_.docAway, "crewDoc", crew.id);
     if (doc != nullptr) { doc->who = crew.id; }

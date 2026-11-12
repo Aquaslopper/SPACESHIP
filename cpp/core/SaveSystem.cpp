@@ -87,11 +87,6 @@ std::string LotBindId(const Json& lot) {
   return id;
 }
 
-bool TruthyMap(const Json& map, const std::string& key) {
-  auto it = map.find(key);
-  return it != map.end() && it->is_boolean() && it->get<bool>();
-}
-
 ChartSettings ReadChartSettings(const Json& root, const ChartSettings& fallback) {
   ChartSettings settings = fallback;
   const Json* chart = At(root, "chart");
@@ -231,8 +226,7 @@ std::string Simulation::SaveJson() const {
 
   Json charges = Json::object();
   for (const auto& entry : state_.charges) {
-    charges[entry.first] = Json{{"tier", entry.second.tier},
-                                {"left", Num(entry.second.left)},
+    charges[entry.first] = Json{{"left", Num(entry.second.left)},
                                 {"volume", Num(entry.second.volume)}};
   }
   s["charges"] = charges;
@@ -251,7 +245,6 @@ std::string Simulation::SaveJson() const {
     if (!task.who.empty()) { t["who"] = task.who; }
     if (!task.other.empty()) { t["other"] = task.other; }
     if (task.slot >= 0) { t["slot"] = Num(task.slot); }
-    if (task.rate != 0) { t["rate"] = Num(task.rate); }
     if (task.vol != 0) { t["vol"] = Num(task.vol); }
     ongoing.push_back(t);
   }
@@ -274,7 +267,6 @@ std::string Simulation::SaveJson() const {
   s["medkits"] = Num(state_.medkits);
   s["engineCondition"] = Num(state_.engineCondition);
   s["wearTick"] = Num(state_.wearTick);
-  s["engineClickAt"] = Num(state_.engineClickAt);
   s["engineerRun"] = state_.engineerRun;
   s["filterLife"] = Num(state_.filterLife);
   s["airHold"] = Num(state_.airHold);
@@ -913,18 +905,12 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
     }
   }
 
-  // ---- incidents ---------------------------------------------------------
   for (const Json& event : *events) {
     if (!IsObject(event) || !GetString(event, "id").size()) { return fail("an incident is unreadable"); }
-    const Json* spec = nullptr;
-    for (const IncidentType& type : catalog.incidentTypes) {
-      if (type.id == GetString(event, "type")) { spec = nullptr; }
-    }
     const IncidentType* incidentType = nullptr;
     for (const IncidentType& type : catalog.incidentTypes) {
       if (type.id == GetString(event, "type")) { incidentType = &type; }
     }
-    (void)spec;
     if (incidentType == nullptr) { return fail("an incident of a type that does not exist"); }
     const double stage = GetNumber(event, "stage");
     if (stage < 0 || stage >= static_cast<double>(incidentType->stages.size())) {
@@ -991,7 +977,6 @@ Task ReadTask(const Json& source) {
   task.who = GetString(source, "who");
   task.other = GetString(source, "other");
   if (auto it = source.find("slot"); it != source.end() && it->is_number()) { task.slot = it->get<double>(); }
-  task.rate = GetNumber(source, "rate");
   task.vol = GetNumber(source, "vol");
   return task;
 }
@@ -1071,7 +1056,6 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     state_.medkits = GetNumber(s, "medkits", 2);
     state_.engineCondition = GetNumber(s, "engineCondition");
     state_.wearTick = GetNumber(s, "wearTick");
-    state_.engineClickAt = GetNumber(s, "engineClickAt", -1e9);
     state_.engineerRun = GetBool(s, "engineerRun");
     state_.filterLife = GetNumber(s, "filterLife");
     state_.airHold = GetNumber(s, "airHold");
@@ -1147,11 +1131,8 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     stowOrder_.clear();
     cargoMixGen_.clear();
     justStowedLot_.clear();
-    stowClicks_ = 0;
-    stowThreshold_ = 0;
     mixClicks_ = 0;
     mixThreshold_ = 0;
-    justStowedLot_.clear();
     readBoolMap(s.at("spOpen"), &state_.spOpen);
     readBoolMap(s.at("freshTabs"), &state_.freshTabs);
 
@@ -1171,7 +1152,6 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     if (auto it = s.find("charges"); it != s.end() && it->is_object()) {
       for (auto entry = it->begin(); entry != it->end(); ++entry) {
         Charge charge;
-        charge.tier = GetString(entry.value(), "tier");
         charge.left = GetNumber(entry.value(), "left");
         charge.volume = GetNumber(entry.value(), "volume");
         state_.charges[entry.key()] = charge;

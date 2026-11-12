@@ -204,7 +204,7 @@
     {
       "group": "Getting started",
       "id": "controls",
-      "text": "Left-click a ship element for a briefing; right-click it to open a task tab. Use the arrows to scroll tabs and Home to return to the ship. The disk icon has three independent save slots, a new-voyage command and a return to the main menu; slot one reads the original save. The gear holds five bridge palettes, ambient music, sound effects, volume, motion, reading, crew labels and confirmations. Rapid repeat click clicks are briefly ignored while each command settles. Reading and changing options are free.",
+      "text": "Left-click a ship element for a briefing; right-click it to open a task tab. Use the arrows to scroll tabs and Home to return to the ship. The disk icon has three independent save slots, a new-voyage command and a return to the main menu; slot one reads the original save. The gear holds five bridge palettes, ambient music, sound effects, volume, motion, reading, crew labels and confirmations. Rapid repeat clicks are briefly ignored while each command settles. Reading and changing options are free.",
       "title": "Controls, tabs and saves"
     },
     {
@@ -224,7 +224,7 @@
       "id": "air",
       "link": "o2",
       "linkLabel": "Open O2 Filter Room",
-      "text": "The O2 Filter Room needs three canisters seated before the bank can start. A full bank contains 200 charge and uses four per click. After it stops, cabin air gradually worsens: bad air slows crew and eventually harms health. The Recyclers can make a canister from salvage, or stations sell supplies.",
+      "text": "The O2 Filter Room needs three canisters seated before the bank can start. A full bank contains 200 charge and uses four per click. After it stops, cabin air gradually worsens; bad air harms health and can eventually kill the crew. An assigned filter hand seats all three canisters in order and starts the bank when air turns bad, or earlier with training. The Recyclers can make a canister from salvage, or stations sell supplies.",
       "title": "Air and the filter bank"
     },
     {
@@ -232,7 +232,7 @@
       "id": "power",
       "link": "engine",
       "linkLabel": "Open Engine Room",
-      "text": "The drive loses one percent every four clicks. The button on the machine runs it and brings it back to full; it is live again after twelve clicks. An engineer can maintain it as well. A dead drive stops travel. Energy falls over time; powered work pauses at zero. Right-click the energy or fuel gauge to use a fuel cell. The Power Bus and Shield Array exchange energy and shields with conversion loss.",
+      "text": "The drive loses one percent every four clicks. Run the drive restores ten percent per click and its green bar holds four clicks, recharging as other controls are used. At 60% condition an assigned engineer presses the button at his trained pace until the drive is full or the green bar is empty. A dead drive stops travel. Energy falls over time; powered work pauses at zero. Right-click the energy or fuel gauge to use a fuel cell. The Power Bus and Shield Array exchange energy and shields with conversion loss.",
       "title": "Power, fuel and drive"
     },
     {
@@ -240,7 +240,7 @@
       "id": "care",
       "link": "mess",
       "linkLabel": "Open Mess Hall",
-      "text": "Crew eat cooked food from the galley counter on their own staggered clocks. With no cooked food, hunger rises; severe hunger damages health. The galley cooks dry rations into cooked food, and Hydroponics turns produce into dry rations. Medical Bay treatment uses a medkit and energy; the slower medical order in Crew Quarters needs no medkit.",
+      "text": "Crew eat cooked food from the galley counter on their own staggered clocks. With no cooked food, hunger rises; severe hunger damages health. The galley cooks one dry ration into five cooked food over five clicks, an assigned cook starts at ten food or below (earlier with training) until the 24-food counter is full, and Hydroponics turns produce into dry rations. Medical Bay treatment uses a medkit and energy; the slower medical order in Crew Quarters needs no medkit.",
       "title": "Food and medicine"
     },
     {
@@ -296,7 +296,7 @@
     {
       "group": "Ship systems",
       "id": "interlocks",
-      "text": "Cargo recovery reserves hold space while it runs. Canister and dry-ration production reserve their output space. Hydroponics cannot overlap Galley cooking, and Thermal Control cannot overlap engine maintenance. Crew cannot be assigned to simultaneous medical, social or order work. Check the room's status when a click is unavailable.",
+      "text": "Cargo recovery reserves hold space while it runs. Canister and dry-ration production reserve their output space. Crew cannot be assigned to simultaneous medical, social or order work. Check the room's status when a click is unavailable.",
       "title": "Reservations and space"
     },
     {

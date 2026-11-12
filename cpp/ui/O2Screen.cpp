@@ -1,11 +1,3 @@
-// ============================================================================
-//  O2Screen.cpp — the rack, the bank, and the air.
-//  ---------------------------------------------------------------------------
-//  Every number on this screen is derived from LIFE.slots and STATE.filterLife;
-//  nothing is stored twice. The three install buttons are the only live parts
-//  of the illustration and they are appended LAST, so scenery can never swallow
-//  a click - the rule the reference repeats four times in its comments.
-// ============================================================================
 #include "ui/O2Screen.h"
 
 #include <cmath>
@@ -28,19 +20,16 @@ MachinePart Part(const std::string& cls, float x, float y, float w, float h,
 TaskStage BuildFilterMachine(const Simulation& sim) {
   TaskStage stage;
   stage.id = "o2mach";
-  stage.width = 600.0f;  // STAGE.o2
+  stage.width = 600.0f;
   stage.height = 360.0f;
   std::vector<MachinePart>& parts = stage.parts;
 
-  // --- intake duct across the top ---------------------------------------
   parts.push_back(Part("o2-duct", 20, 14, 560, 30));
   parts.push_back(Part("o2-mini", 26, 19, 60, 10, "INTAKE"));
   for (int k = 0; k < 7; ++k) {
     parts.push_back(Part("o2-louvre", 100.0f + k * 66.0f, 20, 6, 18));
   }
 
-  // --- the cabin air, rebuilt by the renderer ---------------------------
-  // paintAir(): the chamber is stateful scenery, not the literal word "air".
   const auto add = [&](const std::string& cls, float x, float y, float w, float h,
                        const std::string& text, const std::string& tone) {
     auto part = Part(cls, x, y, w, h, text); part.tone = tone;
@@ -49,7 +38,6 @@ TaskStage BuildFilterMachine(const Simulation& sim) {
   const bool running = sim.BankRunning();
   const auto& air = sim.AirSpec();
   add("o2-air", 20, 52, 560, 66, "", sim.AirStageIndex() == 4 ? "#f1f6ea" : "#efe7d8");
-  // Reflow the source's 8/11px labels inside the same chamber for >=18px.
   add("o2-airlab", 28, 60, 200, 18, "CABIN AIR", "#a2947f");
   add("o2-airword", 330, 58, 240, 18, air.word, air.tone);
   add("o2-airsub", 330, 78, 240, 18,
@@ -67,7 +55,6 @@ TaskStage BuildFilterMachine(const Simulation& sim) {
         "", running ? "#cfdcc0" : "#b9a893");
   }
 
-  // --- three slot housings ----------------------------------------------
   for (int k = 0; k < 3; ++k) {
     const float sx = 20.0f + k * 190.0f;
     parts.push_back(Part("o2-slot", sx, 126, 180, 152));
@@ -87,14 +74,12 @@ TaskStage BuildFilterMachine(const Simulation& sim) {
     const double pct = std::round(sim.State().filterLife / sim.GameRules().life.lifeMax * 100);
     add("o2-fill", sx + 30, 264, slot.state == "active" ? std::round(120 * pct / 100) : 0, 8, "", "#7f9161");
 
-    // The live control - deliberately not scenery.
     LiveControl control;
     control.id = "o2-btnwrap" + std::to_string(k);
     control.box = Area{sx + 5.0f, 286.0f, 170.0f, 26.0f};
     stage.controls.push_back(control);
   }
 
-  // --- outlet manifold ---------------------------------------------------
   parts.push_back(Part("o2-duct", 20, 324, 560, 26));
   parts.push_back(Part("o2-mini", 26, 331, 70, 10, "TO DECKS"));
   for (int k = 0; k < 8; ++k) {
@@ -149,8 +134,7 @@ O2ScreenModel BuildO2Screen(const Simulation& sim) {
                                  " clicks");
   airPanel.Field("Crew", airSpec.word);
   if (sim.AirStageIndex() < 3) {
-    airPanel.Note("Bad air harms the crew and can eventually kill them. It "
-                  "also slows their work and delays their response.");
+    airPanel.Note("Bad air harms the crew and can eventually kill them.");
   }
   screen.left.push_back(airPanel);
 
@@ -232,22 +216,19 @@ O2ScreenModel BuildO2Screen(const Simulation& sim) {
     crew.Field("Skill", hand->skill);
     crew.Field("Acts at", JobThreshold(sim, *hand));
     crew.Field("Activity", hand->activity);
-    crew.Field("Seating", Num(sim.CrewCost(2.0)) + " clicks per slot");
+    crew.Field("Seating", /* Num(sim.CrewCost(2.0)) + */ "2 clicks per slot");
     const std::string stageWord = JobThreshold(sim, *hand);
-    crew.Note("He holds the filter job and works the bank unasked - but not "
-              "until the air is already " + stageWord +
-              ", by which time the crew have been labouring for a while. He is "
-              "slowed by the same bad air he is there to fix.");
+    crew.Note("Holds the filter job. At " + stageWord +
+              " seats slots 1, 2 and 3 in order and turns on the filter bank. "
+              "Training starts the sequence earlier.");
   } else {
     crew.Dim("Nobody holds the filter job. The commander seats every canister "
              "personally.");
   }
   screen.right.push_back(crew);
 
-  // --- the stage, with its three live controls ---------------------------
   screen.stage = BuildFilterMachine(sim);
 
-  // --- slots, live -------------------------------------------------------
   for (std::size_t i = 0; i < sim.Life().slots.size(); ++i) {
     const CanisterSlot& slot = sim.Life().slots[i];
     SlotView view;
@@ -290,7 +271,6 @@ O2ScreenModel BuildO2Screen(const Simulation& sim) {
     model.slots.push_back(view);
   }
 
-  // --- bank status note (no bottom Actions banner; button lives in System Status)
   screen.bandNote =
       model.running
           ? "The bank is running. " + Num(state.filterLife) +

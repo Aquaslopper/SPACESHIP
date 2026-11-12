@@ -1,12 +1,3 @@
-// ============================================================================
-//  CrewLogic.cpp — the people, one action at a time.
-//  ---------------------------------------------------------------------------
-//  Nobody is harmed quickly. Bad air takes a point of health every few actions;
-//  an untrained hand holding a job loses heart slowly; hunger advances on each
-//  crew member's own staggered clock. Wages are paid on the same counter and
-//  the dearest job is paid first, because those are the jobs keeping everybody
-//  breathing.
-// ============================================================================
 #include "core/JsNumber.h"
 
 #include "core/Simulation.h"
@@ -21,13 +12,11 @@ void Simulation::TickCrew() {
   const AirStage& air = AirSpec();
   state_.crewTick += 1;
 
-  // ---- the air gets into people -----------------------------------------
   if (air.harm > 0 && std::fmod(state_.crewTick, air.harm) == 0) {
     for (CrewMember& crew : crew_) { crew.health = std::max(0.0, crew.health - 1); }
     LogLine("The air is telling on the crew.");
   }
 
-  // ---- an untrained hand holding a job loses heart -----------------------
   if (std::fmod(state_.crewTick, 10.0) == 0) {
     for (CrewMember& crew : crew_) {
       if (!crew.job.empty() && (crew.skill == "Untrained" || crew.skill.empty())) {
@@ -38,20 +27,6 @@ void Simulation::TickCrew() {
     }
   }
 
-  // ---- hunger, each on their own staggered clock -------------------------
-  // Everything here is counted in clicks, never in seconds. A hand gains
-  // `hungerPerMeal` (15) over its own `every` (25) clicks - a click at a time,
-  // so the bar creeps up rather than jumping - and then goes to eat. One food
-  // drains `hungerPerFood` (5) of hunger, so a meal is 15 / 5 = 3 food: three
-  // food takes 15% off a hand's hunger, which is the whole point of the number.
-  //
-  // THE MEAL IS SIZED BY THE CLOCK, NOT BY THE COUNTER. A hand eats the 3 food
-  // its 25 clicks earned and stops; it does not clear the shelf. That is what
-  // makes the staggering work: four hands eat 12 food a round, the counter
-  // holds 24 (two rounds), and a cook who restarts at 10 always has food on the
-  // shelf while the next batch runs. What the counter DOES decide is whether
-  // the meal can be paid for: with less than 3 food on it, the hand eats what
-  // is there and carries the rest of its hunger into the next round.
   const double risePerClick = rules_.mess.hungerPerMeal / std::max(1.0, rules_.mess.every);
   const double mealFood = rules_.mess.hungerPerMeal / std::max(1.0, rules_.mess.hungerPerFood);
 
@@ -61,10 +36,6 @@ void Simulation::TickCrew() {
     if (crew.hungerTick < rules_.mess.every) { continue; }
     crew.hungerTick = 0;
 
-    // What the meal is worth to this hand: three food, but never more than it
-    // takes to reach the floor, and never more than is on the counter. Three
-    // bounds, one number, so a hand can neither eat the shelf empty nor go
-    // under five.
     const double spare = crew.hunger - rules_.mess.hungerFloor;
     double wanted = 0.0;
     if (spare > 0.0) {
@@ -85,7 +56,6 @@ void Simulation::TickCrew() {
     }
   }
 
-  // ---- starvation, slow, same law as bad air -----------------------------
   if (std::fmod(state_.crewTick, rules_.mess.starveEvery) == 0) {
     for (CrewMember& crew : crew_) {
       if (crew.hunger >= rules_.mess.starveAt) {
@@ -131,7 +101,6 @@ void Simulation::TickCleaner() {
     if (best == nullptr || CleanerInterval(crew) < CleanerInterval(*best)) { best = &crew; }
   }
   if (best == nullptr) { return; }
-  // One interval for the whole ship: only the best available cleaner counts.
   if (std::fmod(actionCounter_, CleanerInterval(*best)) != 0) { return; }
   for (CrewMember& crew : crew_) { crew.morale = std::min(100.0, crew.morale + 1); }
 }
@@ -173,7 +142,6 @@ void Simulation::TickPayroll() {
     return;
   }
 
-  // Insertion sort, dearest first. Stable for equal wages, as in the reference.
   for (std::size_t i = 1; i < owed.size(); ++i) {
     CrewMember* current = owed[i];
     std::size_t j = i;
@@ -208,15 +176,13 @@ void Simulation::TickPayroll() {
 }
 
 double Simulation::MaintCost() const {
-  // The work is priced in the drive's own clicks: it wears a step every
-  // wearEvery clicks, so a missing percent costs exactly the clicks that took it.
   const double step = rules_.engine.wearStep > 0 ? rules_.engine.wearStep : 1.0;
   const double clicksPerPercent = rules_.engine.wearEvery / step;
   return js::Ceil((100.0 - state_.engineCondition) * clicksPerPercent);
 }
 
 bool Simulation::MaintRunning() const {
-  return FindOngoing("maint") != nullptr || FindOngoing("maint-eng") != nullptr ||
+  return FindOngoing("maint") != nullptr ||
          FindOngoing("project-cooling") != nullptr;
 }
 
@@ -241,10 +207,6 @@ CrewMember* Simulation::AssignedCook() {
   return nullptr;
 }
 
-// ---------------------------------------------------------------------------
-// The read-only views the crew windows share. None of these moves a clock:
-// they are what a panel reads, not what a button does.
-// ---------------------------------------------------------------------------
 double Simulation::CrewWage(const CrewMember& crew) const { return WageOf(crew); }
 
 double Simulation::PayrollBill() const {
@@ -267,7 +229,10 @@ double Simulation::NavigatorFuelDiscount(const CrewMember& crew) const {
 
 std::string Simulation::JobThreshold(const CrewMember& crew) const {
   if (crew.job == "maintenance") {
-    return js::NumToString(rules_.engine.engineerAt) + "% condition";
+    const std::string pace = crew.jobAt >= 60.0
+                                 ? "every click"
+                                 : (crew.jobAt >= 45.0 ? "every 2 clicks" : "every 3 clicks");
+    return js::NumToString(rules_.engine.engineerAt) + "% condition (" + pace + ")";
   }
   if (crew.job == "filters") {
     const std::vector<AirStage>& stages = rules_.air.stages;
@@ -307,7 +272,6 @@ std::string Simulation::ActivityOf(const CrewMember& crew) const {
   return crew.activity;
 }
 
-// needKey(): the order of the tests is the order of what hurts.
 std::string Simulation::NeedKeyFor(const CrewMember& crew) const {
   if (crew.health < 75) { return "ill"; }
   if (AirStageIndex() <= 1) { return "air"; }
@@ -390,8 +354,6 @@ bool Simulation::TalkToCrew(const std::string& crewId) {
   }
   const std::string name = crew->name;
   const std::string said = AskCrew(*crew);
-  // First conversation for a new need gently lifts morale; talking is free
-  // and never advances clicks or blocks when morale is already full.
   if (crew->saidN == 0) {
     crew->morale = std::min(100.0, crew->morale + kConversationMorale);
   }
@@ -406,7 +368,6 @@ std::string Simulation::CrewNameOf(const std::string& id) const {
 
 const Task* Simulation::CrewBusy(const CrewMember& crew) const {
   if (crewClaims_.count(crew.id) != 0) {
-    // A claimed hand is mid-command; report "busy" without inventing a task.
     static const Task claimed = [] {
       Task task;
       task.id = "claimed";
@@ -429,45 +390,46 @@ const Task* Simulation::CrewBusy(const CrewMember& crew) const {
   return nullptr;
 }
 
-// ---------------------------------------------------------------------------
-// Automation: the three jobs that act on their own initiative.
-// ---------------------------------------------------------------------------
-
 void Simulation::AutoMaint() {
-  // The engineer's rule. He leaves the machine's button alone until the drive
-  // is down to engine.engineerAt. From that click on he presses it once on
-  // every click until the drive is full: from 60% that is four presses of 10%.
-  // Only the hand holding the maintenance job does this. Training and air do
-  // not move the line.
   CrewMember* worker = AssignedEngineer();
-  if (worker == nullptr || state_.engineCondition >= 100.0) {
+  if (worker == nullptr || state_.engineCondition >= 100.0 || EngineButtonChargeLeft() < 1.0) {
     state_.engineerRun = false;
     return;
   }
   if (state_.engineCondition <= rules_.engine.engineerAt) { state_.engineerRun = true; }
   if (!state_.engineerRun) { return; }
 
-  // A press he cannot make on this click waits for the next one; the run stays
-  // open until the drive is full.
+  /*
   if (maintClaim_ || projectClaim_ == "cooling" || FindOngoing("project-cooling") != nullptr) {
     return;
   }
-  // The commander's press already services the drive after this tick. Do not
-  // let the engineer service it a second time on that same press.
-  if (engineClicking_ || MaintRunning()) { return; }
-  if (CrewBusy(*worker) != nullptr) { return; }
+  */
+  if (engineClicking_ /* || MaintRunning() */) { return; }
+  // if (CrewBusy(*worker) != nullptr) { return; }
 
-  // His press is this action's click, so it lifts the drive without performing
-  // a second action of its own.
+  const long long interval =
+      worker->jobAt >= 60.0 ? 1 : (worker->jobAt >= 45.0 ? 2 : 3);
+  if (static_cast<long long>(actionCounter_) % interval != 0) { return; }
+
+  if (!TrySpendEngineButton()) {
+    state_.engineerRun = false;
+    return;
+  }
   ServiceDrive(worker->name);
-  if (state_.engineCondition >= 100.0) { state_.engineerRun = false; }
+  LogLine(worker->name + " pressed the maintenance button.");
+  if (state_.engineCondition >= 100.0 || EngineButtonChargeLeft() < 1.0) {
+    state_.engineerRun = false;
+  }
 }
 
 void Simulation::AutoFilters() {
   CrewMember* worker = AssignedFilterHand();
   if (o2Claim_ || state_.filterLife > 0 || StatValue("energy") <= 0) { return; }
   if (worker == nullptr || BankRunning()) { return; }
-  if (CrewBusy(*worker) != nullptr) { return; }
+  // if (CrewBusy(*worker) != nullptr) { return; }
+
+  const int line = std::clamp(static_cast<int>(worker->jobAt), 1, 3);
+  if (AirStageIndex() > line) { return; }
 
   if (BankReady()) {
     RunBank(worker->name + " started the filter bank. Air purified. +10 Pro-Action.");
@@ -482,30 +444,22 @@ void Simulation::AutoFilters() {
   }
   state_.rackWarned = false;
 
-  // One slot at a time, and only if he is not already on one.
   for (std::size_t i = 0; i < life_.slots.size(); ++i) {
     if (FindOngoing("o2s" + std::to_string(i)) != nullptr) { return; }
   }
-  // Two canisters go in as soon as the rack allows; the third waits for the air
-  // to fall to the stage his training lets him wait for. An untrained hand sits
-  // on it until the air is already bad, a trained one fills while there is still
-  // room to breathe.
+  /*
   int seated = 0;
   for (const CanisterSlot& slot : life_.slots) {
     if (slot.state == "installed") { ++seated; }
   }
-  // His training is what lets him fill while there is still room to breathe: an
-  // untrained hand waits for the air to actually fall, a taught one fills as soon
-  // as it leaves perfect.
   const int line = std::min(3, static_cast<int>(worker->jobAt));
   if (seated >= 2 && AirStageIndex() > line) { return; }
+  */
 
-  // He presses the O2 panel's own control: the same press the commander makes,
-  // made by a hand, so it runs at his rate and carries his name.
   for (std::size_t i = 0; i < life_.slots.size(); ++i) {
     if (life_.slots[i].state != "empty") { continue; }
     if (StartCanisterInstall(static_cast<int>(i), worker->name, false)) {
-      LogLine(worker->name + " seated a canister in " + life_.slots[i].name + ".");
+      // LogLine(worker->name + " seated a canister in " + life_.slots[i].name + ".");
     }
     return;
   }
@@ -513,12 +467,15 @@ void Simulation::AutoFilters() {
 
 void Simulation::AutoMess() {
   CrewMember* worker = AssignedCook();
-  if (cookClaim_ || projectClaim_ == "food" || FindOngoing("project-food") != nullptr) { return; }
-  if (worker == nullptr || FindOngoing("cook") != nullptr) { return; }
-  if (CrewBusy(*worker) != nullptr) { return; }
-  // She starts once the counter is at or below CookThreshold(*worker) and does
-  // not stop until it is full: cooking 1 ration, then another ration, until
-  // the rack is stocked.
+  if (cookClaim_ /* || projectClaim_ == "food" || FindOngoing("project-food") != nullptr */) {
+    return;
+  }
+  if (worker == nullptr) {
+    cookRestock_ = false;
+    return;
+  }
+  if (FindOngoing("cook") != nullptr) { return; }
+  // if (CrewBusy(*worker) != nullptr) { return; }
   if (!cookRestock_ && mess_.rack > CookThreshold(*worker)) { return; }
   if (mess_.rack >= mess_.capacity) {
     cookRestock_ = false;
@@ -529,25 +486,20 @@ void Simulation::AutoMess() {
     return;
   }
 
-  // One dry ration yields up to foodPerRation cooked food when the five-click
-  // batch finishes. A batch that would overshoot the ceiling is still cooked;
-  // the landing is clamped, so the counter ends full rather than past its lid.
+  /*
   const double cost = rules_.mess.foodPerRation;
   Task* task = AddOngoing("cook", "Cooking - " + worker->name, cost, "cook", "mess");
   if (task != nullptr) {
     task->by = worker->name;
-    mess_.rations -= 1.0;  // the ration is spent when the batch starts
+    mess_.rations -= 1.0;
   }
   cookRestock_ = true;
   LogLine(worker->name + " started cooking without being asked.");
+  */
+  StartCookingSelf(worker->name, false);
 }
 
-// ---------------------------------------------------------------------------
-// Loss
-// ---------------------------------------------------------------------------
-
 void Simulation::CheckLoss() {
-  bool lost = false;
   for (std::size_t index = crew_.size(); index-- > 0;) {
     CrewMember& crew = crew_[index];
     if (crew.health > 0) { continue; }
@@ -572,7 +524,6 @@ void Simulation::CheckLoss() {
       }
     }
     crew_.erase(crew_.begin() + static_cast<std::ptrdiff_t>(index));
-    lost = true;
   }
 
   if (!state_.gameOver.empty()) { return; }
@@ -580,7 +531,6 @@ void Simulation::CheckLoss() {
     state_.gameOver = StatValue("hull") <= 0 ? "The hull has failed." : "The crew have been lost.";
     LogLine("Ship lost. " + state_.gameOver);
   }
-  (void)lost;
 }
 
 }  // namespace ship
