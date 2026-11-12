@@ -828,3 +828,17 @@ You must append a compressed summary of **every single reply and action you take
 - Read for the other six ideas, nothing changed: acknowledging a finished process is free today (`PressWithoutCharge` around `Acknowledge`), as it was in the old script; the report screen prints "Ignore it and the situation will advance with your other clicks." and the briefing lists "Log and ignore"; the incident table equals the old script's (fracture: hull -8, -12, -10; surge: shield -12, energy -15) and no rule ties fuel to the hull or the shields to the energy; the strip at the bottom is `PaintActionBand` ("Actions", "Work in progress", "Confirm action"); a new voyage starts with 14 m3 of refined ore in a 20 m3 hold (the old script's hold was 40) and two surveys, and an "Ancient nav buoy" files up to two more surveys by itself.
 - Committed and pushed after this entry, into the open PR 72. The CI result is not known at the time of writing.
 - Awaiting from `@Aquaslopper`: the test of the engineer's rule; then his word on the other six.
+
+### Entry #060
+- **Timestamp:** 2026-11-12 00:21 UTC
+- Owner quoted my sentence "not only Jax. Rell on that job does the same." and wrote: "only the one who is asiqned to the job.. what is GOING ON WHY ISI THIS SO HARD".
+- No code changed in this turn. The rule as built in `95f0608` is already that: `AutoMaint` asks `AssignedEngineer()`, the hand whose job is `maintenance`. No other hand presses by himself. The commander's own press is unchanged.
+- The fault was my sentence. It was meant to say that the assignment decides and not the role printed on a hand's card; it read as if a second hand pressed as well.
+- Backing, from the runs of entry #059: nobody assigned, with Jax (role Engineer) aboard: no press (60, 59, 58). Jax assigned: four presses. Rell assigned instead of Jax: four presses.
+- The Engineer job is unique: `ApplyJobTo` in `Orders.cpp` takes it off the previous holder, so there is never more than one hand on it. Read in the code, not played.
+- A new voyage starts with nobody on any job (`crew.json`: `job` is empty for jax, bo and suri and absent for rell). Jax has the role "Engineer" but does not press until he is given the Engineer job in the Crew Quarters. Told to the owner, so that his test does not read as a failure.
+- CI run 43126225837 on `6054db3`: `check-id-prefixes` success, `build-windows` success with the artifact `Spaceship-Windows-x64` (20.9 MB), `test-linux` failure in the same last step as on `main`.
+- The workflow cancels a running build of the same ref when a new push arrives (`concurrency`, `cancel-in-progress: true`). Looked at before this entry was pushed: the run above had finished.
+- Not run in this turn: any build, the viewer, any check script.
+- Still open from entry #059: what training gives an engineer; the other six ideas.
+- Awaiting from `@Aquaslopper`: the test of the engineer's rule.
