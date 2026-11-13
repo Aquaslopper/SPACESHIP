@@ -117,6 +117,7 @@ class Simulation {
   std::string ExtractionDoneLabel(const Body& body) const;
   std::string ExtractionScanSummary(const Body& body) const;
   bool InRange(const Body& body) const;
+  bool InSpace() const;
   bool AtTarget(const Body& body) const;
   std::string CurrentSystemId() const;
   const Body* CurrentSystem() const;
