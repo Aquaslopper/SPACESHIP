@@ -782,7 +782,7 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
  const bool travelEnabled =
       reach && !hereTarget && sim.State().engineCondition > 0 &&
       extractTask == nullptr && energy > 0 && fuel > 0;
-      fuel >= (target == nullptr ? 0.0 : sim.MetricsFor(*target).fuel);
+      
   screen.progress.push_back(BuildProgressButton(
       sim, "travel", target != nullptr && target->type == "system" ? "Start Jump"
                                                                   : "Start Travel",
