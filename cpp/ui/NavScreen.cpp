@@ -779,9 +779,9 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
   actions.placement = "np-full";
   actions.Note(model.courseNote);
 
-  const bool travelEnabled =
+ const bool travelEnabled =
       reach && !hereTarget && sim.State().engineCondition > 0 &&
-      extractTask == nullptr && energy > 0 &&
+      extractTask == nullptr && energy > 0 && fuel > 0;
       fuel >= (target == nullptr ? 0.0 : sim.MetricsFor(*target).fuel);
   screen.progress.push_back(BuildProgressButton(
       sim, "travel", target != nullptr && target->type == "system" ? "Start Jump"
@@ -795,7 +795,7 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
     else if (sim.State().engineCondition <= 0) button.title = "Drive needs maintenance";
     else if (extractTask != nullptr) button.title = "Finish extraction";
     else if (energy <= 0) button.title = "Not enough energy";
-    else button.title = "Not enough fuel";
+    else button.title = "No fuel";
   } else if (screen.progress.back().state == ButtonState::Empty) {
     screen.progress.back().title = "Needs recharge";
   }

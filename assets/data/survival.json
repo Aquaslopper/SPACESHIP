@@ -5,13 +5,13 @@
   },
   "airStages": [
     {
-      "harm": 10,
+      "harm": 1,
       "slow": 2,
       "tone": "#b05a42",
       "word": "FOUL"
     },
     {
-      "harm": 10,
+      "harm": 2,
       "slow": 1.5,
       "tone": "#b05a42",
       "word": "BAD"
@@ -42,7 +42,7 @@
   "engine": {
     "engineerAt": 60,
     "warnBelow": 50,
-    "wearEvery": 4,
+    "wearEvery": 1,
     "wearStep": 1
   },
   "goods": [
@@ -208,7 +208,7 @@
       "name": "Coldwell debris field",
       "src": "Salvage",
       "state": "filed",
-      "value": 260
+      "value": 60
     },
     {
       "id": "sv2",

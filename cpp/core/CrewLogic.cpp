@@ -12,8 +12,8 @@ void Simulation::TickCrew() {
   const AirStage& air = AirSpec();
   state_.crewTick += 1;
 
-  if (air.harm > 0 && std::fmod(state_.crewTick, air.harm) == 0) {
-    for (CrewMember& crew : crew_) { crew.health = std::max(0.0, crew.health - 1); }
+  if (!crew_.empty() && air.harm > 0 && std::fmod(state_.crewTick, air.harm) == 0) {
+    for (CrewMember& crew : crew_) { crew.health = std::max(0.0, crew.health - 5); }
     LogLine("The air is telling on the crew.");
   }
 
@@ -35,6 +35,8 @@ void Simulation::TickCrew() {
     crew.hunger = std::min(100.0, crew.hunger + risePerClick);
     if (crew.hungerTick < rules_.mess.every) { continue; }
     crew.hungerTick = 0;
+    crew.saidKey.clear();
+    crew.saidN = 0;
 
     const double spare = crew.hunger - rules_.mess.hungerFloor;
     double wanted = 0.0;
@@ -46,6 +48,10 @@ void Simulation::TickCrew() {
       mess_.rack -= ate;
       crew.hunger = std::max(rules_.mess.hungerFloor,
                              crew.hunger - ate * rules_.mess.hungerPerFood);
+    }
+
+    if (wanted > ate) {
+      crew.hunger = std::min(100.0, crew.hunger + rules_.mess.hungerPerMeal);
     }
 
     if (ate > 0.0) {
@@ -223,7 +229,7 @@ double Simulation::PayrollDue() const {
 std::string Simulation::AirStageWord() const { return AirSpec().word; }
 
 double Simulation::NavigatorFuelDiscount(const CrewMember& crew) const {
-  const double at = crew.jobAt == 0 ? 1.0 : crew.jobAt;
+  const double at = crew.jobAt <= 0 ? 1.0 : crew.jobAt;
   return 4.0 * std::max(1.0, std::min(5.0, at));
 }
 
@@ -266,7 +272,6 @@ std::string Simulation::CrewWhere(const CrewMember& crew) const {
 
 std::string Simulation::ActivityOf(const CrewMember& crew) const {
   const Task* work = CrewBusy(crew);
-  if (work != nullptr && work->target == "social") { return "Sharing a meal"; }
   if (FindOngoing("doc-" + crew.id) != nullptr) { return "In medical care"; }
   if (work != nullptr && work->by == crew.name) { return work->label; }
   return crew.activity;
@@ -527,9 +532,14 @@ void Simulation::CheckLoss() {
   }
 
   if (!state_.gameOver.empty()) { return; }
-  if (StatValue("hull") <= 0 || crew_.empty()) {
-    state_.gameOver = StatValue("hull") <= 0 ? "The hull has failed." : "The crew have been lost.";
+  const Body* here = FindBodyById(map_.here);
+  const bool atWorld = here != nullptr && (here->type == "planet" || here->type == "moon");
+  if (StatValue("hull") <= 0) {
+    state_.gameOver = "The hull has failed.";
     LogLine("Ship lost. " + state_.gameOver);
+  } else if (StatValue("fuel") <= 0 && !state_.docked && !atWorld) {
+    state_.gameOver = "Adrift with no fuel.";
+    LogLine("Lost in space. " + state_.gameOver);
   }
 }
 

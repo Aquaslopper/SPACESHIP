@@ -155,7 +155,7 @@ struct Options {
   bool soundEffects = true;
   bool music = true;
   double audioLevel = 0.4;
-  double displayGamma = 1.0;
+  double displayGamma = 1.2;
   double displayBrightness = 1.0;
   int fontStep = 0;
   bool fullscreen = false;
@@ -204,8 +204,8 @@ struct SurveyRecord {
 
 struct MapView {
   std::string layer = "system";
-  std::string here = "kessler";
-  std::string sector = "gal-inner";
+  std::string here;
+  std::string sector;
   double zoom = 1;
   double cx = 319;
   double cy = 139;
@@ -257,7 +257,7 @@ struct Cargo {
 struct Mess {
   double rack = 18;
   double capacity = 24;
-  double rations = 21;
+  double rations = 5;
   double rationCapacity = 24;
 };
 
@@ -301,14 +301,14 @@ struct GameState {
   bool rackWarned = false;
   bool rackWarnedMess = false;
 
-  std::string crewSel = "rell";
+  std::string crewSel;
   std::map<std::string, bool> pendingOrders;
   double crewTick = 0;
-  double shiplets = 340;
+  double shiplets = 200;
   double payTick = 0;
   bool docked = false;
-  double fuelCells = 12;
-  double repairKits = 3;
+  double fuelCells = 6;
+  double repairKits = 6;
   double lotSerial = 0;
   std::map<std::string, std::string> contracts;
   std::vector<Passenger> passengers;

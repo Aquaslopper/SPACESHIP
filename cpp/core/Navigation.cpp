@@ -426,7 +426,7 @@ Simulation::NavMetrics Simulation::MetricsFor(const Body& body) const {
     if (body.id == map_.here) { distance = 0; }
   }
 
-  // The navigator shortens the crossing itself: a plotted course is fewer clicks
+   // The navigator shortens the crossing itself: a plotted course is fewer clicks
   // under way, and training buys a shorter one. A busy navigator plots nothing,
   // so only a free hand counts. Fuel follows the distance, so it is not
   // discounted a second time.
@@ -439,11 +439,12 @@ Simulation::NavMetrics Simulation::MetricsFor(const Body& body) const {
   if (distance > 0.0 && saving > 0.0) {
     distance = std::max(1.0, js::Round(distance * (100.0 - saving) / 100.0));
   }
-  const double drivePercent = state_.upgrades.count("drive") != 0 && state_.upgrades.at("drive") ? 80.0 : 100.0;
 
   NavMetrics metrics;
   metrics.dist = distance;
-  metrics.fuel = js::Ceil(distance * drivePercent / 100.0);
+  // One click under way costs one point of fuel. Nothing is paid up front: the
+  // tank falls with each click the ship spends flying.
+  metrics.fuel = 1.0;
   metrics.total = distance + 1;
 
   const double ly = distance * map_.lyPerAction;
@@ -467,7 +468,7 @@ bool Simulation::StartTravel() {
   if (!state_.navTarget.has_value()) { return false; }
   const Body* body = FindBodyById(*state_.navTarget);
   if (body == nullptr || !InRange(*body) || AtTarget(*body)) { return false; }
-  if (FindOngoing("travel") != nullptr || FindOngoing("extract") != nullptr) { return false; }
+  if (FindOngoing("extract") != nullptr) { return false; }
   if (state_.engineCondition <= 0 || StatValue("energy") <= 0) { return false; }
   // Docking never blocks a crossing. A ship that plots a jump from a berth
   // leaves the berth as part of the same departure: no second action, no
@@ -482,10 +483,17 @@ bool Simulation::StartTravel() {
     }
   }
 
+  // Steering away mid-flight. A course already under way is finished where the
+  // ship has got to, not at the target it was aimed at: the task is closed on
+  // the spot and the commander takes the report, exactly as at any arrival.
+  // ArriveAt is not called, so the old target is never reached.
+  if (Task* under = FindOngoing("travel")) {
+    under->left = 0;
+    under->state = "done";
+  }
+
   const NavMetrics metrics = MetricsFor(*body);
-  if (StatValue("fuel") < metrics.fuel) { return false; }
-  Stat* fuel = FindStat("fuel");
-  if (fuel != nullptr) { fuel->value -= metrics.fuel; }
+  // Nothing is paid here. The tank falls with each click under way.
 
   // Order matters. The initiating action is spent FIRST, so the tick it causes
   // cannot eat a step of the journey it starts.

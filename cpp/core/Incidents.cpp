@@ -120,19 +120,12 @@ void Simulation::TickIncidents() {
     if (incident.left > 0) { continue; }
 
     incident.stage += 1;
-    if (incident.stage >= static_cast<int>(spec->stages.size())) {
-      events_.erase(events_.begin() + static_cast<std::ptrdiff_t>(i));
-      continue;
-    }
+    if (incident.stage >= static_cast<int>(spec->stages.size())) { continue; }
+
     const IncidentType::Stage& step = spec->stages[static_cast<std::size_t>(incident.stage)];
     IncidentEffect(step);
     LogLine(step.text);
-
-    if (step.ticks <= 0) {
-      events_.erase(events_.begin() + static_cast<std::ptrdiff_t>(i));
-    } else {
-      incident.left = step.ticks;
-    }
+    incident.left = step.ticks;
   }
 
   // ---- open new ones -----------------------------------------------------
@@ -145,7 +138,7 @@ void Simulation::TickIncidents() {
     if (actionCounter_ < spec.first) { continue; }
     if (spec.every <= 0) { continue; }
     if (std::fmod(actionCounter_ - spec.first, spec.every) != 0) { continue; }
-    if (spec.id == "crew" && crew_.size() < 2) { continue; }
+    if ((spec.id == "crew" || spec.kind == "Crew") && crew_.size() < 2) { continue; }
 
     Incident incident;
     incident.id = spec.id + "-" + std::to_string(static_cast<long long>(actionCounter_));
@@ -177,7 +170,7 @@ bool Simulation::SpawnMapIncident(const std::string& typeId, const std::string& 
       break;
     }
   }
-  if (spec == nullptr || spec->stages.empty() || spec->stages[0].ticks <= 0) { return false; }
+  if ((spec->id == "crew" || spec->kind == "Crew") && crew_.size() < 2) { return false; }
   for (const Incident& live : events_) {
     if (live.type == typeId) { return false; }
   }
