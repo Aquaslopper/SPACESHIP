@@ -532,12 +532,11 @@ void Simulation::CheckLoss() {
   }
 
   if (!state_.gameOver.empty()) { return; }
-  const Body* here = FindBodyById(map_.here);
-  const bool atWorld = here != nullptr && (here->type == "planet" || here->type == "moon");
+
   if (StatValue("hull") <= 0) {
     state_.gameOver = "The hull has failed.";
     LogLine("Ship lost. " + state_.gameOver);
-  } else if (StatValue("fuel") <= 0 && !state_.docked && !atWorld) {
+  } else if (StatValue("fuel") <= 0 && InSpace()) {
     state_.gameOver = "Adrift with no fuel.";
     LogLine("Lost in space. " + state_.gameOver);
   }
