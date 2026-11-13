@@ -128,7 +128,7 @@
     "cookBelow": 10,
     "hungerPerMeal": 10,
     "hungerPerFood": 5,
-    "hungerFloor": 5
+    "hungerFloor": 0
   },
   "messEvery": 10,
   "messStarve": 80,
