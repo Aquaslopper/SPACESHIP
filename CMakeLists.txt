@@ -190,7 +190,6 @@ add_library(spaceship_core STATIC
   cpp/core/Charges.cpp
   cpp/core/Incidents.cpp
   cpp/core/Awards.cpp
-  cpp/core/Trace.cpp
   cpp/core/Navigation.cpp
   cpp/core/Orders.cpp
   cpp/core/Economy.cpp

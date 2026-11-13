@@ -322,8 +322,6 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "spaceship_console: %s\n", error.c_str());
         return 1;
       }
-    } else if (command == "trace") {
-      std::printf("TRACE %s\n", simulation.TraceJson().c_str());
     } else {
       std::fprintf(stderr, "spaceship_console: line %d: unknown command '%s'\n", lineNumber,
                    command.c_str());
@@ -331,6 +329,5 @@ int main(int argc, char** argv) {
     }
   }
 
-  std::printf("END %s\n", simulation.TraceJson().c_str());
   return 0;
 }

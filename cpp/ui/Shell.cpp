@@ -236,6 +236,7 @@ std::vector<SideBlock> SideBlocks(const Simulation& sim) {
   crew.key = "crew";
   crew.title = "Crew";
   crew.open = open("crew");
+  crew.empty = "No crew aboard.";
   for (const CrewMember& member : sim.Crew()) {
     crew.rows.push_back({member.name, ShortRole(member.role), true, false, "pair", ""});
   }

@@ -169,7 +169,7 @@ Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& se
   state.airHold = catalog.rules.air.holdMax;
   state.rackWarned = false;
   state.rackWarnedMess = false;
-  state.crewSel = "rell";
+  state.crewSel = sim.crew_.empty() ? std::string() : sim.crew_.front().id;
   state.crewTick = 0;
   state.shiplets = 200;
   state.payTick = 0;
@@ -250,7 +250,10 @@ void Simulation::FreeCommit(const std::string& detail) {
 
 void Simulation::TickWorld() {
   WearEngine();
-  if (static_cast<long long>(actionCounter_) % 4 == 0) { ClampStat("energy", -1); }
+   // A tank under 40% drags the energy down with it: the drive keeps drawing on
+  // a reserve that is no longer there.
+  const double energyEvery = StatValue("fuel") < 40.0 ? 2.0 : 4.0;
+  if (std::fmod(actionCounter_, energyEvery) == 0.0) { ClampStat("energy", -1); }
   TickFilters();
   TickCrew();
   TickCleaner();
@@ -294,7 +297,6 @@ void Simulation::ClampStat(const std::string& id, double delta) {
   stat->value = std::max(0.0, std::min(100.0, stat->value + delta));
 
   if (id == "energy" && before > 0 && stat->value == 0) {
-    if (state_.filterLife > 0) { state_.airHold = rules_.air.holdMax; }
     LogLine("Power exhausted. The filter bank has stopped; restore energy to restart it.");
   } else if (id == "energy" && before == 0 && stat->value > 0) {
     LogLine("Power restored. Any charged filter bank resumes without another bonus.");
@@ -431,10 +433,7 @@ bool Simulation::ApplyJob(const std::string& crewId, const std::string& jobId) {
   CrewMember* crew = FindCrew(crewId);
   if (crew == nullptr) { return false; }
 
-  const JobDef* job = nullptr;
-  for (const JobDef& candidate : jobs_) {
-    if (candidate.id == jobId) { job = &candidate; }
-  }
+    const JobDef* job = FindJobDef(jobId);
   if (!jobId.empty() && job == nullptr) { return false; }
 
   if (job != nullptr && job->unique) {
@@ -444,7 +443,6 @@ bool Simulation::ApplyJob(const std::string& crewId, const std::string& jobId) {
       LogLine(other.name + " was relieved of the " + Lower(job->label) + " job.");
     }
   }
-
   crew->job = jobId;
   if (job != nullptr && !job->room.empty()) { crew->room = job->room; }
 

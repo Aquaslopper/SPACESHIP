@@ -156,10 +156,10 @@
       "type": "salvage"
     },
     {
-      "autoClear": true,
-      "hasOnAcknowledge": false,
-      "hasOnDone": true,
-      "quiet": true,
+      "autoClear": false,
+      "hasOnAcknowledge": true,
+      "hasOnDone": false,
+      "quiet": false,
       "type": "surveyPackage"
     },
     {
@@ -246,7 +246,7 @@
     {
       "group": "Survival",
       "id": "hazards",
-      "text": "Reports appear in Events as clicks pass. Left open, a report gets worse and damages the ship: a mechanical report the hull, an electrical report the energy. With the hull at 60% or less the same damage also hits the fuel; with the energy at 60% or less the same loss also hits the shields. Resolve a report from its page for one click. Most need a repair kit; without one the report runs its course. Hull failure or the loss of all crew ends the voyage. Load a saved slot or start a new voyage after a loss.",
+      "text":  "Reports appear in Events as clicks pass. Left open, a report gets worse and damages the ship: a mechanical report the hull, an electrical report the energy. With the hull at 60% or less the same damage also hits the fuel; with the energy at 60% or less the same loss also hits the shields. Resolve a report from its page for one click. Most need a repair kit; without one the report runs its course. Hull failure ends the voyage. Load a saved slot or start a new voyage after a loss.",
       "title": "Incidents and loss"
     },
     {
@@ -276,7 +276,7 @@
       "id": "jobs",
       "link": "quarters",
       "linkLabel": "Open Crew Quarters",
-      "text": "In Crew Quarters, stage jobs and orders, then issue the sheet. Work takes the listed clicks and training has a fee. A navigator reduces departure fuel use, a cleaner supports morale, and an engineer, filter hand and cook can work autonomously. Wages are paid from the ship's purse on the click clock.",
+      "text": "Hire crew at a station's hiring hall or tavern. In Crew Quarters, stage jobs and orders, then issue the sheet. Work takes the listed clicks and training has a fee. A navigator reduces departure fuel use, a cleaner supports morale, and an engineer, filter hand and cook can work autonomously. Wages are paid from the ship's purse on the click clock.",
       "title": "Jobs, training and wages"
     },
     {

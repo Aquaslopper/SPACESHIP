@@ -117,6 +117,7 @@ class Simulation {
   std::string ExtractionDoneLabel(const Body& body) const;
   std::string ExtractionScanSummary(const Body& body) const;
   bool InRange(const Body& body) const;
+  bool InSpace() const;
   bool AtTarget(const Body& body) const;
   std::string CurrentSystemId() const;
   const Body* CurrentSystem() const;
@@ -257,8 +258,6 @@ class Simulation {
   bool LoadFromFile(const std::string& path, std::string* error);
   static bool ValidSave(const std::string& text, const Catalog& catalog, std::string* why);
 
-  std::string TraceJson() const;
-
   double StatValue(const std::string& id) const;
   Stat* FindStat(const std::string& id);
   void ClampStat(const std::string& id, double delta);
@@ -315,6 +314,7 @@ class Simulation {
   void TickWorld();
 
   void WearEngine();
+  void TickDryFuel();
   void TickFilters();
 
   void TickCrew();

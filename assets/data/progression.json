@@ -299,22 +299,22 @@
       "stages": [
         {
           "text": "A hairline fracture needs attention.",
-          "ticks": 10
+          "ticks": 2
         },
         {
           "hull": -8,
           "text": "The fracture is spreading.",
-          "ticks": 10
+          "ticks": 2
         },
         {
           "hull": -12,
           "text": "A bulkhead is losing pressure.",
-          "ticks": 8
+          "ticks": 2
         },
         {
-          "hull": -10,
+          "hull": -50,
           "text": "The crew sealed the section, but the hull is damaged.",
-          "ticks": 0
+          "ticks": 2
         }
       ],
       "title": "Hull micro-fracture"
@@ -329,24 +329,24 @@
       "stages": [
         {
           "text": "A circuit is drawing uneven power.",
-          "ticks": 9
+          "ticks": 2
         },
         {
           "energy": -12,
           "text": "The surge is pulling power out of the reserve.",
-          "ticks": 9
+          "ticks": 2
         },
         {
-          "energy": -15,
+          "energy": -35,
           "text": "The circuit trips and drains the reserve.",
-          "ticks": 0
+          "ticks": 2
         }
       ],
       "title": "Power surge"
     },
     {
-      "every": 140,
-      "first": 110,
+      "every": 70,
+      "first": 30,
       "id": "crew",
       "kind": "Crew",
       "remedy": "Mediate the dispute",
@@ -354,17 +354,17 @@
       "stages": [
         {
           "text": "Two hands are arguing over shifts.",
-          "ticks": 12
+          "ticks": 1
         },
         {
-          "morale": -6,
+          "morale": -16,
           "text": "The disagreement is affecting the whole crew.",
-          "ticks": 10
+          "ticks": 1
         },
         {
-          "morale": -6,
+          "morale": -26,
           "text": "The argument subsides, leaving tempers frayed.",
-          "ticks": 0
+          "ticks": 1
         }
       ],
       "title": "Crew dispute"
@@ -379,24 +379,24 @@
       "stages": [
         {
           "text": "A radiation front is approaching the ship.",
-          "ticks": 12
+          "ticks": 2
         },
         {
-          "shield": -12,
+          "shield": -32,
           "text": "The front is stressing the shields.",
-          "ticks": 9
+          "ticks": 2
         },
         {
-          "hull": -8,
+          "hull": -55,
           "text": "The front has passed, leaving the hull scorched.",
-          "ticks": 0
+          "ticks": 2
         }
       ],
       "title": "Radiation front"
     },
     {
-      "every": 200,
-      "first": 165,
+      "every": 20,
+      "first": 15,
       "id": "static",
       "kind": "Contact",
       "remedy": "Filter and acknowledge the signal",
@@ -405,17 +405,17 @@
       "stages": [
         {
           "text": "An unknown signal is interrupting routine traffic.",
-          "ticks": 12
+          "ticks": 2
         },
         {
           "morale": -4,
           "text": "The interference is wearing on the crew.",
-          "ticks": 10
+          "ticks": 1
         },
         {
-          "energy": -5,
+          "energy": -1,
           "text": "The signal fades back into the static.",
-          "ticks": 0
+          "ticks": 1
         }
       ],
       "title": "Unidentified signal"

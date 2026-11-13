@@ -7,10 +7,11 @@
 namespace ship {
 
 struct EngineRules {
-  double wearEvery = 4;
+  double wearEvery = 2;
   double wearStep = 1;
   double warnBelow = 50;
   double engineerAt = 60;
+  double dryEnergy = 1;
 };
 
 struct AirStage {
@@ -36,8 +37,8 @@ struct MessRules {
   double rackStart = 18;
   double capacity = 24;
   double every = 25;
-  double starveAt = 90;
-  double starveEvery = 8;
+  double starveAt = 80;
+  double starveEvery = 4;
   double rationStart = 21;
   double rationCapacity = 24;
   double foodPerRation = 5;

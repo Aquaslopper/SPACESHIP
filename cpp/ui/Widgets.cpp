@@ -119,7 +119,7 @@ std::string TierLabel(const Simulation& sim, const std::string& tier) {
 const char* UnmeteredKey() { return "\x01unmetered"; }
 
 bool KeepsOwnMechanic(const std::string& taskId) {
-  return taskId.compare(0, 2, "o2") == 0 || taskId == "cook";
+  return taskId.compare(0, 2, "o2") == 0 || taskId == "cook" || taskId == "engine-click";
 }
 
 double ChargeLeft(const Simulation& sim, const std::string& key, const std::string& tier) {

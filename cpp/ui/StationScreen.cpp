@@ -830,51 +830,12 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     }
   }
 
-  {
-    StationRow heading;
-    heading.label = "Hiring hall";
-    heading.reading = true;
-    yard.rows.push_back(heading);
-  }
-  for (const CandidateDefinition& candidate : sim.World().candidates) {
-    if (!candidate.port.empty() && candidate.port != portId) { continue; }
-    const CrewDefinition& person = candidate.crew;
-    const std::string name = person.name;
-    const bool already = Hired(sim, person.id);
-    const bool berth = static_cast<double>(sim.Crew().size() + sim.Passengers().size()) <
-                       sim.Ship().Berths();
-    StationRow row;
-    row.id = "hire:" + person.id;
-    row.label = "Hire " + name + " - " + Num(candidate.fee) + " sh";
-    row.details.push_back(name + ": " + person.traits + "; health " + Num(person.health) + "%, " +
-                          (person.skill.empty() ? std::string("untrained") : person.skill) + ".");
-    row.details.push_back("Role: " + person.role + ". Fee: " + Num(candidate.fee) + " sh.");
-    row.details.push_back("Berths: " + Num(sim.Crew().size() + sim.Passengers().size()) +
-                          " of " + Num(sim.Ship().Berths()) + " filled.");
-    if (already) {
-      row.cost = kDone;
-      row.commit = "Hired";
-      row.enabled = false;
-      row.done = true;
-      row.details.push_back("Already signed aboard; the fee is not asked twice.");
-    } else {
-      row.cost = kFree;
-      row.free = true;
-      row.commit = "Hire - " + Num(candidate.fee) + " sh";
-      row.enabled = berth && purse >= candidate.fee;
-      row.details.push_back("Shiplets only: no click spent.");
-      if (!row.enabled) {
-        row.details.push_back(berth ? "Not affordable from this purse."
-                                    : "No berth free for another hand.");
-      }
-    }
-    yard.rows.push_back(row);
-  }
+
 
   // ---- 7. the tavern / bar -------------------------------------------------
   StationColumn tavern;
   tavern.id = "tavern";
-  tavern.title = "Tavern / Bar";
+  tavern.title = "The bar at " + model.portName;
   tavern.badge = "the people at this station";
   tavern.notes.push_back(tip);
   tavern.notes.push_back("Station training only finishes while docked.");
@@ -923,11 +884,49 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     }
     tavern.rows.push_back(row);
   }
-
-  // The Mission board and Tavern / Bar cards are not offered. The starmap sits
-  // directly under the shop, the trade board under that, then the sales counter
-  // and the yard.
-  model.columns = {market, starmap, trade, sales, yard};
+  
+  {
+    StationRow heading;
+    heading.label = "Hiring hall";
+    heading.reading = true;
+    tavern.rows.push_back(heading);
+  }
+  for (const CandidateDefinition& candidate : sim.World().candidates) {
+    if (!candidate.port.empty() && candidate.port != portId) { continue; }
+    const CrewDefinition& person = candidate.crew;
+    const std::string name = person.name;
+    const bool already = Hired(sim, person.id);
+    const bool berth = static_cast<double>(sim.Crew().size() + sim.Passengers().size()) <
+                       sim.Ship().Berths();
+    StationRow row;
+    row.id = "hire:" + person.id;
+    row.label = "Hire " + name + " - " + Num(candidate.fee) + " sh";
+    row.details.push_back(name + ": " + person.traits + "; health " + Num(person.health) + "%, " +
+                          (person.skill.empty() ? std::string("untrained") : person.skill) + ".");
+    row.details.push_back("Role: " + person.role + ". Fee: " + Num(candidate.fee) + " sh.");
+    row.details.push_back("Berths: " + Num(sim.Crew().size() + sim.Passengers().size()) +
+                          " of " + Num(sim.Ship().Berths()) + " filled.");
+    if (already) {
+      row.cost = kDone;
+      row.commit = "Hired";
+      row.enabled = false;
+      row.done = true;
+      row.details.push_back("Already signed aboard; the fee is not asked twice.");
+    } else {
+      row.cost = kFree;
+      row.free = true;
+      row.commit = "Hire - " + Num(candidate.fee) + " sh";
+      row.enabled = berth && purse >= candidate.fee;
+      row.details.push_back("Shiplets only: no click spent.");
+      if (!row.enabled) {
+        row.details.push_back(berth ? "Not affordable from this purse."
+                                    : "No berth free for another hand.");
+      }
+    }
+    tavern.rows.push_back(row);
+  }
+  // The Mission board are not offered.
+  model.columns = {market, starmap, trade, sales, yard, tavern};
   NormalizeStationSelection(model, model.selection);
   return model;
 }
