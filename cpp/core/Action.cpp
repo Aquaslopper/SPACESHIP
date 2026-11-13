@@ -297,6 +297,9 @@ void Simulation::ClampStat(const std::string& id, double delta) {
   stat->value = std::max(0.0, std::min(100.0, stat->value + delta));
 
   if (id == "energy" && before > 0 && stat->value == 0) {
+    // The bank dies with the power, not with its charge: the cabin gets the
+    // same hold it gets when a bank runs dry.
+    state_.airHold = rules_.air.holdMax;
     LogLine("Power exhausted. The filter bank has stopped; restore energy to restart it.");
   } else if (id == "energy" && before == 0 && stat->value > 0) {
     LogLine("Power restored. Any charged filter bank resumes without another bonus.");
