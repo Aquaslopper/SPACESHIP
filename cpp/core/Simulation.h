@@ -315,6 +315,7 @@ class Simulation {
   void TickWorld();
 
   void WearEngine();
+  void TickDryFuel();
   void TickFilters();
 
   void TickCrew();

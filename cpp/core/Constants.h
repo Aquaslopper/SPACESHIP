@@ -11,6 +11,9 @@ struct EngineRules {
   double wearStep = 1;
   double warnBelow = 50;
   double engineerAt = 60;
+  // Energy a click costs while the drive fuel is at nothing. The tank is not a
+  // wall; it is the reactor's load.
+  double dryEnergy = 1;
 };
 
 struct AirStage {

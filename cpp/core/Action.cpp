@@ -251,6 +251,7 @@ void Simulation::FreeCommit(const std::string& detail) {
 void Simulation::TickWorld() {
   WearEngine();
   if (static_cast<long long>(actionCounter_) % 4 == 0) { ClampStat("energy", -1); }
+  TickDryFuel();
   TickFilters();
   TickCrew();
   TickCleaner();
@@ -263,6 +264,21 @@ void Simulation::TickWorld() {
   AutoMess();
   TickIncidents();
   CheckLoss();
+}
+
+// A dry tank does not stop the ship; it drains the power. Every click spent
+// with the drive fuel at nothing costs energy equal to what the click cost the
+// tank - a ship limping on an empty reserve works its reactor harder for the
+// same distance. This is the coupling the gauges have always been read as
+// having: the reserve falls, and the lights go with it. The rate per click is
+// engine.dryEnergy, and it is the only number here.
+void Simulation::TickDryFuel() {
+  if (std::max(0.0, std::min(100.0, StatValue("fuel"))) > 0.0) { return; }
+  if (StatValue("energy") <= 0) { return; }
+  ClampStat("energy", -rules_.engine.dryEnergy);
+  if (StatValue("energy") <= 0) {
+    LogLine("The drive is running on an empty reserve and the power has gone with it.");
+  }
 }
 
 void Simulation::ProAction(double n) {
