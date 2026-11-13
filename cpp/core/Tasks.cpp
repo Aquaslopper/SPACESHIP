@@ -157,7 +157,8 @@ void Simulation::AdvanceTasks(double n) {
     const bool needsDrive = task->type == "travel";
     if (needsDrive && (state_.engineCondition <= 0 || StatValue("energy") <= 0)) { continue; }
     if (needsPower && StatValue("energy") <= 0) { continue; }
-
+    if (task->type == "travel") { ClampStat("fuel", -1); }
+    
     task->left -= n;
     if (task->left <= 0) {
       task->left = 0;
