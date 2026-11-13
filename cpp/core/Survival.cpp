@@ -48,7 +48,7 @@ void Simulation::TickFilters() {
 
     state_.filterLife = 0;
     for (CanisterSlot& slot : life_.slots) { slot.state = "empty"; }
-    state_.airHold = rules_.air.holdMax;
+    state_.airHold = 0;
     LogLine("Filter bank spent. The cabin air will hold for " +
             js::NumToString(rules_.air.holdMax) + " clicks.");
     return;
