@@ -126,13 +126,13 @@
     "rationCapacity": 24,
     "foodPerRation": 5,
     "cookBelow": 10,
-    "hungerPerMeal": 15,
+    "hungerPerMeal": 10,
     "hungerPerFood": 5,
     "hungerFloor": 5
   },
   "messEvery": 25,
-  "messStarve": 90,
-  "messStarveEvery": 8,
+  "messStarve": 80,
+  "messStarveEvery": 4,
   "reports": {
     "energyLine": 60,
     "hullLine": 60
