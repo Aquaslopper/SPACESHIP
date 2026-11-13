@@ -735,6 +735,12 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
       distance.Field("Transit", metrics.transit);
       distance.Field("Click cost", Plur(metrics.total, "action"));
       distance.Field("Fuel required", Num(metrics.fuel) + "%");
+      if (sim.StatValue("fuel") < metrics.fuel) {
+        distance.Field("In the tank", Num(sim.StatValue("fuel")) + "% - short by " +
+                                          Num(metrics.fuel - sim.StatValue("fuel")) +
+                                          "%. The drive goes dry on the way.");
+      }
+
       distance.Field("Navigator",
                      navigator == nullptr
                          ? std::string("None available")
@@ -754,7 +760,6 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
   const bool canScanTarget = target != nullptr && sim.CanScan(*target);
   const bool hereTarget = target != nullptr && sim.AtTarget(*target);
   const double energy = sim.StatValue("energy");
-  const double fuel = sim.StatValue("fuel");
 
   screen.bandNote.clear();
   if (reach && !hereTarget) {
@@ -779,10 +784,11 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
   actions.placement = "np-full";
   actions.Note(model.courseNote);
 
+  // The button is never closed for want of fuel: a course that costs more than
+  // the tank holds is still flyable, and the ship pays for it by running dry.
   const bool travelEnabled =
       reach && !hereTarget && sim.State().engineCondition > 0 &&
-      extractTask == nullptr && energy > 0 &&
-      fuel >= (target == nullptr ? 0.0 : sim.MetricsFor(*target).fuel);
+      extractTask == nullptr && energy > 0;
   screen.progress.push_back(BuildProgressButton(
       sim, "travel", target != nullptr && target->type == "system" ? "Start Jump"
                                                                   : "Start Travel",
@@ -794,8 +800,7 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
     else if (!reach) button.title = "Out of range";
     else if (sim.State().engineCondition <= 0) button.title = "Drive needs maintenance";
     else if (extractTask != nullptr) button.title = "Finish extraction";
-    else if (energy <= 0) button.title = "Not enough energy";
-    else button.title = "Not enough fuel";
+    else button.title = "Not enough energy";
   } else if (screen.progress.back().state == ButtonState::Empty) {
     screen.progress.back().title = "Needs recharge";
   }

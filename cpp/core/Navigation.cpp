@@ -482,10 +482,14 @@ bool Simulation::StartTravel() {
     }
   }
 
+  // A crossing is never refused for want of fuel. The plotted course is flown
+  // and the reserve runs dry on the way: the drive is what carries a ship, and
+  // a ship that cannot pay the course is lost in space rather than held at the
+  // berth. The fuel the course asked for is still spent, capped at what is in
+  // the tank, so a dry ship arrives empty and not in debt.
   const NavMetrics metrics = MetricsFor(*body);
-  if (StatValue("fuel") < metrics.fuel) { return false; }
   Stat* fuel = FindStat("fuel");
-  if (fuel != nullptr) { fuel->value -= metrics.fuel; }
+  if (fuel != nullptr) { fuel->value = std::max(0.0, fuel->value - metrics.fuel); }
 
   // Order matters. The initiating action is spent FIRST, so the tick it causes
   // cannot eat a step of the journey it starts.

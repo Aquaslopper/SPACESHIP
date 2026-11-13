@@ -154,8 +154,11 @@ void Simulation::AdvanceTasks(double n) {
     const bool needsPower = task->type == "scan" || task->type == "salvage" ||
                             task->type == "extract" ||
                             (task->type == "shipProject" && task->target != "social");
+    // A crossing under way is never stopped in the dark. Only the drive failing
+    // ends a passage early; the power being out means the ship limps, not that
+    // it is standing still in the middle of nowhere with no way to finish.
     const bool needsDrive = task->type == "travel";
-    if (needsDrive && (state_.engineCondition <= 0 || StatValue("energy") <= 0)) { continue; }
+    if (needsDrive && state_.engineCondition <= 0) { continue; }
     if (needsPower && StatValue("energy") <= 0) { continue; }
 
     task->left -= n;
