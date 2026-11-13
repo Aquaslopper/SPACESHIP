@@ -70,12 +70,11 @@ Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& se
   sim.scanCost_ = catalog.rules.scanCost;
 
   // ---- the crew -----------------------------------------------------------
-  // A voyage begins with the commander alone. Everyone else is standing in a
-  // bar somewhere and is hired at a berth; the pool in crew.json/candidates is
-  // that pool. `startingCrew` is still read, but only the first entry is the
-  // commander's own record - the ship is not handed four hands for free.
-  if (!catalog.startingCrew.empty()) {
-    sim.crew_.push_back(MakeCrew(catalog.startingCrew.front()));
+  // The starting roster is data: crew.json's "crew" array. It is empty, so a
+  // voyage begins with the commander alone and everyone else is hired at a
+  // berth. Do not special-case this here - the file says who is aboard.
+  for (const CrewDefinition& def : catalog.startingCrew) {
+    sim.crew_.push_back(MakeCrew(def));
   }
 
   // ---- hull readouts -----------------------------------------------------
@@ -177,7 +176,7 @@ Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& se
   state.airHold = catalog.rules.air.holdMax;
   state.rackWarned = false;
   state.rackWarnedMess = false;
-  state.crewSel = "rell";
+  state.crewSel = sim.crew_.empty() ? std::string() : sim.crew_.front().id;
   state.crewTick = 0;
   state.shiplets = 200;
   state.payTick = 0;

@@ -924,10 +924,11 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     tavern.rows.push_back(row);
   }
 
-  // The Mission board and Tavern / Bar cards are not offered. The starmap sits
-  // directly under the shop, the trade board under that, then the sales counter
-  // and the yard.
-  model.columns = {market, starmap, trade, sales, yard};
+  // The starmap sits directly under the shop, the trade board under that, then
+  // the sales counter, the yard and the tavern. The Mission board is not
+  // offered. The tavern is built above whether or not it is listed here, so a
+  // column left out of this line is a column the player never sees.
+  model.columns = {market, starmap, trade, sales, yard, tavern};
   NormalizeStationSelection(model, model.selection);
   return model;
 }
