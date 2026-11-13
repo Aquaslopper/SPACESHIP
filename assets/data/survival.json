@@ -43,7 +43,7 @@
     "burnRate": 1,
     "engineerAt": 60,
     "warnBelow": 50,
-    "wearEvery": 4,
+    "wearEvery": 2,
     "wearStep": 1
   },
   "goods": [
