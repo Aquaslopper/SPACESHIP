@@ -541,6 +541,26 @@ double TradePays(const Body& destination, const std::string& goodId) {
 }
 }  // namespace
 
+std::vector<CandidateDefinition> Simulation::HandsHere() const {
+  std::vector<CandidateDefinition> hands;
+  if (map_.here.empty() || catalog_.FindPort(map_.here) == nullptr) { return hands; }
+  if (catalog_.candidates.empty()) { return hands; }
+
+  const long long epoch = static_cast<long long>(std::floor(ActionCount() / kTradeEpoch));
+  TradeRng rng(TradeHash(map_.here + "#tavern#" + std::to_string(epoch)));
+
+  std::vector<std::size_t> pool;
+  for (std::size_t i = 0; i < catalog_.candidates.size(); ++i) { pool.push_back(i); }
+  for (int i = 0; i < 5 && !pool.empty(); ++i) {
+    const std::size_t pick = static_cast<std::size_t>(rng.Below(static_cast<int>(pool.size())));
+    CandidateDefinition def = catalog_.candidates[pool[pick]];
+    pool.erase(pool.begin() + static_cast<long>(pick));
+    def.port = map_.here;
+    hands.push_back(std::move(def));
+  }
+  return hands;
+}
+
 bool Simulation::TradeAccepted(const std::string& mode, const std::string& to,
                                const std::string& good) const {
   for (const TradeContract& trade : state_.trades) {
