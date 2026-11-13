@@ -443,7 +443,18 @@ bool Simulation::ApplyJob(const std::string& crewId, const std::string& jobId) {
       LogLine(other.name + " was relieved of the " + Lower(job->label) + " job.");
     }
   }
+  crew->job = jobId;
+  if (job != nullptr && !job->room.empty()) { crew->room = job->room; }
 
+  if (jobId.empty()) {
+    LogLine(crew->name + " has no standing job.");
+    return true;
+  }
+
+  if (crew->skill.empty()) { crew->skill = "Untrained"; }
+  crew->jobAt = job->baseAt;
+  LogLine(crew->name + " now holds the " + Lower(job->label) + " job.");
+  return true;
 }
 
 std::vector<std::string> Simulation::FeedText() const {
