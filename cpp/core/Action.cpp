@@ -250,7 +250,10 @@ void Simulation::FreeCommit(const std::string& detail) {
 
 void Simulation::TickWorld() {
   WearEngine();
-  if (static_cast<long long>(actionCounter_) % 4 == 0) { ClampStat("energy", -1); }
+   // A tank under 40% drags the energy down with it: the drive keeps drawing on
+  // a reserve that is no longer there.
+  const double energyEvery = StatValue("fuel") < 40.0 ? 2.0 : 4.0;
+  if (std::fmod(actionCounter_, energyEvery) == 0.0) { ClampStat("energy", -1); }
   TickFilters();
   TickCrew();
   TickCleaner();
