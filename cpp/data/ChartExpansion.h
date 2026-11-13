@@ -21,6 +21,8 @@
 // ============================================================================
 #pragma once
 
+#include <cstdint>
+
 #include "data/Catalog.h"
 
 namespace ship {
@@ -88,6 +90,14 @@ constexpr double kSystemZoomMax = 12.0;
 
 void ExpandChart(Catalog& catalog);
 void ExpandChart(Catalog& catalog, const ChartSettings& settings);
+
+// The generated chart has no authored berths, so a hire has no station written
+// into crew.json to stand in. This gives every port two names from the pool,
+// worked out from the port's own id and the chart seed: the same chart always
+// puts the same people in the same bars, and no two ports get the same pair.
+// It mutates catalog.candidates[i].port, so it must be called *after*
+// ExpandChart and again whenever a save rebuilds the chart.
+void AssignCandidatePorts(Catalog& catalog, std::uint64_t seed);
 
 struct ChartPreviewDot {
   std::string id;

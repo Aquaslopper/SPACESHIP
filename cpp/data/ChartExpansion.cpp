@@ -1127,6 +1127,49 @@ void ExpandChart(Catalog& catalog, const ChartSettings& settings) {
   catalog.RebuildIndex();
 }
 
+// The tavern's people. Every port in the generated chart is a different place,
+// so the pool cannot be pinned to ids written in crew.json - those ids died
+// with the authored chart. Instead each port draws from the pool by a stable
+// hash of its own id: the seed makes the draw per-voyage, the id makes it
+// per-port, and the same chart always seats the same people in the same bars.
+//
+// The pool is five people (`crew.json` / `candidates`), so the same faces recur
+// across the galaxy and a hire is global - Nemi hired at one berth is not
+// standing in the next one. That is a limit of the pool, not of this rule: make
+// the pool larger and the bars thin out on their own.
+void AssignCandidatePorts(Catalog& catalog, std::uint64_t seed) {
+  if (catalog.ports.empty() || catalog.candidates.empty()) { return; }
+
+  // crew.json still pins three of the pool to authored berths (vance-port,
+  // lorn-port, shipgrave-port). Those berths are cleared with the authored
+  // chart, so a pinned candidate could never be reached or hired. A pin to a
+  // place that no longer exists is dropped rather than honoured.
+  for (CandidateDefinition& candidate : catalog.candidates) {
+    if (!candidate.port.empty() && catalog.FindPort(candidate.port) == nullptr) {
+      candidate.port.clear();
+    }
+  }
+
+  constexpr int kPeoplePerPort = 2;
+  for (const Port& port : catalog.ports) {
+    Rng rng(HashOf(port.id) ^ seed);
+    for (int slot = 0; slot < kPeoplePerPort; ++slot) {
+      const std::size_t who =
+          static_cast<std::size_t>(rng.Below(static_cast<int>(catalog.candidates.size())));
+      // A berth that already speaks for someone keeps them; a later port never
+      // moves a person who has been placed.
+      CandidateDefinition& candidate = catalog.candidates[who];
+      if (candidate.port.empty()) { candidate.port = port.id; }
+    }
+  }
+
+  // Nobody may be left standing nowhere: an unreachable hire is a hire that
+  // does not exist. The fallback is the first berth the chart built.
+  for (CandidateDefinition& candidate : catalog.candidates) {
+    if (candidate.port.empty()) { candidate.port = catalog.ports.front().id; }
+  }
+}
+
 ChartPreview BuildChartPreview(const Catalog& catalog, const ChartSettings& settings) {
   ChartPreview preview;
   preview.settings = settings;

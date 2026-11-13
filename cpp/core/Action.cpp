@@ -62,12 +62,20 @@ Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& se
   sim.catalog_ = sim.sourceCatalog_;
   sim.catalog_.chartExpanded = false;
   ExpandChart(sim.catalog_, settings);
+  // The bars are only known once the chart exists; who stands in them follows
+  // from the chart's own seed, so a save that rebuilds this chart seats the
+  // same people.
+  AssignCandidatePorts(sim.catalog_, settings.seed);
   sim.rules_ = sim.catalog_.rules;
   sim.scanCost_ = catalog.rules.scanCost;
 
-  // ---- crew --------------------------------------------------------------
-  for (const CrewDefinition& def : catalog.startingCrew) {
-    sim.crew_.push_back(MakeCrew(def));
+  // ---- the crew -----------------------------------------------------------
+  // A voyage begins with the commander alone. Everyone else is standing in a
+  // bar somewhere and is hired at a berth; the pool in crew.json/candidates is
+  // that pool. `startingCrew` is still read, but only the first entry is the
+  // commander's own record - the ship is not handed four hands for free.
+  if (!catalog.startingCrew.empty()) {
+    sim.crew_.push_back(MakeCrew(catalog.startingCrew.front()));
   }
 
   // ---- hull readouts -----------------------------------------------------
@@ -180,17 +188,35 @@ Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& se
   state.gameOver.clear();
   state.contracts["arrival"] = "active";
 
-  if (!startSystemId.empty()) {
-    const Body* system = sim.catalog_.FindSystem(startSystemId);
-    for (const Port& port : sim.catalog_.ports) {
-      const Body* body = sim.catalog_.FindBody(port.id);
-      if (body == nullptr) { continue; }
-      if (sim.catalog_.BodySystem(*body) != startSystemId) { continue; }
-      sim.map_.here = port.id;
+  // The authored chart is gone by now - ExpandChart cleared it and every
+  // generated id carries its own st-/sr-/pl- prefix - so `here` must be set
+  // from what the generator actually built. Without this the map points at
+  // "kessler", which no longer exists, and no local body is ever in range.
+  {
+    std::string startPort;
+    if (!startSystemId.empty()) {
+      for (const Port& port : sim.catalog_.ports) {
+        const Body* body = sim.catalog_.FindBody(port.id);
+        if (body == nullptr) { continue; }
+        if (sim.catalog_.BodySystem(*body) == startSystemId) { startPort = port.id; break; }
+      }
+    }
+    if (startPort.empty() && !sim.catalog_.ports.empty()) {
+      startPort = sim.catalog_.ports.front().id;
+    }
+    const Body* berth = startPort.empty() ? nullptr : sim.catalog_.FindBody(startPort);
+    if (berth != nullptr) {
+      sim.map_.here = berth->id;
+      sim.views_["system"].sel = berth->id;
       sim.state_.docked = true;
-      if (system != nullptr) { sim.map_.sector = system->region; }
+      const Body* system = sim.catalog_.FindSystem(sim.catalog_.BodySystem(*berth));
+      if (system != nullptr) {
+        sim.map_.sector = system->region;
+        sim.views_["sector"].sel = system->id;
+        sim.views_["galaxy"].sel = system->region;
+      }
       sim.map_.layer = "system";
-      break;
+      sim.RefreshLocationInfo();
     }
   }
 

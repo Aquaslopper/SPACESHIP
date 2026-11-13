@@ -527,8 +527,12 @@ void Simulation::CheckLoss() {
   }
 
   if (!state_.gameOver.empty()) { return; }
-  if (StatValue("hull") <= 0 || crew_.empty()) {
-    state_.gameOver = StatValue("hull") <= 0 ? "The hull has failed." : "The crew have been lost.";
+  // The commander goes down with the ship. An empty berth is not a loss - a
+  // solo voyage has no crew to lose and must be playable - so the ship is lost
+  // when the hull is, and only then. Losing the last hand is a reason to turn
+  // back, not a game over.
+  if (StatValue("hull") <= 0) {
+    state_.gameOver = "The hull has failed.";
     LogLine("Ship lost. " + state_.gameOver);
   }
 }
