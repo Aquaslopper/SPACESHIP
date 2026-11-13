@@ -119,7 +119,9 @@ std::string TierLabel(const Simulation& sim, const std::string& tier) {
 const char* UnmeteredKey() { return "\x01unmetered"; }
 
 bool KeepsOwnMechanic(const std::string& taskId) {
-  return taskId.compare(0, 2, "o2") == 0 || taskId == "cook";
+  // These controls carry no charge bar: they are available or they are not.
+  // The drive button is one click for +10%.
+  return taskId.compare(0, 2, "o2") == 0 || taskId == "cook" || taskId == "engine-click";
 }
 
 double ChargeLeft(const Simulation& sim, const std::string& key, const std::string& tier) {
@@ -281,9 +283,10 @@ bool PressProgressButton(Simulation& sim, const std::string& taskId) {
 bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
   const std::string& taskId = button.taskId;
   if (taskId == "engine-click") {
-    if (button.state == ButtonState::Off || button.state == ButtonState::Empty) { return false; }
-    return CommitActionButton(sim, button.chargeKey, button.tier,
-                              [&sim]() { return sim.EngineClick(); });
+    // The drive button is one click for +10%, full stop. It has no bar and no
+    // wait: the only thing that stops it is a drive that is already at 100%.
+    if (button.state == ButtonState::Off) { return false; }
+    return PressWithoutCharge(sim, [&sim]() { return sim.EngineClick(); });
   }
   const Task* task = taskId == "crew-assign" ? nullptr : sim.FindOngoing(taskId);
   if (task != nullptr && task->state == "running") { return false; }
