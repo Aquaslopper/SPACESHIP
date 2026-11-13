@@ -176,13 +176,11 @@ bool PressWithoutCharge(Simulation& sim, const std::function<bool()>& action) {
 bool CommitActionButton(Simulation& sim, const std::string& key,
                         const std::string& tier,
                         const std::function<bool()>& action) {
-  auto& charges = sim.MutableState().charges;
-  if (charges.find(key) == charges.end()) {
-    const double volume = TierVolume(sim, tier);
-    charges[key] = Charge{volume, volume};
-  }
-  if (ChargeLeft(sim, key, tier) <= 0.0) { return false; }
-
+  // No charge gate. A button that is available is pressable: there is no
+  // counter that can hold a click, and no tier that decides how long to wait.
+  // The only costs are the ones the action itself pays - a click, a fee, a
+  // length of work.
+  (void)tier;
   sim.SetPressedButton(key);
   bool result = false;
   try {
@@ -295,8 +293,7 @@ bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
   if (button.state == ButtonState::Off) { return false; }
   if (button.state == ButtonState::Running) { return false; }
 
-  if (taskId == "crew-assign" && sim.HasPendingLayoff() &&
-      ChargePercent(sim, button.chargeKey, button.tier) <= 0.0) {
+  if (taskId == "crew-assign" && sim.HasPendingLayoff()) {
     return PressWithoutCharge(sim, [&sim]() { return sim.CommitOrders(); });
   }
 

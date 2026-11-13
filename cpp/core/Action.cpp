@@ -307,11 +307,8 @@ void Simulation::TickDryFuel() {
 }
 
 void Simulation::ProAction(double n) {
+  // Time passes only for the work. Nothing counts down behind a button.
   AdvanceTasks(n);
-  for (auto& entry : state_.charges) {
-    Charge& charge = entry.second;
-    charge.left = std::min(charge.volume, charge.left + n);
-  }
 }
 
 // ---------------------------------------------------------------------------
