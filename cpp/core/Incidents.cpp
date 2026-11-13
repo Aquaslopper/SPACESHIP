@@ -120,7 +120,15 @@ void Simulation::TickIncidents() {
     if (incident.left > 0) { continue; }
 
     incident.stage += 1;
-    if (incident.stage >= static_cast<int>(spec->stages.size())) { continue; }
+    if (incident.stage >= static_cast<int>(spec->stages.size())) {
+      // The last stage is the end of the line: it does not pass. Every time its
+      // ticks run out it bites again, so ignoring it costs more than fixing it.
+      incident.stage = static_cast<int>(spec->stages.size()) - 1;
+      const IncidentType::Stage& step = spec->stages[static_cast<std::size_t>(incident.stage)];
+      IncidentEffect(step);
+      incident.left = step.ticks > 0 ? step.ticks : 1;
+      continue;
+    }
 
     const IncidentType::Stage& step = spec->stages[static_cast<std::size_t>(incident.stage)];
     IncidentEffect(step);
