@@ -97,7 +97,8 @@ void ExpandChart(Catalog& catalog, const ChartSettings& settings);
 // puts the same people in the same bars, and no two ports get the same pair.
 // It mutates catalog.candidates[i].port, so it must be called *after*
 // ExpandChart and again whenever a save rebuilds the chart.
-void AssignCandidatePorts(Catalog& catalog, std::uint64_t seed);
+void AssignCandidatePorts(Catalog& catalog, std::uint64_t seed,
+                          const std::string& homePort);
 
 struct ChartPreviewDot {
   std::string id;

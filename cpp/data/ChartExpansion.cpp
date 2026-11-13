@@ -1127,46 +1127,95 @@ void ExpandChart(Catalog& catalog, const ChartSettings& settings) {
   catalog.RebuildIndex();
 }
 
-// The tavern's people. Every port in the generated chart is a different place,
-// so the pool cannot be pinned to ids written in crew.json - those ids died
-// with the authored chart. Instead each port draws from the pool by a stable
-// hash of its own id: the seed makes the draw per-voyage, the id makes it
-// per-port, and the same chart always seats the same people in the same bars.
-//
-// The pool is five people (`crew.json` / `candidates`), so the same faces recur
-// across the galaxy and a hire is global - Nemi hired at one berth is not
-// standing in the next one. That is a limit of the pool, not of this rule: make
-// the pool larger and the bars thin out on their own.
-void AssignCandidatePorts(Catalog& catalog, std::uint64_t seed) {
+// The tavern's people. Every port in the generated chart is its own place, so
+// the pool cannot be pinned to ids written in crew.json - those ids died with
+// the authored chart. Instead the pool is seated at berths: several hands at
+// the station the voyage begins at, so there is somebody to hire without
+// crossing the galaxy first, and the rest along the route from there.
+void AssignCandidatePorts(Catalog& catalog, std::uint64_t seed,
+                          const std::string& homePort) {
   if (catalog.ports.empty() || catalog.candidates.empty()) { return; }
 
-  // crew.json still pins three of the pool to authored berths (vance-port,
-  // lorn-port, shipgrave-port). Those berths are cleared with the authored
-  // chart, so a pinned candidate could never be reached or hired. A pin to a
-  // place that no longer exists is dropped rather than honoured.
+  // crew.json still pins three of the pool to authored berths. Those berths
+  // are cleared with the authored chart, so a pin to a place that no longer
+  // exists is dropped rather than honoured.
   for (CandidateDefinition& candidate : catalog.candidates) {
     if (!candidate.port.empty() && catalog.FindPort(candidate.port) == nullptr) {
       candidate.port.clear();
     }
   }
 
-  constexpr int kPeoplePerPort = 2;
-  for (const Port& port : catalog.ports) {
-    Rng rng(HashOf(port.id) ^ seed);
-    for (int slot = 0; slot < kPeoplePerPort; ++slot) {
-      const std::size_t who =
-          static_cast<std::size_t>(rng.Below(static_cast<int>(catalog.candidates.size())));
-      // A berth that already speaks for someone keeps them; a later port never
-      // moves a person who has been placed.
-      CandidateDefinition& candidate = catalog.candidates[who];
-      if (candidate.port.empty()) { candidate.port = port.id; }
-    }
+  std::string anchorPort = homePort;
+  if (anchorPort.empty() || catalog.FindPort(anchorPort) == nullptr) {
+    anchorPort = catalog.ports.front().id;
   }
 
-  // Nobody may be left standing nowhere: an unreachable hire is a hire that
-  // does not exist. The fallback is the first berth the chart built.
-  for (CandidateDefinition& candidate : catalog.candidates) {
-    if (candidate.port.empty()) { candidate.port = catalog.ports.front().id; }
+  Rng rng(seed ^ 0x48495245504F4F4CULL);
+  auto shuffle = [&rng](std::vector<std::size_t>& values) {
+    for (std::size_t i = values.size(); i > 1; --i) {
+      const std::size_t j = static_cast<std::size_t>(rng.Below(static_cast<int>(i)));
+      std::swap(values[i - 1], values[j]);
+    }
+  };
+
+  const std::size_t total = catalog.candidates.size();
+  std::vector<bool> seated(total, false);
+
+  // The opening berth gets the cheapest hands first, so the first bar you walk
+  // into has somebody the starting purse can actually reach. A third is added
+  // only if it does not turn the first two into a window display.
+  std::vector<std::size_t> cheapest;
+  for (std::size_t i = 0; i < total; ++i) { cheapest.push_back(i); }
+  std::sort(cheapest.begin(), cheapest.end(), [&](std::size_t a, std::size_t b) {
+    if (catalog.candidates[a].fee != catalog.candidates[b].fee) {
+      return catalog.candidates[a].fee < catalog.candidates[b].fee;
+    }
+    return a < b;
+  });
+
+  const std::size_t anchorTarget = std::min<std::size_t>(3, total);
+  std::vector<std::size_t> atAnchor;
+  double feeSum = 0.0;
+  for (std::size_t idx : cheapest) {
+    if (atAnchor.size() >= anchorTarget) { break; }
+    if (atAnchor.size() >= 2 && feeSum + catalog.candidates[idx].fee > 340.0) { continue; }
+    seated[idx] = true;
+    atAnchor.push_back(idx);
+    feeSum += catalog.candidates[idx].fee;
+  }
+  for (std::size_t idx : atAnchor) { catalog.candidates[idx].port = anchorPort; }
+
+  // The remainder goes out along the region first, then further away, so a
+  // hand is reachable by flying the route rather than by crossing the galaxy.
+  std::vector<std::size_t> remaining;
+  for (std::size_t i = 0; i < total; ++i) {
+    if (!seated[i]) { remaining.push_back(i); }
+  }
+  shuffle(remaining);
+
+  std::string anchorRegion;
+  if (const Body* anchorBody = catalog.FindBody(anchorPort)) {
+    if (const Body* anchorSys = catalog.FindSystem(catalog.BodySystem(*anchorBody))) {
+      anchorRegion = anchorSys->region;
+    }
+  }
+  std::vector<std::string> nearPorts;
+  std::vector<std::string> farPorts;
+  for (const Port& port : catalog.ports) {
+    if (port.id == anchorPort) { continue; }
+    std::string region;
+    if (const Body* body = catalog.FindBody(port.id)) {
+      if (const Body* sys = catalog.FindSystem(catalog.BodySystem(*body))) { region = sys->region; }
+    }
+    if (!anchorRegion.empty() && region == anchorRegion) { nearPorts.push_back(port.id); }
+    else { farPorts.push_back(port.id); }
+  }
+  std::vector<std::string> route = nearPorts;
+  route.insert(route.end(), farPorts.begin(), farPorts.end());
+
+  for (std::size_t k = 0; k < remaining.size(); ++k) {
+    catalog.candidates[remaining[k]].port =
+        route.empty() ? anchorPort : route[k % route.size()];
   }
 }
 

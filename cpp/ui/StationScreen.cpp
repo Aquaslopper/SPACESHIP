@@ -836,8 +836,9 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     heading.reading = true;
     yard.rows.push_back(heading);
   }
-  for (const CandidateDefinition& candidate : sim.World().candidates) {
-    if (!candidate.port.empty() && candidate.port != portId) { continue; }
+  // One row for a hire, used by the yard's hiring hall and by the tavern, so
+  // both doors ask the same fee and grey for the same reasons.
+  const auto buildHireRow = [&](const CandidateDefinition& candidate) {
     const CrewDefinition& person = candidate.crew;
     const std::string name = person.name;
     const bool already = Hired(sim, person.id);
@@ -868,7 +869,19 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
                                     : "No berth free for another hand.");
       }
     }
-    yard.rows.push_back(row);
+    return row;
+  };
+  bool anyStationHands = false;
+  for (const CandidateDefinition& candidate : sim.World().candidates) {
+    if (!candidate.port.empty() && candidate.port != portId) { continue; }
+    anyStationHands = true;
+    yard.rows.push_back(buildHireRow(candidate));
+  }
+  if (!anyStationHands) {
+    StationRow none;
+    none.label = "No hands are looking for a berth at this station.";
+    none.reading = true;
+    yard.rows.push_back(none);
   }
 
   // ---- 7. the tavern / bar -------------------------------------------------
@@ -922,6 +935,27 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
                             "themselves and the rumor they are repeating.");
     }
     tavern.rows.push_back(row);
+  }
+
+  // The people looking for a berth, standing in the bar where you can meet
+  // them. The yard's hiring hall asks the same fee for the same person.
+  {
+    StationRow heading;
+    heading.label = "Crew looking for a berth";
+    heading.reading = true;
+    tavern.rows.push_back(heading);
+  }
+  if (!anyStationHands) {
+    StationRow none;
+    none.label = "No hands are looking for a berth at this station.";
+    none.reading = true;
+    tavern.rows.push_back(none);
+  } else {
+    for (const CandidateDefinition& candidate : sim.World().candidates) {
+      if (!candidate.port.empty() && candidate.port != portId) { continue; }
+      if (Hired(sim, candidate.crew.id)) { continue; }  // aboard now, not at the bar
+      tavern.rows.push_back(buildHireRow(candidate));
+    }
   }
 
   // The starmap sits directly under the shop, the trade board under that, then

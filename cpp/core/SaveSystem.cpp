@@ -1029,7 +1029,7 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
       catalog_ = source;
       catalog_.chartExpanded = false;
       ExpandChart(catalog_, chartSettings_);
-      AssignCandidatePorts(catalog_, chartSettings_.seed);
+      AssignCandidatePorts(catalog_, chartSettings_.seed, map_.here);
     }
     const Json& s = d.at("state");
 

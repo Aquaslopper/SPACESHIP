@@ -62,10 +62,6 @@ Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& se
   sim.catalog_ = sim.sourceCatalog_;
   sim.catalog_.chartExpanded = false;
   ExpandChart(sim.catalog_, settings);
-  // The bars are only known once the chart exists; who stands in them follows
-  // from the chart's own seed, so a save that rebuilds this chart seats the
-  // same people.
-  AssignCandidatePorts(sim.catalog_, settings.seed);
   sim.rules_ = sim.catalog_.rules;
   sim.scanCost_ = catalog.rules.scanCost;
 
@@ -205,6 +201,10 @@ Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& se
     }
     const Body* berth = startPort.empty() ? nullptr : sim.catalog_.FindBody(startPort);
     if (berth != nullptr) {
+      // Who stands in the bars follows from the chart's seed and from where the
+      // voyage opens, so this runs once the opening berth is known: several
+      // hands are waiting at this station, the rest along the route from here.
+      AssignCandidatePorts(sim.catalog_, settings.seed, berth->id);
       sim.map_.here = berth->id;
       sim.views_["system"].sel = berth->id;
       sim.state_.docked = true;
