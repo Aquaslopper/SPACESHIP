@@ -235,6 +235,10 @@ bool Simulation::AtTarget(const Body& body) const {
   return body.id == map_.here;
 }
 
+bool Simulation::InSpace() const {
+  return !state_.docked && FindOngoing("travel") != nullptr;
+}
+
 const Body* Simulation::HomeBody() const {
   // Position at the current map scale, not the region being browsed. The
   // sector chart paints every system, so the ship's own system is always on it
