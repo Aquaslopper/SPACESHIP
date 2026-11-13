@@ -51,7 +51,7 @@
       "kind": "Bulk metal",
       "name": "Refined ore",
       "risk": false,
-      "value": 280,
+      "value": 150,
       "vol": 14
     },
     {
@@ -59,7 +59,7 @@
       "kind": "Components",
       "name": "Drive components",
       "risk": false,
-      "value": 840,
+      "value": 1840,
       "vol": 6
     },
     {
@@ -67,7 +67,7 @@
       "kind": "Perishable",
       "name": "Hydroponic produce",
       "risk": false,
-      "value": 210,
+      "value": 110,
       "vol": 9
     },
     {
@@ -97,7 +97,7 @@
     }
   ],
   "life": {
-    "canisters": 6,
+    "canisters": 3,
     "capacity": 10,
     "decay": 4,
     "lifeMax": 200,
@@ -121,8 +121,8 @@
   },
   "mess": {
     "capacity": 24,
-    "rack": 18,
-    "rations": 5,
+    "rack": 4,
+    "rations": 2,
     "rationCapacity": 24,
     "foodPerRation": 5,
     "cookBelow": 10,
