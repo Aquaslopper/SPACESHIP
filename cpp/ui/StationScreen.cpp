@@ -874,7 +874,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   // ---- 7. the tavern / bar -------------------------------------------------
   StationColumn tavern;
   tavern.id = "tavern";
-  tavern.title = "Tavern / Bar";
+  tavern.title = "The bar at " + model.portName;
   tavern.badge = "the people at this station";
   tavern.notes.push_back(tip);
   tavern.notes.push_back("Station training only finishes while docked.");
@@ -927,7 +927,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   // The Mission board and Tavern / Bar cards are not offered. The starmap sits
   // directly under the shop, the trade board under that, then the sales counter
   // and the yard.
-  model.columns = {market, starmap, trade, sales, yard};
+  model.columns = {market, starmap, trade, sales, yard, tavern};
   NormalizeStationSelection(model, model.selection);
   return model;
 }
