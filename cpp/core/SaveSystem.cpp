@@ -386,20 +386,7 @@ std::string Simulation::SaveJson() const {
                       {"job", member.job},
                       {"skill", member.skill},
                       {"jobAt", Num(member.jobAt)}};
-    if (!member.jobProgress.empty()) {
-      Json prog = Json::object();
-      for (const auto& kv : member.jobProgress) {
-        if (!kv.first.empty()) { prog[kv.first] = Num(kv.second); }
-      }
-      if (!prog.empty()) { entry["jobProgress"] = prog; }
-    }
-    if (!member.jobSkill.empty()) {
-      Json sk = Json::object();
-      for (const auto& kv : member.jobSkill) {
-        if (!kv.first.empty() && !kv.second.empty()) { sk[kv.first] = kv.second; }
-      }
-      if (!sk.empty()) { entry["jobSkill"] = sk; }
-    }
+  
     crew.push_back(entry);
   }
   root["crew"] = crew;
