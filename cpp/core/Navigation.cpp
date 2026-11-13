@@ -487,6 +487,14 @@ bool Simulation::StartTravel() {
     }
   }
 
+  // The button stops a crossing where it is. The course is dropped on the
+  // spot and the target with it, so nothing can arrive later.
+  if (Task* under = FindOngoing("travel")) {
+    const std::string id = under->id;
+    ClearOngoing(id);
+    LogLine("Course dropped. The ship is holding position.");
+    return true;
+  }
   // Steering away mid-flight. A course already under way is finished where the
   // ship has got to, not at the target it was aimed at: the task is closed on
   // the spot and the commander takes the report, exactly as at any arrival.
