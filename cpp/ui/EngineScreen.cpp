@@ -324,14 +324,16 @@ EngineScreenModel BuildEngineScreen(const Simulation& sim) {
   if (!sim.Crew().empty()) {
     screen.bandNote = "At " + Num(sim.GameRules().engine.engineerAt) +
                       "% the engineer presses this button (+10% per press) "
-                      "until the drive is full.";
+                      "until the drive is full or the 4-click green bar is empty.";
   }
 
   screen.stage = BuildEngineMachine(sim);
 
+  const std::string chargeKey = Simulation::kEngineButtonChargeKey;
+  const std::string tier = ButtonChargeTier("engine maintenance run the drive", "systems");
+  const double charge = ChargePercent(sim, chargeKey, tier);
   const bool maintained = sim.State().engineCondition >= 100.0;
-  // No charge bar: the drive is workable whenever there is work to do.
-  const bool live = !maintained;
+  const bool live = charge > 0.0 && !maintained;
   LiveControl run;
   run.id = "eng-run";
   run.box = Area{444.0f, 412.0f, 190.0f, 34.0f};
@@ -341,11 +343,13 @@ EngineScreenModel BuildEngineScreen(const Simulation& sim) {
   run.button.title = maintained
       ? "The drive is at full condition; there is nothing to maintain."
       : "One click of the clock restores up to 10% of the drive.";
-  run.button.chargeKey.clear();
-  run.button.fillPercent = 0.0;
+  run.button.chargeKey = chargeKey;
+  run.button.tier = tier;
+  run.button.fillPercent = charge;
   run.button.enabled = live;
   run.button.inert = !live;
-  run.button.state = live ? ButtonState::Idle : ButtonState::Off;
+  run.button.state = live ? ButtonState::Idle
+                          : (charge > 0.0 ? ButtonState::Off : ButtonState::Empty);
   screen.stage.controls.push_back(run);
   screen.hasStage = true;
   return model;
