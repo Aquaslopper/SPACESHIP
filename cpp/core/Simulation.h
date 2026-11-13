@@ -217,6 +217,7 @@ class Simulation {
   void ClearPressedButton(const std::string& key);
 
   std::vector<TradeContract> TradesHere() const;
+  std::vector<CandidateDefinition> HandsHere() const;
   double TradePayout(const TradeContract& trade) const;
   double TradeOfferPayout(const TradeContract& trade, int priceTier) const;
   int FreelanceRejectMask(const TradeContract& trade) const;

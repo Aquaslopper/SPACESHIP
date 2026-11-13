@@ -364,8 +364,12 @@ bool Simulation::HireCrew(const std::string& candidateId) {
   if (!state_.gameOver.empty() || !state_.docked || HerePort() == nullptr) { return false; }
   if (Truthy(state_.hired, candidateId)) { return false; }
 
+  const std::vector<CandidateDefinition> hands = HandsHere();
   const CandidateDefinition* candidate = nullptr;
   for (const CandidateDefinition& entry : catalog_.candidates) {
+    if (entry.crew.id == candidateId) { candidate = &entry; }
+  }
+  for (const CandidateDefinition& entry : hands) {
     if (entry.crew.id == candidateId) { candidate = &entry; }
   }
   if (candidate == nullptr) { return false; }

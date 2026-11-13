@@ -859,7 +859,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     }
     tavern.rows.push_back(row);
   }
-  for (const CandidateDefinition& candidate : sim.World().candidates) {
+  for (const CandidateDefinition& candidate : sim.HandsHere()) {
     if (!candidate.port.empty() && candidate.port != portId) { continue; }
     if (Hired(sim, candidate.crew.id)) { continue; }  // aboard now, not at the bar
     const CrewDefinition& person = candidate.crew;
@@ -891,7 +891,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     heading.reading = true;
     tavern.rows.push_back(heading);
   }
-  for (const CandidateDefinition& candidate : sim.World().candidates) {
+  for (const CandidateDefinition& candidate : sim.HandsHere()) {
     if (!candidate.port.empty() && candidate.port != portId) { continue; }
     const CrewDefinition& person = candidate.crew;
     const std::string name = person.name;

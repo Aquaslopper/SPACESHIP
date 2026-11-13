@@ -128,7 +128,8 @@ std::vector<SpritePixel> Rasterise(const Simulation& sim, const CrewMember& crew
 CrewScene BuildCrewScene(const Simulation& sim, const CrewMember& crew) {
   const Catalog& art = sim.World();
   CrewScene scene;
-  scene.portrait = crew.id + "-portrait";
+  scene.portrait = crew.id.rfind("hand-", 0) == 0 ? std::string("helmet-portrait")
+                                                  : crew.id + "-portrait";
   const double cell = SpriteCell(sim);
   const OrderSheet* sheet = sim.SheetOf(crew);
   const bool atDoc = sim.FindOngoing("doc-" + crew.id) != nullptr;
@@ -156,8 +157,9 @@ CrewScene BuildCrewScene(const Simulation& sim, const CrewMember& crew) {
   // The figure as a picture: "<id>-<pose>", feet on the deck line, wearing the
   // colour the rectangles would wear.
   const auto picture = [&](const std::string& pose) {
+    const std::string who = crew.id.rfind("hand-", 0) == 0 ? std::string("helmet") : crew.id;
     scene.figureArt.push_back(
-        ScenePicture{crew.id + "-" + pose, kCrewFigureX, kCrewDeckY, look.cloth});
+        ScenePicture{who + "-" + pose, kCrewFigureX, kCrewDeckY, look.cloth});
   };
 
   if (doc) {
