@@ -539,6 +539,9 @@ void Simulation::CheckLoss() {
   } else if (StatValue("fuel") <= 0 && InSpace()) {
     state_.gameOver = "Adrift with no fuel.";
     LogLine("Lost in space. " + state_.gameOver);
+  } else if (AirPercent() <= 0) {
+    state_.gameOver = "The air is gone.";
+    LogLine("Suffocated. " + state_.gameOver);
   }
 }
 
