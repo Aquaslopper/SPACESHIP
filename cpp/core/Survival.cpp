@@ -76,14 +76,6 @@ bool Simulation::BankReady() const {
   return !life_.slots.empty();
 }
 
-int Simulation::AirStageIndex() const {
-  if (BankRunning()) { return 4; }
-  int stage = static_cast<int>(js::Ceil(state_.airHold / rules_.air.step));
-  if (stage > 4) { stage = 4; }
-  if (stage < 0) { stage = 0; }
-  return stage;
-}
-
 const struct AirStage& Simulation::AirSpec() const {
   const std::vector<AirStage>& stages = rules_.air.stages;
   const int index = AirStageIndex();
