@@ -130,7 +130,7 @@
     "hungerPerFood": 5,
     "hungerFloor": 5
   },
-  "messEvery": 25,
+  "messEvery": 10,
   "messStarve": 80,
   "messStarveEvery": 4,
   "reports": {
