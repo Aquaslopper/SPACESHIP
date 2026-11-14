@@ -97,8 +97,7 @@ const struct AirStage& Simulation::AirSpec() const {
 }
 
 double Simulation::AirPercent() const {
-  if (BankRunning()) { return 100.0; }
-  const double percent = js::Round((state_.airHold / rules_.air.holdMax) * 100.0);
+  const double percent = js::Round((state_.filterLife / std::max(1.0, rules_.life.lifeMax)) * 100.0);
   return percent < 0 ? 0.0 : percent;
 }
 
