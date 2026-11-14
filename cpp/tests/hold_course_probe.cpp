@@ -1,0 +1,50 @@
+#include "core/Simulation.h"
+#include "ui/NavScreen.h"
+#include <cassert>
+#include <cmath>
+#include <iostream>
+int main() {
+ auto catalog=ship::Catalog::LoadFromAssets("assets");
+ auto sim=ship::Simulation::NewVoyage(catalog);
+ sim.MutableMap().here=sim.World().bodies.front().id;
+ const ship::Body* destination=nullptr;
+ for(const auto& b:sim.World().bodies) if(sim.InRange(b)&&!sim.AtTarget(b)&&sim.MetricsFor(b).dist>0) {destination=&b;break;}
+ assert(destination);
+ const auto home=sim.Map().here;
+ const auto* origin=sim.FindBodyById(home);
+ sim.SelectTarget(destination->id); assert(sim.StartTravel());
+ sim.ProAction(0.5);
+ const auto* trip=sim.FindOngoing("travel");
+ const double part=(trip->total-trip->left)/trip->total;
+ const double x=origin->x+(destination->x-origin->x)*part;
+ const double y=origin->y+(destination->y-origin->y)*part;
+ assert(ship::PressNavAction(sim,"hold"));
+ assert(!sim.FindOngoing("travel")); assert(sim.Map().inSpace);
+ assert(std::abs(sim.Map().flightOrigin.at("system").first-x)<1e-9);
+ assert(std::abs(sim.Map().flightOrigin.at("system").second-y)<1e-9);
+ auto position=sim.Map().flightOrigin;
+ sim.PerformAction("wait"); assert(position==sim.Map().flightOrigin);
+ sim.SelectTarget(home); assert(!sim.AtTarget(*origin));
+ assert(ship::PressNavAction(sim,"change-course"));
+ assert(sim.FindOngoing("travel")->target==home);
+ assert(position==sim.Map().flightOrigin);
+ sim.PerformAction("return flight");
+ assert(ship::PressNavAction(sim,"hold"));
+ assert(position!=sim.Map().flightOrigin);
+ sim.SelectTarget(destination->id); assert(sim.StartTravel());
+ sim.SelectTarget(home); assert(ship::PressNavAction(sim,"change-course"));
+ assert(sim.FindOngoing("travel")->target==home);
+ sim.FindStat("fuel")->value=1;
+ sim.PerformAction("last fuel");
+ assert(sim.State().gameOver=="Adrift with no fuel.");
+ std::cout<<"PASS: exact HOLD position, stationary wait, return course, repeated HOLD, in-flight course change, Lost in Space\n";
+ auto jump=ship::Simulation::NewVoyage(catalog);
+ jump.MutableMap().here=jump.World().bodies.front().id;
+ for(const auto& b:jump.World().systems) if(jump.InRange(b)&&!jump.AtTarget(b)) {jump.SelectTarget(b.id);break;}
+ assert(jump.StartTravel()); jump.PerformAction("jump");
+ assert(jump.HoldTravel());
+ auto at=jump.Map().flightOrigin;
+ jump.PerformAction("wait"); assert(at==jump.Map().flightOrigin);
+ assert(jump.StartTravel());
+ std::cout<<"PASS: inter-system HOLD and restart\n";
+}

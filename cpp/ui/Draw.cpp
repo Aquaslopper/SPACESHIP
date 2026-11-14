@@ -4678,6 +4678,8 @@ void ShellView::PaintNavScreen(Simulation& sim) {
                     static_cast<int>(barW), 2, ::Color{126, 198, 63, 255});
     }
     std::string action;
+    if (row.label == "HOLD") { action = "hold"; }
+    if (row.label == "Change Course") { action = "change-course"; }
     if (row.label.find("Stand watch") == 0) { action = "stand-watch"; }
     if (row.label.find("Dock at ") == 0) { action = "dock"; }
     if (row.label.find("View ") == 0) { action = "view-sector"; }

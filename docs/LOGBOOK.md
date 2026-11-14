@@ -23,3 +23,36 @@ You must append a compressed summary of **every single reply and action you take
 - **Timestamp:** 
 
 
+
+### Entry #002
+- Timestamp: 2026-11-14 UTC.
+- Owner approved implementation of HOLD and Change Course.
+- Owner specified exact stopping position and departure from that position.
+- Read navigation, task progression, button dispatch and map drawing paths.
+- Removed existing-travel refusal from StartTravel; course changes replace the current leg.
+- Preserved per-flight-tick fuel consumption and the existing Lost in Space loss check.
+- HOLD retains interpolated coordinates and removes the travel task without advancing it.
+- Added flight origins for existing chart scales; no new worker state machine or charge alias.
+- Connected HOLD and Change Course command rows to native drawing and console commands.
+- Updated map marker and navigation strip for stopped-in-space position.
+- Installed build-only CMake under ignored build/tooling because CMake was absent.
+- Headless core and console compiled successfully with GUI disabled.
+- Regression probe passed exact position, stationary wait, return course, repeated HOLD and mid-flight course change.
+- Regression probe passed fuel-loss consequence and inter-system HOLD/restart.
+- GUI syntax checks passed for Draw.cpp, AudioDevice.cpp and main.cpp.
+- Retained regression source in cpp/tests/hold_course_probe.cpp; CMakeLists.txt unchanged.
+- Save/load behavior unchanged; save/load and graphical interaction not tested.
+
+### Entry #003
+- Timestamp: 2026-11-14 UTC.
+- Owner requested a pull request for manual testing.
+- Current branch verified as arena/5305dfda-spaceship.
+- No existing open pull request found for this branch.
+- Reviewed working tree status and change summary.
+- Scope remains HOLD and Change Course implementation.
+- Existing-travel refusal removed in the implementation; flight fuel mechanics preserved.
+- No further gameplay gate removed or added for pull request preparation.
+- No additional gameplay changes made this turn.
+- Preparing commit and push on the current branch only.
+- Pull request targets main and is not to be merged automatically.
+- Manual client testing remains with the owner.

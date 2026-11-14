@@ -180,6 +180,7 @@ class Simulation {
 
   bool SelectTarget(const std::string& bodyId);
   bool StartTravel();
+  bool HoldTravel();
   bool StartScan();
   bool StartExtraction();
   bool StandWatch();
