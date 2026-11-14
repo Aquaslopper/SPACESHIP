@@ -234,9 +234,8 @@ bool Simulation::AtTarget(const Body& body) const {
   if (body.type == "system") { return body.id == CurrentSystemId(); }
   return body.id == map_.here;
 }
-
 bool Simulation::InSpace() const {
-  return !state_.docked && FindOngoing("travel") != nullptr;
+  return !state_.docked;
 }
 
 const Body* Simulation::HomeBody() const {
