@@ -42,7 +42,7 @@
   "engine": {
     "engineerAt": 60,
     "warnBelow": 50,
-    "wearEvery": 1,
+    "wearEvery": 2,
     "wearStep": 1
   },
   "goods": [
@@ -208,26 +208,26 @@
       "name": "Coldwell debris field",
       "src": "Salvage",
       "state": "filed",
-      "value": 60
+      "value": 10
     },
     {
       "id": "sv2",
       "name": "Tolme approach traffic",
       "src": "Contract",
       "state": "packaged",
-      "value": 90
+      "value": 10
     }
   ],
   "surveyWorth": {
-    "belt": 120,
-    "moon": 90,
-    "origin": 60,
-    "planet": 110,
-    "region": 0,
-    "site": 160,
-    "star": 140,
-    "station": 90,
-    "system": 0
+    "belt": 5,
+    "moon": 9,
+    "origin": 6,
+    "planet": 11,
+    "region": 1,
+    "site": 16,
+    "star": 14,
+    "station": 9,
+    "system": 1
   },
-  "hungerFloor": 5
+  "hungerFloor": 0
 }
