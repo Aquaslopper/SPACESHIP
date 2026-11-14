@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cmath>
 #include <iostream>
+#include <nlohmann/json.hpp>
 int main() {
  auto catalog=ship::Catalog::LoadFromAssets("assets");
  auto sim=ship::Simulation::NewVoyage(catalog);
@@ -22,6 +23,26 @@ int main() {
  const auto* origin=sim.FindBodyById(home);
  sim.SelectTarget(destination->id); assert(sim.StartTravel());
  sim.ProAction(0.5);
+ auto legacy=nlohmann::ordered_json::parse(sim.SaveJson());
+ legacy["map"].erase("inSpace");
+ legacy["map"].erase("flightOrigin");
+ auto legacyLoaded=ship::Simulation::NewVoyage(catalog);
+ std::string legacyError;
+ assert(legacyLoaded.LoadJson(legacy.dump(), &legacyError));
+ assert(legacyLoaded.Map().inSpace);
+ assert(legacyLoaded.FindOngoing("travel")->left==sim.FindOngoing("travel")->left);
+ const auto legacyWave=ship::ComputeRadiationTelemetry(legacyLoaded);
+ (void)legacyWave;
+ for (const auto& layer : {"system", "sector", "galaxy"}) {
+   legacyLoaded.SetLayer(layer);
+   const auto legacyScreen=ship::BuildNavScreen(legacyLoaded);
+   (void)legacyScreen;
+ }
+ assert(legacyLoaded.HoldTravel());
+ auto sameFlight=sim;
+ assert(sameFlight.HoldTravel());
+ assert(legacyLoaded.Map().flightOrigin==sameFlight.Map().flightOrigin);
+ std::cout<<"PASS: legacy in-flight save startup telemetry, all navigation layers, retained progress and HOLD position\n";
  const auto* trip=sim.FindOngoing("travel");
  const double part=(trip->total-trip->left)/trip->total;
  const double x=origin->x+(destination->x-origin->x)*part;

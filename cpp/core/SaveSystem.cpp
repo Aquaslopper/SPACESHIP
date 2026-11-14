@@ -1357,8 +1357,14 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     map_.zmax = GetNumber(map, "zmax", 2.0);
     map_.zstep = GetNumber(map, "zstep", 0.2);
     map_.here = GetString(map, "here", "kessler");
-    map_.inSpace = GetBool(map, "inSpace");
-    map_.flightOrigin = {};
+    map_.inSpace = GetBool(map, "inSpace", FindOngoing("travel") != nullptr);
+    const Body* flightBody = FindBodyById(map_.here);
+    const Body* flightSystem = CurrentSystem();
+    const Body* flightRegion = flightSystem == nullptr ? nullptr : catalog_.FindRegion(flightSystem->region);
+    map_.flightOrigin = {
+        {"system", {flightBody == nullptr ? 0.0 : flightBody->x, flightBody == nullptr ? 0.0 : flightBody->y}},
+        {"sector", {flightSystem == nullptr ? 0.0 : flightSystem->x, flightSystem == nullptr ? 0.0 : flightSystem->y}},
+        {"galaxy", {flightRegion == nullptr ? 0.0 : flightRegion->x, flightRegion == nullptr ? 0.0 : flightRegion->y}}};
     if (const Json* origins = At(map, "flightOrigin")) {
       for (auto it = origins->begin(); it != origins->end(); ++it) {
         map_.flightOrigin[it.key()] = {GetNumber(it.value(), "x"), GetNumber(it.value(), "y")};

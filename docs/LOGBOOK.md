@@ -88,3 +88,21 @@ You must append a compressed summary of **every single reply and action you take
 - Headless build and position/save-load/game-over regression checks passed.
 - GUI syntax checks passed for Draw.cpp, AudioDevice.cpp and main.cpp.
 - Native graphical interaction still requires owner verification.
+
+### Entry #006
+- Timestamp: 2026-11-14 UTC.
+- Owner reported black-screen crash and clarified it occurs immediately after EXE launch.
+- Prior response requested the exact crash stage; no gameplay change was made then.
+- Read automatic startup loading and initial radiation telemetry call.
+- Reproduced map::at exception using a pre-change save with an active local flight.
+- Old saves have neither flightOrigin nor inSpace in their serialized map.
+- Load missing origins from the existing saved departure body, system and region.
+- Load absent inSpace from the already loaded travel task; explicit saved values remain authoritative.
+- Saved explicit flight origins override the old-format departure coordinates.
+- No task progress, destination or fuel value reset.
+- No gameplay gate or worker state machine added; course-change refusal stays removed.
+- Added legacy-save regression covering startup telemetry and all three navigation layers.
+- Verified legacy task progress and subsequent HOLD coordinates match the original voyage.
+- Headless build and all HOLD/save-load/Lost in Space probe checks passed.
+- Original standalone startup reproducer no longer throws.
+- Windows executable not run locally; owner must verify the new Windows build.
