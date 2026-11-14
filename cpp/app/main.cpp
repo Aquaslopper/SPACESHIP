@@ -53,9 +53,8 @@ using ship::Options;
 using ship::Simulation;
 namespace audio = ship::audio;
 
-// The reference opens itself at 1440x940 and centres the window.
-constexpr int kDefaultWidth = 1440;
-constexpr int kDefaultHeight = 940;
+constexpr int kDefaultWidth = 1720;
+constexpr int kDefaultHeight = 1040;
 
 bool HasCatalog(const std::filesystem::path& assets) {
   return std::filesystem::exists(assets / "data" / "manifest.json");
@@ -505,6 +504,11 @@ int main(int argc, char** argv) {
   if (fullscreen != IsWindowState(FLAG_BORDERLESS_WINDOWED_MODE)) {
     ToggleBorderlessWindowed();
   }
+  int lastScreenW = GetScreenWidth();
+  int lastScreenH = GetScreenHeight();
+  display.Resize(lastScreenW, lastScreenH);
+  shell.Configure(static_cast<float>(lastScreenW), static_cast<float>(lastScreenH), theme);
+  shell.SetDisplayAdjustmentAvailable(display.Ready());
 
   ship::PointerOwnership leftPointer, rightPointer, middlePointer;
   ship::RadiationTelemetry smoothedWave = ship::ComputeRadiationTelemetry(sim);
@@ -579,19 +583,23 @@ int main(int argc, char** argv) {
                               nextTheme.hideCrewLabels != theme.hideCrewLabels ||
                               nextTheme.reducedMotion != theme.reducedMotion ||
                               nextTheme.stageCompact != theme.stageCompact;
-    const bool resized = IsWindowResized();
-    if (themeChanged || resized) {
-      theme = nextTheme;
-      shell.Configure(static_cast<float>(GetScreenWidth()),
-                      static_cast<float>(GetScreenHeight()), theme);
-      ship::ui::ApplyPalette(theme);
-    }
-    SelectImGuiFont(fonts, sim.State().options.fontStep, sim.State().options.largeText);
-
     if (sim.State().options.fullscreen != fullscreen) {
       fullscreen = sim.State().options.fullscreen;
       ToggleBorderlessWindowed();
     }
+    const int curScreenW = GetScreenWidth();
+    const int curScreenH = GetScreenHeight();
+    const bool resized = IsWindowResized() || curScreenW != lastScreenW || curScreenH != lastScreenH;
+    if (themeChanged || resized) {
+      lastScreenW = curScreenW;
+      lastScreenH = curScreenH;
+      theme = nextTheme;
+      display.Resize(curScreenW, curScreenH);
+      shell.Configure(static_cast<float>(curScreenW),
+                      static_cast<float>(curScreenH), theme);
+      ship::ui::ApplyPalette(theme);
+    }
+    SelectImGuiFont(fonts, sim.State().options.fontStep, sim.State().options.largeText);
 
     audio.Configure(sim.State().options);
     audio.Tick(sim);

@@ -71,7 +71,7 @@ struct PopupModel {
   int fontStep = 0;
   std::vector<std::string> fontStepLabels;
   std::string fontStepLine;    // "Reading size: +5% (19 px)"
-  bool fullscreen = false;
+  bool fullscreen = true;
   std::string fullscreenLabel; // "Window: Borderless fullscreen"
   std::vector<PopupSlot> slots;
   std::string message;

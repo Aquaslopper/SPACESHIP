@@ -24,6 +24,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <functional>
 #include <unordered_map>
 
 #include "imgui.h"
@@ -667,6 +668,8 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
     DrawRectangle(static_cast<int>(x + 4), static_cast<int>(style.top), 2, 11, markInk);
   }
 
+  // The launch cut paints last: it owns the frame until it lands.
+  PaintLaunchCinematic(sim);
 }
 
 void ShellView::SyncIdleDots(const Simulation& sim, double nowMs) {
@@ -1955,6 +1958,171 @@ void ShellView::PaintWrenExterior(const Simulation& sim) {
   }
 }
 
+// ============================================================================
+//  LAUNCH: the cut out of Setup and into the ship.
+//  Setup fades down to black, the Wren arrives alone in that darkness, holds
+//  for a beat, and only then does the cockpit, its cards and its chrome blend
+//  back in underneath it. The voyage has already begun on the click, so the
+//  simulation never waits on the picture; any input, and reduced motion, land
+//  the cut immediately.
+// ============================================================================
+void ShellView::BeginLaunchCinematic(double nowMs) {
+  launchActive_ = true;
+  launchStartMs_ = nowMs;
+}
+
+void ShellView::PaintLaunchCinematic(const Simulation& sim) {
+  if (!launchActive_) { return; }
+  if (sim.State().reducedMotion || width_ < 2.0f || height_ < 2.0f) {
+    launchActive_ = false;
+    return;
+  }
+
+  const double t = std::max(0.0, frameTimeMs_ - launchStartMs_);
+  constexpr double kFadeToBlack = 520.0;   // Setup sinks into pitch black
+  constexpr double kRevealAt = 400.0;      // the hull starts to lift out of it
+  constexpr double kRevealDone = 800.0;
+  constexpr double kHoldEnd = 1560.0;      // cinematic hold: ship alone
+  constexpr double kShipGone = 2400.0;     // it has receded into the hangar
+  constexpr double kBlendEnd = 2600.0;     // cockpit fully back
+  if (t >= kBlendEnd) {
+    launchActive_ = false;
+    return;
+  }
+  const auto smooth = [](double u) {
+    u = std::clamp(u, 0.0, 1.0);
+    return u * u * (3.0 - 2.0 * u);
+  };
+
+  // The black curtain: everything the cockpit painted this frame sits under it.
+  float curtain = 1.0f;
+  if (t < kFadeToBlack) { curtain = static_cast<float>(smooth(t / kFadeToBlack)); }
+  else if (t >= kHoldEnd) {
+    curtain = static_cast<float>(1.0 - smooth((t - kHoldEnd) / (kBlendEnd - kHoldEnd)));
+  }
+  if (curtain > 0.0f) {
+    DrawRectangle(0, 0, static_cast<int>(width_), static_cast<int>(height_),
+                  Fade(BLACK, std::clamp(curtain, 0.0f, 1.0f)));
+  }
+
+  const bool shipShown = t >= kRevealAt && t < kShipGone;
+  const float reveal = shipShown
+                           ? static_cast<float>(smooth((t - kRevealAt) / (kRevealDone - kRevealAt)))
+                           : 0.0f;
+  if (shipShown) {
+    EnsureWrenMesh();
+    if (wrenMeshBuilt_) {
+      const float u = static_cast<float>(
+          std::clamp((t - kRevealAt) / (kShipGone - kRevealAt), 0.0, 1.0));
+      const float tSec = static_cast<float>(t * 0.001);
+      constexpr float kFovDeg = 28.0f;
+      constexpr double kZNear = 0.5;
+      constexpr double kZFar = 60.0;
+      const float fovRad = kFovDeg * DEG2RAD;
+      const float viewAspect = width_ / height_;
+
+      // Slow dolly in while it emerges, then a long recede as the cockpit
+      // returns: the hull settles into the hangar it is about to be drawn in.
+      const float recede = t > kHoldEnd
+                               ? static_cast<float>(smooth((t - kHoldEnd) / (kShipGone - kHoldEnd)))
+                               : 0.0f;
+      const float camDist = (16.8f - 4.2f * u) + 7.5f * recede;
+      const float halfViewH = camDist * std::tan(fovRad * 0.5f);
+      const float stageH = height_ * (0.50f + 0.10f * u) * (1.0f - 0.72f * recede);
+      const float cx = width_ * 0.5f;
+      const float cy = height_ * (0.53f - 0.06f * recede);
+      const float shipWorldH = (stageH / height_) * 2.0f * halfViewH;
+
+      const float yawDeg = 24.0f - 18.0f * u + 3.2f * std::sin(tSec * 0.55f);
+      const float pitchDeg = -7.0f + 4.0f * u + 2.0f * std::sin(tSec * 0.71f + 0.8f);
+      const float rollDeg = 6.5f * (1.0f - u) + 2.0f * std::cos(tSec * 0.47f);
+
+      const Matrix modelMat = BuildScaleRotateXYZ(
+          shipWorldH, pitchDeg * DEG2RAD, yawDeg * DEG2RAD, rollDeg * DEG2RAD);
+      const Matrix viewMat = BuildTranslateZ(-camDist);
+      const float ndcX = (2.0f * cx / width_) - 1.0f;
+      const float ndcY = 1.0f - (2.0f * cy / height_);
+      const double top0 = kZNear * std::tan(static_cast<double>(fovRad) * 0.5);
+      const double right0 = top0 * static_cast<double>(viewAspect);
+      const double shiftX = -static_cast<double>(ndcX) * right0;
+      const double shiftY = -static_cast<double>(ndcY) * top0;
+      const double fLeft = -right0 + shiftX;
+      const double fRight = right0 + shiftX;
+      const double fBottom = -top0 + shiftY;
+      const double fTop = top0 + shiftY;
+      const Matrix projMat = BuildOffAxisFrustumMatrix(fLeft, fRight, fBottom, fTop, kZNear, kZFar);
+      const Matrix mvp = MulColMajor(projMat, MulColMajor(viewMat, modelMat));
+
+      const Texture2D* hullTexture = static_cast<const Texture2D*>(wrenExteriorArt_);
+      const float texAspect = (hullTexture != nullptr && hullTexture->height > 0)
+                                  ? static_cast<float>(hullTexture->width) /
+                                        static_cast<float>(hullTexture->height)
+                                  : 1.78f;
+      auto projectUv = [&](float uu, float vv, float z) -> Vector2 {
+        const Vector3 local{(uu - 0.5f) * texAspect, 0.5f - vv, z};
+        Vector2 sp = ProjectPointMvp(local, mvp, width_, height_);
+        return sp;
+      };
+
+      if (wrenShader_.id != 0) {
+        const RadiationTelemetry rad = ComputeRadiationTelemetry(sim);
+        if (wrenShaderWarmLoc_ >= 0) {
+          SetShaderValue(wrenShader_, wrenShaderWarmLoc_, &rad.warmBias, SHADER_UNIFORM_FLOAT);
+        }
+        if (wrenShaderLightLoc_ >= 0) {
+          const float keyDir[3]{-0.42f + 0.22f * rad.waveDirX,
+                                0.62f - 0.12f * rad.waveDirY,
+                                0.66f};
+          SetShaderValue(wrenShader_, wrenShaderLightLoc_, keyDir, SHADER_UNIFORM_VEC3);
+        }
+      }
+
+      Camera3D cam{};
+      cam.position = Vector3{0.0f, 0.0f, camDist};
+      cam.target = Vector3{0.0f, 0.0f, 0.0f};
+      cam.up = Vector3{0.0f, 1.0f, 0.0f};
+      cam.fovy = kFovDeg;
+      cam.projection = CAMERA_PERSPECTIVE;
+
+      EndMode2D();
+      BeginMode3D(cam);
+      rlMatrixMode(RL_PROJECTION);
+      rlLoadIdentity();
+      rlFrustum(fLeft, fRight, fBottom, fTop, kZNear, kZFar);
+      rlMatrixMode(RL_MODELVIEW);
+      rlEnableBackfaceCulling();
+      DrawMesh(wrenMesh_, wrenMat_, modelMat);
+      EndMode3D();
+      BeginMode2D(Camera2D{{0.0f, 0.0f}, {0.0f, 0.0f}, 0.0f, 1.0f});
+
+      // Three aft nozzles burning in the dark: the only light in the frame.
+      const float pulse = 0.62f + 0.38f * std::sin(tSec * 9.5f);
+      static constexpr float kNozzleU[3] = {0.055f, 0.018f, 0.055f};
+      static constexpr float kNozzleV[3] = {0.28f, 0.49f, 0.69f};
+      static constexpr float kNozzleR[3] = {11.0f, 16.0f, 11.0f};
+      for (int i = 0; i < 3; ++i) {
+        const Vector2 aft = projectUv(kNozzleU[i], kNozzleV[i], 0.0f);
+        const Vector2 plume{aft.x - 10.0f, aft.y};
+        DrawCircleGradient(plume, kNozzleR[i] * (0.90f + 0.18f * pulse),
+                           Fade(::Color{245, 188, 92, 255}, 0.30f * pulse * reveal),
+                           Fade(::Color{255, 224, 156, 255}, 0.0f));
+        DrawCircleGradient(Vector2{aft.x - 5.0f, aft.y},
+                           kNozzleR[i] * 0.48f * (0.90f + 0.14f * pulse),
+                           Fade(::Color{255, 238, 194, 255}, 0.34f * pulse * reveal),
+                           Fade(::Color{255, 224, 156, 255}, 0.0f));
+      }
+
+      // The reveal itself: the hull is not alpha-blended out of a mesh; a veil
+      // of the same black the cockpit is buried in lifts off it instead.
+      if (reveal < 0.999f) {
+        DrawRectangle(0, 0, static_cast<int>(width_), static_cast<int>(height_),
+                      Fade(BLACK, 1.0f - reveal));
+      }
+      return;
+    }
+  }
+}
+
 void ShellView::PaintIdle(Simulation& sim) {
   const Theme& theme = theme_;
   const auto hovered = [&](const Area& box) {
@@ -3058,53 +3226,37 @@ void ShellView::PaintTaskScreen(Simulation& sim) {
 namespace {
 #include "ChartArt.inc"
 
+// The chart reads as one flat table: every layer - System, Sector and Galaxy -
+// keeps its bodies on the ecliptic plane. Tilted orbits and drop-stems are gone
+// so the star map is read horizontally, not as a cluster of floating rocks.
 float NavBodyWorldY(const NavBodyView& body, const std::string& layer) {
-  const ChartLook look = ChartLookOf(body);
-  const unsigned h = ChartSeed(body.id);
-  const float signedU = (static_cast<float>(h % 2001u) / 1000.0f) - 1.0f;
-  const float posU = static_cast<float>((h / 2003u) % 1000u) / 1000.0f;
-  if (layer == "galaxy") {
-    if (look == ChartLook::Region) { return signedU * 0.34f; }
-    return signedU * 0.72f;
-  }
-  if (layer == "sector") {
-    return signedU * 0.62f;
-  }
-  switch (look) {
-    case ChartLook::Star:
-    case ChartLook::Origin: return 0.0f;
-    case ChartLook::Station: return 0.16f + posU * 0.24f;
-    case ChartLook::Site: return (signedU >= 0.0f ? 0.10f : -0.10f) + signedU * 0.22f;
-    case ChartLook::Belt: return signedU * 0.22f;
-    case ChartLook::Moon: return signedU * 0.36f;
-    case ChartLook::Gas:
-    case ChartLook::Ice:
-    case ChartLook::Ocean:
-    case ChartLook::Rock: return signedU * 0.48f;
-    case ChartLook::System:
-    case ChartLook::Region: return signedU * 0.40f;
-  }
+  (void)body;
+  (void)layer;
   return 0.0f;
 }
 
 float NavBodyScale3D(const NavBodyView& body, float tableScale, const std::string& layer) {
   const ChartLook look = ChartLookOf(body);
-  float base = static_cast<float>(body.size) * 0.0085f * tableScale;
+  // Worlds, moons, stations, sites and belts used to be drawn at near-star
+  // radius and swamped the chart. They now sit at roughly half that size; the
+  // stars stay the anchor the eye reads a system by.
+  constexpr float kBodyShrink = 0.50f;
+  float base = static_cast<float>(body.size) * 0.0085f * tableScale * kBodyShrink;
   switch (look) {
     case ChartLook::Star: base = std::max(base, 0.155f); break;
-    case ChartLook::System: base = std::max(base, layer == "galaxy" ? 0.068f : 0.105f); break;
-    case ChartLook::Region: base = std::max(base, 0.140f); break;
-    case ChartLook::Gas: base = std::max(base, 0.125f); break;
+    case ChartLook::System: base = std::max(base, (layer == "galaxy" ? 0.068f : 0.105f) * kBodyShrink); break;
+    case ChartLook::Region: base = std::max(base, 0.140f * kBodyShrink); break;
+    case ChartLook::Gas: base = std::max(base, 0.125f * kBodyShrink); break;
     case ChartLook::Ice:
     case ChartLook::Ocean:
-    case ChartLook::Rock: base = std::max(base, 0.095f); break;
-    case ChartLook::Moon: base = std::max(base, 0.056f); break;
-    case ChartLook::Station: base = std::max(base, 0.085f); break;
-    case ChartLook::Site: base = std::max(base, 0.072f); break;
-    case ChartLook::Belt: base = std::max(base, 0.088f); break;
-    case ChartLook::Origin: base = std::max(base, 0.088f); break;
+    case ChartLook::Rock: base = std::max(base, 0.095f * kBodyShrink); break;
+    case ChartLook::Moon: base = std::max(base, 0.056f * kBodyShrink); break;
+    case ChartLook::Station: base = std::max(base, 0.085f * kBodyShrink); break;
+    case ChartLook::Site: base = std::max(base, 0.072f * kBodyShrink); break;
+    case ChartLook::Belt: base = std::max(base, 0.088f * kBodyShrink); break;
+    case ChartLook::Origin: base = std::max(base, 0.088f * kBodyShrink); break;
   }
-  return std::clamp(base, 0.042f, 0.26f);
+  return std::clamp(base, 0.026f, 0.26f);
 }
 
 void PaintShadedSphere3D(const Vector3& center, float radius, int rings, int slices,
@@ -3433,14 +3585,16 @@ void PaintSatellite3D(const Vector3& center, float scale, float tangentX, float 
                            Fade(ToRay(p.terracotta), 0.35f + 0.65f * beaconPulse));
 }
 
+// Opaque station hull only. The mast beacon is translucent, so the chart
+// queues it for the far-to-near Pass C instead of blending it here.
 void PaintStation3D(const Vector3& center, float scale, float yawRad,
-                    const Palette& p, float alpha, float beaconOpacity) {
+                    const Palette& p) {
   const float cs = std::cos(yawRad), sn = std::sin(yawRad);
-  const ::Color hub = ChartFade(ToRay(p.coffee), alpha);
-  const ::Color trim = ChartFade(ToRay(p.coffeeLight), alpha);
-  const ::Color dark = ChartFade(ToRay(p.coffeeDark), alpha);
+  const ::Color hub = ToRay(p.coffee);
+  const ::Color trim = ToRay(p.coffeeLight);
+  const ::Color dark = ToRay(p.coffeeDark);
   PaintShadedSphere3D(center, scale * 0.52f, 6, 10, hub,
-                      Vector3{-0.4f, 0.75f, 0.5f}, false, 0, 7u, p, alpha);
+                      Vector3{-0.4f, 0.75f, 0.5f}, false, 0, 7u, p, 1.0f);
   // Equatorial orbital ring + twin orthogonal truss arms + antenna mast
   PaintRing3D(center, scale * 0.72f, scale * 0.94f, 0.0f, 0.0f, 16, trim);
   const float arm = scale * 1.55f;
@@ -3450,8 +3604,6 @@ void PaintStation3D(const Vector3& center, float scale, float yawRad,
              Vector3{center.x - arm * sn, center.y, center.z + arm * cs}, dark);
   const Vector3 mastTop{center.x, center.y + scale * 1.85f, center.z};
   DrawLine3D(center, mastTop, trim);
-  PaintTranslucentSphere3D(mastTop, scale * 0.26f, 5, 6,
-                           ChartFade(ToRay(p.terracotta), beaconOpacity * alpha));
 }
 
 }  // namespace
@@ -3866,13 +4018,31 @@ void ShellView::PaintNavScreen(Simulation& sim) {
       rlEnableBackfaceCulling();
     }
 
-    // --- Pass B (DepthMask ON): Drop-stems, lit 3D worlds, stations, satellites & asteroids
+    // --- Pass B (DepthMask ON): strictly opaque lit worlds, stations & rock
+    // Every translucent element - gas rings, orbit tracks, beacons, courier
+    // blips, route pips, the player ring - is deferred to Pass C and painted
+    // far to near, so depth testing cuts it against solid hulls instead of
+    // blending through them from a depth-masked pass.
     rlDrawRenderBatchActive();
     rlEnableDepthMask();
 
     const Vector3 fallbackKey{-0.45f, 0.75f, 0.50f};
     const float tableScale = std::clamp(bodyScale, 0.65f, 1.55f);
     const bool compactGalaxyStars = (chart.layer == "galaxy");
+
+    struct DeferredDraw {
+      float depthSq = 0.0f;
+      std::function<void()> paint;
+    };
+    std::vector<DeferredDraw> translucent;
+    translucent.reserve(ordered.size() * 4 + chart.routes.size() + 32);
+    const auto deferPaint = [&translucent, &camPos](const Vector3& at,
+                                                    std::function<void()> paint) {
+      const float dx = at.x - camPos.x;
+      const float dy = at.y - camPos.y;
+      const float dz = at.z - camPos.z;
+      translucent.push_back(DeferredDraw{dx * dx + dy * dy + dz * dz, std::move(paint)});
+    };
 
     for (const NavBodyView* body : ordered) {
       const auto itW = worldAllById.find(body->id);
@@ -3882,83 +4052,82 @@ void ShellView::PaintNavScreen(Simulation& sim) {
       const float r3 = NavBodyScale3D(*body, tableScale, chart.layer);
       const unsigned seed = ChartSeed(body->id);
 
-      float alpha = body->inRange || body->here ? 1.0f : 0.78f;
+      float tone = body->inRange || body->here ? 1.0f : 0.78f;
       if (chart.layer == "sector" && !body->region.empty() && !sim.Map().sector.empty() &&
           body->region != sim.Map().sector) {
-        alpha = std::min(alpha, 0.86f);
+        tone = std::min(tone, 0.86f);
       }
+      // Unscanned bodies read dim through pigment, not vertex alpha: the hull
+      // stays fully opaque and its colour is mixed toward the chart plane.
+      const auto dim = [&tone, &p](const ::Color& c) -> ::Color {
+        return tone >= 0.999f ? c : ChartMix(c, ToRay(p.chart), 1.0f - tone);
+      };
 
-      // Drop-stem + ecliptic footprint tick for elevated bodies (makes 3D depth unmistakable)
-      if (std::fabs(wp.y) > 0.03f &&
-          !(compactGalaxyStars && body->type == "system" && !body->selected && !body->here)) {
-        const ::Color stemCol = Fade(ToRay(p.coffee), 0.34f * alpha);
-        DrawLine3D(wp, Vector3{wp.x, 0.0f, wp.z}, stemCol);
-        const float tick = std::min(0.055f, r3 * 0.48f);
-        DrawLine3D(Vector3{wp.x - tick, 0.0f, wp.z}, Vector3{wp.x + tick, 0.0f, wp.z}, stemCol);
-        DrawLine3D(Vector3{wp.x, 0.0f, wp.z - tick}, Vector3{wp.x, 0.0f, wp.z + tick}, stemCol);
-      }
-
-      const Vector3 lightRef = (chart.layer == "system" && hasPointStarLight && look != ChartLook::Star)
-                                   ? systemStarPos
-                                   : fallbackKey;
-      const bool pointLight = (chart.layer == "system" && hasPointStarLight && look != ChartLook::Star);
+      // The chart is a flat table now, so the star's light is lifted off the
+      // ecliptic: without that bias every northern hemisphere goes black.
+      const bool pointLight =
+          (chart.layer == "system" && hasPointStarLight && look != ChartLook::Star);
+      const Vector3 starLight{systemStarPos.x, systemStarPos.y + 1.65f, systemStarPos.z};
+      const Vector3 lightRef = pointLight ? starLight : fallbackKey;
 
       if (compactGalaxyStars && body->type == "system" && !body->selected && !body->here) {
-        PaintShadedSphere3D(wp, r3 * 0.44f, 4, 6, ToRay(p.amber),
-                            fallbackKey, false, 5, seed, p, 0.76f * alpha);
+        PaintShadedSphere3D(wp, r3 * 0.44f, 4, 6, dim(ToRay(p.amber)),
+                            fallbackKey, false, 5, seed, p, 1.0f);
       } else {
         switch (look) {
           case ChartLook::Star:
-            PaintShadedSphere3D(wp, r3 * 0.92f, 8, 14, ToRay(p.amber),
-                                fallbackKey, false, 5, seed, p, alpha);
+            PaintShadedSphere3D(wp, r3 * 0.92f, 8, 14, dim(ToRay(p.amber)),
+                                fallbackKey, false, 5, seed, p, 1.0f);
             break;
           case ChartLook::System:
-            PaintShadedSphere3D(wp, r3 * 0.64f, 6, 10, ToRay(p.amber),
-                                fallbackKey, false, 5, seed, p, alpha);
-            PaintOrbitTrack3D(wp, r3 * 1.15f, r3 * 1.15f, 0.18f, 0.12f, 18,
-                              Fade(ToRay(p.coffeeLight), 0.36f * alpha));
+            PaintShadedSphere3D(wp, r3 * 0.64f, 6, 10, dim(ToRay(p.amber)),
+                                fallbackKey, false, 5, seed, p, 1.0f);
+            deferPaint(wp, [&p, wp, r3, tone]() {
+              PaintOrbitTrack3D(wp, r3 * 1.15f, r3 * 1.15f, 0.18f, 0.12f, 18,
+                                Fade(ToRay(p.coffeeLight), 0.36f * tone));
+            });
             break;
           case ChartLook::Gas: {
             const ::Color gasCol = ChartLift(ToRay(p.amber), 0.38f);
-            PaintShadedSphere3D(wp, r3, 8, 14, gasCol, lightRef, pointLight, 1, seed, p, alpha);
+            PaintShadedSphere3D(wp, r3, 8, 14, dim(gasCol), lightRef, pointLight, 1, seed, p, 1.0f);
             const float ringTiltX = 0.42f + static_cast<float>(seed % 7u) * 0.04f;
             const float ringTiltZ = -0.22f + static_cast<float>((seed / 7u) % 5u) * 0.06f;
-            PaintRing3D(wp, r3 * 1.38f, r3 * 1.72f, ringTiltX, ringTiltZ, 28,
-                        ChartFade(ChartLift(ToRay(p.coffeeLight), 0.25f), 0.78f * alpha));
-            PaintRing3D(wp, r3 * 1.82f, r3 * 2.08f, ringTiltX, ringTiltZ, 28,
-                        ChartFade(ToRay(p.coffeeLight), 0.48f * alpha));
+            deferPaint(wp, [&p, wp, r3, ringTiltX, ringTiltZ, tone]() {
+              PaintRing3D(wp, r3 * 1.38f, r3 * 1.72f, ringTiltX, ringTiltZ, 28,
+                          ChartFade(ChartLift(ToRay(p.coffeeLight), 0.25f), 0.78f * tone));
+              PaintRing3D(wp, r3 * 1.82f, r3 * 2.08f, ringTiltX, ringTiltZ, 28,
+                          ChartFade(ToRay(p.coffeeLight), 0.48f * tone));
+            });
             break;
           }
           case ChartLook::Ice:
-            PaintShadedSphere3D(wp, r3, 8, 14, ChartMix(ToRay(p.white), ToRay(p.sage), 0.28f),
-                                lightRef, pointLight, 2, seed, p, alpha);
+            PaintShadedSphere3D(wp, r3, 8, 14, dim(ChartMix(ToRay(p.white), ToRay(p.sage), 0.28f)),
+                                lightRef, pointLight, 2, seed, p, 1.0f);
             break;
           case ChartLook::Ocean:
-            PaintShadedSphere3D(wp, r3, 8, 14, ChartMix(ToRay(p.sage), ToRay(p.coffeeDark), 0.18f),
-                                lightRef, pointLight, 3, seed, p, alpha);
+            PaintShadedSphere3D(wp, r3, 8, 14, dim(ChartMix(ToRay(p.sage), ToRay(p.coffeeDark), 0.18f)),
+                                lightRef, pointLight, 3, seed, p, 1.0f);
             break;
           case ChartLook::Rock:
-            PaintShadedSphere3D(wp, r3, 8, 14, ChartMix(ToRay(p.coffee), ToRay(p.terracotta), 0.34f),
-                                lightRef, pointLight, 4, seed, p, alpha);
+            PaintShadedSphere3D(wp, r3, 8, 14, dim(ChartMix(ToRay(p.coffee), ToRay(p.terracotta), 0.34f)),
+                                lightRef, pointLight, 4, seed, p, 1.0f);
             break;
           case ChartLook::Moon:
-            PaintShadedSphere3D(wp, r3, 6, 10, ChartLift(ToRay(p.muted), 0.38f),
-                                lightRef, pointLight, 4, seed, p, alpha);
+            PaintShadedSphere3D(wp, r3, 6, 10, dim(ChartLift(ToRay(p.muted), 0.38f)),
+                                lightRef, pointLight, 4, seed, p, 1.0f);
             break;
           case ChartLook::Station: {
             const float spin = tSec * 0.28f + static_cast<float>(seed % 100u) * 0.06f;
             const float beaconOp = (liveFx.hasStation && body->id == liveFx.stationId)
                                        ? static_cast<float>(liveFx.beaconOpacity)
                                        : (reduced ? 1.0f : (0.35f + 0.65f * (0.5f + 0.5f * std::sin(tSec * 4.5f))));
-            PaintStation3D(wp, r3, spin, p, alpha, beaconOp);
+            PaintStation3D(wp, r3, spin, p);
 
             // Orbiting 3D telemetry satellites flying continuously around every station
             const float satOrbitR = r3 * 2.65f;
             const float satAngle = tSec * 0.85f + static_cast<float>(seed % 31u) * 0.2f;
             const float satTiltX = 0.32f + static_cast<float>(seed % 5u) * 0.10f;
             const float satTiltZ = -0.25f;
-            PaintOrbitTrack3D(wp, satOrbitR, satOrbitR * 0.88f, satTiltX, satTiltZ, 28,
-                              Fade(ToRay(p.coffeeLight), 0.42f * alpha));
             const float lx = std::cos(satAngle) * satOrbitR;
             const float lz = std::sin(satAngle) * satOrbitR * 0.88f;
             const float cxT = std::cos(satTiltX), sxT = std::sin(satTiltX);
@@ -3969,22 +4138,36 @@ void ShellView::PaintNavScreen(Simulation& sim) {
                                  wp.z + lz1};
             const float tx = -std::sin(satAngle);
             const float tz = std::cos(satAngle) * 0.88f;
-            PaintSatellite3D(satPos, r3 * 0.44f, tx, tz, p,
-                             reduced ? 1.0f : (0.5f + 0.5f * std::sin(tSec * 6.0f + satAngle)));
+            const float satPulse =
+                reduced ? 1.0f : (0.5f + 0.5f * std::sin(tSec * 6.0f + satAngle));
+            deferPaint(wp, [&p, wp, r3, satPos, satOrbitR, satTiltX, satTiltZ, tx, tz,
+                            satPulse, beaconOp, tone]() {
+              // Mast beacon: the only translucent part of the station itself.
+              PaintTranslucentSphere3D(Vector3{wp.x, wp.y + r3 * 1.85f, wp.z}, r3 * 0.26f, 5, 6,
+                                       ChartFade(ToRay(p.terracotta), beaconOp * tone));
+              PaintOrbitTrack3D(wp, satOrbitR, satOrbitR * 0.88f, satTiltX, satTiltZ, 28,
+                                Fade(ToRay(p.coffeeLight), 0.42f * tone));
+              PaintSatellite3D(satPos, r3 * 0.44f, tx, tz, p, satPulse);
+            });
             break;
           }
           case ChartLook::Site: {
             const float spin = tSec * 0.75f + static_cast<float>(seed % 17u);
-            PaintAsteroid3D(wp, r3 * 0.68f, 0.35f, spin, 0.2f, ToRay(p.terracotta),
+            PaintAsteroid3D(wp, r3 * 0.68f, 0.35f, spin, 0.2f, dim(ToRay(p.terracotta)),
                             fallbackKey, seed);
-            PaintOrbitTrack3D(wp, r3 * 1.25f, r3 * 1.25f, 0.5f, 0.0f, 18,
-                              Fade(ToRay(p.terracotta), 0.55f * alpha));
+            deferPaint(wp, [&p, wp, r3, tone]() {
+              PaintOrbitTrack3D(wp, r3 * 1.25f, r3 * 1.25f, 0.5f, 0.0f, 18,
+                                Fade(ToRay(p.terracotta), 0.55f * tone));
+            });
             break;
           }
           case ChartLook::Belt: {
             const ::Color beltCol = ChartMix(ToRay(p.coffeeLight), ToRay(p.coffeeDark), 0.25f);
-            PaintOrbitTrack3D(wp, r3 * 1.7f, r3 * 1.15f, 0.22f, -0.15f, 24,
-                              Fade(beltCol, 0.42f * alpha));
+            const ::Color beltInk = dim(beltCol);
+            deferPaint(wp, [&p, wp, r3, beltInk, tone]() {
+              PaintOrbitTrack3D(wp, r3 * 1.7f, r3 * 1.15f, 0.22f, -0.15f, 24,
+                                Fade(beltInk, 0.42f * tone));
+            });
             for (int bi = 0; bi < 6; ++bi) {
               const float a = static_cast<float>(bi) / 6.0f * 2.0f * PI + tSec * 0.22f;
               const Vector3 bp{
@@ -3993,16 +4176,18 @@ void ShellView::PaintNavScreen(Simulation& sim) {
                   wp.z + std::sin(a) * r3 * 1.12f,
               };
               PaintAsteroid3D(bp, r3 * (0.20f + 0.04f * static_cast<float>(bi % 3)),
-                              a * 1.7f, a * 2.3f, a * 0.9f, beltCol, lightRef,
+                              a * 1.7f, a * 2.3f, a * 0.9f, beltInk, lightRef,
                               seed + static_cast<unsigned>(bi) * 97u);
             }
             break;
           }
           case ChartLook::Region:
-            PaintShadedSphere3D(wp, r3 * 0.50f, 6, 10, ToRay(p.amber),
-                                fallbackKey, false, 5, seed, p, alpha);
-            PaintOrbitTrack3D(wp, r3 * 1.35f, r3 * 1.35f, 0.12f, -0.10f, 24,
-                              Fade(ToRay(p.coffeeLight), 0.52f * alpha));
+            PaintShadedSphere3D(wp, r3 * 0.50f, 6, 10, dim(ToRay(p.amber)),
+                                fallbackKey, false, 5, seed, p, 1.0f);
+            deferPaint(wp, [&p, wp, r3, tone]() {
+              PaintOrbitTrack3D(wp, r3 * 1.35f, r3 * 1.35f, 0.12f, -0.10f, 24,
+                                Fade(ToRay(p.coffeeLight), 0.52f * tone));
+            });
             for (int ri = 0; ri < 7; ++ri) {
               const float a = 0.8975979f * static_cast<float>(ri + 1) + tSec * 0.09f;
               const float reach = r3 * (1.25f + 0.22f * static_cast<float>(ri % 3));
@@ -4011,15 +4196,17 @@ void ShellView::PaintNavScreen(Simulation& sim) {
                   wp.y + std::sin(a * 1.7f) * r3 * 0.36f,
                   wp.z + std::sin(a) * reach * 0.72f,
               };
-              PaintShadedSphere3D(rp, r3 * 0.16f, 4, 6, ToRay(p.coffeeLight),
-                                  fallbackKey, false, 5, seed + static_cast<unsigned>(ri), p, alpha);
+              PaintShadedSphere3D(rp, r3 * 0.16f, 4, 6, dim(ToRay(p.coffeeLight)),
+                                  fallbackKey, false, 5, seed + static_cast<unsigned>(ri), p, 1.0f);
             }
             break;
           case ChartLook::Origin:
-            PaintShadedSphere3D(wp, r3 * 0.72f, 6, 10, ToRay(p.sage),
-                                fallbackKey, false, 0, seed, p, alpha);
-            PaintOrbitTrack3D(wp, r3 * 1.55f, r3 * 1.55f, 0.0f, 0.0f, 24,
-                              Fade(ToRay(p.sage), 0.65f * alpha));
+            PaintShadedSphere3D(wp, r3 * 0.72f, 6, 10, dim(ToRay(p.sage)),
+                                fallbackKey, false, 0, seed, p, 1.0f);
+            deferPaint(wp, [&p, wp, r3, tone]() {
+              PaintOrbitTrack3D(wp, r3 * 1.55f, r3 * 1.55f, 0.0f, 0.0f, 24,
+                                Fade(ToRay(p.sage), 0.65f * tone));
+            });
             break;
         }
       }
@@ -4052,8 +4239,10 @@ void ShellView::PaintNavScreen(Simulation& sim) {
                         rockCol, fallbackKey, 4242u + static_cast<unsigned>(ri) * 131u);
         // Subtle dust wake trailing behind moving asteroid
         const float wakeLen = std::clamp(static_cast<float>(rock.vx) * 0.85f, 0.10f, 0.28f);
-        DrawLine3D(rp, Vector3{rp.x - wakeLen, rp.y, rp.z},
-                   Fade(ToRay(p.coffeeLight), 0.42f));
+        deferPaint(rp, [&p, rp, wakeLen]() {
+          DrawLine3D(rp, Vector3{rp.x - wakeLen, rp.y, rp.z},
+                     Fade(ToRay(p.coffeeLight), 0.42f));
+        });
       }
 
       // Free-roaming reconnaissance satellite orbiting around system center / local star
@@ -4065,10 +4254,13 @@ void ShellView::PaintNavScreen(Simulation& sim) {
             systemStarPos.y + std::sin(probeAng) * 0.38f,
             systemStarPos.z + std::sin(probeAng) * probeR * 0.82f,
         };
-        PaintOrbitTrack3D(systemStarPos, probeR, probeR * 0.82f, 0.26f, 0.0f, 36,
-                          Fade(ToRay(p.coffeeLight), 0.22f));
-        PaintSatellite3D(probePos, 0.048f, -std::sin(probeAng), std::cos(probeAng) * 0.82f,
-                         p, reduced ? 1.0f : (0.5f + 0.5f * std::sin(tSec * 5.0f)));
+        const float probePulse = reduced ? 1.0f : (0.5f + 0.5f * std::sin(tSec * 5.0f));
+        deferPaint(systemStarPos, [&p, systemStarPos, probeR, probeAng, probePos, probePulse]() {
+          PaintOrbitTrack3D(systemStarPos, probeR, probeR * 0.82f, 0.26f, 0.0f, 36,
+                            Fade(ToRay(p.coffeeLight), 0.22f));
+          PaintSatellite3D(probePos, 0.048f, -std::sin(probeAng), std::cos(probeAng) * 0.82f,
+                           p, probePulse);
+        });
       }
     } else if (!reduced && (chart.layer == "sector" || chart.layer == "galaxy")) {
       // Live 3D courier traffic blips cruising along hyperspace lanes
@@ -4094,8 +4286,11 @@ void ShellView::PaintNavScreen(Simulation& sim) {
             a->second.y + (b->second.y - a->second.y) * u + arc,
             a->second.z + (b->second.z - a->second.z) * u,
         };
-        PaintTranslucentSphere3D(cp, lit ? 0.024f : 0.017f, 4, 6,
-                                 lit ? ToRay(p.sage) : ToRay(p.amber));
+        const float courierR = lit ? 0.024f : 0.017f;
+        const ::Color courierInk = lit ? ToRay(p.sage) : ToRay(p.amber);
+        deferPaint(cp, [cp, courierR, courierInk]() {
+          PaintTranslucentSphere3D(cp, courierR, 4, 6, courierInk);
+        });
         ++courierCount;
       }
     }
@@ -4122,7 +4317,10 @@ void ShellView::PaintNavScreen(Simulation& sim) {
         ink = ::Color{126, 198, 63, 255};
         sz = 0.0145f;
       }
-      PaintTranslucentSphere3D(Vector3{xz.first, archY, xz.second}, sz, 4, 6, ink);
+      const Vector3 pip{xz.first, archY, xz.second};
+      deferPaint(pip, [pip, sz, ink]() {
+        PaintTranslucentSphere3D(pip, sz, 4, 6, ink);
+      });
     }
 
     // 3D Ship marker elevation & ring
@@ -4135,18 +4333,22 @@ void ShellView::PaintNavScreen(Simulation& sim) {
         if (itHome != worldAllById.end()) { my = itHome->second.y; }
       }
       markerWorld = Vector3{mxz.first, my, mxz.second};
-      PaintOrbitTrack3D(markerWorld, 0.16f, 0.16f, 0.0f, 0.0f, 24,
-                        Fade(kPlayerBeaconRed, 0.85f));
-      if (std::fabs(my) > 0.02f) {
-        DrawLine3D(markerWorld, Vector3{markerWorld.x, 0.0f, markerWorld.z},
-                   Fade(kPlayerBeaconRed, 0.55f));
-      }
+      deferPaint(markerWorld, [markerWorld, kPlayerBeaconRed]() {
+        PaintOrbitTrack3D(markerWorld, 0.16f, 0.16f, 0.0f, 0.0f, 24,
+                          Fade(kPlayerBeaconRed, 0.85f));
+      });
       markerOnScreen = projectDoc(markerWorld, &markerDocPos);
     }
 
-    // --- Pass C (DepthMask OFF): Soft luminous coronas, halos & star rays
+    // --- Pass C (DepthMask OFF): deferred translucent detail, far to near
     rlDrawRenderBatchActive();
     rlDisableDepthMask();
+    std::stable_sort(translucent.begin(), translucent.end(),
+                     [](const DeferredDraw& a, const DeferredDraw& b) {
+                       return a.depthSq > b.depthSq;  // farthest first, nearest painted last
+                     });
+    for (const DeferredDraw& queued : translucent) { queued.paint(); }
+    rlDrawRenderBatchActive();
     for (const NavBodyView* body : ordered) {
       const ChartLook look = ChartLookOf(*body);
       if (look != ChartLook::Star && look != ChartLook::System && look != ChartLook::Region &&
@@ -6736,6 +6938,9 @@ void ShellView::PaintSetup(Simulation& sim) {
   const float mapH = card.h * 0.72f;
   const float barY = card.Bottom() - card.h * 0.11f;
   const int textPx = TypePx(12);
+  // Setup is a control surface: every control says so when the pointer is on
+  // it, using the title art's own menu palette rather than a new one.
+  const auto hovered = [&](const Area& box) { return box.Contains(mouseX_, mouseY_); };
 
   Text("VOYAGE SETTINGS", static_cast<int>(card.x + pad), static_cast<int>(card.y + pad),
        TypePx(16), ToRay(p.titleInk));
@@ -6746,9 +6951,11 @@ void ShellView::PaintSetup(Simulation& sim) {
     y += 18.0f;
     const Area minus{card.x + pad, y, 28.0f, 28.0f};
     const Area plus{card.x + pad + leftW - pad * 2.0f - 28.0f, y, 28.0f, 28.0f};
-    PaintChamferBoxRay(minus, kChamferSmall, ToRay(p.titleMenu),
+    PaintChamferBoxRay(minus, kChamferSmall,
+                       ToRay(hovered(minus) ? p.titleMenuHover : p.titleMenu),
                        ToRay(p.titleMenuBorder), ToRay(p.border));
-    PaintChamferBoxRay(plus, kChamferSmall, ToRay(p.titleMenu),
+    PaintChamferBoxRay(plus, kChamferSmall,
+                       ToRay(hovered(plus) ? p.titleMenuHover : p.titleMenu),
                        ToRay(p.titleMenuBorder), ToRay(p.border));
     Text("-", static_cast<int>(minus.x + 10), static_cast<int>(minus.y + 6), textPx, ToRay(p.titleMenuInk));
     Text("+", static_cast<int>(plus.x + 8), static_cast<int>(plus.y + 6), textPx, ToRay(p.titleMenuInk));
@@ -6785,7 +6992,8 @@ void ShellView::PaintSetup(Simulation& sim) {
   for (int i = 0; i < 3; ++i) {
     const Area box{card.x + pad + i * (lw + 8.0f), y, lw, 28.0f};
     const bool on = setupLayer_ == layers[i];
-    PaintChamferBoxRay(box, kChamferSmall, ToRay(on ? p.titleMenuHover : p.titleMenu),
+    PaintChamferBoxRay(box, kChamferSmall,
+                       ToRay(on || hovered(box) ? p.titleMenuHover : p.titleMenu),
                        ToRay(p.titleMenuBorder), ToRay(p.border));
     const float tw = TextWidth(layerLabels[i], TypePx(10), false);
     Text(layerLabels[i], static_cast<int>(box.x + (box.w - tw) * 0.5f), static_cast<int>(box.y + 7),
@@ -6809,13 +7017,41 @@ void ShellView::PaintSetup(Simulation& sim) {
     return Vector2{px, py};
   };
 
+  // What the disc is showing, in names rather than ids: the layer, and the
+  // galaxy or system that has already been chosen.
+  std::string caption = "GALAXY LAYER";
+  if (setupLayer_ != "galaxy") {
+    caption = "SECTOR LAYER";
+    for (const auto& galaxy : setupPreview_.galaxies) {
+      if (galaxy.id == setupGalaxyId_) { caption = galaxy.name; break; }
+    }
+    if (setupLayer_ == "system") {
+      for (const auto& system : setupPreview_.systems) {
+        if (system.id == setupSystemId_) { caption = system.name; break; }
+      }
+    }
+  }
+  caption = FitText(caption, std::max(40.0f, mapW - 24.0f), TypePx(10));
+  const float capW = TextWidth(caption.c_str(), TypePx(10)) + 14.0f;
+  const Area capPill{mapX + 8.0f, mapY + 8.0f, capW, TypePx(10) + 10.0f};
+  PaintChamferBoxRay(capPill, kChamferSmall, ToRay(p.titleMenu),
+                     ToRay(p.titleMenuBorder), ToRay(p.border));
+  Text(caption.c_str(), static_cast<int>(capPill.x + 7.0f), static_cast<int>(capPill.y + 5.0f),
+       TypePx(10), ToRay(p.titleMenuInk));
+
   if (setupLayer_ == "galaxy") {
     for (const auto& dot : setupPreview_.galaxies) {
       const Vector2 pt = plot(dot.x, dot.y, setupPreview_.galaxyW, setupPreview_.galaxyH);
+      const Area target{pt.x - 8, pt.y - 8, 16, 16};
       const bool sel = dot.id == setupGalaxyId_;
-      DrawCircle(static_cast<int>(pt.x), static_cast<int>(pt.y), sel ? 5.0f : 3.0f,
+      const bool hot = hovered(target);
+      if (sel) {
+        DrawCircleLines(static_cast<int>(pt.x), static_cast<int>(pt.y), 8.0f,
+                        ToRay(p.terracotta));
+      }
+      DrawCircle(static_cast<int>(pt.x), static_cast<int>(pt.y), sel ? 5.0f : (hot ? 4.0f : 3.0f),
                  ToRay(sel ? p.terracotta : p.coffee));
-      titleHits_.push_back({Area{pt.x - 8, pt.y - 8, 16, 16}, "setup-pick-galaxy", dot.id});
+      titleHits_.push_back({target, "setup-pick-galaxy", dot.id});
     }
   } else {
     const double bw = setupPreview_.sectorW;
@@ -6824,16 +7060,25 @@ void ShellView::PaintSetup(Simulation& sim) {
       if (!setupGalaxyId_.empty() && dot.parent != setupGalaxyId_) { continue; }
       if (setupLayer_ == "system" && !setupSystemId_.empty() && dot.id != setupSystemId_) { continue; }
       const Vector2 pt = plot(dot.x, dot.y, bw, bh);
+      const Area target{pt.x - 7, pt.y - 7, 14, 14};
       const bool sel = dot.id == setupSystemId_;
-      DrawCircle(static_cast<int>(pt.x), static_cast<int>(pt.y), sel ? 4.5f : 2.5f,
+      const bool hot = hovered(target);
+      if (sel) {
+        DrawCircleLines(static_cast<int>(pt.x), static_cast<int>(pt.y), 7.0f,
+                        ToRay(p.terracotta));
+      }
+      DrawCircle(static_cast<int>(pt.x), static_cast<int>(pt.y), sel ? 4.5f : (hot ? 3.5f : 2.5f),
                  ToRay(sel ? p.terracotta : p.coffee));
-      titleHits_.push_back({Area{pt.x - 7, pt.y - 7, 14, 14}, "setup-pick-system", dot.id});
+      titleHits_.push_back({target, "setup-pick-system", dot.id});
     }
   }
 
   const bool canLaunch = !setupSystemId_.empty();
   const Area launch{mapX, barY, std::min(180.0f, mapW * 0.4f), 36.0f};
-  PaintChamferBoxRay(launch, kChamferCard, ToRay(canLaunch ? p.titleMenuHover : p.titleMenu, canLaunch ? 255 : 140),
+  const bool launchHot = canLaunch && hovered(launch);
+  PaintChamferBoxRay(launch, kChamferCard,
+                       ToRay(canLaunch ? (launchHot ? p.panel3 : p.titleMenuHover) : p.titleMenu,
+                             canLaunch ? 255 : 140),
                        ToRay(p.titleMenuBorder), ToRay(p.border));
   const float ltw = TextWidth("LAUNCH", TypePx(14), false);
   Text("LAUNCH", static_cast<int>(launch.x + (launch.w - ltw) * 0.5f),
@@ -6842,19 +7087,35 @@ void ShellView::PaintSetup(Simulation& sim) {
   if (canLaunch) { titleHits_.push_back({launch, "setup-launch", ""}); }
 
   const Area back{card.x + pad, barY, 120.0f, 36.0f};
-  PaintChamferBoxRay(back, kChamferCard, ToRay(p.titleMenu),
+  PaintChamferBoxRay(back, kChamferCard,
+                       ToRay(hovered(back) ? p.titleMenuHover : p.titleMenu),
                        ToRay(p.titleMenuBorder), ToRay(p.border));
   const float btw = TextWidth("BACK", textPx, false);
   Text("BACK", static_cast<int>(back.x + (120 - btw) * 0.5f), static_cast<int>(back.y + 10),
        textPx, ToRay(p.titleMenuInk));
   titleHits_.push_back({back, "back", ""});
 
+  // The berth is named, not spelled as a generated id: "Start: Kestrel Reach"
+  // reads on the title art; "Start: sec-gen-205" does not.
+  const float noteX = launch.x + launch.w + 12.0f;
+  const float noteW = std::max(40.0f, card.Right() - pad - noteX);
   if (!setupSystemId_.empty()) {
-    Text(("Start: " + setupSystemId_).c_str(), static_cast<int>(launch.x + launch.w + 12),
-         static_cast<int>(barY + 10), TypePx(10), ToRay(p.titleInk));
+    std::string startName = setupSystemId_;
+    for (const auto& system : setupPreview_.systems) {
+      if (system.id == setupSystemId_) { startName = system.name; break; }
+    }
+    if (startName.empty()) { startName = setupSystemId_; }
+    const std::string line = FitText("START: " + startName, noteW, TypePx(10));
+    const Area pill{noteX, barY + 6.0f, TextWidth(line.c_str(), TypePx(10)) + 14.0f,
+                    static_cast<float>(TypePx(10)) + 12.0f};
+    PaintChamferBoxRay(pill, kChamferSmall, ToRay(p.titleMenu),
+                       ToRay(p.titleMenuBorder), ToRay(p.border));
+    Text(line.c_str(), static_cast<int>(pill.x + 7.0f), static_cast<int>(pill.y + 6.0f),
+         TypePx(10), ToRay(p.titleMenuInk));
   } else {
-    Text("Choose a starting system on the map.", static_cast<int>(launch.x + launch.w + 12),
-         static_cast<int>(barY + 10), TypePx(10), ToRay(p.muted));
+    const std::string line = FitText("Choose a starting system on the map.", noteW, TypePx(10));
+    Text(line.c_str(), static_cast<int>(noteX), static_cast<int>(barY + 10),
+         TypePx(10), ToRay(p.titleMenuInk));
   }
 }
 
@@ -7759,6 +8020,7 @@ void ShellView::Scroll(Simulation& sim, float x, float y, float wheelDelta) {
 }
 
 void ShellView::Escape(Simulation& sim) {
+  if (launchActive_) { launchActive_ = false; return; }
   if (LossVisible(sim)) { lossDismissed_ = true; return; }
   if (titleActive_) {
     if (titleConfirm_) { titleConfirm_ = false; }
@@ -7783,6 +8045,9 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
     chartDragMoved_ = false;
     if (moved) { return; }
   }
+  // Input never waits on the launch cut: the first press lands it and is then
+  // handled as the press it was.
+  launchActive_ = false;
   if (floating_.HasConfirmation() || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow)) { return; }
   if (button == HitButton::None) { return; }
 
@@ -7920,6 +8185,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         sim.BeginVoyage(setupSettings_, setupSystemId_);
         fromVoyage_ = false;
         HideTitle();
+        BeginLaunchCinematic(nowMs);
         return;
       }
       PressTitleAction(sim, hit.action, "", &fromVoyage_, &titlePanel_, &titleSlot_,

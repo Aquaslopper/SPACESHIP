@@ -159,7 +159,7 @@ struct Options {
   double displayBrightness = 1.0;
   double radiationWave = 1.0;
   int fontStep = 0;
-  bool fullscreen = false;
+  bool fullscreen = true;
 };
 
 struct Charge {

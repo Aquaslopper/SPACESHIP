@@ -1183,7 +1183,7 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
           RadiationWaveStrength(GetNumber(*it, "radiationWave", kRadiationWaveDefault));
       const double step = GetNumber(*it, "fontStep", 0.0);
       state_.options.fontStep = step < 0 ? 0 : (step > 3 ? 3 : static_cast<int>(step));
-      state_.options.fullscreen = GetBool(*it, "fullscreen", false);
+      state_.options.fullscreen = GetBool(*it, "fullscreen", true);
     }
 
     state_.chronicle = Chronicle();

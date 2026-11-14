@@ -150,6 +150,9 @@ class ShellView {
   void ReleaseWrenMesh();
   ExteriorLayout BuildExteriorLayout(const Simulation& sim, const Area& stage) const;
   void PaintWrenExterior(const Simulation& sim);
+  // LAUNCH cut: setup to black, the Wren alone, then the cockpit blends in.
+  void BeginLaunchCinematic(double nowMs);
+  void PaintLaunchCinematic(const Simulation& sim);
 
   struct TabHit {
     std::string key;
@@ -367,6 +370,8 @@ class ShellView {
   std::string pendingAction_;
 
   bool titleActive_ = false;
+  bool launchActive_ = false;
+  double launchStartMs_ = 0.0;
   bool titleConfirm_ = false;
   bool fromVoyage_ = false;
   TitlePanel titlePanel_ = TitlePanel::None;
