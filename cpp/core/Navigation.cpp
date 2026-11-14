@@ -473,7 +473,6 @@ bool Simulation::StartTravel() {
   if (Task* under = FindOngoing("travel")) {
     const std::string id = under->id;
     ClearOngoing(id);
-    map_.here = CurrentSystemId();
     state_.navTarget.reset();
     for (InfoRow& row : infos_) {
       if (row.id == "location") { row.value = "In space - holding"; }
