@@ -103,6 +103,23 @@ You must append a compressed summary of **every single reply and action you take
 - Verified builds & visual inspection: `tools/check-id-prefixes.sh` passed; `tools/check-gui-syntax.sh` (`Draw.cpp`, `AudioDevice.cpp`, `main.cpp`) + strict `-Wall -Wextra -Wpedantic -Werror` compilation passed with 0 warnings; `tools/viewer` and isolated C++ harnesses verified resting, middle-drag orbited (`yaw=44.10 pitch=18.32`, `-48/33`), zoomed/panned, click-selected orbited targets, `RESET 3D`, active Engine (`14,092` changed px; `11,140` changed px under critical+travel), active O2 (`20,610` changed px across all 3 seated/running canisters), `28/28` Engine stage text bounds (`0` overflow/missing), and `0` pixel delta under `reducedMotion` across Navigation 3D, Engine Room, and O2 Filter Room.
 - Git action: staging modified `cpp/` files + `docs/LOGBOOK.md`, committing to `arena/7e36ca28-spaceship`, pushing to `origin`, and opening a pull request targeting `main`.
 
+### Entry #008
+- **Timestamp:** 2026-11-14 09:55 UTC
+- Session scope: owner-requested Crew Quarters chibi persona idle poses, subtle skeletal movement, and living corridor atmosphere on branch `arena/b5c8029b-spaceship` (off `main` `7d403ce`).
+- `cpp/ui/Draw.cpp` (`ComputeChibiPose`, `PaintRiggedChibi`, `PaintQuartersCorridorFx`, `PaintQuartersSchematicProps`, `PaintQuartersScreen`):
+  - **2.5D Articulated Chibi Mesh Rig (`PaintRiggedChibi`)**: replaced flat static quad blitting of `<id>-stand-cloth` and `<id>-stand` with a smooth `14x36` skeletal `RL_QUADS` mesh anchored at the boot soles (`kBootSrc`), blending waist weight-shift, subtle chest breathing expansion/lift, counter-balanced sleeve/arm float, and rigid neck-pivoted head tilt/glance (`wHead` blended cleanly across the collar `146..168`) so eyes, glasses, and hairlines stay 100% crisp with zero seam tears.
+  - **Contextual Idle Poses (`ComputeChibiPose`)**:
+    - Active duty (`stand`): personalized per-crew breathing cadence & phase (`CrewSeedPhase`), relaxed alternating hip weight-shift + counter-shoulder tilt, curious head tilt & held glances, fatigued/ill slouch modulation (`NeedKeyFor`), active-travel hull micro-vibration, and responsive perk-up bounce/nod on cursor hover or dialogue (`8,467` changed px).
+    - Off-duty idle (`sit`): relaxed knee slouch, soft forward torso lean, periodic `4.6 s` head-nod-off droop with brisk wake-up catch, and rising typographic `z z Z` glyphs floating clear of the dark viewport (`15,667` changed px over `0.75 s`).
+    - Study (`desk`) & transfer (`crate`): attentive forward lean toward the study console with periodic reading nods, or curious glances toward the transfer crate.
+    - Medical Bay (`lie` / `doc`): maps `<id>-lie` to `<id>-stand` when no dedicated lie PNG exists so illustrated chibi crew rest calmly propped against a headboard & plump pillow in patient-gown tint, tucked neatly under a folded medical blanket with zero exposed boots, paired with a glowing medical cross plaque and live scrolling green EKG heartbeat monitor.
+    - Procedural sprite-grid fallback (`figure == nullptr`): retains exact `CrewSprites` pixels with smooth body-only breathing bob & sway.
+  - **Corridor Atmosphere & Vector Props (`PaintQuartersCorridorFx`, `PaintQuartersSchematicProps`)**:
+    - Added star-drifted / travel-streaked deep space observation viewport inside `DECK A` (`cq-dpane`) with glass sheen, subtle ceiling light wash & floating ambient dust motes, glowing doorway status LED (`sage`/`amber`/`terracotta`), synced double-ellipse contact shadow (`cq-shadow` replaced cleanly when crew present), animated `...` dots on the speech button, and chamfered palette-matched vector props (`cross` + EKG, `desk`, `crate`, `mop`, `chart`, `wrench`, `tank` with rising bubbles, `ladle`, `zzz`).
+- Untouched restricted files: `CMakeLists.txt`, `cpp/ui/First2000Styles.h`, `cpp/ui/CrewSprites.*`, `cpp/ui/QuartersScreen.*`, gameplay simulation logic, and `tools/viewer/` tracked files remain unmodified.
+- Verified builds & visual inspection: `tools/check-id-prefixes.sh` passed; `tools/check-gui-syntax.sh` and strict `-Wall -Wextra -Wpedantic -Werror` passed with 0 warnings; `tools/viewer` and isolated C++ harness verified standing/idle/study/crate/filters/medical states (`15,667` and `14,601` live animated px; `8,467` hover px), `0` text overlaps at `18px` and `23px`, light `classic` and cyan `void` themes, travel star streaks, and `0` pixel delta under `reducedMotion` (`standing` and `sleeping`).
+- Git action: staging modified `cpp/ui/Draw.cpp` + `docs/LOGBOOK.md`, committing to `arena/b5c8029b-spaceship`, pushing to `origin`, and opening a pull request targeting `main`.
+
 
 
 

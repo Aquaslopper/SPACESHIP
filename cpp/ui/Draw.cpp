@@ -4667,6 +4667,601 @@ Color Blend(Color from, Color to, float amount) {
   };
   return Color{channel(from.r, to.r), channel(from.g, to.g), channel(from.b, to.b), 255};
 }
+
+float CrewSeedPhase(const std::string& id) {
+  unsigned h = 2166136261u;
+  for (unsigned char ch : id) {
+    h ^= ch;
+    h *= 16777619u;
+  }
+  return static_cast<float>(h % 628u) * 0.01f;
+}
+
+bool HasCrewProp(const CrewScene& scene, const std::string& propName) {
+  return std::find(scene.propNames.begin(), scene.propNames.end(), propName) !=
+         scene.propNames.end();
+}
+
+bool IsVectorCrewProp(const std::string& name) {
+  return name == "cross" || name == "desk" || name == "crate" || name == "zzz" ||
+         name == "mop" || name == "chart" || name == "wrench" || name == "tank" ||
+         name == "ladle";
+}
+
+struct ChibiPose {
+  float breath = 0.0f;         // 0..1 inhale expansion
+  float breathLiftY = 0.0f;    // vertical chest/torso lift (stage px)
+  float hipShiftX = 0.0f;      // horizontal weight shift (stage px)
+  float hipDipY = 0.0f;        // knee/crouch settle downward (stage px)
+  float torsoTiltRad = 0.0f;   // upper-body lean around waist pivot
+  float armFloatY = 0.0f;      // subtle shoulder/sleeve vertical float
+  float armSwayX = 0.0f;       // subtle arm outward/horizontal drift
+  float armSpreadX = 0.0f;     // arm outward posture offset
+  float armCounterY = 0.0f;    // opposite-phase left/right arm counterbalance
+  float headTiltRad = 0.0f;    // rigid neck rotation (keeps face/glasses crisp)
+  float headNodY = 0.0f;       // vertical head nod/droop (stage px)
+  float headTurnX = 0.0f;      // horizontal look shift (stage px)
+  float headScaleX = 1.0f;     // subtle 2.5D perspective compression on head turn
+  float shadowScale = 1.0f;    // dynamic ground contact shadow width factor
+  bool isSleeping = false;
+  bool isMedical = false;
+  bool hasDesk = false;
+  bool hasCrate = false;
+  bool perked = false;
+};
+
+ChibiPose ComputeChibiPose(const Simulation& sim, const CrewMember* crew, const CrewScene& scene,
+                           const std::string& crewId, bool hasSaid, bool hovered,
+                           float tSec, float stageScale) {
+  ChibiPose pose;
+  pose.isSleeping = (scene.pose == "sit");
+  pose.isMedical = (scene.pose == "lie");
+  pose.hasDesk = HasCrewProp(scene, "desk");
+  pose.hasCrate = HasCrewProp(scene, "crate");
+  pose.perked = hovered || hasSaid;
+
+  const bool reduced = sim.State().reducedMotion;
+  const bool travel = sim.FindOngoing("travel") != nullptr;
+  const std::string needKey = crew != nullptr ? sim.NeedKeyFor(*crew) : std::string();
+  const bool tired = (needKey == "tired" || needKey == "ill" || needKey == "morale");
+
+  const float phase = CrewSeedPhase(crewId);
+  const float cadence = 0.94f + 0.12f * (0.5f + 0.5f * std::sin(phase));
+
+  // Static posture offsets remain legible even under reducedMotion while all
+  // time-varying motion zeroes cleanly when reducedMotion is enabled.
+  if (pose.isMedical) {
+    pose.hipDipY = 1.5f * stageScale;
+    pose.torsoTiltRad = -0.11f;
+    pose.headTiltRad = -0.045f;
+    pose.headNodY = 0.8f * stageScale;
+    pose.shadowScale = 1.15f;
+    if (!reduced) {
+      const float br = 0.5f + 0.5f * std::sin(tSec * 1.45f * cadence + phase);
+      pose.breath = br;
+      pose.breathLiftY = -1.75f * br * stageScale;
+      pose.armFloatY = 0.60f * std::sin(tSec * 1.45f * cadence + phase - 0.6f) * stageScale;
+      pose.headTiltRad += 0.018f * std::sin(tSec * 0.9f + phase);
+      pose.headNodY += 0.60f * br * stageScale;
+    }
+    return pose;
+  }
+
+  if (pose.isSleeping) {
+    pose.hipDipY = 3.2f * stageScale;
+    pose.torsoTiltRad = 0.026f;
+    pose.headTiltRad = 0.045f;
+    pose.headNodY = 1.0f * stageScale;
+    pose.shadowScale = 1.05f;
+    if (!reduced) {
+      const float br = 0.5f + 0.5f * std::sin(tSec * 1.55f * cadence + phase);
+      const float sway = std::sin(tSec * 0.85f * cadence + phase);
+      // Periodic 4.6 s head-nod droop followed by a soft wake-up catch.
+      const float loopT = std::fmod(tSec * 0.217f * cadence + phase * 0.15f, 1.0f);
+      float nodCycle = 0.0f;
+      if (loopT < 0.74f) {
+        nodCycle = SmoothStep01(0.10f, 0.74f, loopT);
+      } else {
+        const float u = (loopT - 0.74f) / 0.26f;
+        nodCycle = std::max(0.0f, (1.0f - SmoothStep01(0.0f, 0.45f, u)) - 0.22f * std::sin(u * 6.28318f) * (1.0f - u));
+      }
+      pose.breath = br;
+      pose.breathLiftY = -1.55f * br * stageScale;
+      pose.hipShiftX = 1.1f * sway * stageScale;
+      pose.hipDipY += 0.65f * br * stageScale;
+      pose.torsoTiltRad += 0.016f * nodCycle + 0.012f * sway;
+      pose.armFloatY = (0.7f * br + 0.4f * nodCycle) * stageScale;
+      pose.headTiltRad = 0.025f + 0.068f * nodCycle + (hovered ? -0.045f : 0.0f);
+      pose.headNodY = (0.5f + 2.1f * nodCycle + (hovered ? -1.2f : 0.0f)) * stageScale;
+      pose.headTurnX = 0.5f * sway * stageScale;
+      pose.shadowScale += 0.04f * br;
+    }
+    return pose;
+  }
+
+  // Active / Standing Duty pose (with desk, crate, fatigue, perk-up, and travel nuances)
+  if (pose.hasDesk) {
+    pose.hipShiftX = -1.6f * stageScale;
+    pose.torsoTiltRad = -0.022f;
+    pose.headTiltRad = -0.026f;
+    pose.headTurnX = -1.1f * stageScale;
+  } else if (pose.hasCrate) {
+    pose.headTiltRad = -0.024f;
+    pose.headTurnX = -0.9f * stageScale;
+  }
+  if (tired) {
+    pose.hipDipY = 2.0f * stageScale;
+    pose.torsoTiltRad += 0.022f;
+    pose.headTiltRad += 0.032f;
+    pose.headNodY += 0.8f * stageScale;
+  }
+
+  if (!reduced) {
+    const float brFreq = (tired ? 1.75f : (hovered ? 2.55f : 2.15f)) * cadence;
+    const float br = 0.5f + 0.5f * std::sin(tSec * brFreq + phase);
+    const float weightShift = std::sin(tSec * (tired ? 0.92f : 1.22f) * cadence + phase);
+    const float lookWave = std::sin(tSec * 0.68f * cadence + phase * 1.7f);
+    // Shape lookWave into gentle held glances (left -> center -> right).
+    const float glance = std::clamp(lookWave * 1.45f, -1.0f, 1.0f);
+
+    pose.breath = br;
+    pose.breathLiftY = -(tired ? 1.80f : 1.50f) * br * stageScale;
+    pose.hipShiftX += (tired ? 1.45f : 2.40f) * weightShift * stageScale;
+    pose.hipDipY += (0.70f * (1.0f - std::cos(tSec * 2.44f * cadence + 2.0f * phase)) *
+                     (tired ? 0.50f : 0.95f)) * stageScale;
+    pose.torsoTiltRad += -0.030f * weightShift;
+    pose.armFloatY = (-1.00f * br + 0.65f * std::sin(tSec * brFreq + phase - 0.8f)) * stageScale;
+    pose.armSwayX = -0.55f * weightShift * stageScale;
+    pose.armSpreadX = (hovered ? 1.00f : 0.42f * br) * stageScale;
+    pose.armCounterY = 0.80f * weightShift * stageScale;
+
+    if (pose.hasDesk) {
+      const float studyNod = 0.5f + 0.5f * std::sin(tSec * 1.9f * cadence + phase);
+      pose.headTiltRad += -0.026f * studyNod + 0.020f * weightShift;
+      pose.headNodY += 1.25f * studyNod * stageScale;
+      pose.headTurnX += 0.65f * glance * stageScale;
+    } else {
+      const float curiosity = std::sin(tSec * 0.95f * cadence + phase * 0.9f);
+      pose.headTiltRad += 0.048f * curiosity + (hovered ? -0.038f : 0.0f);
+      pose.headNodY += ((hovered ? -1.05f * std::fabs(std::sin(tSec * 4.2f)) : 0.0f) +
+                        0.55f * br) * stageScale;
+      pose.headTurnX += 1.65f * glance * stageScale;
+    }
+
+    if (pose.perked && !pose.hasDesk) {
+      const float perkNod = std::sin(tSec * 3.4f + phase);
+      pose.headTiltRad += 0.024f * perkNod;
+      pose.hipDipY = std::max(0.0f, pose.hipDipY - 0.5f * stageScale);
+    }
+    if (travel) {
+      const float microVib = std::sin(tSec * 26.0f + phase) * 0.18f * stageScale;
+      pose.hipShiftX += microVib;
+      pose.headNodY += std::cos(tSec * 21.0f) * 0.14f * stageScale;
+    }
+    pose.headScaleX = 1.0f - 0.020f * std::min(1.0f, std::fabs(pose.headTurnX) / std::max(0.5f, 1.8f * stageScale));
+    pose.shadowScale = 1.0f - 0.035f * br + 0.025f * std::fabs(weightShift);
+  }
+  return pose;
+}
+
+void PaintRiggedChibi(const Texture2D& tex, const ScenePicture& shown, const Area& hall,
+                      float stageScale, const ChibiPose& pose, Color tint) {
+  if (tex.id == 0 || tex.width <= 0 || tex.height <= 0) { return; }
+  const float tw = static_cast<float>(tex.width);
+  const float th = static_cast<float>(tex.height);
+  const float w = tw * 0.5f * stageScale;
+  const float h = th * 0.5f * stageScale;
+  const float cx = hall.x + static_cast<float>(shown.x) * stageScale;
+  const float baseY = hall.y + static_cast<float>(shown.base) * stageScale;
+
+  // Consistent chibi anatomical heights measured up from the boot soles (2px margin):
+  // soles = 0, boot cuff ~ 24, belt/waist pivot ~ 86, collar/neck pivot ~ 160.
+  const float waistStageY = -86.0f * 0.5f * stageScale;
+  const float neckStageY = -160.0f * 0.5f * stageScale;
+
+  const float cosT = std::cos(pose.torsoTiltRad);
+  const float sinT = std::sin(pose.torsoTiltRad);
+  const float cosH = std::cos(pose.headTiltRad);
+  const float sinH = std::sin(pose.headTiltRad);
+
+  const float waistPivotX = pose.hipShiftX * 0.85f;
+  const float waistPivotY = waistStageY + pose.hipDipY * 0.85f;
+
+  // Transform the exact collar center through the waist->torso transform so
+  // the rigid head rotates seamlessly around the live moving neck joint.
+  const float neckRawX = pose.hipShiftX;
+  const float neckRawY = neckStageY + pose.hipDipY + pose.breathLiftY;
+  const float ndxW = neckRawX - waistPivotX;
+  const float ndyW = neckRawY - waistPivotY;
+  const float neckPivotX = waistPivotX + ndxW * cosT - ndyW * sinT;
+  const float neckPivotY = waistPivotY + ndxW * sinT + ndyW * cosT;
+
+  const auto evalVertex = [&](float u, float v) -> Vector2 {
+    const float srcFromBottom = (1.0f - v) * th;
+    const float wAnkle = SmoothStep01(14.0f, 36.0f, srcFromBottom);
+    const float wTorso = SmoothStep01(68.0f, 102.0f, srcFromBottom);
+    const float wHead = SmoothStep01(146.0f, 168.0f, srcFromBottom);
+    const float wBodyOnly = wTorso * (1.0f - wHead);
+
+    const float sideAbs = std::fabs(u - 0.5f);
+    const float sideSign = (u >= 0.5f) ? 1.0f : -1.0f;
+    const float armMask = SmoothStep01(0.27f, 0.36f, sideAbs) *
+                          SmoothStep01(56.0f, 74.0f, srcFromBottom) *
+                          (1.0f - SmoothStep01(138.0f, 158.0f, srcFromBottom));
+
+    float px = (u - 0.5f) * w;
+    float py = (v - 1.0f) * h;
+
+    // 1) Grounded weight shift + crouch settle
+    px += pose.hipShiftX * wAnkle;
+    py += pose.hipDipY * wAnkle;
+
+    // 2) Chest breathing + arm counterbalance
+    px += px * (0.018f * pose.breath * wBodyOnly);
+    py += pose.breathLiftY * wTorso;
+    py += (pose.armFloatY + sideSign * pose.armCounterY) * armMask;
+    px += (sideSign * pose.armSpreadX + pose.armSwayX) * armMask;
+
+    // 3) Torso rotation around waist pivot weighted by wTorso
+    const float dxW = px - waistPivotX;
+    const float dyW = py - waistPivotY;
+    const float aT = pose.torsoTiltRad * wTorso;
+    const float cT = std::cos(aT);
+    const float sT = std::sin(aT);
+    const float tx = waistPivotX + dxW * cT - dyW * sT;
+    const float ty = waistPivotY + dxW * sT + dyW * cT;
+
+    // 4) Rigid head rotation + 2.5D glance around neck pivot weighted by wHead
+    const float dxN = (tx - neckPivotX) * (1.0f - (1.0f - pose.headScaleX) * wHead);
+    const float dyN = ty - neckPivotY;
+    const float aH = pose.headTiltRad * wHead;
+    const float cH = std::cos(aH);
+    const float sH = std::sin(aH);
+    const float hx = neckPivotX + dxN * cH - dyN * sH + pose.headTurnX * wHead;
+    const float hy = neckPivotY + dxN * sH + dyN * cH + pose.headNodY * wHead;
+
+    return Vector2{cx + hx, baseY + hy};
+  };
+  (void)cosH;
+  (void)sinH;
+
+  constexpr int kCols = 14;
+  constexpr int kRows = 36;
+  Vector2 grid[(kRows + 1) * (kCols + 1)];
+  for (int r = 0; r <= kRows; ++r) {
+    const float v = static_cast<float>(r) / static_cast<float>(kRows);
+    for (int c = 0; c <= kCols; ++c) {
+      const float u = static_cast<float>(c) / static_cast<float>(kCols);
+      grid[r * (kCols + 1) + c] = evalVertex(u, v);
+    }
+  }
+
+  rlSetTexture(tex.id);
+  rlBegin(RL_QUADS);
+  rlColor4ub(tint.r, tint.g, tint.b, tint.a);
+  rlNormal3f(0.0f, 0.0f, 1.0f);
+  for (int r = 0; r < kRows; ++r) {
+    const float v0 = static_cast<float>(r) / static_cast<float>(kRows);
+    const float v1 = static_cast<float>(r + 1) / static_cast<float>(kRows);
+    for (int c = 0; c < kCols; ++c) {
+      const float u0 = static_cast<float>(c) / static_cast<float>(kCols);
+      const float u1 = static_cast<float>(c + 1) / static_cast<float>(kCols);
+      const Vector2& tl = grid[r * (kCols + 1) + c];
+      const Vector2& tr = grid[r * (kCols + 1) + c + 1];
+      const Vector2& bl = grid[(r + 1) * (kCols + 1) + c];
+      const Vector2& br = grid[(r + 1) * (kCols + 1) + c + 1];
+
+      rlTexCoord2f(u0, v0);
+      rlVertex2f(tl.x, tl.y);
+      rlTexCoord2f(u0, v1);
+      rlVertex2f(bl.x, bl.y);
+      rlTexCoord2f(u1, v1);
+      rlVertex2f(br.x, br.y);
+      rlTexCoord2f(u1, v0);
+      rlVertex2f(tr.x, tr.y);
+    }
+  }
+  rlEnd();
+  rlSetTexture(0);
+}
+
+void PaintQuartersCorridorFx(const Simulation& sim, const Palette& p, const Area& hall,
+                             float stageScale, const CrewScene& scene, bool hasCrew,
+                             const ChibiPose& pose, float tSec, float contentScroll) {
+  const bool reduced = sim.State().reducedMotion;
+  const bool travel = sim.FindOngoing("travel") != nullptr;
+  const float doorX = kCrewFigureX - kCrewDoorW * 0.5f;
+  const float paneX = hall.x + (doorX + 15.0f) * stageScale;
+  const float paneY = hall.y + 82.0f * stageScale;
+  const float paneW = 66.0f * stageScale;
+  const float paneH = 56.0f * stageScale;
+
+  // 1) Door porthole glass: star drift & diagonal reflection glint inside cq-dpane
+  BeginScissorMode(static_cast<int>(std::floor(paneX)),
+                   static_cast<int>(std::floor(paneY - contentScroll)),
+                   std::max(1, static_cast<int>(std::ceil(paneW))),
+                   std::max(1, static_cast<int>(std::ceil(paneH))));
+  const Color spaceBg = Blend(ToRay(p.panel3), ToRay(p.ink), 0.78f);
+  DrawRectangle(static_cast<int>(paneX), static_cast<int>(paneY),
+                static_cast<int>(std::ceil(paneW)), static_cast<int>(std::ceil(paneH)), spaceBg);
+  const float driftSpeed = reduced ? 0.0f : (travel ? 0.28f : 0.025f);
+  for (int si = 0; si < 9; ++si) {
+    const float sx0 = std::fmod(0.11f * static_cast<float>(si) + 0.37f * static_cast<float>((si * 3) % 7), 1.0f);
+    const float sy0 = std::fmod(0.19f * static_cast<float>(si) + 0.23f * static_cast<float>((si * 5) % 9), 1.0f);
+    const float sx = paneX + std::fmod(sx0 + 1.0f - std::fmod(tSec * driftSpeed * (0.65f + 0.12f * static_cast<float>(si % 4)), 1.0f), 1.0f) * paneW;
+    const float sy = paneY + sy0 * paneH;
+    const float tw = reduced ? 0.8f : (0.55f + 0.45f * std::sin(tSec * (2.2f + 0.5f * static_cast<float>(si)) + static_cast<float>(si)));
+    if (travel && !reduced) {
+      DrawLineEx(Vector2{sx, sy}, Vector2{sx + 7.0f * stageScale, sy}, 1.2f * stageScale,
+                 Fade(ToRay(p.white), 0.45f * tw));
+    } else {
+      DrawCircleV(Vector2{sx, sy}, ((si % 3 == 0) ? 1.25f : 0.85f) * stageScale,
+                  Fade(ToRay(p.white), 0.35f + 0.45f * tw));
+    }
+  }
+  // Subtle glass reflection diagonal bands
+  DrawLineEx(Vector2{paneX + 8.0f * stageScale, paneY + 4.0f * stageScale},
+             Vector2{paneX + 26.0f * stageScale, paneY + 22.0f * stageScale},
+             3.0f * stageScale, Fade(ToRay(p.white), 0.14f));
+  DrawLineEx(Vector2{paneX + 16.0f * stageScale, paneY + 4.0f * stageScale},
+             Vector2{paneX + 28.0f * stageScale, paneY + 16.0f * stageScale},
+             1.5f * stageScale, Fade(ToRay(p.white), 0.10f));
+  EndScissorMode();
+  // Restore hallway scissor
+  BeginScissorMode(static_cast<int>(hall.x + kDoubleInset),
+                   static_cast<int>(hall.y + kDoubleInset - contentScroll),
+                   std::max(0, static_cast<int>(hall.w - 2.0f * kDoubleInset)),
+                   std::max(0, static_cast<int>(hall.h - 2.0f * kDoubleInset)));
+
+  // 2) Soft overhead ceiling light wash down into the corridor + floating dust specks
+  {
+    const float pulse = reduced ? 1.0f : (0.94f + 0.06f * std::sin(tSec * 2.3f));
+    const Color beamCol = Fade(ToRay(p.white), 0.055f * pulse);
+    const float topL = hall.x + doorX * stageScale;
+    const float topR = hall.x + (doorX + kCrewDoorW) * stageScale;
+    const float topY = hall.y + 9.0f * stageScale;
+    const float botL = hall.x + (doorX - 42.0f) * stageScale;
+    const float botR = hall.x + (doorX + kCrewDoorW + 42.0f) * stageScale;
+    const float botY = hall.y + 266.0f * stageScale;
+    rlBegin(RL_QUADS);
+    rlColor4ub(beamCol.r, beamCol.g, beamCol.b, beamCol.a);
+    rlVertex2f(topL, topY);
+    rlVertex2f(botL, botY);
+    rlVertex2f(botR, botY);
+    rlVertex2f(topR, topY);
+    rlEnd();
+
+    if (!reduced) {
+      for (int di = 0; di < 7; ++di) {
+        const float u = static_cast<float>(di) / 7.0f;
+        const float dx = 342.0f + 118.0f * std::fmod(0.29f * static_cast<float>(di) + 0.03f * tSec * (di % 2 == 0 ? 1.0f : -0.7f) + 10.0f, 1.0f);
+        const float dy = 38.0f + 210.0f * std::fmod(0.41f * static_cast<float>(di) + 0.055f * tSec + 0.15f * std::sin(tSec * 0.7f + u * 6.0f), 1.0f);
+        const float alpha = 0.16f + 0.14f * std::sin(tSec * 1.9f + static_cast<float>(di) * 1.3f);
+        DrawCircleV(Vector2{hall.x + dx * stageScale, hall.y + dy * stageScale},
+                    1.1f * stageScale, Fade(ToRay(p.amber), alpha));
+      }
+    }
+  }
+
+  // 3) Animated doorway status beacon right beside DECK A frame
+  {
+    Color led = ToRay(p.borderDark);
+    float ledPulse = 0.75f;
+    if (hasCrew) {
+      if (scene.pose == "lie") {
+        led = ToRay(p.terracotta);
+        ledPulse = reduced ? 0.85f : (0.5f + 0.5f * std::sin(tSec * 3.8f));
+      } else if (scene.pose == "sit") {
+        led = ToRay(p.amber);
+        ledPulse = reduced ? 0.75f : (0.4f + 0.6f * std::sin(tSec * 1.8f));
+      } else {
+        led = ToRay(p.sage);
+        ledPulse = reduced ? 0.85f : (0.55f + 0.45f * std::sin(tSec * 3.0f));
+      }
+    }
+    const float lx = hall.x + (doorX + kCrewDoorW - 9.0f) * stageScale;
+    const float ly = hall.y + 49.0f * stageScale;
+    DrawCircleV(Vector2{lx, ly}, 4.5f * stageScale, Fade(led, 0.25f * ledPulse));
+    DrawCircleV(Vector2{lx, ly}, 2.2f * stageScale, StageMix(ToRay(p.panel), led, 0.45f + 0.55f * ledPulse));
+  }
+
+  // 4) Synced soft contact shadow under the figure
+  if (hasCrew) {
+    const float sx = hall.x + kCrewFigureX * stageScale + pose.hipShiftX * 0.55f;
+    const float sy = hall.y + kCrewDeckY * stageScale;
+    const float rx = 38.0f * pose.shadowScale * stageScale;
+    const float ry = 5.5f * stageScale;
+    const Color shad = Fade(ToRay(p.coffeeDark), 0.22f);
+    DrawEllipse(static_cast<int>(std::round(sx)), static_cast<int>(std::round(sy)),
+                rx, ry, shad);
+    DrawEllipse(static_cast<int>(std::round(sx)), static_cast<int>(std::round(sy)),
+                rx * 0.68f, ry * 0.65f, Fade(ToRay(p.coffeeDark), 0.18f));
+  }
+}
+
+void PaintQuartersSchematicProps(const Simulation& sim, const Palette& p, const Area& hall,
+                                 float stageScale, const CrewScene& scene,
+                                 const ChibiPose& pose, float tSec,
+                                 const Font& textFont, int smallPx) {
+  const bool reduced = sim.State().reducedMotion;
+  const float doorX = kCrewFigureX - kCrewDoorW * 0.5f;
+  const float wallLeftCenter = kCrewFigureX - (kCrewDoorW + kCrewBareWall) * 0.5f;   // 327
+  const float wallRightCenter = kCrewFigureX + (kCrewDoorW + kCrewBareWall) * 0.5f;  // 475
+  const Color edge = ToRay(p.borderDark);
+  const Color cardBg = ToRay(p.panel);
+  const Color cardHi = ToRay(p.panel3);
+  const Color coffee = ToRay(p.coffee);
+  const Color dark = ToRay(p.coffeeDark);
+
+  const auto propArea = [&](float sx, float sy, float sw, float sh) {
+    return Area{hall.x + sx * stageScale, hall.y + sy * stageScale,
+                sw * stageScale, sh * stageScale};
+  };
+
+  for (const std::string& propName : scene.propNames) {
+    if (propName == "cross") {
+      // Wall medical placard + scrolling cardiac telemetry line
+      const Area pl = propArea(wallLeftCenter - 20.0f, 118.0f, 40.0f, 52.0f);
+      PaintChamferBoxRay(pl, 3.0f * stageScale, cardBg, edge, ToRay(p.border));
+      const float cx = pl.x + pl.w * 0.5f;
+      const float cy = pl.y + 15.0f * stageScale;
+      const Color redCol = ToRay(p.terracotta);
+      DrawRectangle(static_cast<int>(cx - 3.0f * stageScale),
+                    static_cast<int>(cy - 8.5f * stageScale),
+                    std::max(2, static_cast<int>(6.0f * stageScale)),
+                    std::max(4, static_cast<int>(17.0f * stageScale)), redCol);
+      DrawRectangle(static_cast<int>(cx - 8.5f * stageScale),
+                    static_cast<int>(cy - 3.0f * stageScale),
+                    std::max(4, static_cast<int>(17.0f * stageScale)),
+                    std::max(2, static_cast<int>(6.0f * stageScale)), redCol);
+      // Mini EKG glass display at bottom of placard
+      const Area scr{pl.x + 5.0f * stageScale, pl.y + 30.0f * stageScale,
+                     pl.w - 10.0f * stageScale, 15.0f * stageScale};
+      DrawRectangleRec(Rectangle{scr.x, scr.y, scr.w, scr.h},
+                       Blend(cardBg, ToRay(p.ink), 0.78f));
+      DrawRectangleLinesEx(Rectangle{scr.x, scr.y, scr.w, scr.h}, 1.0f, edge);
+      const float midY = scr.y + scr.h * 0.55f;
+      const float phase = reduced ? 0.5f : std::fmod(tSec * 0.85f, 1.0f);
+      Vector2 prev{scr.x + 2.0f * stageScale, midY};
+      for (int i = 1; i <= 14; ++i) {
+        const float u = static_cast<float>(i) / 14.0f;
+        const float d = std::fabs(u - phase);
+        float spike = 0.0f;
+        if (d < 0.08f) {
+          const float k = (u - phase) / 0.08f;
+          spike = k < 0.0f ? 2.5f * (1.0f + k) : (k < 0.45f ? -5.0f * (1.0f - k * 2.2f) : 2.2f * (1.0f - (k - 0.45f) * 1.8f));
+        }
+        const Vector2 cur{scr.x + (2.0f + u * (pl.w / stageScale - 14.0f)) * stageScale,
+                          midY + spike * stageScale};
+        DrawLineEx(prev, cur, 1.3f * stageScale, ToRay(p.sage));
+        prev = cur;
+      }
+    } else if (propName == "desk") {
+      // Study terminal console left of the figure, staying cleanly clear of Locker 01
+      const Area desk = propArea(298.0f, 218.0f, 52.0f, 60.0f);
+      // Legs & tabletop
+      DrawRectangle(static_cast<int>(desk.x + 4.0f * stageScale),
+                    static_cast<int>(desk.y + 24.0f * stageScale),
+                    std::max(2, static_cast<int>(4.0f * stageScale)),
+                    std::max(4, static_cast<int>(36.0f * stageScale)), dark);
+      DrawRectangle(static_cast<int>(desk.Right() - 8.0f * stageScale),
+                    static_cast<int>(desk.y + 24.0f * stageScale),
+                    std::max(2, static_cast<int>(4.0f * stageScale)),
+                    std::max(4, static_cast<int>(36.0f * stageScale)), dark);
+      PaintChamferBoxRay(Area{desk.x, desk.y + 20.0f * stageScale, desk.w, 6.0f * stageScale},
+                         1.5f * stageScale, coffee, dark, edge);
+      // Study terminal monitor angled on tabletop
+      const Area mon{desk.x + 8.0f * stageScale, desk.y, 30.0f * stageScale, 19.0f * stageScale};
+      PaintChamferBoxRay(mon, 2.0f * stageScale, cardHi, dark, edge);
+      const Area glass{mon.x + 3.0f * stageScale, mon.y + 3.0f * stageScale,
+                       mon.w - 6.0f * stageScale, mon.h - 6.0f * stageScale};
+      DrawRectangleRec(Rectangle{glass.x, glass.y, glass.w, glass.h},
+                       Blend(cardBg, ToRay(p.ink), 0.72f));
+      const float pulse = reduced ? 0.8f : (0.5f + 0.5f * std::sin(tSec * 3.6f));
+      DrawRectangleRec(Rectangle{glass.x + 3.0f * stageScale, glass.y + 3.0f * stageScale,
+                                 14.0f * stageScale, 2.0f * stageScale},
+                       Fade(ToRay(p.sage), 0.85f));
+      DrawRectangleRec(Rectangle{glass.x + 3.0f * stageScale, glass.y + 7.0f * stageScale,
+                                 10.0f * stageScale, 2.0f * stageScale},
+                       Fade(ToRay(p.amber), 0.65f + 0.3f * pulse));
+    } else if (propName == "crate") {
+      // Compact gear transfer crate sitting cleanly between Locker 01 and figure
+      const Area cr = propArea(307.0f, 240.0f, 46.0f, 38.0f);
+      PaintChamferBoxRay(cr, 3.0f * stageScale, cardHi, edge, ToRay(p.border));
+      DrawRectangleRec(Rectangle{cr.x + 2.0f * stageScale, cr.y + 8.0f * stageScale,
+                                 cr.w - 4.0f * stageScale, 5.0f * stageScale},
+                       Blend(cardBg, HexColor(scene.figureArt.empty() ? std::string() : scene.figureArt.front().cloth, ToRay(p.sage)), 0.75f));
+      DrawLineEx(Vector2{cr.x + 2.0f * stageScale, cr.y + 13.0f * stageScale},
+                 Vector2{cr.Right() - 2.0f * stageScale, cr.y + 13.0f * stageScale},
+                 1.2f * stageScale, edge);
+      DrawRectangleRec(Rectangle{cr.x + cr.w * 0.5f - 5.0f * stageScale, cr.y + 16.0f * stageScale,
+                                 10.0f * stageScale, 4.0f * stageScale}, dark);
+    } else if (propName == "mop") {
+      // Lean broom/mop against the bare wall right of the door
+      const float bx = hall.x + wallRightCenter * stageScale;
+      const float by = hall.y + 276.0f * stageScale;
+      DrawLineEx(Vector2{bx + 6.0f * stageScale, by - 76.0f * stageScale},
+                 Vector2{bx - 5.0f * stageScale, by - 6.0f * stageScale},
+                 2.6f * stageScale, coffee);
+      PaintChamferBoxRay(Area{bx - 16.0f * stageScale, by - 8.0f * stageScale,
+                              22.0f * stageScale, 7.0f * stageScale},
+                         1.5f * stageScale, ToRay(p.sage), dark, edge);
+    } else if (propName == "chart") {
+      // Rolled navigation chart tube & plotting slate beside door
+      const Area slate = propArea(wallRightCenter - 16.0f, 210.0f, 32.0f, 40.0f);
+      PaintChamferBoxRay(slate, 2.5f * stageScale, cardBg, edge, ToRay(p.border));
+      const float sx = slate.x + 5.0f * stageScale;
+      const float sy = slate.y + 6.0f * stageScale;
+      DrawRectangleRec(Rectangle{sx, sy, slate.w - 10.0f * stageScale, slate.h - 14.0f * stageScale},
+                       Blend(cardBg, ToRay(p.ink), 0.75f));
+      DrawLineEx(Vector2{sx + 4.0f * stageScale, sy + 18.0f * stageScale},
+                 Vector2{sx + 17.0f * stageScale, sy + 6.0f * stageScale},
+                 1.4f * stageScale, ToRay(p.amber));
+      const float blip = reduced ? 0.85f : (0.45f + 0.55f * std::sin(tSec * 3.4f));
+      DrawCircleV(Vector2{sx + 17.0f * stageScale, sy + 6.0f * stageScale},
+                  2.1f * stageScale, Fade(ToRay(p.amber), blip));
+    } else if (propName == "wrench") {
+      // Heavy engineering wrench mounted cleanly beside door
+      const float wx = hall.x + wallRightCenter * stageScale;
+      const float wy = hall.y + 228.0f * stageScale;
+      DrawLineEx(Vector2{wx, wy - 20.0f * stageScale}, Vector2{wx, wy + 24.0f * stageScale},
+                 5.0f * stageScale, dark);
+      DrawCircleV(Vector2{wx, wy - 24.0f * stageScale}, 8.5f * stageScale, dark);
+      DrawCircleV(Vector2{wx, wy - 24.0f * stageScale}, 4.5f * stageScale, cardBg);
+      DrawRectangle(static_cast<int>(wx - 2.5f * stageScale),
+                    static_cast<int>(wy - 33.0f * stageScale),
+                    std::max(2, static_cast<int>(5.0f * stageScale)),
+                    std::max(3, static_cast<int>(8.0f * stageScale)), cardBg);
+      DrawCircleV(Vector2{wx, wy + 24.0f * stageScale}, 5.0f * stageScale, coffee);
+    } else if (propName == "tank") {
+      // Miniature O2 filter canister with live sight-glass & tiny bubble
+      const Area tk = propArea(wallRightCenter - 13.0f, 224.0f, 26.0f, 52.0f);
+      DrawRectangle(static_cast<int>(tk.x + 8.0f * stageScale),
+                    static_cast<int>(tk.y - 4.0f * stageScale),
+                    std::max(3, static_cast<int>(10.0f * stageScale)),
+                    std::max(2, static_cast<int>(5.0f * stageScale)), dark);
+      PaintChamferBoxRay(tk, 3.5f * stageScale, Blend(cardBg, ToRay(p.sage), 0.55f),
+                         dark, edge);
+      const Area win{tk.x + 6.0f * stageScale, tk.y + 12.0f * stageScale,
+                     tk.w - 12.0f * stageScale, 24.0f * stageScale};
+      DrawRectangleRec(Rectangle{win.x, win.y, win.w, win.h}, cardBg);
+      DrawRectangleLinesEx(Rectangle{win.x, win.y, win.w, win.h}, 1.0f, edge);
+      for (int bi = 0; bi < 3; ++bi) {
+        const float u = reduced ? (0.25f + 0.25f * static_cast<float>(bi))
+                                : std::fmod(tSec * 0.42f + static_cast<float>(bi) * 0.33f, 1.0f);
+        const float bx = win.x + (3.5f + static_cast<float>((bi * 3) % 7)) * stageScale;
+        const float by = win.Bottom() - 3.0f * stageScale - u * (win.h - 6.0f * stageScale);
+        DrawCircleV(Vector2{bx, by}, 1.5f * stageScale, Fade(ToRay(p.sage), 0.78f));
+      }
+    } else if (propName == "ladle") {
+      // Galley utensil rack beside door
+      const float lx = hall.x + wallRightCenter * stageScale;
+      const float ly = hall.y + 220.0f * stageScale;
+      DrawLineEx(Vector2{lx, ly - 18.0f * stageScale}, Vector2{lx, ly + 32.0f * stageScale},
+                 3.2f * stageScale, dark);
+      DrawCircleV(Vector2{lx, ly + 34.0f * stageScale}, 8.0f * stageScale, coffee);
+      DrawCircleV(Vector2{lx, ly + 33.0f * stageScale}, 4.5f * stageScale, cardHi);
+    } else if (propName == "zzz") {
+      // Smoothly drifting typographic Z motifs floating clearly beside the right brow
+      const char* glyphs[3] = {"z", "z", "Z"};
+      const float baseX = hall.x + (kCrewFigureX + 41.0f) * stageScale + pose.headTurnX;
+      const float baseY = hall.y + (kCrewDeckY - 138.0f) * stageScale + pose.headNodY * 0.5f;
+      for (int zi = 0; zi < 3; ++zi) {
+        const float phase = reduced ? (0.20f + 0.28f * static_cast<float>(zi))
+                                    : std::fmod(tSec * 0.34f + static_cast<float>(zi) / 3.0f, 1.0f);
+        const float alpha = reduced ? (0.86f - 0.16f * static_cast<float>(zi))
+                                    : (SmoothStep01(0.0f, 0.22f, phase) *
+                                       (1.0f - SmoothStep01(0.68f, 1.0f, phase)));
+        const float zx = baseX + (static_cast<float>(zi) * 7.5f + 5.0f * std::sin(phase * 6.28318f + static_cast<float>(zi))) * stageScale;
+        const float zy = baseY - (phase * 40.0f + static_cast<float>(zi) * 5.0f) * stageScale;
+        const int sz = std::max(8, static_cast<int>(static_cast<float>(smallPx) * (0.74f + 0.24f * phase)));
+        DrawTextEx(textFont, glyphs[zi], Vector2{zx, zy}, static_cast<float>(sz), 0.5f,
+                   Fade(dark, std::clamp(alpha, 0.0f, 0.94f)));
+      }
+    }
+  }
+  (void)doorX;
+}
 }  // namespace
 
 void ShellView::PaintQuartersScreen(Simulation& sim) {
@@ -4729,6 +5324,7 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
                    std::max(0, static_cast<int>(hall.h - 2.0f * kDoubleInset)));
   MachinePart grown;
   for (const MachinePart& drawn : quarters_.hall) {
+    if (quarters_.hasCrew && drawn.cls.find("cq-shadow") != std::string::npos) { continue; }
     if (stageScale != 1.0f) {
       grown = drawn;
       grown.box = Area{drawn.box.x * stageScale, drawn.box.y * stageScale,
@@ -4806,66 +5402,159 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
     DrawRectangleLinesEx(Rectangle{card.x, card.y, card.w, card.h}, 2.0f, edge);
   }
 
-  // The figure is the first of its pictures on file. With none, it is the
-  // rectangles; with one, the rectangles before `figureFrom` are still painted:
-  // the desk, the crate, the tool, the sign.
+  // Evaluate crew persona pose & corridor atmospheric fx
   const CrewScene& scene = quarters_.scene;
   const ScenePicture* shown = nullptr;
+  ScenePicture medicalStandFallback{};
   const Texture2D* figure = nullptr;
   for (const ScenePicture& candidate : scene.figureArt) {
     figure = CrewTexture(crewArt_, candidate.name);
     if (figure != nullptr) { shown = &candidate; break; }
   }
-  const std::size_t cells =
-      figure != nullptr ? std::min(scene.figureFrom, scene.pixels.size()) : scene.pixels.size();
-  for (std::size_t i = 0; i < cells; ++i) {
-    // Each edge is rounded down on its own, so neighbouring cells meet at every scale.
-    const Area& box = scene.pixels[i].box;
-    const int x0 = static_cast<int>(std::floor(hall.x + box.x * stageScale));
-    const int y0 = static_cast<int>(std::floor(hall.y + box.y * stageScale));
-    const int x1 = static_cast<int>(std::floor(hall.x + (box.x + box.w) * stageScale));
-    const int y1 = static_cast<int>(std::floor(hall.y + (box.y + box.h) * stageScale));
-    DrawRectangle(x0, y0, std::max(1, x1 - x0), std::max(1, y1 - y0),
-                  HexColor(scene.pixels[i].colour, ToRay(p.coffee)));
+  if (figure == nullptr && scene.pose == "lie" && !scene.figureArt.empty()) {
+    const ScenePicture& orig = scene.figureArt.front();
+    const std::size_t pos = orig.name.rfind("-lie");
+    if (pos != std::string::npos) {
+      medicalStandFallback = orig;
+      medicalStandFallback.name = orig.name.substr(0, pos) + "-stand";
+      figure = CrewTexture(crewArt_, medicalStandFallback.name);
+      if (figure != nullptr) { shown = &medicalStandFallback; }
+    }
   }
+  const CrewMember* selectedCrew = quarters_.hasCrew ? sim.FindCrew(quarters_.selectedId) : nullptr;
+  const Area talkBtn{hall.x + quarters_.talk.x * stageScale, hall.y + quarters_.talk.y * stageScale,
+                     quarters_.talk.w * stageScale, quarters_.talk.h * stageScale};
+  const Area figureHoverBox{hall.x + (kCrewFigureX - 42.0f) * stageScale,
+                            hall.y + (kCrewDeckY - 165.0f) * stageScale,
+                            84.0f * stageScale, 170.0f * stageScale};
+  const bool figureHovered = quarters_.hasCrew &&
+                             (figureHoverBox.Contains(mouseX_, mouseY_ + contentScroll_) ||
+                              (quarters_.conversation.enabled &&
+                               talkBtn.Contains(mouseX_, mouseY_ + contentScroll_)));
+  const float tSec = static_cast<float>(frameTimeMs_ * 0.001);
+  const ChibiPose pose = ComputeChibiPose(sim, selectedCrew, scene, quarters_.selectedId,
+                                          !quarters_.said.empty(), figureHovered, tSec, stageScale);
+
+  PaintQuartersCorridorFx(sim, p, hall, stageScale, scene, quarters_.hasCrew, pose, tSec,
+                          contentScroll_);
+
   if (figure != nullptr) {
-    // Half the picture's pixel size at the size the stage is laid out for,
-    // the middle of its lower edge on its mark.
-    const float w = static_cast<float>(figure->width) * 0.5f * stageScale;
-    const float h = static_cast<float>(figure->height) * 0.5f * stageScale;
-    const Rectangle at{std::round(hall.x + static_cast<float>(shown->x) * stageScale - w / 2.0f),
-                       std::round(hall.y + static_cast<float>(shown->base) * stageScale - h), w, h};
-    const auto paint = [&at](const Texture2D& texture, Color tint) {
-      DrawTexturePro(texture,
-                     Rectangle{0, 0, static_cast<float>(texture.width),
-                               static_cast<float>(texture.height)},
-                     at, Vector2{0, 0}, 0.0f, tint);
-    };
-    // The uniform is a separate layer underneath, in the colour of the job.
+    // Crisp vector schematic corridor props replace blocky sprite-table placeholders
+    PaintQuartersSchematicProps(sim, p, hall, stageScale, scene, pose, tSec,
+                                SelectFont(TypePx(10), true), TypePx(10));
+    // Also render any unrecognised custom props below figureFrom if present
+    const std::size_t cells = std::min(scene.figureFrom, scene.pixels.size());
+    bool hasCustomProp = false;
+    for (const std::string& propName : scene.propNames) {
+      if (!IsVectorCrewProp(propName)) { hasCustomProp = true; break; }
+    }
+    if (hasCustomProp) {
+      for (std::size_t i = 0; i < cells; ++i) {
+        const Area& box = scene.pixels[i].box;
+        const int x0 = static_cast<int>(std::floor(hall.x + box.x * stageScale));
+        const int y0 = static_cast<int>(std::floor(hall.y + box.y * stageScale));
+        const int x1 = static_cast<int>(std::floor(hall.x + (box.x + box.w) * stageScale));
+        const int y1 = static_cast<int>(std::floor(hall.y + (box.y + box.h) * stageScale));
+        DrawRectangle(x0, y0, std::max(1, x1 - x0), std::max(1, y1 - y0),
+                      HexColor(scene.pixels[i].colour, ToRay(p.coffee)));
+      }
+    }
+
+    if (pose.isMedical) {
+      // Medical bay headboard + pillow behind the patient chibi
+      const float cotL = hall.x + (kCrewFigureX - 46.0f) * stageScale;
+      const float cotW = 92.0f * stageScale;
+      const Color medEdge = ToRay(p.borderDark);
+      const Color frameCol = ToRay(p.coffeeDark);
+      PaintChamferBoxRay(Area{cotL, hall.y + 190.0f * stageScale, 12.0f * stageScale, 88.0f * stageScale},
+                         2.5f * stageScale, frameCol, medEdge, ToRay(p.border));
+      PaintChamferBoxRay(Area{cotL + cotW - 10.0f * stageScale, hall.y + 220.0f * stageScale,
+                              10.0f * stageScale, 58.0f * stageScale},
+                         2.0f * stageScale, frameCol, medEdge, ToRay(p.border));
+      // Soft pillow propped against the headboard behind head/shoulders
+      PaintChamferBoxRay(Area{cotL + 10.0f * stageScale, hall.y + 194.0f * stageScale,
+                              32.0f * stageScale, 32.0f * stageScale},
+                         6.0f * stageScale, ToRay(p.white), medEdge, ToRay(p.border));
+    }
+
+    // 2.5D articulated chibi render: uniform layer underneath tinted by job color,
+    // then character ink & features seamlessly stitched on top.
+    ScenePicture drawShown = *shown;
+    if (pose.isMedical) { drawShown.base -= 10.0; }
     const Texture2D* cloth = CrewTexture(crewArt_, shown->name + "-cloth");
-    if (cloth != nullptr) { paint(*cloth, HexColor(shown->cloth, Color{162, 148, 127, 255})); }
-    paint(*figure, WHITE);
+    if (cloth != nullptr) {
+      PaintRiggedChibi(*cloth, drawShown, hall, stageScale, pose,
+                       HexColor(shown->cloth, Color{162, 148, 127, 255}));
+    }
+    PaintRiggedChibi(*figure, drawShown, hall, stageScale, pose, WHITE);
+
+    if (pose.isMedical) {
+      // Medical mattress & folded recovery blanket tucked cleanly over waist & legs
+      const float cotL = hall.x + (kCrewFigureX - 44.0f) * stageScale;
+      const float cotW = 88.0f * stageScale;
+      const Color medEdge = ToRay(p.borderDark);
+      PaintChamferBoxRay(Area{cotL + 2.0f * stageScale, hall.y + 226.0f * stageScale,
+                              cotW - 4.0f * stageScale, 42.0f * stageScale},
+                         4.0f * stageScale, Blend(ToRay(p.panel), ToRay(p.sage), 0.34f),
+                         medEdge, ToRay(p.border));
+      // Folded crisp white top cuff of the blanket
+      DrawRectangleRec(Rectangle{cotL + 4.0f * stageScale, hall.y + 226.0f * stageScale,
+                                 cotW - 8.0f * stageScale, 7.0f * stageScale},
+                       ToRay(p.white));
+      DrawLineEx(Vector2{cotL + 4.0f * stageScale, hall.y + 233.0f * stageScale},
+                 Vector2{cotL + cotW - 4.0f * stageScale, hall.y + 233.0f * stageScale},
+                 1.2f * stageScale, medEdge);
+      // Bed frame & rolling legs down to deck
+      DrawRectangleRec(Rectangle{cotL + 4.0f * stageScale, hall.y + 266.0f * stageScale,
+                                 cotW - 8.0f * stageScale, 4.0f * stageScale},
+                       ToRay(p.coffeeDark));
+      DrawRectangleRec(Rectangle{cotL + 6.0f * stageScale, hall.y + 270.0f * stageScale,
+                                 5.0f * stageScale, 8.0f * stageScale},
+                       ToRay(p.coffeeDark));
+      DrawRectangleRec(Rectangle{cotL + cotW - 11.0f * stageScale, hall.y + 270.0f * stageScale,
+                                 5.0f * stageScale, 8.0f * stageScale},
+                       ToRay(p.coffeeDark));
+    }
+  } else {
+    // Procedural pixel-grid crew fallback with gentle idle breathing & sway
+    const std::size_t cells = scene.pixels.size();
+    for (std::size_t i = 0; i < cells; ++i) {
+      const bool isBody = (i >= scene.figureFrom);
+      const float dx = isBody ? pose.hipShiftX * 0.45f : 0.0f;
+      const float dy = isBody ? (pose.breathLiftY * 0.7f + pose.hipDipY * 0.35f) : 0.0f;
+      const Area& box = scene.pixels[i].box;
+      const int x0 = static_cast<int>(std::floor(hall.x + box.x * stageScale + dx));
+      const int y0 = static_cast<int>(std::floor(hall.y + box.y * stageScale + dy));
+      const int x1 = static_cast<int>(std::floor(hall.x + (box.x + box.w) * stageScale + dx));
+      const int y1 = static_cast<int>(std::floor(hall.y + (box.y + box.h) * stageScale + dy));
+      DrawRectangle(x0, y0, std::max(1, x1 - x0), std::max(1, y1 - y0),
+                    HexColor(scene.pixels[i].colour, ToRay(p.coffee)));
+    }
   }
   if (quarters_.hasCrew) {
     // The speech bubble beside the figure: the conversation control.
-    const Area talkBtn{hall.x + quarters_.talk.x * stageScale, hall.y + quarters_.talk.y * stageScale,
-                       quarters_.talk.w * stageScale, quarters_.talk.h * stageScale};
     const bool enabled = quarters_.conversation.enabled;
     const bool hovered = enabled && talkBtn.Contains(mouseX_, mouseY_ + contentScroll_);
     const Color btnBg = ToRay(hovered || !enabled ? p.panel3 : p.panel);
     PaintChamferBoxRay(talkBtn, kChamferSmall, btnBg,
                        ToRay(enabled ? p.borderDark : p.border), ToRay(p.border));
     const Color mark = ToRay(enabled ? p.ink : p.muted);
-    // A 20x18 bubble with three dots, in the middle of the frame.
+    // A 20x18 bubble with three animated waiting/speaking dots
     const int bx = static_cast<int>(talkBtn.x + (talkBtn.w - 20.0f) / 2.0f);
     const int by = static_cast<int>(talkBtn.y + (talkBtn.h - 18.0f) / 2.0f);
     DrawRectangleLines(bx, by, 20, 14, mark);
     DrawRectangle(bx + 2, by + 13, 4, 4, btnBg);
     DrawRectangle(bx + 2, by + 14, 2, 4, mark);
     DrawRectangle(bx + 4, by + 14, 2, 2, mark);
-    DrawRectangle(bx + 5, by + 6, 2, 2, mark);
-    DrawRectangle(bx + 9, by + 6, 2, 2, mark);
-    DrawRectangle(bx + 13, by + 6, 2, 2, mark);
+    for (int di = 0; di < 3; ++di) {
+      const float wave = (enabled && !sim.State().reducedMotion)
+                             ? std::sin(tSec * (hovered || !quarters_.said.empty() ? 5.2f : 2.4f) -
+                                        static_cast<float>(di) * 0.9f)
+                             : 0.0f;
+      const int lift = wave > 0.35f ? -1 : 0;
+      const Color dotCol = (hovered && wave > 0.35f) ? ToRay(p.sage) : mark;
+      DrawRectangle(bx + 5 + di * 4, by + 6 + lift, 2, 2, dotCol);
+    }
     if (enabled) { navHits_.push_back({talkBtn, "talk", ""}); }
   }
   EndScissorMode();
