@@ -505,6 +505,7 @@ bool Simulation::StartTravel() {
 
   AddOngoing("travel", "Under way to " + body->name, metrics.dist, "travel", body->id);
   map_.inSpace = true;
+  return true;
 }
 bool Simulation::StartScan() {
   if (!state_.navTarget.has_value()) { return false; }
