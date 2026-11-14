@@ -3583,6 +3583,7 @@ void ShellView::EnsureNavScreen(const Simulation& sim) {
     taskSig ^= std::hash<double>{}(task.left) + 0x9e3779b9 + (taskSig << 6) + (taskSig >> 2);
     taskSig ^= std::hash<std::string>{}(task.state) + 0x9e3779b9 + (taskSig << 6) + (taskSig >> 2);
   }
+  if (sim.State().holding) { taskSig ^= 0x9e3779b9u; }
   key.ongoingSig = taskSig;
 
   std::size_t crewSig = sim.Crew().size();
@@ -4662,8 +4663,8 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   float leftButtonBottom = leftButtonTop;
   float rightButtonBottom = std::max(uy, rightBottom + 8.0f);
   for (const ProgressButton& button : screen.progress) {
-    if (button.taskId == "travel") {
-      leftButtonBottom = paintNavButton(button, left, leftButtonTop, leftColumn);
+    if (button.taskId == "travel" || button.taskId == "hold" || button.taskId == "change-course") {
+      leftButtonBottom = paintNavButton(button, left, leftButtonBottom, leftColumn) + 8.0f;
     } else {
       rightButtonBottom = paintNavButton(button, right - rightColumn, rightButtonBottom, rightColumn) + 12.0f;
     }

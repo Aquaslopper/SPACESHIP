@@ -320,6 +320,8 @@ bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
                               if (taskId == "maint") { return sim.StartMaintenanceSelf(); }
                               if (taskId == "cook") { return sim.StartCookingSelf(); }
                               if (taskId == "travel") { return sim.StartTravel(); }
+                              if (taskId == "hold") { return sim.Hold(); }
+                              if (taskId == "change-course") { return sim.ChangeCourse(); }
                               if (taskId == "scan") { return sim.StartScan(); }
                               if (taskId == "extract") { return sim.StartExtraction(); }
                               if (taskId == "crew-assign") { return sim.CommitOrders(); }

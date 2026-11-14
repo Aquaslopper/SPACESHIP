@@ -140,3 +140,14 @@ You must append a compressed summary of **every single reply and action you take
 - Verified builds & visual inspection: `tools/viewer` rebuilt cleanly; screenshots `c01-title` through `c11-navcrop` (plus crops `c-title-bl/br`, `c-setup-tl/br`) in `/tmp/out/` confirm (i) title strip sits inside its painted dark band, (ii) setup preview clears the lower-right diagonal, "Start:" label legible, (iii) iris-out, loading card with progress bar, iris-in all render, (iv) system chart sits on the horizontal ecliptic with smaller bodies and flattened orbits/rings; `tools/check-id-prefixes.sh`, `tools/check-gui-syntax.sh`, `tools/check-draw.sh` returned clean.
 - Git action: staging modified `cpp/ui/Draw.cpp`, `cpp/ui/Draw.h`, `cpp/ui/QuartersScreen.cpp`, `cpp/app/main.cpp`, plus `docs/LOGBOOK.md`, committing to `arena/561a6383-spaceship`, pushing to `origin`, and opening a pull request targeting `main`.
 
+### Entry #010
+- **Timestamp:** 2026-11-14 21:07 UTC
+- Session scope: owner said go on, on branch `arena/3b505a94-spaceship`, after the prior pull request was closed. Restore in-space Hold and Change Course. Do not copy the dock reset into Change Course.
+- `cpp/core/GameState.h`: added `holding`. Not cleared on arrival, dock, death, or save.
+- `cpp/core/Simulation.h`, `cpp/core/Navigation.cpp`: `Hold()` sets `holding`. `ChangeCourse()` requires `holding` and a selected target. It does not test `body == nullptr`. It does not read or write `docked`. It does not rewrite the location row.
+- `cpp/core/Tasks.cpp`: a running travel task does not advance while `holding`.
+- `cpp/core/SaveSystem.cpp`: writes and reads `holding` the same way as `docked`.
+- `cpp/ui/NavScreen.cpp`, `cpp/ui/Widgets.cpp`, `cpp/ui/Draw.cpp`: while `InSpace()`, Navigation shows Hold and Change Course on the existing `space` charge. Change Course is enabled only while `holding`.
+- `StartTravel` was not edited. Its existing dock block was left as it was.
+- Not added: a null-body refusal, a `docked = false` block, or a game-over refusal at the start of `ChangeCourse`.
+

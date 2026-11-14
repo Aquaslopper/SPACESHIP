@@ -798,6 +798,18 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
     screen.progress.back().title = "Needs recharge";
   }
 
+  if (sim.InSpace()) {
+    screen.progress.push_back(BuildProgressButton(sim, "hold", "Hold", true, "Hold", "space"));
+    if (screen.progress.back().state == ButtonState::Empty) {
+      screen.progress.back().title = "Needs recharge";
+    }
+    screen.progress.push_back(BuildProgressButton(
+        sim, "change-course", "Change Course", sim.State().holding, "Change Course", "space"));
+    if (screen.progress.back().state == ButtonState::Empty) {
+      screen.progress.back().title = "Needs recharge";
+    }
+  }
+
   if (scanTask != nullptr && scanTask->state == "running" && target != nullptr &&
       scanTask->target != target->id) {
     screen.progress.push_back(
@@ -927,7 +939,8 @@ bool PressNavActionRaw(Simulation& sim, const std::string& action, const std::st
 
 bool PressNavAction(Simulation& sim, const std::string& action, const std::string& arg) {
   const auto screen = BuildNavScreen(sim).screen;
-  if (action == "travel" || action == "scan" || action == "extract") {
+  if (action == "travel" || action == "scan" || action == "extract" || action == "hold" ||
+      action == "change-course") {
     for (const auto& button : screen.progress) {
       if (button.taskId == action) { return PressProgressButton(sim, button); }
     }
