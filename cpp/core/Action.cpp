@@ -163,9 +163,9 @@ Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& se
   GameState& state = sim.state_;
   state.medkits = 2;
   state.shipClass = "wren";
-  state.engineCondition = 80;
+  state.engineCondition = 60;
   state.wearTick = 0;
-  state.filterLife = 0;
+  state.filterLife = 200;
   state.airHold = 20;
   state.rackWarned = false;
   state.rackWarnedMess = false;
@@ -175,7 +175,7 @@ Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& se
   state.payTick = 0;
   state.docked = false;
   state.fuelCells = 6;
-  state.repairKits = 0;
+  state.repairKits = 3;
   state.lotSerial = 0;
   state.gameOver.clear();
   state.contracts["arrival"] = "active";
