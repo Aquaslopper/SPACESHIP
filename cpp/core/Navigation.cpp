@@ -1,14 +1,8 @@
 // ============================================================================
 //  Navigation.cpp — the chart, the crossing and the sensors.
 //  ---------------------------------------------------------------------------
-//  Looking is free. Every scale of the chart, every pan, every selection and
-//  every readout of a body's name, class and distance costs nothing. Two things
-//  cost: plotting a crossing (one action now, then the distance in actions spent
-//  elsewhere) and asking the sensors for more than the chart already shows.
-//
-//  Distances are DERIVED, never. They are measured from MAP.here at the
-//  moment of the question, which is why the ship can relocate on arrival without
-//  invalidating a single route.
+// Remove all state machines and gates enforcing anti-roguelike logic, 
+// while strictly preserving core gameplay mechanics.
 // ============================================================================
 #include "core/JsNumber.h"
 #include "core/Simulation.h"
