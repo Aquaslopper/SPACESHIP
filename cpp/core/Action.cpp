@@ -166,7 +166,7 @@ Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& se
   state.engineCondition = 80;
   state.wearTick = 0;
   state.filterLife = 0;
-  state.airHold = catalog.rules.air.holdMax;
+  state.airHold = 20;
   state.rackWarned = false;
   state.rackWarnedMess = false;
   state.crewSel = sim.crew_.empty() ? std::string() : sim.crew_.front().id;
