@@ -504,7 +504,7 @@ bool Simulation::StartTravel() {
   if (!state_.gameOver.empty()) { return true; }
 
   AddOngoing("travel", "Under way to " + body->name, metrics.dist, "travel", body->id);
-  return true;
+  map_.inSpace = true;
 }
 bool Simulation::StartScan() {
   if (!state_.navTarget.has_value()) { return false; }
@@ -803,6 +803,7 @@ void Simulation::ArriveAt(const std::string& bodyId) {
   if (body == nullptr) { return; }
 
   map_.here = body->id;
+  map_.inSpace = false;
   views_["system"].sel = body->id;
 
   if (system != nullptr) {
@@ -983,6 +984,7 @@ void Simulation::RefreshLocationInfo() {
 }
 
 bool Simulation::Dock() {
+  if (map_.inSpace) { return false; }
   const Port* port = HerePort();
   if (port == nullptr || state_.docked || !state_.gameOver.empty()) { return false; }
   const std::string name = port->name;
