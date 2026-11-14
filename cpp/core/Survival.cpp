@@ -48,7 +48,7 @@ void Simulation::TickFilters() {
 
     state_.filterLife = 0;
     for (CanisterSlot& slot : life_.slots) { slot.state = "empty"; }
-    state_.airHold = 0;
+    state_.airHold = rules_.air.holdMax;
     LogLine("Filter bank spent. The cabin air will hold for " +
             js::NumToString(rules_.air.holdMax) + " clicks.");
     return;
@@ -80,8 +80,8 @@ bool Simulation::BankReady() const {
 }
 
 int Simulation::AirStageIndex() const {
-  const double share = state_.filterLife / std::max(1.0, rules_.life.lifeMax);
-  int stage = static_cast<int>(js::Ceil(share * 4.0));
+  if (BankRunning()) { return 4; }
+  int stage = static_cast<int>(js::Ceil(state_.airHold / rules_.air.step));
   if (stage > 4) { stage = 4; }
   if (stage < 0) { stage = 0; }
   return stage;
@@ -100,7 +100,8 @@ const struct AirStage& Simulation::AirSpec() const {
 }
 
 double Simulation::AirPercent() const {
-  const double percent = js::Round((state_.filterLife / std::max(1.0, rules_.life.lifeMax)) * 100.0);
+  if (BankRunning()) { return 100.0; }
+  const double percent = js::Round((state_.airHold / rules_.air.holdMax) * 100.0);
   return percent < 0 ? 0.0 : percent;
 }
 
