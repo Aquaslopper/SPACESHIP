@@ -1,15 +1,8 @@
 // ============================================================================
 //  Draw.cpp — the skin.
 //  ---------------------------------------------------------------------------
-//  Raylib paints the ship; ImGui paints the cockpit around it. Both are told
-//  what to paint by the view-models, and neither decides anything: a click is
-//  turned into a (kind, id) pair here and handed to the shell, which is where
-//  tabs open and briefings are chosen.
-//
-//  The palette is the stylesheet's: parchment panels, coffee ink, and one warm
-//  cream for a tab that has just announced itself. There is no default ImGui
-//  theme anywhere in this file - a stock blue-dark window in a parchment
-//  cockpit would be the loudest possible lie about what this port is.
+// Remove all state machines and gates enforcing anti-roguelike logic, 
+// while strictly preserving core gameplay mechanics.
 // ============================================================================
 #include "ui/Draw.h"
 #include "core/DisplaySettings.h"
