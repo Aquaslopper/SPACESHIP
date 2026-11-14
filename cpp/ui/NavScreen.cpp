@@ -5,6 +5,7 @@
 #include "ui/Widgets.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <map>
 #include <optional>
@@ -947,6 +948,175 @@ bool PressNavAction(Simulation& sim, const std::string& action, const std::strin
     return false;
   }
   return PressNavActionRaw(sim, action, arg);
+}
+
+namespace {
+
+std::string LowerCopy(std::string value) {
+  for (char& ch : value) {
+    ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+  }
+  return value;
+}
+
+bool ContainsAny(const std::string& haystack, const std::initializer_list<const char*>& needles) {
+  for (const char* needle : needles) {
+    if (haystack.find(needle) != std::string::npos) { return true; }
+  }
+  return false;
+}
+
+float BodyRadiationKeywords(const Body& body) {
+  std::string text = body.name + " " + body.klass;
+  for (const auto& pair : body.details) { text += " " + pair.first + " " + pair.second; }
+  for (const auto& line : body.scan) { text += " " + line; }
+  const std::string lower = LowerCopy(std::move(text));
+  float bonus = 0.0f;
+  if (ContainsAny(lower, {"binary", "unstable", "heavy radiation", "flare", "nova", "blue-giant",
+                          "blue giant", "magnetosphere"})) {
+    bonus += 0.14f;
+  }
+  return bonus;
+}
+
+float RegionNebulaBaseline(const Body* region) {
+  if (region == nullptr) { return 0.14f; }
+  std::string text = region->name + " " + region->klass;
+  for (const auto& pair : region->details) { text += " " + pair.first + " " + pair.second; }
+  for (const auto& line : region->scan) { text += " " + line; }
+  const std::string lower = LowerCopy(std::move(text));
+  if (ContainsAny(lower, {"nebula", "silicate", "veil", "cryo-dust"})) { return 0.58f; }
+  if (ContainsAny(lower, {"cloud", "dust", "ion squall", "ion storm", "shear", "stream", "spur"})) {
+    return 0.36f;
+  }
+  return 0.15f;
+}
+
+float RegionStellarBonus(const Body* region) {
+  if (region == nullptr) { return 0.0f; }
+  std::string text = region->name + " " + region->klass;
+  for (const auto& pair : region->details) { text += " " + pair.first + " " + pair.second; }
+  const std::string lower = LowerCopy(std::move(text));
+  return ContainsAny(lower, {"flare", "solar", "red giant", "binaries"}) ? 0.12f : 0.0f;
+}
+
+}  // namespace
+
+RadiationTelemetry ComputeRadiationTelemetry(const Simulation& sim) {
+  RadiationTelemetry out;
+  const Catalog& catalog = sim.World();
+  const std::string& sysId = sim.CurrentSystemId();
+  const Body* curSystem = sim.CurrentSystem();
+  const Body* curRegion = curSystem != nullptr ? catalog.FindRegion(curSystem->region) : nullptr;
+  const Body* here = sim.FindBodyById(sim.Map().here);
+
+  // Use interpolated crossing coordinates only when the active leg stays inside
+  // the current system; inter-system legs live in sector coordinates.
+  NavPoint shipPos{here == nullptr ? 0.0 : here->x, here == nullptr ? 0.0 : here->y};
+  const Task* travel = sim.FindOngoing("travel");
+  const Body* travelBody =
+      (travel != nullptr && !travel->target.empty()) ? sim.FindBodyById(travel->target) : nullptr;
+  if (travelBody != nullptr && travelBody->type != "system" && travelBody->type != "region" &&
+      catalog.BodySystem(*travelBody) == sysId) {
+    const double p = OngoingPercent(*travel) / 100.0;
+    shipPos.x += (travelBody->x - shipPos.x) * p;
+    shipPos.y += (travelBody->y - shipPos.y) * p;
+  }
+
+  // 1) Proximity to local stars.
+  float starProx = 0.0f;
+  double nearestStarDist = 1e12;
+  bool hasNearestStar = false;
+  NavPoint nearestStarPos{};
+  for (std::size_t idx : catalog.BodiesInSystem(sysId)) {
+    if (idx >= catalog.bodies.size()) { continue; }
+    const Body& body = catalog.bodies[idx];
+    if (body.type == "star") {
+      const double dx = body.x - shipPos.x;
+      const double dy = body.y - shipPos.y;
+      const double d = std::hypot(dx, dy);
+      if (!hasNearestStar || d < nearestStarDist) {
+        hasNearestStar = true;
+        nearestStarDist = d;
+        nearestStarPos = NavPoint{body.x, body.y};
+      }
+      float falloff = 1.0f / (1.0f + static_cast<float>((d / 115.0) * (d / 115.0)));
+      if (falloff > 0.15f) {
+        falloff = std::min(1.0f, falloff + BodyRadiationKeywords(body));
+      }
+      starProx = std::max(starProx, falloff);
+    }
+  }
+  if (!hasNearestStar && curSystem != nullptr) { starProx = 0.15f; }
+  if (here != nullptr && here->type == "star") { starProx = 1.0f; }
+  starProx = std::clamp(starProx + RegionStellarBonus(curRegion), 0.0f, 1.0f);
+
+  // 2) Proximity to nebulae / silicate dust / debris belts.
+  float beltProx = 0.0f;
+  for (std::size_t idx : catalog.BodiesInSystem(sysId)) {
+    if (idx >= catalog.bodies.size()) { continue; }
+    const Body& body = catalog.bodies[idx];
+    if (body.type == "belt" || body.subtype == "belt") {
+      const double d = std::hypot(body.x - shipPos.x, body.y - shipPos.y);
+      const float falloff = 0.72f / (1.0f + static_cast<float>((d / 85.0) * (d / 85.0)));
+      beltProx = std::max(beltProx, falloff);
+    }
+  }
+  const float regionNebula = RegionNebulaBaseline(curRegion);
+  const float nebulaProx = std::clamp(
+      std::max(beltProx, regionNebula) + 0.18f * std::min(beltProx, regionNebula), 0.0f, 1.0f);
+
+  // 3) Ship orientation / heading from active travel, plotted navTarget, or star bearing.
+  double vecX = 0.76;
+  double vecY = 0.65;
+  const Body* courseTarget = travelBody;
+  if (courseTarget == nullptr && sim.State().navTarget.has_value()) {
+    courseTarget = sim.FindBodyById(*sim.State().navTarget);
+  }
+  auto vectorToBody = [&](const Body& target) {
+    if (target.type != "system" && target.type != "region" &&
+        catalog.BodySystem(target) == sysId) {
+      const double dx = target.x - shipPos.x;
+      const double dy = target.y - shipPos.y;
+      if (std::hypot(dx, dy) > 1e-3) { vecX = dx; vecY = dy; return true; }
+    } else if (curSystem != nullptr) {
+      const Body* destSys = target.type == "system"
+                                ? &target
+                                : catalog.FindSystem(catalog.BodySystem(target));
+      if (destSys != nullptr && destSys->id != curSystem->id) {
+        const double dx = destSys->x - curSystem->x;
+        const double dy = destSys->y - curSystem->y;
+        if (std::hypot(dx, dy) > 1e-3) { vecX = dx; vecY = dy; return true; }
+      } else if (target.type == "region" && curRegion != nullptr && target.id != curRegion->id) {
+        const double dx = target.x - curRegion->x;
+        const double dy = target.y - curRegion->y;
+        if (std::hypot(dx, dy) > 1e-3) { vecX = dx; vecY = dy; return true; }
+      }
+    }
+    return false;
+  };
+  if (courseTarget == nullptr || !vectorToBody(*courseTarget)) {
+    if (hasNearestStar && nearestStarDist > 1e-3) {
+      vecX = nearestStarPos.x - shipPos.x;
+      vecY = nearestStarPos.y - shipPos.y;
+    }
+  }
+
+  const float headingRad = static_cast<float>(std::atan2(vecY, vecX));
+  // Keep the wavefront on a smooth diagonal band (~12 deg to ~73 deg) while
+  // pivoting visibly whenever ship course or star bearing changes.
+  const float waveAngle =
+      0.72f + 0.36f * std::sin(headingRad) + 0.22f * std::cos(headingRad);
+
+  out.starProximity = starProx;
+  out.nebulaProximity = nebulaProx;
+  out.headingRad = headingRad;
+  out.waveDirX = std::cos(waveAngle);
+  out.waveDirY = std::sin(waveAngle);
+  out.baseIntensity =
+      std::clamp(0.18f + 0.48f * starProx + 0.36f * nebulaProx, 0.15f, 1.0f);
+  out.warmBias = starProx / std::max(0.001f, starProx + nebulaProx);
+  return out;
 }
 
 }  // namespace ship

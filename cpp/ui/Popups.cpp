@@ -154,6 +154,7 @@ PopupModel BuildPopup(const Simulation& sim, const std::string& key,
   model.audioLevel = js::NumToString(options.audioLevel);
   model.displayGamma = static_cast<float>(DisplayGamma(options.displayGamma));
   model.displayBrightness = static_cast<float>(DisplayBrightness(options.displayBrightness));
+  model.radiationWave = static_cast<float>(RadiationWaveStrength(options.radiationWave));
   model.audioChoices = {{"0.18", "Quiet"}, {"0.4", "Standard"},
                         {"0.65", "Loud"}, {"0.9", "Very loud"}};
   model.toggles.push_back(PopupToggle{
@@ -241,13 +242,15 @@ bool PressPopupAction(Simulation& sim, const std::string& key,
       options.audioLevel = std::stod(arg);
       return true;
     }
-    if (action == "display-gamma" || action == "display-brightness") {
+    if (action == "display-gamma" || action == "display-brightness" ||
+        action == "radiation-wave") {
       try {
         std::size_t parsed = 0;
         const double value = std::stod(arg, &parsed);
         if (parsed != arg.size() || !std::isfinite(value)) { return false; }
         if (action == "display-gamma") { options.displayGamma = DisplayGamma(value); }
-        else { options.displayBrightness = DisplayBrightness(value); }
+        else if (action == "display-brightness") { options.displayBrightness = DisplayBrightness(value); }
+        else { options.radiationWave = RadiationWaveStrength(value); }
         return true;
       } catch (const std::exception&) { return false; }
     }

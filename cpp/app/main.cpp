@@ -10,7 +10,9 @@
 //  is only the loop that turns a mouse into a verb and a frame into a paint.
 // ============================================================================
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdio>
 #include <filesystem>
 #include <map>
@@ -28,6 +30,7 @@
 #include "core/DisplaySettings.h"
 #include "data/Catalog.h"
 #include "ui/Draw.h"
+#include "ui/NavScreen.h"
 #include "ui/PointerOwnership.h"
 #include "ui/Palette.h"
 #include "ui/Theme.h"
@@ -212,15 +215,56 @@ uniform sampler2D texture0;
 uniform vec4 colDiffuse;
 uniform float displayGamma;
 uniform float displayBrightness;
+uniform vec2 uResolution;
+uniform float uTime;
+uniform vec2 uWaveDir;
+uniform float uIntensity;
+uniform float uOptionScale;
+uniform vec3 uWarmTint;
 out vec4 finalColor;
 void main() {
-  vec4 colour = texture(texture0, fragTexCoord) * colDiffuse * fragColor;
-  finalColor = vec4(clamp(pow(clamp(colour.rgb, 0.0, 1.0), vec3(displayGamma)) * displayBrightness, 0.0, 1.0), colour.a);
+  vec2 uv = fragTexCoord;
+  vec4 center = texture(texture0, uv);
+  vec3 rgb = center.rgb * colDiffuse.rgb * fragColor.rgb;
+  if (uOptionScale > 0.001 && uIntensity > 0.001) {
+    vec2 res = max(uResolution, vec2(1.0));
+    vec2 texel = 1.0 / res;
+    vec2 dir = normalize(uWaveDir);
+    // RenderTexture Y runs upward; flip Y in spatial projection so screen-down
+    // ship bearings match visual screen coordinates.
+    vec2 screenPos = vec2(uv.x, 1.0 - uv.y) * res;
+    vec2 centered = (screenPos - 0.5 * res) / min(res.x, res.y);
+    float proj = dot(centered, dir);
+    float phase = proj * 2.25 - uTime * 0.42 + 0.16 * sin(proj * 1.1 + uTime * 0.13);
+    float crest = pow(0.5 + 0.5 * cos(phase), 3.5);
+
+    // 0.5 to 1.0 px sub-pixel R/B shift relative to anchored Green along crest
+    // (scalable by player preference, safely capped so small text remains sharp).
+    float shiftPx = clamp(mix(0.45, 0.90, clamp(uIntensity, 0.0, 1.0)) * uOptionScale, 0.0, 1.35) * crest;
+    vec2 shiftUV = vec2(dir.x, -dir.y) * (shiftPx * texel);
+    float r = texture(texture0, clamp(uv + shiftUV, vec2(0.0), vec2(1.0))).r;
+    float b = texture(texture0, clamp(uv - shiftUV, vec2(0.0), vec2(1.0))).b;
+    rgb = vec3(r, center.g, b) * colDiffuse.rgb * fragColor.rgb;
+
+    // Subtle milky grey/amber black-level lift & contrast dip on sensor saturation.
+    float luma = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
+    vec3 milkyFloor = mix(vec3(0.26, 0.24, 0.21), uWarmTint, 0.42);
+    float dip = crest * clamp(uIntensity * uOptionScale, 0.0, 1.5) * 0.055;
+    rgb = mix(rgb, milkyFloor, dip * (1.0 - 0.58 * luma));
+  }
+  vec3 calibrated = pow(clamp(rgb, 0.0, 1.0), vec3(displayGamma)) * displayBrightness;
+  finalColor = vec4(clamp(calibrated, 0.0, 1.0), center.a * colDiffuse.a * fragColor.a);
 }
 )GLSL";
     shader_ = LoadShaderFromMemory(nullptr, fragment);
     gammaLoc_ = GetShaderLocation(shader_, "displayGamma");
     brightnessLoc_ = GetShaderLocation(shader_, "displayBrightness");
+    resLoc_ = GetShaderLocation(shader_, "uResolution");
+    timeLoc_ = GetShaderLocation(shader_, "uTime");
+    waveDirLoc_ = GetShaderLocation(shader_, "uWaveDir");
+    intensityLoc_ = GetShaderLocation(shader_, "uIntensity");
+    optionScaleLoc_ = GetShaderLocation(shader_, "uOptionScale");
+    warmTintLoc_ = GetShaderLocation(shader_, "uWarmTint");
     shaderReady_ = IsShaderValid(shader_) && gammaLoc_ >= 0 && brightnessLoc_ >= 0;
     if (!shaderReady_) {
       std::fprintf(stderr, "spaceship: display adjustment shader unavailable; using unadjusted display\n");
@@ -236,16 +280,33 @@ void main() {
     width_ = width; height_ = height;
     if (!IsRenderTextureValid(target_)) {
       std::fprintf(stderr, "spaceship: display adjustment render target unavailable\n");
+    } else {
+      SetTextureFilter(target_.texture, TEXTURE_FILTER_BILINEAR);
+      SetTextureWrap(target_.texture, TEXTURE_WRAP_CLAMP);
     }
   }
   bool Ready() const { return shaderReady_ && IsRenderTextureValid(target_); }
   void Begin() const { BeginTextureMode(target_); }
-  void End(double gamma, double brightness) const {
+  void End(double gamma, double brightness, float waveTime, float waveDirX, float waveDirY,
+           float intensity, float optionScale, float warmBias) const {
     EndTextureMode();
     const float g = static_cast<float>(ship::EffectiveDisplayGamma(gamma));
     const float b = static_cast<float>(ship::DisplayBrightness(brightness));
+    const float res[2] = {static_cast<float>(width_), static_cast<float>(height_)};
+    const float dir[2] = {waveDirX, waveDirY};
+    const float tint[3] = {
+        0.64f + (0.88f - 0.64f) * warmBias,
+        0.58f + (0.68f - 0.58f) * warmBias,
+        0.82f + (0.42f - 0.82f) * warmBias,
+    };
     SetShaderValue(shader_, gammaLoc_, &g, SHADER_UNIFORM_FLOAT);
     SetShaderValue(shader_, brightnessLoc_, &b, SHADER_UNIFORM_FLOAT);
+    if (resLoc_ >= 0) SetShaderValue(shader_, resLoc_, res, SHADER_UNIFORM_VEC2);
+    if (timeLoc_ >= 0) SetShaderValue(shader_, timeLoc_, &waveTime, SHADER_UNIFORM_FLOAT);
+    if (waveDirLoc_ >= 0) SetShaderValue(shader_, waveDirLoc_, dir, SHADER_UNIFORM_VEC2);
+    if (intensityLoc_ >= 0) SetShaderValue(shader_, intensityLoc_, &intensity, SHADER_UNIFORM_FLOAT);
+    if (optionScaleLoc_ >= 0) SetShaderValue(shader_, optionScaleLoc_, &optionScale, SHADER_UNIFORM_FLOAT);
+    if (warmTintLoc_ >= 0) SetShaderValue(shader_, warmTintLoc_, tint, SHADER_UNIFORM_VEC3);
     BeginShaderMode(shader_);
     DrawTexturePro(target_.texture,
                    Rectangle{0, 0, static_cast<float>(width_), -static_cast<float>(height_)},
@@ -261,6 +322,8 @@ void main() {
   Shader shader_{};
   RenderTexture2D target_{};
   int gammaLoc_ = -1, brightnessLoc_ = -1;
+  int resLoc_ = -1, timeLoc_ = -1, waveDirLoc_ = -1;
+  int intensityLoc_ = -1, optionScaleLoc_ = -1, warmTintLoc_ = -1;
   int width_ = 0, height_ = 0;
   bool shaderReady_ = false;
 };
@@ -432,6 +495,8 @@ int main(int argc, char** argv) {
   }
 
   ship::PointerOwnership leftPointer, rightPointer;
+  ship::RadiationTelemetry smoothedWave = ship::ComputeRadiationTelemetry(sim);
+  float waveTime = 0.0f;
   while (!WindowShouldClose() && !shell.QuitRequested()) {
     if (IsKeyPressed(KEY_ESCAPE)) { shell.Escape(sim); }
     if (IsKeyPressed(KEY_LEFT)) { shell.PageTutorial(-1, GetTime() * 1000.0); }
@@ -506,9 +571,28 @@ int main(int argc, char** argv) {
     audio.Tick(sim);
     shell.SetAudioStatus(audio.Status());
 
+    const ship::RadiationTelemetry targetWave = ship::ComputeRadiationTelemetry(sim);
+    const float dt = std::clamp(GetFrameTime(), 0.0f, 0.1f);
+    const float blend = 1.0f - std::exp(-dt * 2.5f);
+    smoothedWave.waveDirX += (targetWave.waveDirX - smoothedWave.waveDirX) * blend;
+    smoothedWave.waveDirY += (targetWave.waveDirY - smoothedWave.waveDirY) * blend;
+    const float dirLen = std::hypot(smoothedWave.waveDirX, smoothedWave.waveDirY);
+    if (dirLen > 1e-4f) {
+      smoothedWave.waveDirX /= dirLen;
+      smoothedWave.waveDirY /= dirLen;
+    }
+    smoothedWave.baseIntensity += (targetWave.baseIntensity - smoothedWave.baseIntensity) * blend;
+    smoothedWave.warmBias += (targetWave.warmBias - smoothedWave.warmBias) * blend;
+    if (!sim.State().reducedMotion) { waveTime += dt; }
+
+    const float waveScale = sim.State().reducedMotion
+                                ? 0.0f
+                                : static_cast<float>(ship::RadiationWaveStrength(
+                                      sim.State().options.radiationWave));
     const bool adjusted = display.Ready() &&
         (ship::EffectiveDisplayGamma(sim.State().options.displayGamma) != 1.0 ||
-         ship::DisplayBrightness(sim.State().options.displayBrightness) != 1.0);
+         ship::DisplayBrightness(sim.State().options.displayBrightness) != 1.0 ||
+         waveScale > 0.001f);
     if (adjusted) {
       display.Begin();
       // The offscreen texture uses logical screen pixels even on Retina
@@ -518,7 +602,11 @@ int main(int argc, char** argv) {
     shell.Draw(sim, static_cast<double>(GetTime()) * 1000.0);
     if (!shell.TitleActive()) voyageStarted = true;
     rlImGuiEnd();
-    if (adjusted) display.End(sim.State().options.displayGamma, sim.State().options.displayBrightness);
+    if (adjusted) {
+      display.End(sim.State().options.displayGamma, sim.State().options.displayBrightness,
+                  waveTime, smoothedWave.waveDirX, smoothedWave.waveDirY,
+                  smoothedWave.baseIntensity, waveScale, smoothedWave.warmBias);
+    }
     EndDrawing();
   }
 

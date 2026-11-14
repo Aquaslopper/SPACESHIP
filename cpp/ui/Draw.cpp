@@ -794,6 +794,22 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
   }
   draw->PopClipRect();
 
+  ImFont* bezelFont = io.Fonts->Fonts.Size > 6 ? io.Fonts->Fonts[io.Fonts->Fonts.Size - 1]
+                                               : ImGui::GetFont();
+  constexpr float kBezelPx = 10.5f;
+  const ImU32 bezelInk = ToIm(p.muted, 122);
+  const ImU32 tickInk = ToIm(p.borderDark, 88);
+  {
+    const char* topBezel = "CRT-84 // CH-04";
+    const ImVec2 topSz = bezelFont->CalcTextSizeA(kBezelPx, FLT_MAX, 0.0f, topBezel);
+    const float topX = layout_.controls.x - topSz.x - 10.0f;
+    if (x + 14.0f < topX && topX > layout_.tabStrip.x + 8.0f) {
+      draw->AddText(bezelFont, kBezelPx,
+                    ImVec2(topX, std::round((Metrics::kTaskbarH - topSz.y) * 0.5f)),
+                    bezelInk, topBezel);
+    }
+  }
+
   // The ship identity is a permanent home control in the fixed sidebar slot.
   PaintChamferBoxIm(draw, layout_.home.x + 2.0f, layout_.home.y + 2.0f, layout_.home.w - 4.0f,
                     layout_.home.h - 4.0f, kChamferSmall, ToIm(p.panel2), ToIm(p.borderDark),
@@ -963,9 +979,37 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
     }
     draw->AddText(ImVec2(hit.box.x, hit.box.y), ToIm(p.ink), hit.text.c_str());
   }
-  draw->AddText(ImVec2(8.0f, layout_.sidefoot.y + 68.0f), ToIm(p.muted),
+  draw->AddText(ImVec2(8.0f, layout_.sidefoot.y + 63.0f), ToIm(p.muted),
                 "Spaceship Command");
+  draw->AddText(bezelFont, kBezelPx, ImVec2(8.0f, layout_.sidefoot.y + 81.0f),
+                bezelInk, "SYS-01 // REV.84");
   ImGui::PopFont();
+
+  // Subtle corner chassis registration ticks tucked inside the outer frame gutter.
+  if (layout_.content.w > 24.0f && layout_.content.h > 24.0f) {
+    const float cl = layout_.content.x + 2.0f;
+    const float ct = layout_.content.y + 2.0f;
+    const float cr = layout_.content.Right() - 3.0f;
+    const float cb = layout_.content.Bottom() - 3.0f;
+    constexpr float kTick = 5.0f;
+    draw->AddLine(ImVec2(cl, ct), ImVec2(cl + kTick, ct), tickInk, 1.0f);
+    draw->AddLine(ImVec2(cl, ct), ImVec2(cl, ct + kTick), tickInk, 1.0f);
+    draw->AddLine(ImVec2(cr - kTick, ct), ImVec2(cr, ct), tickInk, 1.0f);
+    draw->AddLine(ImVec2(cr, ct), ImVec2(cr, ct + kTick), tickInk, 1.0f);
+    draw->AddLine(ImVec2(cl, cb - kTick), ImVec2(cl, cb), tickInk, 1.0f);
+    draw->AddLine(ImVec2(cl, cb), ImVec2(cl + kTick, cb), tickInk, 1.0f);
+    draw->AddLine(ImVec2(cr - kTick, cb), ImVec2(cr, cb), tickInk, 1.0f);
+    draw->AddLine(ImVec2(cr, cb - kTick), ImVec2(cr, cb), tickInk, 1.0f);
+
+    if (sim.State().activeTab != "home" &&
+        contentPaintBottom_ < layout_.content.Bottom() - 24.0f) {
+      const char* brBezel = "CAL 60HZ // MK.IV";
+      const ImVec2 brSz = bezelFont->CalcTextSizeA(kBezelPx, FLT_MAX, 0.0f, brBezel);
+      draw->AddText(bezelFont, kBezelPx,
+                    ImVec2(cr - brSz.x - 4.0f, cb - brSz.y - 1.0f),
+                    bezelInk, brBezel);
+    }
+  }
 
   ImGui::End();
   ImGui::PopStyleColor();
@@ -3593,11 +3637,12 @@ void ShellView::PaintSettingsControls(Simulation& sim, const PopupModel& model) 
       }
       if (!audioStatus_.empty()) { heading("Soundtrack"); text(audioStatus_); }
       heading("Display adjustment");
-      text("Higher gamma darkens midtones; brightness adjusts the white level. Default is 1.00.");
+      text("Higher gamma darkens midtones; brightness adjusts the white level. Radiation wave shifts sub-pixel R/B channels along stellar/nebular drift (pauses under reduced motion).");
       if (!displayAdjustmentAvailable_) { text("Display adjustment is unavailable; using the unadjusted display."); }
       ImGui::BeginDisabled(!displayAdjustmentAvailable_);
       float gamma = model.displayGamma;
       float brightness = model.displayBrightness;
+      float wave = model.radiationWave;
       ImGui::SetNextItemWidth(-1);
       if (ImGui::SliderFloat("##display-gamma", &gamma, static_cast<float>(kDisplayGammaMin),
                              static_cast<float>(kDisplayGammaMax), "Gamma: %.2f")) {
@@ -3607,9 +3652,16 @@ void ShellView::PaintSettingsControls(Simulation& sim, const PopupModel& model) 
       if (ImGui::SliderFloat("##display-brightness", &brightness, 0.75f, 1.15f, "Brightness: %.2f")) {
         action("display-brightness", std::to_string(brightness));
       }
+      ImGui::SetNextItemWidth(-1);
+      if (ImGui::SliderFloat("##radiation-wave", &wave, static_cast<float>(kRadiationWaveMin),
+                             static_cast<float>(kRadiationWaveMax),
+                             wave <= 0.01f ? "Radiation wave: Off" : "Radiation wave: %.2f")) {
+        action("radiation-wave", std::to_string(wave));
+      }
       ImGui::EndDisabled();
       if (displayAdjustmentAvailable_ && button("Reset display adjustment", "display-reset")) {
         action("display-gamma", "1"); action("display-brightness", "1");
+        action("radiation-wave", "1");
       }
       for (const auto& toggle : model.toggles) {
         heading(toggle.heading); text(toggle.help);

@@ -194,4 +194,18 @@ const std::vector<std::string>& NavLayerOrder();
 std::string NavLayerLabel(const std::string& key);  // SYSTEM / SECTOR / GALAXY
 std::string NavLayerName(const std::string& key);   // System / Sector / Galaxy
 
+// Read-only environmental telemetry derived from ship position, heading, and
+// nearby stars/nebulae for the subtle CRT radiation wave shader.
+struct RadiationTelemetry {
+  float starProximity = 0.0f;    // [0..1] inverse-square falloff from local stars
+  float nebulaProximity = 0.0f;  // [0..1] belts, silicate/dust clouds, region hazards
+  float headingRad = 0.0f;       // radians along active route, target, or star bearing
+  float waveDirX = 0.76f;        // normalized diagonal screen wavefront direction
+  float waveDirY = 0.65f;
+  float baseIntensity = 0.25f;   // [0..1] combined proximity baseline
+  float warmBias = 0.65f;        // 1.0 solar amber <-> 0.0 nebula violet-cyan
+};
+
+RadiationTelemetry ComputeRadiationTelemetry(const Simulation& sim);
+
 }  // namespace ship

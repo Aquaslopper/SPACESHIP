@@ -24,4 +24,12 @@ inline double AdjustDisplayChannel(double value, double gamma, double brightness
                     DisplayBrightness(brightness), 0.0, 1.0);
 }
 
+constexpr double kRadiationWaveMin = 0.0;
+constexpr double kRadiationWaveDefault = 1.0;
+constexpr double kRadiationWaveMax = 2.0;
+inline double RadiationWaveStrength(double value) {
+  return std::isfinite(value) ? std::clamp(value, kRadiationWaveMin, kRadiationWaveMax)
+                              : kRadiationWaveDefault;
+}
+
 }  // namespace ship
