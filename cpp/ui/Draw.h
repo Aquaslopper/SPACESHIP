@@ -74,6 +74,7 @@ class ShellView {
   void Click(Simulation& sim, float x, float y, HitButton button, double nowMs);
   void Move(float x, float y);
   void Drag(Simulation& sim, float x, float y, float dx, float dy, bool down, bool pressed);
+  void OrbitDrag(Simulation& sim, float x, float y, float dx, float dy, bool down, bool pressed);
   void Scroll(Simulation& sim, float x, float y, float wheelDelta);
   void Escape(Simulation& sim);
 
@@ -194,7 +195,7 @@ class ShellView {
   void PaintCrewRecord(const Simulation& sim);
   void PaintPanel(const NavPanel& panel, const Area& box);
   bool PaintScenePart(const MachinePart& part, const Area& origin);
-  void PaintStage(const TaskStage& stage, const Area& origin);
+  void PaintStage(const Simulation& sim, const TaskStage& stage, const Area& origin);
   void PaintIdle(Simulation& sim);
   float PaintActionBand(const std::string& title, const std::string& note,
                        const std::vector<ProgressButton>& buttons,
@@ -280,6 +281,14 @@ class ShellView {
   Area navChartBox_{};
   float navChartScaleX_ = 1.0f;
   float navChartScaleY_ = 1.0f;
+  static constexpr float kDefaultNavOrbitYaw = 0.0f;
+  static constexpr float kDefaultNavOrbitPitch = 50.0f;
+  float navOrbitYaw_ = kDefaultNavOrbitYaw;
+  float navOrbitPitch_ = kDefaultNavOrbitPitch;
+  bool orbitingChart_ = false;
+  bool orbitDragMoved_ = false;
+  double orbitDragAccumX_ = 0.0;
+  double orbitDragAccumY_ = 0.0;
 
   TaskScreenModel taskScreen_;
   std::vector<std::pair<Area, std::string>> taskButtons_;

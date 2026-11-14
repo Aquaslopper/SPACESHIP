@@ -1173,6 +1173,56 @@ Vector2 ProjectPointMvp(const Vector3& p, const Matrix& mvp, float viewW, float 
   return Vector2{(ndcX * 0.5f + 0.5f) * viewW, (0.5f - ndcY * 0.5f) * viewH};
 }
 
+Matrix BuildIdentityMatrix() {
+  Matrix m{};
+  m.m0 = 1.0f;
+  m.m5 = 1.0f;
+  m.m10 = 1.0f;
+  m.m15 = 1.0f;
+  return m;
+}
+
+Matrix BuildLookAtMatrix(const Vector3& eye, const Vector3& target, const Vector3& up) {
+  float zx = eye.x - target.x;
+  float zy = eye.y - target.y;
+  float zz = eye.z - target.z;
+  const float zLen = std::sqrt(zx * zx + zy * zy + zz * zz);
+  if (zLen > 1e-6f) { zx /= zLen; zy /= zLen; zz /= zLen; }
+  float xx = up.y * zz - up.z * zy;
+  float xy = up.z * zx - up.x * zz;
+  float xz = up.x * zy - up.y * zx;
+  const float xLen = std::sqrt(xx * xx + xy * xy + xz * xz);
+  if (xLen > 1e-6f) { xx /= xLen; xy /= xLen; xz /= xLen; }
+  const float yx = zy * xz - zz * xy;
+  const float yy = zz * xx - zx * xz;
+  const float yz = zx * xy - zy * xx;
+  Matrix m{};
+  m.m0 = xx;  m.m4 = xy;  m.m8  = xz;  m.m12 = -(xx * eye.x + xy * eye.y + xz * eye.z);
+  m.m1 = yx;  m.m5 = yy;  m.m9  = yz;  m.m13 = -(yx * eye.x + yy * eye.y + yz * eye.z);
+  m.m2 = zx;  m.m6 = zy;  m.m10 = zz;  m.m14 = -(zx * eye.x + zy * eye.y + zz * eye.z);
+  m.m3 = 0.0f; m.m7 = 0.0f; m.m11 = 0.0f; m.m15 = 1.0f;
+  return m;
+}
+
+bool ProjectWorld3D(const Vector3& p, const Matrix& mvp, float viewW, float viewH,
+                    Vector2* outScreen, float* outNdcZ = nullptr) {
+  const float x = mvp.m0 * p.x + mvp.m4 * p.y + mvp.m8 * p.z + mvp.m12;
+  const float y = mvp.m1 * p.x + mvp.m5 * p.y + mvp.m9 * p.z + mvp.m13;
+  const float z = mvp.m2 * p.x + mvp.m6 * p.y + mvp.m10 * p.z + mvp.m14;
+  const float w = mvp.m3 * p.x + mvp.m7 * p.y + mvp.m11 * p.z + mvp.m15;
+  if (w <= 0.05f) { return false; }
+  const float invW = 1.0f / w;
+  const float ndcX = x * invW;
+  const float ndcY = y * invW;
+  const float ndcZ = z * invW;
+  if (ndcZ < -1.0f || ndcZ > 1.0f) { return false; }
+  if (outScreen != nullptr) {
+    *outScreen = Vector2{(ndcX * 0.5f + 0.5f) * viewW, (0.5f - ndcY * 0.5f) * viewH};
+  }
+  if (outNdcZ != nullptr) { *outNdcZ = ndcZ; }
+  return true;
+}
+
 constexpr const char* kWren3DVertexShader = R"(
 #version 330
 in vec3 vertexPosition;
@@ -2289,9 +2339,17 @@ namespace {
 float StageScale(const TaskStage& stage, const Theme& theme) {
   return stage.typePx > 0.0f ? theme.FontPx() / stage.typePx : 1.0f;
 }
+
+Color StageMix(Color a, Color b, float t) {
+  const float u = std::clamp(t, 0.0f, 1.0f);
+  const auto ch = [u](unsigned char x, unsigned char y) {
+    return static_cast<unsigned char>(std::lround(static_cast<float>(x) + (static_cast<float>(y) - static_cast<float>(x)) * u));
+  };
+  return Color{ch(a.r, b.r), ch(a.g, b.g), ch(a.b, b.b), ch(a.a, b.a)};
+}
 }  // namespace
 
-void ShellView::PaintStage(const TaskStage& stage, const Area& origin) {
+void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const Area& origin) {
   const Palette& p = theme_.palette;
   // HTA #machine is not overridden by the dark palette; the filter and
   // galley housings are. Keep the frame behind (not over) the scenery.
@@ -2301,6 +2359,38 @@ void ShellView::PaintStage(const TaskStage& stage, const Area& origin) {
   const float scale = StageScale(stage, theme_);
   const Area stageFrame{origin.x, origin.y, stage.width * scale, stage.height * scale};
   PaintChamferBoxRay(stageFrame, kChamferPanel, housing, edge, ToRay(p.border));
+
+  const bool reduced = sim.State().reducedMotion;
+  const float tSec = reduced ? 0.0f : static_cast<float>(frameTimeMs_ * 0.001);
+  const bool engineStage = stage.id == "machine";
+  const bool o2Stage = stage.id == "o2mach";
+
+  // Engine drive telemetry derived from simulation state
+  const float condRatio = std::clamp(static_cast<float>(sim.State().engineCondition) / 100.0f, 0.0f, 1.0f);
+  const bool underway = sim.FindOngoing("travel") != nullptr;
+  const float rpmFactor =
+      (reduced || sim.State().engineCondition <= 0.0)
+          ? 0.0f
+          : ((0.50f + 0.55f * condRatio) * (underway ? 1.85f : 1.0f));
+  const float turbinePhase1 = tSec * 2.55f * rpmFactor;
+  const float turbinePhase2 = tSec * 2.55f * (76.0f / 52.0f) * rpmFactor;
+  const float corePhase = -tSec * 0.62f * rpmFactor;
+
+  // O2 filter telemetry derived from simulation state
+  const bool o2Running = sim.BankRunning();
+  int o2Seated = 0;
+  for (const CanisterSlot& s : sim.Life().slots) {
+    if (s.state == "active" || s.state == "installed") { ++o2Seated; }
+  }
+
+  int machLampIdx = 0;
+  int machCylIdx = 0;
+  int machFinIdx = 0;
+  int o2LouvreIdx = 0;
+  int o2FlowIdx = 0;
+  int o2StreakIdx = 0;
+  int o2DustIdx = 0;
+
   MachinePart grown;
   for (const MachinePart& drawn : stage.parts) {
     if (scale != 1.0f) {
@@ -2308,7 +2398,223 @@ void ShellView::PaintStage(const TaskStage& stage, const Area& origin) {
       grown.box = Area{drawn.box.x * scale, drawn.box.y * scale,
                        drawn.box.w * scale, drawn.box.h * scale};
     }
-    const MachinePart& part = scale != 1.0f ? grown : drawn;
+    MachinePart part = scale != 1.0f ? grown : drawn;
+
+    // --- Priority 2: Engine Room dynamic stage replacement/modulation ---
+    if (engineStage) {
+      if (drawn.cls == "mach-flow" || drawn.cls == "mach-spoke" || drawn.cls == "mach-nd") {
+        continue;  // Drawn smoothly by animated Engine Room pass below
+      }
+      if (drawn.cls == "mach-tick" &&
+          ((drawn.box.w == 3.0f && drawn.box.h == 3.0f) ||
+           (drawn.box.w == 6.0f && drawn.box.h == 6.0f) ||
+           (drawn.box.w == 5.0f && drawn.box.h == 5.0f))) {
+        continue;  // Core encoder ticks & turbine blades rotate continuously below
+      }
+      if (drawn.cls == "mach-hub2" && drawn.box.x > 400.0f) {
+        continue;  // Drawn on top of rotating turbine spokes below
+      }
+      if (drawn.cls == "mach-hub2" && drawn.box.x < 120.0f) {
+        continue;  // Drawn on top of sweeping gauge needles below
+      }
+      if (drawn.cls == "mach-core") {
+        const float pulse = reduced ? 0.5f : (0.5f + 0.5f * std::sin(tSec * 3.4f));
+        const float cx = origin.x + (drawn.box.x + drawn.box.w * 0.5f) * scale;
+        const float cy = origin.y + (drawn.box.y + drawn.box.h * 0.5f) * scale;
+        const float r = drawn.box.w * 0.5f * scale;
+        const Color coreCol = condRatio < 0.50f ? HexColor("#b05a42", ToRay(p.terracotta))
+                                                : HexColor("#c08a3e", ToRay(p.amber));
+        DrawCircleV(Vector2{cx, cy}, r * (1.28f + 0.18f * pulse), Fade(coreCol, 0.25f + 0.20f * pulse));
+        DrawCircleV(Vector2{cx, cy}, r, StageMix(HexColor("#fdfbf7", WHITE), coreCol, 0.18f + 0.32f * pulse));
+        continue;
+      }
+      if (drawn.cls == "mach-rod") {
+        if (drawn.box.w < 10.0f) {
+          // Vertical drive belt between upper & lower turbines: draw belt + traveling seam ticks
+          PaintScenePart(part, origin);
+          if (rpmFactor > 0.0f) {
+            const float bx = origin.x + (drawn.box.x + drawn.box.w * 0.5f) * scale;
+            const float byTop = origin.y + drawn.box.y * scale;
+            const float bh = drawn.box.h * scale;
+            for (int bi = 0; bi < 3; ++bi) {
+              const float u = std::fmod(tSec * 1.4f * rpmFactor + static_cast<float>(bi) / 3.0f, 1.0f);
+              const float ty = byTop + u * bh;
+              DrawRectangleRec(Rectangle{bx - 2.0f * scale, ty - 1.0f * scale,
+                                         4.0f * scale, 2.0f * scale},
+                               HexColor("#8c6f4e", ToRay(p.coffeeDark)));
+            }
+          }
+          continue;
+        }
+        // Reciprocating horizontal linkage rods synchronized with primary turbine phase
+        const float sign = (drawn.box.y < 200.0f) ? 1.0f : -1.0f;
+        const float shift = reduced ? 0.0f : (sign * 2.4f * std::sin(turbinePhase1) * scale);
+        part.box.x += shift;
+      }
+      if (drawn.cls == "mach-fin") {
+        // Subtle heat-exchanger thermal shimmer from left (hot) to right (cool)
+        const float wave = reduced ? 0.0f : (0.5f + 0.5f * std::sin(tSec * 2.8f - static_cast<float>(machFinIdx) * 0.55f));
+        ++machFinIdx;
+        PaintScenePart(part, origin);
+        if (wave > 0.05f) {
+          const Color hot = HexColor("#c08a3e", ToRay(p.amber));
+          const Color cool = HexColor("#7f9161", ToRay(p.sage));
+          const Color finTint = StageMix(hot, cool, static_cast<float>(machFinIdx) / 9.0f);
+          DrawRectangleRec(Rectangle{origin.x + (drawn.box.x + 1.5f) * scale,
+                                     origin.y + (drawn.box.y + 4.0f) * scale,
+                                     std::max(1.0f, (drawn.box.w - 3.0f) * scale),
+                                     std::max(1.0f, (drawn.box.h - 8.0f) * scale)},
+                           Fade(finTint, 0.14f + 0.22f * wave));
+        }
+        continue;
+      }
+      if (drawn.cls.rfind("mach-lamp", 0) == 0) {
+        const int idx = machLampIdx++;
+        const float lx = origin.x + (drawn.box.x + drawn.box.w * 0.5f) * scale;
+        const float ly = origin.y + (drawn.box.y + drawn.box.h * 0.5f) * scale;
+        const float lr = drawn.box.w * 0.5f * scale;
+        const Color greenCol = HexColor("#7f9161", ToRay(p.sage));
+        const Color greenEdge = HexColor("#6b7d50", ToRay(p.sage));
+        const Color ambCol = HexColor("#c08a3e", ToRay(p.amber));
+        const Color warnCol = HexColor("#b05a42", ToRay(p.terracotta));
+        const Color offCol = HexColor("#efe8dc", ToRay(p.panel));
+        const Color offEdge = HexColor("#cbb89c", ToRay(p.border));
+        Color fill = offCol;
+        Color rim = offEdge;
+        float glow = 0.0f;
+        const bool isAmb = drawn.cls.find("amb") != std::string::npos;
+        const bool isOn = drawn.cls.find("-on") != std::string::npos;
+        if (idx == 5) {
+          // Telemetry bus heartbeat lamp
+          const float beat = reduced ? 0.0f : std::sin(tSec * (underway ? 8.5f : 4.2f));
+          if (beat > 0.15f) {
+            fill = underway ? ambCol : greenCol;
+            rim = greenEdge;
+            glow = beat * 0.55f;
+          }
+        } else if (isAmb || (condRatio < 0.50f && (idx == 3 || idx == 6))) {
+          const float blink = reduced ? 0.85f : (0.5f + 0.5f * std::sin(tSec * 4.8f + static_cast<float>(idx) * 1.4f));
+          const Color base = condRatio < 0.30f ? warnCol : ambCol;
+          fill = StageMix(offCol, base, 0.25f + 0.75f * blink);
+          rim = base;
+          glow = blink * 0.5f;
+        } else if (isOn) {
+          const float shimmer = reduced ? 1.0f : (0.72f + 0.28f * std::sin(tSec * 2.6f + static_cast<float>(idx) * 1.7f));
+          fill = StageMix(offCol, greenCol, shimmer);
+          rim = greenEdge;
+          glow = shimmer * 0.35f;
+        }
+        if (glow > 0.05f) {
+          DrawCircleV(Vector2{lx, ly}, lr * 1.75f, Fade(fill, glow * 0.55f));
+        }
+        DrawCircleV(Vector2{lx, ly}, lr, fill);
+        DrawCircleLinesV(Vector2{lx, ly}, lr, rim);
+        continue;
+      }
+      if (drawn.cls == "mach-cyl") {
+        const int k = machCylIdx++;
+        const float bottomY = 402.0f;
+        const float minH = 16.0f;
+        const float maxH = 44.0f;
+        const float phase = reduced
+                                ? (k % 2 ? 0.55f : 1.0f)
+                                : (0.5f + 0.5f * std::sin(tSec * (3.2f * std::max(0.25f, rpmFactor)) -
+                                                          static_cast<float>(k) * 0.58f));
+        const float cyH = minH + (maxH - minH) * phase;
+        const float cx = origin.x + drawn.box.x * scale;
+        const float cy = origin.y + (bottomY - cyH) * scale;
+        const float cw = drawn.box.w * scale;
+        const float ch = cyH * scale;
+        // Faint cylinder guide track
+        DrawRectangleLinesEx(Rectangle{cx, origin.y + (bottomY - maxH) * scale, cw, maxH * scale},
+                             std::max(1.0f, scale), Fade(HexColor("#ddd2bf", ToRay(p.border)), 0.75f));
+        const Color baseFill = HexColor("#efe8dc", ToRay(p.panel));
+        const Color hotFill = condRatio < 0.50f ? HexColor("#b05a42", ToRay(p.terracotta))
+                                                : HexColor("#c08a3e", ToRay(p.amber));
+        const Color cylFill = StageMix(baseFill, hotFill, phase * 0.28f);
+        DrawRectangleRec(Rectangle{cx, cy, cw, ch}, cylFill);
+        DrawRectangleLinesEx(Rectangle{cx, cy, cw, ch}, std::max(1.0f, scale),
+                             HexColor("#cbb89c", ToRay(p.borderDark)));
+        DrawRectangleRec(Rectangle{cx + scale, cy + scale, std::max(1.0f, cw - 2.0f * scale),
+                                   std::max(1.0f, 3.0f * scale)},
+                         StageMix(HexColor("#8c6f4e", ToRay(p.coffeeDark)), hotFill, phase * 0.45f));
+        continue;
+      }
+    }
+
+    // --- Priority 3: O2 Filter Room dynamic stage modulation ---
+    if (o2Stage) {
+      if (drawn.cls == "o2-louvre") {
+        const int li = o2LouvreIdx++;
+        const float wave = reduced ? 0.35f : (0.5f + 0.5f * std::sin(tSec * (o2Running ? 4.4f : 1.5f) - static_cast<float>(li) * 0.55f));
+        const float lx = origin.x + drawn.box.x * scale;
+        const float ly = origin.y + drawn.box.y * scale;
+        const float lw = drawn.box.w * scale;
+        const float lh = drawn.box.h * scale;
+        const Color slatCol = StageMix(HexColor("#cbb89c", ToRay(p.borderDark)),
+                                       o2Running ? HexColor("#7f9161", ToRay(p.sage))
+                                                 : HexColor("#8c6f4e", ToRay(p.coffee)),
+                                       wave * (o2Running ? 0.55f : 0.25f));
+        const float openW = std::max(2.0f, lw * (0.65f + 0.45f * wave));
+        DrawRectangleRec(Rectangle{lx + (lw - openW) * 0.5f, ly, openW, lh}, slatCol);
+        continue;
+      }
+      if (drawn.cls == "o2-streak") {
+        const int si = o2StreakIdx++;
+        const float minX = 24.0f;
+        const float span = 550.0f - drawn.box.w;
+        const float speed = o2Running ? (85.0f + static_cast<float>(si % 2) * 32.0f) : 22.0f;
+        const float baseOff = drawn.box.x - minX;
+        const float animX = reduced ? drawn.box.x
+                                    : (minX + std::fmod(baseOff + tSec * speed, std::max(1.0f, span)));
+        const float animY = reduced ? drawn.box.y
+                                    : (78.0f + static_cast<float>(si) * 6.5f +
+                                       1.8f * std::sin(tSec * 2.4f + static_cast<float>(si)));
+        const Color streakCol = HexColor("#cfdcc0", ToRay(p.sage));
+        DrawRectangleRec(Rectangle{origin.x + animX * scale, origin.y + animY * scale,
+                                   drawn.box.w * scale, drawn.box.h * scale},
+                         Fade(streakCol, 0.85f));
+        continue;
+      }
+      if (drawn.cls == "o2-dust") {
+        const int di = o2DustIdx++;
+        const float dx = reduced ? 0.0f : (8.5f * std::sin(tSec * (0.75f + 0.12f * static_cast<float>(di % 4)) + static_cast<float>(di) * 1.9f));
+        const float dy = reduced ? 0.0f : (3.5f * std::cos(tSec * (0.95f + 0.15f * static_cast<float>(di % 3)) + static_cast<float>(di) * 1.1f));
+        part.box.x = std::clamp(drawn.box.x + dx, 24.0f, 572.0f);
+        part.box.y = std::clamp(drawn.box.y + dy, 96.0f, 113.0f);
+      }
+      if (drawn.cls == "o2-flow") {
+        const int fi = o2FlowIdx++;
+        const float lx = origin.x + drawn.box.x * scale;
+        const float ly = origin.y + drawn.box.y * scale;
+        const float lw = drawn.box.w * scale;
+        const float lh = drawn.box.h * scale;
+        const Color baseBg = HexColor("#e4dbcb", ToRay(p.panel3));
+        const Color baseRim = HexColor("#cbb89c", ToRay(p.borderDark));
+        const Color activeBg = HexColor("#7f9161", ToRay(p.sage));
+        const Color standBg = HexColor("#c08a3e", ToRay(p.amber));
+        float pulse = 0.0f;
+        if (!reduced) {
+          if (o2Running) {
+            const float head = std::fmod(tSec * 5.2f, 8.0f);
+            float d = std::fabs(head - static_cast<float>(fi));
+            d = std::min(d, 8.0f - d);
+            pulse = std::clamp(1.0f - d * 0.55f, 0.0f, 1.0f);
+          } else if (o2Seated > 0) {
+            pulse = 0.25f * (0.5f + 0.5f * std::sin(tSec * 2.0f - static_cast<float>(fi) * 0.65f));
+          } else {
+            pulse = 0.12f * (0.5f + 0.5f * std::sin(tSec * 1.3f - static_cast<float>(fi) * 0.5f));
+          }
+        }
+        const Color fill = o2Running ? StageMix(baseBg, activeBg, 0.22f + 0.78f * pulse)
+                                     : StageMix(baseBg, standBg, pulse);
+        DrawRectangleRec(Rectangle{lx, ly, lw, lh}, fill);
+        DrawRectangleLinesEx(Rectangle{lx, ly, lw, lh}, std::max(1.0f, scale),
+                             o2Running && pulse > 0.45f ? activeBg : baseRim);
+        continue;
+      }
+    }
+
     if (PaintMessStockIcon(part, origin)) continue;
     if (PaintScenePart(part, origin)) continue;
     const int x = static_cast<int>(origin.x + part.box.x);
@@ -2350,6 +2656,258 @@ void ShellView::PaintStage(const TaskStage& stage, const Area& origin) {
     }
     if (!part.text.empty() && part.text[0] != 'm') {
       Text(part.text.c_str(), x + 2, y + 1, TypePx(8) , ToRay(p.muted));
+    }
+  }
+
+  // --- Priority 2 Overlay: Spinning turbines, rotating core encoder, sweeping needles & coolant loop ---
+  if (engineStage) {
+    const Color spokeCol = HexColor("#cbb89c", ToRay(p.borderDark));
+    const Color wheelRimCol = HexColor("#8c6f4e", ToRay(p.coffeeDark));
+    const Color hubFillCol = HexColor("#cbb89c", ToRay(p.panel2));
+    const Color needleCol = HexColor("#8c6f4e", ToRay(p.coffeeDark));
+    const Color hotFlowCol = HexColor("#c08a3e", ToRay(p.amber));
+    const Color coolFlowCol = HexColor("#7f9161", ToRay(p.sage));
+
+    // 1) Rotating 24-tick primary core encoder ring around (270, 188)
+    {
+      const float cx = origin.x + 270.0f * scale;
+      const float cy = origin.y + 188.0f * scale;
+      const float r = 52.0f * scale;
+      for (int k = 0; k < 24; ++k) {
+        const float a = static_cast<float>(k) * (PI / 12.0f) + corePhase;
+        const bool major = (k % 6 == 0);
+        const float tx = cx + r * std::cos(a);
+        const float ty = cy + r * std::sin(a);
+        const float sz = (major ? 4.0f : 3.0f) * scale;
+        DrawRectangleRec(Rectangle{tx - sz * 0.5f, ty - sz * 0.5f, sz, sz},
+                         major ? wheelRimCol : spokeCol);
+      }
+    }
+
+    // 2) Upper & lower spinning turbine spokes + blades + center hubs
+    auto paintTurbine = [&](float sx, float sy, float spokeR, float bladeR, float hubR,
+                            int bladeCount, float bladeSize, float phase) {
+      const float cx = origin.x + sx * scale;
+      const float cy = origin.y + sy * scale;
+      for (int s = 0; s < 2; ++s) {
+        const float a = phase + static_cast<float>(s) * (PI * 0.5f);
+        const float dx = std::cos(a) * spokeR * scale;
+        const float dy = std::sin(a) * spokeR * scale;
+        DrawLineEx(Vector2{cx - dx, cy - dy}, Vector2{cx + dx, cy + dy},
+                   std::max(1.5f, 2.0f * scale), spokeCol);
+      }
+      for (int k = 0; k < bladeCount; ++k) {
+        const float a = phase + static_cast<float>(k) * (2.0f * PI / static_cast<float>(bladeCount)) +
+                        (bladeCount == 8 ? PI / 8.0f : 0.0f);
+        const float bx = cx + std::cos(a) * bladeR * scale;
+        const float by = cy + std::sin(a) * bladeR * scale;
+        const float bs = bladeSize * scale;
+        DrawRectangleRec(Rectangle{bx - bs * 0.5f, by - bs * 0.5f, bs, bs},
+                         (k % 2 == 0) ? wheelRimCol : spokeCol);
+      }
+      DrawCircleV(Vector2{cx, cy}, hubR * scale, hubFillCol);
+      DrawCircleLinesV(Vector2{cx, cy}, hubR * scale, wheelRimCol);
+    };
+    paintTurbine(424.0f, 158.0f, 36.5f, 29.0f, 8.0f, 8, 5.5f, turbinePhase1);
+    paintTurbine(424.0f, 240.0f, 24.5f, 19.0f, 6.0f, 6, 4.5f, turbinePhase2);
+
+    // 3) Sweeping PRS & TMP gauge needles
+    const float prsVal = reduced ? 68.0f
+                                 : std::clamp(68.0f + (underway ? 11.0f : 0.0f) +
+                                                  5.5f * std::sin(tSec * 1.7f) +
+                                                  2.0f * std::sin(tSec * 4.6f),
+                                              12.0f, 96.0f);
+    const float tmpVal = reduced ? 41.0f
+                                 : std::clamp(41.0f + (1.0f - condRatio) * 18.0f +
+                                                  (underway ? 10.0f : 0.0f) +
+                                                  4.2f * std::sin(tSec * 1.15f + 1.2f),
+                                              10.0f, 96.0f);
+    const float gaugeVals[2] = {prsVal, tmpVal};
+    for (int gi = 0; gi < 2; ++gi) {
+      const float gx = origin.x + 96.0f * scale;
+      const float gy = origin.y + (109.0f + static_cast<float>(gi) * 104.0f) * scale;
+      const float deg = 135.0f + gaugeVals[gi] * 2.7f;
+      const float rad = deg * DEG2RAD;
+      const float cs = std::cos(rad), sn = std::sin(rad);
+      const Color ndTint = (gi == 1 && tmpVal > 68.0f) ? HexColor("#b05a42", ToRay(p.terracotta)) : needleCol;
+      DrawLineEx(Vector2{gx - cs * 4.0f * scale, gy - sn * 4.0f * scale},
+                 Vector2{gx + cs * 18.5f * scale, gy + sn * 18.5f * scale},
+                 std::max(1.8f, 2.2f * scale), ndTint);
+      DrawCircleV(Vector2{gx + cs * 17.5f * scale, gy + sn * 17.5f * scale}, 2.2f * scale, ndTint);
+      DrawCircleV(Vector2{gx, gy}, 4.0f * scale, hubFillCol);
+      DrawCircleLinesV(Vector2{gx, gy}, 4.0f * scale, wheelRimCol);
+    }
+
+    // 4) Continuous coolant loop circulation pulses around main circuit + exchanger loop
+    // Main loop path: (30,39) -> (607,39) -> (607,305) -> (193,305) -> (193,262)
+    constexpr float kL0 = 577.0f;
+    constexpr float kL1 = 266.0f;
+    constexpr float kL2 = 414.0f;
+    constexpr float kL3 = 43.0f;
+    constexpr float kTotalLoop = kL0 + kL1 + kL2 + kL3;
+    const float loopSpeed = (reduced || sim.State().engineCondition <= 0.0)
+                                ? 0.0f
+                                : (115.0f * (underway ? 1.6f : 1.0f));
+    constexpr int kLoopPulses = 10;
+    for (int pi = 0; pi < kLoopPulses; ++pi) {
+      const float d = std::fmod(tSec * loopSpeed +
+                                    static_cast<float>(pi) * (kTotalLoop / static_cast<float>(kLoopPulses)),
+                                kTotalLoop);
+      float px = 30.0f, py = 39.0f;
+      float heat = 1.0f;
+      if (d < kL0) {
+        px = 30.0f + d;
+        py = 39.0f;
+        heat = 1.0f - (d / kL0) * 0.25f;
+      } else if (d < kL0 + kL1) {
+        const float s = d - kL0;
+        px = 607.0f;
+        py = 39.0f + s;
+        heat = 0.75f - (s / kL1) * 0.55f;
+      } else if (d < kL0 + kL1 + kL2) {
+        const float s = d - (kL0 + kL1);
+        px = 607.0f - s;
+        py = 305.0f;
+        heat = 0.20f - (s / kL2) * 0.20f;
+      } else {
+        const float s = d - (kL0 + kL1 + kL2);
+        px = 193.0f;
+        py = 305.0f - s;
+        heat = 0.0f;
+      }
+      const Color pCol = StageMix(coolFlowCol, hotFlowCol, std::clamp(heat, 0.0f, 1.0f));
+      DrawCircleV(Vector2{origin.x + px * scale, origin.y + py * scale}, 2.8f * scale,
+                  Fade(pCol, 0.88f));
+    }
+    // Exchanger vertical feed & drain pulses (x = 538, y = 46..120 and y = 224..298)
+    for (int ei = 0; ei < 4; ++ei) {
+      const float u = std::fmod(tSec * (loopSpeed / 120.0f) + static_cast<float>(ei) * 0.25f, 1.0f);
+      const float feedY = 46.0f + u * 74.0f;
+      const float drainY = 224.0f + u * 74.0f;
+      DrawCircleV(Vector2{origin.x + 538.0f * scale, origin.y + feedY * scale},
+                  2.4f * scale, Fade(hotFlowCol, 0.82f));
+      DrawCircleV(Vector2{origin.x + 538.0f * scale, origin.y + drainY * scale},
+                  2.4f * scale, Fade(coolFlowCol, 0.85f));
+    }
+  }
+
+  // --- Priority 3 Overlay: O2 Intake Airflow, Canister Rising Bubbles & Status LEDs ---
+  if (o2Stage) {
+    const Color sageCol = HexColor("#7f9161", ToRay(p.sage));
+    const Color ambCol = HexColor("#c08a3e", ToRay(p.amber));
+    const Color bareCol = HexColor("#cbb89c", ToRay(p.borderDark));
+    const Color bubbleFill = HexColor("#f5faee", WHITE);
+
+    // 1) Intake duct live indicator dot + traveling intake airflow packets
+    {
+      const float dotPulse = reduced ? 0.85f : (0.5f + 0.5f * std::sin(tSec * (o2Running ? 4.5f : 1.8f)));
+      const Color led = o2Running ? sageCol : ambCol;
+      const float lx = origin.x + 88.0f * scale;
+      const float ly = origin.y + 28.0f * scale;
+      DrawCircleV(Vector2{lx, ly}, 4.5f * scale, Fade(led, 0.25f * dotPulse));
+      DrawCircleV(Vector2{lx, ly}, 2.6f * scale, StageMix(bareCol, led, 0.45f + 0.55f * dotPulse));
+      if (!reduced && (o2Running || o2Seated > 0)) {
+        const float spd = o2Running ? 140.0f : 42.0f;
+        for (int bi = 0; bi < 6; ++bi) {
+          const float u = std::fmod(tSec * (spd / 470.0f) + static_cast<float>(bi) / 6.0f, 1.0f);
+          const float ax = 98.0f + u * 472.0f;
+          const float ay = 29.0f + ((bi % 2 == 0) ? -3.0f : 3.0f);
+          DrawRectangleRec(Rectangle{origin.x + ax * scale, origin.y + ay * scale,
+                                     14.0f * scale, 2.0f * scale},
+                           Fade(o2Running ? sageCol : ambCol, o2Running ? 0.50f : 0.25f));
+        }
+      }
+    }
+
+    // 2) CABIN AIR chamber pulsing indicator LED + exhaust TO DECKS indicator LED
+    {
+      const float airPulse = reduced ? 0.8f : (0.5f + 0.5f * std::sin(tSec * (o2Running ? 3.8f : 1.4f)));
+      const Color airLed = o2Running ? sageCol : HexColor(sim.AirSpec().tone, ToRay(p.amber));
+      DrawCircleV(Vector2{origin.x + 113.0f * scale, origin.y + 68.0f * scale},
+                  4.5f * scale, Fade(airLed, 0.24f * airPulse));
+      DrawCircleV(Vector2{origin.x + 113.0f * scale, origin.y + 68.0f * scale},
+                  2.5f * scale, StageMix(bareCol, airLed, 0.4f + 0.6f * airPulse));
+
+      const float exPulse = reduced ? 0.8f : (0.5f + 0.5f * std::sin(tSec * 4.2f + 1.0f));
+      const Color exLed = o2Running ? sageCol : (o2Seated > 0 ? ambCol : bareCol);
+      if (o2Running || o2Seated > 0) {
+        DrawCircleV(Vector2{origin.x + 109.0f * scale, origin.y + 337.0f * scale},
+                    4.5f * scale, Fade(exLed, 0.26f * exPulse));
+      }
+      DrawCircleV(Vector2{origin.x + 109.0f * scale, origin.y + 337.0f * scale},
+                  2.5f * scale, exLed);
+    }
+
+    // 3) Per-slot bay status LED + tiny rising bubbles inside seated / active filter canisters
+    for (int k = 0; k < 3; ++k) {
+      const float sx = 20.0f + static_cast<float>(k) * 190.0f;
+      const auto& slot = sim.Life().slots[static_cast<std::size_t>(k)];
+      const bool seatingNow = sim.FindOngoing("o2s" + std::to_string(k)) != nullptr;
+      const bool active = slot.state == "active";
+      const bool installed = slot.state == "installed";
+
+      // Bay status LED in upper-right header of SLOT frame
+      const float ledX = origin.x + (sx + 162.0f) * scale;
+      const float ledY = origin.y + 137.0f * scale;
+      Color ledCol = bareCol;
+      float ledGlow = 0.0f;
+      if (active && o2Running) {
+        const float pGlow = reduced ? 0.9f : (0.55f + 0.45f * std::sin(tSec * 4.4f + static_cast<float>(k) * 1.1f));
+        ledCol = sageCol;
+        ledGlow = pGlow * 0.45f;
+      } else if (active && !o2Running) {
+        const float pGlow = reduced ? 0.8f : (0.35f + 0.65f * std::sin(tSec * 3.0f + static_cast<float>(k)));
+        ledCol = HexColor("#b05a42", ToRay(p.terracotta));
+        ledGlow = pGlow * 0.35f;
+      } else if (installed || seatingNow) {
+        const float rate = seatingNow ? 6.5f : 2.1f;
+        const float pGlow = reduced ? 0.85f : (0.35f + 0.65f * std::sin(tSec * rate + static_cast<float>(k) * 1.5f));
+        ledCol = ambCol;
+        ledGlow = pGlow * 0.35f;
+      }
+      if (ledGlow > 0.05f) {
+        DrawCircleV(Vector2{ledX, ledY}, 6.0f * scale, Fade(ledCol, ledGlow));
+      }
+      DrawCircleV(Vector2{ledX, ledY}, 3.2f * scale, ledCol);
+      DrawCircleLinesV(Vector2{ledX, ledY}, 3.2f * scale, HexColor("#8c6f4e", ToRay(p.borderDark)));
+
+      // Rising O2 filtration bubbles inside any seated or active canister!
+      if (active || installed) {
+        const Color fluidCol = active ? sageCol : ambCol;
+        const float riseRate = (active && o2Running) ? 0.56f : (active ? 0.14f : 0.22f);
+        // Canister interior bounds: x in [sx+52 .. sx+128], y in [168 .. 221]
+        if (!reduced) {
+          const float shimmer = 0.5f + 0.5f * std::sin(tSec * (active ? 3.2f : 1.4f) + static_cast<float>(k));
+          DrawRectangleRec(Rectangle{origin.x + (sx + 52.0f) * scale, origin.y + 170.0f * scale,
+                                     76.0f * scale, 50.0f * scale},
+                           Fade(fluidCol, active ? (0.06f + 0.06f * shimmer) : 0.04f));
+        }
+        constexpr int kBubbles = 11;
+        for (int bi = 0; bi < kBubbles; ++bi) {
+          const unsigned h = static_cast<unsigned>((k + 1) * 977 + bi * 353);
+          const float xFrac = static_cast<float>(h % 100u) / 99.0f;
+          const float phase = std::fmod(static_cast<float>(bi) / static_cast<float>(kBubbles) +
+                                            tSec * (riseRate + 0.06f * static_cast<float>(bi % 3)),
+                                        1.0f);
+          const float by = 220.0f - phase * 50.0f;  // Rises bottom (220) -> neck (170)
+          const float wobble = reduced ? 0.0f
+                                       : (3.2f * std::sin(tSec * 2.8f + static_cast<float>(bi) * 1.4f +
+                                                          static_cast<float>(k)));
+          const float bx = std::clamp(sx + 54.0f + xFrac * 72.0f + wobble,
+                                      sx + 52.0f, sx + 128.0f);
+          const float edgeFade = std::min(std::clamp(phase * 5.0f, 0.0f, 1.0f),
+                                          std::clamp((1.0f - phase) * 5.0f, 0.0f, 1.0f));
+          const float r = (1.5f + static_cast<float>(bi % 3) * 0.75f) * scale;
+          const float a = edgeFade * (active ? 0.85f : 0.58f);
+          if (a <= 0.02f) { continue; }
+          const float px = origin.x + bx * scale;
+          const float py = origin.y + by * scale;
+          DrawCircleV(Vector2{px, py}, r, Fade(bubbleFill, a));
+          DrawCircleLinesV(Vector2{px, py}, r, Fade(fluidCol, a * 0.90f));
+          DrawCircleV(Vector2{px - r * 0.32f, py - r * 0.32f}, std::max(0.7f, r * 0.28f),
+                      Fade(WHITE, a));
+        }
+      }
     }
   }
 
@@ -2479,7 +3037,7 @@ void ShellView::PaintTaskScreen(Simulation& sim) {
     // width. When the side panels cannot fit beside it, they flow beneath,
     // never over it.
     const Area origin{stageX, bodyTop, stageW, stageH};
-    PaintStage(screen.stage, origin);
+    PaintStage(sim, screen.stage, origin);
     const float uy = beside ? origin.Bottom() + 4 : std::max({origin.Bottom(), y, ry}) + 12;
     const float gap = 6;
     const float panelW = (origin.w - gap * std::max(0, static_cast<int>(screen.under.size()) - 1)) /
@@ -2499,6 +3057,403 @@ void ShellView::PaintTaskScreen(Simulation& sim) {
 // The chart's celestial bodies: stars, worlds, moons, stations and dust.
 namespace {
 #include "ChartArt.inc"
+
+float NavBodyWorldY(const NavBodyView& body, const std::string& layer) {
+  const ChartLook look = ChartLookOf(body);
+  const unsigned h = ChartSeed(body.id);
+  const float signedU = (static_cast<float>(h % 2001u) / 1000.0f) - 1.0f;
+  const float posU = static_cast<float>((h / 2003u) % 1000u) / 1000.0f;
+  if (layer == "galaxy") {
+    if (look == ChartLook::Region) { return signedU * 0.34f; }
+    return signedU * 0.72f;
+  }
+  if (layer == "sector") {
+    return signedU * 0.62f;
+  }
+  switch (look) {
+    case ChartLook::Star:
+    case ChartLook::Origin: return 0.0f;
+    case ChartLook::Station: return 0.16f + posU * 0.24f;
+    case ChartLook::Site: return (signedU >= 0.0f ? 0.10f : -0.10f) + signedU * 0.22f;
+    case ChartLook::Belt: return signedU * 0.22f;
+    case ChartLook::Moon: return signedU * 0.36f;
+    case ChartLook::Gas:
+    case ChartLook::Ice:
+    case ChartLook::Ocean:
+    case ChartLook::Rock: return signedU * 0.48f;
+    case ChartLook::System:
+    case ChartLook::Region: return signedU * 0.40f;
+  }
+  return 0.0f;
+}
+
+float NavBodyScale3D(const NavBodyView& body, float tableScale, const std::string& layer) {
+  const ChartLook look = ChartLookOf(body);
+  float base = static_cast<float>(body.size) * 0.0085f * tableScale;
+  switch (look) {
+    case ChartLook::Star: base = std::max(base, 0.155f); break;
+    case ChartLook::System: base = std::max(base, layer == "galaxy" ? 0.068f : 0.105f); break;
+    case ChartLook::Region: base = std::max(base, 0.140f); break;
+    case ChartLook::Gas: base = std::max(base, 0.125f); break;
+    case ChartLook::Ice:
+    case ChartLook::Ocean:
+    case ChartLook::Rock: base = std::max(base, 0.095f); break;
+    case ChartLook::Moon: base = std::max(base, 0.056f); break;
+    case ChartLook::Station: base = std::max(base, 0.085f); break;
+    case ChartLook::Site: base = std::max(base, 0.072f); break;
+    case ChartLook::Belt: base = std::max(base, 0.088f); break;
+    case ChartLook::Origin: base = std::max(base, 0.088f); break;
+  }
+  return std::clamp(base, 0.042f, 0.26f);
+}
+
+void PaintShadedSphere3D(const Vector3& center, float radius, int rings, int slices,
+                         const ::Color& base, const Vector3& lightRef, bool isPointLight,
+                         int styleMode, unsigned seed, const Palette& p, float alpha) {
+  if (radius <= 1e-4f || alpha <= 0.01f) { return; }
+  Vector3 lightDir = lightRef;
+  if (isPointLight) {
+    lightDir = Vector3{lightRef.x - center.x, lightRef.y - center.y, lightRef.z - center.z};
+  }
+  const float lLen = std::sqrt(lightDir.x * lightDir.x + lightDir.y * lightDir.y +
+                               lightDir.z * lightDir.z);
+  if (lLen > 1e-5f) {
+    lightDir.x /= lLen;
+    lightDir.y /= lLen;
+    lightDir.z /= lLen;
+  } else {
+    lightDir = Vector3{-0.45f, 0.72f, 0.52f};
+  }
+
+  std::array<Vector3, 3> spots{};
+  for (int k = 0; k < 3; ++k) {
+    const float a = static_cast<float>((seed >> (k * 7)) % 360u) * DEG2RAD;
+    const float b = (static_cast<float>((seed >> (k * 5 + 3)) % 140u) - 70.0f) * DEG2RAD;
+    spots[static_cast<std::size_t>(k)] = Vector3{
+        std::cos(b) * std::cos(a), std::sin(b), std::cos(b) * std::sin(a)};
+  }
+
+  const ::Color shadowCol = ChartDeep(base, 0.54f);
+  const ::Color whiteCol = ToRay(p.white);
+  const ::Color inkCol = ToRay(p.coffeeDark);
+
+  auto evalVertex = [&](float nx, float ny, float nz, ::Color* outCol) {
+    ::Color albedo = base;
+    if (styleMode == 1) {
+      // Gas giant latitude banding
+      const float band = 0.5f + 0.5f * std::sin(ny * 15.0f + static_cast<float>(seed % 17u));
+      albedo = ChartMix(ChartDeep(base, 0.24f), ChartLift(base, 0.22f), band);
+    } else if (styleMode == 2) {
+      // Ice world frost polar caps + pale glacial core
+      if (std::fabs(ny) > 0.58f) {
+        albedo = ChartMix(base, whiteCol, 0.78f);
+      } else {
+        const float patch = nx * spots[0].x + ny * spots[0].y + nz * spots[0].z;
+        if (patch > 0.55f) { albedo = ChartMix(base, whiteCol, 0.50f); }
+      }
+    } else if (styleMode == 3) {
+      // Ocean world with continental landmasses
+      bool land = false;
+      for (int k = 0; k < 3; ++k) {
+        const float d = nx * spots[static_cast<std::size_t>(k)].x +
+                        ny * spots[static_cast<std::size_t>(k)].y +
+                        nz * spots[static_cast<std::size_t>(k)].z;
+        if (d > 0.56f) { land = true; break; }
+      }
+      if (land) {
+        albedo = ChartLift(ToRay(p.coffeeLight), 0.14f);
+      }
+    } else if (styleMode == 4) {
+      // Cratered rock / moon
+      for (int k = 0; k < 3; ++k) {
+        const float d = nx * spots[static_cast<std::size_t>(k)].x +
+                        ny * spots[static_cast<std::size_t>(k)].y +
+                        nz * spots[static_cast<std::size_t>(k)].z;
+        if (d > 0.82f) {
+          albedo = ChartDeep(base, 0.36f);
+          break;
+        }
+      }
+    } else if (styleMode == 5) {
+      // Emissive star core
+      const float core = std::clamp(0.55f + 0.45f * ny, 0.0f, 1.0f);
+      *outCol = ChartFade(ChartMix(base, whiteCol, 0.48f * core), alpha);
+      return;
+    }
+
+    const float ndotl = std::max(0.0f, nx * lightDir.x + ny * lightDir.y + nz * lightDir.z);
+    const float hemi = 0.28f + 0.16f * std::max(0.0f, ny);
+    const float lit = std::clamp(hemi + 0.72f * ndotl, 0.0f, 1.0f);
+    ::Color c = ChartMix(shadowCol, albedo, lit);
+    if (ndotl > 0.62f) {
+      c = ChartMix(c, ChartLift(albedo, 0.45f), (ndotl - 0.62f) / 0.38f * 0.55f);
+    }
+    // Crisp subtle dark terminator contour so pale spheres stay clear on parchment
+    const float edgeTone = 1.0f - std::fabs(ny) * 0.08f;
+    c = ChartMix(inkCol, c, std::clamp(edgeTone, 0.80f, 1.0f));
+    *outCol = ChartFade(c, alpha);
+  };
+
+  rlCheckRenderBatchLimit(rings * slices * 6);
+  rlBegin(RL_TRIANGLES);
+  for (int i = 0; i < rings; ++i) {
+    const float lat0 = (0.5f - static_cast<float>(i) / static_cast<float>(rings)) * PI;
+    const float lat1 = (0.5f - static_cast<float>(i + 1) / static_cast<float>(rings)) * PI;
+    const float cl0 = std::cos(lat0), sl0 = std::sin(lat0);
+    const float cl1 = std::cos(lat1), sl1 = std::sin(lat1);
+    for (int j = 0; j < slices; ++j) {
+      const float lon0 = static_cast<float>(j) / static_cast<float>(slices) * 2.0f * PI;
+      const float lon1 = static_cast<float>(j + 1) / static_cast<float>(slices) * 2.0f * PI;
+      const float cx0 = std::cos(lon0), sx0 = std::sin(lon0);
+      const float cx1 = std::cos(lon1), sx1 = std::sin(lon1);
+
+      const Vector3 n00{cl0 * cx0, sl0, cl0 * sx0};
+      const Vector3 n01{cl0 * cx1, sl0, cl0 * sx1};
+      const Vector3 n10{cl1 * cx0, sl1, cl1 * sx0};
+      const Vector3 n11{cl1 * cx1, sl1, cl1 * sx1};
+      ::Color c00{}, c01{}, c10{}, c11{};
+      evalVertex(n00.x, n00.y, n00.z, &c00);
+      evalVertex(n01.x, n01.y, n01.z, &c01);
+      evalVertex(n10.x, n10.y, n10.z, &c10);
+      evalVertex(n11.x, n11.y, n11.z, &c11);
+
+      const auto vtx = [&](const Vector3& n, const ::Color& col) {
+        rlColor4ub(col.r, col.g, col.b, col.a);
+        rlVertex3f(center.x + n.x * radius, center.y + n.y * radius, center.z + n.z * radius);
+      };
+      // Outward CCW winding verified for (p00, p01, p10) & (p01, p11, p10)
+      vtx(n00, c00); vtx(n01, c01); vtx(n10, c10);
+      vtx(n01, c01); vtx(n11, c11); vtx(n10, c10);
+    }
+  }
+  rlEnd();
+}
+
+void PaintTranslucentSphere3D(const Vector3& center, float radius, int rings, int slices,
+                                const ::Color& col) {
+  if (rings < 2 || slices < 4 || radius <= 0.0f || col.a == 0) { return; }
+  rlCheckRenderBatchLimit(rings * slices * 6);
+  rlBegin(RL_TRIANGLES);
+  for (int i = 0; i < rings; ++i) {
+    const float lat0 = (0.5f - static_cast<float>(i) / static_cast<float>(rings)) * PI;
+    const float lat1 = (0.5f - static_cast<float>(i + 1) / static_cast<float>(rings)) * PI;
+    const float cl0 = std::cos(lat0), sl0 = std::sin(lat0);
+    const float cl1 = std::cos(lat1), sl1 = std::sin(lat1);
+    for (int j = 0; j < slices; ++j) {
+      const float lon0 = static_cast<float>(j) / static_cast<float>(slices) * 2.0f * PI;
+      const float lon1 = static_cast<float>(j + 1) / static_cast<float>(slices) * 2.0f * PI;
+      const float cx0 = std::cos(lon0), sx0 = std::sin(lon0);
+      const float cx1 = std::cos(lon1), sx1 = std::sin(lon1);
+      const auto emitV = [&](float x, float y, float z) {
+        rlColor4ub(col.r, col.g, col.b, col.a);
+        rlVertex3f(center.x + x * radius, center.y + y * radius, center.z + z * radius);
+      };
+      emitV(cl0 * cx0, sl0, cl0 * sx0);
+      emitV(cl0 * cx1, sl0, cl0 * sx1);
+      emitV(cl1 * cx0, sl1, cl1 * sx0);
+      emitV(cl0 * cx1, sl0, cl0 * sx1);
+      emitV(cl1 * cx1, sl1, cl1 * sx1);
+      emitV(cl1 * cx0, sl1, cl1 * sx0);
+    }
+  }
+  rlEnd();
+}
+
+void PaintRing3D(const Vector3& center, float innerR, float outerR,
+                 float tiltX, float tiltZ, int segs, const ::Color& col) {
+  if (segs < 6 || outerR <= innerR) { return; }
+  const float cx = std::cos(tiltX), sx = std::sin(tiltX);
+  const float cz = std::cos(tiltZ), sz = std::sin(tiltZ);
+  auto xform = [&](float lx, float lz) -> Vector3 {
+    // Rotate around X then Z
+    const float y1 = -lz * sx;
+    const float z1 = lz * cx;
+    const float x2 = lx * cz - y1 * sz;
+    const float y2 = lx * sz + y1 * cz;
+    return Vector3{center.x + x2, center.y + y2, center.z + z1};
+  };
+  rlDisableBackfaceCulling();
+  rlCheckRenderBatchLimit(segs * 6);
+  rlBegin(RL_TRIANGLES);
+  for (int i = 0; i < segs; ++i) {
+    const float a0 = static_cast<float>(i) / static_cast<float>(segs) * 2.0f * PI;
+    const float a1 = static_cast<float>(i + 1) / static_cast<float>(segs) * 2.0f * PI;
+    const float c0 = std::cos(a0), s0 = std::sin(a0);
+    const float c1 = std::cos(a1), s1 = std::sin(a1);
+    const Vector3 i0 = xform(c0 * innerR, s0 * innerR);
+    const Vector3 o0 = xform(c0 * outerR, s0 * outerR);
+    const Vector3 i1 = xform(c1 * innerR, s1 * innerR);
+    const Vector3 o1 = xform(c1 * outerR, s1 * outerR);
+    // Repeat rlColor4ub per triangle so software rasterizers keep alpha blending active.
+    rlColor4ub(col.r, col.g, col.b, col.a);
+    rlVertex3f(i0.x, i0.y, i0.z);
+    rlVertex3f(o0.x, o0.y, o0.z);
+    rlVertex3f(o1.x, o1.y, o1.z);
+    rlColor4ub(col.r, col.g, col.b, col.a);
+    rlVertex3f(i0.x, i0.y, i0.z);
+    rlVertex3f(o1.x, o1.y, o1.z);
+    rlVertex3f(i1.x, i1.y, i1.z);
+  }
+  rlEnd();
+  rlEnableBackfaceCulling();
+}
+
+void PaintAsteroid3D(const Vector3& center, float radius, float rx, float ry, float rz,
+                     const ::Color& base, const Vector3& lightDir, unsigned seed) {
+  static constexpr float kPhi = 1.61803398875f;
+  static constexpr float kRaw[12][3] = {
+      {-1,  kPhi, 0}, { 1,  kPhi, 0}, {-1, -kPhi, 0}, { 1, -kPhi, 0},
+      { 0, -1,  kPhi}, { 0,  1,  kPhi}, { 0, -1, -kPhi}, { 0,  1, -kPhi},
+      { kPhi, 0, -1}, { kPhi, 0,  1}, {-kPhi, 0, -1}, {-kPhi, 0,  1},
+  };
+  static constexpr int kFaces[20][3] = {
+      {0, 11, 5}, {0, 5, 1}, {0, 1, 7}, {0, 7, 10}, {0, 10, 11},
+      {1, 5, 9}, {5, 11, 4}, {11, 10, 2}, {10, 7, 6}, {7, 1, 8},
+      {3, 9, 4}, {3, 4, 2}, {3, 2, 6}, {3, 6, 8}, {3, 8, 9},
+      {4, 9, 5}, {2, 4, 11}, {6, 2, 10}, {8, 6, 7}, {9, 8, 1},
+  };
+  const float crx = std::cos(rx), srx = std::sin(rx);
+  const float cry = std::cos(ry), sry = std::sin(ry);
+  const float crz = std::cos(rz), srz = std::sin(rz);
+  std::array<Vector3, 12> v{};
+  for (int i = 0; i < 12; ++i) {
+    const unsigned h = seed ^ static_cast<unsigned>(i * 2654435761u);
+    const float jitter = 0.72f + 0.50f * (static_cast<float>(h % 100u) / 99.0f);
+    const float len = std::sqrt(kRaw[i][0] * kRaw[i][0] + kRaw[i][1] * kRaw[i][1] +
+                                kRaw[i][2] * kRaw[i][2]);
+    float x = kRaw[i][0] / len * radius * jitter;
+    float y = kRaw[i][1] / len * radius * jitter * 0.82f;
+    float z = kRaw[i][2] / len * radius * jitter;
+    // Rotate X -> Y -> Z
+    const float y1 = y * crx - z * srx;
+    const float z1 = y * srx + z * crx;
+    const float x2 = x * cry + z1 * sry;
+    const float z2 = -x * sry + z1 * cry;
+    const float x3 = x2 * crz - y1 * srz;
+    const float y3 = x2 * srz + y1 * crz;
+    v[static_cast<std::size_t>(i)] = Vector3{center.x + x3, center.y + y3, center.z + z2};
+  }
+  rlCheckRenderBatchLimit(60);
+  rlBegin(RL_TRIANGLES);
+  for (int f = 0; f < 20; ++f) {
+    const Vector3& a = v[static_cast<std::size_t>(kFaces[f][0])];
+    const Vector3& b = v[static_cast<std::size_t>(kFaces[f][1])];
+    const Vector3& c = v[static_cast<std::size_t>(kFaces[f][2])];
+    const float ux = b.x - a.x, uy = b.y - a.y, uz = b.z - a.z;
+    const float vx = c.x - a.x, vy = c.y - a.y, vz = c.z - a.z;
+    float nx = uy * vz - uz * vy;
+    float ny = uz * vx - ux * vz;
+    float nz = ux * vy - uy * vx;
+    const float nLen = std::sqrt(nx * nx + ny * ny + nz * nz);
+    if (nLen > 1e-6f) { nx /= nLen; ny /= nLen; nz /= nLen; }
+    const float ndotl = std::max(0.0f, nx * lightDir.x + ny * lightDir.y + nz * lightDir.z);
+    const ::Color col = ChartMix(ChartDeep(base, 0.56f), ChartLift(base, 0.24f),
+                                 std::clamp(0.24f + 0.76f * ndotl, 0.0f, 1.0f));
+    rlColor4ub(col.r, col.g, col.b, col.a);
+    rlVertex3f(a.x, a.y, a.z);
+    rlVertex3f(b.x, b.y, b.z);
+    rlVertex3f(c.x, c.y, c.z);
+  }
+  rlEnd();
+}
+
+void PaintOrbitTrack3D(const Vector3& center, float rx, float rz, float tiltX, float tiltZ,
+                       int segs, const ::Color& col) {
+  if (segs < 8) { return; }
+  const float cx = std::cos(tiltX), sx = std::sin(tiltX);
+  const float cz = std::cos(tiltZ), sz = std::sin(tiltZ);
+  auto pt = [&](int i) -> Vector3 {
+    const float a = static_cast<float>(i) / static_cast<float>(segs) * 2.0f * PI;
+    const float lx = std::cos(a) * rx;
+    const float lz = std::sin(a) * rz;
+    const float y1 = -lz * sx;
+    const float z1 = lz * cx;
+    const float x2 = lx * cz - y1 * sz;
+    const float y2 = lx * sz + y1 * cz;
+    return Vector3{center.x + x2, center.y + y2, center.z + z1};
+  };
+  rlCheckRenderBatchLimit(segs * 2);
+  rlBegin(RL_LINES);
+  Vector3 prev = pt(0);
+  for (int i = 1; i <= segs; ++i) {
+    const Vector3 cur = pt(i);
+    rlColor4ub(col.r, col.g, col.b, col.a);
+    rlVertex3f(prev.x, prev.y, prev.z);
+    rlVertex3f(cur.x, cur.y, cur.z);
+    prev = cur;
+  }
+  rlEnd();
+}
+
+void PaintSatellite3D(const Vector3& center, float scale, float tangentX, float tangentZ,
+                      const Palette& p, float beaconPulse) {
+  const float tLen = std::hypot(tangentX, tangentZ);
+  const float fx = tLen > 1e-4f ? tangentX / tLen : 1.0f;
+  const float fz = tLen > 1e-4f ? tangentZ / tLen : 0.0f;
+  const float rx = -fz;
+  const float rz = fx;
+  // Tiny spacecraft bus + twin angled solar wings + antenna beacon
+  const Vector3 busSize{scale * 0.85f, scale * 0.72f, scale * 0.85f};
+  DrawCube(center, busSize.x, busSize.y, busSize.z, ChartLift(ToRay(p.coffeeLight), 0.15f));
+  DrawCubeWires(center, busSize.x, busSize.y, busSize.z, ToRay(p.coffeeDark));
+
+  const ::Color wingCol{66, 98, 138, 255};
+  const ::Color wingEdge{42, 64, 92, 255};
+  const float wOff = scale * 1.35f;
+  const float wSpan = scale * 1.45f;
+  const float wChord = scale * 0.62f;
+  const float wTilt = scale * 0.24f;
+  rlDisableBackfaceCulling();
+  rlCheckRenderBatchLimit(12);
+  rlBegin(RL_TRIANGLES);
+  for (const float side : {-1.0f, 1.0f}) {
+    const Vector3 inner{center.x + rx * side * (scale * 0.45f), center.y,
+                        center.z + rz * side * (scale * 0.45f)};
+    const Vector3 outer{center.x + rx * side * (wOff + wSpan * 0.5f), center.y + wTilt * 0.35f,
+                        center.z + rz * side * (wOff + wSpan * 0.5f)};
+    const Vector3 a{inner.x - fx * wChord, inner.y - wTilt, inner.z - fz * wChord};
+    const Vector3 b{inner.x + fx * wChord, inner.y + wTilt, inner.z + fz * wChord};
+    const Vector3 c{outer.x + fx * wChord, outer.y + wTilt, outer.z + fz * wChord};
+    const Vector3 d{outer.x - fx * wChord, outer.y - wTilt, outer.z - fz * wChord};
+    rlColor4ub(wingCol.r, wingCol.g, wingCol.b, 255);
+    rlVertex3f(a.x, a.y, a.z); rlVertex3f(b.x, b.y, b.z); rlVertex3f(c.x, c.y, c.z);
+    rlVertex3f(a.x, a.y, a.z); rlVertex3f(c.x, c.y, c.z); rlVertex3f(d.x, d.y, d.z);
+  }
+  rlEnd();
+  rlEnableBackfaceCulling();
+
+  DrawLine3D(Vector3{center.x - rx * (wOff + wSpan * 0.5f), center.y,
+                     center.z - rz * (wOff + wSpan * 0.5f)},
+             Vector3{center.x + rx * (wOff + wSpan * 0.5f), center.y,
+                     center.z + rz * (wOff + wSpan * 0.5f)},
+             wingEdge);
+  const Vector3 tip{center.x, center.y + scale * 1.15f, center.z};
+  DrawLine3D(center, tip, ToRay(p.coffeeDark));
+  PaintTranslucentSphere3D(tip, scale * 0.28f, 4, 6,
+                           Fade(ToRay(p.terracotta), 0.35f + 0.65f * beaconPulse));
+}
+
+void PaintStation3D(const Vector3& center, float scale, float yawRad,
+                    const Palette& p, float alpha, float beaconOpacity) {
+  const float cs = std::cos(yawRad), sn = std::sin(yawRad);
+  const ::Color hub = ChartFade(ToRay(p.coffee), alpha);
+  const ::Color trim = ChartFade(ToRay(p.coffeeLight), alpha);
+  const ::Color dark = ChartFade(ToRay(p.coffeeDark), alpha);
+  PaintShadedSphere3D(center, scale * 0.52f, 6, 10, hub,
+                      Vector3{-0.4f, 0.75f, 0.5f}, false, 0, 7u, p, alpha);
+  // Equatorial orbital ring + twin orthogonal truss arms + antenna mast
+  PaintRing3D(center, scale * 0.72f, scale * 0.94f, 0.0f, 0.0f, 16, trim);
+  const float arm = scale * 1.55f;
+  DrawLine3D(Vector3{center.x - arm * cs, center.y, center.z - arm * sn},
+             Vector3{center.x + arm * cs, center.y, center.z + arm * sn}, dark);
+  DrawLine3D(Vector3{center.x + arm * sn, center.y, center.z - arm * cs},
+             Vector3{center.x - arm * sn, center.y, center.z + arm * cs}, dark);
+  const Vector3 mastTop{center.x, center.y + scale * 1.85f, center.z};
+  DrawLine3D(center, mastTop, trim);
+  PaintTranslucentSphere3D(mastTop, scale * 0.26f, 5, 6,
+                           ChartFade(ToRay(p.terracotta), beaconOpacity * alpha));
+}
+
 }  // namespace
 
 void ShellView::EnsureNavScreen(const Simulation& sim) {
@@ -2596,100 +3551,94 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   const float clipMinY = box.y - 18.0f;
   const float clipMaxY = box.Bottom() + 18.0f;
 
+  const ::Color kPlayerBeaconRed{220, 38, 38, 255};
+  const bool reduced = sim.State().reducedMotion;
+  const float tSec = reduced ? 0.0f : static_cast<float>(frameTimeMs_ * 0.001);
+  navFxTick_ = reduced ? 0.0 : frameTimeMs_ / 60.0;
+  const NavFxFrame liveFx = BuildNavFx(sim, navFxTick_, reduced);
+
   PaintChamferBoxRay(box, kChamferPanel, ToRay(p.chart),
                        ToRay(p.borderDark), ToRay(p.border));
 
-  BeginScissorMode(static_cast<int>(box.x + kDoubleInset),
-                   static_cast<int>(box.y + kDoubleInset - contentScroll_),
-                   std::max(0, static_cast<int>(box.w - 2.0f * kDoubleInset)),
-                   std::max(0, static_cast<int>(box.h - 2.0f * kDoubleInset)));
-
-  // The rungs: depth lines across the chart, faint far, solid near.
-  for (const NavRasterRung& rung : raster.rungs) {
-    const int y = static_cast<int>(box.y + static_cast<float>(rung.y) * sy);
-    DrawRectangle(static_cast<int>(box.x), y, static_cast<int>(box.w), 1,
-                  Fade(ToRay(p.ink), static_cast<float>(rung.alpha)));
-  }
-  // The fan: hairlines converging on a point held above the top edge.
-  for (const NavRasterLine& line : raster.lines) {
-    const double pi = 3.14159265358979323846;
-    const double rad = line.angle * pi / 180.0;
-    const double dx = std::cos(rad);
-    const double dy = std::sin(rad);
-    const float x1 = box.x + static_cast<float>(raster.vx - dx * 4000) * sx;
-    const float y1 = box.y + static_cast<float>(raster.vy - dy * 4000) * sy;
-    const float x2 = box.x + static_cast<float>(raster.vx + dx * 4000) * sx;
-    const float y2 = box.y + static_cast<float>(raster.vy + dy * 4000) * sy;
-    DrawLineEx(Vector2{x1, y1}, Vector2{x2, y2}, 0.5f, Fade(ToRay(p.ink), 0.10f));
-  }
-
-  // Deep field stars, frustum-culled to the chart viewport.
-  const float starPx = std::clamp(sx, 1.0f, 2.0f);
-  for (const NavDot& dot : chart.clusters) {
-    const float px = box.x + static_cast<float>(dot.x) * sx;
-    const float py = box.y + static_cast<float>(dot.y) * sy;
-    if (px < clipMinX || px > clipMaxX || py < clipMinY || py > clipMaxY) { continue; }
-    if (dot.cls.find("bright") != std::string::npos) {
-      DrawCircleV(Vector2{px, py}, starPx + 1.7f, Fade(ToRay(p.amber), 0.22f));
-      DrawCircleV(Vector2{px, py}, std::max(1.0f, starPx * 0.8f), ToRay(p.coffee));
-    } else {
-      const int size = static_cast<int>(std::ceil(starPx * 0.75f));
-      DrawRectangle(static_cast<int>(px), static_cast<int>(py), size, size, ToRay(p.muted));
-    }
-  }
-  for (const NavDot& dot : chart.routes) {
-    const float px = box.x + static_cast<float>(dot.x) * sx;
-    const float py = box.y + static_cast<float>(dot.y) * sy;
-    if (px < clipMinX || px > clipMaxX || py < clipMinY || py > clipMaxY) { continue; }
-    Color ink = Fade(ToRay(p.coffee), 0.8f);
-    int size = 2;
-    if (dot.cls.find("faint") != std::string::npos) { ink = Fade(ToRay(p.coffeeLight), 0.55f); }
-    if (dot.cls.find("sel") != std::string::npos) { ink = ToRay(p.sage); }
-    // A trade trail is the one route the chart is asked about, so it is drawn in
-    // the game's own green (#7ec63f) and a pixel larger than the rest.
-    if (dot.cls.find("trade") != std::string::npos) {
-      ink = ::Color{126, 198, 63, 255};
-      size = 3;
-    }
-    DrawRectangle(static_cast<int>(px), static_cast<int>(py), size, size, ink);
-  }
-
-  // Sector territory contours & region map on Layer 2 ("sector").
+  struct ProjectedBody {
+    Vector3 worldPos{};
+    Vector2 docPos{};
+    float ndcZ = 0.0f;
+    float screenR = 6.0f;
+    bool onScreen = false;
+  };
   struct SectorTerritory {
     std::string id;
     std::string name;
-    float cx = 0.0f;
-    float cy = 0.0f;
+    Vector3 worldCenter{};
     float rx = 0.0f;
-    float ry = 0.0f;
+    float rz = 0.0f;
     ::Color tint{};
     bool active = false;
   };
   std::vector<SectorTerritory> sectorTerritories;
+  std::unordered_map<std::string, Vector3> worldAllById;
+  worldAllById.reserve(chart.bodies.size() * 2);
+
+  const float tableHalfD = 3.15f;
+  const float tableHalfW = tableHalfD * (box.w / std::max(1.0f, box.h));
+  const float invRasterW = 1.0f / static_cast<float>(raster.width == 0 ? 1.0 : raster.width);
+  const float invRasterH = 1.0f / static_cast<float>(raster.height == 0 ? 1.0 : raster.height);
+  auto chartToXZ = [&](double cx, double cy) -> std::pair<float, float> {
+    const float nx = (static_cast<float>(cx) * invRasterW - 0.5f) * 2.0f;
+    const float nz = (static_cast<float>(cy) * invRasterH - 0.5f) * 2.0f;
+    return {nx * tableHalfW, nz * tableHalfD};
+  };
+
+  // Locate primary system star (if any) for real directional planetary lighting and orbit rings.
+  Vector3 systemStarPos{-tableHalfW * 0.6f, 2.5f, -tableHalfD * 0.6f};
+  bool hasPointStarLight = false;
+  for (const NavBodyView& body : chart.bodies) {
+    const auto xz = chartToXZ(body.at.x, body.at.y);
+    const float wy = NavBodyWorldY(body, chart.layer);
+    const Vector3 wp{xz.first, wy, xz.second};
+    worldAllById.emplace(body.id, wp);
+    if (chart.layer == "system" && body.type == "star" && !hasPointStarLight) {
+      systemStarPos = wp;
+      hasPointStarLight = true;
+    }
+  }
+
+  // Visible bodies inside generous 3D horizon margin around the chart table.
+  std::vector<const NavBodyView*> ordered;
+  ordered.reserve(chart.bodies.size());
+  for (const NavBodyView& body : chart.bodies) {
+    const float nx = (static_cast<float>(body.at.x) * invRasterW - 0.5f) * 2.0f;
+    const float nz = (static_cast<float>(body.at.y) * invRasterH - 0.5f) * 2.0f;
+    if (std::fabs(nx) > 1.55f || std::fabs(nz) > 1.55f) { continue; }
+    ordered.push_back(&body);
+  }
+  std::stable_sort(ordered.begin(), ordered.end(),
+                   [](const NavBodyView* a, const NavBodyView* b) {
+                     return ChartPaintRank(ChartLookOf(*a)) < ChartPaintRank(ChartLookOf(*b));
+                   });
+
   if (chart.layer == "sector") {
     static constexpr ::Color kSectorPalette[6] = {
-        ::Color{146, 98, 42, 255},   // ochre-amber
-        ::Color{62, 108, 142, 255},  // slate-cobalt
-        ::Color{74, 122, 84, 255},   // sage-jade
-        ::Color{154, 78, 68, 255},   // terracotta-rose
-        ::Color{110, 84, 138, 255},  // plum-indigo
-        ::Color{56, 124, 118, 255},  // deep-teal
+        ::Color{146, 98, 42, 255},   ::Color{62, 108, 142, 255},
+        ::Color{74, 122, 84, 255},   ::Color{154, 78, 68, 255},
+        ::Color{110, 84, 138, 255},  ::Color{56, 124, 118, 255},
     };
     struct BoundsAcc {
-      float minX = 1e9f, maxX = -1e9f, minY = 1e9f, maxY = -1e9f;
+      float minX = 1e9f, maxX = -1e9f, minZ = 1e9f, maxZ = -1e9f;
       int count = 0;
     };
     std::unordered_map<std::string, BoundsAcc> boundsByRegion;
     boundsByRegion.reserve(sim.World().regions.size() * 2);
     for (const NavBodyView& body : chart.bodies) {
       if (body.region.empty()) { continue; }
-      const float bx = box.x + static_cast<float>(body.at.x) * sx;
-      const float by = box.y + static_cast<float>(body.at.y) * sy;
+      const auto itPos = worldAllById.find(body.id);
+      if (itPos == worldAllById.end()) { continue; }
       BoundsAcc& acc = boundsByRegion[body.region];
-      acc.minX = std::min(acc.minX, bx);
-      acc.maxX = std::max(acc.maxX, bx);
-      acc.minY = std::min(acc.minY, by);
-      acc.maxY = std::max(acc.maxY, by);
+      acc.minX = std::min(acc.minX, itPos->second.x);
+      acc.maxX = std::max(acc.maxX, itPos->second.x);
+      acc.minZ = std::min(acc.minZ, itPos->second.z);
+      acc.maxZ = std::max(acc.maxZ, itPos->second.z);
       ++acc.count;
     }
     const Body* curSys = sim.CurrentSystem();
@@ -2697,136 +3646,620 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     sectorTerritories.reserve(sim.World().regions.size());
     for (std::size_t ri = 0; ri < sim.World().regions.size(); ++ri) {
       const Body& reg = sim.World().regions[ri];
-      auto it = boundsByRegion.find(reg.id);
+      const auto it = boundsByRegion.find(reg.id);
       if (it == boundsByRegion.end() || it->second.count == 0) { continue; }
-      const ::Color tint = kSectorPalette[ri % 6];
       const BoundsAcc& acc = it->second;
-      const float pad = std::clamp(18.0f * static_cast<float>(sim.Map().zoom * 0.55), 14.0f, 44.0f);
+      const float pad = std::clamp(0.32f * static_cast<float>(sim.Map().zoom * 0.55), 0.24f, 0.72f);
       SectorTerritory terr;
       terr.id = reg.id;
       terr.name = reg.name;
-      terr.cx = 0.5f * (acc.minX + acc.maxX);
-      terr.cy = 0.5f * (acc.minY + acc.maxY);
-      terr.rx = std::max(26.0f, 0.5f * (acc.maxX - acc.minX) + pad);
-      terr.ry = std::max(20.0f, 0.5f * (acc.maxY - acc.minY) + pad * 0.85f);
-      terr.tint = tint;
+      terr.worldCenter = Vector3{0.5f * (acc.minX + acc.maxX), 0.0f, 0.5f * (acc.minZ + acc.maxZ)};
+      terr.rx = std::max(0.45f, 0.5f * (acc.maxX - acc.minX) + pad);
+      terr.rz = std::max(0.35f, 0.5f * (acc.maxZ - acc.minZ) + pad * 0.85f);
+      terr.tint = kSectorPalette[ri % 6];
       terr.active = (reg.id == sim.Map().sector || reg.id == shipRegion);
       sectorTerritories.push_back(std::move(terr));
     }
   }
 
-  // Lane web on sector and galaxy layers with hash lookup and frustum culling.
-  if (chart.layer == "sector" || chart.layer == "galaxy") {
-    std::unordered_map<std::string, NavPoint> screenAt;
-    screenAt.reserve(chart.bodies.size() * 2);
-    for (const NavBodyView& body : chart.bodies) { screenAt.emplace(body.id, body.at); }
-    const std::vector<Lane>& lanes =
-        chart.layer == "sector" ? sim.World().sectorLanes : sim.World().galaxyLanes;
-    const std::string homeId = sim.HomeBody() == nullptr ? std::string() : sim.HomeBody()->id;
-    const std::string targetId = sim.State().navTarget.value_or(std::string());
-    for (const Lane& lane : lanes) {
-      const auto a = screenAt.find(lane.from);
-      const auto b = screenAt.find(lane.to);
-      if (a == screenAt.end() || b == screenAt.end()) { continue; }
-      const Vector2 from{box.x + static_cast<float>(a->second.x) * sx,
-                         box.y + static_cast<float>(a->second.y) * sy};
-      const Vector2 to{box.x + static_cast<float>(b->second.x) * sx,
-                       box.y + static_cast<float>(b->second.y) * sy};
-      if ((from.x < clipMinX && to.x < clipMinX) || (from.x > clipMaxX && to.x > clipMaxX) ||
-          (from.y < clipMinY && to.y < clipMinY) || (from.y > clipMaxY && to.y > clipMaxY)) {
+  std::unordered_map<std::string, ProjectedBody> projById;
+  projById.reserve(ordered.size() * 2);
+  Vector2 markerDocPos{};
+  bool markerOnScreen = false;
+
+  if (width_ > 1.0f && height_ > 1.0f) {
+    constexpr float kCamDist = 13.4f;
+    constexpr float kNavFovDeg = 32.0f;
+    constexpr double kZNear = 0.5;
+    constexpr double kZFar = 80.0;
+    const float yawRad = navOrbitYaw_ * DEG2RAD;
+    const float pitchRad = navOrbitPitch_ * DEG2RAD;
+    const float cosPitch = std::cos(pitchRad);
+    const Vector3 camPos{
+        kCamDist * cosPitch * std::sin(yawRad),
+        kCamDist * std::sin(pitchRad),
+        kCamDist * cosPitch * std::cos(yawRad),
+    };
+    const float fovRad = kNavFovDeg * DEG2RAD;
+    const float viewAspect = width_ / height_;
+    const float screenCX = box.x + box.w * 0.5f;
+    const float screenCY = box.y + box.h * 0.5f - contentScroll_;
+    const float ndcX = (2.0f * screenCX / width_) - 1.0f;
+    const float ndcY = 1.0f - (2.0f * screenCY / height_);
+
+    const double top0 = kZNear * std::tan(static_cast<double>(fovRad) * 0.5);
+    const double right0 = top0 * static_cast<double>(viewAspect);
+    const double shiftX = -static_cast<double>(ndcX) * right0;
+    const double shiftY = -static_cast<double>(ndcY) * top0;
+    const double fLeft = -right0 + shiftX;
+    const double fRight = right0 + shiftX;
+    const double fBottom = -top0 + shiftY;
+    const double fTop = top0 + shiftY;
+
+    Camera3D cam{};
+    cam.position = camPos;
+    cam.target = Vector3{0.0f, 0.0f, 0.0f};
+    cam.up = Vector3{0.0f, 1.0f, 0.0f};
+    cam.fovy = kNavFovDeg;
+    cam.projection = CAMERA_PERSPECTIVE;
+
+    const Matrix viewMat = BuildLookAtMatrix(cam.position, cam.target, cam.up);
+    const Matrix projMat = BuildOffAxisFrustumMatrix(fLeft, fRight, fBottom, fTop, kZNear, kZFar);
+    const Matrix mvp = MulColMajor(projMat, viewMat);
+
+    auto projectDoc = [&](const Vector3& wp, Vector2* outDoc, float* outNdcZ = nullptr) -> bool {
+      Vector2 sp{};
+      if (!ProjectWorld3D(wp, mvp, width_, height_, &sp, outNdcZ)) { return false; }
+      sp.y += contentScroll_;
+      if (outDoc != nullptr) { *outDoc = sp; }
+      return true;
+    };
+
+    // Camera right & up vectors for crisp 3D billboarded deep-field star sprites.
+    const Vector3 camRight{std::cos(yawRad), 0.0f, -std::sin(yawRad)};
+    const Vector3 camForward{-cosPitch * std::sin(yawRad), -std::sin(pitchRad),
+                             -cosPitch * std::cos(yawRad)};
+    const Vector3 camUp{
+        camRight.y * camForward.z - camRight.z * camForward.y,
+        camRight.z * camForward.x - camRight.x * camForward.z,
+        camRight.x * camForward.y - camRight.y * camForward.x,
+    };
+
+    EndMode2D();
+    BeginScissorMode(static_cast<int>(box.x + kDoubleInset),
+                     static_cast<int>(box.y + kDoubleInset - contentScroll_),
+                     std::max(0, static_cast<int>(box.w - 2.0f * kDoubleInset)),
+                     std::max(0, static_cast<int>(box.h - 2.0f * kDoubleInset)));
+    BeginMode3D(cam);
+    rlMatrixMode(RL_PROJECTION);
+    rlLoadIdentity();
+    rlFrustum(fLeft, fRight, fBottom, fTop, kZNear, kZFar);
+    rlMatrixMode(RL_MODELVIEW);
+    rlEnableDepthTest();
+    rlEnableBackfaceCulling();
+
+    // --- Pass A (DepthMask OFF): Hologram reference grid, orbits, lanes & starfield
+    rlDisableDepthMask();
+    {
+      const ::Color gridCol = Fade(ToRay(p.ink), 0.11f);
+      const ::Color axisCol = Fade(ToRay(p.ink), 0.19f);
+      const float gSpanW = tableHalfW * 1.18f;
+      const float gSpanD = tableHalfD * 1.18f;
+      rlBegin(RL_LINES);
+      for (int gx = -5; gx <= 5; ++gx) {
+        const float x = (static_cast<float>(gx) / 5.0f) * gSpanW;
+        const ::Color c = (gx == 0) ? axisCol : gridCol;
+        rlColor4ub(c.r, c.g, c.b, c.a);
+        rlVertex3f(x, 0.0f, -gSpanD);
+        rlVertex3f(x, 0.0f, gSpanD);
+      }
+      for (int gz = -3; gz <= 3; ++gz) {
+        const float z = (static_cast<float>(gz) / 3.0f) * gSpanD;
+        const ::Color c = (gz == 0) ? axisCol : gridCol;
+        rlColor4ub(c.r, c.g, c.b, c.a);
+        rlVertex3f(-gSpanW, 0.0f, z);
+        rlVertex3f(gSpanW, 0.0f, z);
+      }
+      rlEnd();
+
+      const ::Color ringGridCol = Fade(ToRay(p.ink), 0.13f);
+      for (const float rad : {1.2f, 2.4f, 3.6f, 5.0f}) {
+        PaintOrbitTrack3D(Vector3{0.0f, 0.0f, 0.0f}, rad, rad, 0.0f, 0.0f, 44, ringGridCol);
+      }
+
+      if (chart.layer == "system" && hasPointStarLight) {
+        const ::Color orbCol = Fade(ToRay(p.coffeeLight), 0.24f);
+        for (const NavBodyView* body : ordered) {
+          if (body->type != "planet" && body->type != "belt" && body->type != "station") {
+            continue;
+          }
+          const auto itP = worldAllById.find(body->id);
+          if (itP == worldAllById.end()) { continue; }
+          const float dx = itP->second.x - systemStarPos.x;
+          const float dz = itP->second.z - systemStarPos.z;
+          const float rOrb = std::hypot(dx, dz);
+          if (rOrb > 0.25f && rOrb < tableHalfW * 2.2f) {
+            const float tilt = std::clamp(itP->second.y / rOrb, -0.22f, 0.22f);
+            PaintOrbitTrack3D(Vector3{systemStarPos.x, systemStarPos.y, systemStarPos.z},
+                              rOrb, rOrb, tilt * 0.45f, -tilt * 0.35f, 40, orbCol);
+          }
+        }
+      }
+
+      if (chart.layer == "sector") {
+        for (const SectorTerritory& terr : sectorTerritories) {
+          PaintOrbitTrack3D(terr.worldCenter, terr.rx, terr.rz, 0.0f, 0.0f, 36,
+                            Fade(terr.tint, terr.active ? 0.48f : 0.24f));
+        }
+      }
+
+      if (chart.layer == "sector" || chart.layer == "galaxy") {
+        const std::vector<Lane>& lanes =
+            chart.layer == "sector" ? sim.World().sectorLanes : sim.World().galaxyLanes;
+        const std::string homeId = sim.HomeBody() == nullptr ? std::string() : sim.HomeBody()->id;
+        const std::string targetId = sim.State().navTarget.value_or(std::string());
+        for (const Lane& lane : lanes) {
+          const auto a = worldAllById.find(lane.from);
+          const auto b = worldAllById.find(lane.to);
+          if (a == worldAllById.end() || b == worldAllById.end()) { continue; }
+          const bool lit = lane.from == homeId || lane.to == homeId || lane.from == targetId ||
+                           lane.to == targetId;
+          const ::Color laneCol = lit ? Fade(ToRay(p.coffee), 0.62f)
+                                      : Fade(ToRay(p.coffee), 0.20f);
+          const float dist = std::hypot(b->second.x - a->second.x, b->second.z - a->second.z);
+          const float archH = std::min(0.45f, dist * 0.12f);
+          constexpr int kSegs = 6;
+          rlCheckRenderBatchLimit(kSegs * 2);
+          rlBegin(RL_LINES);
+          Vector3 prev = a->second;
+          for (int s = 1; s <= kSegs; ++s) {
+            const float u = static_cast<float>(s) / static_cast<float>(kSegs);
+            const float arc = 4.0f * u * (1.0f - u) * archH;
+            const Vector3 cur{
+                a->second.x + (b->second.x - a->second.x) * u,
+                a->second.y + (b->second.y - a->second.y) * u + arc,
+                a->second.z + (b->second.z - a->second.z) * u,
+            };
+            rlColor4ub(laneCol.r, laneCol.g, laneCol.b, laneCol.a);
+            rlVertex3f(prev.x, prev.y, prev.z);
+            rlVertex3f(cur.x, cur.y, cur.z);
+            prev = cur;
+          }
+          rlEnd();
+        }
+      }
+
+      // 3D Starfield clusters (distributed in depth across Y for crisp orbital parallax)
+      const ::Color amberCol = ToRay(p.amber);
+      const ::Color coffeeCol = ToRay(p.coffee);
+      const ::Color mutedCol = ToRay(p.muted);
+      rlDisableBackfaceCulling();
+      rlBegin(RL_TRIANGLES);
+      for (std::size_t ci = 0; ci < chart.clusters.size(); ++ci) {
+        const NavDot& dot = chart.clusters[ci];
+        const auto xz = chartToXZ(dot.x, dot.y);
+        const bool isRegionCloud = (dot.cls == "cdot");
+        const float hHash = static_cast<float>((ci * 2654435761u) % 2001u) / 1000.0f - 1.0f;
+        const float wy = isRegionCloud ? hHash * 0.42f : hHash * 2.35f;
+        const Vector3 sc{xz.first, wy, xz.second};
+        const bool bright = dot.cls.find("bright") != std::string::npos;
+        const float sz = bright ? 0.014f : (isRegionCloud ? 0.011f : 0.008f);
+        const ::Color c = bright ? Fade(coffeeCol, 0.85f)
+                                 : (isRegionCloud ? Fade(amberCol, 0.62f) : Fade(mutedCol, 0.55f));
+        rlCheckRenderBatchLimit(bright ? 12 : 6);
+        const auto emitQuad = [&](float r, const ::Color& qc) {
+          const Vector3 rx{camRight.x * r, camRight.y * r, camRight.z * r};
+          const Vector3 uy{camUp.x * r, camUp.y * r, camUp.z * r};
+          const Vector3 v0{sc.x - rx.x - uy.x, sc.y - rx.y - uy.y, sc.z - rx.z - uy.z};
+          const Vector3 v1{sc.x + rx.x - uy.x, sc.y + rx.y - uy.y, sc.z + rx.z - uy.z};
+          const Vector3 v2{sc.x + rx.x + uy.x, sc.y + rx.y + uy.y, sc.z + rx.z + uy.z};
+          const Vector3 v3{sc.x - rx.x + uy.x, sc.y - rx.y + uy.y, sc.z - rx.z + uy.z};
+          rlColor4ub(qc.r, qc.g, qc.b, qc.a);
+          rlVertex3f(v0.x, v0.y, v0.z); rlVertex3f(v1.x, v1.y, v1.z); rlVertex3f(v2.x, v2.y, v2.z);
+          rlColor4ub(qc.r, qc.g, qc.b, qc.a);
+          rlVertex3f(v0.x, v0.y, v0.z); rlVertex3f(v2.x, v2.y, v2.z); rlVertex3f(v3.x, v3.y, v3.z);
+        };
+        if (bright) { emitQuad(sz * 1.9f, Fade(amberCol, 0.24f)); }
+        emitQuad(sz, c);
+      }
+      rlEnd();
+      rlEnableBackfaceCulling();
+    }
+
+    // --- Pass B (DepthMask ON): Drop-stems, lit 3D worlds, stations, satellites & asteroids
+    rlDrawRenderBatchActive();
+    rlEnableDepthMask();
+
+    const Vector3 fallbackKey{-0.45f, 0.75f, 0.50f};
+    const float tableScale = std::clamp(bodyScale, 0.65f, 1.55f);
+    const bool compactGalaxyStars = (chart.layer == "galaxy");
+
+    for (const NavBodyView* body : ordered) {
+      const auto itW = worldAllById.find(body->id);
+      if (itW == worldAllById.end()) { continue; }
+      const Vector3 wp = itW->second;
+      const ChartLook look = ChartLookOf(*body);
+      const float r3 = NavBodyScale3D(*body, tableScale, chart.layer);
+      const unsigned seed = ChartSeed(body->id);
+
+      float alpha = body->inRange || body->here ? 1.0f : 0.78f;
+      if (chart.layer == "sector" && !body->region.empty() && !sim.Map().sector.empty() &&
+          body->region != sim.Map().sector) {
+        alpha = std::min(alpha, 0.86f);
+      }
+
+      // Drop-stem + ecliptic footprint tick for elevated bodies (makes 3D depth unmistakable)
+      if (std::fabs(wp.y) > 0.03f &&
+          !(compactGalaxyStars && body->type == "system" && !body->selected && !body->here)) {
+        const ::Color stemCol = Fade(ToRay(p.coffee), 0.34f * alpha);
+        DrawLine3D(wp, Vector3{wp.x, 0.0f, wp.z}, stemCol);
+        const float tick = std::min(0.055f, r3 * 0.48f);
+        DrawLine3D(Vector3{wp.x - tick, 0.0f, wp.z}, Vector3{wp.x + tick, 0.0f, wp.z}, stemCol);
+        DrawLine3D(Vector3{wp.x, 0.0f, wp.z - tick}, Vector3{wp.x, 0.0f, wp.z + tick}, stemCol);
+      }
+
+      const Vector3 lightRef = (chart.layer == "system" && hasPointStarLight && look != ChartLook::Star)
+                                   ? systemStarPos
+                                   : fallbackKey;
+      const bool pointLight = (chart.layer == "system" && hasPointStarLight && look != ChartLook::Star);
+
+      if (compactGalaxyStars && body->type == "system" && !body->selected && !body->here) {
+        PaintShadedSphere3D(wp, r3 * 0.44f, 4, 6, ToRay(p.amber),
+                            fallbackKey, false, 5, seed, p, 0.76f * alpha);
+      } else {
+        switch (look) {
+          case ChartLook::Star:
+            PaintShadedSphere3D(wp, r3 * 0.92f, 8, 14, ToRay(p.amber),
+                                fallbackKey, false, 5, seed, p, alpha);
+            break;
+          case ChartLook::System:
+            PaintShadedSphere3D(wp, r3 * 0.64f, 6, 10, ToRay(p.amber),
+                                fallbackKey, false, 5, seed, p, alpha);
+            PaintOrbitTrack3D(wp, r3 * 1.15f, r3 * 1.15f, 0.18f, 0.12f, 18,
+                              Fade(ToRay(p.coffeeLight), 0.36f * alpha));
+            break;
+          case ChartLook::Gas: {
+            const ::Color gasCol = ChartLift(ToRay(p.amber), 0.38f);
+            PaintShadedSphere3D(wp, r3, 8, 14, gasCol, lightRef, pointLight, 1, seed, p, alpha);
+            const float ringTiltX = 0.42f + static_cast<float>(seed % 7u) * 0.04f;
+            const float ringTiltZ = -0.22f + static_cast<float>((seed / 7u) % 5u) * 0.06f;
+            PaintRing3D(wp, r3 * 1.38f, r3 * 1.72f, ringTiltX, ringTiltZ, 28,
+                        ChartFade(ChartLift(ToRay(p.coffeeLight), 0.25f), 0.78f * alpha));
+            PaintRing3D(wp, r3 * 1.82f, r3 * 2.08f, ringTiltX, ringTiltZ, 28,
+                        ChartFade(ToRay(p.coffeeLight), 0.48f * alpha));
+            break;
+          }
+          case ChartLook::Ice:
+            PaintShadedSphere3D(wp, r3, 8, 14, ChartMix(ToRay(p.white), ToRay(p.sage), 0.28f),
+                                lightRef, pointLight, 2, seed, p, alpha);
+            break;
+          case ChartLook::Ocean:
+            PaintShadedSphere3D(wp, r3, 8, 14, ChartMix(ToRay(p.sage), ToRay(p.coffeeDark), 0.18f),
+                                lightRef, pointLight, 3, seed, p, alpha);
+            break;
+          case ChartLook::Rock:
+            PaintShadedSphere3D(wp, r3, 8, 14, ChartMix(ToRay(p.coffee), ToRay(p.terracotta), 0.34f),
+                                lightRef, pointLight, 4, seed, p, alpha);
+            break;
+          case ChartLook::Moon:
+            PaintShadedSphere3D(wp, r3, 6, 10, ChartLift(ToRay(p.muted), 0.38f),
+                                lightRef, pointLight, 4, seed, p, alpha);
+            break;
+          case ChartLook::Station: {
+            const float spin = tSec * 0.28f + static_cast<float>(seed % 100u) * 0.06f;
+            const float beaconOp = (liveFx.hasStation && body->id == liveFx.stationId)
+                                       ? static_cast<float>(liveFx.beaconOpacity)
+                                       : (reduced ? 1.0f : (0.35f + 0.65f * (0.5f + 0.5f * std::sin(tSec * 4.5f))));
+            PaintStation3D(wp, r3, spin, p, alpha, beaconOp);
+
+            // Orbiting 3D telemetry satellites flying continuously around every station
+            const float satOrbitR = r3 * 2.65f;
+            const float satAngle = tSec * 0.85f + static_cast<float>(seed % 31u) * 0.2f;
+            const float satTiltX = 0.32f + static_cast<float>(seed % 5u) * 0.10f;
+            const float satTiltZ = -0.25f;
+            PaintOrbitTrack3D(wp, satOrbitR, satOrbitR * 0.88f, satTiltX, satTiltZ, 28,
+                              Fade(ToRay(p.coffeeLight), 0.42f * alpha));
+            const float lx = std::cos(satAngle) * satOrbitR;
+            const float lz = std::sin(satAngle) * satOrbitR * 0.88f;
+            const float cxT = std::cos(satTiltX), sxT = std::sin(satTiltX);
+            const float czT = std::cos(satTiltZ), szT = std::sin(satTiltZ);
+            const float ly1 = -lz * sxT, lz1 = lz * cxT;
+            const Vector3 satPos{wp.x + (lx * czT - ly1 * szT),
+                                 wp.y + (lx * szT + ly1 * czT),
+                                 wp.z + lz1};
+            const float tx = -std::sin(satAngle);
+            const float tz = std::cos(satAngle) * 0.88f;
+            PaintSatellite3D(satPos, r3 * 0.44f, tx, tz, p,
+                             reduced ? 1.0f : (0.5f + 0.5f * std::sin(tSec * 6.0f + satAngle)));
+            break;
+          }
+          case ChartLook::Site: {
+            const float spin = tSec * 0.75f + static_cast<float>(seed % 17u);
+            PaintAsteroid3D(wp, r3 * 0.68f, 0.35f, spin, 0.2f, ToRay(p.terracotta),
+                            fallbackKey, seed);
+            PaintOrbitTrack3D(wp, r3 * 1.25f, r3 * 1.25f, 0.5f, 0.0f, 18,
+                              Fade(ToRay(p.terracotta), 0.55f * alpha));
+            break;
+          }
+          case ChartLook::Belt: {
+            const ::Color beltCol = ChartMix(ToRay(p.coffeeLight), ToRay(p.coffeeDark), 0.25f);
+            PaintOrbitTrack3D(wp, r3 * 1.7f, r3 * 1.15f, 0.22f, -0.15f, 24,
+                              Fade(beltCol, 0.42f * alpha));
+            for (int bi = 0; bi < 6; ++bi) {
+              const float a = static_cast<float>(bi) / 6.0f * 2.0f * PI + tSec * 0.22f;
+              const Vector3 bp{
+                  wp.x + std::cos(a) * r3 * 1.65f,
+                  wp.y + std::sin(a * 2.0f) * r3 * 0.28f,
+                  wp.z + std::sin(a) * r3 * 1.12f,
+              };
+              PaintAsteroid3D(bp, r3 * (0.20f + 0.04f * static_cast<float>(bi % 3)),
+                              a * 1.7f, a * 2.3f, a * 0.9f, beltCol, lightRef,
+                              seed + static_cast<unsigned>(bi) * 97u);
+            }
+            break;
+          }
+          case ChartLook::Region:
+            PaintShadedSphere3D(wp, r3 * 0.50f, 6, 10, ToRay(p.amber),
+                                fallbackKey, false, 5, seed, p, alpha);
+            PaintOrbitTrack3D(wp, r3 * 1.35f, r3 * 1.35f, 0.12f, -0.10f, 24,
+                              Fade(ToRay(p.coffeeLight), 0.52f * alpha));
+            for (int ri = 0; ri < 7; ++ri) {
+              const float a = 0.8975979f * static_cast<float>(ri + 1) + tSec * 0.09f;
+              const float reach = r3 * (1.25f + 0.22f * static_cast<float>(ri % 3));
+              const Vector3 rp{
+                  wp.x + std::cos(a) * reach,
+                  wp.y + std::sin(a * 1.7f) * r3 * 0.36f,
+                  wp.z + std::sin(a) * reach * 0.72f,
+              };
+              PaintShadedSphere3D(rp, r3 * 0.16f, 4, 6, ToRay(p.coffeeLight),
+                                  fallbackKey, false, 5, seed + static_cast<unsigned>(ri), p, alpha);
+            }
+            break;
+          case ChartLook::Origin:
+            PaintShadedSphere3D(wp, r3 * 0.72f, 6, 10, ToRay(p.sage),
+                                fallbackKey, false, 0, seed, p, alpha);
+            PaintOrbitTrack3D(wp, r3 * 1.55f, r3 * 1.55f, 0.0f, 0.0f, 24,
+                              Fade(ToRay(p.sage), 0.65f * alpha));
+            break;
+        }
+      }
+
+      ProjectedBody pb;
+      pb.worldPos = wp;
+      pb.onScreen = projectDoc(wp, &pb.docPos, &pb.ndcZ);
+      Vector3 edgePos{wp.x + camRight.x * r3, wp.y + camRight.y * r3, wp.z + camRight.z * r3};
+      Vector2 edgeDoc{};
+      if (pb.onScreen && projectDoc(edgePos, &edgeDoc)) {
+        pb.screenR = std::max(4.5f, std::hypot(edgeDoc.x - pb.docPos.x, edgeDoc.y - pb.docPos.y));
+      } else {
+        pb.screenR = std::max(4.5f, ChartMinimumRadius(look, bodyScale));
+      }
+      projById.emplace(body->id, pb);
+    }
+
+    // --- Live Flying 3D Asteroids & Deep-System Survey Satellite (System scale) ---
+    if (chart.layer == "system") {
+      const ::Color rockCol = ChartMix(ToRay(p.coffee), ToRay(p.coffeeDark), 0.24f);
+      for (std::size_t ri = 0; ri < liveFx.rocks.size(); ++ri) {
+        const NavFxRock& rock = liveFx.rocks[ri];
+        const auto xz = chartToXZ(rock.at.x, rock.at.y);
+        const float hHash = static_cast<float>((ri * 1337u + 17u) % 200u) / 100.0f - 1.0f;
+        const float wy = hHash * 0.56f + 0.06f * std::sin(tSec * 0.6f + static_cast<float>(ri));
+        const Vector3 rp{xz.first, wy, xz.second};
+        const float rad = 0.036f + 0.013f * static_cast<float>(rock.size);
+        const float tumble = tSec * (0.9f + 0.35f * static_cast<float>(ri % 4));
+        PaintAsteroid3D(rp, rad, tumble * 0.8f, tumble * 1.2f, tumble * 0.5f,
+                        rockCol, fallbackKey, 4242u + static_cast<unsigned>(ri) * 131u);
+        // Subtle dust wake trailing behind moving asteroid
+        const float wakeLen = std::clamp(static_cast<float>(rock.vx) * 0.85f, 0.10f, 0.28f);
+        DrawLine3D(rp, Vector3{rp.x - wakeLen, rp.y, rp.z},
+                   Fade(ToRay(p.coffeeLight), 0.42f));
+      }
+
+      // Free-roaming reconnaissance satellite orbiting around system center / local star
+      if (hasPointStarLight) {
+        const float probeR = 1.45f;
+        const float probeAng = tSec * 0.34f + 1.1f;
+        const Vector3 probePos{
+            systemStarPos.x + std::cos(probeAng) * probeR,
+            systemStarPos.y + std::sin(probeAng) * 0.38f,
+            systemStarPos.z + std::sin(probeAng) * probeR * 0.82f,
+        };
+        PaintOrbitTrack3D(systemStarPos, probeR, probeR * 0.82f, 0.26f, 0.0f, 36,
+                          Fade(ToRay(p.coffeeLight), 0.22f));
+        PaintSatellite3D(probePos, 0.048f, -std::sin(probeAng), std::cos(probeAng) * 0.82f,
+                         p, reduced ? 1.0f : (0.5f + 0.5f * std::sin(tSec * 5.0f)));
+      }
+    } else if (!reduced && (chart.layer == "sector" || chart.layer == "galaxy")) {
+      // Live 3D courier traffic blips cruising along hyperspace lanes
+      const std::vector<Lane>& lanes =
+          chart.layer == "sector" ? sim.World().sectorLanes : sim.World().galaxyLanes;
+      const std::string homeId = sim.HomeBody() == nullptr ? std::string() : sim.HomeBody()->id;
+      int courierCount = 0;
+      for (std::size_t li = 0; li < lanes.size() && courierCount < 14; ++li) {
+        const Lane& lane = lanes[li];
+        const bool lit = (lane.from == homeId || lane.to == homeId);
+        if (!lit && (li % 5 != 0)) { continue; }
+        const auto a = worldAllById.find(lane.from);
+        const auto b = worldAllById.find(lane.to);
+        if (a == worldAllById.end() || b == worldAllById.end()) { continue; }
+        const float dist = std::hypot(b->second.x - a->second.x, b->second.z - a->second.z);
+        const float archH = std::min(0.45f, dist * 0.12f);
+        const float u = std::fmod(tSec * (0.11f + 0.02f * static_cast<float>(li % 3)) +
+                                      static_cast<float>(li) * 0.23f,
+                                  1.0f);
+        const float arc = 4.0f * u * (1.0f - u) * archH;
+        const Vector3 cp{
+            a->second.x + (b->second.x - a->second.x) * u,
+            a->second.y + (b->second.y - a->second.y) * u + arc,
+            a->second.z + (b->second.z - a->second.z) * u,
+        };
+        PaintTranslucentSphere3D(cp, lit ? 0.024f : 0.017f, 4, 6,
+                                 lit ? ToRay(p.sage) : ToRay(p.amber));
+        ++courierCount;
+      }
+    }
+
+    // 3D Route trajectory dots
+    for (std::size_t ri = 0; ri < chart.routes.size(); ++ri) {
+      const NavDot& dot = chart.routes[ri];
+      const auto xz = chartToXZ(dot.x, dot.y);
+      const float frac = chart.routes.size() > 1
+                             ? static_cast<float>(ri) / static_cast<float>(chart.routes.size() - 1)
+                             : 0.5f;
+      const float archY = 0.08f + 0.22f * 4.0f * frac * (1.0f - frac);
+      Color ink = Fade(ToRay(p.coffee), 0.78f);
+      float sz = 0.0085f;
+      if (dot.cls.find("faint") != std::string::npos) {
+        ink = Fade(ToRay(p.coffeeLight), 0.55f);
+        sz = 0.0070f;
+      }
+      if (dot.cls.find("sel") != std::string::npos) {
+        ink = ToRay(p.sage);
+        sz = 0.0115f;
+      }
+      if (dot.cls.find("trade") != std::string::npos) {
+        ink = ::Color{126, 198, 63, 255};
+        sz = 0.0145f;
+      }
+      PaintTranslucentSphere3D(Vector3{xz.first, archY, xz.second}, sz, 4, 6, ink);
+    }
+
+    // 3D Ship marker elevation & ring
+    Vector3 markerWorld{};
+    if (chart.hasMarker) {
+      const auto mxz = chartToXZ(chart.marker.x, chart.marker.y);
+      float my = 0.05f;
+      if (sim.HomeBody() != nullptr) {
+        const auto itHome = worldAllById.find(sim.HomeBody()->id);
+        if (itHome != worldAllById.end()) { my = itHome->second.y; }
+      }
+      markerWorld = Vector3{mxz.first, my, mxz.second};
+      PaintOrbitTrack3D(markerWorld, 0.16f, 0.16f, 0.0f, 0.0f, 24,
+                        Fade(kPlayerBeaconRed, 0.85f));
+      if (std::fabs(my) > 0.02f) {
+        DrawLine3D(markerWorld, Vector3{markerWorld.x, 0.0f, markerWorld.z},
+                   Fade(kPlayerBeaconRed, 0.55f));
+      }
+      markerOnScreen = projectDoc(markerWorld, &markerDocPos);
+    }
+
+    // --- Pass C (DepthMask OFF): Soft luminous coronas, halos & star rays
+    rlDrawRenderBatchActive();
+    rlDisableDepthMask();
+    for (const NavBodyView* body : ordered) {
+      const ChartLook look = ChartLookOf(*body);
+      if (look != ChartLook::Star && look != ChartLook::System && look != ChartLook::Region &&
+          look != ChartLook::Origin) {
         continue;
       }
-      const bool lit = lane.from == homeId || lane.to == homeId || lane.from == targetId ||
-                       lane.to == targetId;
-      ::Color laneColor = lit ? Fade(ToRay(p.coffee), 0.55f) : Fade(ToRay(p.coffee), 0.18f);
-      float laneWidth = lit ? 0.7f : 0.35f;
-      DrawLineEx(from, to, laneWidth, laneColor);
+      if (compactGalaxyStars && look == ChartLook::System && !body->selected && !body->here) {
+        continue;
+      }
+      const auto itW = worldAllById.find(body->id);
+      if (itW == worldAllById.end()) { continue; }
+      const Vector3 wp = itW->second;
+      const float r3 = NavBodyScale3D(*body, tableScale, chart.layer);
+      const float pulse = reduced ? 1.0f : (0.92f + 0.08f * std::sin(tSec * 2.1f + wp.x));
+      if (look == ChartLook::Star) {
+        const ::Color haloCol = ToRay(p.amber);
+        PaintTranslucentSphere3D(wp, r3 * 1.48f * pulse, 6, 10, Fade(haloCol, 0.24f));
+        PaintTranslucentSphere3D(wp, r3 * 2.10f * pulse, 6, 10, Fade(haloCol, 0.10f));
+        const float reach = r3 * 2.35f * pulse;
+        const ::Color rayCol = Fade(ChartLift(haloCol, 0.35f), 0.45f);
+        for (int ray = 0; ray < 4; ++ray) {
+          const float ang = 0.785398f + static_cast<float>(ray) * 1.570796f;
+          DrawLine3D(Vector3{wp.x + std::cos(ang) * r3 * 1.05f, wp.y,
+                             wp.z + std::sin(ang) * r3 * 1.05f},
+                     Vector3{wp.x + std::cos(ang) * reach, wp.y,
+                             wp.z + std::sin(ang) * reach},
+                     rayCol);
+        }
+      } else if (look == ChartLook::System) {
+        const ::Color haloCol = ToRay(p.amber);
+        PaintTranslucentSphere3D(wp, r3 * 1.24f * pulse, 5, 8, Fade(haloCol, 0.17f));
+      } else if (look == ChartLook::Region) {
+        PaintTranslucentSphere3D(wp, r3 * 1.65f * pulse, 6, 10, Fade(ToRay(p.amber), 0.14f));
+        PaintOrbitTrack3D(wp, r3 * 1.68f * pulse, r3 * 1.68f * pulse, 0.08f, -0.06f, 24,
+                          Fade(ToRay(p.coffeeLight), 0.35f));
+      } else if (look == ChartLook::Origin) {
+        PaintTranslucentSphere3D(wp, r3 * 1.75f * pulse, 6, 10, Fade(ToRay(p.sage), 0.18f));
+      }
+    }
+    if (chart.hasMarker) {
+      PaintTranslucentSphere3D(markerWorld, 0.14f, 5, 8, Fade(kPlayerBeaconRed, 0.18f));
+    }
+
+    rlDrawRenderBatchActive();
+    rlEnableDepthMask();
+    rlEnableBackfaceCulling();
+    EndMode3D();
+    EndScissorMode();
+
+    Camera2D scrollCam{{0.0f, 0.0f}, {0.0f, contentScroll_}, 0.0f, 1.0f};
+    BeginMode2D(scrollCam);
+    BeginScissorMode(static_cast<int>(box.x + kDoubleInset),
+                     static_cast<int>(box.y + kDoubleInset - contentScroll_),
+                     std::max(0, static_cast<int>(box.w - 2.0f * kDoubleInset)),
+                     std::max(0, static_cast<int>(box.h - 2.0f * kDoubleInset)));
+  } else {
+    BeginScissorMode(static_cast<int>(box.x + kDoubleInset),
+                     static_cast<int>(box.y + kDoubleInset - contentScroll_),
+                     std::max(0, static_cast<int>(box.w - 2.0f * kDoubleInset)),
+                     std::max(0, static_cast<int>(box.h - 2.0f * kDoubleInset)));
+    for (const NavBodyView* body : ordered) {
+      const float cx = box.x + static_cast<float>(body->at.x) * sx;
+      const float cy = box.y + static_cast<float>(body->at.y) * sy;
+      const float radius = static_cast<float>(body->size) * 0.42f * bodyScale;
+      PaintChartBody(*body, cx, cy, radius, bodyScale, p, 1.0f);
+      projById.emplace(body->id, ProjectedBody{{}, Vector2{cx, cy}, 0.0f, std::max(6.0f, radius), true});
+    }
+    if (chart.hasMarker) {
+      markerDocPos = Vector2{box.x + static_cast<float>(chart.marker.x) * sx,
+                             box.y + static_cast<float>(chart.marker.y) * sy};
+      markerOnScreen = true;
     }
   }
 
-  const ::Color kPlayerBeaconRed{220, 38, 38, 255};
-  if (chart.hasMarker) {
-    const float px = box.x + static_cast<float>(chart.marker.x) * sx;
-    const float py = box.y + static_cast<float>(chart.marker.y) * sy;
-    if (px >= clipMinX && px <= clipMaxX && py >= clipMinY && py <= clipMaxY) {
-      const float markerR = std::max(10.0f, 13.5f * bodyScale);
-      DrawCircleV(Vector2{px, py}, markerR + 4.5f, Fade(kPlayerBeaconRed, 0.18f));
-    }
-  }
-
-  // --- visible bodies only ------------------------------------------------
-  const float bodyPad = 30.0f;
-  std::vector<const NavBodyView*> ordered;
-  ordered.reserve(chart.bodies.size());
-  for (const NavBodyView& body : chart.bodies) {
-    const float cx = box.x + static_cast<float>(body.at.x) * sx;
-    const float cy = box.y + static_cast<float>(body.at.y) * sy;
-    if (cx < box.x - bodyPad || cx > box.Right() + bodyPad ||
-        cy < box.y - bodyPad || cy > box.Bottom() + bodyPad) {
-      continue;
-    }
-    ordered.push_back(&body);
-  }
-  // Paint back to front: dust and regions, then the stars that light the scene,
-  // then the worlds, then the marks people built.
-  std::stable_sort(ordered.begin(), ordered.end(),
-                   [](const NavBodyView* a, const NavBodyView* b) {
-                     return ChartPaintRank(ChartLookOf(*a)) < ChartPaintRank(ChartLookOf(*b));
-                   });
-
-  const bool compactGalaxyStars = (chart.layer == "galaxy" && bodyScale < 0.55f);
-  for (const NavBodyView* body : ordered) {
-    const float cx = box.x + static_cast<float>(body->at.x) * sx;
-    const float cy = box.y + static_cast<float>(body->at.y) * sy;
-    const float radius = static_cast<float>(body->size) * 0.42f * bodyScale;
-    float alpha = body->inRange || body->here ? 1.0f : 0.78f;
-    if (chart.layer == "sector" && !body->region.empty() && !sim.Map().sector.empty() &&
-        body->region != sim.Map().sector) {
-      alpha = std::min(alpha, 0.86f);
-    }
-
-    if (compactGalaxyStars && body->type == "system" && !body->selected && !body->here) {
-      // Compact star LOD on zoomed-out galaxy view avoids thousands of tiny
-      // sub-pixel corona rings while keeping every star visible and clickable.
-      DrawCircleV(Vector2{cx, cy}, 1.7f, Fade(ToRay(p.amber), 0.72f * alpha));
-    } else {
-      PaintChartBody(*body, cx, cy, radius, bodyScale, p, alpha);
-    }
-  }
-
-  // Hit-test front to back. The click loop walks navHits_ backwards and takes
-  // the first box containing the point, so the winners must sit at the END:
-  // register the lowest rank first. See ChartHitRank() for why a region has to
-  // outrank the stars drawn inside it.
+  // Hit-test front to back (last entry in navHits_ wins clicks).
   std::vector<const NavBodyView*> hitOrder = ordered;
   std::stable_sort(hitOrder.begin(), hitOrder.end(),
-                   [](const NavBodyView* a, const NavBodyView* b) {
-                     return ChartHitRank(*a) < ChartHitRank(*b);
+                   [&projById](const NavBodyView* a, const NavBodyView* b) {
+                     const int ra = ChartHitRank(*a);
+                     const int rb = ChartHitRank(*b);
+                     if (ra != rb) { return ra < rb; }
+                     const auto ia = projById.find(a->id);
+                     const auto ib = projById.find(b->id);
+                     const float za = ia != projById.end() ? ia->second.ndcZ : 1.0f;
+                     const float zb = ib != projById.end() ? ib->second.ndcZ : 1.0f;
+                     return za > zb;  // Larger ndcZ (farther) first so closer wins last
                    });
   for (const NavBodyView* body : hitOrder) {
-    const float cx = box.x + static_cast<float>(body->at.x) * sx;
-    const float cy = box.y + static_cast<float>(body->at.y) * sy;
+    const auto itP = projById.find(body->id);
+    if (itP == projById.end() || !itP->second.onScreen) { continue; }
+    const float cx = itP->second.docPos.x;
+    const float cy = itP->second.docPos.y;
     if (cx < box.x || cx > box.Right() || cy < box.y || cy > box.Bottom()) { continue; }
-    const float radius = static_cast<float>(body->size) * 0.42f * bodyScale;
-    const float reach = std::max(radius, ChartMinimumRadius(ChartLookOf(*body), bodyScale)) + 4.0f;
+    const float reach = itP->second.screenR + 6.0f;
     navHits_.push_back(NavHit{Area{cx - reach, cy - reach, reach * 2.0f, reach * 2.0f},
                               "select", body->id});
   }
 
   for (const NavBodyView* body : ordered) {
     if (!body->selected) { continue; }
-    const float cx = box.x + static_cast<float>(body->at.x) * sx;
-    const float cy = box.y + static_cast<float>(body->at.y) * sy;
-    const float radius = static_cast<float>(body->size) * 0.42f * bodyScale;
-    const float drawn = std::max(radius, ChartMinimumRadius(ChartLookOf(*body), bodyScale));
-    DrawCircleLinesV(Vector2{cx, cy}, drawn + 3.5f, ToRay(p.terracotta));
-    DrawCircleLinesV(Vector2{cx, cy}, drawn + 5.5f, Fade(ToRay(p.terracotta), 0.45f));
+    const auto itP = projById.find(body->id);
+    if (itP == projById.end() || !itP->second.onScreen) { continue; }
+    const float cx = itP->second.docPos.x;
+    const float cy = itP->second.docPos.y;
+    const float drawn = itP->second.screenR;
+    DrawCircleLinesV(Vector2{cx, cy}, drawn + 4.0f, ToRay(p.terracotta));
+    DrawCircleLinesV(Vector2{cx, cy}, drawn + 6.0f, Fade(ToRay(p.terracotta), 0.45f));
   }
 
-  // Top-pass vivid red player position reticle so dense star clusters never hide the ship.
-  if (chart.hasMarker) {
-    const float px = box.x + static_cast<float>(chart.marker.x) * sx;
-    const float py = box.y + static_cast<float>(chart.marker.y) * sy;
+  // Top-pass vivid red player position reticle projected from 3D ship location.
+  if (chart.hasMarker && markerOnScreen) {
+    const float px = markerDocPos.x;
+    const float py = markerDocPos.y;
     if (px >= clipMinX && px <= clipMaxX && py >= clipMinY && py <= clipMaxY) {
       const float markerR = std::max(10.0f, 13.5f * bodyScale);
       DrawCircleLinesV(Vector2{px, py}, markerR, kPlayerBeaconRed);
@@ -2843,20 +4276,48 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     }
   }
 
-  // --- labels (sector headers first on Layer 2, then visible body labels) --
+  // --- labels (projected 3D sector headers + collision-free body labels) ---
   std::vector<Area> takenLabels;
+  // Reserve caption, zoom/layer/reset buttons, and bottom orbit hint so chart text never collides.
+  takenLabels.push_back(Area{box.x + 6.0f, box.y + 4.0f, std::min(box.w * 0.48f, 340.0f),
+                             theme_.LineHeight() + 10.0f});
+  takenLabels.push_back(Area{box.Right() - 96.0f, box.y + 4.0f, 92.0f, 180.0f});
+  takenLabels.push_back(Area{box.x + 6.0f, box.Bottom() - theme_.LineHeight() - 10.0f,
+                             std::min(box.w * 0.60f, 360.0f), theme_.LineHeight() + 8.0f});
   if (chart.layer == "sector") {
     const int hdrSize = TypePx(9);
     const float hdrH = theme_.LineHeight() + 2.0f;
+    // Re-derive live 2D screen anchor of each sector from projected visible systems
+    struct ScreenBoundsAcc {
+      float minX = 1e9f, maxX = -1e9f, minY = 1e9f, maxY = -1e9f;
+      int count = 0;
+    };
+    std::unordered_map<std::string, ScreenBoundsAcc> sBounds;
+    for (const NavBodyView* body : ordered) {
+      if (body->region.empty()) { continue; }
+      const auto itP = projById.find(body->id);
+      if (itP == projById.end() || !itP->second.onScreen) { continue; }
+      ScreenBoundsAcc& sa = sBounds[body->region];
+      sa.minX = std::min(sa.minX, itP->second.docPos.x);
+      sa.maxX = std::max(sa.maxX, itP->second.docPos.x);
+      sa.minY = std::min(sa.minY, itP->second.docPos.y);
+      sa.maxY = std::max(sa.maxY, itP->second.docPos.y);
+      ++sa.count;
+    }
     for (const SectorTerritory& terr : sectorTerritories) {
-      const float textW = TextWidth(terr.name.c_str(), hdrSize);
-      const float pillW = textW + 10.0f;
-      const float pillX = std::clamp(terr.cx - pillW * 0.5f, box.x + 4.0f, box.Right() - pillW - 36.0f);
-      const float pillY = std::clamp(terr.cy - terr.ry + 4.0f, box.y + 4.0f, box.Bottom() - hdrH - 4.0f);
-      if (terr.cx + terr.rx < box.x + 20.0f || terr.cx - terr.rx > box.Right() - 20.0f ||
-          terr.cy + terr.ry < box.y + 20.0f || terr.cy - terr.ry > box.Bottom() - 20.0f) {
+      const auto itS = sBounds.find(terr.id);
+      if (itS == sBounds.end() || itS->second.count == 0) { continue; }
+      const ScreenBoundsAcc& sa = itS->second;
+      const float cx = 0.5f * (sa.minX + sa.maxX);
+      const float topY = sa.minY - 18.0f;
+      if (sa.maxX < box.x + 20.0f || sa.minX > box.Right() - 20.0f ||
+          sa.maxY < box.y + 20.0f || sa.minY > box.Bottom() - 20.0f) {
         continue;
       }
+      const float textW = TextWidth(terr.name.c_str(), hdrSize);
+      const float pillW = textW + 10.0f;
+      const float pillX = std::clamp(cx - pillW * 0.5f, box.x + 4.0f, box.Right() - pillW - 36.0f);
+      const float pillY = std::clamp(topY, box.y + 4.0f, box.Bottom() - hdrH - 4.0f);
       const Area pill{pillX, pillY, pillW + 4.0f, hdrH + 4.0f};
       bool overlaps = false;
       for (const Area& taken : takenLabels) {
@@ -2904,10 +4365,12 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   takenLabels.reserve(takenLabels.size() + labelBudget);
   for (const NavBodyView* body : labelled) {
     if (labelsPainted >= labelBudget) { break; }
-    const float labelX = box.x + static_cast<float>(body->labelX) * sx;
-    const float labelY = box.y + static_cast<float>(body->labelY) * sy;
-    if (labelX < box.x || labelY < box.y || labelX > box.Right() - 24.0f ||
-        labelY > box.Bottom() - 16.0f) {
+    const auto itP = projById.find(body->id);
+    if (itP == projById.end() || !itP->second.onScreen) { continue; }
+    const float bodyX = itP->second.docPos.x;
+    const float bodyY = itP->second.docPos.y;
+    if (bodyX < box.x + 4.0f || bodyY < box.y + 4.0f ||
+        bodyX > box.Right() - 4.0f || bodyY > box.Bottom() - 4.0f) {
       continue;
     }
     float longestWord = 0.0f;
@@ -2929,9 +4392,14 @@ void ShellView::PaintNavScreen(Simulation& sim) {
         WrapText(body->name, labelW, TypePx(9), SelectFont(TypePx(9), false));
     const float textHeight =
         theme_.LineHeight() * static_cast<float>(labelLines.size());
+    const bool flipLeft = body->labelRight || (bodyX + itP->second.screenR + labelW + 10.0f > box.Right() - 78.0f);
+    const float labelX = flipLeft
+                             ? (bodyX - itP->second.screenR - labelW - 5.0f)
+                             : (bodyX + itP->second.screenR + 5.0f);
+    const float labelY = bodyY - textHeight * 0.5f;
     const Area rect{labelX, labelY, labelW, textHeight};
-    if (rect.x < box.x || rect.y < box.y || rect.Right() > box.Right() ||
-        rect.Bottom() > box.Bottom()) {
+    if (rect.x < box.x + 4.0f || rect.y < box.y + 20.0f || rect.Right() > box.Right() - 4.0f ||
+        rect.Bottom() > box.Bottom() - 18.0f) {
       continue;
     }
     bool clashes = false;
@@ -2947,15 +4415,15 @@ void ShellView::PaintNavScreen(Simulation& sim) {
                                        : (body->scanned ? ToRay(p.ink) : ToRay(p.muted));
     for (const auto& line : labelLines) {
       const float textX =
-          body->labelRight ? labelX + labelW - TextWidth(line.c_str(), TypePx(9)) : labelX;
+          flipLeft ? labelX + labelW - TextWidth(line.c_str(), TypePx(9)) : labelX;
       Text(line.c_str(), static_cast<int>(textX), static_cast<int>(textY), TypePx(9), ink);
       textY += theme_.LineHeight();
     }
     navHits_.push_back(NavHit{rect, "select", body->id});
   }
-  if (chart.hasMarker && sim.HomeBody() != nullptr) {
-    const float px = box.x + static_cast<float>(chart.marker.x) * sx;
-    const float py = box.y + static_cast<float>(chart.marker.y) * sy;
+  if (chart.hasMarker && markerOnScreen && sim.HomeBody() != nullptr) {
+    const float px = markerDocPos.x;
+    const float py = markerDocPos.y;
     const float r = std::max(10.0f, 13.5f * bodyScale);
     navHits_.push_back(NavHit{Area{std::max(box.x, px - r), std::max(box.y, py - r),
         std::max(0.0f, std::min(box.Right(), px + r) - std::max(box.x, px - r)),
@@ -3001,8 +4469,32 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     navHits_.push_back(NavHit{layerBox, "layer", key});
     layerY += layerH + 4.0f;
   }
-  Text(chart.scaleText.c_str(), static_cast<int>(box.x + 10.0f),
+  const bool orbited = std::fabs(navOrbitYaw_ - kDefaultNavOrbitYaw) > 0.5f ||
+                       std::fabs(navOrbitPitch_ - kDefaultNavOrbitPitch) > 0.5f;
+  if (orbited) {
+    const char* resetLabel = "RESET 3D";
+    const float rstW = std::max(64.0f, TextWidth(resetLabel, TypePx(8)) + 16.0f);
+    const float rstH = std::max(18.0f, theme_.LineHeight() + 2.0f);
+    const Area rstBox{box.Right() - rstW - 7.0f, layerY + 2.0f, rstW, rstH};
+    PaintChamferBoxRay(rstBox, kChamferSmall, ToRay(p.panel2),
+                       ToRay(p.borderDark), ToRay(p.border));
+    Text(resetLabel, static_cast<int>(rstBox.x + 8.0f),
+         static_cast<int>(rstBox.y + (rstH - TypePx(8)) * 0.5f), TypePx(8), ToRay(p.ink));
+    navHits_.push_back(NavHit{rstBox, "reset-3d", ""});
+  }
+
+  std::string caption = chart.scaleText;
+  if (orbited) {
+    char orbBuf[48];
+    std::snprintf(orbBuf, sizeof(orbBuf), "  [3D %.0f/%.0f deg]", navOrbitYaw_, navOrbitPitch_);
+    caption += orbBuf;
+  }
+  Text(caption.c_str(), static_cast<int>(box.x + 10.0f),
        static_cast<int>(box.y + 9.0f), TypePx(9), ToRay(p.chartInk));
+  Text("Left-drag pan  |  Wheel zoom  |  Middle-drag orbit",
+       static_cast<int>(box.x + 10.0f),
+       static_cast<int>(box.Bottom() - static_cast<float>(TypePx(8)) - 7.0f),
+       TypePx(8), Fade(ToRay(p.muted), 0.72f));
 
   // --- panels: identity left, sensors right, the leg underneath the chart
   float ly = layout_.content.y + headerH + 8.0f;
@@ -5504,10 +6996,57 @@ void ShellView::Drag(Simulation& sim, float x, float y, float dx, float dy, bool
   chartDragAccumX_ += dx;
   chartDragAccumY_ += dy;
   chartDragMoved_ = std::abs(chartDragAccumX_) + std::abs(chartDragAccumY_) > 4.0;
-  // PanMap accepts deltas, not absolute offsets. Convert once from live chart
-  // pixels to the model viewport; adding the accumulated pan accelerates it.
-  sim.PanMap(dx / std::max(0.01f, navChartScaleX_),
-             dy / std::max(0.01f, navChartScaleY_));
+  // Rotate pan delta into the current 3D orbit yaw so dragging left/right/up/down
+  // always pans smoothly along the screen axes regardless of camera azimuth.
+  const float yawRad = navOrbitYaw_ * DEG2RAD;
+  const float cosY = std::cos(yawRad);
+  const float sinY = std::sin(yawRad);
+  const float worldDx = dx * cosY + dy * sinY;
+  const float worldDy = -dx * sinY + dy * cosY;
+  sim.PanMap(worldDx / std::max(0.01f, navChartScaleX_),
+             worldDy / std::max(0.01f, navChartScaleY_));
+}
+
+void ShellView::OrbitDrag(Simulation& sim, float x, float y, float dx, float dy,
+                          bool down, bool pressed) {
+  (void)sim;
+  Move(x, y);
+  if (!down) {
+    if (orbitingChart_ && !orbitDragMoved_) {
+      navOrbitYaw_ = kDefaultNavOrbitYaw;
+      navOrbitPitch_ = kDefaultNavOrbitPitch;
+    }
+    orbitingChart_ = false;
+    orbitDragMoved_ = false;
+    return;
+  }
+  if (floating_.HasConfirmation()) { return; }
+  if (titleActive_ || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow)) { return; }
+  const float localY = y + contentScroll_;
+  if (!orbitingChart_) {
+    if (!pressed) { return; }
+    if (!screenNav_ || !layout_.content.Contains(x, y) ||
+        !navChartBox_.Contains(x, localY)) {
+      return;
+    }
+    for (const auto& hit : navHits_) {
+      if (hit.action != "select" && hit.box.Contains(x, localY)) { return; }
+    }
+    orbitDragAccumX_ = 0.0;
+    orbitDragAccumY_ = 0.0;
+    orbitDragMoved_ = false;
+    orbitingChart_ = true;
+    return;
+  }
+  orbitDragAccumX_ += dx;
+  orbitDragAccumY_ += dy;
+  if (std::abs(orbitDragAccumX_) + std::abs(orbitDragAccumY_) > 4.0) {
+    orbitDragMoved_ = true;
+  }
+  navOrbitYaw_ -= dx * 0.42f;
+  while (navOrbitYaw_ > 180.0f) { navOrbitYaw_ -= 360.0f; }
+  while (navOrbitYaw_ < -180.0f) { navOrbitYaw_ += 360.0f; }
+  navOrbitPitch_ = std::clamp(navOrbitPitch_ + dy * 0.36f, -82.0f, 86.0f);
 }
 
 void ShellView::Scroll(Simulation& sim, float x, float y, float wheelDelta) {
@@ -5899,6 +7438,11 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
     for (auto it = navHits_.rbegin(); it != navHits_.rend(); ++it) {
       const NavHit& hit = *it;
       if (!hit.box.Contains(x, y + scrollY)) { continue; }
+      if (hit.action == "reset-3d") {
+        navOrbitYaw_ = kDefaultNavOrbitYaw;
+        navOrbitPitch_ = kDefaultNavOrbitPitch;
+        return;
+      }
       const double actionsBefore = sim.ActionCount();
       PressNavAction(sim, hit.action, hit.arg);
       if (sim.ActionCount() > actionsBefore) {
