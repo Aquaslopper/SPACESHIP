@@ -380,7 +380,10 @@ bool Simulation::HireCrew(const std::string& candidateId) {
   state_.shiplets -= candidate->fee;
   state_.hired[candidateId] = true;
   crew_.push_back(MakeCrew(candidate->crew));
-  const std::string name = candidate->crew.name;
+  for (const CandidateDefinition& hand : HandsHere()) {
+    if (hand.crew.id == candidateId) { crew_.back().name = hand.crew.name; }
+  }
+  const std::string name = crew_.back().name;
   FreeCommit(name + " joined the crew");
   return true;
 }
