@@ -1,18 +1,8 @@
 // ============================================================================
 //  SaveSystem.cpp — the voyage, on disk, in both directions.
 //  ---------------------------------------------------------------------------
-//  A save is one JSON object with seventeen keys, written in the reference's
-//  order and with the reference's field names. `format` is checked first, then
-//  everything that could make the voyage impossible: a hold fuller than the
-//  hold, a task pointing at a body that does not exist, an incident waiting on a
-//  stage that has no ticks left, a decode task without the signal that needs it.
-//
-//  Loading is transactional. The reference snapshots the live voyage before it
-//  applies anything and restores that snapshot if validation fails; the port
-//  validates first and applies second, which is the same promise with less work.
-//
-//  Slot 1 on the original platform is UTF-16LE with a BOM, because the HTA reads
-//  it with ActiveX. The port reads and writes both encodings.
+// Remove all state machines and gates enforcing anti-roguelike logic, 
+// while strictly preserving core gameplay mechanics.
 // ============================================================================
 #include <nlohmann/json.hpp>
 
