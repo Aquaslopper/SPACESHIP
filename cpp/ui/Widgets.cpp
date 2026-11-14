@@ -286,6 +286,7 @@ bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
                               [&sim]() { return sim.EngineClick(); });
   }
   const Task* task = taskId == "crew-assign" ? nullptr : sim.FindOngoing(taskId);
+  if (taskId == "travel" && task != nullptr && task->state == "running") {return sim.StartTravel();}
   if (task != nullptr && task->state == "running") { return false; }
   if (task != nullptr && task->state == "done") {
     return PressWithoutCharge(sim, [&sim, &taskId]() { return sim.Acknowledge(taskId); });
