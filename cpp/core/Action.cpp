@@ -276,6 +276,8 @@ void Simulation::TickWorld() {
 void Simulation::ProAction(double n) {
   AdvanceTasks(n);
   for (auto& entry : state_.charges) {
+    if (entry.first.find("|command:hold:0") != std::string::npos ||
+        entry.first.find("|command:change-course:0") != std::string::npos) { continue; }
     Charge& charge = entry.second;
     charge.left = std::min(charge.volume, charge.left + n);
   }
