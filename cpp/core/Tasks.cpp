@@ -150,7 +150,6 @@ void Simulation::AdvanceTasks(double n) {
   for (const Task& original : snapshot) {
     Task* task = FindOngoing(original.id);
     if (task == nullptr || task->state != "running") { continue; }
-    if (task->type == "travel" && state_.holding) { continue; }
 
     if (task->type == "travel") { ClampStat("fuel", -1); }
     const bool needsPower = task->type == "scan" || task->type == "salvage" ||

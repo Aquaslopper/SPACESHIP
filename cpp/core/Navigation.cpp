@@ -474,17 +474,6 @@ bool Simulation::StartTravel() {
   if (FindOngoing("travel") != nullptr || FindOngoing("extract") != nullptr) { return false; }
   if (StatValue("fuel") <= 0) { return false; }
 
-  if (state_.docked) {
-    const Port* port = HerePort();
-    state_.docked = false;
-    if (port != nullptr) {
-      for (InfoRow& row : infos_) {
-        if (row.id == "location") { row.value = port->name + " - undocked"; }
-      }
-    }
-  }
-
-
   const NavMetrics metrics = MetricsFor(*body);
 
   PerformAction("Course locked - " + body->name);
@@ -507,7 +496,6 @@ bool Simulation::ChangeCourse() {
 
   const NavMetrics metrics = MetricsFor(*body);
   PerformAction("Course changed - " + body->name);
-  if (!state_.gameOver.empty()) { return true; }
 
   Task* travel = FindOngoing("travel");
   if (travel == nullptr) {
@@ -520,7 +508,6 @@ bool Simulation::ChangeCourse() {
     travel->state = "running";
   }
   map_.inSpace = true;
-  state_.holding = false;
   return true;
 }
 

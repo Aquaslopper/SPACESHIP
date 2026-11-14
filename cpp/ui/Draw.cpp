@@ -4647,6 +4647,9 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     const float height = std::max(48.0f, static_cast<float>(label.size()) * line + 16.0f);
     const Area control{bx, by, bw, height};
     PaintProgressSurface(control, button, p);
+    if ((button.taskId == "hold" || button.taskId == "change-course") && button.fillPercent > 0.0) {
+      PaintProgressFill(control, button.fillPercent, kChamferCard);
+    }
     float textY = by + (height - label.size() * line) / 2.0f;
     for (const auto& text : label) {
       Text(text.c_str(), static_cast<int>(bx + (bw - TextWidth(text.c_str(), size)) / 2),
