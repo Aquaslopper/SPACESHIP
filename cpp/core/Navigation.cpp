@@ -492,6 +492,48 @@ bool Simulation::StartTravel() {
 
   AddOngoing("travel", "Under way to " + body->name, metrics.dist, "travel", body->id);
   map_.inSpace = true;
+  state_.holding = false;
+  return true;
+}
+
+bool Simulation::Hold() {
+  if (!state_.gameOver.empty()) { return false; }
+  state_.holding = true;
+  PerformAction("Holding");
+  return true;
+}
+
+bool Simulation::ChangeCourse() {
+  if (!state_.gameOver.empty() || !state_.holding || !state_.navTarget.has_value()) { return false; }
+  const Body* body = FindBodyById(*state_.navTarget);
+  if (body == nullptr) { return false; }
+
+  if (state_.docked) {
+    const Port* port = HerePort();
+    state_.docked = false;
+    if (port != nullptr) {
+      for (InfoRow& row : infos_) {
+        if (row.id == "location") { row.value = port->name + " - undocked"; }
+      }
+    }
+  }
+
+  const NavMetrics metrics = MetricsFor(*body);
+  PerformAction("Course changed - " + body->name);
+  if (!state_.gameOver.empty()) { return true; }
+
+  Task* travel = FindOngoing("travel");
+  if (travel == nullptr) {
+    AddOngoing("travel", "Under way to " + body->name, metrics.dist, "travel", body->id);
+  } else {
+    travel->label = "Under way to " + body->name;
+    travel->target = body->id;
+    travel->total = metrics.dist;
+    travel->left = metrics.dist;
+    travel->state = "running";
+  }
+  map_.inSpace = true;
+  state_.holding = false;
   return true;
 }
 bool Simulation::StartScan() {

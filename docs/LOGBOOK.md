@@ -140,3 +140,16 @@ You must append a compressed summary of **every single reply and action you take
 - Verified builds & visual inspection: `tools/viewer` rebuilt cleanly; screenshots `c01-title` through `c11-navcrop` (plus crops `c-title-bl/br`, `c-setup-tl/br`) in `/tmp/out/` confirm (i) title strip sits inside its painted dark band, (ii) setup preview clears the lower-right diagonal, "Start:" label legible, (iii) iris-out, loading card with progress bar, iris-in all render, (iv) system chart sits on the horizontal ecliptic with smaller bodies and flattened orbits/rings; `tools/check-id-prefixes.sh`, `tools/check-gui-syntax.sh`, `tools/check-draw.sh` returned clean.
 - Git action: staging modified `cpp/ui/Draw.cpp`, `cpp/ui/Draw.h`, `cpp/ui/QuartersScreen.cpp`, `cpp/app/main.cpp`, plus `docs/LOGBOOK.md`, committing to `arena/561a6383-spaceship`, pushing to `origin`, and opening a pull request targeting `main`.
 
+### Entry #010
+- **Timestamp:** 2026-11-14 20:38 UTC
+- Session scope: owner-ordered restoration of in-space Hold and Change Course on branch `arena/d76d127b-spaceship`.
+- `cpp/core/GameState.h`: added `GameState::holding`. Not cleared on arrival, dock, death, or save.
+- `cpp/core/Simulation.h`, `cpp/core/Navigation.cpp`: `Hold()` sets `holding` and spends the click. `ChangeCourse()` runs only while holding, retargets or starts the crossing to the selected body, and clears `holding` when that course is locked. No fuel, energy, drive, or range refusal on either action.
+- `cpp/core/Navigation.cpp` (`StartTravel`): a locked departure clears `holding` so the new crossing moves.
+- `cpp/core/Tasks.cpp` (`AdvanceTasks`): a running travel task does not advance and does not burn leg fuel while `holding`.
+- `cpp/core/SaveSystem.cpp`: writes and reads `state.holding` the same way as `docked`. Missing key on an older save reads false.
+- `cpp/ui/NavScreen.cpp`: while `InSpace()`, Navigation shows `Hold` and `Change Course`. Both use the existing `space` charge (volume 2). `Change Course` is enabled only while `holding`. Presses go through `PressProgressButton`.
+- `cpp/ui/Widgets.cpp`: progress press dispatches `hold` to `Hold()` and `change-course` to `ChangeCourse()`.
+- `cpp/ui/Draw.cpp`: those two buttons paint under Start Travel on the chart, and the nav cache includes `holding`.
+- Syntax check: `g++ -std=c++17 -Wall -Wextra -Wpedantic -Werror -fsyntax-only` passed for `Navigation.cpp`, `Tasks.cpp`, `SaveSystem.cpp`, `Widgets.cpp`, and `NavScreen.cpp`.
+

@@ -176,6 +176,8 @@ class Simulation {
   bool TalkToCrew(const std::string& crewId);
 
   bool SelectTarget(const std::string& bodyId);
+  bool Hold();
+  bool ChangeCourse();
   bool StartTravel();
   bool StartScan();
   bool StartExtraction();

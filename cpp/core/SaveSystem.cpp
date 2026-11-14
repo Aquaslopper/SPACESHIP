@@ -283,6 +283,7 @@ std::string Simulation::SaveJson() const {
   s["shiplets"] = Num(state_.shiplets);
   s["payTick"] = Num(state_.payTick);
   s["docked"] = state_.docked;
+  s["holding"] = state_.holding;
   s["fuelCells"] = Num(state_.fuelCells);
   s["repairKits"] = Num(state_.repairKits);
   s["lotSerial"] = Num(state_.lotSerial);
@@ -1069,6 +1070,7 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     state_.shiplets = GetNumber(s, "shiplets");
     state_.payTick = GetNumber(s, "payTick");
     state_.docked = GetBool(s, "docked");
+    state_.holding = GetBool(s, "holding");
     state_.fuelCells = GetNumber(s, "fuelCells");
     state_.repairKits = GetNumber(s, "repairKits");
     state_.lotSerial = GetNumber(s, "lotSerial");
