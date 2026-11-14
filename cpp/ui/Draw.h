@@ -388,8 +388,10 @@ class ShellView {
   std::string setupSystemId_;
   char setupSeed_[21] = "SPACESHI";
   bool setupPreviewDirty_ = true;
+  bool setupLaunchPending_ = false;
+  double setupLaunchStartMs_ = 0.0;
 
-  void PaintSetup(Simulation& sim);
+  void PaintSetup(Simulation& sim, double nowMs);
   void RebuildSetupPreview(const Simulation& sim);
   bool displayAdjustmentAvailable_ = true;
   std::array<void*, 6> tutorialArt_{};

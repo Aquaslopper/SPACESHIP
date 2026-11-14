@@ -124,3 +124,15 @@ You must append a compressed summary of **every single reply and action you take
 
 
 
+### Entry #009
+- **Timestamp:** 2026-11-14 UTC
+- Session scope: owner-approved, surface-level public-beta polish on branch `arena/9558f1bd-spaceship`, branched from `main` at `60e82ddb9b19e8e036d011176f8a046e706e8919`.
+- `cpp/ui/QuartersScreen.cpp`: moved the `crew-assign` button from an inline assignments panel into `TaskScreenModel::progress`, so `PaintQuartersScreen` can display it in the pinned action band; gated its active state on staged fees being affordable or a pending layoff.
+- `cpp/ui/Draw.cpp`: painted the Quarters action band; kept the order staging, time costs, crew job behavior, conversation button's intentional free/no-op behavior, cargo hover, and gameplay rules unchanged.
+- `cpp/ui/Draw.cpp` 3D chart passes: rendered Pass B bodies in camera-depth order, disabled depth writes for translucent body groups and transparent rings/stems/routes/beacons, and sorted Pass C halos back-to-front.
+- `cpp/ui/Draw.cpp`: added a 1.35-second chart-locked departure overlay before the existing `BeginVoyage` call; no start-station or voyage initialization behavior was changed.
+- `cpp/ui/Draw.cpp`: added an explicit `RND` seed affordance, hover feedback for Setup controls, a focused system-scale preview, and human-readable selected-system labels.
+- Scope explicitly left untouched: `NewVoyage` portless-system behavior, camera basis, chart hit-testing/ship-marker priority, Cargo hover behavior, and Setup changes to simulation/generation logic.
+- `tools/viewer/`: tracked files untouched; headless viewer dependencies were built in ignored directories, and the viewer rendered Quarters, Setup/system preview, departure transition, and Navigation system/sector/galaxy screens; a scripted Quarters test found and clicked the pinned `crew-assign` hit, advancing exactly one action.
+- Verification passed: viewer build; `tools/check-gui-syntax.sh` for Draw.cpp, AudioDevice.cpp, and main.cpp; ID-prefix check; and strict `-Wall -Wextra -Wpedantic -Werror -fsyntax-only` across all C++ translation units.
+- Verification limitation: CMake/CTest could not run because `cmake` is not installed; `check-imgui-input.sh` references absent `cpp/tests/imgui_input_probe.cpp` and therefore could not run its optional probe.

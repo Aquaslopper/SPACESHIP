@@ -155,19 +155,14 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
   sheet.id = "cq-sheet";
   sheet.title = "Order Sheet";
 
-  NavPanel assignPanel;
-  assignPanel.id = "cq-assign";
-  assignPanel.title = "Assignments";
-  assignPanel.placement = "np-last";
-
   if (selected == nullptr) {
     cond.Dim("No crew aboard.");
     model.bandNote = "No orders written.";
-    assignPanel.Note(model.bandNote);
-    assignPanel.buttons.push_back(BuildProgressButton(
+    screen.progress.push_back(BuildProgressButton(
         sim, "crew-assign", "Assign Tasks (0 Clicks)", false, "Complete", std::string()));
+    screen.bandNote = model.bandNote;
     screen.left = {roster};
-    screen.right = {ordersPanel, sheet, assignPanel};
+    screen.right = {ordersPanel, sheet};
     return model;
   }
 
@@ -270,13 +265,15 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
   model.conversation = BuildConversationRow(sim, hand.id);
   model.said = hand.said;
 
-  // --- right-column assignments commit (no bottom banner) -----------------
+  // --- pinned assignment band ---------------------------------------------
   const double total = sim.OrdersCost();
   const int who = sim.OrderedCount();
+  const double fee = sim.OrdersFee();
+  const bool canAssign = total > 0 &&
+                         (fee <= sim.State().shiplets || sim.HasPendingLayoff());
   if (total > 0) {
     model.bandNote = "Orders written for " + js::NumToString(who) + " crew member" +
                      (who == 1 ? "" : "s") + ".";
-    const double fee = sim.OrdersFee();
     if (fee > 0) {
       model.bandNote += " Training fees " + js::NumToString(fee) + " sh of " +
                         js::NumToString(sim.State().shiplets) + ".";
@@ -284,15 +281,15 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
   } else {
     model.bandNote = "No orders written.";
   }
-  assignPanel.Note(model.bandNote);
-  assignPanel.buttons.push_back(BuildProgressButton(
+  screen.progress.push_back(BuildProgressButton(
       sim, "crew-assign",
       "Assign Tasks (" + js::NumToString(total) + " Click" + (total == 1 ? "" : "s") + ")",
-      total > 0, "Complete", std::string()));
+      canAssign, "Complete", std::string()));
+  screen.bandNote = model.bandNote;
 
   screen.left = {roster};
   screen.under = {cond, stand};
-  screen.right = {ordersPanel, sheet, assignPanel};
+  screen.right = {ordersPanel, sheet};
   return model;
 }
 
