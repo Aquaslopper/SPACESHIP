@@ -506,7 +506,7 @@ int main(int argc, char** argv) {
     ToggleBorderlessWindowed();
   }
 
-  ship::PointerOwnership leftPointer, rightPointer;
+  ship::PointerOwnership leftPointer, rightPointer, middlePointer;
   ship::RadiationTelemetry smoothedWave = ship::ComputeRadiationTelemetry(sim);
   float waveTime = 0.0f;
   while (!WindowShouldClose() && !shell.QuitRequested()) {
@@ -528,12 +528,20 @@ int main(int argc, char** argv) {
     if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
       rightPointer.Press(ImGui::GetIO().WantCaptureMouse);
     }
+    if (IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE)) {
+      middlePointer.Press(ImGui::GetIO().WantCaptureMouse);
+    }
     const Vector2 pointer = GetMousePosition();
     shell.Move(pointer.x, pointer.y);
     if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && !leftPointer.UiOwned()) {
       const Vector2 delta = GetMouseDelta();
       shell.Drag(sim, pointer.x, pointer.y, delta.x, delta.y, true,
                  IsMouseButtonPressed(MOUSE_BUTTON_LEFT));
+    }
+    if (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE) && !middlePointer.UiOwned()) {
+      const Vector2 delta = GetMouseDelta();
+      shell.OrbitDrag(sim, pointer.x, pointer.y, delta.x, delta.y, true,
+                      IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE));
     }
     const float wheel = GetMouseWheelMove();
     if (wheel != 0.0f) { shell.Scroll(sim, pointer.x, pointer.y, wheel); }
@@ -548,6 +556,12 @@ int main(int argc, char** argv) {
       if (!rightPointer.Release()) {
         shell.Click(sim, mouse.x, mouse.y, ship::HitButton::Right,
                     static_cast<double>(GetTime()) * 1000.0);
+      }
+    }
+    if (IsMouseButtonReleased(MOUSE_BUTTON_MIDDLE)) {
+      const Vector2 mouse = GetMousePosition();
+      if (!middlePointer.Release()) {
+        shell.OrbitDrag(sim, mouse.x, mouse.y, 0.0f, 0.0f, false, false);
       }
     }
 
