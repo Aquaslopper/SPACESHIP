@@ -935,7 +935,7 @@ bool PressNavActionRaw(Simulation& sim, const std::string& action, const std::st
 
 bool PressNavAction(Simulation& sim, const std::string& action, const std::string& arg) {
   const auto screen = BuildNavScreen(sim).screen;
-  if (action == "travel" || action == "scan" || action == "extract") {
+  if (action == "travel" || action == "scan" || action == "extract" || action == "travel-hold") {
     for (const auto& button : screen.progress) {
       if (button.taskId == action) { return PressProgressButton(sim, button); }
     }

@@ -65,6 +65,10 @@ bool MentionsAction(const std::string& text) {
 
 std::string ButtonChargeKey(const Simulation& sim, const std::string& id) {
   if (id == "progress:engine-click") { return Simulation::kEngineButtonChargeKey; }
+  if (id == "progress:travel-hold") { return "ch|nav:chart|hold-course"; }
+  if (id == "progress:travel" && sim.State().travelHeld && sim.FindOngoing("travel") != nullptr) {
+    return "ch|nav:chart|hold-course";
+  }
   const std::string tab = sim.State().activeTab.empty() ? "home" : sim.State().activeTab;
   return "ch|" + tab + "|" + (id.empty() ? std::string("action") : id);
 }
@@ -192,6 +196,10 @@ bool CommitActionButton(Simulation& sim, const std::string& key,
     throw;
   }
   sim.ClearPressedButton(key);
+  if (result && key == "ch|nav:chart|hold-course") {
+    auto it = charges.find(key);
+    if (it != charges.end()) { it->second.left = 0.0; }
+  }
   return result;
 }
 
