@@ -11,11 +11,15 @@ int main() {
  int courseControls=0;
  for (const auto& row : ship::BuildNavScreen(sim).screen.commands) {
    if (row.label=="HOLD" || row.label=="Change Course") {
-     assert(row.enabled && !row.actionCost);
+     assert(row.enabled && row.actionCost && row.charged);
+     assert(row.tier=="space" && row.chargePercent==100.0);
      ++courseControls;
    }
  }
  assert(courseControls==2);
+ const auto idleHold=ship::BuildNavScreen(sim).screen.commands.front();
+ assert(!ship::PressNavAction(sim,"hold"));
+ assert(ship::ChargePercent(sim,idleHold.chargeKey,idleHold.tier)==100);
  const ship::Body* destination=nullptr;
  for(const auto& b:sim.World().bodies) if(sim.InRange(b)&&!sim.AtTarget(b)&&sim.MetricsFor(b).dist>0) {destination=&b;break;}
  assert(destination);
@@ -78,6 +82,7 @@ int main() {
  assert(sim.FindOngoing("travel")->target==home);
  assert(position==sim.Map().flightOrigin);
  sim.PerformAction("return flight");
+ assert(ship::PressWithoutCharge(sim, [&]() { return sim.StandWatch(); }));
  assert(ship::PressNavAction(sim,"hold"));
  assert(position!=sim.Map().flightOrigin);
  sim.SelectTarget(destination->id); assert(sim.StartTravel());
@@ -103,4 +108,55 @@ int main() {
  jump.PerformAction("wait"); assert(at==jump.Map().flightOrigin);
  assert(jump.StartTravel());
  std::cout<<"PASS: inter-system HOLD and restart\n";
+ auto battery=ship::Simulation::NewVoyage(catalog);
+ battery.MutableMap().here=battery.World().bodies.front().id;
+ battery.SelectTarget(destination->id);
+ assert(battery.StartTravel());
+ battery.FindOngoing("travel")->total=100;
+ battery.FindOngoing("travel")->left=75;
+ const auto holdRow=ship::BuildNavScreen(battery).screen.commands.front();
+ const double fuelBefore=battery.StatValue("fuel");
+ assert(ship::PressNavAction(battery,"hold"));
+ const auto held=battery.Map().flightOrigin;
+ assert(battery.StatValue("fuel")==fuelBefore);
+ assert(ship::ChargePercent(battery,holdRow.chargeKey,holdRow.tier)==0);
+ battery.ProAction(10);
+ assert(ship::ChargePercent(battery,holdRow.chargeKey,holdRow.tier)==0);
+ auto clicks=battery.ActionCount();
+ assert(!ship::PressNavAction(battery,"hold"));
+ assert(battery.ActionCount()==clicks);
+ assert(ship::PressWithoutCharge(battery,[&](){return battery.StandWatch();}));
+ assert(ship::ChargePercent(battery,holdRow.chargeKey,holdRow.tier)==50);
+ assert(!ship::BuildNavScreen(battery).screen.commands.front().enabled);
+ assert(battery.Map().flightOrigin==held);
+ auto partial=ship::Simulation::NewVoyage(catalog);
+ assert(partial.LoadJson(battery.SaveJson(),&error));
+ assert(ship::ChargePercent(partial,holdRow.chargeKey,holdRow.tier)==50);
+ assert(!ship::PressNavAction(partial,"hold"));
+ assert(ship::PressWithoutCharge(battery,[&](){return battery.StandWatch();}));
+ assert(ship::ChargePercent(battery,holdRow.chargeKey,holdRow.tier)==100);
+ battery.SelectTarget(home);
+ assert(ship::PressNavAction(battery,"change-course"));
+ const auto courseRow=ship::BuildNavScreen(battery).screen.commands[1];
+ assert(ship::ChargePercent(battery,courseRow.chargeKey,courseRow.tier)==0);
+ auto boosted=battery;
+ boosted.ProAction(10);
+ assert(ship::ChargePercent(boosted,courseRow.chargeKey,courseRow.tier)==0);
+ const auto remaining=battery.FindOngoing("travel")->left;
+ const auto coursePosition=battery.Map().flightOrigin;
+ clicks=battery.ActionCount();
+ assert(!ship::PressNavAction(battery,"change-course"));
+ assert(battery.ActionCount()==clicks);
+ assert(battery.FindOngoing("travel")->left==remaining);
+ assert(battery.Map().flightOrigin==coursePosition);
+ assert(ship::PressWithoutCharge(battery,[&](){return battery.StandWatch();}));
+ assert(ship::ChargePercent(battery,courseRow.chargeKey,courseRow.tier)==50);
+ assert(!ship::PressNavAction(battery,"change-course"));
+ assert(ship::PressWithoutCharge(battery,[&](){return battery.StandWatch();}));
+ assert(ship::ChargePercent(battery,courseRow.chargeKey,courseRow.tier)==100);
+ battery.SelectTarget(destination->id);
+ assert(ship::PressNavAction(battery,"change-course"));
+ assert(ship::ChargePercent(battery,courseRow.chargeKey,courseRow.tier)==0);
+ std::cout<<"PASS: independent batteries drain fully, require two other clicks, persist partial charge and reject spam without moving ship\n";
+
 }

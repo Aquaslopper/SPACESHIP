@@ -106,3 +106,25 @@ You must append a compressed summary of **every single reply and action you take
 - Headless build and all HOLD/save-load/Lost in Space probe checks passed.
 - Original standalone startup reproducer no longer throws.
 - Windows executable not run locally; owner must verify the new Windows build.
+
+### Entry #007
+- Timestamp: 2026-11-14 UTC.
+- Owner requested HOLD and Change Course stacked below the left travel button.
+- Owner requested green batteries requiring at least two other clicks to refill.
+- Read current repository instructions, charge processing, command binding and native drawing.
+- Reused BuildCommandRow, CommitActionButton, space tier and standard generated command keys.
+- Each successful press empties its own existing-style charge record.
+- Existing command dispatch accepts these buttons only at full charge.
+- HOLD stops before spending one action; the stopped ship does not advance during that action.
+- Failed commands and recharge-period clicks do not spend time or drain batteries.
+- Draw both controls under travel at full left-column width with existing green progress-fill rendering.
+- Keep partial fill visible while charging; no top-row duplicate controls.
+- Exclude only these two batteries from ProAction process bonuses so bonuses cannot bypass two-click recharge.
+- No worker state machine, new tier, charge alias, helper or navigation restriction added.
+- Removed previous top-row placement; existing flight fuel and Lost in Space mechanics retained.
+- Headless core and console build passed.
+- Regression probe passed 0/50/100 recharge, spam rejection, failed-command charge retention and partial-charge save/load.
+- Regression probe passed process-bonus exclusion and prior HOLD/course/save-load/legacy-startup/Lost in Space checks.
+- Native drawing, audio and main entry-point syntax checks passed.
+- ID-prefix check and git diff whitespace check passed.
+- Native graphical interaction and Windows executable not verified locally.

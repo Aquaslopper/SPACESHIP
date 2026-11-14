@@ -3604,24 +3604,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   const float middleLeft = left + leftColumn + 12.0f;
   const float middleRight = right - rightColumn - 12.0f;
 
-  const float titleH = PaintTaskHeader(screen.head, left, layout_.content.y);
-  const float courseButtonH = std::max(38.0f, theme_.LineHeight() + 16.0f);
-  const float courseButtonW = std::max(160.0f, TextWidth("Change Course", TypePx(10)) + 32.0f);
-  const float headerH = titleH + courseButtonH + 8.0f;
-  float courseButtonX = left;
-  for (const auto& row : screen.commands) {
-    if (row.label != "HOLD" && row.label != "Change Course") { continue; }
-    const Area control{courseButtonX, layout_.content.y + titleH + 4.0f,
-                       courseButtonW, courseButtonH};
-    PaintChamferBoxRay(control, kChamferSmall, ToRay(p.panel2),
-                      ToRay(p.borderDark), ToRay(p.border));
-    Text(row.label.c_str(),
-         static_cast<int>(control.x + (control.w - TextWidth(row.label.c_str(), TypePx(10))) / 2.0f),
-         static_cast<int>(control.y + (control.h - TypePx(10)) / 2.0f),
-         TypePx(10), ToRay(p.ink));
-    navHits_.push_back({control, row.label == "HOLD" ? "hold" : "change-course", ""});
-    courseButtonX += courseButtonW + 8.0f;
-  }
+  const float headerH = PaintTaskHeader(screen.head, left, layout_.content.y);
 
   // HTA #map fills the middle column up to 1100px. Its height is limited by
   // the remaining content height, 500px and half its width, with a 240px floor.
@@ -4677,6 +4660,28 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     } else {
       rightButtonBottom = paintNavButton(button, right - rightColumn, rightButtonBottom, rightColumn) + 12.0f;
     }
+  }
+
+  for (const auto& row : screen.commands) {
+    if (row.label != "HOLD" && row.label != "Change Course") { continue; }
+    const int size = TypePx(10);
+    const float line = std::max(theme_.LineHeight(), static_cast<float>(size) + 4.0f);
+    const auto label = WrapText(row.label, leftColumn - 20.0f, size, SelectFont(size, false));
+    const float height = std::max(48.0f, static_cast<float>(label.size()) * line + 16.0f);
+    const Area control{left, leftButtonBottom + 12.0f, leftColumn, height};
+    FillChamferRay(control, kChamferCard, ToRay(row.enabled ? p.control : p.panel3));
+    PaintProgressFill(control, row.chargePercent, kChamferCard);
+    PaintChamferDoubleLinesRay(control, kChamferCard, ToRay(p.borderDark), ToRay(p.border));
+    float textY = control.y + (height - label.size() * line) / 2.0f;
+    for (const auto& text : label) {
+      Text(text.c_str(), static_cast<int>(left + (leftColumn - TextWidth(text.c_str(), size)) / 2),
+           static_cast<int>(textY), size, ToRay(row.enabled ? p.ink : p.muted));
+      textY += line;
+    }
+    if (row.enabled) {
+      navHits_.push_back({control, row.label == "HOLD" ? "hold" : "change-course", ""});
+    }
+    leftButtonBottom = control.Bottom();
   }
 
   float ty = std::max({ly, rightBottom, uy + underH, leftButtonBottom, rightButtonBottom}) + 12;

@@ -878,16 +878,13 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
     }
   }
 
-  CommandRowView hold;
-  hold.label = "HOLD";
-  hold.enabled = hold.live = true;
-  hold.actionCost = false;
-  screen.commands.push_back(hold);
-  CommandRowView course;
-  course.label = "Change Course";
-  course.enabled = course.live = true;
-  course.actionCost = false;
-  screen.commands.push_back(course);
+  for (const auto& label : {"HOLD", "Change Course"}) {
+    CommandRowView row = BuildCommandRow(sim, label, true, "1 click", "space", 0);
+    row.enabled = row.live = row.chargePercent >= 100.0;
+    row.spent = !row.enabled;
+    if (row.spent) { row.title = "Recharging - needs two other button clicks"; }
+    screen.commands.push_back(row);
+  }
 
   if (target != nullptr && target->type == "region") {
     CommandRowView view = BuildCommandRow(
@@ -922,7 +919,11 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
 // ---------------------------------------------------------------------------
 namespace {
 bool PressNavActionRaw(Simulation& sim, const std::string& action, const std::string& arg) {
-  if (action == "hold") { return sim.HoldTravel(); }
+  if (action == "hold") {
+    const bool stopped = sim.HoldTravel();
+    if (stopped) { sim.PerformAction(); }
+    return stopped;
+  }
   if (action == "change-course") { return sim.StartTravel(); }
   if (action == "travel") { return PressProgressButton(sim, "travel"); }
   if (action == "scan") { return PressProgressButton(sim, "scan"); }
@@ -968,7 +969,13 @@ bool PressNavAction(Simulation& sim, const std::string& action, const std::strin
     if (!row.enabled || row.spent) { return false; }
     if (!row.actionCost) { return PressNavActionRaw(sim, action, arg); }
     return CommitActionButton(sim, row.chargeKey, row.tier,
-        [&]() { return PressNavActionRaw(sim, action, arg); });
+        [&]() {
+          const bool acted = PressNavActionRaw(sim, action, arg);
+          if (acted && (action == "hold" || action == "change-course")) {
+            sim.MutableState().charges.at(row.chargeKey).left = 0.0;
+          }
+          return acted;
+        });
   }
   if (action == "stand-watch" || action == "dock" || action == "view-sector") {
     return false;
