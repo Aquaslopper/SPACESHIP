@@ -468,11 +468,11 @@ Simulation::NavMetrics Simulation::MetricsFor(const Body& body) const {
 // ---------------------------------------------------------------------------
 
 bool Simulation::StartTravel() {
-  if (!state_.navTarget.has_value()) { return false; }
+  if (!state_.gameOver.empty() || !state_.navTarget.has_value()) { return false; }
   const Body* body = FindBodyById(*state_.navTarget);
   if (body == nullptr || !InRange(*body) || AtTarget(*body)) { return false; }
-  if (FindOngoing("extract") != nullptr) { return false; }
-  if (state_.engineCondition <= 0 || StatValue("energy") <= 0) { return false; }
+  if (FindOngoing("travel") != nullptr || FindOngoing("extract") != nullptr) { return false; }
+  if (StatValue("fuel") <= 0) { return false; }
 
   if (state_.docked) {
     const Port* port = HerePort();

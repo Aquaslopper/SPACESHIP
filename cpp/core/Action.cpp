@@ -250,10 +250,15 @@ void Simulation::FreeCommit(const std::string& detail) {
 
 void Simulation::TickWorld() {
   WearEngine();
-   // A tank under 40% drags the energy down with it: the drive keeps drawing on
-  // a reserve that is no longer there.
-  const double energyEvery = StatValue("fuel") < 40.0 ? 2.0 : 4.0;
+  // Fuel at or below 60% drags the energy down with it: the drive keeps drawing
+  // on a reserve that is no longer there.
+  const double energyEvery = StatValue("fuel") <= 60.0 ? 2.0 : 4.0;
   if (std::fmod(actionCounter_, energyEvery) == 0.0) { ClampStat("energy", -1); }
+  const double energy = StatValue("energy");
+  if (energy <= 60.0 && StatValue("shield") > energy) {
+    ClampStat("shield", energy - StatValue("shield"));
+  }
+  if (InSpace() && std::fmod(actionCounter_, 20.0) == 0.0) { ClampStat("hull", -5); }
   TickFilters();
   TickCrew();
   TickCleaner();
@@ -300,6 +305,15 @@ void Simulation::ClampStat(const std::string& id, double delta) {
     LogLine("Power exhausted. The filter bank has stopped; restore energy to restart it.");
   } else if (id == "energy" && before == 0 && stat->value > 0) {
     LogLine("Power restored. Any charged filter bank resumes without another bonus.");
+  }
+
+  if (id == "energy" || id == "shield") {
+    Stat* energy = FindStat("energy");
+    Stat* shield = FindStat("shield");
+    if (energy != nullptr && shield != nullptr && energy->value <= 60.0 &&
+        shield->value > energy->value) {
+      shield->value = energy->value;
+    }
   }
 }
 
