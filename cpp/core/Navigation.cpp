@@ -462,16 +462,10 @@ Simulation::NavMetrics Simulation::MetricsFor(const Body& body) const {
 // ---------------------------------------------------------------------------
 
 bool Simulation::StartTravel() {
-  if (!state_.gameOver.empty() || !state_.navTarget.has_value()) { return false; }
   const Body* body = FindBodyById(*state_.navTarget);
-  if (!InRange(*body) || AtTarget(*body)) { return false; }
-  if (FindOngoing("travel") != nullptr || FindOngoing("extract") != nullptr) { return false; }
-  if (StatValue("fuel") <= 0) { return false; }
-
   const NavMetrics metrics = MetricsFor(*body);
 
   PerformAction("Course locked - " + body->name);
-  if (!state_.gameOver.empty()) { return true; }
 
   AddOngoing("travel", "Under way to " + body->name, metrics.dist, "travel", body->id);
   map_.inSpace = true;

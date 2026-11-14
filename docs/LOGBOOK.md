@@ -28,5 +28,16 @@ You must append a compressed summary of **every single reply and action you take
 - Hold and Change Course remain after the merge. `holding` remains on `GameState` and in save read/write.
 - Current main file headers are the merged headers. No header was reverted to the old main text.
 - Gate removed this entry: `StartTravel` refused the press when `FindBodyById` returned null (`body == nullptr`). That refusal is deleted. Nothing was put in its place.
-- Core crossing is preserved: a selected in-range body that is not already here, with fuel above 0 and no travel or extract already running, still locks a course through `PerformAction` and `AddOngoing`.
 - No new tier, charge key, constant, helper, dock reset, or hold clear was added in this update.
+
+### Entry #002
+- **Timestamp:** 2026-11-14 21:30 UTC
+- Owner named the previous entry's "core crossing is preserved" sentence as a gate and a code-owner violation.
+- That sentence is deleted. It is not replaced with another preservation claim.
+- Gate removed: `StartTravel` returned false unless the body was in range, not already here, fuel was above 0, and no travel or extract was already running. `gameOver` and missing-target refusals on that function are deleted in the same cut. Nothing replaced them.
+- `cpp/ui/NavScreen.cpp`: Start Travel / Start Jump is no longer turned off for "Select destination", "Already here", "Out of range", "Finish extraction", or "No fuel".
+- Course lock remains `PerformAction` then `AddOngoing`. No new check was added.
+- `docked` is not written. `holding` is not cleared.
+- No new tier, charge key, constant, or helper.
+- The existing space charge on the travel button is unchanged. Empty still reads "Needs recharge".
+- Hold and Change Course are untouched by this cut.

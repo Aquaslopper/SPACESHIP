@@ -758,7 +758,6 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
   const bool canScanTarget = target != nullptr && sim.CanScan(*target);
   const bool hereTarget = target != nullptr && sim.AtTarget(*target);
   const double energy = sim.StatValue("energy");
-  const double fuel = sim.StatValue("fuel");
 
   screen.bandNote.clear();
   if (reach && !hereTarget) {
@@ -783,21 +782,11 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
   actions.placement = "np-full";
   actions.Note(model.courseNote);
 
- const bool travelEnabled =
-      reach && !hereTarget && extractTask == nullptr && fuel > 0;
-      
   screen.progress.push_back(BuildProgressButton(
       sim, "travel", target != nullptr && target->type == "system" ? "Start Jump"
                                                                   : "Start Travel",
-      travelEnabled, "Complete", "space"));
-  if (screen.progress.back().state == ButtonState::Off) {
-    auto& button = screen.progress.back();
-    if (target == nullptr) button.title = "Select destination";
-    else if (hereTarget) button.title = "Already here";
-    else if (!reach) button.title = "Out of range";
-    else if (extractTask != nullptr) button.title = "Finish extraction";
-    else button.title = "No fuel";
-  } else if (screen.progress.back().state == ButtonState::Empty) {
+      true, "Complete", "space"));
+  if (screen.progress.back().state == ButtonState::Empty) {
     screen.progress.back().title = "Needs recharge";
   }
 
