@@ -309,8 +309,19 @@ bool PressQuartersActionRaw(Simulation& sim, const std::string& action,
     }
     return false;
   }
-  if (action == "job") { return sim.StageJob(sim.State().crewSel, arg); }
-  if (action == "order") { return sim.ToggleOrder(sim.State().crewSel, arg); }
+  if (action == "job" || action == "order") {
+    // The screen shows the first hand when crewSel names nobody aboard (a
+    // voyage that starts without crew leaves it empty, and the first hire does
+    // not fill it). Write the order for the hand the screen shows, and make
+    // that hand the selection, so the sheet and the highlight agree.
+    std::string hand = sim.State().crewSel;
+    if (sim.FindCrew(hand) == nullptr) {
+      if (sim.Crew().empty()) { return false; }
+      hand = sim.Crew().front().id;
+      sim.MutableState().crewSel = hand;
+    }
+    return action == "job" ? sim.StageJob(hand, arg) : sim.ToggleOrder(hand, arg);
+  }
   if (action == "commit") { return PressProgressButton(sim, "crew-assign"); }
   if (action == "talk") {
     const auto model = BuildQuartersScreen(sim);

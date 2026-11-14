@@ -647,6 +647,7 @@ int main(int argc, char** argv) {
   audio.Shutdown();
   rlImGuiShutdown();
   display.Shutdown();
+  shell.ReleaseGraphics();
   if (titleTexture.id != 0) { UnloadTexture(titleTexture); }
   if (setupTexture.id != 0) { UnloadTexture(setupTexture); }
   if (wrenExterior.id != 0) { UnloadTexture(wrenExterior); }

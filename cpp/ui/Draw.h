@@ -47,6 +47,9 @@ class ShellView {
  public:
   ShellView();
   ~ShellView();
+  // Frees the hull mesh, material and shader. Call while the window, and with
+  // it the GL context, still exists; the destructor runs after CloseWindow.
+  void ReleaseGraphics() { ReleaseWrenMesh(); }
   ShellView(const ShellView&) = delete;
   ShellView& operator=(const ShellView&) = delete;
 
@@ -390,6 +393,21 @@ class ShellView {
   bool setupPreviewDirty_ = true;
 
   void PaintSetup(Simulation& sim);
+  void PaintTitleBody(Simulation& sim, double nowMs);
+
+  // Screen changes that would otherwise cut in one frame. The state has
+  // already changed when one starts; only the picture is held back.
+  //   1  menu <-> voyage settings: dip to dark and back.
+  //   2  LAUNCH: iris out over the settings, a loading card, iris in on the ship.
+  int fadeKind_ = 0;
+  double fadeStartMs_ = 0.0;
+  bool fadeFromSetup_ = false;
+  bool titleWasSetup_ = false;
+  double titlePaintMs_ = -1.0e9;
+  std::string fadeLabel_;
+  bool LaunchCoverUp(double nowMs) const;
+  void PaintIris(float open, bool reduced);
+  void PaintLaunchCard(double elapsedMs);
   void RebuildSetupPreview(const Simulation& sim);
   bool displayAdjustmentAvailable_ = true;
   std::array<void*, 6> tutorialArt_{};

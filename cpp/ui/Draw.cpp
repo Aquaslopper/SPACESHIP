@@ -417,6 +417,15 @@ float ShellView::PaintTaskHeader(const TaskHead& head, float left, float top) co
 
 ShellView::ShellView() { theme_ = Theme::ById("classic"); }
 
+namespace {
+// Milliseconds. Menu <-> settings dip, then the three steps of a launch.
+constexpr double kDipOutMs = 200.0;
+constexpr double kDipInMs = 260.0;
+constexpr double kLaunchIrisOutMs = 450.0;
+constexpr double kLaunchCardMs = 1500.0;
+constexpr double kLaunchIrisInMs = 550.0;
+}  // namespace
+
 ShellView::~ShellView() { ReleaseWrenMesh(); }
 
 void ShellView::SetWrenExteriorImage(const Image* image) {
@@ -560,8 +569,27 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   if (titleActive_) {
     cargoAnims_.clear();
     lastCargoAnimMs_ = 0.0;
+    if (fadeKind_ == 2) { fadeKind_ = 0; }
     PaintTitle(sim, nowMs);
     return;
+  }
+
+  // LAUNCH. The voyage exists already; the picture gets there in three steps.
+  if (fadeKind_ == 2) {
+    const double t = nowMs - fadeStartMs_;
+    if (t < 0.0 || t >= kLaunchIrisOutMs + kLaunchCardMs + kLaunchIrisInMs) {
+      fadeKind_ = 0;
+    } else if (t < kLaunchIrisOutMs) {
+      titleHits_.clear();
+      PaintSetup(sim);
+      titleHits_.clear();
+      const float u = static_cast<float>(t / kLaunchIrisOutMs);
+      PaintIris(1.0f - u * u, sim.State().reducedMotion);
+      return;
+    } else if (t < kLaunchIrisOutMs + kLaunchCardMs) {
+      PaintLaunchCard(t - kLaunchIrisOutMs);
+      return;
+    }
   }
 
   // Main-content scroll: the whole content column moves with contentScroll_,
@@ -667,6 +695,79 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
     DrawRectangle(static_cast<int>(x + 4), static_cast<int>(style.top), 2, 11, markInk);
   }
 
+  if (fadeKind_ == 2) {
+    const double t = nowMs - fadeStartMs_ - kLaunchIrisOutMs - kLaunchCardMs;
+    const float u = std::clamp(static_cast<float>(t / kLaunchIrisInMs), 0.0f, 1.0f);
+    PaintIris(u * u, sim.State().reducedMotion);
+  }
+}
+
+bool ShellView::LaunchCoverUp(double nowMs) const {
+  if (fadeKind_ != 2 || titleActive_) { return false; }
+  const double t = nowMs - fadeStartMs_;
+  return t >= 0.0 && t < kLaunchIrisOutMs + kLaunchCardMs;
+}
+
+// The closing circle of an old film: everything outside it is the dark of the
+// menu bar. `open` runs from 1 (nothing covered) to 0 (all covered). With
+// reduced motion the same span is a plain fade.
+void ShellView::PaintIris(float open, bool reduced) {
+  const Color dark = ToRay(theme_.palette.titleMenu);
+  open = std::clamp(open, 0.0f, 1.0f);
+  if (open >= 1.0f) { return; }
+  if (reduced) {
+    DrawRectangle(0, 0, static_cast<int>(width_), static_cast<int>(height_),
+                  Fade(dark, 1.0f - open));
+    return;
+  }
+  const Vector2 centre{width_ * 0.5f, height_ * 0.5f};
+  const float reach = std::hypot(width_, height_) * 0.5f + 4.0f;
+  const float radius = reach * open;
+  if (radius < 1.0f) {
+    DrawRectangle(0, 0, static_cast<int>(width_), static_cast<int>(height_), dark);
+    return;
+  }
+  DrawRing(centre, radius, reach + 2.0f, 0.0f, 360.0f, 72, dark);
+  DrawRing(centre, std::max(0.0f, radius - 3.0f), radius, 0.0f, 360.0f, 72,
+           ToRay(theme_.palette.titleMenuBorder));
+}
+
+// The card between the settings and the ship. Nothing is loading: the voyage
+// was built on the press. It is the pause a launch should have.
+void ShellView::PaintLaunchCard(double elapsedMs) {
+  const Palette& p = theme_.palette;
+  DrawRectangle(0, 0, static_cast<int>(width_), static_cast<int>(height_), ToRay(p.titleMenu));
+  const float u = std::clamp(static_cast<float>(elapsedMs / kLaunchCardMs), 0.0f, 1.0f);
+  const int headPx = TypePx(16);
+  const int linePx = TypePx(11);
+  const float barW = std::min(420.0f, width_ * 0.6f);
+  const float barX = std::round((width_ - barW) * 0.5f);
+  const float midY = std::round(height_ * 0.5f);
+
+  const char* head = "PREPARING VOYAGE";
+  Text(head, static_cast<int>((width_ - TextWidth(head, headPx, true)) * 0.5f),
+       static_cast<int>(midY - 34.0f - headPx), headPx, ToRay(p.titleMenuInk), true);
+
+  // Twenty-four blocks, filled left to right in whole steps.
+  const int cells = 24;
+  const int lit = std::min(cells, static_cast<int>(u * 1.08f * cells));
+  const float gap = 3.0f;
+  const float cellW = (barW - gap * (cells - 1)) / cells;
+  for (int i = 0; i < cells; ++i) {
+    const Rectangle cell{barX + i * (cellW + gap), midY - 8.0f, cellW, 16.0f};
+    if (i < lit) { DrawRectangleRec(cell, ToRay(p.titleMenuInk)); }
+    else { DrawRectangleLinesEx(cell, 1.0f, ToRay(p.titleMenuBorder, 150)); }
+  }
+
+  const char* step = u < 0.30f ? "Reading the chart" : u < 0.62f ? "Placing the ship"
+                   : u < 0.92f ? "Opening the deck" : "Ready";
+  Text(step, static_cast<int>(barX), static_cast<int>(midY + 22.0f), linePx,
+       ToRay(p.titleMenuBorder), true);
+  if (!fadeLabel_.empty()) {
+    const float lw = TextWidth(fadeLabel_.c_str(), linePx, true);
+    Text(fadeLabel_.c_str(), static_cast<int>(barX + barW - lw), static_cast<int>(midY + 22.0f),
+         linePx, ToRay(p.titleMenuBorder), true);
+  }
 }
 
 void ShellView::SyncIdleDots(const Simulation& sim, double nowMs) {
@@ -3070,20 +3171,11 @@ float NavBodyWorldY(const NavBodyView& body, const std::string& layer) {
   if (layer == "sector") {
     return signedU * 0.62f;
   }
-  switch (look) {
-    case ChartLook::Star:
-    case ChartLook::Origin: return 0.0f;
-    case ChartLook::Station: return 0.16f + posU * 0.24f;
-    case ChartLook::Site: return (signedU >= 0.0f ? 0.10f : -0.10f) + signedU * 0.22f;
-    case ChartLook::Belt: return signedU * 0.22f;
-    case ChartLook::Moon: return signedU * 0.36f;
-    case ChartLook::Gas:
-    case ChartLook::Ice:
-    case ChartLook::Ocean:
-    case ChartLook::Rock: return signedU * 0.48f;
-    case ChartLook::System:
-    case ChartLook::Region: return signedU * 0.40f;
-  }
+  // System scale: every body lies on the ecliptic. Seeded heights stacked the
+  // worlds above and below one another on their stems; the chart's own x/y is
+  // the horizontal plane and is the only placement a system has.
+  (void)look;
+  (void)posU;
   return 0.0f;
 }
 
@@ -3104,7 +3196,10 @@ float NavBodyScale3D(const NavBodyView& body, float tableScale, const std::strin
     case ChartLook::Belt: base = std::max(base, 0.088f); break;
     case ChartLook::Origin: base = std::max(base, 0.088f); break;
   }
-  return std::clamp(base, 0.042f, 0.26f);
+  // System scale shows worlds, moons and stations side by side on one plane;
+  // at full size they crowd the orbits and each other's labels.
+  const float shrink = layer == "system" ? 0.62f : 1.0f;
+  return std::clamp(base, 0.042f, 0.26f) * shrink;
 }
 
 void PaintShadedSphere3D(const Vector3& center, float radius, int rings, int slices,
@@ -3725,6 +3820,8 @@ void ShellView::PaintNavScreen(Simulation& sim) {
         camRight.x * camForward.y - camRight.y * camForward.x,
     };
 
+    const std::string layer = chart.layer;
+    (void)layer;
     EndMode2D();
     BeginScissorMode(static_cast<int>(box.x + kDoubleInset),
                      static_cast<int>(box.y + kDoubleInset - contentScroll_),
@@ -3780,8 +3877,9 @@ void ShellView::PaintNavScreen(Simulation& sim) {
           const float rOrb = std::hypot(dx, dz);
           if (rOrb > 0.25f && rOrb < tableHalfW * 2.2f) {
             const float tilt = std::clamp(itP->second.y / rOrb, -0.22f, 0.22f);
+            const float orbTilt = layer == "system" ? 0.0f : tilt * 0.45f;
             PaintOrbitTrack3D(Vector3{systemStarPos.x, systemStarPos.y, systemStarPos.z},
-                              rOrb, rOrb, tilt * 0.45f, -tilt * 0.35f, 40, orbCol);
+                              rOrb, rOrb, orbTilt, -orbTilt * 0.78f, 40, orbCol);
           }
         }
       }
@@ -3857,6 +3955,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
           rlColor4ub(qc.r, qc.g, qc.b, qc.a);
           rlVertex3f(v0.x, v0.y, v0.z); rlVertex3f(v1.x, v1.y, v1.z); rlVertex3f(v2.x, v2.y, v2.z);
           rlColor4ub(qc.r, qc.g, qc.b, qc.a);
+  const std::string layer = chart.layer;
           rlVertex3f(v0.x, v0.y, v0.z); rlVertex3f(v2.x, v2.y, v2.z); rlVertex3f(v3.x, v3.y, v3.z);
         };
         if (bright) { emitQuad(sz * 1.9f, Fade(amberCol, 0.24f)); }
@@ -3919,14 +4018,20 @@ void ShellView::PaintNavScreen(Simulation& sim) {
                               Fade(ToRay(p.coffeeLight), 0.36f * alpha));
             break;
           case ChartLook::Gas: {
+            const bool flatLayer = (layer == "system");
             const ::Color gasCol = ChartLift(ToRay(p.amber), 0.38f);
             PaintShadedSphere3D(wp, r3, 8, 14, gasCol, lightRef, pointLight, 1, seed, p, alpha);
-            const float ringTiltX = 0.42f + static_cast<float>(seed % 7u) * 0.04f;
-            const float ringTiltZ = -0.22f + static_cast<float>((seed / 7u) % 5u) * 0.06f;
-            PaintRing3D(wp, r3 * 1.38f, r3 * 1.72f, ringTiltX, ringTiltZ, 28,
+            const float ringTiltX = flatLayer ? 0.0f : 0.42f + static_cast<float>(seed % 7u) * 0.04f;
+            const float ringTiltZ = flatLayer ? 0.0f : -0.22f + static_cast<float>((seed / 7u) % 5u) * 0.06f;
+            const float ringIn = r3 * (flatLayer ? 1.18f : 1.38f);
+            const float ringMid = r3 * (flatLayer ? 1.46f : 1.72f);
+            const float ringOut = r3 * (flatLayer ? 1.55f : 2.08f);
+            PaintRing3D(wp, ringIn, ringMid, ringTiltX, ringTiltZ, 28,
                         ChartFade(ChartLift(ToRay(p.coffeeLight), 0.25f), 0.78f * alpha));
-            PaintRing3D(wp, r3 * 1.82f, r3 * 2.08f, ringTiltX, ringTiltZ, 28,
-                        ChartFade(ToRay(p.coffeeLight), 0.48f * alpha));
+            if (!flatLayer) {
+              PaintRing3D(wp, r3 * 1.82f, ringOut, ringTiltX, ringTiltZ, 28,
+                          ChartFade(ToRay(p.coffeeLight), 0.48f * alpha));
+            }
             break;
           }
           case ChartLook::Ice:
@@ -3952,47 +4057,57 @@ void ShellView::PaintNavScreen(Simulation& sim) {
                                        : (reduced ? 1.0f : (0.35f + 0.65f * (0.5f + 0.5f * std::sin(tSec * 4.5f))));
             PaintStation3D(wp, r3, spin, p, alpha, beaconOp);
 
-            // Orbiting 3D telemetry satellites flying continuously around every station
-            const float satOrbitR = r3 * 2.65f;
+            // The telemetry satellite keeps its orbit in the chart plane so the
+            // system layer reads horizontally. Sector and galaxy keep their tilt.
+            const bool flatLayer = (layer == "system");
+            const float satOrbitR = r3 * (flatLayer ? 2.20f : 2.65f);
             const float satAngle = tSec * 0.85f + static_cast<float>(seed % 31u) * 0.2f;
-            const float satTiltX = 0.32f + static_cast<float>(seed % 5u) * 0.10f;
-            const float satTiltZ = -0.25f;
-            PaintOrbitTrack3D(wp, satOrbitR, satOrbitR * 0.88f, satTiltX, satTiltZ, 28,
+            const float satTiltX = flatLayer ? 0.0f : 0.32f + static_cast<float>(seed % 5u) * 0.10f;
+            const float satTiltZ = flatLayer ? 0.0f : -0.25f;
+            PaintOrbitTrack3D(wp, satOrbitR, flatLayer ? satOrbitR : satOrbitR * 0.88f,
+                              satTiltX, satTiltZ, 28,
                               Fade(ToRay(p.coffeeLight), 0.42f * alpha));
             const float lx = std::cos(satAngle) * satOrbitR;
-            const float lz = std::sin(satAngle) * satOrbitR * 0.88f;
+            const float lz = std::sin(satAngle) * (flatLayer ? satOrbitR : satOrbitR * 0.88f);
             const float cxT = std::cos(satTiltX), sxT = std::sin(satTiltX);
             const float czT = std::cos(satTiltZ), szT = std::sin(satTiltZ);
             const float ly1 = -lz * sxT, lz1 = lz * cxT;
             const Vector3 satPos{wp.x + (lx * czT - ly1 * szT),
-                                 wp.y + (lx * szT + ly1 * czT),
+                                 wp.y + (flatLayer ? 0.0f : (lx * szT + ly1 * czT)),
                                  wp.z + lz1};
             const float tx = -std::sin(satAngle);
-            const float tz = std::cos(satAngle) * 0.88f;
+            const float tz = std::cos(satAngle) * (flatLayer ? 1.0f : 0.88f);
             PaintSatellite3D(satPos, r3 * 0.44f, tx, tz, p,
                              reduced ? 1.0f : (0.5f + 0.5f * std::sin(tSec * 6.0f + satAngle)));
             break;
           }
           case ChartLook::Site: {
+            const bool flatLayer = (layer == "system");
             const float spin = tSec * 0.75f + static_cast<float>(seed % 17u);
             PaintAsteroid3D(wp, r3 * 0.68f, 0.35f, spin, 0.2f, ToRay(p.terracotta),
                             fallbackKey, seed);
-            PaintOrbitTrack3D(wp, r3 * 1.25f, r3 * 1.25f, 0.5f, 0.0f, 18,
+            PaintOrbitTrack3D(wp, r3 * (flatLayer ? 1.15f : 1.25f),
+                              flatLayer ? r3 * 1.15f : r3 * 1.25f,
+                              flatLayer ? 0.0f : 0.5f, 0.0f, 18,
                               Fade(ToRay(p.terracotta), 0.55f * alpha));
             break;
           }
           case ChartLook::Belt: {
+            const bool flatLayer = (layer == "system");
             const ::Color beltCol = ChartMix(ToRay(p.coffeeLight), ToRay(p.coffeeDark), 0.25f);
-            PaintOrbitTrack3D(wp, r3 * 1.7f, r3 * 1.15f, 0.22f, -0.15f, 24,
+            const float beltR = r3 * (flatLayer ? 1.45f : 1.7f);
+            PaintOrbitTrack3D(wp, beltR, flatLayer ? beltR : r3 * 1.15f,
+                              flatLayer ? 0.0f : 0.22f, flatLayer ? 0.0f : -0.15f, 24,
                               Fade(beltCol, 0.42f * alpha));
             for (int bi = 0; bi < 6; ++bi) {
               const float a = static_cast<float>(bi) / 6.0f * 2.0f * PI + tSec * 0.22f;
+              const float rr = flatLayer ? beltR : r3 * 1.65f;
               const Vector3 bp{
-                  wp.x + std::cos(a) * r3 * 1.65f,
-                  wp.y + std::sin(a * 2.0f) * r3 * 0.28f,
-                  wp.z + std::sin(a) * r3 * 1.12f,
+                  wp.x + std::cos(a) * rr,
+                  wp.y + (flatLayer ? 0.0f : std::sin(a * 2.0f) * r3 * 0.28f),
+                  wp.z + std::sin(a) * (flatLayer ? beltR : r3 * 1.12f),
               };
-              PaintAsteroid3D(bp, r3 * (0.20f + 0.04f * static_cast<float>(bi % 3)),
+              PaintAsteroid3D(bp, r3 * (flatLayer ? 0.18f : 0.20f + 0.04f * static_cast<float>(bi % 3)),
                               a * 1.7f, a * 2.3f, a * 0.9f, beltCol, lightRef,
                               seed + static_cast<unsigned>(bi) * 97u);
             }
@@ -6720,9 +6835,23 @@ void ShellView::PaintSetup(Simulation& sim) {
   const Texture2D* texture = static_cast<const Texture2D*>(setupArt_);
   const bool hasArt = texture != nullptr && texture->id != 0 && texture->width > 0;
   if (hasArt) {
-    DrawTexturePro(*texture,
-                   Rectangle{0, 0, static_cast<float>(texture->width), static_cast<float>(texture->height)},
+    // setupscreen.png is opaque: outside its chamfered frame it is black, a
+    // 4 px rim and four 36 px corners (measured on the 1867x842 file). Leave
+    // the rim out of the source and lay the page colour over the corners.
+    const float tw = static_cast<float>(texture->width);
+    const float th = static_cast<float>(texture->height);
+    const float rimX = tw * (4.0f / 1867.0f);
+    const float rimY = th * (4.0f / 842.0f);
+    DrawTexturePro(*texture, Rectangle{rimX, rimY, tw - 2.0f * rimX, th - 2.0f * rimY},
                    Rectangle{card.x, card.y, card.w, card.h}, Vector2{0, 0}, 0, ToRay(p.white));
+    const float cx = card.w * (38.0f / 1859.0f) + 1.0f;
+    const float cy = card.h * (38.0f / 834.0f) + 1.0f;
+    const Color page = ToRay(p.titleBackground);
+    const float l = card.x, r = card.Right(), t = card.y, b = card.Bottom();
+    DrawTriangle(Vector2{l, t}, Vector2{l, t + cy}, Vector2{l + cx, t}, page);
+    DrawTriangle(Vector2{r, t}, Vector2{r - cx, t}, Vector2{r, t + cy}, page);
+    DrawTriangle(Vector2{l, b}, Vector2{l + cx, b}, Vector2{l, b - cy}, page);
+    DrawTriangle(Vector2{r, b}, Vector2{r, b - cy}, Vector2{r - cx, b}, page);
   } else {
     PaintChamferBoxRay(card, kChamferPanel, ToRay(p.panel),
                        ToRay(p.borderDark), ToRay(p.border));
@@ -6732,8 +6861,12 @@ void ShellView::PaintSetup(Simulation& sim) {
   const float leftW = card.w * 0.42f;
   const float mapX = card.x + leftW;
   const float mapY = card.y + pad;
-  const float mapW = card.w - leftW - pad;
   const float mapH = card.h * 0.72f;
+  // The art's lower right corner is cut by a diagonal that runs, in fractions
+  // of the card, along x + 0.451 y = 1.275. The preview keeps its height and
+  // gives up width, so its own lower right corner stays inside that line.
+  const float diagonalX = card.w * (1.275f - 0.451f * ((mapY + mapH - card.y) / card.h));
+  const float mapW = std::min(card.w - leftW - pad, diagonalX - card.w * 0.017f - leftW);
   const float barY = card.Bottom() - card.h * 0.11f;
   const int textPx = TypePx(12);
 
@@ -6851,14 +6984,53 @@ void ShellView::PaintSetup(Simulation& sim) {
 
   if (!setupSystemId_.empty()) {
     Text(("Start: " + setupSystemId_).c_str(), static_cast<int>(launch.x + launch.w + 12),
-         static_cast<int>(barY + 10), TypePx(10), ToRay(p.titleInk));
+         static_cast<int>(barY + 10), TypePx(10), ToRay(p.titleMenuInk));
   } else {
     Text("Choose a starting system on the map.", static_cast<int>(launch.x + launch.w + 12),
-         static_cast<int>(barY + 10), TypePx(10), ToRay(p.muted));
+         static_cast<int>(barY + 10), TypePx(10), ToRay(p.titleMenuBorder));
   }
 }
 
 void ShellView::PaintTitle(Simulation& sim, double nowMs) {
+  // Menu <-> voyage settings: the screen that was up darkens, the new one
+  // comes out of the dark. Only when the menu was on screen the frame before.
+  const bool setupNow = !titleConfirm_ && titlePanel_ == TitlePanel::Setup;
+  const bool continuous = nowMs - titlePaintMs_ < 250.0;
+  titlePaintMs_ = nowMs;
+  if (continuous && setupNow != titleWasSetup_ &&
+      (titlePanel_ == TitlePanel::Setup || titlePanel_ == TitlePanel::None)) {
+    fadeKind_ = 1;
+    fadeStartMs_ = nowMs;
+    fadeFromSetup_ = titleWasSetup_;
+  }
+  titleWasSetup_ = setupNow;
+
+  PaintTitleBody(sim, nowMs);
+  if (fadeKind_ != 1) { return; }
+  const double t = nowMs - fadeStartMs_;
+  if (t < 0.0 || t >= kDipOutMs + kDipInMs || titleConfirm_ ||
+      (titlePanel_ != TitlePanel::Setup && titlePanel_ != TitlePanel::None)) {
+    fadeKind_ = 0;
+    return;
+  }
+  const Color dark = ToRay(theme_.palette.titleMenu);
+  if (t < kDipOutMs) {
+    // The new screen's controls are already live; keep them, show the old one.
+    const std::vector<NavHit> live = titleHits_;
+    const TitlePanel panel = titlePanel_;
+    titlePanel_ = fadeFromSetup_ ? TitlePanel::Setup : TitlePanel::None;
+    PaintTitleBody(sim, nowMs);
+    titlePanel_ = panel;
+    titleHits_ = live;
+    DrawRectangle(0, 0, static_cast<int>(width_), static_cast<int>(height_),
+                  Fade(dark, static_cast<float>(t / kDipOutMs)));
+  } else {
+    DrawRectangle(0, 0, static_cast<int>(width_), static_cast<int>(height_),
+                  Fade(dark, 1.0f - static_cast<float>((t - kDipOutMs) / kDipInMs)));
+  }
+}
+
+void ShellView::PaintTitleBody(Simulation& sim, double nowMs) {
   const Palette& p = theme_.palette;
   titleHits_.clear();
   title_ = BuildTitleScreen(sim, fromVoyage_, titlePanel_, saveDir_, titleSlot_,
@@ -6919,8 +7091,10 @@ void ShellView::PaintTitle(Simulation& sim, double nowMs) {
 
   // The art says DESIGN / MANAGE / ...; these are decorative, not menu
   // controls. HTA #title-actions paints its own five commands over that strip.
-  const Area menu{card.x + card.w * 0.02f, card.Bottom() - card.h * (0.0405f + 0.0565f),
-                  card.w * 0.818f, std::max(card.h * 0.0565f, theme_.LineHeight() + 12)};
+  // The strip painted into title.jpg runs from x = 36 to 1397 of 1672, short of
+  // the frame line on the left and the diagonal on the right.
+  const Area menu{card.x + card.w * 0.0204f, card.Bottom() - card.h * (0.0405f + 0.0565f),
+                  card.w * 0.8128f, std::max(card.h * 0.0565f, theme_.LineHeight() + 12)};
   const Color menuBg = ToRay(p.titleMenu), menuText = ToRay(p.titleMenuInk);
   const float cell = menu.w / static_cast<float>(title_.actions.size());
   for (std::size_t i = 0; i < title_.actions.size(); ++i) {
@@ -7759,6 +7933,7 @@ void ShellView::Scroll(Simulation& sim, float x, float y, float wheelDelta) {
 }
 
 void ShellView::Escape(Simulation& sim) {
+  if (LaunchCoverUp(frameTimeMs_)) { return; }
   if (LossVisible(sim)) { lossDismissed_ = true; return; }
   if (titleActive_) {
     if (titleConfirm_) { titleConfirm_ = false; }
@@ -7785,6 +7960,8 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
   }
   if (floating_.HasConfirmation() || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow)) { return; }
   if (button == HitButton::None) { return; }
+  // Nothing of the ship is on screen yet; a press must not land on it blind.
+  if (LaunchCoverUp(nowMs)) { return; }
 
   // The menu covers everything below it, and the loss overlay covers the ship.
   if (titleActive_) {
@@ -7920,6 +8097,9 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         sim.BeginVoyage(setupSettings_, setupSystemId_);
         fromVoyage_ = false;
         HideTitle();
+        fadeKind_ = 2;
+        fadeStartMs_ = nowMs;
+        fadeLabel_ = setupSystemId_;
         return;
       }
       PressTitleAction(sim, hit.action, "", &fromVoyage_, &titlePanel_, &titleSlot_,
