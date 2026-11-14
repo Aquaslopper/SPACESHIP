@@ -468,21 +468,10 @@ Simulation::NavMetrics Simulation::MetricsFor(const Body& body) const {
 // ---------------------------------------------------------------------------
 
 bool Simulation::StartTravel() {
-  if (!state_.gameOver.empty() || !state_.navTarget.has_value()) { return false; }
+  if !state_.navTarget.has_value()) { return false; }
   const Body* body = FindBodyById(*state_.navTarget);
   if (body == nullptr || !InRange(*body) || AtTarget(*body)) { return false; }
   if (FindOngoing("travel") != nullptr || FindOngoing("extract") != nullptr) { return false; }
-  if (StatValue("fuel") <= 0) { return false; }
-
-  if (state_.docked) {
-    const Port* port = HerePort();
-    state_.docked = false;
-    if (port != nullptr) {
-      for (InfoRow& row : infos_) {
-        if (row.id == "location") { row.value = port->name + " - undocked"; }
-      }
-    }
-  }
 
 
   const NavMetrics metrics = MetricsFor(*body);
@@ -504,7 +493,7 @@ bool Simulation::Hold() {
 }
 
 bool Simulation::ChangeCourse() {
-  if (!state_.gameOver.empty() || !state_.holding || !state_.navTarget.has_value()) { return false; }
+  if !state_.holding || !state_.navTarget.has_value()) { return false; }
   const Body* body = FindBodyById(*state_.navTarget);
 
   const NavMetrics metrics = MetricsFor(*body);
