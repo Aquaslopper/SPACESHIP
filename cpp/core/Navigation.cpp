@@ -468,19 +468,6 @@ Simulation::NavMetrics Simulation::MetricsFor(const Body& body) const {
 // ---------------------------------------------------------------------------
 
 bool Simulation::StartTravel() {
-  // A crossing in progress is dropped here, before any other check, so the
-  // button that started it also stops it.
-  if (Task* under = FindOngoing("travel")) {
-    const std::string id = under->id;
-    ClearOngoing(id);
-    state_.navTarget.reset();
-    for (InfoRow& row : infos_) {
-      if (row.id == "location") { row.value = "In space - holding"; }
-    }
-    LogLine("Course dropped. The ship is holding position.");
-    return true;
-  }
-
   if (!state_.navTarget.has_value()) { return false; }
   const Body* body = FindBodyById(*state_.navTarget);
   if (body == nullptr || !InRange(*body) || AtTarget(*body)) { return false; }
@@ -496,6 +483,7 @@ bool Simulation::StartTravel() {
       }
     }
   }
+
 
   const NavMetrics metrics = MetricsFor(*body);
 
