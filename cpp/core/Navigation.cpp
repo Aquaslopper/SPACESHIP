@@ -234,9 +234,8 @@ bool Simulation::AtTarget(const Body& body) const {
   if (body.type == "system") { return body.id == CurrentSystemId(); }
   return body.id == map_.here;
 }
-
 bool Simulation::InSpace() const {
-  return !state_.docked && FindOngoing("travel") != nullptr;
+  return !state_.docked;
 }
 
 const Body* Simulation::HomeBody() const {
@@ -474,9 +473,7 @@ bool Simulation::StartTravel() {
   if (body == nullptr || !InRange(*body) || AtTarget(*body)) { return false; }
   if (FindOngoing("extract") != nullptr) { return false; }
   if (state_.engineCondition <= 0 || StatValue("energy") <= 0) { return false; }
-  // Docking never blocks a crossing. A ship that plots a jump from a berth
-  // leaves the berth as part of the same departure: no second action, no
-  // refusal, the location readout follows.
+
   if (state_.docked) {
     const Port* port = HerePort();
     state_.docked = false;
@@ -487,35 +484,16 @@ bool Simulation::StartTravel() {
     }
   }
 
-  // The button stops a crossing where it is. The course is dropped on the
-  // spot and the target with it, so nothing can arrive later.
-  if (Task* under = FindOngoing("travel")) {
-    const std::string id = under->id;
-    ClearOngoing(id);
-    LogLine("Course dropped. The ship is holding position.");
-    return true;
-  }
-  // Steering away mid-flight. A course already under way is finished where the
-  // ship has got to, not at the target it was aimed at: the task is closed on
-  // the spot and the commander takes the report, exactly as at any arrival.
-  // ArriveAt is not called, so the old target is never reached.
-  if (Task* under = FindOngoing("travel")) {
-    under->left = 0;
-    under->state = "done";
-  }
 
   const NavMetrics metrics = MetricsFor(*body);
-  // Nothing is paid here. The tank falls with each click under way.
 
-  // Order matters. The initiating action is spent FIRST, so the tick it causes
-  // cannot eat a step of the journey it starts.
   PerformAction("Course locked - " + body->name);
   if (!state_.gameOver.empty()) { return true; }
 
   AddOngoing("travel", "Under way to " + body->name, metrics.dist, "travel", body->id);
+  map_.inSpace = true;
   return true;
 }
-
 bool Simulation::StartScan() {
   if (!state_.navTarget.has_value()) { return false; }
   const Body* body = FindBodyById(*state_.navTarget);
@@ -813,6 +791,7 @@ void Simulation::ArriveAt(const std::string& bodyId) {
   if (body == nullptr) { return; }
 
   map_.here = body->id;
+  map_.inSpace = false;
   views_["system"].sel = body->id;
 
   if (system != nullptr) {
@@ -993,6 +972,7 @@ void Simulation::RefreshLocationInfo() {
 }
 
 bool Simulation::Dock() {
+  if (map_.inSpace) { return false; }
   const Port* port = HerePort();
   if (port == nullptr || state_.docked || !state_.gameOver.empty()) { return false; }
   const std::string name = port->name;

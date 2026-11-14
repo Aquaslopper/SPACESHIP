@@ -66,7 +66,10 @@ void Simulation::TickFilters() {
 }
 
 bool Simulation::BankRunning() const {
-  return state_.filterLife > 0 && StatValue("energy") > 0;
+  for (const CanisterSlot& slot : life_.slots) {
+    if (slot.state == "active") { return true; }
+  }
+  return false;
 }
 
 bool Simulation::BankReady() const {

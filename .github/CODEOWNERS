@@ -1,0 +1,5 @@
+# The game itself belongs to its owner. Nothing is merged into these paths
+# without an explicit approval from @Aquaslopper.
+
+/cpp/                @Aquaslopper
+/assets/data/        @Aquaslopper

@@ -299,29 +299,29 @@
       "stages": [
         {
           "text": "A hairline fracture needs attention.",
-          "ticks": 2
+          "ticks": 5
         },
         {
-          "hull": -8,
+          "hull": -1,
           "text": "The fracture is spreading.",
-          "ticks": 2
+          "ticks": 3
         },
         {
-          "hull": -12,
+          "hull": -3,
           "text": "A bulkhead is losing pressure.",
-          "ticks": 2
+          "ticks": 4
         },
         {
-          "hull": -50,
+          "hull": -6,
           "text": "The crew sealed the section, but the hull is damaged.",
-          "ticks": 2
+          "ticks": 6
         }
       ],
       "title": "Hull micro-fracture"
     },
     {
-      "every": 80,
-      "first": 40,
+      "every": 140,
+      "first": 80,
       "id": "surge",
       "kind": "Electrical",
       "remedy": "Isolate the damaged circuit",
@@ -329,24 +329,24 @@
       "stages": [
         {
           "text": "A circuit is drawing uneven power.",
-          "ticks": 2
+          "ticks": 5
         },
         {
-          "energy": -12,
+          "energy": -3,
           "text": "The surge is pulling power out of the reserve.",
-          "ticks": 2
+          "ticks": 4
         },
         {
-          "energy": -35,
+          "energy": -6,
           "text": "The circuit trips and drains the reserve.",
-          "ticks": 2
+          "ticks": 6
         }
       ],
       "title": "Power surge"
     },
     {
-      "every": 70,
-      "first": 30,
+      "every": 90,
+      "first": 110,
       "id": "crew",
       "kind": "Crew",
       "remedy": "Mediate the dispute",
@@ -357,12 +357,12 @@
           "ticks": 1
         },
         {
-          "morale": -16,
+          "morale": -6,
           "text": "The disagreement is affecting the whole crew.",
           "ticks": 1
         },
         {
-          "morale": -26,
+          "morale": -10,
           "text": "The argument subsides, leaving tempers frayed.",
           "ticks": 1
         }
@@ -370,8 +370,8 @@
       "title": "Crew dispute"
     },
     {
-      "every": 120,
-      "first": 90,
+      "every": 150,
+      "first": 200,
       "id": "radiation",
       "kind": "Environmental",
       "remedy": "Shield the exposed sections",
@@ -379,23 +379,23 @@
       "stages": [
         {
           "text": "A radiation front is approaching the ship.",
-          "ticks": 2
+          "ticks": 4
         },
         {
-          "shield": -32,
+          "shield": -2,
           "text": "The front is stressing the shields.",
-          "ticks": 2
+          "ticks": 6
         },
         {
-          "hull": -55,
+          "hull": -10,
           "text": "The front has passed, leaving the hull scorched.",
-          "ticks": 2
+          "ticks": 4
         }
       ],
       "title": "Radiation front"
     },
     {
-      "every": 20,
+      "every": 50,
       "first": 15,
       "id": "static",
       "kind": "Contact",

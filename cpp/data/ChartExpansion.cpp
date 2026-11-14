@@ -815,38 +815,8 @@ void PopulateLocalCharts(Catalog& catalog, std::size_t firstSystem) {
       system.details.emplace_back("Navigable", std::to_string(localCount) + " local destinations");
     }
   }
-
-  // Every berth has its own hands, drawn from the berth's own seed: the same
-  // faces on every visit, and no station borrowing another's.
-  static const char* kFirst[] = {"Nemi", "Ori",  "Ryn",  "Sol",   "Tace",
-                                 "Ilsa", "Bram", "Vey",  "Mira",  "Ondo"};
-  static const char* kLast[] = {"Vale", "Dane", "Isley", "Renn", "Sable",
-                                "Quill", "Marrow", "Hale", "Tarn", "Voss"};
-  for (const Port& port : catalog.ports) {
-    Rng hand(HashOf(port.id + "-hands"));
-    for (int i = 0; i < 2; ++i) {
-      CandidateDefinition def;
-      def.port = port.id;
-      def.fee = 180.0 + 20.0 * hand.Below(4);
-      def.crew.id = "hand-" + port.id + "-" + std::to_string(i);
-      def.crew.name = std::string(kFirst[hand.Below(10)]) + " " + kLast[hand.Below(10)];
-      def.crew.role = "Deckhand";
-      def.crew.room = "quarters";
-      def.crew.activity = "Idle in the corridor";
-      def.crew.sex = hand.Below(2) == 0 ? "f" : "m";
-      def.crew.age = 22 + hand.Below(24);
-      def.crew.health = 90.0;
-      def.crew.morale = 72.0;
-      def.crew.fatigue = 22.0;
-      def.crew.hunger = 18.0;
-      def.crew.race = "Human";
-      def.crew.religion = "None";
-      def.crew.skill = "Untrained";
-      def.crew.homeworld = port.name;
-      catalog.candidates.push_back(std::move(def));
-    }
-  }
 }
+
 void PlaceGalaxyDots(Catalog& catalog) {
   if (catalog.regions.empty()) { return; }
   catalog.galaxyPositions.clear();

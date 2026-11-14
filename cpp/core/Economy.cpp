@@ -28,7 +28,10 @@ bool Truthy(const std::map<std::string, bool>& map, const std::string& key) {
 }
 }  // namespace
 
-const Port* Simulation::HerePort() const { return catalog_.FindPort(map_.here); }
+const Port* Simulation::HerePort() const {
+  if (map_.inSpace) { return nullptr; }
+  return catalog_.FindPort(map_.here);
+}
 
 double Simulation::SurveyWorth(const std::string& type) const {
   auto it = catalog_.surveyWorth.find(type);
@@ -364,8 +367,12 @@ bool Simulation::HireCrew(const std::string& candidateId) {
   if (!state_.gameOver.empty() || !state_.docked || HerePort() == nullptr) { return false; }
   if (Truthy(state_.hired, candidateId)) { return false; }
 
+  const std::vector<CandidateDefinition> hands = HandsHere();
   const CandidateDefinition* candidate = nullptr;
   for (const CandidateDefinition& entry : catalog_.candidates) {
+    if (entry.crew.id == candidateId) { candidate = &entry; }
+  }
+  for (const CandidateDefinition& entry : hands) {
     if (entry.crew.id == candidateId) { candidate = &entry; }
   }
   if (candidate == nullptr) { return false; }
@@ -376,7 +383,10 @@ bool Simulation::HireCrew(const std::string& candidateId) {
   state_.shiplets -= candidate->fee;
   state_.hired[candidateId] = true;
   crew_.push_back(MakeCrew(candidate->crew));
-  const std::string name = candidate->crew.name;
+  for (const CandidateDefinition& hand : HandsHere()) {
+    if (hand.crew.id == candidateId) { crew_.back().name = hand.crew.name; }
+  }
+  const std::string name = crew_.back().name;
   FreeCommit(name + " joined the crew");
   return true;
 }
@@ -536,6 +546,26 @@ double TradePays(const Body& destination, const std::string& goodId) {
   return 1.0;
 }
 }  // namespace
+
+std::vector<CandidateDefinition> Simulation::HandsHere() const {
+  std::vector<CandidateDefinition> hands;
+  if (map_.here.empty() || catalog_.FindPort(map_.here) == nullptr) { return hands; }
+  if (catalog_.candidates.empty()) { return hands; }
+
+  const long long epoch = static_cast<long long>(std::floor(ActionCount() / kTradeEpoch));
+  TradeRng rng(TradeHash(map_.here + "#tavern#" + std::to_string(epoch)));
+
+  std::vector<std::size_t> pool;
+  for (std::size_t i = 0; i < catalog_.candidates.size(); ++i) { pool.push_back(i); }
+  for (int i = 0; i < 5 && !pool.empty(); ++i) {
+    const std::size_t pick = static_cast<std::size_t>(rng.Below(static_cast<int>(pool.size())));
+    CandidateDefinition def = catalog_.candidates[pool[pick]];
+    pool.erase(pool.begin() + static_cast<long>(pick));
+    def.port = map_.here;
+    hands.push_back(std::move(def));
+  }
+  return hands;
+}
 
 bool Simulation::TradeAccepted(const std::string& mode, const std::string& to,
                                const std::string& good) const {

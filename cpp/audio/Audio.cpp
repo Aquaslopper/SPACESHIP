@@ -44,8 +44,8 @@ Gains GainsFor(const Options& options) {
   gains.effectsOn = options.soundEffects;
   gains.musicOn = options.music;
   gains.master = level * 0.62;
-  gains.effects = gains.effectsOn ? 0.8 : 0.0;
-  gains.music = gains.musicOn ? 0.18 : 0.0;
+  gains.effects = gains.effectsOn ? 1.0 : 0.0;
+  gains.music = gains.musicOn ? 0.12 : 0.0;
   return gains;
 }
 
