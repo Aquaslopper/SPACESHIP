@@ -3604,7 +3604,24 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   const float middleLeft = left + leftColumn + 12.0f;
   const float middleRight = right - rightColumn - 12.0f;
 
-  const float headerH = PaintTaskHeader(screen.head, left, layout_.content.y);
+  const float titleH = PaintTaskHeader(screen.head, left, layout_.content.y);
+  const float courseButtonH = std::max(38.0f, theme_.LineHeight() + 16.0f);
+  const float courseButtonW = std::max(160.0f, TextWidth("Change Course", TypePx(10)) + 32.0f);
+  const float headerH = titleH + courseButtonH + 8.0f;
+  float courseButtonX = left;
+  for (const auto& row : screen.commands) {
+    if (row.label != "HOLD" && row.label != "Change Course") { continue; }
+    const Area control{courseButtonX, layout_.content.y + titleH + 4.0f,
+                       courseButtonW, courseButtonH};
+    PaintChamferBoxRay(control, kChamferSmall, ToRay(p.panel2),
+                      ToRay(p.borderDark), ToRay(p.border));
+    Text(row.label.c_str(),
+         static_cast<int>(control.x + (control.w - TextWidth(row.label.c_str(), TypePx(10))) / 2.0f),
+         static_cast<int>(control.y + (control.h - TypePx(10)) / 2.0f),
+         TypePx(10), ToRay(p.ink));
+    navHits_.push_back({control, row.label == "HOLD" ? "hold" : "change-course", ""});
+    courseButtonX += courseButtonW + 8.0f;
+  }
 
   // HTA #map fills the middle column up to 1100px. Its height is limited by
   // the remaining content height, 500px and half its width, with a 240px floor.
@@ -4664,6 +4681,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
 
   float ty = std::max({ly, rightBottom, uy + underH, leftButtonBottom, rightButtonBottom}) + 12;
   for (const CommandRowView& row : screen.commands) {
+    if (row.label == "HOLD" || row.label == "Change Course") { continue; }
     const float costW = TextWidth(row.displayCost.c_str(), TypePx(9)) + 12.0f;
     const Area rowBox{left + 8.0f, ty, right - left - 16.0f, theme_.LineHeight() + 8.0f};
     const std::string& rowText = !row.enabled && !row.title.empty() ? row.title : row.label;
@@ -4678,6 +4696,8 @@ void ShellView::PaintNavScreen(Simulation& sim) {
                     static_cast<int>(barW), 2, ::Color{126, 198, 63, 255});
     }
     std::string action;
+    if (row.label == "HOLD") { action = "hold"; }
+    if (row.label == "Change Course") { action = "change-course"; }
     if (row.label.find("Stand watch") == 0) { action = "stand-watch"; }
     if (row.label.find("Dock at ") == 0) { action = "dock"; }
     if (row.label.find("View ") == 0) { action = "view-sector"; }

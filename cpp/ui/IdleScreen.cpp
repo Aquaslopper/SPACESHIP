@@ -111,6 +111,8 @@ Strip NavStrip(const Simulation& sim, const Area& box) {
     strip.main = travel->label + " - crossing in progress";
   } else if (travel != nullptr && travel->state == "done") {
     strip.main = "Crossing complete - awaiting acknowledgement";
+  } else if (sim.Map().inSpace) {
+    strip.main = "HOLD - stopped in space";
   } else {
     strip.main = "Holding at " + where + " - no course plotted";
   }

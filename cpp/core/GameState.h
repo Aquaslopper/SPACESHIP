@@ -211,6 +211,7 @@ struct MapView {
   std::string layer = "system";
   std::string here;
   bool inSpace = false;  // the ship is between bodies: no berth, no body
+  std::map<std::string, std::pair<double, double>> flightOrigin;
   std::string sector;
   double zoom = 1;
   double cx = 319;

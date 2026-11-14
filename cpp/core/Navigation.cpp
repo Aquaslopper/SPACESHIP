@@ -225,6 +225,7 @@ std::string Simulation::ExtractionDoneLabel(const Body& body) const {
 }
 
 bool Simulation::AtTarget(const Body& body) const {
+  if (map_.inSpace) { return false; }
   if (body.type == "system") { return body.id == CurrentSystemId(); }
   return body.id == map_.here;
 }
@@ -395,8 +396,10 @@ Simulation::NavMetrics Simulation::MetricsFor(const Body& body) const {
     const Body* origin = catalog_.FindSystem(curSysId);
     double px = 0;
     if (origin != nullptr && body.region == origin->region) {
-      const double dx = body.x - origin->x;
-      const double dy = body.y - origin->y;
+      const auto at = map_.inSpace ? map_.flightOrigin.at("sector")
+                                  : std::make_pair(origin->x, origin->y);
+      const double dx = body.x - at.first;
+      const double dy = body.y - at.second;
       px = std::sqrt(dx * dx + dy * dy);
     } else if (origin != nullptr) {
       const Body* fromRegion = catalog_.FindRegion(origin->region);
@@ -404,8 +407,10 @@ Simulation::NavMetrics Simulation::MetricsFor(const Body& body) const {
       double dx = 0;
       double dy = 0;
       if (fromRegion != nullptr && toRegion != nullptr) {
-        dx = (toRegion->x - fromRegion->x) * 1.3;
-        dy = (toRegion->y - fromRegion->y) * 1.3;
+        const auto at = map_.inSpace ? map_.flightOrigin.at("galaxy")
+                                    : std::make_pair(fromRegion->x, fromRegion->y);
+        dx = (toRegion->x - at.first) * 1.3;
+        dy = (toRegion->y - at.second) * 1.3;
       }
       px = std::sqrt(dx * dx + dy * dy) + 150;
       if (px > 1050.0) {
@@ -414,13 +419,16 @@ Simulation::NavMetrics Simulation::MetricsFor(const Body& body) const {
       }
     }
     distance = std::max(6.0, js::Round(px / 24.0) + 5.0);
-    if (body.id == curSysId) { distance = 0; }
+    if (!map_.inSpace && body.id == curSysId) { distance = 0; }
   } else {
-    const double dx = body.x - (here == nullptr ? 0.0 : here->x);
-    const double dy = body.y - (here == nullptr ? 0.0 : here->y);
+    const auto at = map_.inSpace ? map_.flightOrigin.at("system")
+                                : std::make_pair(here == nullptr ? 0.0 : here->x,
+                                                 here == nullptr ? 0.0 : here->y);
+    const double dx = body.x - at.first;
+    const double dy = body.y - at.second;
     const double px = std::sqrt(dx * dx + dy * dy);
     distance = std::max(3.0, js::Round(px / map_.pxPerAction));
-    if (body.id == map_.here) { distance = 0; }
+    if (!map_.inSpace && body.id == map_.here) { distance = 0; }
   }
 
    // The navigator shortens the crossing itself: a plotted course is fewer clicks
@@ -461,11 +469,38 @@ Simulation::NavMetrics Simulation::MetricsFor(const Body& body) const {
 // Commitments
 // ---------------------------------------------------------------------------
 
+bool Simulation::HoldTravel() {
+  const Task* travel = FindOngoing("travel");
+  if (travel == nullptr) { return false; }
+  const Body* destination = FindBodyById(travel->target);
+  const double part = (travel->total - travel->left) / travel->total;
+  for (auto& entry : map_.flightOrigin) {
+    const Body* target = destination;
+    if (entry.first == "system" && destination->type == "system") { continue; }
+    if (entry.first == "sector") {
+      target = destination->type == "system" ? destination
+          : catalog_.FindSystem(catalog_.BodySystem(*destination));
+    }
+    if (entry.first == "galaxy") {
+      const Body* system = destination->type == "system" ? destination
+          : catalog_.FindSystem(catalog_.BodySystem(*destination));
+      target = system == nullptr ? nullptr : catalog_.FindRegion(system->region);
+    }
+    if (target != nullptr) {
+      entry.second.first += (target->x - entry.second.first) * part;
+      entry.second.second += (target->y - entry.second.second) * part;
+    }
+  }
+  ClearOngoing("travel");
+  FreeCommit("HOLD - stopped at current position");
+  return true;
+}
+
 bool Simulation::StartTravel() {
   if (!state_.gameOver.empty() || !state_.navTarget.has_value()) { return false; }
   const Body* body = FindBodyById(*state_.navTarget);
   if (body == nullptr || !InRange(*body) || AtTarget(*body)) { return false; }
-  if (FindOngoing("travel") != nullptr || FindOngoing("extract") != nullptr) { return false; }
+  if (FindOngoing("extract") != nullptr) { return false; }
   if (StatValue("fuel") <= 0) { return false; }
 
   if (state_.docked) {
@@ -479,6 +514,15 @@ bool Simulation::StartTravel() {
   }
 
 
+  if (FindOngoing("travel") != nullptr) { HoldTravel(); }
+  if (!map_.inSpace) {
+    const Body* here = FindBodyById(map_.here);
+    const Body* system = CurrentSystem();
+    const Body* region = system == nullptr ? nullptr : catalog_.FindRegion(system->region);
+    map_.flightOrigin["system"] = {here == nullptr ? 0.0 : here->x, here == nullptr ? 0.0 : here->y};
+    map_.flightOrigin["sector"] = {system == nullptr ? 0.0 : system->x, system == nullptr ? 0.0 : system->y};
+    map_.flightOrigin["galaxy"] = {region == nullptr ? 0.0 : region->x, region == nullptr ? 0.0 : region->y};
+  }
   const NavMetrics metrics = MetricsFor(*body);
 
   PerformAction("Course locked - " + body->name);

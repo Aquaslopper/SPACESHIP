@@ -95,10 +95,14 @@ std::string BodyClasses(const Body& body, bool selected) {
 NavPoint TravelMarker(const Simulation& sim) {
   const Body* here = sim.FindBodyById(sim.Map().here);
   NavPoint at{here == nullptr ? 0.0 : here->x, here == nullptr ? 0.0 : here->y};
+  if (sim.Map().inSpace) {
+    const auto origin = sim.Map().flightOrigin.at("system");
+    at = {origin.first, origin.second};
+  }
   const Task* travel = sim.FindOngoing("travel");
   if (travel == nullptr || travel->target.empty()) { return at; }
   const Body* body = sim.FindBodyById(travel->target);
-  if (body == nullptr) { return at; }
+  if (body == nullptr || body->type == "system") { return at; }
   const double p = OngoingPercent(*travel) / 100.0;
   return NavPoint{at.x + (body->x - at.x) * p, at.y + (body->y - at.y) * p};
 }
@@ -521,6 +525,10 @@ NavChartView BuildNavChart(const Simulation& sim) {
     if (chart.layer == "system") {
       at = TravelMarker(sim);
     } else {
+      if (map.inSpace) {
+        const auto origin = map.flightOrigin.at(chart.layer);
+        at = {origin.first, origin.second};
+      }
       const Task* trip = sim.FindOngoing("travel");
       const Body* dest = trip == nullptr ? nullptr : sim.World().FindSystem(trip->target);
       const Body* markerTarget = nullptr;
@@ -532,8 +540,8 @@ NavChartView BuildNavChart(const Simulation& sim) {
       if (markerTarget != nullptr &&
           (chart.layer == "galaxy" || dest->region == home->region)) {
         const double part = OngoingPercent(*trip) / 100.0;
-        at.x = home->x + (markerTarget->x - home->x) * part;
-        at.y = home->y + (markerTarget->y - home->y) * part;
+        at.x += (markerTarget->x - at.x) * part;
+        at.y += (markerTarget->y - at.y) * part;
       }
     }
     chart.marker = NavProjectPanned(map, view, at.x, at.y);
@@ -870,6 +878,17 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
     }
   }
 
+  CommandRowView hold;
+  hold.label = "HOLD";
+  hold.enabled = hold.live = true;
+  hold.actionCost = false;
+  screen.commands.push_back(hold);
+  CommandRowView course;
+  course.label = "Change Course";
+  course.enabled = course.live = true;
+  course.actionCost = false;
+  screen.commands.push_back(course);
+
   if (target != nullptr && target->type == "region") {
     CommandRowView view = BuildCommandRow(
         sim, "View " + target->name + " sector chart", true, "free", std::string(), 0);
@@ -903,6 +922,8 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
 // ---------------------------------------------------------------------------
 namespace {
 bool PressNavActionRaw(Simulation& sim, const std::string& action, const std::string& arg) {
+  if (action == "hold") { return sim.HoldTravel(); }
+  if (action == "change-course") { return sim.StartTravel(); }
   if (action == "travel") { return PressProgressButton(sim, "travel"); }
   if (action == "scan") { return PressProgressButton(sim, "scan"); }
   if (action == "extract") { return PressProgressButton(sim, "extract"); }
@@ -938,6 +959,8 @@ bool PressNavAction(Simulation& sim, const std::string& action, const std::strin
   }
   for (const auto& row : screen.commands) {
     const bool matches =
+        (action == "hold" && row.label == "HOLD") ||
+        (action == "change-course" && row.label == "Change Course") ||
         (action == "stand-watch" && row.label.find("Stand watch") == 0) ||
         (action == "dock" && row.label.find("Dock at ") == 0) ||
         (action == "view-sector" && row.label.find("View ") == 0);
@@ -1016,11 +1039,17 @@ RadiationTelemetry ComputeRadiationTelemetry(const Simulation& sim) {
   // Use interpolated crossing coordinates only when the active leg stays inside
   // the current system; inter-system legs live in sector coordinates.
   NavPoint shipPos{here == nullptr ? 0.0 : here->x, here == nullptr ? 0.0 : here->y};
+  if (sim.Map().inSpace) {
+    const auto origin = sim.Map().flightOrigin.at("system");
+    shipPos = {origin.first, origin.second};
+  }
   const Task* travel = sim.FindOngoing("travel");
   const Body* travelBody =
       (travel != nullptr && !travel->target.empty()) ? sim.FindBodyById(travel->target) : nullptr;
   if (travelBody != nullptr && travelBody->type != "system" && travelBody->type != "region" &&
       catalog.BodySystem(*travelBody) == sysId) {
+    const auto origin = sim.Map().flightOrigin.at("system");
+    shipPos = {origin.first, origin.second};
     const double p = OngoingPercent(*travel) / 100.0;
     shipPos.x += (travelBody->x - shipPos.x) * p;
     shipPos.y += (travelBody->y - shipPos.y) * p;

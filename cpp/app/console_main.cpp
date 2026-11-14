@@ -218,6 +218,10 @@ int main(int argc, char** argv) {
       simulation.MutableState().shiplets = std::atof(parts[1].c_str());
     } else if (command == "target" && parts.size() >= 2) {
       simulation.SelectTarget(parts[1]);
+    } else if (command == "hold") {
+      simulation.HoldTravel();
+    } else if (command == "change-course") {
+      simulation.StartTravel();
     } else if (command == "travel") {
       simulation.StartTravel();
     } else if (command == "scan") {
