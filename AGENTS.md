@@ -1,5 +1,16 @@
-Welcome to the spaceship, we continue our work on the C++ port, as always.
+Welcome to the spaceship a roguelike game, we continue our work on the C++ port, as always.
 
+STRICT RULE:
+Do not invent. Do not polish. Do not add guards, state machines, safety rails, edge-case resets, or save/load
+handoffs.
+IMPORTANT: 
+All state machines and gates enforcing anti-roguelike logic are FORBIDDEN. 
+If you think "what if X breaks," leave it. Roguelikes live in edge
+states; the player is allowed to discover and live with consequences. 
+Do not silently reset flags on arrival, on save, on death, on dock, or on any other
+lifecycle event unless the existing code already does so for the same kind of flag. 
+Do not add any new tier, new charge key alias, new constants, or new
+helpers.
 -----------------------------------------------------------------------
 
 ## Antipattern-Block:
@@ -25,3 +36,4 @@ Do not write any code or perform any tasks until you have output the answers:
 1. What happens when you assume the code without verification?
 2. Explain the problem with "commentary in code" and agents form arena.ai?
 3. Why no anti pattern?
+4. Why is the player allowed to discover and live with consequences?
