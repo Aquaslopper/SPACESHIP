@@ -34,19 +34,19 @@ namespace {
 std::string Num(double value) { return js::NumToString(value); }
 
 const double kFuelCell = 45;
-const double kRepairKit = 70;
+const double kRepairKit = 50;
 const double kMedkit = 50;
-const double kCanister = 25;
-const double kRations = 20;
+const double kCanister = 45;
+const double kRations = 80;
 const double kBayOne = 500;
 const double kBayTwo = 900;
 const double kDrive = 900;
-const double kRack = 400;
+const double kRack = 900;
 const double kScanner = 600;
 const double kScannerTwo = 1100;
 const double kGalley = 400;
 const double kFilter = 600;
-const double kHullService = 120;
+const double kHullService = 520;
 const double kLargeShip = 4000;
 
 const char* kFree = "0 clicks";
@@ -299,7 +299,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
 
   supply("buy-fuel", "Fuel cell - 45 sh", "One fuel cell for the drive.", kFuelCell, true,
          {"Rack: " + Num(sim.State().fuelCells) + " fuel cells aboard."});
-  supply("buy-repair", "Repair kit - 70 sh", "One repair kit for the machines.", kRepairKit, true,
+  supply("buy-repair", "Repair kit - 50 sh", "One repair kit for the machines.", kRepairKit, true,
          {"Rack: " + Num(sim.State().repairKits) + " repair kits aboard."});
   supply("buy-medkit", "Medkit - 50 sh", "One medkit for the medical bay.", kMedkit, true,
          {"Rack: " + Num(sim.State().medkits) + " medkits aboard."});
@@ -309,7 +309,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
          {"Rack: " + Num(sim.Life().canisters) + " of " + Num(sim.Life().capacity) +
               " canisters.",
           "The Recyclers' oxygen project blocks this while it runs."});
-  supply("buy-rations", "Six dry rations - 20 sh",
+  supply("buy-rations", "Six dry rations - 80 sh",
          "Six dry rations for the larder; the cook turns them into galley food.", kRations,
          sim.MessRations() <= sim.MessRationCapacity() - 6 &&
              sim.FindOngoing("project-food") == nullptr,
