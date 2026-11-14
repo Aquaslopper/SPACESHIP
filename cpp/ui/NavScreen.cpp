@@ -878,20 +878,16 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
     }
   }
 
-  if (running != nullptr) {
-    CommandRowView hold;
-    hold.label = "HOLD";
-    hold.enabled = hold.live = true;
-    hold.actionCost = false;
-    screen.commands.push_back(hold);
-  }
-  if (map.inSpace) {
-    CommandRowView course;
-    course.label = "Change Course";
-    course.enabled = course.live = target != nullptr;
-    course.actionCost = false;
-    screen.commands.push_back(course);
-  }
+  CommandRowView hold;
+  hold.label = "HOLD";
+  hold.enabled = hold.live = true;
+  hold.actionCost = false;
+  screen.commands.push_back(hold);
+  CommandRowView course;
+  course.label = "Change Course";
+  course.enabled = course.live = true;
+  course.actionCost = false;
+  screen.commands.push_back(course);
 
   if (target != nullptr && target->type == "region") {
     CommandRowView view = BuildCommandRow(

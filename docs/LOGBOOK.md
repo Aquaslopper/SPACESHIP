@@ -72,3 +72,19 @@ You must append a compressed summary of **every single reply and action you take
 - Passed inter-system HOLD save/load and restart from loaded position.
 - Original position, course-change and Lost in Space regression checks still pass.
 - Updating the existing pull request on the current branch; no merge requested.
+
+### Entry #005
+- Timestamp: 2026-11-14 UTC.
+- Owner reported no visible HOLD control during manual testing.
+- Inspected native navigation drawing and command placement.
+- Previous implementation placed HOLD as a text row below navigation panels.
+- Replaced that presentation with dedicated chamfered buttons directly below the navigation title.
+- HOLD and Change Course now remain visible without an active travel task.
+- Removed active-travel and in-space visibility conditions from these command rows.
+- Reserved button-row height before positioning the map and side panels.
+- Removed duplicate rendering of these controls in the bottom text rows.
+- Existing navigation actions and fuel consequences unchanged.
+- Added regression assertions that both controls exist before departure.
+- Headless build and position/save-load/game-over regression checks passed.
+- GUI syntax checks passed for Draw.cpp, AudioDevice.cpp and main.cpp.
+- Native graphical interaction still requires owner verification.

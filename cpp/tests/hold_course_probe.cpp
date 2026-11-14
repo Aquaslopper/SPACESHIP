@@ -7,6 +7,14 @@ int main() {
  auto catalog=ship::Catalog::LoadFromAssets("assets");
  auto sim=ship::Simulation::NewVoyage(catalog);
  sim.MutableMap().here=sim.World().bodies.front().id;
+ int courseControls=0;
+ for (const auto& row : ship::BuildNavScreen(sim).screen.commands) {
+   if (row.label=="HOLD" || row.label=="Change Course") {
+     assert(row.enabled && !row.actionCost);
+     ++courseControls;
+   }
+ }
+ assert(courseControls==2);
  const ship::Body* destination=nullptr;
  for(const auto& b:sim.World().bodies) if(sim.InRange(b)&&!sim.AtTarget(b)&&sim.MetricsFor(b).dist>0) {destination=&b;break;}
  assert(destination);
