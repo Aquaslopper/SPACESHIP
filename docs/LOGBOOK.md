@@ -53,5 +53,44 @@ You must append a compressed summary of **every single reply and action you take
 - PR target: opening GitHub pull request targeting `main` from head branch `arena/96d9f5c9-spaceship` via `gh pr create`.
 - Post-PR verification: confirming PR URL, base/head branch refs, and clean working tree via `gh pr view --json` and `git status`.
 
+### Entry #004
+- **Timestamp:** 2026-11-14 07:36 UTC
+- Session scope: owner-approved cassette-futurism UI enhancements keeping UI pure (no glass frame), subtle corner bezel markings, moving diagonal radiation wave (R/B micro-chromatic shift with anchored green + milky luminance dip), simulation coupling to star/nebula proximity & ship heading, and a per-player Settings slider (`radiationWave`).
+- `cpp/core/DisplaySettings.h` & `cpp/core/GameState.h`: added `RadiationWaveStrength` (`0.0..2.0`, default `1.0`) and `Options::radiationWave` (`1.0`); `Simulation::BeginVoyage` preserves player options across voyages.
+- `cpp/core/SaveSystem.cpp`: serialized/deserialized `options.radiationWave` cleanly, falling back to `1.0` when loading legacy saves missing `"radiationWave"`.
+- `cpp/ui/Popups.h` & `cpp/ui/Popups.cpp`: added `PopupModel::radiationWave` and `"radiation-wave"` handler in `PressPopupAction` / `BuildPopup` (shared between Title Options and in-game Settings).
+- `cpp/ui/NavScreen.h` & `cpp/ui/NavScreen.cpp`: added read-only `RadiationTelemetry` and `ComputeRadiationTelemetry(const Simulation&)` computing star proximity (`1 / (1 + (d / 115)^2)` + stellar flare boost), nebula/dust/belt proximity (`RegionNebulaBaseline` + belt inverse-square, matching `"ion squall"`/`"ion storm"` specifically to avoid `"condition"` false matches), ship heading/travel vector (`waveDirX/Y`), `baseIntensity`, and `warmBias` without mutating simulation state.
+- `cpp/ui/Draw.cpp`: added `##radiation-wave` (`"Radiation wave"`) slider (`0.00`..`2.00`) and reset wiring in `ShellView::PaintSettingsControls`; added subtle corner bezel markings (`CRT-84 // CH-04`, `"Spaceship Command"`, `SYS-01 // REV.84`, 5-px corner L-ticks on `layout_.content`, and bottom-right `CAL 60HZ // MK.IV` when clear of content) with zero overlap or glass overlay.
+- `cpp/app/main.cpp`: added frame-smoothed `RadiationTelemetry` uniforms (`uWaveTime`, `uWaveDir`, `uWaveIntensity`, `uWaveWarmBias`, `uWaveOptionScale`, `uResolution`) to `DisplayAdjustment`'s `#version 330` `RenderTexture2D` pass; applies `0.45..0.90 px` default (`* radiationWave`, capped at `1.35 px`) R/B opposite shift along the diagonal wave crest with G anchored at exact center and a subtle milky grey/amber black-level lift/dip; zeroes wave strength under `reducedMotion`.
+- Untouched restricted files: `CMakeLists.txt` and all gameplay simulation rules remain untouched; `tools/viewer/` was only built/run without altering tracked files.
+- Verified builds & checks: `tools/check-id-prefixes.sh` passed; `tools/check-gui-syntax.sh` passed (`Draw.cpp`, `AudioDevice.cpp`, `main.cpp`); every `.cpp` in `CMakeLists.txt` (`spaceship_core` + `console_main.cpp`) compiled cleanly under `-std=c++17 -fsyntax-only -Wall -Wextra -Wpedantic -Werror`; `tools/viewer` built cleanly and headless PNGs (`01-title-options`, `02-home`, `03-settings`, `04-nav`) + 300%-zoomed CPU shader text/hull previews verified readability and bezel spacing; `/tmp/test_radiation_all` passed clamping, popup actions, save/load round-trip, legacy saves, real system star/nebula/heading coupling, and active `StartTravel` mid-crossing updates.
+
+### Entry #005
+- **Timestamp:** 2026-11-14 07:42 UTC
+- Session scope: owner requested pull request creation on branch `arena/5ef248e7-spaceship` for the cassette-futurism CRT wave shader, corner bezel markings, simulation radiation telemetry coupling, and `radiationWave` player setting.
+- Pre-commit file inventory: verified `git status -s` contains only the 9 modified `cpp/` files (`cpp/app/main.cpp`, `cpp/core/{DisplaySettings.h,GameState.h,SaveSystem.cpp}`, `cpp/ui/{Draw.cpp,NavScreen.h,NavScreen.cpp,Popups.h,Popups.cpp}`) and `docs/LOGBOOK.md`.
+- Restricted & untouched checks: confirmed `CMakeLists.txt`, gameplay simulation/travel/economy rules, and `tools/viewer/` tracked files remain unmodified.
+- Syntax & lint checks passed prior to commit: `bash tools/check-id-prefixes.sh` (exit `0`), `bash tools/check-gui-syntax.sh` (`Draw.cpp`, `AudioDevice.cpp`, `main.cpp` clean under `-Wall -Wextra -Wpedantic`), and `-std=c++17 -fsyntax-only -Wall -Wextra -Wpedantic -Werror` across all `spaceship_core` + `console_main.cpp` sources.
+- Functional checks passed prior to commit: `make -C tools/viewer -j4`, headless viewer screenshots (`01-title-options`, `02-home`, `03-settings`, `04-nav`), CPU shader pixel/text audit, and `/tmp/test_radiation_all` covering clamping, `PressPopupAction`, `SaveSlot`/`LoadSlot`, legacy saves, real system star/nebula/heading coupling, and active `StartTravel` updates.
+- Git commit target: branch `arena/5ef248e7-spaceship` branched from `main` commit `01c68a0dd5757c99d383548feebae10c637eef14`.
+- Git staging & commit: staging all 10 modified files and committing changes on `arena/5ef248e7-spaceship`.
+- Remote action: pushing `origin arena/5ef248e7-spaceship` and opening a pull request targeting `main` via `gh pr create`.
+- Post-PR verification: confirming PR URL, base/head branch refs, and clean working tree via `gh pr view --json` and `git status`.
+
+### Entry #006
+- **Timestamp:** 2026-11-14 08:13 UTC
+- Session scope: owner-approved fake-3D SDF-lofted exterior Wren ship with gentle motion, travel banking/thruster wash, and tracked room callout pins on branch `arena/5ef248e7-spaceship` (updating PR #86).
+- `cpp/ui/Draw.h`: added `SetWrenExteriorImage`, destructor `~ShellView()` (non-copyable), `WrenSdfGrid`, `Wren3D` mesh/material/shader state, `ExteriorCallout::normUV`/`localZ`, and SDF/mesh lifecycle helpers.
+- `cpp/app/main.cpp`: loaded `assets/art/ships/wren-exterior.png` via `LoadImage` -> `LoadTextureFromImage` (`TEXTURE_FILTER_BILINEAR`, `TEXTURE_WRAP_CLAMP`), passed `&wrenImage` to `shell.SetWrenExteriorImage`, and unloaded the temporary CPU image immediately.
+- `cpp/ui/Draw.cpp`: implemented `BuildWrenSdfFromImage` using a `670x210` two-pass 2D Euclidean distance transform (`distIn - distOut`) + smoothed luminance micro-relief (`kWrenHalfDepth = 0.25f`) so thin turret barrels, antenna masts, and bow spikes are preserved cleanly.
+- `cpp/ui/Draw.cpp` (`EnsureWrenMesh`, `ReleaseWrenMesh`): built a shared-vertex `240x76` marching-clipped symmetric front/back 3D mesh (`z = 0` welded strictly along `sdf == 0`, ~16k vertices), pre-baked studio shading into vertex colors for `rlsw`/OpenGL 1.1 compatibility, and loaded a `#version 330` fragment/vertex hull shader (`alpha < 0.08` cutout + `uWarmBias`/`uKeyDir` rim/key lighting) while detaching external `wrenExteriorArt_` safely before `UnloadMaterial`.
+- `cpp/ui/Draw.cpp` (`PaintWrenExterior`): renders the 3D hull inside `BeginMode3D` using an off-axis shift-lens `rlFrustum` centered on `exterior_.image` (keeping resting pose straight-on without sidebar/stage skew), clipped to `layout_.content`, smoothly drifting/yawing/pitching/rolling at idle, stepping up motion + dual-layer warm thruster exhaust plumes behind the three aft nozzles (`kNozzleU`/`kNozzleV`) during active `travel`, and zeroing all motion under `reducedMotion`.
+- `cpp/ui/Draw.cpp` (`BuildExteriorLayout`, `PaintWrenExterior`): projects each room callout's `(normUV, localZ)` anchor through the live 3D `mvp` matrix (`ProjectPointMvp`) so leader lines and dots track the moving 3D hull while callout cards stay steady.
+- Untouched restricted files: `CMakeLists.txt`, gameplay logic, and `tools/viewer/` tracked files remain unmodified (`EnsureWrenMesh` includes a `LoadImageFromTexture` -> asset PNG fallback when running under headless `rlsw`).
+- Verified builds & visual inspection: `tools/check-id-prefixes.sh` passed; `tools/check-gui-syntax.sh` (`Draw.cpp`, `AudioDevice.cpp`, `main.cpp`) passed with 0 `-Wall -Wextra -Wpedantic` warnings; all `spaceship_core` + `console_main.cpp` units passed `-std=c++17 -fsyntax-only -Wall -Wextra -Wpedantic -Werror`; `tools/viewer` rendered idle multi-pose frames (`01-wren3d-t0`..`t3`) and active in-flight (`05-inflight`) + 200%/250% zoomed crops confirming intact turret/antenna/bow details, clean silhouette, 3D yaw/pitch perspective, tracked dots, and nozzle-aligned thruster plumes.
+- Git action: staging modified `cpp/` files + `docs/LOGBOOK.md`, committing to `arena/5ef248e7-spaceship`, and pushing to `origin` to update PR #86.
+
+
+
 
 

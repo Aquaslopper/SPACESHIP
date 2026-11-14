@@ -170,6 +170,7 @@ std::string Simulation::SaveJson() const {
                       {"displayGamma", Num(DisplayGamma(state_.options.displayGamma))},
                       {"displayGammaScale", "relative-1.6"},
                       {"displayBrightness", Num(DisplayBrightness(state_.options.displayBrightness))},
+                      {"radiationWave", Num(RadiationWaveStrength(state_.options.radiationWave))},
                       // Phase 9: the reading size and the window travel too.
                       {"fontStep", Num(static_cast<double>(state_.options.fontStep))},
                       {"fullscreen", state_.options.fullscreen}};
@@ -1178,6 +1179,8 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
             std::clamp(savedGamma, 0.7, 1.6) / kDisplayGammaBaseline);
       }
       state_.options.displayBrightness = DisplayBrightness(GetNumber(*it, "displayBrightness", 1.0));
+      state_.options.radiationWave =
+          RadiationWaveStrength(GetNumber(*it, "radiationWave", kRadiationWaveDefault));
       const double step = GetNumber(*it, "fontStep", 0.0);
       state_.options.fontStep = step < 0 ? 0 : (step > 3 ? 3 : static_cast<int>(step));
       state_.options.fullscreen = GetBool(*it, "fullscreen", false);
