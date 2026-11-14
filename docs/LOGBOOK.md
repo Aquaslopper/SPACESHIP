@@ -56,3 +56,19 @@ You must append a compressed summary of **every single reply and action you take
 - Preparing commit and push on the current branch only.
 - Pull request targets main and is not to be merged automatically.
 - Manual client testing remains with the owner.
+
+### Entry #004
+- Timestamp: 2026-11-14 UTC.
+- Owner explicitly requested persistence of the HOLD position.
+- Read map serialization, loading and the existing regression probe.
+- Save map.inSpace alongside the existing map data.
+- Save flightOrigin coordinates for all stored chart scales.
+- Load the saved flag and coordinates without moving the ship.
+- No additional gameplay gate or state machine introduced.
+- Previously removed existing-travel refusal remains removed; fuel consumption unchanged.
+- Rebuilt headless core and console successfully.
+- Passed HOLD UTF-8 save/load and departure from loaded position.
+- Passed in-flight UTF-16 save/load and identical subsequent HOLD coordinates.
+- Passed inter-system HOLD save/load and restart from loaded position.
+- Original position, course-change and Lost in Space regression checks still pass.
+- Updating the existing pull request on the current branch; no merge requested.

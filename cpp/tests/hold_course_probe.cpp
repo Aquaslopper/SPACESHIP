@@ -23,6 +23,26 @@ int main() {
  assert(std::abs(sim.Map().flightOrigin.at("system").first-x)<1e-9);
  assert(std::abs(sim.Map().flightOrigin.at("system").second-y)<1e-9);
  auto position=sim.Map().flightOrigin;
+ std::string error;
+ assert(sim.SaveToFile("build/hold-save.json", false, &error));
+ auto loaded=ship::Simulation::NewVoyage(catalog);
+ if (!loaded.LoadFromFile("build/hold-save.json", &error)) { std::cerr<<error<<"\n"; return 1; }
+ assert(loaded.Map().inSpace);
+ assert(loaded.Map().flightOrigin==position);
+ assert(!loaded.FindOngoing("travel"));
+ loaded.SelectTarget(home);
+ assert(loaded.StartTravel());
+ assert(loaded.Map().flightOrigin==position);
+ assert(loaded.SaveToFile("build/flight-save.json", true, &error));
+ auto flying=ship::Simulation::NewVoyage(catalog);
+ if (!flying.LoadFromFile("build/flight-save.json", &error)) { std::cerr<<error<<"\n"; return 1; }
+ assert(flying.Map().inSpace);
+ assert(flying.Map().flightOrigin==position);
+ assert(flying.FindOngoing("travel")->left==loaded.FindOngoing("travel")->left);
+ loaded.ProAction(0.25); flying.ProAction(0.25);
+ assert(loaded.HoldTravel()); assert(flying.HoldTravel());
+ assert(loaded.Map().flightOrigin==flying.Map().flightOrigin);
+ std::cout<<"PASS: HOLD save/load, departure after load, UTF-16 flight save/load and identical subsequent HOLD position\n";
  sim.PerformAction("wait"); assert(position==sim.Map().flightOrigin);
  sim.SelectTarget(home); assert(!sim.AtTarget(*origin));
  assert(ship::PressNavAction(sim,"change-course"));
@@ -44,6 +64,13 @@ int main() {
  assert(jump.StartTravel()); jump.PerformAction("jump");
  assert(jump.HoldTravel());
  auto at=jump.Map().flightOrigin;
+ assert(jump.SaveToFile("build/jump-hold-save.json", false, &error));
+ auto jumpLoaded=ship::Simulation::NewVoyage(catalog);
+ assert(jumpLoaded.LoadFromFile("build/jump-hold-save.json", &error));
+ assert(jumpLoaded.Map().inSpace);
+ assert(jumpLoaded.Map().flightOrigin==at);
+ assert(jumpLoaded.StartTravel());
+ assert(jumpLoaded.Map().flightOrigin==at);
  jump.PerformAction("wait"); assert(at==jump.Map().flightOrigin);
  assert(jump.StartTravel());
  std::cout<<"PASS: inter-system HOLD and restart\n";

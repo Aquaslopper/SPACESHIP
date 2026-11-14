@@ -453,6 +453,12 @@ std::string Simulation::SaveJson() const {
   map["zmax"] = Num(map_.zmax);
   map["zstep"] = Num(map_.zstep);
   map["here"] = map_.here;
+  map["inSpace"] = map_.inSpace;
+  map["flightOrigin"] = Json::object();
+  for (const auto& origin : map_.flightOrigin) {
+    map["flightOrigin"][origin.first] = Json{{"x", Num(origin.second.first)},
+                                             {"y", Num(origin.second.second)}};
+  }
   map["layer"] = map_.layer;
   map["sector"] = map_.sector;
   map["grid"] = Num(map_.grid);
@@ -1351,6 +1357,13 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     map_.zmax = GetNumber(map, "zmax", 2.0);
     map_.zstep = GetNumber(map, "zstep", 0.2);
     map_.here = GetString(map, "here", "kessler");
+    map_.inSpace = GetBool(map, "inSpace");
+    map_.flightOrigin = {};
+    if (const Json* origins = At(map, "flightOrigin")) {
+      for (auto it = origins->begin(); it != origins->end(); ++it) {
+        map_.flightOrigin[it.key()] = {GetNumber(it.value(), "x"), GetNumber(it.value(), "y")};
+      }
+    }
     map_.layer = GetString(map, "layer", "system");
     map_.sector = GetString(map, "sector");
     map_.grid = GetNumber(map, "grid", 45);
