@@ -177,6 +177,8 @@ class Simulation {
 
   bool SelectTarget(const std::string& bodyId);
   bool StartTravel();
+  bool ToggleTravelHold();
+  bool PlotNewCourse();
   bool StartScan();
   bool StartExtraction();
   bool StandWatch();

@@ -494,6 +494,32 @@ bool Simulation::StartTravel() {
   map_.inSpace = true;
   return true;
 }
+
+bool Simulation::ToggleTravelHold() {
+  if (!state_.gameOver.empty()) { return false; }
+  if (FindOngoing("travel") == nullptr) { return false; }
+  state_.travelHeld = !state_.travelHeld;
+  PerformAction(state_.travelHeld ? "Held course - engines idle" : "Resumed course");
+  return true;
+}
+
+bool Simulation::PlotNewCourse() {
+  if (!state_.gameOver.empty() || !state_.navTarget.has_value()) { return false; }
+  if (!state_.travelHeld) { return false; }
+  const Task* old = FindOngoing("travel");
+  if (old == nullptr || old->state != "running") { return false; }
+  const Body* body = FindBodyById(*state_.navTarget);
+  if (body == nullptr || !InRange(*body) || AtTarget(*body)) { return false; }
+  if (FindOngoing("extract") != nullptr) { return false; }
+  if (StatValue("fuel") <= 0) { return false; }
+  if (body->id == old->target) { return false; }
+  ClearOngoing("travel");
+  const NavMetrics metrics = MetricsFor(*body);
+  LogLine("Course re-plotted - " + body->name + " (" + metrics.transit + ").");
+  AddOngoing("travel", "Under way to " + body->name, metrics.dist, "travel", body->id);
+  return true;
+}
+
 bool Simulation::StartScan() {
   if (!state_.navTarget.has_value()) { return false; }
   const Body* body = FindBodyById(*state_.navTarget);

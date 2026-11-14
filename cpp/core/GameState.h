@@ -309,6 +309,7 @@ struct GameState {
   double shiplets = 200;
   double payTick = 0;
   bool docked = false;
+  bool travelHeld = false;
   double fuelCells = 6;
   double repairKits = 6;
   double lotSerial = 0;

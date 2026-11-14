@@ -151,14 +151,15 @@ void Simulation::AdvanceTasks(double n) {
     Task* task = FindOngoing(original.id);
     if (task == nullptr || task->state != "running") { continue; }
 
-    if (task->type == "travel") { ClampStat("fuel", -1); }
+    const bool heldTravel = (task->type == "travel" && state_.travelHeld);
+    if (task->type == "travel" && !heldTravel) { ClampStat("fuel", -1); }
     const bool needsPower = task->type == "scan" || task->type == "salvage" ||
                             task->type == "extract" ||
                             (task->type == "shipProject" && task->target != "social");
     const bool needsDrive = task->type == "travel";
     if (needsDrive && (state_.engineCondition <= 0 || StatValue("energy") <= 0)) { continue; }
     if (needsPower && StatValue("energy") <= 0) { continue; }
-    
+    if (heldTravel) { continue; }
     task->left -= n;
     if (task->left <= 0) {
       task->left = 0;

@@ -286,7 +286,8 @@ bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
                               [&sim]() { return sim.EngineClick(); });
   }
   const Task* task = taskId == "crew-assign" ? nullptr : sim.FindOngoing(taskId);
-  if (task != nullptr && task->state == "running") { return false; }
+  if (task != nullptr && task->state == "running" &&
+      !(taskId == "travel" && sim.State().travelHeld)) { return false; }
   if (task != nullptr && task->state == "done") {
     return PressWithoutCharge(sim, [&sim, &taskId]() { return sim.Acknowledge(taskId); });
   }
@@ -319,7 +320,11 @@ bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
                               if (taskId == "o2-run") { return sim.StartFilterBank(); }
                               if (taskId == "maint") { return sim.StartMaintenanceSelf(); }
                               if (taskId == "cook") { return sim.StartCookingSelf(); }
-                              if (taskId == "travel") { return sim.StartTravel(); }
+                              if (taskId == "travel") {
+                                if (sim.State().travelHeld && sim.FindOngoing("travel") != nullptr) { return sim.PlotNewCourse(); }
+                                return sim.StartTravel();
+                              }
+                              if (taskId == "travel-hold") { return sim.ToggleTravelHold(); }
                               if (taskId == "scan") { return sim.StartScan(); }
                               if (taskId == "extract") { return sim.StartExtraction(); }
                               if (taskId == "crew-assign") { return sim.CommitOrders(); }

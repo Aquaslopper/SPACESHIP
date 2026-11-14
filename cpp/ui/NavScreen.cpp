@@ -780,9 +780,17 @@ NavScreenModel BuildNavScreen(const Simulation& sim) {
   actions.placement = "np-full";
   actions.Note(model.courseNote);
 
- const bool travelEnabled =
-      reach && !hereTarget && extractTask == nullptr && fuel > 0;
-      
+  const bool held = sim.State().travelHeld;
+  if (running != nullptr && running->state == "running") {
+    screen.progress.push_back(BuildProgressButton(
+        sim, "travel-hold", held ? "RESUME" : "HOLD",
+        true, held ? "Course resumed" : "Engines idle", "space"));
+  }
+
+  const bool travelEnabled =
+      reach && !hereTarget && extractTask == nullptr && fuel > 0 &&
+      (running == nullptr || running->state != "running" || held);
+
   screen.progress.push_back(BuildProgressButton(
       sim, "travel", target != nullptr && target->type == "system" ? "Start Jump"
                                                                   : "Start Travel",
