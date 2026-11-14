@@ -28,7 +28,10 @@ bool Truthy(const std::map<std::string, bool>& map, const std::string& key) {
 }
 }  // namespace
 
-const Port* Simulation::HerePort() const { return catalog_.FindPort(map_.here); }
+const Port* Simulation::HerePort() const {
+  if (map_.inSpace) { return nullptr; }
+  return catalog_.FindPort(map_.here);
+}
 
 double Simulation::SurveyWorth(const std::string& type) const {
   auto it = catalog_.surveyWorth.find(type);
