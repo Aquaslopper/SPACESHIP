@@ -73,7 +73,7 @@ void Simulation::ApplyShipLayout() {
 }
 
 bool Simulation::BuyLargerShip() {
-  const double price = 4000;
+  const double price = 40000;
   if (!state_.gameOver.empty() || !state_.docked) { return false; }
   const Port* port = HerePort();
   if (port == nullptr || state_.shipClass != "wren" || state_.shiplets < price) { return false; }
