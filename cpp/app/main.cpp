@@ -425,10 +425,17 @@ int main(int argc, char** argv) {
   Texture2D titleTexture = LoadTitleTexture(assets);
   Texture2D setupTexture = LoadSetupTexture(assets);
   Texture2D wrenExterior{};
+  Image wrenImage{};
   const auto exteriorPath = assets / "art" / "ships" / "wren-exterior.png";
   if (std::filesystem::exists(exteriorPath)) {
-    wrenExterior = LoadTexture(exteriorPath.string().c_str());
-    if (wrenExterior.id != 0) SetTextureFilter(wrenExterior, TEXTURE_FILTER_BILINEAR);
+    wrenImage = LoadImage(exteriorPath.string().c_str());
+    if (wrenImage.data != nullptr && wrenImage.width > 0 && wrenImage.height > 0) {
+      wrenExterior = LoadTextureFromImage(wrenImage);
+      if (wrenExterior.id != 0) {
+        SetTextureFilter(wrenExterior, TEXTURE_FILTER_BILINEAR);
+        SetTextureWrap(wrenExterior, TEXTURE_WRAP_CLAMP);
+      }
+    }
   }
   if (wrenExterior.id == 0) {
     std::fprintf(stderr, "spaceship: Wren exterior unavailable; using deck plan\n");
@@ -468,6 +475,11 @@ int main(int argc, char** argv) {
   shell.SetTitleTexture(&titleTexture);
   shell.SetSetupTexture(&setupTexture);
   shell.SetWrenExteriorTexture(&wrenExterior);
+  if (wrenImage.data != nullptr) {
+    shell.SetWrenExteriorImage(&wrenImage);
+    UnloadImage(wrenImage);
+    wrenImage = {};
+  }
   for (std::size_t i = 0; i < tutorialTextures.size(); ++i) { shell.SetTutorialTexture(i, &tutorialTextures[i]); }
   for (auto& picture : crewTextures) { shell.SetCrewTexture(picture.first, &picture.second); }
   shell.Configure(static_cast<float>(GetScreenWidth()),

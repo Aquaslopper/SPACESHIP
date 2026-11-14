@@ -77,6 +77,19 @@ You must append a compressed summary of **every single reply and action you take
 - Remote action: pushing `origin arena/5ef248e7-spaceship` and opening a pull request targeting `main` via `gh pr create`.
 - Post-PR verification: confirming PR URL, base/head branch refs, and clean working tree via `gh pr view --json` and `git status`.
 
+### Entry #006
+- **Timestamp:** 2026-11-14 08:13 UTC
+- Session scope: owner-approved fake-3D SDF-lofted exterior Wren ship with gentle motion, travel banking/thruster wash, and tracked room callout pins on branch `arena/5ef248e7-spaceship` (updating PR #86).
+- `cpp/ui/Draw.h`: added `SetWrenExteriorImage`, destructor `~ShellView()` (non-copyable), `WrenSdfGrid`, `Wren3D` mesh/material/shader state, `ExteriorCallout::normUV`/`localZ`, and SDF/mesh lifecycle helpers.
+- `cpp/app/main.cpp`: loaded `assets/art/ships/wren-exterior.png` via `LoadImage` -> `LoadTextureFromImage` (`TEXTURE_FILTER_BILINEAR`, `TEXTURE_WRAP_CLAMP`), passed `&wrenImage` to `shell.SetWrenExteriorImage`, and unloaded the temporary CPU image immediately.
+- `cpp/ui/Draw.cpp`: implemented `BuildWrenSdfFromImage` using a `670x210` two-pass 2D Euclidean distance transform (`distIn - distOut`) + smoothed luminance micro-relief (`kWrenHalfDepth = 0.25f`) so thin turret barrels, antenna masts, and bow spikes are preserved cleanly.
+- `cpp/ui/Draw.cpp` (`EnsureWrenMesh`, `ReleaseWrenMesh`): built a shared-vertex `240x76` marching-clipped symmetric front/back 3D mesh (`z = 0` welded strictly along `sdf == 0`, ~16k vertices), pre-baked studio shading into vertex colors for `rlsw`/OpenGL 1.1 compatibility, and loaded a `#version 330` fragment/vertex hull shader (`alpha < 0.08` cutout + `uWarmBias`/`uKeyDir` rim/key lighting) while detaching external `wrenExteriorArt_` safely before `UnloadMaterial`.
+- `cpp/ui/Draw.cpp` (`PaintWrenExterior`): renders the 3D hull inside `BeginMode3D` using an off-axis shift-lens `rlFrustum` centered on `exterior_.image` (keeping resting pose straight-on without sidebar/stage skew), clipped to `layout_.content`, smoothly drifting/yawing/pitching/rolling at idle, stepping up motion + dual-layer warm thruster exhaust plumes behind the three aft nozzles (`kNozzleU`/`kNozzleV`) during active `travel`, and zeroing all motion under `reducedMotion`.
+- `cpp/ui/Draw.cpp` (`BuildExteriorLayout`, `PaintWrenExterior`): projects each room callout's `(normUV, localZ)` anchor through the live 3D `mvp` matrix (`ProjectPointMvp`) so leader lines and dots track the moving 3D hull while callout cards stay steady.
+- Untouched restricted files: `CMakeLists.txt`, gameplay logic, and `tools/viewer/` tracked files remain unmodified (`EnsureWrenMesh` includes a `LoadImageFromTexture` -> asset PNG fallback when running under headless `rlsw`).
+- Verified builds & visual inspection: `tools/check-id-prefixes.sh` passed; `tools/check-gui-syntax.sh` (`Draw.cpp`, `AudioDevice.cpp`, `main.cpp`) passed with 0 `-Wall -Wextra -Wpedantic` warnings; all `spaceship_core` + `console_main.cpp` units passed `-std=c++17 -fsyntax-only -Wall -Wextra -Wpedantic -Werror`; `tools/viewer` rendered idle multi-pose frames (`01-wren3d-t0`..`t3`) and active in-flight (`05-inflight`) + 200%/250% zoomed crops confirming intact turret/antenna/bow details, clean silhouette, 3D yaw/pitch perspective, tracked dots, and nozzle-aligned thruster plumes.
+- Git action: staging modified `cpp/` files + `docs/LOGBOOK.md`, committing to `arena/5ef248e7-spaceship`, and pushing to `origin` to update PR #86.
+
 
 
 

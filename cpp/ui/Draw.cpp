@@ -21,13 +21,15 @@
 #include <cfloat>
 #include <cmath>
 #include <cstdio>
-#include <cstring>
 #include <cstdlib>
+#include <cstring>
+#include <filesystem>
 #include <unordered_map>
 
 #include "imgui.h"
 #include "raylib.h"
 #include "rlImGui.h"
+#include "rlgl.h"
 
 #include "audio/Audio.h"
 #include "ui/WikiScreen.h"
@@ -414,6 +416,19 @@ float ShellView::PaintTaskHeader(const TaskHead& head, float left, float top) co
 }
 
 ShellView::ShellView() { theme_ = Theme::ById("classic"); }
+
+ShellView::~ShellView() { ReleaseWrenMesh(); }
+
+void ShellView::SetWrenExteriorImage(const Image* image) {
+  if (image == nullptr || image->data == nullptr || image->width <= 0 || image->height <= 0) {
+    return;
+  }
+  BuildWrenSdfFromImage(*image);
+  if (wrenMeshBuilt_) {
+    ReleaseWrenMesh();
+    wrenMeshAttempted_ = false;
+  }
+}
 
 void ShellView::Configure(float width, float height, const Theme& theme) {
   width_ = width;
@@ -1016,6 +1031,597 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
   ImGui::PopStyleVar();
 }
 
+namespace {
+
+constexpr float kWrenHalfDepth = 0.25f;
+
+float SmoothStep01(float edge0, float edge1, float x) {
+  const float t = std::clamp((x - edge0) / std::max(1e-5f, edge1 - edge0), 0.0f, 1.0f);
+  return t * t * (3.0f - 2.0f * t);
+}
+
+void Edt1D(const float* f, int n, float* d, std::vector<int>& v, std::vector<float>& z) {
+  if (n <= 0) return;
+  int k = 0;
+  v[0] = 0;
+  z[0] = -1e20f;
+  z[1] = 1e20f;
+  for (int q = 1; q < n; ++q) {
+    float s = ((f[q] + static_cast<float>(q * q)) -
+               (f[v[k]] + static_cast<float>(v[k] * v[k]))) /
+              static_cast<float>(2 * q - 2 * v[k]);
+    while (s <= z[k]) {
+      --k;
+      s = ((f[q] + static_cast<float>(q * q)) -
+           (f[v[k]] + static_cast<float>(v[k] * v[k]))) /
+          static_cast<float>(2 * q - 2 * v[k]);
+    }
+    ++k;
+    v[k] = q;
+    z[k] = s;
+    z[k + 1] = 1e20f;
+  }
+  k = 0;
+  for (int q = 0; q < n; ++q) {
+    while (z[k + 1] < static_cast<float>(q)) { ++k; }
+    const float dx = static_cast<float>(q - v[k]);
+    d[q] = dx * dx + f[v[k]];
+  }
+}
+
+std::vector<float> ComputeEuclideanDistance2D(const std::vector<uint8_t>& zeroSet, int w, int h) {
+  constexpr float kInf = 1e12f;
+  std::vector<float> grid(static_cast<std::size_t>(w) * h, kInf);
+  for (std::size_t i = 0; i < grid.size(); ++i) {
+    if (zeroSet[i] != 0) grid[i] = 0.0f;
+  }
+  const int maxDim = std::max(w, h);
+  std::vector<float> f(static_cast<std::size_t>(maxDim));
+  std::vector<float> d(static_cast<std::size_t>(maxDim));
+  std::vector<int> v(static_cast<std::size_t>(maxDim));
+  std::vector<float> z(static_cast<std::size_t>(maxDim) + 1);
+
+  for (int x = 0; x < w; ++x) {
+    for (int y = 0; y < h; ++y) { f[y] = grid[static_cast<std::size_t>(y) * w + x]; }
+    Edt1D(f.data(), h, d.data(), v, z);
+    for (int y = 0; y < h; ++y) { grid[static_cast<std::size_t>(y) * w + x] = d[y]; }
+  }
+  for (int y = 0; y < h; ++y) {
+    float* row = &grid[static_cast<std::size_t>(y) * w];
+    Edt1D(row, w, d.data(), v, z);
+    for (int x = 0; x < w; ++x) { row[x] = std::sqrt(std::max(0.0f, d[x])); }
+  }
+  return grid;
+}
+
+Matrix BuildOffAxisFrustumMatrix(double left, double right, double bottom, double top,
+                                 double znear, double zfar) {
+  Matrix m{};
+  const float rl = static_cast<float>(right - left);
+  const float tb = static_cast<float>(top - bottom);
+  const float fn = static_cast<float>(zfar - znear);
+  m.m0 = (2.0f * static_cast<float>(znear)) / rl;
+  m.m5 = (2.0f * static_cast<float>(znear)) / tb;
+  m.m8 = static_cast<float>(right + left) / rl;
+  m.m9 = static_cast<float>(top + bottom) / tb;
+  m.m10 = -static_cast<float>(zfar + znear) / fn;
+  m.m11 = -1.0f;
+  m.m14 = -(2.0f * static_cast<float>(zfar) * static_cast<float>(znear)) / fn;
+  return m;
+}
+
+Matrix BuildScaleRotateXYZ(float scale, float pitchRad, float yawRad, float rollRad) {
+  const float cosz = std::cos(-rollRad);
+  const float sinz = std::sin(-rollRad);
+  const float cosy = std::cos(-yawRad);
+  const float siny = std::sin(-yawRad);
+  const float cosx = std::cos(-pitchRad);
+  const float sinx = std::sin(-pitchRad);
+  Matrix m{};
+  m.m0 = scale * (cosz * cosy);
+  m.m1 = scale * ((cosz * siny * sinx) - (sinz * cosx));
+  m.m2 = scale * ((cosz * siny * cosx) + (sinz * sinx));
+  m.m4 = scale * (sinz * cosy);
+  m.m5 = scale * ((sinz * siny * sinx) + (cosz * cosx));
+  m.m6 = scale * ((sinz * siny * cosx) - (cosz * sinx));
+  m.m8 = scale * (-siny);
+  m.m9 = scale * (cosy * sinx);
+  m.m10 = scale * (cosy * cosx);
+  m.m15 = 1.0f;
+  return m;
+}
+
+Matrix BuildTranslateZ(float tz) {
+  Matrix m{};
+  m.m0 = 1.0f;
+  m.m5 = 1.0f;
+  m.m10 = 1.0f;
+  m.m14 = tz;
+  m.m15 = 1.0f;
+  return m;
+}
+
+// Column-vector product C = A * B (B applies first, then A).
+Matrix MulColMajor(const Matrix& a, const Matrix& b) {
+  Matrix r{};
+  r.m0  = a.m0*b.m0 + a.m4*b.m1 + a.m8*b.m2  + a.m12*b.m3;
+  r.m1  = a.m1*b.m0 + a.m5*b.m1 + a.m9*b.m2  + a.m13*b.m3;
+  r.m2  = a.m2*b.m0 + a.m6*b.m1 + a.m10*b.m2 + a.m14*b.m3;
+  r.m3  = a.m3*b.m0 + a.m7*b.m1 + a.m11*b.m2 + a.m15*b.m3;
+  r.m4  = a.m0*b.m4 + a.m4*b.m5 + a.m8*b.m6  + a.m12*b.m7;
+  r.m5  = a.m1*b.m4 + a.m5*b.m5 + a.m9*b.m6  + a.m13*b.m7;
+  r.m6  = a.m2*b.m4 + a.m6*b.m5 + a.m10*b.m6 + a.m14*b.m7;
+  r.m7  = a.m3*b.m4 + a.m7*b.m5 + a.m11*b.m6 + a.m15*b.m7;
+  r.m8  = a.m0*b.m8 + a.m4*b.m9 + a.m8*b.m10 + a.m12*b.m11;
+  r.m9  = a.m1*b.m8 + a.m5*b.m9 + a.m9*b.m10 + a.m13*b.m11;
+  r.m10 = a.m2*b.m8 + a.m6*b.m9 + a.m10*b.m10 + a.m14*b.m11;
+  r.m11 = a.m3*b.m8 + a.m7*b.m9 + a.m11*b.m10 + a.m15*b.m11;
+  r.m12 = a.m0*b.m12 + a.m4*b.m13 + a.m8*b.m14 + a.m12*b.m15;
+  r.m13 = a.m1*b.m12 + a.m5*b.m13 + a.m9*b.m14 + a.m13*b.m15;
+  r.m14 = a.m2*b.m12 + a.m6*b.m13 + a.m10*b.m14 + a.m14*b.m15;
+  r.m15 = a.m3*b.m12 + a.m7*b.m13 + a.m11*b.m14 + a.m15*b.m15;
+  return r;
+}
+
+Vector2 ProjectPointMvp(const Vector3& p, const Matrix& mvp, float viewW, float viewH) {
+  const float x = mvp.m0 * p.x + mvp.m4 * p.y + mvp.m8 * p.z + mvp.m12;
+  const float y = mvp.m1 * p.x + mvp.m5 * p.y + mvp.m9 * p.z + mvp.m13;
+  const float w = mvp.m3 * p.x + mvp.m7 * p.y + mvp.m11 * p.z + mvp.m15;
+  const float invW = std::fabs(w) > 1e-5f ? 1.0f / w : 1.0f;
+  const float ndcX = x * invW;
+  const float ndcY = y * invW;
+  return Vector2{(ndcX * 0.5f + 0.5f) * viewW, (0.5f - ndcY * 0.5f) * viewH};
+}
+
+constexpr const char* kWren3DVertexShader = R"(
+#version 330
+in vec3 vertexPosition;
+in vec2 vertexTexCoord;
+in vec3 vertexNormal;
+in vec4 vertexColor;
+
+uniform mat4 mvp;
+uniform mat4 matModel;
+uniform mat4 matNormal;
+
+out vec2 fragTexCoord;
+out vec3 fragNormal;
+out vec3 fragWorldPos;
+out vec4 fragColor;
+
+void main() {
+  fragTexCoord = vertexTexCoord;
+  fragColor = vertexColor;
+  vec4 worldPos = matModel * vec4(vertexPosition, 1.0);
+  fragWorldPos = worldPos.xyz;
+  fragNormal = normalize(mat3(matNormal) * vertexNormal);
+  gl_Position = mvp * vec4(vertexPosition, 1.0);
+}
+)";
+
+constexpr const char* kWren3DFragmentShader = R"(
+#version 330
+in vec2 fragTexCoord;
+in vec3 fragNormal;
+in vec3 fragWorldPos;
+in vec4 fragColor;
+
+uniform sampler2D texture0;
+uniform vec4 colDiffuse;
+uniform float uWarmBias;
+uniform vec3 uKeyDir;
+
+out vec4 finalColor;
+
+void main() {
+  vec4 tex = texture(texture0, fragTexCoord);
+  if (tex.a < 0.08) discard;
+
+  vec3 N = normalize(fragNormal);
+  vec3 L = normalize(uKeyDir);
+  vec3 V = normalize(vec3(0.0, 0.0, 12.0) - fragWorldPos);
+
+  float ndotl = max(dot(N, L), 0.0);
+  float bounce = max(-N.y, 0.0) * 0.25;
+  float fresnel = pow(1.0 - clamp(abs(dot(N, V)), 0.0, 1.0), 2.3);
+  vec3 H = normalize(L + V);
+  float spec = pow(max(dot(N, H), 0.0), 26.0) * 0.09;
+
+  vec3 base = tex.rgb * colDiffuse.rgb * mix(vec3(1.0), fragColor.rgb, 0.45);
+  float shade = 0.89 + 0.14 * ndotl + 0.03 * bounce;
+  vec3 rimTint = mix(vec3(0.76, 0.86, 0.98), vec3(1.00, 0.90, 0.72), clamp(uWarmBias, 0.0, 1.0));
+  vec3 lit = base * shade + rimTint * (fresnel * 0.09 + spec);
+  finalColor = vec4(clamp(lit, 0.0, 1.0), tex.a * colDiffuse.a);
+}
+)";
+
+}  // namespace
+
+void ShellView::BuildWrenSdfFromImage(const Image& image) {
+  if (image.data == nullptr || image.width <= 0 || image.height <= 0) { return; }
+  Image copy = ImageCopy(image);
+  if (copy.format != PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) {
+    ImageFormat(&copy, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+  }
+  const int gw = 670;
+  const int gh = 210;
+  const int srcW = copy.width;
+  const int srcH = copy.height;
+  const uint8_t* px = static_cast<const uint8_t*>(copy.data);
+
+  std::vector<uint8_t> solid(static_cast<std::size_t>(gw) * gh, 0);
+  std::vector<uint8_t> empty(static_cast<std::size_t>(gw) * gh, 1);
+  std::vector<float> luma(static_cast<std::size_t>(gw) * gh, 0.5f);
+
+  for (int gy = 0; gy < gh; ++gy) {
+    const int y0 = gy * srcH / gh;
+    const int y1 = std::max(y0 + 1, (gy + 1) * srcH / gh);
+    for (int gx = 0; gx < gw; ++gx) {
+      const int x0 = gx * srcW / gw;
+      const int x1 = std::max(x0 + 1, (gx + 1) * srcW / gw);
+      uint8_t maxA = 0;
+      float lSum = 0.0f;
+      int opaqueCnt = 0;
+      for (int y = y0; y < y1 && y < srcH; ++y) {
+        for (int x = x0; x < x1 && x < srcW; ++x) {
+          const uint8_t* c = &px[(static_cast<std::size_t>(y) * srcW + x) * 4];
+          if (c[3] > maxA) maxA = c[3];
+          if (c[3] >= 64) {
+            lSum += (0.2126f * c[0] + 0.7152f * c[1] + 0.0722f * c[2]) / 255.0f;
+            ++opaqueCnt;
+          }
+        }
+      }
+      const std::size_t idx = static_cast<std::size_t>(gy) * gw + gx;
+      const bool isBorder = (gx == 0 || gy == 0 || gx == gw - 1 || gy == gh - 1);
+      if (!isBorder && maxA >= 96) {
+        solid[idx] = 1;
+        empty[idx] = 0;
+        luma[idx] = opaqueCnt > 0 ? (lSum / static_cast<float>(opaqueCnt)) : 0.75f;
+      }
+    }
+  }
+  UnloadImage(copy);
+
+  const std::vector<float> distIn = ComputeEuclideanDistance2D(empty, gw, gh);
+  const std::vector<float> distOut = ComputeEuclideanDistance2D(solid, gw, gh);
+  float maxDist = 1.0f;
+  std::vector<float> sdf(static_cast<std::size_t>(gw) * gh, 0.0f);
+  for (std::size_t i = 0; i < sdf.size(); ++i) {
+    sdf[i] = solid[i] != 0 ? distIn[i] : -distOut[i];
+    if (sdf[i] > maxDist) maxDist = sdf[i];
+  }
+
+  // Smooth the luma slightly so micro-relief emphasizes armor bays without jitter.
+  std::vector<float> smoothLuma = luma;
+  for (int pass = 0; pass < 2; ++pass) {
+    std::vector<float> next = smoothLuma;
+    for (int gy = 1; gy < gh - 1; ++gy) {
+      for (int gx = 1; gx < gw - 1; ++gx) {
+        const std::size_t idx = static_cast<std::size_t>(gy) * gw + gx;
+        if (solid[idx] == 0) continue;
+        float acc = 0.0f;
+        float wsum = 0.0f;
+        for (int dy = -1; dy <= 1; ++dy) {
+          for (int dx = -1; dx <= 1; ++dx) {
+            const std::size_t nidx = static_cast<std::size_t>(gy + dy) * gw + (gx + dx);
+            if (solid[nidx] == 0) continue;
+            acc += smoothLuma[nidx];
+            wsum += 1.0f;
+          }
+        }
+        if (wsum > 0.0f) next[idx] = acc / wsum;
+      }
+    }
+    smoothLuma = std::move(next);
+  }
+
+  wrenSdf_.w = gw;
+  wrenSdf_.h = gh;
+  wrenSdf_.maxDist = maxDist;
+  wrenSdf_.sdf = std::move(sdf);
+  wrenSdf_.luma = std::move(smoothLuma);
+}
+
+float ShellView::SampleWrenHullZ(float u, float v) const {
+  if (wrenSdf_.w <= 1 || wrenSdf_.h <= 1 || wrenSdf_.sdf.empty()) { return 0.0f; }
+  const float fx = std::clamp(u, 0.0f, 1.0f) * static_cast<float>(wrenSdf_.w - 1);
+  const float fy = std::clamp(v, 0.0f, 1.0f) * static_cast<float>(wrenSdf_.h - 1);
+  const int x0 = static_cast<int>(std::floor(fx));
+  const int y0 = static_cast<int>(std::floor(fy));
+  const int x1 = std::min(wrenSdf_.w - 1, x0 + 1);
+  const int y1 = std::min(wrenSdf_.h - 1, y0 + 1);
+  const float tx = fx - static_cast<float>(x0);
+  const float ty = fy - static_cast<float>(y0);
+  auto sampleField = [&](const std::vector<float>& f) {
+    const float a = f[static_cast<std::size_t>(y0) * wrenSdf_.w + x0] * (1.0f - tx) +
+                    f[static_cast<std::size_t>(y0) * wrenSdf_.w + x1] * tx;
+    const float b = f[static_cast<std::size_t>(y1) * wrenSdf_.w + x0] * (1.0f - tx) +
+                    f[static_cast<std::size_t>(y1) * wrenSdf_.w + x1] * tx;
+    return a * (1.0f - ty) + b * ty;
+  };
+  const float s = sampleField(wrenSdf_.sdf);
+  if (s <= 0.0f) { return 0.0f; }
+  const float t = std::clamp(s / wrenSdf_.maxDist, 0.0f, 1.0f);
+  const float dome = std::sqrt(std::clamp(1.0f - std::pow(1.0f - std::min(1.0f, t * 1.15f), 2.15f),
+                                          0.0f, 1.0f));
+  const float lum = sampleField(wrenSdf_.luma);
+  const float relief = 0.89f + 0.11f * lum;
+  return kWrenHalfDepth * dome * (1.0f + (relief - 1.0f) * SmoothStep01(0.0f, 0.18f, t));
+}
+
+void ShellView::ReleaseWrenMesh() {
+  if (wrenMeshBuilt_) {
+    UnloadMesh(wrenMesh_);
+    wrenMesh_ = {};
+    wrenMeshBuilt_ = false;
+  }
+  if (wrenMat_.maps != nullptr) {
+    // Keep external wrenExteriorArt_ alive (owned by caller); detach before unload.
+    wrenMat_.maps[MATERIAL_MAP_DIFFUSE].texture.id = rlGetTextureIdDefault();
+    wrenMat_.shader.id = rlGetShaderIdDefault();
+    wrenMat_.shader.locs = rlGetShaderLocsDefault();
+    UnloadMaterial(wrenMat_);
+    wrenMat_ = {};
+  }
+  if (wrenShader_.id != 0 && wrenShader_.id != rlGetShaderIdDefault()) {
+    UnloadShader(wrenShader_);
+  }
+  wrenShader_ = {};
+  wrenShaderWarmLoc_ = -1;
+  wrenShaderLightLoc_ = -1;
+  wrenMeshTextureId_ = 0;
+}
+
+void ShellView::EnsureWrenMesh() {
+  const Texture2D* texture = static_cast<const Texture2D*>(wrenExteriorArt_);
+  if (texture == nullptr || texture->id == 0 || texture->width <= 0 || texture->height <= 0) {
+    return;
+  }
+  if (wrenMeshBuilt_ && wrenMeshTextureId_ == texture->id) { return; }
+  if (wrenMeshAttempted_ && wrenMeshTextureId_ == texture->id) { return; }
+
+  ReleaseWrenMesh();
+  wrenMeshAttempted_ = true;
+  wrenMeshTextureId_ = texture->id;
+
+  if (wrenSdf_.sdf.empty()) {
+    Image gpuImg = LoadImageFromTexture(*texture);
+    bool hasOpaque = false;
+    if (gpuImg.data != nullptr && gpuImg.width > 0 && gpuImg.height > 0) {
+      Image check = ImageCopy(gpuImg);
+      if (check.format != PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) {
+        ImageFormat(&check, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+      }
+      const uint8_t* p = static_cast<const uint8_t*>(check.data);
+      const std::size_t total = static_cast<std::size_t>(check.width) * check.height;
+      for (std::size_t i = 0; i < total; i += 37) {
+        if (p[i * 4 + 3] > 20) { hasOpaque = true; break; }
+      }
+      if (hasOpaque) { BuildWrenSdfFromImage(check); }
+      UnloadImage(check);
+    }
+    if (gpuImg.data != nullptr) { UnloadImage(gpuImg); }
+  }
+  if (wrenSdf_.sdf.empty()) {
+#ifdef SPACESHIP_ASSET_DIR
+    const std::filesystem::path assetRoot(SPACESHIP_ASSET_DIR);
+#else
+    const std::filesystem::path assetRoot("assets");
+#endif
+    const std::array<std::filesystem::path, 2> candidates{
+        assetRoot / "art" / "ships" / "wren-exterior.png",
+        std::filesystem::path("assets") / "art" / "ships" / "wren-exterior.png",
+    };
+    for (const auto& path : candidates) {
+      std::error_code ec;
+      if (!std::filesystem::exists(path, ec)) { continue; }
+      Image diskImg = LoadImage(path.string().c_str());
+      if (diskImg.data != nullptr && diskImg.width > 0 && diskImg.height > 0) {
+        BuildWrenSdfFromImage(diskImg);
+        UnloadImage(diskImg);
+        break;
+      }
+      if (diskImg.data != nullptr) { UnloadImage(diskImg); }
+    }
+  }
+  if (wrenSdf_.sdf.empty()) { return; }
+
+  const float aspect = static_cast<float>(texture->width) / static_cast<float>(texture->height);
+  constexpr int kGridW = 240;
+  constexpr int kGridH = 76;
+
+  auto sampleSdf = [&](float u, float v) {
+    const float fx = std::clamp(u, 0.0f, 1.0f) * static_cast<float>(wrenSdf_.w - 1);
+    const float fy = std::clamp(v, 0.0f, 1.0f) * static_cast<float>(wrenSdf_.h - 1);
+    const int x0 = static_cast<int>(std::floor(fx));
+    const int y0 = static_cast<int>(std::floor(fy));
+    const int x1 = std::min(wrenSdf_.w - 1, x0 + 1);
+    const int y1 = std::min(wrenSdf_.h - 1, y0 + 1);
+    const float tx = fx - static_cast<float>(x0);
+    const float ty = fy - static_cast<float>(y0);
+    const float a = wrenSdf_.sdf[static_cast<std::size_t>(y0) * wrenSdf_.w + x0] * (1.0f - tx) +
+                    wrenSdf_.sdf[static_cast<std::size_t>(y0) * wrenSdf_.w + x1] * tx;
+    const float b = wrenSdf_.sdf[static_cast<std::size_t>(y1) * wrenSdf_.w + x0] * (1.0f - tx) +
+                    wrenSdf_.sdf[static_cast<std::size_t>(y1) * wrenSdf_.w + x1] * tx;
+    return a * (1.0f - ty) + b * ty;
+  };
+
+  struct MeshVert {
+    Vector3 pos;
+    Vector2 uv;
+    Vector3 nrm;
+    ::Color col;
+  };
+  std::vector<MeshVert> verts;
+  std::vector<unsigned short> indices;
+  verts.reserve(18000);
+  indices.reserve(54000);
+
+  auto evalVert = [&](float u, float v, float sideSign, bool onContour) -> MeshVert {
+    const float x = (u - 0.5f) * aspect;
+    const float y = 0.5f - v;
+    const float z = onContour ? 0.0f : sideSign * SampleWrenHullZ(u, v);
+    const float du = 1.0f / static_cast<float>(kGridW - 1);
+    const float dv = 1.0f / static_cast<float>(kGridH - 1);
+    const float dzdx = (SampleWrenHullZ(u + du, v) - SampleWrenHullZ(u - du, v)) / (2.0f * du * aspect);
+    const float dzdy = (SampleWrenHullZ(u, v - dv) - SampleWrenHullZ(u, v + dv)) / (2.0f * dv);
+    Vector3 n{-sideSign * dzdx, -sideSign * dzdy, sideSign};
+    const float nLen = std::sqrt(n.x * n.x + n.y * n.y + n.z * n.z);
+    if (nLen > 1e-5f) { n.x /= nLen; n.y /= nLen; n.z /= nLen; }
+    // Subtle baked studio illumination (visible on both software renderer & GPU).
+    const Vector3 key{-0.45f, 0.52f, 0.72f};
+    const float keyLen = std::sqrt(key.x * key.x + key.y * key.y + key.z * key.z);
+    const float ndotl = std::max(0.0f, (n.x * key.x + n.y * key.y + n.z * key.z) / keyLen);
+    const float shade = std::clamp(0.88f + 0.14f * ndotl + 0.03f * std::max(0.0f, n.y), 0.85f, 1.04f);
+    const unsigned char c = static_cast<unsigned char>(std::round(std::min(1.0f, shade) * 255.0f));
+    return MeshVert{{x, y, z}, {u, v}, n, ::Color{c, c, c, 255}};
+  };
+
+  auto emitIdxTri = [&](unsigned short i0, unsigned short i1, unsigned short i2, float expectedZSign) {
+    const Vector3& a = verts[i0].pos;
+    const Vector3& b = verts[i1].pos;
+    const Vector3& c = verts[i2].pos;
+    const Vector3 ab{b.x - a.x, b.y - a.y, b.z - a.z};
+    const Vector3 ac{c.x - a.x, c.y - a.y, c.z - a.z};
+    const float crossZ = ab.x * ac.y - ab.y * ac.x;
+    if (std::fabs(crossZ) < 1e-8f) return;
+    indices.push_back(i0);
+    if (crossZ * expectedZSign >= 0.0f) {
+      indices.push_back(i1);
+      indices.push_back(i2);
+    } else {
+      indices.push_back(i2);
+      indices.push_back(i1);
+    }
+  };
+
+  // Precompute grid SDF values and shared interior vertex indices (keeps count ~16k).
+  std::vector<float> gridSdf(static_cast<std::size_t>(kGridW) * kGridH, 0.0f);
+  constexpr unsigned short kInvalidIdx = 0xFFFFu;
+  std::vector<unsigned short> frontGridIdx(static_cast<std::size_t>(kGridW) * kGridH, kInvalidIdx);
+  std::vector<unsigned short> backGridIdx(static_cast<std::size_t>(kGridW) * kGridH, kInvalidIdx);
+
+  for (int gy = 0; gy < kGridH; ++gy) {
+    const float v = static_cast<float>(gy) / static_cast<float>(kGridH - 1);
+    for (int gx = 0; gx < kGridW; ++gx) {
+      const float u = static_cast<float>(gx) / static_cast<float>(kGridW - 1);
+      const float s = sampleSdf(u, v);
+      const std::size_t idx = static_cast<std::size_t>(gy) * kGridW + gx;
+      gridSdf[idx] = s;
+      if (s >= 0.0f && verts.size() + 2 <= 65000) {
+        frontGridIdx[idx] = static_cast<unsigned short>(verts.size());
+        verts.push_back(evalVert(u, v, 1.0f, false));
+        backGridIdx[idx] = static_cast<unsigned short>(verts.size());
+        verts.push_back(evalVert(u, v, -1.0f, false));
+      }
+    }
+  }
+
+  for (int gy = 0; gy < kGridH - 1; ++gy) {
+    const float v0 = static_cast<float>(gy) / static_cast<float>(kGridH - 1);
+    const float v1 = static_cast<float>(gy + 1) / static_cast<float>(kGridH - 1);
+    for (int gx = 0; gx < kGridW - 1; ++gx) {
+      const float u0 = static_cast<float>(gx) / static_cast<float>(kGridW - 1);
+      const float u1 = static_cast<float>(gx + 1) / static_cast<float>(kGridW - 1);
+      struct Corner { float u, v, s; int gx, gy; };
+      const Corner corners[4]{
+          {u0, v0, gridSdf[static_cast<std::size_t>(gy) * kGridW + gx], gx, gy},
+          {u1, v0, gridSdf[static_cast<std::size_t>(gy) * kGridW + gx + 1], gx + 1, gy},
+          {u1, v1, gridSdf[static_cast<std::size_t>(gy + 1) * kGridW + gx + 1], gx + 1, gy + 1},
+          {u0, v1, gridSdf[static_cast<std::size_t>(gy + 1) * kGridW + gx], gx, gy + 1},
+      };
+      // Clip cell polygon against s >= 0 (Sutherland-Hodgman on a quad -> 3..5 vertices).
+      struct PolyPt { float u, v; bool contour; int gx, gy; };
+      std::array<PolyPt, 6> poly{};
+      int count = 0;
+      for (int i = 0; i < 4; ++i) {
+        const Corner& cur = corners[i];
+        const Corner& nxt = corners[(i + 1) % 4];
+        const bool curIn = cur.s >= 0.0f;
+        const bool nxtIn = nxt.s >= 0.0f;
+        if (curIn) { poly[static_cast<std::size_t>(count++)] = {cur.u, cur.v, false, cur.gx, cur.gy}; }
+        if (curIn != nxtIn) {
+          const float denom = cur.s - nxt.s;
+          const float t = std::fabs(denom) > 1e-6f ? std::clamp(cur.s / denom, 0.0f, 1.0f) : 0.5f;
+          poly[static_cast<std::size_t>(count++)] = {
+              cur.u + (nxt.u - cur.u) * t,
+              cur.v + (nxt.v - cur.v) * t,
+              true, -1, -1,
+          };
+        }
+      }
+      if (count < 3) { continue; }
+      for (const float side : {1.0f, -1.0f}) {
+        const auto& gridIdx = side > 0.0f ? frontGridIdx : backGridIdx;
+        std::array<unsigned short, 6> polyIdx{};
+        bool ok = true;
+        for (int k = 0; k < count; ++k) {
+          const PolyPt& pt = poly[static_cast<std::size_t>(k)];
+          if (!pt.contour && pt.gx >= 0) {
+            const unsigned short shared = gridIdx[static_cast<std::size_t>(pt.gy) * kGridW + pt.gx];
+            if (shared != kInvalidIdx) {
+              polyIdx[static_cast<std::size_t>(k)] = shared;
+              continue;
+            }
+          }
+          if (verts.size() >= 65000) { ok = false; break; }
+          polyIdx[static_cast<std::size_t>(k)] = static_cast<unsigned short>(verts.size());
+          verts.push_back(evalVert(pt.u, pt.v, side, pt.contour));
+        }
+        if (!ok) { continue; }
+        for (int k = 1; k < count - 1; ++k) {
+          emitIdxTri(polyIdx[0], polyIdx[static_cast<std::size_t>(k)],
+                     polyIdx[static_cast<std::size_t>(k + 1)], side);
+        }
+      }
+    }
+  }
+
+  if (verts.empty() || indices.empty()) { return; }
+
+  wrenMesh_.vertexCount = static_cast<int>(verts.size());
+  wrenMesh_.triangleCount = static_cast<int>(indices.size() / 3);
+  wrenMesh_.vertices = static_cast<float*>(MemAlloc(static_cast<unsigned int>(verts.size() * 3 * sizeof(float))));
+  wrenMesh_.texcoords = static_cast<float*>(MemAlloc(static_cast<unsigned int>(verts.size() * 2 * sizeof(float))));
+  wrenMesh_.normals = static_cast<float*>(MemAlloc(static_cast<unsigned int>(verts.size() * 3 * sizeof(float))));
+  wrenMesh_.colors = static_cast<unsigned char*>(MemAlloc(static_cast<unsigned int>(verts.size() * 4 * sizeof(unsigned char))));
+  wrenMesh_.indices = static_cast<unsigned short*>(MemAlloc(static_cast<unsigned int>(indices.size() * sizeof(unsigned short))));
+
+  for (std::size_t i = 0; i < verts.size(); ++i) {
+    wrenMesh_.vertices[i * 3 + 0] = verts[i].pos.x;
+    wrenMesh_.vertices[i * 3 + 1] = verts[i].pos.y;
+    wrenMesh_.vertices[i * 3 + 2] = verts[i].pos.z;
+    wrenMesh_.texcoords[i * 2 + 0] = verts[i].uv.x;
+    wrenMesh_.texcoords[i * 2 + 1] = verts[i].uv.y;
+    wrenMesh_.normals[i * 3 + 0] = verts[i].nrm.x;
+    wrenMesh_.normals[i * 3 + 1] = verts[i].nrm.y;
+    wrenMesh_.normals[i * 3 + 2] = verts[i].nrm.z;
+    wrenMesh_.colors[i * 4 + 0] = verts[i].col.r;
+    wrenMesh_.colors[i * 4 + 1] = verts[i].col.g;
+    wrenMesh_.colors[i * 4 + 2] = verts[i].col.b;
+    wrenMesh_.colors[i * 4 + 3] = verts[i].col.a;
+  }
+  std::memcpy(wrenMesh_.indices, indices.data(), indices.size() * sizeof(unsigned short));
+  UploadMesh(&wrenMesh_, false);
+
+  wrenMat_ = LoadMaterialDefault();
+  wrenMat_.maps[MATERIAL_MAP_DIFFUSE].texture = *texture;
+  wrenMat_.maps[MATERIAL_MAP_DIFFUSE].color = WHITE;
+
+  Shader custom = LoadShaderFromMemory(kWren3DVertexShader, kWren3DFragmentShader);
+  if (custom.id != 0 && custom.id != rlGetShaderIdDefault()) {
+    wrenShader_ = custom;
+    wrenShaderWarmLoc_ = GetShaderLocation(wrenShader_, "uWarmBias");
+    wrenShaderLightLoc_ = GetShaderLocation(wrenShader_, "uKeyDir");
+    wrenMat_.shader = wrenShader_;
+  } else {
+    if (custom.locs != nullptr && custom.id == 0) { UnloadShader(custom); }
+    wrenShader_ = {};
+  }
+  wrenMeshBuilt_ = true;
+}
+
 bool ShellView::HasWrenExterior(const Simulation& sim) const {
   const Texture2D* texture = static_cast<const Texture2D*>(wrenExteriorArt_);
   if (sim.State().shipClass != "wren" || texture == nullptr || texture->id == 0 ||
@@ -1107,8 +1713,12 @@ ShellView::ExteriorLayout ShellView::BuildExteriorLayout(const Simulation& sim, 
     // does not claim the supplied sketch is an engineering deck layout.
     const float nx = std::clamp(static_cast<float>((rooms[i].box.x + rooms[i].box.w * 0.5) / 600.0), 0.0f, 1.0f);
     const float ny = std::clamp(static_cast<float>((rooms[i].box.y + rooms[i].box.h * 0.5) / 365.0), 0.0f, 1.0f);
-    item.anchor = {out.image.x + out.image.w * (0.07f + 0.86f * nx),
-                   out.image.y + out.image.h * (0.30f + 0.42f * ny)};
+    const float u = 0.07f + 0.86f * nx;
+    const float v = 0.30f + 0.42f * ny;
+    item.normUV = Vector2{u, v};
+    item.localZ = SampleWrenHullZ(u, v);
+    item.anchor = {out.image.x + out.image.w * u,
+                   out.image.y + out.image.h * v};
     out.callouts.push_back(std::move(item));
   }
   return out;
@@ -1118,14 +1728,152 @@ void ShellView::PaintWrenExterior(const Simulation& sim) {
   const Texture2D* texture = static_cast<const Texture2D*>(wrenExteriorArt_);
   const Palette& p = theme_.palette;
   const Area image = exterior_.image;
-  DrawTexturePro(*texture, Rectangle{0, 0, static_cast<float>(texture->width), static_cast<float>(texture->height)},
-                 Rectangle{image.x, image.y, image.w, image.h}, Vector2{0, 0}, 0, WHITE);
+
+  EnsureWrenMesh();
+
+  std::vector<Vector2> liveAnchors;
+  liveAnchors.reserve(exterior_.callouts.size());
+
+  const bool reduced = sim.State().reducedMotion;
+  const Task* travel = sim.FindOngoing("travel");
+  const bool inFlight = travel != nullptr && travel->state == "running";
+
+  if (wrenMeshBuilt_ && width_ > 1.0f && height_ > 1.0f) {
+    const float t = reduced ? 0.0f : static_cast<float>(frameTimeMs_ * 0.001);
+    float yawDeg = 0.0f;
+    float pitchDeg = 0.0f;
+    float rollDeg = 0.0f;
+    float bobX = 0.0f;
+    float bobY = 0.0f;
+    if (!reduced) {
+      if (inFlight) {
+        yawDeg = 10.5f * std::sin(t * 0.68f) + 2.6f * std::sin(t * 0.31f);
+        pitchDeg = 5.2f * std::sin(t * 0.95f + 0.6f) + 1.6f;
+        rollDeg = 4.6f * std::cos(t * 0.57f) + 1.3f * std::sin(t * 1.4f);
+        bobX = 6.5f * std::sin(t * 0.48f);
+        bobY = 5.0f * std::sin(t * 1.15f) + 0.40f * std::sin(t * 18.0f);
+      } else {
+        yawDeg = 8.4f * std::sin(t * 0.52f) + 2.0f * std::sin(t * 0.23f);
+        pitchDeg = 4.2f * std::sin(t * 0.71f + 0.9f);
+        rollDeg = 2.9f * std::cos(t * 0.43f + 0.4f);
+        bobX = 3.8f * std::sin(t * 0.37f);
+        bobY = 4.4f * std::sin(t * 0.89f + 0.5f);
+      }
+    }
+
+    const float texAspect = static_cast<float>(texture->width) / static_cast<float>(texture->height);
+    constexpr float kCamDist = 12.0f;
+    constexpr float kFovDeg = 26.0f;
+    constexpr double kZNear = 0.5;
+    constexpr double kZFar = 40.0;
+    const float fovRad = kFovDeg * DEG2RAD;
+    const float halfViewH = kCamDist * std::tan(fovRad * 0.5f);
+    const float viewAspect = width_ / height_;
+    const float shipWorldH = (image.h / height_) * 2.0f * halfViewH;
+
+    const float screenCX = image.x + image.w * 0.5f + bobX;
+    const float screenCY = image.y + image.h * 0.5f - contentScroll_ + bobY;
+    const float ndcX = (2.0f * screenCX / width_) - 1.0f;
+    const float ndcY = 1.0f - (2.0f * screenCY / height_);
+
+    const double top0 = kZNear * std::tan(static_cast<double>(fovRad) * 0.5);
+    const double right0 = top0 * static_cast<double>(viewAspect);
+    const double shiftX = -static_cast<double>(ndcX) * right0;
+    const double shiftY = -static_cast<double>(ndcY) * top0;
+    const double left = -right0 + shiftX;
+    const double right = right0 + shiftX;
+    const double bottom = -top0 + shiftY;
+    const double top = top0 + shiftY;
+
+    Camera3D cam{};
+    cam.position = Vector3{0.0f, 0.0f, kCamDist};
+    cam.target = Vector3{0.0f, 0.0f, 0.0f};
+    cam.up = Vector3{0.0f, 1.0f, 0.0f};
+    cam.fovy = kFovDeg;
+    cam.projection = CAMERA_PERSPECTIVE;
+
+    const Matrix modelMat = BuildScaleRotateXYZ(
+        shipWorldH, pitchDeg * DEG2RAD, yawDeg * DEG2RAD, rollDeg * DEG2RAD);
+    const Matrix viewMat = BuildTranslateZ(-kCamDist);
+    const Matrix projMat = BuildOffAxisFrustumMatrix(left, right, bottom, top, kZNear, kZFar);
+    const Matrix mvp = MulColMajor(projMat, MulColMajor(viewMat, modelMat));
+
+    auto projectUv = [&](float u, float v, float z) -> Vector2 {
+      const Vector3 local{(u - 0.5f) * texAspect, 0.5f - v, z};
+      Vector2 sp = ProjectPointMvp(local, mvp, width_, height_);
+      sp.y += contentScroll_;
+      return sp;
+    };
+
+    if (inFlight && !reduced) {
+      // Soft thruster exhaust aura behind the three aft nozzles while traveling.
+      const float pulse = 0.65f + 0.35f * std::sin(t * 9.5f);
+      static constexpr float kNozzleU[3] = {0.055f, 0.018f, 0.055f};
+      static constexpr float kNozzleV[3] = {0.28f, 0.49f, 0.69f};
+      static constexpr float kNozzleR[3] = {11.0f, 16.0f, 11.0f};
+      for (int i = 0; i < 3; ++i) {
+        const Vector2 aft = projectUv(kNozzleU[i], kNozzleV[i], 0.0f);
+        const Vector2 plume{aft.x - 10.0f, aft.y};
+        DrawCircleGradient(plume, kNozzleR[i] * (0.90f + 0.18f * pulse),
+                           Fade(::Color{245, 188, 92, 255}, 0.32f * pulse),
+                           Fade(::Color{255, 224, 156, 255}, 0.0f));
+        DrawCircleGradient(Vector2{aft.x - 5.0f, aft.y},
+                           kNozzleR[i] * 0.48f * (0.90f + 0.14f * pulse),
+                           Fade(::Color{255, 238, 194, 255}, 0.38f * pulse),
+                           Fade(::Color{255, 224, 156, 255}, 0.0f));
+      }
+    }
+
+    if (wrenShader_.id != 0) {
+      const RadiationTelemetry rad = ComputeRadiationTelemetry(sim);
+      if (wrenShaderWarmLoc_ >= 0) {
+        SetShaderValue(wrenShader_, wrenShaderWarmLoc_, &rad.warmBias, SHADER_UNIFORM_FLOAT);
+      }
+      if (wrenShaderLightLoc_ >= 0) {
+        const float keyDir[3]{-0.45f + 0.25f * rad.waveDirX,
+                              0.55f - 0.15f * rad.waveDirY,
+                              0.75f};
+        SetShaderValue(wrenShader_, wrenShaderLightLoc_, keyDir, SHADER_UNIFORM_VEC3);
+      }
+    }
+
+    EndMode2D();
+    BeginScissorMode(static_cast<int>(layout_.content.x), static_cast<int>(layout_.content.y),
+                     std::max(0, static_cast<int>(layout_.content.w)),
+                     std::max(0, static_cast<int>(layout_.content.h)));
+    BeginMode3D(cam);
+    rlMatrixMode(RL_PROJECTION);
+    rlLoadIdentity();
+    rlFrustum(left, right, bottom, top, kZNear, kZFar);
+    rlMatrixMode(RL_MODELVIEW);
+    rlEnableBackfaceCulling();
+    DrawMesh(wrenMesh_, wrenMat_, modelMat);
+    EndMode3D();
+    EndScissorMode();
+    Camera2D scrollCam{{0.0f, 0.0f}, {0.0f, contentScroll_}, 0.0f, 1.0f};
+    BeginMode2D(scrollCam);
+
+    for (const ExteriorCallout& item : exterior_.callouts) {
+      const float z = item.localZ > 0.0f ? item.localZ : SampleWrenHullZ(item.normUV.x, item.normUV.y);
+      liveAnchors.push_back(projectUv(item.normUV.x, item.normUV.y, z));
+    }
+  } else {
+    DrawTexturePro(*texture,
+                   Rectangle{0, 0, static_cast<float>(texture->width), static_cast<float>(texture->height)},
+                   Rectangle{image.x, image.y, image.w, image.h}, Vector2{0, 0}, 0, WHITE);
+    for (const ExteriorCallout& item : exterior_.callouts) {
+      liveAnchors.push_back(item.anchor);
+    }
+  }
+
   const auto hovered = [&](const ExteriorCallout& item) {
     return layout_.content.Contains(mouseX_, mouseY_) && item.box.Contains(mouseX_, mouseY_ + contentScroll_);
   };
   // Lines first and labels last: another room's leader can never paint over
   // a label. The highlights are decorative; neither they nor hover tick time.
-  for (const ExteriorCallout& item : exterior_.callouts) {
+  for (std::size_t i = 0; i < exterior_.callouts.size(); ++i) {
+    const ExteriorCallout& item = exterior_.callouts[i];
+    const Vector2 anchor = i < liveAnchors.size() ? liveAnchors[i] : item.anchor;
     const bool hover = hovered(item);
     const Color line = ToRay(hover ? p.coffeeDark : p.borderDark);
     const float edgeX = item.left ? item.box.Right() : item.box.x;
@@ -1133,15 +1881,17 @@ void ShellView::PaintWrenExterior(const Simulation& sim) {
     const Vector2 from{edgeX, item.box.y + item.box.h * 0.5f};
     const Vector2 elbow{elbowX, from.y};
     DrawLineEx(from, elbow, 1.0f, line);
-    DrawLineEx(elbow, item.anchor, 1.0f, line);
-    DrawCircleV(item.anchor, hover ? 4.0f : 2.5f, line);
+    DrawLineEx(elbow, anchor, 1.0f, line);
+    DrawCircleV(anchor, hover ? 4.0f : 2.5f, line);
   }
-  for (const ExteriorCallout& item : exterior_.callouts) {
+  for (std::size_t i = 0; i < exterior_.callouts.size(); ++i) {
+    const ExteriorCallout& item = exterior_.callouts[i];
+    const Vector2 anchor = i < liveAnchors.size() ? liveAnchors[i] : item.anchor;
     const bool hover = hovered(item);
     if (hover) {
-      const float pulse = sim.State().reducedMotion ? 0.20f :
+      const float pulse = reduced ? 0.20f :
           0.15f + 0.05f * static_cast<float>(0.5 + 0.5 * std::sin(frameTimeMs_ / 650.0));
-      DrawEllipse(static_cast<int>(item.anchor.x), static_cast<int>(item.anchor.y),
+      DrawEllipse(static_cast<int>(anchor.x), static_cast<int>(anchor.y),
                   std::max(12.0f, image.w * 0.045f), std::max(8.0f, image.h * 0.09f),
                   Fade(::Color{255, 224, 156, 255}, pulse));
     }

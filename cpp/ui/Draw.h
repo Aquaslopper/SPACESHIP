@@ -46,6 +46,9 @@ enum class HitButton { None, Left, Right };
 class ShellView {
  public:
   ShellView();
+  ~ShellView();
+  ShellView(const ShellView&) = delete;
+  ShellView& operator=(const ShellView&) = delete;
 
   void Configure(float width, float height, const Theme& theme);
   void SetFonts(Font body, Font bold, Font mono) {
@@ -57,6 +60,7 @@ class ShellView {
   void SetSetupTexture(void* texture) { setupArt_ = texture; }
   void SetAudioStatus(std::string status) { audioStatus_ = std::move(status); }
   void SetWrenExteriorTexture(void* texture) { wrenExteriorArt_ = texture; }
+  void SetWrenExteriorImage(const Image* image);
   void SetDisplayAdjustmentAvailable(bool available) { displayAdjustmentAvailable_ = available; }
   void SetTutorialTexture(std::size_t index, void* texture) {
     if (index < tutorialArt_.size()) { tutorialArt_[index] = texture; }
@@ -119,6 +123,8 @@ class ShellView {
   struct ExteriorCallout {
     Area box;
     Vector2 anchor{};
+    Vector2 normUV{};
+    float localZ = 0.0f;
     std::string id;
     std::vector<std::string> lines;
     bool left = false;
@@ -129,7 +135,18 @@ class ShellView {
     float lineHeight = 0;
     std::vector<ExteriorCallout> callouts;
   };
+  struct WrenSdfGrid {
+    int w = 0;
+    int h = 0;
+    float maxDist = 1.0f;
+    std::vector<float> sdf;
+    std::vector<float> luma;
+  };
   bool HasWrenExterior(const Simulation& sim) const;
+  void BuildWrenSdfFromImage(const Image& image);
+  float SampleWrenHullZ(float u, float v) const;
+  void EnsureWrenMesh();
+  void ReleaseWrenMesh();
   ExteriorLayout BuildExteriorLayout(const Simulation& sim, const Area& stage) const;
   void PaintWrenExterior(const Simulation& sim);
 
@@ -201,6 +218,15 @@ class ShellView {
   void* wrenExteriorArt_ = nullptr;
   bool exteriorView_ = true;
   ExteriorLayout exterior_;
+  WrenSdfGrid wrenSdf_;
+  Mesh wrenMesh_{};
+  Material wrenMat_{};
+  Shader wrenShader_{};
+  int wrenShaderWarmLoc_ = -1;
+  int wrenShaderLightLoc_ = -1;
+  unsigned int wrenMeshTextureId_ = 0;
+  bool wrenMeshBuilt_ = false;
+  bool wrenMeshAttempted_ = false;
   double frameTimeMs_ = 0.0;
 
   Description selection_;
