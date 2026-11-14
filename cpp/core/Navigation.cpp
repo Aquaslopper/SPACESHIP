@@ -506,17 +506,6 @@ bool Simulation::Hold() {
 bool Simulation::ChangeCourse() {
   if (!state_.gameOver.empty() || !state_.holding || !state_.navTarget.has_value()) { return false; }
   const Body* body = FindBodyById(*state_.navTarget);
-  if (body == nullptr) { return false; }
-
-  if (state_.docked) {
-    const Port* port = HerePort();
-    state_.docked = false;
-    if (port != nullptr) {
-      for (InfoRow& row : infos_) {
-        if (row.id == "location") { row.value = port->name + " - undocked"; }
-      }
-    }
-  }
 
   const NavMetrics metrics = MetricsFor(*body);
   PerformAction("Course changed - " + body->name);
