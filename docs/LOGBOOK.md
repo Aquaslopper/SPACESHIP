@@ -128,3 +128,22 @@ You must append a compressed summary of **every single reply and action you take
 - Native drawing, audio and main entry-point syntax checks passed.
 - ID-prefix check and git diff whitespace check passed.
 - Native graphical interaction and Windows executable not verified locally.
+
+### Entry #008
+- Timestamp: 2026-11-14 UTC.
+- Owner approved implementing the GitHub Protocol GameOver check.
+- Added a separate GitHub Actions workflow for pushes, pull requests and manual runs.
+- Added a headless runner script without changing CMakeLists.txt.
+- Added boundary fixtures invoking actual Simulation action/loss logic.
+- Covered hull failure, out-of-fuel loss and suffocation with exact expected messages.
+- Covered docked zero fuel, positive fuel and remaining air as nonfatal controls.
+- Covered active filters and filter exhaustion handing over to the air reserve.
+- Covered insufficient-range departure and actual flight fuel depletion.
+- Never set gameOver directly in fixtures; explicit failures remain active in Release builds.
+- Local workflow command passed all nine checks.
+- Separate ignored build copies individually disabled each of the three game-over assignments.
+- All three disabled-death mutations were detected with exit status 1.
+- Gameplay source unchanged; no gate removed or added and existing mechanics preserved.
+- No agent-driven playthrough, new game-over scenario, helper, tier or state machine introduced.
+- Check covers named boundaries, not unrestricted whole-program reachability.
+- A required merge check would need repository branch-protection configuration; not changed here.
