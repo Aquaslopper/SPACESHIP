@@ -168,6 +168,13 @@
       "hasOnDone": true,
       "quiet": true,
       "type": "shipProject"
+    },
+    {
+      "autoClear": false,
+      "hasOnAcknowledge": true,
+      "hasOnDone": false,
+      "quiet": false,
+      "type": "extract"
     }
   ],
   "themes": {
