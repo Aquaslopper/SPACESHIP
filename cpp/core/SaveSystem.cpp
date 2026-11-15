@@ -646,7 +646,7 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
   if (rooms == nullptr || !IsArray(*rooms)) { return fail("rooms"); }
   if (crew == nullptr || !IsArray(*crew)) { return fail("crew"); }
   if (stats == nullptr || !IsArray(*stats)) { return fail("stats"); }
-  if (infos == nullptr || !IsArray(*infos)) { return fail("infos"); }
+  if (infos != nullptr && !IsArray(*infos)) { return fail("infos"); }
   if (goods == nullptr || !IsArray(*goods)) { return fail("goods"); }
   if (survey == nullptr || !IsArray(*survey)) { return fail("survey"); }
   if (events == nullptr || !IsArray(*events)) { return fail("events"); }
@@ -683,16 +683,15 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
     if (!found) { return fail(std::string("no ") + required + " readout"); }
   }
 
-  for (const Json& info : *infos) {
-    if (!IsObject(info) || !GetString(info, "id").size()) { return fail("a readout row is unreadable"); }
+  if (infos != nullptr) {
+    for (const Json& info : *infos) {
+      if (!IsObject(info) || !GetString(info, "id").size()) { return fail("a readout row is unreadable"); }
+    }
   }
-  bool hasLocation = false;
-  bool hasLife = false;
-  for (const Json& info : *infos) {
-    if (GetString(info, "id") == "location") { hasLocation = true; }
-    if (GetString(info, "id") == "life") { hasLife = true; }
-  }
-  if (!hasLocation || !hasLife) { return fail("the side panel has no location or life readout"); }
+  // The side-panel readouts are derived, not world state: the loader does not
+  // demand the infos key, the location/life rows, or any row at all. A save
+  // without them loads; the panel keeps whatever rows the file holds, or the
+  // catalogue's own rows when it has none.
 
   auto roomExists = [rooms](const std::string& id) {
     for (const Json& room : *rooms) {
@@ -1274,8 +1273,17 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     }
 
     infos_.clear();
-    for (const Json& info : d.at("infos")) {
-      infos_.push_back(InfoRow{GetString(info, "id"), GetString(info, "label"), GetString(info, "value")});
+    const Json* infoRows = At(d, "infos");
+    if (infoRows != nullptr && infoRows->is_array()) {
+      for (const Json& info : *infoRows) {
+        infos_.push_back(InfoRow{GetString(info, "id"), GetString(info, "label"), GetString(info, "value")});
+      }
+    } else {
+      // No rows in the file: the panel is rebuilt from the catalogue, the same
+      // rows a fresh voyage starts with.
+      for (const InfoDefinition& info : catalog_.infoDefs) {
+        infos_.push_back(InfoRow{info.id, info.label, info.value});
+      }
     }
 
     life_.canisters = GetNumber(d.at("life"), "canisters");
