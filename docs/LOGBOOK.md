@@ -128,3 +128,19 @@ You must append a compressed summary of **every single reply and action you take
 - Native drawing, audio and main entry-point syntax checks passed.
 - ID-prefix check and git diff whitespace check passed.
 - Native graphical interaction and Windows executable not verified locally.
+
+### Entry #008
+- Timestamp: 2026-11-15 UTC.
+- Owner asked why test-linux is red and ordered the Linux build to stop calling files that do not exist.
+- Cause found: tools/check-imgui-input.sh compiles cpp/tests/imgui_input_probe.cpp and tools/check-draw.sh compiles cpp/tests/draw_probe.cpp; neither source is in this tree.
+- cpp/tests here holds hold_course_probe.cpp only; compiler reports "No such file or directory" for both probe paths.
+- ctest in the same step was already vacuous: CMakeLists.txt declares SPACESHIP_BUILD_TESTS and include(CTest) but no add_test follows.
+- The job failed on those calls on every run since 2026-11-14, on main as well as on PR #103, so PR #103's red status was inherited, not caused by the protocol.
+- Last tree still carrying the suite: branch arena/17a07741-spaceship, 2026-11-09; CMake test wiring had already dropped to 0 add_test there.
+- Removed the two probe calls and the ctest call from .github/workflows/build.yml; step renamed "Drawing sources compile".
+- Kept tools/check-gui-syntax.sh, the only call whose inputs exist; a comment in the workflow records what was removed and where the last copy lives.
+- Probe scripts left in tools/ unchanged, so they work again once their sources return.
+- Remaining job verified locally with the pinned raylib 6.0, ImGui 1.92.7 and rlImGui Raylib_6_0 headers: Draw.cpp, AudioDevice.cpp and main.cpp clean under -Wall -Wextra -Wpedantic, exit 0.
+- Workflow YAML parsed after the edit; jobs and step order intact.
+- Gate line required by this logbook: no anti-roguelike gate exists in the workflow or in the removed calls; no gameplay gate added or removed, and no proposal invented to fill the requirement.
+- Gameplay source, CMakeLists.txt and assets unchanged; no new helper, tier, constant or state machine.
