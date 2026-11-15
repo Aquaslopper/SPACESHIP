@@ -1891,16 +1891,16 @@ void ShellView::PaintWrenExterior(const Simulation& sim) {
     float bobY = 0.0f;
     if (!reduced) {
       if (inFlight) {
-        yawDeg = 4.5f * std::sin(t * 0.34f) + 1.2f * std::sin(t * 0.16f);
-        pitchDeg = 2.2f * std::sin(t * 0.45f + 0.6f) + 0.8f;
-        rollDeg = 1.9f * std::cos(t * 0.28f) + 0.5f * std::sin(t * 0.65f);
+        yawDeg = 6.5f * std::sin(t * 0.34f) + 1.2f * std::sin(t * 0.16f);
+        pitchDeg = 3.2f * std::sin(t * 0.45f + 0.6f) + 0.8f;
+        rollDeg = 2.9f * std::cos(t * 0.28f) + 0.5f * std::sin(t * 0.65f);
         bobX = 2.8f * std::sin(t * 0.24f);
         bobY = 2.2f * std::sin(t * 0.55f) + 0.15f * std::sin(t * 14.0f);
       } else {
-        yawDeg = 3.5f * std::sin(t * 0.25f) + 0.9f * std::sin(t * 0.12f);
-        pitchDeg = 1.8f * std::sin(t * 0.34f + 0.9f);
-        rollDeg = 1.2f * std::cos(t * 0.21f + 0.4f);
-        bobX = 1.6f * std::sin(t * 0.18f);
+        yawDeg = 4.5f * std::sin(t * 0.25f) + 0.9f * std::sin(t * 0.12f);
+        pitchDeg = 2.8f * std::sin(t * 0.34f + 0.9f);
+        rollDeg = 1.8f * std::cos(t * 0.21f + 0.4f);
+        bobX = 1.9f * std::sin(t * 0.18f);
         bobY = 1.8f * std::sin(t * 0.42f + 0.5f);
       }
     }
