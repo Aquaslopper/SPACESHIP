@@ -27,7 +27,7 @@ float HullRadius(const std::string& cls) {
 int NozzleCount(bool compact) { return compact ? 2 : 3; }
 
 const DeckPlan& ActivePlan(const Simulation& sim) {
-  return sim.State().shipClass == "wren" ? sim.World().wren : sim.World().kestrel;
+  return (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta") ? sim.World().wren : sim.World().kestrel;
 }
 
 const Room* CrewRoom(const Simulation& sim, const CrewMember& crew) {
@@ -60,7 +60,7 @@ DiagramModel BuildDiagram(const Simulation& sim, const Area& stage,
                           bool hideCrewLabels, FxRng& rng) {
   DiagramModel out;
   out.stage = stage;
-  out.compact = sim.State().shipClass == "wren";
+  out.compact = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta");
 
   const DeckPlan& plan = ActivePlan(sim);
   out.hull = plan.hull;
