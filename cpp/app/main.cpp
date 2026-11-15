@@ -261,21 +261,33 @@ void main() {
     vec3 milkyFloor = mix(vec3(0.26, 0.24, 0.21), uWarmTint, 0.42);
     float dip = crest * clamp(uIntensity * uOptionScale, 0.0, 1.5) * 0.055;
     rgb = mix(rgb, milkyFloor, dip * (1.0 - 0.58 * luma));
-  }
-  if (uGlow > 0.0) {
-    vec3 bloom = vec3(0.0);
-    float weights = 0.0;
-    for (int y = -4; y <= 4; ++y) {
-      for (int x = -4; x <= 4; ++x) {
-        vec2 offset = vec2(x, y);
-        float weight = exp(-dot(offset, offset) / 8.0);
-        vec3 sampleRgb = texture(texture0, clamp(uv + offset * 2.0 / uResolution,
-                                               vec2(0.0), vec2(1.0))).rgb;
-        bloom += max(sampleRgb - vec3(0.65), vec3(0.0)) * weight;
-        weights += weight;
+    if (uGlow > 0.0) {
+      vec3 bloom = vec3(0.0);
+      float weights = 0.0;
+      for (int y = -4; y <= 4; ++y) {
+        for (int x = -4; x <= 4; ++x) {
+          vec2 offset = vec2(x, y);
+          float weight = exp(-dot(offset, offset) / 8.0);
+          vec2 sampleUV = clamp(uv + offset * 2.0 * texel, vec2(0.0), vec2(1.0));
+          vec2 samplePos = vec2(sampleUV.x, 1.0 - sampleUV.y) * res;
+          float sampleProj = dot((samplePos - 0.5 * res) / min(res.x, res.y), dir);
+          float samplePhase = sampleProj * 2.25 - uTime * 0.42
+                              + 0.16 * sin(sampleProj * 1.1 + uTime * 0.13);
+          float sampleCrest = pow(0.5 + 0.5 * cos(samplePhase), 3.5);
+          float sampleShift = clamp(mix(0.45, 0.90, clamp(uIntensity, 0.0, 1.0))
+                                    * uOptionScale, 0.0, 1.35) * sampleCrest;
+          vec2 sampleShiftUV = vec2(dir.x, -dir.y) * sampleShift * texel;
+          vec3 original = texture(texture0, sampleUV).rgb;
+          vec3 shifted = vec3(
+              texture(texture0, clamp(sampleUV + sampleShiftUV, vec2(0.0), vec2(1.0))).r,
+              original.g,
+              texture(texture0, clamp(sampleUV - sampleShiftUV, vec2(0.0), vec2(1.0))).b);
+          bloom += max(shifted - original, vec3(0.0)) * weight;
+          weights += weight;
+        }
       }
+      rgb += bloom * colDiffuse.rgb * fragColor.rgb * (uGlow / weights);
     }
-    rgb += bloom * (uGlow / weights);
   }
   float angle = radians(uColorShift);
   vec3 axis = normalize(vec3(1.0));
