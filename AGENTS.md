@@ -20,7 +20,8 @@ helpers.
 
 ## SOURCE AUTHORITY: ABSOLUTE; NO EXCEPTIONS
 1. the owner's instructions
-2. cpp/
+2. tools/viewer
+3. cpp/
 
 ## HARD RULES
 -**Do not edit files without the owner's permission.** Wait for explicit approval from the repository owner
