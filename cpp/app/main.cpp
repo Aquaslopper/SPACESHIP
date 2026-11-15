@@ -339,6 +339,7 @@ void main() {
 }  // namespace
 
 int main(int argc, char** argv) {
+  bool voyageStarted = false;
   if (argc == 3 && std::string(argv[1]) == "--check-music-file") {
     // Decodes with the same raylib codecs as music streams; no sound device or
     // graphics context is required. Keep the argument relative to launch CWD.
