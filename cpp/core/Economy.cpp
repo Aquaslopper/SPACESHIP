@@ -118,7 +118,7 @@ bool Simulation::BuySupply(const std::string& id) {
     FreeCommit("O2 canister purchased");
     return true;
   }
-  if (id == "rations" && state_.shiplets >= 20 &&
+  if (id == "rations" && state_.shiplets >= 80 &&
       mess_.rations <= mess_.rationCapacity - 6 &&
       FindOngoing("project-food") == nullptr) {
     state_.shiplets -= 20;
