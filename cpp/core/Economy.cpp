@@ -144,7 +144,7 @@ bool Simulation::BuySupply(const std::string& id) {
       mess_.rations <= mess_.rationCapacity - 6 &&
       FindOngoing("project-food") == nullptr) {
     state_.shiplets -= 20;
-    mess_.rations += 6;  // dry rations go in the larder; the galley cooks them
+    mess_.rations += 4;  // dry rations go in the larder; the galley cooks them
     FreeCommit("Rations purchased");
     return true;
   }
