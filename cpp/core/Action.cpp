@@ -228,7 +228,8 @@ void Simulation::BeginVoyage(const ChartSettings& settings, const std::string& s
 }
 
 void Simulation::PerformAction(const std::string& detail) {
-  if (!state_.gameOver.empty()) { return; }
+  // PRESERVED GAMEPLAY: Action clock, world tick, cargo mix, commendations.
+  // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
 
   actionCounter_ += 1;
 
@@ -243,7 +244,8 @@ void Simulation::PerformAction(const std::string& detail) {
 }
 
 void Simulation::FreeCommit(const std::string& detail) {
-  if (!state_.gameOver.empty()) { return; }
+  // PRESERVED GAMEPLAY: Action clock, commendations.
+  // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
   if (!detail.empty()) { LogLine(detail + "."); }
   CheckCommendations();
 }
@@ -263,7 +265,6 @@ void Simulation::TickWorld() {
   TickCrew();
   TickCleaner();
   CheckLoss();
-  if (!state_.gameOver.empty()) { return; }
   TickPayroll();
   TickOngoing();
   AutoMaint();
@@ -362,7 +363,6 @@ bool Simulation::StartCanisterInstall(int slot, const std::string& by,
     PerformAction(by.empty() ? "Canister carried to " + target.name
                              : by + " carried a canister to " + target.name);
     o2Claim_ = false;
-    if (!state_.gameOver.empty()) { return true; }
   } else {
     LogLine(who + " carried a canister to " + target.name);
   }
@@ -404,8 +404,6 @@ bool Simulation::StartMaintenanceSelf() {
   PerformAction("Engine maintenance begun by the commander");
   maintClaim_ = false;
 
-  if (!state_.gameOver.empty()) { return false; }
-
   Task* task = AddOngoing("maint", "Maintenance - the commander", cost, "maint", "engine");
   if (task != nullptr) { task->by = "the commander"; }
   return true;
@@ -431,7 +429,6 @@ bool Simulation::StartCookingSelf(const std::string& by, bool spendsAction) {
     cookClaim_ = true;
     PerformAction(by.empty() ? "Cooking begun by the commander" : "Cooking begun by " + by);
     cookClaim_ = false;
-    if (!state_.gameOver.empty()) { return false; }
   } else {
     LogLine("Cooking begun by " + who);
   }

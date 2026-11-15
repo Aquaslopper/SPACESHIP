@@ -12,14 +12,13 @@ void Simulation::ServiceDrive(const std::string& by) {
   const std::string who = by.empty() ? "The commander" : by;
   LogLine(who + " pressed the maintenance button");
   */
-  if (state_.gameOver.empty()) {
-    state_.engineCondition = std::min(100.0, state_.engineCondition + 10.0);
-    if (state_.engineCondition >= 100.0) { state_.engineerRun = false; }
-  }
+  state_.engineCondition = std::min(100.0, state_.engineCondition + 10.0);
+  if (state_.engineCondition >= 100.0) { state_.engineerRun = false; }
 }
 
 bool Simulation::EngineClick(const std::string& by) {
-  if (!state_.gameOver.empty()) { return false; }
+  // PRESERVED GAMEPLAY: Engine condition, click state, service drive.
+  // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
   if (engineClicking_) { return false; }
   if (state_.engineCondition >= 100.0) { return false; }
   // if (MaintRunning()) { return false; }
@@ -124,7 +123,8 @@ void Simulation::RunBank(const std::string& line) {
 }
 
 bool Simulation::ServiceSystem(const std::string& statId) {
-  if (!state_.gameOver.empty()) { return false; }
+  // PRESERVED GAMEPLAY: Stat repair/fuel/medkit logic, kit usage.
+  // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
   Stat* stat = FindStat(statId);
   if (stat == nullptr || stat->value >= 100.0) { return false; }
 

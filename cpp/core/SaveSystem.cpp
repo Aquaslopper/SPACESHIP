@@ -1070,7 +1070,8 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     state_.lotSerial = GetNumber(s, "lotSerial");
     state_.gameOver = GetString(s, "gameOver");
 
-    state_.navTarget.reset();
+    // PRESERVED GAMEPLAY: Nav target state from save.
+    // REMOVED: state_.navTarget.reset() (Anti-game logic gate/silent reset).
     if (auto it = s.find("navTarget"); it != s.end() && it->is_string()) {
       state_.navTarget = it->get<std::string>();
     }
