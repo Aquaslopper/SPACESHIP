@@ -50,6 +50,7 @@ Palette ClassicPalette() {
   p.chart = Hex("#ece2d1"); p.chartInk = Hex("#6b5338");
   p.titleMenu = Hex("#3f342b"); p.titleMenuInk = Hex("#f2e5cc");
   p.titleMenuBorder = Hex("#a48e72"); p.titleMenuHover = Hex("#6b543f");
+  p.progressFill = Hex("#dff0cc");
   return p;
 }
 
@@ -118,11 +119,13 @@ Palette PaletteForId(const std::string& id) {
   // at classic's strength. The semantic trio - terracotta, sage, amber - is never
   // turned, because those three mean something.
   Palette p = ClassicPalette();
-  double hue = -1.0;
-  if (id == "void") { hue = 196.0; }        // deep space, petrol blue
-  else if (id == "aurora") { hue = 148.0; }  // mint green
-  else if (id == "nebula") { hue = 284.0; }  // violet
-  else if (id == "ember") { hue = 20.0; }    // copper
+  const bool night = id.size() > 6 && id.substr(id.size() - 6) == "-night";
+  const std::string base = night ? id.substr(0, id.size() - 6) : id;
+  double hue = night ? 32.0 : -1.0;
+  if (base == "void") { hue = 196.0; }        // deep space, petrol blue
+  else if (base == "aurora") { hue = 148.0; }  // mint green
+  else if (base == "nebula") { hue = 284.0; }  // violet
+  else if (base == "ember") { hue = 20.0; }    // copper
   if (hue < 0.0) { return p; }
 
   const double strength = 1.15;
@@ -134,6 +137,18 @@ Palette PaletteForId(const std::string& id) {
                   &p.tabInk,        &p.activeInk,    &p.chart,        &p.chartInk,
                   &p.titleMenu,     &p.titleMenuInk, &p.titleMenuBorder, &p.titleMenuHover};
   for (Rgb* role : roles) { *role = Deepen(*role, hue, strength); }
+  if (night) {
+    for (Rgb* role : roles) {
+      Hsl value = ToHsl(*role);
+      value.l = 0.08 + (1.0 - value.l) * 0.35;
+      *role = FromHsl(value);
+    }
+    Rgb* textRoles[] = {&p.ink, &p.muted, &p.titleInk, &p.tabInk,
+                       &p.activeInk, &p.chartInk, &p.titleMenuInk};
+    for (Rgb* role : textRoles) { *role = FromHsl({hue, 0.30, role == &p.muted ? 0.70 : 0.88}); }
+    p.progressFill = Hex("#29471c");
+    p.terracotta = Hex("#ef957f"); p.sage = Hex("#a5cf8b"); p.amber = Hex("#efc572");
+  }
   return p;
 }
 
@@ -176,6 +191,11 @@ const std::vector<ThemeSpec>& Theme::Specs() {
       {"aurora", "Aurora - mint", {0x5b, 0xbe, 0x9d}},
       {"nebula", "Nebula - violet", {0x9b, 0x79, 0xd0}},
       {"ember", "Ember - copper", {0xd7, 0x90, 0x5b}},
+      {"classic-night", "Flight Deck - parchment night", {0xc9, 0xa9, 0x7c}},
+      {"void-night", "Deep Space - cyan night", {0x5b, 0xb8, 0xd5}},
+      {"aurora-night", "Aurora - mint night", {0x5b, 0xbe, 0x9d}},
+      {"nebula-night", "Nebula - violet night", {0x9b, 0x79, 0xd0}},
+      {"ember-night", "Ember - copper night", {0xd7, 0x90, 0x5b}},
   };
   return specs;
 }

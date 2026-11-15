@@ -209,9 +209,9 @@ void PaintChamferBoxIm(ImDrawList* draw, float x, float y, float w, float h, flo
   }
 }
 
-// Spaceship.hta .pbtn-fill: #dff0cc, with a #7ec63f right edge.
+// Theme progress fill, with the original #7ec63f right edge.
 // Share this across machine controls, generic bands, chart and quarters.
-void PaintProgressFill(const Area& box, double percent, float chamfer = kChamferCard) {
+void PaintProgressFill(const Area& box, double percent, const Palette& p, float chamfer = kChamferCard) {
   const float inset = (box.w >= 14.0f && box.h >= 14.0f) ? kDoubleInset : 1.0f;
   const float ix = box.x + inset;
   const float iy = box.y + inset;
@@ -221,7 +221,7 @@ void PaintProgressFill(const Area& box, double percent, float chamfer = kChamfer
   if (width <= 0.0f || iw <= 0.0f || ih <= 0.0f) { return; }
   const float ci = InnerChamfer(chamfer, box.w, box.h, inset);
   const auto poly = ClipFillAgainstChamfer(ix, ix + width, iy, ih, ix, iw, ci);
-  if (poly.size() >= 3) { FillPolyRay(poly.data(), poly.size(), ::Color{223, 240, 204, 255}); }
+  if (poly.size() >= 3) { FillPolyRay(poly.data(), poly.size(), ToRay(p.progressFill)); }
   const float fx = ix + width - 0.5f;
   const float yTop = std::max(iy, iy + ci - (fx - ix));
   const float yBot = std::min(iy + ih, iy + ih - std::max(0.0f, ci - (ix + iw - fx)));
@@ -243,7 +243,7 @@ void PaintProgressSurface(const Area& box, const ProgressButton& button, const P
     }
   }
   FillChamferRay(box, chamfer, ToRay(blocked ? p.panel3 : p.control));
-  if (!blocked) { PaintProgressFill(box, button.fillPercent, chamfer); }
+  if (!blocked) { PaintProgressFill(box, button.fillPercent, p, chamfer); }
   const ::Color outerLine =
       button.state == ButtonState::Done ? ::Color{100, 165, 47, 255} : ToRay(p.borderDark);
   const ::Color innerLine =
@@ -260,7 +260,7 @@ void PaintProgressSurface(const Area& box, const ProgressButton& button, const P
           static_cast<unsigned char>(rgb), 255};
 }
 
-bool PaintMessStockIcon(const MachinePart& part, const Area& origin) {
+bool PaintMessStockIcon(const MachinePart& part, const Area& origin, const Palette& p, bool night) {
   const bool cookedFood = part.cls == "mess-food-bottle";
   const bool dryRation = part.cls == "mess-ration-pack";
   if (!cookedFood && !dryRation) { return false; }
@@ -271,11 +271,11 @@ bool PaintMessStockIcon(const MachinePart& part, const Area& origin) {
   const float h = part.box.h;
   if (w <= 0.0f || h <= 0.0f) { return true; }
 
-  const ::Color outline = cookedFood ? ::Color{107, 125, 80, 255}
+  const ::Color outline = night ? ToRay(p.muted) : cookedFood ? ::Color{107, 125, 80, 255}
                                       : ::Color{140, 111, 78, 255};
-  const ::Color shell = cookedFood ? ::Color{223, 236, 205, 255}
+  const ::Color shell = night ? ToRay(p.panel3) : cookedFood ? ::Color{223, 236, 205, 255}
                                     : ::Color{243, 230, 207, 255};
-  const ::Color label = ::Color{250, 247, 242, 255};
+  const ::Color label = night ? ToRay(p.panel) : ::Color{250, 247, 242, 255};
   if (cookedFood) {
     const Rectangle neck{x + w * 0.32f, y + h * 0.10f,
                          w * 0.36f, h * 0.37f};
@@ -306,7 +306,7 @@ bool PaintMessStockIcon(const MachinePart& part, const Area& origin) {
                1.0f, outline);
     const Rectangle label{x + w * 0.24f, y + h * 0.48f,
                           w * 0.52f, h * 0.22f};
-    DrawRectangleRec(label, ::Color{228, 219, 203, 255});
+    DrawRectangleRec(label, night ? ToRay(p.panel) : ::Color{228, 219, 203, 255});
   }
   return true;
 }
@@ -1050,17 +1050,21 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
                     text.c_str(), nullptr, width);
     };
     if (hit.header) {
-      draw->AddText(ImVec2(box.x, box.y), ToIm(p.coffee), hit.text.c_str());
+      draw->AddText(ImVec2(box.x, box.y),
+                    ToIm(theme_.id.find("-night") != std::string::npos ? p.ink : p.coffee),
+                    hit.text.c_str());
       bool open = true;
       for (const auto& block : blocks) { if (block.key == hit.key) { open = block.open; } }
       if (hit.key != "indicators") {
         const float x = box.Right() - 9, y = box.y + 5;
         if (open) {
           draw->AddTriangleFilled(ImVec2(x, y), ImVec2(x + 8, y),
-                                  ImVec2(x + 4, y + 5), IM_COL32(140,111,78,255));
+                                  ImVec2(x + 4, y + 5),
+                                  theme_.id.find("-night") != std::string::npos ? ToIm(p.ink) : IM_COL32(140,111,78,255));
         } else {
           draw->AddTriangleFilled(ImVec2(x, y - 1), ImVec2(x, y + 7),
-                                  ImVec2(x + 5, y + 3), IM_COL32(162,148,127,255));
+                                  ImVec2(x + 5, y + 3),
+                                  theme_.id.find("-night") != std::string::npos ? ToIm(p.ink) : IM_COL32(162,148,127,255));
         }
       } else {
         for (const auto& line : PlaceIndicators(IndicatorLines(sim))) {
@@ -1110,7 +1114,7 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
                         kChamferSmall, ToIm(p.panel2), ToIm(p.borderDark), ToIm(p.border));
       const ImVec2 iconCenter(hit.box.x + hit.box.w * 0.5f,
                              hit.box.y + 14.0f);
-      const ImU32 iconInk = ToIm(p.coffee);
+      const ImU32 iconInk = ToIm(theme_.id.find("-night") != std::string::npos ? p.ink : p.coffee);
       if (hit.action == SideAction::Manifest) {
         draw->AddLine(ImVec2(iconCenter.x, iconCenter.y - 8.0f),
                       ImVec2(iconCenter.x, iconCenter.y + 4.0f), iconInk, 2.0f);
@@ -2426,6 +2430,9 @@ float ShellView::MeasurePanelHeight(const NavPanel& panel, float width) const {
 // Geometry stays in the existing part models; CSS borders are inside the box.
 bool ShellView::PaintScenePart(const MachinePart& part, const Area& origin) {
   const SceneStyle style = SceneStyleFor(part.cls);
+  const bool night = theme_.id.find("-night") != std::string::npos &&
+      (part.cls.rfind("mach-", 0) == 0 || part.cls.rfind("o2-", 0) == 0 ||
+       part.cls.rfind("mess-", 0) == 0);
   if (!*style.cls) return false;
   const float x = origin.x + part.box.x, y = origin.y + part.box.y;
   const float w = std::max(0.0f, part.box.w), h = std::max(0.0f, part.box.h);
@@ -2434,13 +2441,18 @@ bool ShellView::PaintScenePart(const MachinePart& part, const Area& origin) {
   const std::string background = tonedFill ? part.tone : style.background;
   const float rounding = std::min(1.0f, 2.0f * std::max(0, style.radius) / std::max(1.0f, std::min(w, h)));
   if (!background.empty() && w > 0 && h > 0) {
-    const Color ink = HexColor(background, ToRay(theme_.palette.panel));
+    const Color ink = night
+        ? (tonedFill ? ColorBrightness(HexColor(background, ToRay(theme_.palette.sage)), -0.35f)
+                     : ColorTint(HexColor(background, ToRay(theme_.palette.panel)),
+                                 ToRay(theme_.palette.panel3)))
+        : HexColor(background, ToRay(theme_.palette.panel));
     if (style.radius == -1) DrawEllipse(static_cast<int>(x + w / 2), static_cast<int>(y + h / 2), w / 2, h / 2, ink);
     else if (style.radius > 0) DrawRectangleRounded(box, rounding, 12, ink);
     else DrawRectangle(static_cast<int>(x), static_cast<int>(y), static_cast<int>(w), static_cast<int>(h), ink);
   }
   if (style.width > 0 && *style.border && w > 0 && h > 0) {
-    const Color ink = HexColor(style.border, ToRay(theme_.palette.border));
+    const Color ink = night ? ToRay(theme_.palette.border)
+                            : HexColor(style.border, ToRay(theme_.palette.border));
     const float thick = static_cast<float>(style.width);
     if (style.radius == -1 && w == h) {
       const Vector2 center{x + w / 2, y + h / 2};
@@ -2479,11 +2491,13 @@ bool ShellView::PaintScenePart(const MachinePart& part, const Area& origin) {
       const std::string value = part.text.substr(bar + 1);
       const int valuePx = TypePx(reading.fontPx);
       Text(label.c_str(), static_cast<int>(x), static_cast<int>(y), size,
-           HexColor(ink, ToRay(theme_.palette.ink)), style.mono);
+           (night ? (part.tone.empty() ? ToRay(theme_.palette.ink)
+                                    : ColorBrightness(HexColor(ink, ToRay(theme_.palette.ink)), 0.35f))
+                  : HexColor(ink, ToRay(theme_.palette.ink))), style.mono);
       Text(value.c_str(),
            static_cast<int>(x + w - TextWidth(value.c_str(), valuePx, reading.mono)),
            static_cast<int>(y), valuePx,
-           HexColor(reading.ink, ToRay(theme_.palette.ink)), reading.mono);
+           (night ? ToRay(theme_.palette.ink) : HexColor(reading.ink, ToRay(theme_.palette.ink))), reading.mono);
       return true;
     }
     float tx = x;
@@ -2492,7 +2506,9 @@ bool ShellView::PaintScenePart(const MachinePart& part, const Area& origin) {
       tx += style.align == 1 ? space / 2 : space;
     }
     Text(part.text.c_str(), static_cast<int>(tx), static_cast<int>(y), size,
-         HexColor(ink, ToRay(theme_.palette.ink)), style.mono);
+         (night ? (part.tone.empty() ? ToRay(theme_.palette.ink)
+                                    : ColorBrightness(HexColor(ink, ToRay(theme_.palette.ink)), 0.35f))
+                  : HexColor(ink, ToRay(theme_.palette.ink))), style.mono);
   }
   return true;
 }
@@ -2515,11 +2531,10 @@ Color StageMix(Color a, Color b, float t) {
 
 void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const Area& origin) {
   const Palette& p = theme_.palette;
-  // HTA #machine is not overridden by the dark palette; the filter and
-  // galley housings are. Keep the frame behind (not over) the scenery.
-  const bool darkHousing = theme_.id != "classic" && stage.id != "machine";
-  const Color housing = darkHousing ? ToRay(p.chrome) : HexColor("#fdfbf7", ToRay(p.panel));
-  const Color edge = darkHousing ? ToRay(p.borderDark) : HexColor("#8c6f4e", ToRay(p.borderDark));
+  const bool night = theme_.id.find("-night") != std::string::npos;
+  const bool darkHousing = night || (theme_.id != "classic" && stage.id != "machine");
+  const Color housing = darkHousing ? ToRay(p.chrome) : (night ? ToRay(p.panel) : HexColor("#fdfbf7", ToRay(p.panel)));
+  const Color edge = darkHousing ? ToRay(p.borderDark) : (night ? ToRay(p.borderDark) : HexColor("#8c6f4e", ToRay(p.borderDark)));
   const float scale = StageScale(stage, theme_);
   const Area stageFrame{origin.x, origin.y, stage.width * scale, stage.height * scale};
   PaintChamferBoxRay(stageFrame, kChamferPanel, housing, edge, ToRay(p.border));
@@ -2586,10 +2601,10 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
         const float cx = origin.x + (drawn.box.x + drawn.box.w * 0.5f) * scale;
         const float cy = origin.y + (drawn.box.y + drawn.box.h * 0.5f) * scale;
         const float r = drawn.box.w * 0.5f * scale;
-        const Color coreCol = condRatio < 0.50f ? HexColor("#b05a42", ToRay(p.terracotta))
-                                                : HexColor("#c08a3e", ToRay(p.amber));
+        const Color coreCol = condRatio < 0.50f ? (night ? ToRay(p.terracotta) : HexColor("#b05a42", ToRay(p.terracotta)))
+                                                : (night ? ToRay(p.amber) : HexColor("#c08a3e", ToRay(p.amber)));
         DrawCircleV(Vector2{cx, cy}, r * (1.28f + 0.18f * pulse), Fade(coreCol, 0.25f + 0.20f * pulse));
-        DrawCircleV(Vector2{cx, cy}, r, StageMix(HexColor("#fdfbf7", WHITE), coreCol, 0.18f + 0.32f * pulse));
+        DrawCircleV(Vector2{cx, cy}, r, StageMix((night ? ToRay(p.panel2) : HexColor("#fdfbf7", WHITE)), coreCol, 0.18f + 0.32f * pulse));
         continue;
       }
       if (drawn.cls == "mach-rod") {
@@ -2605,7 +2620,7 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
               const float ty = byTop + u * bh;
               DrawRectangleRec(Rectangle{bx - 2.0f * scale, ty - 1.0f * scale,
                                          4.0f * scale, 2.0f * scale},
-                               HexColor("#8c6f4e", ToRay(p.coffeeDark)));
+                               (night ? ToRay(p.coffeeDark) : HexColor("#8c6f4e", ToRay(p.coffeeDark))));
             }
           }
           continue;
@@ -2621,8 +2636,8 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
         ++machFinIdx;
         PaintScenePart(part, origin);
         if (wave > 0.05f) {
-          const Color hot = HexColor("#c08a3e", ToRay(p.amber));
-          const Color cool = HexColor("#7f9161", ToRay(p.sage));
+          const Color hot = (night ? ToRay(p.amber) : HexColor("#c08a3e", ToRay(p.amber)));
+          const Color cool = (night ? ToRay(p.sage) : HexColor("#7f9161", ToRay(p.sage)));
           const Color finTint = StageMix(hot, cool, static_cast<float>(machFinIdx) / 9.0f);
           DrawRectangleRec(Rectangle{origin.x + (drawn.box.x + 1.5f) * scale,
                                      origin.y + (drawn.box.y + 4.0f) * scale,
@@ -2637,12 +2652,12 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
         const float lx = origin.x + (drawn.box.x + drawn.box.w * 0.5f) * scale;
         const float ly = origin.y + (drawn.box.y + drawn.box.h * 0.5f) * scale;
         const float lr = drawn.box.w * 0.5f * scale;
-        const Color greenCol = HexColor("#7f9161", ToRay(p.sage));
-        const Color greenEdge = HexColor("#6b7d50", ToRay(p.sage));
-        const Color ambCol = HexColor("#c08a3e", ToRay(p.amber));
-        const Color warnCol = HexColor("#b05a42", ToRay(p.terracotta));
-        const Color offCol = HexColor("#efe8dc", ToRay(p.panel));
-        const Color offEdge = HexColor("#cbb89c", ToRay(p.border));
+        const Color greenCol = (night ? ToRay(p.sage) : HexColor("#7f9161", ToRay(p.sage)));
+        const Color greenEdge = (night ? ToRay(p.sage) : HexColor("#6b7d50", ToRay(p.sage)));
+        const Color ambCol = (night ? ToRay(p.amber) : HexColor("#c08a3e", ToRay(p.amber)));
+        const Color warnCol = (night ? ToRay(p.terracotta) : HexColor("#b05a42", ToRay(p.terracotta)));
+        const Color offCol = (night ? ToRay(p.panel) : HexColor("#efe8dc", ToRay(p.panel)));
+        const Color offEdge = (night ? ToRay(p.border) : HexColor("#cbb89c", ToRay(p.border)));
         Color fill = offCol;
         Color rim = offEdge;
         float glow = 0.0f;
@@ -2691,17 +2706,17 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
         const float ch = cyH * scale;
         // Faint cylinder guide track
         DrawRectangleLinesEx(Rectangle{cx, origin.y + (bottomY - maxH) * scale, cw, maxH * scale},
-                             std::max(1.0f, scale), Fade(HexColor("#ddd2bf", ToRay(p.border)), 0.75f));
-        const Color baseFill = HexColor("#efe8dc", ToRay(p.panel));
-        const Color hotFill = condRatio < 0.50f ? HexColor("#b05a42", ToRay(p.terracotta))
-                                                : HexColor("#c08a3e", ToRay(p.amber));
+                             std::max(1.0f, scale), Fade((night ? ToRay(p.border) : HexColor("#ddd2bf", ToRay(p.border))), 0.75f));
+        const Color baseFill = (night ? ToRay(p.panel) : HexColor("#efe8dc", ToRay(p.panel)));
+        const Color hotFill = condRatio < 0.50f ? (night ? ToRay(p.terracotta) : HexColor("#b05a42", ToRay(p.terracotta)))
+                                                : (night ? ToRay(p.amber) : HexColor("#c08a3e", ToRay(p.amber)));
         const Color cylFill = StageMix(baseFill, hotFill, phase * 0.28f);
         DrawRectangleRec(Rectangle{cx, cy, cw, ch}, cylFill);
         DrawRectangleLinesEx(Rectangle{cx, cy, cw, ch}, std::max(1.0f, scale),
-                             HexColor("#cbb89c", ToRay(p.borderDark)));
+                             (night ? ToRay(p.borderDark) : HexColor("#cbb89c", ToRay(p.borderDark))));
         DrawRectangleRec(Rectangle{cx + scale, cy + scale, std::max(1.0f, cw - 2.0f * scale),
                                    std::max(1.0f, 3.0f * scale)},
-                         StageMix(HexColor("#8c6f4e", ToRay(p.coffeeDark)), hotFill, phase * 0.45f));
+                         StageMix((night ? ToRay(p.coffeeDark) : HexColor("#8c6f4e", ToRay(p.coffeeDark))), hotFill, phase * 0.45f));
         continue;
       }
     }
@@ -2715,9 +2730,9 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
         const float ly = origin.y + drawn.box.y * scale;
         const float lw = drawn.box.w * scale;
         const float lh = drawn.box.h * scale;
-        const Color slatCol = StageMix(HexColor("#cbb89c", ToRay(p.borderDark)),
-                                       o2Running ? HexColor("#7f9161", ToRay(p.sage))
-                                                 : HexColor("#8c6f4e", ToRay(p.coffee)),
+        const Color slatCol = StageMix((night ? ToRay(p.borderDark) : HexColor("#cbb89c", ToRay(p.borderDark))),
+                                       o2Running ? (night ? ToRay(p.sage) : HexColor("#7f9161", ToRay(p.sage)))
+                                                 : (night ? ToRay(p.coffee) : HexColor("#8c6f4e", ToRay(p.coffee))),
                                        wave * (o2Running ? 0.55f : 0.25f));
         const float openW = std::max(2.0f, lw * (0.65f + 0.45f * wave));
         DrawRectangleRec(Rectangle{lx + (lw - openW) * 0.5f, ly, openW, lh}, slatCol);
@@ -2734,7 +2749,7 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
         const float animY = reduced ? drawn.box.y
                                     : (78.0f + static_cast<float>(si) * 6.5f +
                                        1.8f * std::sin(tSec * 2.4f + static_cast<float>(si)));
-        const Color streakCol = HexColor("#cfdcc0", ToRay(p.sage));
+        const Color streakCol = (night ? ToRay(p.sage) : HexColor("#cfdcc0", ToRay(p.sage)));
         DrawRectangleRec(Rectangle{origin.x + animX * scale, origin.y + animY * scale,
                                    drawn.box.w * scale, drawn.box.h * scale},
                          Fade(streakCol, 0.85f));
@@ -2753,10 +2768,10 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
         const float ly = origin.y + drawn.box.y * scale;
         const float lw = drawn.box.w * scale;
         const float lh = drawn.box.h * scale;
-        const Color baseBg = HexColor("#e4dbcb", ToRay(p.panel3));
-        const Color baseRim = HexColor("#cbb89c", ToRay(p.borderDark));
-        const Color activeBg = HexColor("#7f9161", ToRay(p.sage));
-        const Color standBg = HexColor("#c08a3e", ToRay(p.amber));
+        const Color baseBg = (night ? ToRay(p.panel3) : HexColor("#e4dbcb", ToRay(p.panel3)));
+        const Color baseRim = (night ? ToRay(p.borderDark) : HexColor("#cbb89c", ToRay(p.borderDark)));
+        const Color activeBg = (night ? ToRay(p.sage) : HexColor("#7f9161", ToRay(p.sage)));
+        const Color standBg = (night ? ToRay(p.amber) : HexColor("#c08a3e", ToRay(p.amber)));
         float pulse = 0.0f;
         if (!reduced) {
           if (o2Running) {
@@ -2779,7 +2794,7 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
       }
     }
 
-    if (PaintMessStockIcon(part, origin)) continue;
+    if (PaintMessStockIcon(part, origin, p, night)) continue;
     if (PaintScenePart(part, origin)) continue;
     const int x = static_cast<int>(origin.x + part.box.x);
     const int y = static_cast<int>(origin.y + part.box.y);
@@ -2825,12 +2840,12 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
 
   // --- Priority 2 Overlay: Spinning turbines, rotating core encoder, sweeping needles & coolant loop ---
   if (engineStage) {
-    const Color spokeCol = HexColor("#cbb89c", ToRay(p.borderDark));
-    const Color wheelRimCol = HexColor("#8c6f4e", ToRay(p.coffeeDark));
-    const Color hubFillCol = HexColor("#cbb89c", ToRay(p.panel2));
-    const Color needleCol = HexColor("#8c6f4e", ToRay(p.coffeeDark));
-    const Color hotFlowCol = HexColor("#c08a3e", ToRay(p.amber));
-    const Color coolFlowCol = HexColor("#7f9161", ToRay(p.sage));
+    const Color spokeCol = (night ? ToRay(p.borderDark) : HexColor("#cbb89c", ToRay(p.borderDark)));
+    const Color wheelRimCol = (night ? ToRay(p.coffeeDark) : HexColor("#8c6f4e", ToRay(p.coffeeDark)));
+    const Color hubFillCol = (night ? ToRay(p.panel2) : HexColor("#cbb89c", ToRay(p.panel2)));
+    const Color needleCol = (night ? ToRay(p.coffeeDark) : HexColor("#8c6f4e", ToRay(p.coffeeDark)));
+    const Color hotFlowCol = (night ? ToRay(p.amber) : HexColor("#c08a3e", ToRay(p.amber)));
+    const Color coolFlowCol = (night ? ToRay(p.sage) : HexColor("#7f9161", ToRay(p.sage)));
 
     // 1) Rotating 24-tick primary core encoder ring around (270, 188)
     {
@@ -2893,7 +2908,7 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
       const float deg = 135.0f + gaugeVals[gi] * 2.7f;
       const float rad = deg * DEG2RAD;
       const float cs = std::cos(rad), sn = std::sin(rad);
-      const Color ndTint = (gi == 1 && tmpVal > 68.0f) ? HexColor("#b05a42", ToRay(p.terracotta)) : needleCol;
+      const Color ndTint = (gi == 1 && tmpVal > 68.0f) ? (night ? ToRay(p.terracotta) : HexColor("#b05a42", ToRay(p.terracotta))) : needleCol;
       DrawLineEx(Vector2{gx - cs * 4.0f * scale, gy - sn * 4.0f * scale},
                  Vector2{gx + cs * 18.5f * scale, gy + sn * 18.5f * scale},
                  std::max(1.8f, 2.2f * scale), ndTint);
@@ -2957,10 +2972,10 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
 
   // --- Priority 3 Overlay: O2 Intake Airflow, Canister Rising Bubbles & Status LEDs ---
   if (o2Stage) {
-    const Color sageCol = HexColor("#7f9161", ToRay(p.sage));
-    const Color ambCol = HexColor("#c08a3e", ToRay(p.amber));
-    const Color bareCol = HexColor("#cbb89c", ToRay(p.borderDark));
-    const Color bubbleFill = HexColor("#f5faee", WHITE);
+    const Color sageCol = (night ? ToRay(p.sage) : HexColor("#7f9161", ToRay(p.sage)));
+    const Color ambCol = (night ? ToRay(p.amber) : HexColor("#c08a3e", ToRay(p.amber)));
+    const Color bareCol = (night ? ToRay(p.borderDark) : HexColor("#cbb89c", ToRay(p.borderDark)));
+    const Color bubbleFill = (night ? ToRay(p.muted) : HexColor("#f5faee", WHITE));
 
     // 1) Intake duct live indicator dot + traveling intake airflow packets
     {
@@ -3021,7 +3036,7 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
         ledGlow = pGlow * 0.45f;
       } else if (active && !o2Running) {
         const float pGlow = reduced ? 0.8f : (0.35f + 0.65f * std::sin(tSec * 3.0f + static_cast<float>(k)));
-        ledCol = HexColor("#b05a42", ToRay(p.terracotta));
+        ledCol = (night ? ToRay(p.terracotta) : HexColor("#b05a42", ToRay(p.terracotta)));
         ledGlow = pGlow * 0.35f;
       } else if (installed || seatingNow) {
         const float rate = seatingNow ? 6.5f : 2.1f;
@@ -3033,7 +3048,7 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
         DrawCircleV(Vector2{ledX, ledY}, 6.0f * scale, Fade(ledCol, ledGlow));
       }
       DrawCircleV(Vector2{ledX, ledY}, 3.2f * scale, ledCol);
-      DrawCircleLinesV(Vector2{ledX, ledY}, 3.2f * scale, HexColor("#8c6f4e", ToRay(p.borderDark)));
+      DrawCircleLinesV(Vector2{ledX, ledY}, 3.2f * scale, (night ? ToRay(p.borderDark) : HexColor("#8c6f4e", ToRay(p.borderDark))));
 
       // Rising O2 filtration bubbles inside any seated or active canister!
       if (active || installed) {
@@ -3086,7 +3101,7 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
       // The engine's battery remains visible even when the drive is full and
       // there is nothing to maintain. Its charge is not the drive condition.
       FillChamferRay(box, kChamferCard, ToRay(control.button.enabled ? p.panel2 : p.panel3));
-      PaintProgressFill(box, control.button.fillPercent, kChamferCard);
+      PaintProgressFill(box, control.button.fillPercent, p, kChamferCard);
       PaintChamferDoubleLinesRay(box, kChamferCard, ToRay(p.borderDark), ToRay(p.border));
     } else {
       PaintProgressSurface(box, control.button, p);
@@ -4740,7 +4755,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     const float height = std::max(48.0f, static_cast<float>(label.size()) * line + 16.0f);
     const Area control{left, leftButtonBottom + 12.0f, leftColumn, height};
     FillChamferRay(control, kChamferCard, ToRay(row.enabled ? p.control : p.panel3));
-    PaintProgressFill(control, row.chargePercent, kChamferCard);
+    PaintProgressFill(control, row.chargePercent, p, kChamferCard);
     PaintChamferDoubleLinesRay(control, kChamferCard, ToRay(p.borderDark), ToRay(p.border));
     float textY = control.y + (height - label.size() * line) / 2.0f;
     for (const auto& text : label) {
@@ -4817,7 +4832,7 @@ void ShellView::PaintCrewRecord(const Simulation& sim) {
     const auto lines = WrapText(label, right - left - 20.0f, size, SelectFont(size, false));
     const Area box{left, y, right - left, lines.size() * line + 16.0f};
     FillChamferRay(box, kChamferCard, ToRay(row.enabled ? p.panel : p.panel3));
-    if (row.charged) { PaintProgressFill(box, row.chargePercent, kChamferCard); }
+    if (row.charged) { PaintProgressFill(box, row.chargePercent, p, kChamferCard); }
     PaintChamferDoubleLinesRay(box, kChamferCard, ToRay(p.borderDark), ToRay(p.border));
     float textY = box.y + 8.0f;
     for (const auto& text : lines) {
@@ -5569,12 +5584,23 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
                                  card.h / static_cast<float>(portrait->height));
       const float w = static_cast<float>(portrait->width) * fit;
       const float h = static_cast<float>(portrait->height) * fit;
+      if (displayAdjustmentAvailable_) {
+        // Keep RGB source-over, but remove artwork coverage from the hue mask.
+        rlSetBlendFactorsSeparate(RL_SRC_ALPHA, RL_ONE_MINUS_SRC_ALPHA,
+                                  RL_ZERO, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD, RL_FUNC_ADD);
+        BeginBlendMode(BLEND_CUSTOM_SEPARATE);
+      }
       DrawTexturePro(*portrait,
                      Rectangle{0, 0, static_cast<float>(portrait->width),
                                static_cast<float>(portrait->height)},
                      Rectangle{std::round(card.x + (card.w - w) / 2.0f),
                                std::round(card.Bottom() - h), w, h},
                      Vector2{0, 0}, 0.0f, WHITE);
+      if (displayAdjustmentAvailable_) {
+        rlSetBlendFactorsSeparate(RL_SRC_ALPHA, RL_ONE_MINUS_SRC_ALPHA,
+                                  RL_ONE, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD, RL_FUNC_ADD);
+        BeginBlendMode(BLEND_CUSTOM_SEPARATE);
+      }
     } else {
       const std::string none = quarters_.hasCrew ? "No portrait on file." : "No crew aboard.";
       float ty = card.y + card.h * 0.36f;
@@ -5685,11 +5711,21 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
     ScenePicture drawShown = *shown;
     if (pose.isMedical) { drawShown.base -= 10.0; }
     const Texture2D* cloth = CrewTexture(crewArt_, shown->name + "-cloth");
+    if (displayAdjustmentAvailable_) {
+      rlSetBlendFactorsSeparate(RL_SRC_ALPHA, RL_ONE_MINUS_SRC_ALPHA,
+                                RL_ZERO, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD, RL_FUNC_ADD);
+      BeginBlendMode(BLEND_CUSTOM_SEPARATE);
+    }
     if (cloth != nullptr) {
       PaintRiggedChibi(*cloth, drawShown, hall, stageScale, pose,
                        HexColor(shown->cloth, Color{162, 148, 127, 255}));
     }
     PaintRiggedChibi(*figure, drawShown, hall, stageScale, pose, WHITE);
+    if (displayAdjustmentAvailable_) {
+      rlSetBlendFactorsSeparate(RL_SRC_ALPHA, RL_ONE_MINUS_SRC_ALPHA,
+                                RL_ONE, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD, RL_FUNC_ADD);
+      BeginBlendMode(BLEND_CUSTOM_SEPARATE);
+    }
 
     if (pose.isMedical) {
       // Medical mattress & folded recovery blanket tucked cleanly over waist & legs
@@ -6521,7 +6557,7 @@ void ShellView::PaintCargoScreen(Simulation& sim) {
     const bool live = row.enabled && hasId && ChargeLeft(sim, chargeKey, chargeTier) > 0.0;
 
     FillChamferRay(btnBox, kChamferCard, ToRay(live ? p.control : p.panel3));
-    if (live && hasId) { PaintProgressFill(btnBox, chargePct, kChamferCard); }
+    if (live && hasId) { PaintProgressFill(btnBox, chargePct, p, kChamferCard); }
     PaintChamferDoubleLinesRay(btnBox, kChamferCard, ToRay(live ? p.borderDark : p.border), ToRay(p.border));
 
     float ty = btnBox.y + 7.0f;
@@ -6805,10 +6841,21 @@ void ShellView::PaintSettingsControls(Simulation& sim, const PopupModel& model) 
                              wave <= 0.01f ? "Radiation wave: Off" : "Radiation wave: %.2f")) {
         action("radiation-wave", std::to_string(wave));
       }
+      float colorShift = model.colorShift;
+      float glow = model.glow;
+      ImGui::SetNextItemWidth(-1);
+      if (ImGui::SliderFloat("##color-shift", &colorShift, -180.0f, 180.0f, "Colorshift: %.0f degrees")) {
+        action("color-shift", std::to_string(colorShift));
+      }
+      ImGui::SetNextItemWidth(-1);
+      if (ImGui::SliderFloat("##glow", &glow, 0.0f, 2.0f, "Glow: %.2f")) {
+        action("glow", std::to_string(glow));
+      }
       ImGui::EndDisabled();
       if (displayAdjustmentAvailable_ && button("Reset display adjustment", "display-reset")) {
         action("display-gamma", "1"); action("display-brightness", "1");
         action("radiation-wave", "1");
+        action("color-shift", "0"); action("glow", "0");
       }
       for (const auto& toggle : model.toggles) {
         heading(toggle.heading); text(toggle.help);
@@ -7521,7 +7568,7 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
                        ToRay(row.selected ? p.panel3
                                           : (row.enabled ? (grouped ? p.control : p.panel2)
                                                          : p.panel3)));
-        if (row.charged) { PaintProgressFill(box, row.chargePercent, kChamferCard); }
+        if (row.charged) { PaintProgressFill(box, row.chargePercent, p, kChamferCard); }
         PaintChamferDoubleLinesRay(
             box, kChamferCard,
             ToRay(row.selected ? p.coffee : (row.enabled ? p.borderDark : p.border)),
