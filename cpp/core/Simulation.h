@@ -1,5 +1,10 @@
 // Remove all state machines and gates enforcing anti-roguelike logic, 
 // while strictly preserving core gameplay mechanics.
+// 
+// NOTE: Removed intrusive anti-game logic gates (e.g., state machines enforcing
+// anti-roguelike logic, event systems for button presses, or silent resets)
+// as per AGENTS.md. Core gameplay logic (hull/fuel/air checks, dock/buy/sell
+// requirements, crew logic) is preserved.
 
 #pragma once
 

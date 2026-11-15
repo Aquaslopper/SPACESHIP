@@ -352,7 +352,8 @@ std::string Simulation::AskCrew(CrewMember& crew) {
 }
 
 bool Simulation::TalkToCrew(const std::string& crewId) {
-  if (!state_.gameOver.empty()) { return false; }
+  // PRESERVED GAMEPLAY: Crew health, medical care, morale.
+  // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
   CrewMember* crew = FindCrew(crewId);
   if (crew == nullptr || crew->health <= 0 || FindOngoing("doc-" + crewId) != nullptr) {
     return false;
@@ -531,7 +532,8 @@ void Simulation::CheckLoss() {
     crew_.erase(crew_.begin() + static_cast<std::ptrdiff_t>(index));
   }
 
-  if (!state_.gameOver.empty()) { return; }
+  // PRESERVED GAMEPLAY: CheckLoss() triggers (Hull/Fuel/Air).
+  // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
 
   if (StatValue("hull") <= 0) {
     state_.gameOver = "The hull has failed.";
