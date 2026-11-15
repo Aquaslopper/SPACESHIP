@@ -254,7 +254,7 @@ class Simulation {
   bool StartSocial(const std::string& a, const std::string& b);
   std::string ProjectBlock(const std::string& id) const;
   void ApplyShipLayout();
-  bool BuyLargerShip();
+  bool BuyLargerShip(const std::string& kind = "kestrel");
   double ShipCargoCapacity(const std::string& kind, int level) const;
   int CargoRefitLevel() const;
 

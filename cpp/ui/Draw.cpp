@@ -429,6 +429,16 @@ constexpr double kTitleInMs = 700.0;
 
 ShellView::~ShellView() { ReleaseWrenMesh(); }
 
+void ShellView::SetWrenExteriorTexture(void* texture, const std::string& path) {
+  if (wrenExteriorArt_ != texture) {
+    ReleaseWrenMesh();
+    wrenSdf_ = {};
+    wrenMeshAttempted_ = false;
+  }
+  wrenExteriorArt_ = texture;
+  exteriorArtPath_ = path;
+}
+
 void ShellView::SetWrenExteriorImage(const Image* image) {
   if (image == nullptr || image->data == nullptr || image->width <= 0 || image->height <= 0) {
     return;
@@ -466,8 +476,8 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
     draggingChart_ = false;
   }
 
-  // Only Wren has supplied exterior artwork. The Kestrel and a missing asset
-  // keep the existing fully interactive deck plan, without invented hull art.
+  // Wren and the cargo haulers use their selected exterior artwork;
+  // Kestrel retains its interactive deck plan.
   if (sim.State().activeTab == "home" && HasWrenExterior(sim)) {
     if (exteriorView_) {
       layout_.stage = {layout_.content.x + 8.0f, layout_.content.y,
@@ -1628,8 +1638,8 @@ void ShellView::EnsureWrenMesh() {
     const std::filesystem::path assetRoot("assets");
 #endif
     const std::array<std::filesystem::path, 2> candidates{
-        assetRoot / "art" / "ships" / "wren-exterior.png",
-        std::filesystem::path("assets") / "art" / "ships" / "wren-exterior.png",
+        assetRoot / exteriorArtPath_,
+        std::filesystem::path("assets") / exteriorArtPath_,
     };
     for (const auto& path : candidates) {
       std::error_code ec;
@@ -1842,9 +1852,10 @@ void ShellView::EnsureWrenMesh() {
 
 bool ShellView::HasWrenExterior(const Simulation& sim) const {
   const Texture2D* texture = static_cast<const Texture2D*>(wrenExteriorArt_);
-  if (sim.State().shipClass != "wren" || texture == nullptr || texture->id == 0 ||
+  if ((sim.State().shipClass != "wren" && sim.State().shipClass != "cargo-spine" &&
+       sim.State().shipClass != "cargo-bulk") || texture == nullptr || texture->id == 0 ||
       texture->width <= 0 || texture->height <= 0) return false;
-  // Wren exterior artwork remains visible throughout the voyage. The callouts
+  // Selected exterior artwork remains visible throughout the voyage. The callouts
   // are built from sim.Rooms(), so only installed rooms are usable.
   return true;
 }

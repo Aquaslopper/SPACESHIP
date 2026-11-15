@@ -1,8 +1,8 @@
 // ============================================================================
 //  Ships.cpp — the hull the voyage is happening in.
 //  ---------------------------------------------------------------------------
-//  Two classes, one deck plan each. Buying the Kestrel is not a new ship: it is
-//  the same voyage in a larger hull. The crew, the hold, the equipment, the work
+//  Wren, Kestrel and two cargo haulers share the existing deck plans. Buying a hull is
+//  the same voyage in another hull. The crew, the hold, the equipment, the work
 //  in progress and every record transfer; only the deck plan and the berths
 //  change.
 // ============================================================================
@@ -72,20 +72,23 @@ void Simulation::ApplyShipLayout() {
   }
 }
 
-bool Simulation::BuyLargerShip() {
-  const double price = 4000;
+bool Simulation::BuyLargerShip(const std::string& kind) {
+  const double price = kind == "kestrel" ? 4000 : 1;
   if (!state_.gameOver.empty() || !state_.docked) { return false; }
   const Port* port = HerePort();
-  if (port == nullptr || state_.shipClass != "wren" || state_.shiplets < price) { return false; }
+  if (port == nullptr || (kind == "kestrel" && state_.shipClass != "wren") ||
+      state_.shipClass == kind || state_.shiplets < price) { return false; }
 
   state_.shiplets -= price;
-  state_.shipClass = "kestrel";
-  auto fields = catalog_.shipFields.find("kestrel");
+  state_.shipClass = kind;
+  auto fields = catalog_.shipFields.find(kind);
   if (fields != catalog_.shipFields.end()) { ship_.fields = fields->second; }
-  cargo_.capacity = std::max(cargo_.capacity, ShipCargoCapacity("kestrel", CargoRefitLevel()));
+  cargo_.capacity = kind == "kestrel"
+      ? std::max(cargo_.capacity, ShipCargoCapacity(kind, CargoRefitLevel()))
+      : ShipCargoCapacity(kind, CargoRefitLevel());
   ApplyShipLayout();
 
-  FreeCommit("Commissioned SC Tessellate");
+  FreeCommit("Commissioned " + ship_.fields["name"]);
   return true;
 }
 

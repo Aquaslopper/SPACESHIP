@@ -710,7 +710,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     ship.details.push_back("Permanent, and it costs no click: shiplets only.");
     if (!ship.enabled) { ship.details.push_back("Not affordable from this purse."); }
     yard.rows.push_back(ship);
-  } else {
+  } else if (sim.State().shipClass == "kestrel") {
     yard.notes.push_back("Your Kestrel-series ship: " + Num(capacity) + " m3 cargo, " +
                          Num(sim.Ship().Berths()) + " berths.");
     StationRow ship;
@@ -723,6 +723,25 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     ship.details.push_back("You are already flying the Kestrel-series SC Tessellate.");
     ship.details.push_back("Hull: " + Num(capacity) + " m3 cargo, " + Num(sim.Ship().Berths()) +
                            " berths.");
+    yard.rows.push_back(ship);
+  }
+
+  for (const std::string kind : {"cargo-spine", "cargo-bulk"}) {
+    const auto& fields = sim.World().shipFields.at(kind);
+    StationRow ship;
+    ship.id = "ship-buy:" + kind;
+    ship.label = fields.at("name") + " - cargo hauler - 1 sh";
+    ship.free = true;
+    ship.done = sim.State().shipClass == kind;
+    ship.enabled = !ship.done && purse >= 1;
+    ship.cost = ship.done ? kDone : kFree;
+    ship.commit = ship.done ? "Owned" : "Buy - 1 sh";
+    ship.confirm = "Buy " + fields.at("name") + " for 1 shiplet? Crew, installed rooms, cargo, "
+                   "equipment, refits, tasks and condition transfer unchanged.";
+    ship.details.push_back(Num(sim.ShipCargoCapacity(kind, sim.CargoRefitLevel())) +
+                           " m3 cargo with current refits. Same installed rooms; " +
+                           fields.at("berths") + " berths.");
+    ship.details.push_back("Cargo is retained even when switching to a smaller hold.");
     yard.rows.push_back(ship);
   }
 
@@ -1005,6 +1024,8 @@ bool PressStationActionRaw(Simulation& sim, const std::string& action,
   if (action.compare(0, 5, "hire:") == 0) return sim.HireCrew(action.substr(5));
   if (action.compare(0, 8, "upgrade:") == 0) return sim.BuyUpgrade(action.substr(8));
   if (action == "ship-buy") return sim.BuyLargerShip();
+  if (action == "ship-buy:cargo-spine") return sim.BuyLargerShip("cargo-spine");
+  if (action == "ship-buy:cargo-bulk") return sim.BuyLargerShip("cargo-bulk");
   if (action.compare(0, 9, "room-buy:") == 0) return sim.BuyRoom(action.substr(9));
   if (action.compare(0, 17, "commission-accept") == 0) {
     return sim.AcceptCommission(action.substr(18));

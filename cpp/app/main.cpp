@@ -485,6 +485,16 @@ int main(int argc, char** argv) {
   if (wrenExterior.id == 0) {
     std::fprintf(stderr, "spaceship: Wren exterior unavailable; using deck plan\n");
   }
+  std::map<std::string, Texture2D> cargoExteriors;
+  for (const std::string kind : {"cargo-spine", "cargo-bulk"}) {
+    const auto path = assets / "art" / "ships" / (kind + "-exterior.png");
+    Texture2D texture = LoadTexture(path.string().c_str());
+    if (texture.id != 0) {
+      SetTextureFilter(texture, TEXTURE_FILTER_BILINEAR);
+      SetTextureWrap(texture, TEXTURE_WRAP_CLAMP);
+    }
+    cargoExteriors[kind] = texture;
+  }
   std::array<Texture2D, 6> tutorialTextures{};
   for (std::size_t i = 0; i < tutorialTextures.size(); ++i) {
     const auto path = assets / "art" / "tutorial" / ("spaceship0" + std::to_string(i + 1) + ".png");
@@ -614,6 +624,13 @@ int main(int argc, char** argv) {
 
     // Apply settings from either the title sheet or the in-game Options panel
     // before rendering this frame, so palettes and type sizes change at once.
+    const auto cargoExterior = cargoExteriors.find(sim.State().shipClass);
+    if (cargoExterior != cargoExteriors.end()) {
+      shell.SetWrenExteriorTexture(&cargoExterior->second,
+          "art/ships/" + cargoExterior->first + "-exterior.png");
+    } else {
+      shell.SetWrenExteriorTexture(&wrenExterior);
+    }
     ship::Theme nextTheme = ship::Theme::ById(sim.State().options.theme);
     nextTheme.fontStep = sim.State().options.fontStep;
     nextTheme.largeText = sim.State().options.largeText;
@@ -709,6 +726,7 @@ int main(int argc, char** argv) {
   if (setupTexture.id != 0) { UnloadTexture(setupTexture); }
   if (splashTexture.id != 0) { UnloadTexture(splashTexture); }
   if (wrenExterior.id != 0) { UnloadTexture(wrenExterior); }
+  for (auto& entry : cargoExteriors) { if (entry.second.id != 0) UnloadTexture(entry.second); }
   for (auto texture : tutorialTextures) { if (texture.id != 0) { UnloadTexture(texture); } }
   for (auto& picture : crewTextures) { UnloadTexture(picture.second); }
   if (fonts.body.texture.id != 0) { UnloadFont(fonts.body); }
