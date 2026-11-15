@@ -24,7 +24,7 @@ helpers.
 
 ## HARD RULES
 -**Do not edit files without the owner's permission.** Wait for explicit approval from the repository owner
-   before creating, changing, moving or deleting any file. If permission is unclear,
+   before creating, changing, moving or deleting any file. If permission is unclear (LOGBOOK anti-roguelike),
    ask and stop; never make the edit first and explain afterwards.  
 - **Do not hide differences.** Do not silently omit content, truncate values, inert a
    control, change a cost, or shrink text to avoid overflow.
