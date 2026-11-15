@@ -14,7 +14,7 @@ You must append a compressed summary of **every single reply and action you take
 1. **Ongoing Number:** Increment the sequential entry number (`#001`, `#002`, etc.) for every reply.
 2. **Compressed & Factual Only:** Strip all conversational filler, apologies, and speculation.
 3. **Minimum 10 Lines per Entry:** Every logged entry must contain **at least 10 distinct lines** of structured information:
-4. **EACH ENTRY MUST NAME: one gate enforcing anti-roguelike logic in this game and remove it while naming how the core gameplay mechanics was preserved without adding more gates.!
+4. **EACH ENTRY MUST NAME: one gate enforcing anti-roguelike logic in this game. Propse most minimal removeal!
 ==========================================================================
 
 ## Log Entries 
