@@ -147,3 +147,17 @@ You must append a compressed summary of **every single reply and action you take
 - No agent-driven playthrough, new game-over scenario, helper, tier or state machine introduced.
 - Check covers named boundaries, not unrestricted whole-program reachability.
 - A required merge check would need repository branch-protection configuration; not changed here.
+
+### Entry #009
+- Timestamp: 2026-11-14 UTC.
+- Owner clarified Protocol GameOver must be a chat-invoked manual tool only.
+- Removed .github/workflows/gameover.yml entirely.
+- Retained tools/check-gameover.sh as the explicit invocation command.
+- Retained the existing technical boundary checks unchanged.
+- Added short manual/chat invocation instructions in docs/PROTOCOL_GAMEOVER.md.
+- Tool must report failures, not automatically repair gameplay.
+- No integration into EXE build, push events or pull request events remains.
+- No branch-protection setting changed.
+- No gameplay gate removed or introduced; gameplay source unchanged.
+- Script syntax and whitespace checks performed.
+- Existing successful nine-case and mutation test results remain applicable; probe unchanged.
