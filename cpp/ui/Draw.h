@@ -63,7 +63,8 @@ class ShellView {
   void SetSetupTexture(void* texture) { setupArt_ = texture; }
   void SetSplashTexture(void* texture) { splashArt_ = texture; }
   void SetAudioStatus(std::string status) { audioStatus_ = std::move(status); }
-  void SetWrenExteriorTexture(void* texture) { wrenExteriorArt_ = texture; }
+  void SetWrenExteriorTexture(void* texture,
+      const std::string& path = "art/ships/wren-exterior.png");
   void SetWrenExteriorImage(const Image* image);
   void SetDisplayAdjustmentAvailable(bool available) { displayAdjustmentAvailable_ = available; }
   void SetTutorialTexture(std::size_t index, void* texture) {
@@ -222,6 +223,7 @@ class ShellView {
   Area idleStageBox_{};
   float idleDiagramScale_ = 1.0f;
   void* wrenExteriorArt_ = nullptr;
+  std::string exteriorArtPath_ = "art/ships/wren-exterior.png";
   bool exteriorView_ = true;
   ExteriorLayout exterior_;
   WrenSdfGrid wrenSdf_;
