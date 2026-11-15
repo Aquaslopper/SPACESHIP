@@ -22,6 +22,7 @@
 #include "imgui.h"
 #include "raylib.h"
 #include "rlImGui.h"
+#include "rlgl.h"
 
 #include "audio/Audio.h"
 #include "audio/AudioDevice.h"
@@ -291,10 +292,11 @@ void main() {
   }
   float angle = radians(uColorShift);
   vec3 axis = normalize(vec3(1.0));
-  rgb = rgb * cos(angle) + cross(axis, rgb) * sin(angle)
-        + axis * dot(axis, rgb) * (1.0 - cos(angle));
+  vec3 shiftedRgb = rgb * cos(angle) + cross(axis, rgb) * sin(angle)
+                    + axis * dot(axis, rgb) * (1.0 - cos(angle));
+  rgb = mix(rgb, shiftedRgb, center.a);
   vec3 calibrated = pow(clamp(rgb, 0.0, 1.0), vec3(displayGamma)) * displayBrightness;
-  finalColor = vec4(clamp(calibrated, 0.0, 1.0), center.a * colDiffuse.a * fragColor.a);
+  finalColor = vec4(clamp(calibrated, 0.0, 1.0), 1.0);
 }
 )GLSL";
     shader_ = LoadShaderFromMemory(nullptr, fragment);
@@ -671,7 +673,14 @@ int main(int argc, char** argv) {
       // displays; rlImGui otherwise scissors as if it were the HiDPI window.
       ImGui::GetIO().DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
     }
+    if (adjusted) {
+      // Scene alpha carries colorshift coverage; ordinary UI draws source-over.
+      rlSetBlendFactorsSeparate(RL_SRC_ALPHA, RL_ONE_MINUS_SRC_ALPHA,
+                                RL_ONE, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD, RL_FUNC_ADD);
+      BeginBlendMode(BLEND_CUSTOM_SEPARATE);
+    }
     shell.Draw(sim, static_cast<double>(GetTime()) * 1000.0);
+    if (adjusted) { EndBlendMode(); }
     if (!shell.TitleActive()) voyageStarted = true;
     rlImGuiEnd();
     if (adjusted) {

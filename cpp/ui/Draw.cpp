@@ -5569,12 +5569,23 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
                                  card.h / static_cast<float>(portrait->height));
       const float w = static_cast<float>(portrait->width) * fit;
       const float h = static_cast<float>(portrait->height) * fit;
+      if (displayAdjustmentAvailable_) {
+        // Keep RGB source-over, but remove artwork coverage from the hue mask.
+        rlSetBlendFactorsSeparate(RL_SRC_ALPHA, RL_ONE_MINUS_SRC_ALPHA,
+                                  RL_ZERO, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD, RL_FUNC_ADD);
+        BeginBlendMode(BLEND_CUSTOM_SEPARATE);
+      }
       DrawTexturePro(*portrait,
                      Rectangle{0, 0, static_cast<float>(portrait->width),
                                static_cast<float>(portrait->height)},
                      Rectangle{std::round(card.x + (card.w - w) / 2.0f),
                                std::round(card.Bottom() - h), w, h},
                      Vector2{0, 0}, 0.0f, WHITE);
+      if (displayAdjustmentAvailable_) {
+        rlSetBlendFactorsSeparate(RL_SRC_ALPHA, RL_ONE_MINUS_SRC_ALPHA,
+                                  RL_ONE, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD, RL_FUNC_ADD);
+        BeginBlendMode(BLEND_CUSTOM_SEPARATE);
+      }
     } else {
       const std::string none = quarters_.hasCrew ? "No portrait on file." : "No crew aboard.";
       float ty = card.y + card.h * 0.36f;
@@ -5685,11 +5696,21 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
     ScenePicture drawShown = *shown;
     if (pose.isMedical) { drawShown.base -= 10.0; }
     const Texture2D* cloth = CrewTexture(crewArt_, shown->name + "-cloth");
+    if (displayAdjustmentAvailable_) {
+      rlSetBlendFactorsSeparate(RL_SRC_ALPHA, RL_ONE_MINUS_SRC_ALPHA,
+                                RL_ZERO, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD, RL_FUNC_ADD);
+      BeginBlendMode(BLEND_CUSTOM_SEPARATE);
+    }
     if (cloth != nullptr) {
       PaintRiggedChibi(*cloth, drawShown, hall, stageScale, pose,
                        HexColor(shown->cloth, Color{162, 148, 127, 255}));
     }
     PaintRiggedChibi(*figure, drawShown, hall, stageScale, pose, WHITE);
+    if (displayAdjustmentAvailable_) {
+      rlSetBlendFactorsSeparate(RL_SRC_ALPHA, RL_ONE_MINUS_SRC_ALPHA,
+                                RL_ONE, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD, RL_FUNC_ADD);
+      BeginBlendMode(BLEND_CUSTOM_SEPARATE);
+    }
 
     if (pose.isMedical) {
       // Medical mattress & folded recovery blanket tucked cleanly over waist & legs
