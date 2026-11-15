@@ -6805,10 +6805,21 @@ void ShellView::PaintSettingsControls(Simulation& sim, const PopupModel& model) 
                              wave <= 0.01f ? "Radiation wave: Off" : "Radiation wave: %.2f")) {
         action("radiation-wave", std::to_string(wave));
       }
+      float colorShift = model.colorShift;
+      float glow = model.glow;
+      ImGui::SetNextItemWidth(-1);
+      if (ImGui::SliderFloat("##color-shift", &colorShift, -180.0f, 180.0f, "Colorshift: %.0f degrees")) {
+        action("color-shift", std::to_string(colorShift));
+      }
+      ImGui::SetNextItemWidth(-1);
+      if (ImGui::SliderFloat("##glow", &glow, 0.0f, 2.0f, "Glow: %.2f")) {
+        action("glow", std::to_string(glow));
+      }
       ImGui::EndDisabled();
       if (displayAdjustmentAvailable_ && button("Reset display adjustment", "display-reset")) {
         action("display-gamma", "1"); action("display-brightness", "1");
         action("radiation-wave", "1");
+        action("color-shift", "0"); action("glow", "0");
       }
       for (const auto& toggle : model.toggles) {
         heading(toggle.heading); text(toggle.help);

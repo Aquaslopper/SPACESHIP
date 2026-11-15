@@ -160,6 +160,8 @@ std::string Simulation::SaveJson() const {
                       {"displayGamma", Num(DisplayGamma(state_.options.displayGamma))},
                       {"displayGammaScale", "relative-1.6"},
                       {"displayBrightness", Num(DisplayBrightness(state_.options.displayBrightness))},
+                      {"colorShift", Num(state_.options.colorShift)},
+                      {"glow", Num(state_.options.glow)},
                       {"radiationWave", Num(RadiationWaveStrength(state_.options.radiationWave))},
                       // Phase 9: the reading size and the window travel too.
                       {"fontStep", Num(static_cast<double>(state_.options.fontStep))},
@@ -1176,6 +1178,8 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
             std::clamp(savedGamma, 0.7, 1.6) / kDisplayGammaBaseline);
       }
       state_.options.displayBrightness = DisplayBrightness(GetNumber(*it, "displayBrightness", 1.0));
+      state_.options.colorShift = GetNumber(*it, "colorShift", 0.0);
+      state_.options.glow = GetNumber(*it, "glow", 0.0);
       state_.options.radiationWave =
           RadiationWaveStrength(GetNumber(*it, "radiationWave", kRadiationWaveDefault));
       const double step = GetNumber(*it, "fontStep", 0.0);

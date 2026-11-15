@@ -223,6 +223,8 @@ uniform sampler2D texture0;
 uniform vec4 colDiffuse;
 uniform float displayGamma;
 uniform float displayBrightness;
+uniform float uColorShift;
+uniform float uGlow;
 uniform vec2 uResolution;
 uniform float uTime;
 uniform vec2 uWaveDir;
@@ -260,11 +262,32 @@ void main() {
     float dip = crest * clamp(uIntensity * uOptionScale, 0.0, 1.5) * 0.055;
     rgb = mix(rgb, milkyFloor, dip * (1.0 - 0.58 * luma));
   }
+  if (uGlow > 0.0) {
+    vec3 bloom = vec3(0.0);
+    float weights = 0.0;
+    for (int y = -4; y <= 4; ++y) {
+      for (int x = -4; x <= 4; ++x) {
+        vec2 offset = vec2(x, y);
+        float weight = exp(-dot(offset, offset) / 8.0);
+        vec3 sampleRgb = texture(texture0, clamp(uv + offset * 2.0 / uResolution,
+                                               vec2(0.0), vec2(1.0))).rgb;
+        bloom += max(sampleRgb - vec3(0.65), vec3(0.0)) * weight;
+        weights += weight;
+      }
+    }
+    rgb += bloom * (uGlow / weights);
+  }
+  float angle = radians(uColorShift);
+  vec3 axis = normalize(vec3(1.0));
+  rgb = rgb * cos(angle) + cross(axis, rgb) * sin(angle)
+        + axis * dot(axis, rgb) * (1.0 - cos(angle));
   vec3 calibrated = pow(clamp(rgb, 0.0, 1.0), vec3(displayGamma)) * displayBrightness;
   finalColor = vec4(clamp(calibrated, 0.0, 1.0), center.a * colDiffuse.a * fragColor.a);
 }
 )GLSL";
     shader_ = LoadShaderFromMemory(nullptr, fragment);
+    colorShiftLoc_ = GetShaderLocation(shader_, "uColorShift");
+    glowLoc_ = GetShaderLocation(shader_, "uGlow");
     gammaLoc_ = GetShaderLocation(shader_, "displayGamma");
     brightnessLoc_ = GetShaderLocation(shader_, "displayBrightness");
     resLoc_ = GetShaderLocation(shader_, "uResolution");
@@ -296,7 +319,7 @@ void main() {
   bool Ready() const { return shaderReady_ && IsRenderTextureValid(target_); }
   void Begin() const { BeginTextureMode(target_); }
   void End(double gamma, double brightness, float waveTime, float waveDirX, float waveDirY,
-           float intensity, float optionScale, float warmBias) const {
+           float intensity, float optionScale, float warmBias, float colorShift, float glow) const {
     EndTextureMode();
     const float g = static_cast<float>(ship::EffectiveDisplayGamma(gamma));
     const float b = static_cast<float>(ship::DisplayBrightness(brightness));
@@ -307,6 +330,8 @@ void main() {
         0.58f + (0.68f - 0.58f) * warmBias,
         0.82f + (0.42f - 0.82f) * warmBias,
     };
+    SetShaderValue(shader_, colorShiftLoc_, &colorShift, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(shader_, glowLoc_, &glow, SHADER_UNIFORM_FLOAT);
     SetShaderValue(shader_, gammaLoc_, &g, SHADER_UNIFORM_FLOAT);
     SetShaderValue(shader_, brightnessLoc_, &b, SHADER_UNIFORM_FLOAT);
     if (resLoc_ >= 0) SetShaderValue(shader_, resLoc_, res, SHADER_UNIFORM_VEC2);
@@ -330,6 +355,7 @@ void main() {
   Shader shader_{};
   RenderTexture2D target_{};
   int gammaLoc_ = -1, brightnessLoc_ = -1;
+  int colorShiftLoc_ = -1, glowLoc_ = -1;
   int resLoc_ = -1, timeLoc_ = -1, waveDirLoc_ = -1;
   int intensityLoc_ = -1, optionScaleLoc_ = -1, warmTintLoc_ = -1;
   int width_ = 0, height_ = 0;
@@ -625,7 +651,8 @@ int main(int argc, char** argv) {
     const bool adjusted = display.Ready() &&
         (ship::EffectiveDisplayGamma(sim.State().options.displayGamma) != 1.0 ||
          ship::DisplayBrightness(sim.State().options.displayBrightness) != 1.0 ||
-         waveScale > 0.001f);
+         waveScale > 0.001f || sim.State().options.colorShift != 0.0 ||
+         sim.State().options.glow > 0.0);
     if (adjusted) {
       display.Begin();
       // The offscreen texture uses logical screen pixels even on Retina
@@ -638,7 +665,9 @@ int main(int argc, char** argv) {
     if (adjusted) {
       display.End(sim.State().options.displayGamma, sim.State().options.displayBrightness,
                   waveTime, smoothedWave.waveDirX, smoothedWave.waveDirY,
-                  smoothedWave.baseIntensity, waveScale, smoothedWave.warmBias);
+                  smoothedWave.baseIntensity, waveScale, smoothedWave.warmBias,
+                  static_cast<float>(sim.State().options.colorShift),
+                  static_cast<float>(sim.State().options.glow));
     }
     EndDrawing();
   }

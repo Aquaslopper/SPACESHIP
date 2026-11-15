@@ -162,6 +162,8 @@ struct Options {
   double displayGamma = 1.2;
   double displayBrightness = 1.0;
   double radiationWave = 1.0;
+  double colorShift = 0.0;
+  double glow = 0.0;
   int fontStep = 0;
   bool fullscreen = false;
 };
