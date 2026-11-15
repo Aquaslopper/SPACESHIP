@@ -1364,7 +1364,7 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     map_.zmin = GetNumber(map, "zmin", 0.6);
     map_.zmax = GetNumber(map, "zmax", 2.0);
     map_.zstep = GetNumber(map, "zstep", 0.2);
-    map_.here = GetString(map, "here", "kessler");
+    map_.here = GetString(map, "here");
     map_.inSpace = GetBool(map, "inSpace", FindOngoing("travel") != nullptr);
     const Body* flightBody = FindBodyById(map_.here);
     const Body* flightSystem = CurrentSystem();
