@@ -165,7 +165,7 @@ Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& se
   state.shipClass = "wren";
   state.engineCondition = 60;
   state.wearTick = 0;
-  state.filterLife = 200;
+  state.filterLife = 0;
   state.airHold = 20;
   state.rackWarned = false;
   state.rackWarnedMess = false;
