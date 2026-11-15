@@ -400,11 +400,6 @@ int main(int argc, char** argv) {
       ? std::filesystem::path(appDir) / "runtime" / "saves"
       : std::filesystem::path("runtime") / "saves";
   std::string loadedPath, loadWarning;
-  const auto autoLoad = ship::LoadNewestSave(sim, saveDir.u8string(), &loadedPath, &loadWarning);
-  if (!loadWarning.empty()) SaveWarning(loadWarning +
-      (autoLoad == ship::AutoLoadResult::Loaded ? "\nAn older valid save was loaded instead." :
-       "\nYour files were not changed. You can start a new voyage or load a slot manually."));
-  bool voyageStarted = autoLoad == ship::AutoLoadResult::Loaded;
 
   // ---- window ------------------------------------------------------------
   SetTraceLogLevel(LOG_WARNING);
