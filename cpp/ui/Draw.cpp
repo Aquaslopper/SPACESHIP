@@ -209,9 +209,9 @@ void PaintChamferBoxIm(ImDrawList* draw, float x, float y, float w, float h, flo
   }
 }
 
-// Spaceship.hta .pbtn-fill: #dff0cc, with a #7ec63f right edge.
+// Theme progress fill, with the original #7ec63f right edge.
 // Share this across machine controls, generic bands, chart and quarters.
-void PaintProgressFill(const Area& box, double percent, float chamfer = kChamferCard) {
+void PaintProgressFill(const Area& box, double percent, const Palette& p, float chamfer = kChamferCard) {
   const float inset = (box.w >= 14.0f && box.h >= 14.0f) ? kDoubleInset : 1.0f;
   const float ix = box.x + inset;
   const float iy = box.y + inset;
@@ -221,7 +221,7 @@ void PaintProgressFill(const Area& box, double percent, float chamfer = kChamfer
   if (width <= 0.0f || iw <= 0.0f || ih <= 0.0f) { return; }
   const float ci = InnerChamfer(chamfer, box.w, box.h, inset);
   const auto poly = ClipFillAgainstChamfer(ix, ix + width, iy, ih, ix, iw, ci);
-  if (poly.size() >= 3) { FillPolyRay(poly.data(), poly.size(), ::Color{223, 240, 204, 255}); }
+  if (poly.size() >= 3) { FillPolyRay(poly.data(), poly.size(), ToRay(p.progressFill)); }
   const float fx = ix + width - 0.5f;
   const float yTop = std::max(iy, iy + ci - (fx - ix));
   const float yBot = std::min(iy + ih, iy + ih - std::max(0.0f, ci - (ix + iw - fx)));
@@ -243,7 +243,7 @@ void PaintProgressSurface(const Area& box, const ProgressButton& button, const P
     }
   }
   FillChamferRay(box, chamfer, ToRay(blocked ? p.panel3 : p.control));
-  if (!blocked) { PaintProgressFill(box, button.fillPercent, chamfer); }
+  if (!blocked) { PaintProgressFill(box, button.fillPercent, p, chamfer); }
   const ::Color outerLine =
       button.state == ButtonState::Done ? ::Color{100, 165, 47, 255} : ToRay(p.borderDark);
   const ::Color innerLine =
@@ -1050,17 +1050,21 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
                     text.c_str(), nullptr, width);
     };
     if (hit.header) {
-      draw->AddText(ImVec2(box.x, box.y), ToIm(p.coffee), hit.text.c_str());
+      draw->AddText(ImVec2(box.x, box.y),
+                    ToIm(theme_.id.find("-night") != std::string::npos ? p.ink : p.coffee),
+                    hit.text.c_str());
       bool open = true;
       for (const auto& block : blocks) { if (block.key == hit.key) { open = block.open; } }
       if (hit.key != "indicators") {
         const float x = box.Right() - 9, y = box.y + 5;
         if (open) {
           draw->AddTriangleFilled(ImVec2(x, y), ImVec2(x + 8, y),
-                                  ImVec2(x + 4, y + 5), IM_COL32(140,111,78,255));
+                                  ImVec2(x + 4, y + 5),
+                                  theme_.id.find("-night") != std::string::npos ? ToIm(p.ink) : IM_COL32(140,111,78,255));
         } else {
           draw->AddTriangleFilled(ImVec2(x, y - 1), ImVec2(x, y + 7),
-                                  ImVec2(x + 5, y + 3), IM_COL32(162,148,127,255));
+                                  ImVec2(x + 5, y + 3),
+                                  theme_.id.find("-night") != std::string::npos ? ToIm(p.ink) : IM_COL32(162,148,127,255));
         }
       } else {
         for (const auto& line : PlaceIndicators(IndicatorLines(sim))) {
@@ -1110,7 +1114,7 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
                         kChamferSmall, ToIm(p.panel2), ToIm(p.borderDark), ToIm(p.border));
       const ImVec2 iconCenter(hit.box.x + hit.box.w * 0.5f,
                              hit.box.y + 14.0f);
-      const ImU32 iconInk = ToIm(p.coffee);
+      const ImU32 iconInk = ToIm(theme_.id.find("-night") != std::string::npos ? p.ink : p.coffee);
       if (hit.action == SideAction::Manifest) {
         draw->AddLine(ImVec2(iconCenter.x, iconCenter.y - 8.0f),
                       ImVec2(iconCenter.x, iconCenter.y + 4.0f), iconInk, 2.0f);
@@ -3086,7 +3090,7 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
       // The engine's battery remains visible even when the drive is full and
       // there is nothing to maintain. Its charge is not the drive condition.
       FillChamferRay(box, kChamferCard, ToRay(control.button.enabled ? p.panel2 : p.panel3));
-      PaintProgressFill(box, control.button.fillPercent, kChamferCard);
+      PaintProgressFill(box, control.button.fillPercent, p, kChamferCard);
       PaintChamferDoubleLinesRay(box, kChamferCard, ToRay(p.borderDark), ToRay(p.border));
     } else {
       PaintProgressSurface(box, control.button, p);
@@ -4740,7 +4744,7 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     const float height = std::max(48.0f, static_cast<float>(label.size()) * line + 16.0f);
     const Area control{left, leftButtonBottom + 12.0f, leftColumn, height};
     FillChamferRay(control, kChamferCard, ToRay(row.enabled ? p.control : p.panel3));
-    PaintProgressFill(control, row.chargePercent, kChamferCard);
+    PaintProgressFill(control, row.chargePercent, p, kChamferCard);
     PaintChamferDoubleLinesRay(control, kChamferCard, ToRay(p.borderDark), ToRay(p.border));
     float textY = control.y + (height - label.size() * line) / 2.0f;
     for (const auto& text : label) {
@@ -4817,7 +4821,7 @@ void ShellView::PaintCrewRecord(const Simulation& sim) {
     const auto lines = WrapText(label, right - left - 20.0f, size, SelectFont(size, false));
     const Area box{left, y, right - left, lines.size() * line + 16.0f};
     FillChamferRay(box, kChamferCard, ToRay(row.enabled ? p.panel : p.panel3));
-    if (row.charged) { PaintProgressFill(box, row.chargePercent, kChamferCard); }
+    if (row.charged) { PaintProgressFill(box, row.chargePercent, p, kChamferCard); }
     PaintChamferDoubleLinesRay(box, kChamferCard, ToRay(p.borderDark), ToRay(p.border));
     float textY = box.y + 8.0f;
     for (const auto& text : lines) {
@@ -6542,7 +6546,7 @@ void ShellView::PaintCargoScreen(Simulation& sim) {
     const bool live = row.enabled && hasId && ChargeLeft(sim, chargeKey, chargeTier) > 0.0;
 
     FillChamferRay(btnBox, kChamferCard, ToRay(live ? p.control : p.panel3));
-    if (live && hasId) { PaintProgressFill(btnBox, chargePct, kChamferCard); }
+    if (live && hasId) { PaintProgressFill(btnBox, chargePct, p, kChamferCard); }
     PaintChamferDoubleLinesRay(btnBox, kChamferCard, ToRay(live ? p.borderDark : p.border), ToRay(p.border));
 
     float ty = btnBox.y + 7.0f;
@@ -7553,7 +7557,7 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
                        ToRay(row.selected ? p.panel3
                                           : (row.enabled ? (grouped ? p.control : p.panel2)
                                                          : p.panel3)));
-        if (row.charged) { PaintProgressFill(box, row.chargePercent, kChamferCard); }
+        if (row.charged) { PaintProgressFill(box, row.chargePercent, p, kChamferCard); }
         PaintChamferDoubleLinesRay(
             box, kChamferCard,
             ToRay(row.selected ? p.coffee : (row.enabled ? p.borderDark : p.border)),

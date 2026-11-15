@@ -43,6 +43,7 @@ struct Palette {
   // texture tint; menu colours are overridden independently in dark themes.
   Rgb content, chrome, hover, control, input, tabInk, activeInk, chart, chartInk;
   Rgb titleMenu, titleMenuInk, titleMenuBorder, titleMenuHover;
+  Rgb progressFill;
 };
 
 // One of THEMES: a name, a label for the settings screen, and the ink that the

@@ -50,6 +50,7 @@ Palette ClassicPalette() {
   p.chart = Hex("#ece2d1"); p.chartInk = Hex("#6b5338");
   p.titleMenu = Hex("#3f342b"); p.titleMenuInk = Hex("#f2e5cc");
   p.titleMenuBorder = Hex("#a48e72"); p.titleMenuHover = Hex("#6b543f");
+  p.progressFill = Hex("#dff0cc");
   return p;
 }
 
@@ -145,6 +146,7 @@ Palette PaletteForId(const std::string& id) {
     Rgb* textRoles[] = {&p.ink, &p.muted, &p.titleInk, &p.tabInk,
                        &p.activeInk, &p.chartInk, &p.titleMenuInk};
     for (Rgb* role : textRoles) { *role = FromHsl({hue, 0.30, role == &p.muted ? 0.70 : 0.88}); }
+    p.progressFill = Hex("#29471c");
     p.terracotta = Hex("#ef957f"); p.sage = Hex("#a5cf8b"); p.amber = Hex("#efc572");
   }
   return p;
