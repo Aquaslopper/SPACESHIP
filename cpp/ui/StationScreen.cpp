@@ -309,8 +309,8 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
          {"Rack: " + Num(sim.Life().canisters) + " of " + Num(sim.Life().capacity) +
               " canisters.",
           "The Recyclers' oxygen project blocks this while it runs."});
-  supply("buy-rations", "Six dry rations - 80 sh",
-         "Six dry rations for the larder; the cook turns them into galley food.", kRations,
+  supply("buy-rations", "4 dry rations - 80 sh",
+         "4 dry rations for the larder; the cook turns them into galley food.", kRations,
          sim.MessRations() <= sim.MessRationCapacity() - 6 &&
              sim.FindOngoing("project-food") == nullptr,
          {"Larder: " + Num(sim.MessRations()) + " of " +
