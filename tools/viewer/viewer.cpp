@@ -221,6 +221,8 @@ int main(int argc, char** argv) {
   if (titleTexture.id != 0) { SetTextureFilter(titleTexture, TEXTURE_FILTER_BILINEAR); }
   Texture2D setupTexture = LoadTexture("assets/art/setupscreen.png");
   if (setupTexture.id != 0) { SetTextureFilter(setupTexture, TEXTURE_FILTER_BILINEAR); }
+  Texture2D splashTexture = LoadTexture("assets/art/splash.png");
+  if (splashTexture.id != 0) { SetTextureFilter(splashTexture, TEXTURE_FILTER_BILINEAR); }
   Texture2D wrenExterior = LoadTexture("assets/art/ships/wren-exterior.png");
   if (wrenExterior.id != 0) { SetTextureFilter(wrenExterior, TEXTURE_FILTER_BILINEAR); }
   std::array<Texture2D, 6> tutorialTextures{};
@@ -250,6 +252,7 @@ int main(int argc, char** argv) {
   shell.SetFonts(fonts.body, fonts.bold, fonts.mono);
   shell.SetTitleTexture(&titleTexture);
   shell.SetSetupTexture(&setupTexture);
+  shell.SetSplashTexture(&splashTexture);
   shell.SetWrenExteriorTexture(&wrenExterior);
   for (std::size_t i = 0; i < tutorialTextures.size(); ++i) { shell.SetTutorialTexture(i, &tutorialTextures[i]); }
   for (auto& picture : crewTextures) { shell.SetCrewTexture(picture.first, &picture.second); }
@@ -594,6 +597,8 @@ int main(int argc, char** argv) {
       ship::SwitchTab(sim, p[1]);
     } else if (c == "title") {
       shell.ShowTitle(num(1, 0) != 0);
+    } else if (c == "splash") {
+      shell.ShowSplash(num(1, 0) != 0);
     } else if (c == "hidetitle") {
       shell.HideTitle();
     } else if (c == "popup" && p.size() >= 2) {

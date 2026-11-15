@@ -1,0 +1,19 @@
+# The dev splash card from boot to title, clocked off a fresh ShowSplash.
+# t=0 is the first painted frame after `splash`; a frame is 1000/60 ms.
+# Card: fade in 0-900, hold to 3400, 50 ms chromatic tear, dark by 5000.
+# The title then spends 700 ms coming up out of the dark.
+splash 0
+frames 30
+shot splash-01-fade-in
+frames 96
+shot splash-02-hold
+frames 80
+shot splash-03-tear
+frames 46
+shot splash-04-into-the-dark
+frames 47
+shot splash-05-darkness
+frames 16
+shot splash-06-title-rising
+frames 60
+shot splash-07-title

@@ -417,6 +417,14 @@ constexpr double kDipInMs = 260.0;
 constexpr double kLaunchIrisOutMs = 450.0;
 constexpr double kLaunchCardMs = 1500.0;
 constexpr double kLaunchIrisInMs = 550.0;
+// The dev card ahead of the menu: out of the dark, held, then the slow dip
+// back into darkness; the last 50 ms tear the picture into its channels.
+constexpr double kSplashFadeInMs = 900.0;
+constexpr double kSplashHoldMs = 2500.0;
+constexpr double kSplashFadeOutMs = 1600.0;
+constexpr double kSplashGlitchMs = 50.0;
+// ...and the menu itself comes out of the dark behind the card.
+constexpr double kTitleInMs = 700.0;
 }  // namespace
 
 ShellView::~ShellView() { ReleaseWrenMesh(); }
@@ -559,11 +567,25 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
 
   ClearBackground(ToRay(theme_.palette.content));
 
+  if (splashActive_) {
+    PaintSplash(nowMs);
+    return;
+  }
+
   if (titleActive_) {
     cargoAnims_.clear();
     lastCargoAnimMs_ = 0.0;
     if (fadeKind_ == 2) { fadeKind_ = 0; }
     PaintTitle(sim, nowMs);
+    if (titleInStartMs_ >= 0.0) {
+      const double t = nowMs - titleInStartMs_;
+      if (t >= kTitleInMs) { titleInStartMs_ = -1.0; }
+      else {
+        DrawRectangle(0, 0, static_cast<int>(width_), static_cast<int>(height_),
+                      Fade(ToRay(theme_.palette.titleMenu),
+                           1.0f - static_cast<float>(t / kTitleInMs)));
+      }
+    }
     return;
   }
 
@@ -704,6 +726,54 @@ bool ShellView::LaunchCoverUp(double nowMs) const {
 // The closing circle of an old film: everything outside it is the dark of the
 // menu bar. `open` runs from 1 (nothing covered) to 0 (all covered). With
 // reduced motion the same span is a plain fade.
+// The dev card. One static picture, three fades on pure black, and at the cut
+// into the menu a 50 ms chromatic tear. A click or Esc hands over at once.
+void ShellView::PaintSplash(double nowMs) {
+  if (splashStartMs_ < 0.0) { splashStartMs_ = nowMs; }
+  DrawRectangle(0, 0, static_cast<int>(width_), static_cast<int>(height_), BLACK);
+  const Texture2D* art = static_cast<const Texture2D*>(splashArt_);
+  const double t = nowMs - splashStartMs_;
+  const double holdMs = kSplashFadeInMs + kSplashHoldMs;
+  const double totalMs = holdMs + kSplashFadeOutMs;
+  if (art == nullptr || art->id == 0 || t >= totalMs) {
+    EndSplash(nowMs);
+    return;
+  }
+  const float alpha =
+      t < kSplashFadeInMs ? static_cast<float>(t / kSplashFadeInMs)
+      : t > holdMs ? static_cast<float>(1.0 - (t - holdMs) / kSplashFadeOutMs)
+                   : 1.0f;
+
+  // Whole window, aspect kept, centred on the dark.
+  const float scale =
+      std::min(width_ / art->width, height_ / art->height);
+  const Rectangle src{0.0f, 0.0f, static_cast<float>(art->width),
+                      static_cast<float>(art->height)};
+  const Rectangle dst{std::round((width_ - art->width * scale) * 0.5f),
+                      std::round((height_ - art->height * scale) * 0.5f),
+                      art->width * scale, art->height * scale};
+
+  if (t < holdMs || t >= holdMs + kSplashGlitchMs) {
+    DrawTexturePro(*art, src, dst, Vector2{0.0f, 0.0f}, 0.0f, Fade(WHITE, alpha));
+    return;
+  }
+
+  // The wild 50 ms at full light: channels split and scatter, then the card
+  // dies into the dark.
+  const float g = static_cast<float>((t - holdMs) / kSplashGlitchMs);
+  const float jitter = 0.7f + 0.3f * std::sin(static_cast<float>(nowMs) * 1.9f);
+  const float dx = (4.0f + 34.0f * g * g) * jitter;
+  const float dy = dx * 0.22f;
+  BeginBlendMode(BLEND_ADDITIVE);
+  DrawTexturePro(*art, src, Rectangle{dst.x - dx, dst.y + dy, dst.width, dst.height},
+                 Vector2{0.0f, 0.0f}, 0.0f, Fade(Color{255, 0, 0, 255}, alpha));
+  DrawTexturePro(*art, src, dst, Vector2{0.0f, 0.0f}, 0.0f,
+                 Fade(Color{0, 255, 0, 255}, alpha));
+  DrawTexturePro(*art, src, Rectangle{dst.x + dx, dst.y - dy, dst.width, dst.height},
+                 Vector2{0.0f, 0.0f}, 0.0f, Fade(Color{0, 0, 255, 255}, alpha));
+  EndBlendMode();
+}
+
 void ShellView::PaintIris(float open, bool reduced) {
   const Color dark = ToRay(theme_.palette.titleMenu);
   open = std::clamp(open, 0.0f, 1.0f);
@@ -6651,6 +6721,13 @@ void ShellView::HideTitle() {
   titleMessage_.clear();
 }
 
+void ShellView::ShowSplash(bool fromVoyage) {
+  splashActive_ = true;
+  splashFromVoyage_ = fromVoyage;
+  splashStartMs_ = -1.0;
+  titleInStartMs_ = -1.0;
+}
+
 void ShellView::ShowTitle(bool fromVoyage) {
   titleActive_ = true;
   fromVoyage_ = fromVoyage;
@@ -6662,6 +6739,12 @@ void ShellView::ShowTitle(bool fromVoyage) {
   popupKey_.clear();
   floating_.Clear();
   focusedPanel_ = 0;
+}
+
+void ShellView::EndSplash(double nowMs) {
+  splashActive_ = false;
+  ShowTitle(splashFromVoyage_);
+  titleInStartMs_ = nowMs;
 }
 
 void ShellView::PaintSettingsControls(Simulation& sim, const PopupModel& model) {
@@ -7951,6 +8034,7 @@ void ShellView::Scroll(Simulation& sim, float x, float y, float wheelDelta) {
 }
 
 void ShellView::Escape(Simulation& sim) {
+  if (splashActive_) { EndSplash(frameTimeMs_); return; }
   if (LaunchCoverUp(frameTimeMs_)) { return; }
   if (LossVisible(sim)) { lossDismissed_ = true; return; }
   if (titleActive_) {
@@ -7970,6 +8054,7 @@ void ShellView::Escape(Simulation& sim) {
 
 void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
                       double nowMs) {
+  if (splashActive_) { EndSplash(nowMs); return; }
   if (button == HitButton::Left) {
     const bool moved = draggingChart_ && chartDragMoved_;
     draggingChart_ = false;
