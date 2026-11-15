@@ -61,6 +61,7 @@ class ShellView {
   }
   void SetTitleTexture(void* texture) { titleArt_ = texture; }
   void SetSetupTexture(void* texture) { setupArt_ = texture; }
+  void SetSplashTexture(void* texture) { splashArt_ = texture; }
   void SetAudioStatus(std::string status) { audioStatus_ = std::move(status); }
   void SetWrenExteriorTexture(void* texture) { wrenExteriorArt_ = texture; }
   void SetWrenExteriorImage(const Image* image);
@@ -95,6 +96,7 @@ class ShellView {
   int PopupCount() const { return popupCount_; }
   void ClosePopup();
 
+  void ShowSplash(bool fromVoyage);
   void ShowTitle(bool fromVoyage);
   void HideTitle();
   bool TitleActive() const { return titleActive_; }
@@ -369,6 +371,11 @@ class ShellView {
   std::string pendingConfirm_;
   std::string pendingAction_;
 
+  bool splashActive_ = false;
+  bool splashFromVoyage_ = false;
+  double splashStartMs_ = -1.0;
+  double titleInStartMs_ = -1.0;
+
   bool titleActive_ = false;
   bool titleConfirm_ = false;
   bool fromVoyage_ = false;
@@ -383,6 +390,7 @@ class ShellView {
   TitleModel title_;
   std::vector<NavHit> titleHits_;
   void* titleArt_ = nullptr;
+  void* splashArt_ = nullptr;
   void* setupArt_ = nullptr;
   ChartSettings setupSettings_{};
   ChartPreview setupPreview_{};
@@ -408,6 +416,8 @@ class ShellView {
   bool LaunchCoverUp(double nowMs) const;
   void PaintIris(float open, bool reduced);
   void PaintLaunchCard(double elapsedMs);
+  void PaintSplash(double nowMs);
+  void EndSplash(double nowMs);
   void RebuildSetupPreview(const Simulation& sim);
   bool displayAdjustmentAvailable_ = true;
   std::array<void*, 6> tutorialArt_{};

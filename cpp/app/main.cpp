@@ -202,6 +202,14 @@ Texture2D LoadSetupTexture(const std::filesystem::path& assets) {
   return texture;
 }
 
+Texture2D LoadSplashTexture(const std::filesystem::path& assets) {
+  const std::filesystem::path path = assets / "art" / "splash.png";
+  if (!std::filesystem::exists(path)) { return Texture2D{}; }
+  Texture2D texture = LoadTexture(path.string().c_str());
+  if (texture.id != 0) { SetTextureFilter(texture, TEXTURE_FILTER_BILINEAR); }
+  return texture;
+}
+
 // The calibrated default needs the shader. Only an identity transform can
 // bypass the render target. The shader and target cover the complete frame
 // (including ImGui, title art and popups), rather than changing the theme.
@@ -424,6 +432,7 @@ int main(int argc, char** argv) {
 
   Texture2D titleTexture = LoadTitleTexture(assets);
   Texture2D setupTexture = LoadSetupTexture(assets);
+  Texture2D splashTexture = LoadSplashTexture(assets);
   Texture2D wrenExterior{};
   Image wrenImage{};
   const auto exteriorPath = assets / "art" / "ships" / "wren-exterior.png";
@@ -474,6 +483,7 @@ int main(int argc, char** argv) {
   shell.SetFonts(fonts.body, fonts.bold, fonts.mono);
   shell.SetTitleTexture(&titleTexture);
   shell.SetSetupTexture(&setupTexture);
+  shell.SetSplashTexture(&splashTexture);
   shell.SetWrenExteriorTexture(&wrenExterior);
   if (wrenImage.data != nullptr) {
     shell.SetWrenExteriorImage(&wrenImage);
@@ -496,9 +506,10 @@ int main(int argc, char** argv) {
   std::printf("audio: %zu music file(s), %zu sound file(s)\n",
               audio.External().music.size(), audio.External().sfx.size());
 
-  // Restore the voyage in memory, but always present the title screen. A
-  // restored voyage can be entered with RESUME, or replaced explicitly.
-  shell.ShowTitle(voyageStarted);
+  // Restore the voyage in memory, but always present the title screen — behind
+  // the dev's splash card, which opens the window. A restored voyage can be
+  // entered with RESUME, or replaced explicitly.
+  shell.ShowSplash(voyageStarted);
 
   // Phase 9: the borderless window follows Options, whichever way it changes.
   bool fullscreen = sim.State().options.fullscreen;
@@ -650,6 +661,7 @@ int main(int argc, char** argv) {
   shell.ReleaseGraphics();
   if (titleTexture.id != 0) { UnloadTexture(titleTexture); }
   if (setupTexture.id != 0) { UnloadTexture(setupTexture); }
+  if (splashTexture.id != 0) { UnloadTexture(splashTexture); }
   if (wrenExterior.id != 0) { UnloadTexture(wrenExterior); }
   for (auto texture : tutorialTextures) { if (texture.id != 0) { UnloadTexture(texture); } }
   for (auto& picture : crewTextures) { UnloadTexture(picture.second); }
