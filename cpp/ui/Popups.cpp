@@ -172,14 +172,19 @@ PopupModel BuildPopup(const Simulation& sim, const std::string& key,
   model.toggles.push_back(PopupToggle{
       "hideCrewLabels", options.hideCrewLabels ? "Show crew labels" : "Hide crew labels",
       options.hideCrewLabels});
-  const char* headings[] = {"Ambient soundtrack", "Sound effects", "Decorative motion", "Reading text", "Confirmations", "Crew labels"};
+  model.toggles.push_back(PopupToggle{
+      "autoload", options.autoload ? "Autoload restored voyage: On"
+                                   : "Autoload restored voyage: Off",
+      options.autoload});
+  const char* headings[] = {"Ambient soundtrack", "Sound effects", "Decorative motion", "Reading text", "Confirmations", "Crew labels", "Autoload"};
   const char* help[] = {
       "Play custom music from assets/audio/music, or the built-in shipboard theme.",
       "Soft console clicks, scan pings, drive cues and completion chimes.",
       "Pause map and crew drift, tab glows and click marks.",
       "Enlarge the main reading and click text.",
       "Ask before jettisoning, abandoning, story decisions, saving or loading.",
-      "Show or hide names on the ship diagram."};
+      "Show or hide names on the ship diagram.",
+      "Open the newest save straight from the launch card instead of stopping on the title screen."};
   for (std::size_t i = 0; i < model.toggles.size(); ++i) {
     model.toggles[i].heading = headings[i];
     model.toggles[i].help = help[i];
@@ -224,6 +229,10 @@ bool PressPopupAction(Simulation& sim, const std::string& key,
       if (arg == "confirmRisk") { options.confirmRisk = !options.confirmRisk; return true; }
       if (arg == "hideCrewLabels") {
         options.hideCrewLabels = !options.hideCrewLabels;
+        return true;
+      }
+      if (arg == "autoload") {
+        options.autoload = !options.autoload;
         return true;
       }
       if (arg == "reducedMotion") {

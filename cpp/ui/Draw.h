@@ -96,7 +96,7 @@ class ShellView {
   int PopupCount() const { return popupCount_; }
   void ClosePopup();
 
-  void ShowSplash(bool fromVoyage);
+  void ShowSplash(bool fromVoyage, bool toVoyage = false);
   void ShowTitle(bool fromVoyage);
   void HideTitle();
   bool TitleActive() const { return titleActive_; }
@@ -373,6 +373,7 @@ class ShellView {
 
   bool splashActive_ = false;
   bool splashFromVoyage_ = false;
+  bool splashToVoyage_ = false;
   double splashStartMs_ = -1.0;
   double titleInStartMs_ = -1.0;
 

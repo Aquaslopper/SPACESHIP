@@ -506,10 +506,10 @@ int main(int argc, char** argv) {
   std::printf("audio: %zu music file(s), %zu sound file(s)\n",
               audio.External().music.size(), audio.External().sfx.size());
 
-  // Restore the voyage in memory, but always present the title screen — behind
-  // the dev's splash card, which opens the window. A restored voyage can be
-  // entered with RESUME, or replaced explicitly.
-  shell.ShowSplash(voyageStarted);
+  // Restore the voyage in memory, then open on the dev's splash card. The card
+  // hands over to the title screen, or straight to the restored voyage when
+  // Options has Autoload on; without a save it always ends on the title.
+  shell.ShowSplash(voyageStarted, voyageStarted && sim.State().options.autoload);
 
   // Phase 9: the borderless window follows Options, whichever way it changes.
   bool fullscreen = sim.State().options.fullscreen;

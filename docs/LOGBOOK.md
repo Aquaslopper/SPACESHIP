@@ -128,3 +128,19 @@ You must append a compressed summary of **every single reply and action you take
 - Native drawing, audio and main entry-point syntax checks passed.
 - ID-prefix check and git diff whitespace check passed.
 - Native graphical interaction and Windows executable not verified locally.
+
+### Entry #008
+- Timestamp: 2026-11-15 UTC.
+- Owner asked for one option: Autoload; approved as an Options row, default Off.
+- Read startup save handling, Options persistence, the settings sheet and the splash handover.
+- `LoadNewestSave` already restores the newest valid save before the window opens.
+- The forced title stop after the launch card was the gate; it is removed when Autoload is on.
+- With Autoload off the splash still ends on the title exactly as before, so no restore/load handoff is added.
+- One new Options field round-trips inside the save with the existing preference keys.
+- The row reads "Autoload restored voyage: On/Off" and sits after Crew labels in the same settings sheet.
+- `ShowSplash` carries the handover destination beside the existing from-voyage flag; no new tier, alias or helper.
+- Headless core, console and the GUI syntax check under -Wall -Wextra -Wpedantic passed.
+- Throwaway probe passed: default off, row present, press flips it, save/load keeps it, older saves load off.
+- Throwaway probe passed: boot restores the newest save and the splash skips the menu only when the option is on.
+- Software-rendered frames show the Autoload row and the splash handing over to the ship.
+- Windows executable not built here; owner must verify the CI artifact.

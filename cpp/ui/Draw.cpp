@@ -6721,9 +6721,10 @@ void ShellView::HideTitle() {
   titleMessage_.clear();
 }
 
-void ShellView::ShowSplash(bool fromVoyage) {
+void ShellView::ShowSplash(bool fromVoyage, bool toVoyage) {
   splashActive_ = true;
   splashFromVoyage_ = fromVoyage;
+  splashToVoyage_ = toVoyage;
   splashStartMs_ = -1.0;
   titleInStartMs_ = -1.0;
 }
@@ -6743,6 +6744,12 @@ void ShellView::ShowTitle(bool fromVoyage) {
 
 void ShellView::EndSplash(double nowMs) {
   splashActive_ = false;
+  if (splashToVoyage_) {
+    // Autoload: the voyage was already restored before the splash, so the card
+    // hands over to the ship and the menu is never shown.
+    splashToVoyage_ = false;
+    return;
+  }
   ShowTitle(splashFromVoyage_);
   titleInStartMs_ = nowMs;
 }
