@@ -161,11 +161,11 @@ struct Options {
   double audioLevel = 0.4;
   double displayGamma = 1.2;
   double displayBrightness = 1.0;
-  double radiationWave = 1.0;
+  double radiationWave = 1.3;
   double colorShift = 0.0;
-  double glow = 0.0;
+  double glow = 1.0;
   int fontStep = 0;
-  bool fullscreen = false;
+  bool fullscreen = true;
 };
 
 struct Charge {
