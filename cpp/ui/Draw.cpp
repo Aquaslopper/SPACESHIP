@@ -47,6 +47,145 @@ constexpr float kChamferCard = 5.0f;
 constexpr float kChamferSmall = 4.0f;
 constexpr float kDoubleInset = 3.0f;
 
+struct QueuedFlare {
+  float x = 0.0f;
+  float y = 0.0f;
+  float halfLen = 0.0f;
+  float weight = 0.0f;
+  bool warm = false;
+};
+
+float gLensFlareLevel = 0.0f;
+float gLensFlarePhase = 0.0f;
+bool gQueueChamferFlares = false;
+std::vector<Area> gSeenFlareBoxes;
+std::vector<QueuedFlare> gQueuedFlares;
+
+unsigned char FlareByte(float v) {
+  return static_cast<unsigned char>(std::clamp(std::round(v), 0.0f, 255.0f));
+}
+
+float FlarePulse(float x, float y) {
+  if (gLensFlarePhase == 0.0f) { return 1.0f; }
+  const float seed = std::sin(x * 0.037f + y * 0.053f) * 6.2831853f;
+  return 0.88f + 0.12f * std::sin(gLensFlarePhase * 2.1f + seed);
+}
+
+void DrawVerticalBandRay(int left, int width, int cy, int halfH, ::Color peak) {
+  if (width < 1 || halfH < 2 || peak.a == 0) { return; }
+  const ::Color zero{peak.r, peak.g, peak.b, 0};
+  DrawRectangleGradientV(left, cy - halfH, width, halfH, zero, peak);
+  DrawRectangleGradientV(left, cy, width, halfH, peak, zero);
+}
+
+void PaintVerticalFlareRay(float cx, float cy, float halfLen, float weight, bool warm) {
+  if (gLensFlareLevel <= 0.01f || halfLen < 3.0f || weight <= 0.0f) { return; }
+  const float k = gLensFlareLevel * weight * FlarePulse(cx, cy);
+  const float reach = halfLen * (0.70f + 0.42f * gLensFlareLevel);
+  const int ix = static_cast<int>(std::round(cx));
+  const int iy = static_cast<int>(std::round(cy));
+  const int outerH = std::max(4, static_cast<int>(std::round(reach)));
+  const int midH = std::max(3, static_cast<int>(std::round(reach * 0.68f)));
+  const int warmH = std::max(2, static_cast<int>(std::round(reach * 0.44f)));
+  const int coreH = std::max(2, static_cast<int>(std::round(reach * 0.18f)));
+
+  DrawVerticalBandRay(ix - 4, 9, iy, outerH,
+                      ::Color{16, 98, 255, FlareByte(k * 46.0f)});
+  DrawVerticalBandRay(ix - 2, 5, iy, outerH,
+                      ::Color{32, 150, 255, FlareByte(k * 94.0f)});
+  if (warm) {
+    DrawVerticalBandRay(ix - 3, 7, iy, warmH,
+                        ::Color{255, 138, 20, FlareByte(k * 116.0f)});
+    DrawVerticalBandRay(ix - 1, 3, iy, midH,
+                        ::Color{104, 212, 255, FlareByte(k * 144.0f)});
+    DrawVerticalBandRay(ix - 1, 3, iy, warmH,
+                        ::Color{255, 208, 96, FlareByte(k * 184.0f)});
+    DrawVerticalBandRay(ix, 1, iy, outerH,
+                        ::Color{238, 250, 255, FlareByte(k * 218.0f)});
+  } else {
+    DrawVerticalBandRay(ix - 1, 3, iy, midH,
+                        ::Color{82, 206, 255, FlareByte(k * 160.0f)});
+    DrawVerticalBandRay(ix, 1, iy, outerH,
+                        ::Color{232, 250, 255, FlareByte(k * 220.0f)});
+  }
+  DrawVerticalBandRay(ix - 1, 3, iy, coreH,
+                      ::Color{255, 253, 244, FlareByte(k * 234.0f)});
+}
+
+void DrawVerticalBandIm(ImDrawList* draw, float left, float width, float cy, float halfH,
+                        ImU32 peak) {
+  const unsigned int alpha = (peak >> IM_COL32_A_SHIFT) & 0xFFu;
+  if (width < 0.5f || halfH < 2.0f || alpha == 0u) { return; }
+  const ImU32 zero = peak & ~(0xFFu << IM_COL32_A_SHIFT);
+  draw->AddRectFilledMultiColor(ImVec2(left, cy - halfH), ImVec2(left + width, cy),
+                                zero, zero, peak, peak);
+  draw->AddRectFilledMultiColor(ImVec2(left, cy), ImVec2(left + width, cy + halfH),
+                                peak, peak, zero, zero);
+}
+
+void PaintVerticalFlareIm(ImDrawList* draw, float cx, float cy, float halfLen, float weight,
+                          bool warm) {
+  if (draw == nullptr || gLensFlareLevel <= 0.01f || halfLen < 3.0f || weight <= 0.0f) { return; }
+  const float k = gLensFlareLevel * weight * FlarePulse(cx, cy);
+  const float reach = halfLen * (0.70f + 0.42f * gLensFlareLevel);
+  const float ix = std::round(cx);
+  const float iy = std::round(cy);
+  const float midH = std::max(3.0f, std::round(reach * 0.68f));
+  const float warmH = std::max(2.0f, std::round(reach * 0.44f));
+  const float coreH = std::max(2.0f, std::round(reach * 0.18f));
+
+  DrawVerticalBandIm(draw, ix - 4.0f, 9.0f, iy, reach,
+                     IM_COL32(18, 96, 255, FlareByte(k * 40.0f)));
+  DrawVerticalBandIm(draw, ix - 2.0f, 5.0f, iy, reach,
+                     IM_COL32(34, 146, 255, FlareByte(k * 84.0f)));
+  if (warm) {
+    DrawVerticalBandIm(draw, ix - 3.0f, 7.0f, iy, warmH,
+                       IM_COL32(255, 148, 32, FlareByte(k * 90.0f)));
+    DrawVerticalBandIm(draw, ix - 1.0f, 3.0f, iy, warmH,
+                       IM_COL32(255, 206, 108, FlareByte(k * 158.0f)));
+  } else {
+    DrawVerticalBandIm(draw, ix - 1.0f, 3.0f, iy, midH,
+                       IM_COL32(86, 204, 255, FlareByte(k * 146.0f)));
+  }
+  DrawVerticalBandIm(draw, ix, 1.0f, iy, reach,
+                     IM_COL32(228, 248, 255, FlareByte(k * 204.0f)));
+  DrawVerticalBandIm(draw, ix - 1.0f, 3.0f, iy, coreH,
+                     IM_COL32(255, 252, 242, FlareByte(k * 216.0f)));
+}
+
+void EmitChamferEdgeFlaresRay(const Area& box, float chamfer) {
+  if (!gQueueChamferFlares || gLensFlareLevel <= 0.01f || box.w < 16.0f || box.h < 14.0f) {
+    return;
+  }
+  for (const Area& seen : gSeenFlareBoxes) {
+    if (std::fabs(seen.x - box.x) < 1.0f && std::fabs(seen.y - box.y) < 1.0f &&
+        std::fabs(seen.w - box.w) < 1.0f && std::fabs(seen.h - box.h) < 1.0f) {
+      return;
+    }
+  }
+  gSeenFlareBoxes.push_back(box);
+  const float c = std::min(chamfer, std::max(0.0f, std::min(box.w, box.h) * 0.32f));
+  const float span = std::clamp(std::min(box.h * 0.72f, 14.0f + box.w * 0.075f), 14.0f, 48.0f);
+  const float w = box.w >= 260.0f ? 0.90f : (box.w >= 110.0f ? 0.74f : 0.56f);
+  gQueuedFlares.push_back({box.x + 0.5f, box.y + c, span, w, false});
+  gQueuedFlares.push_back({box.x + box.w - 0.5f, box.y + box.h - c, span, w, true});
+  if (box.w >= 96.0f && box.h >= 26.0f) {
+    gQueuedFlares.push_back({box.x + box.w - 0.5f, box.y + 1.0f, span * 0.78f, w * 0.76f, false});
+  }
+  if (box.w >= 220.0f && box.h >= 52.0f) {
+    gQueuedFlares.push_back({box.x + 0.5f, box.y + box.h - 1.0f, span * 0.76f, w * 0.72f, true});
+  }
+}
+
+void EmitChamferEdgeFlaresIm(ImDrawList* draw, float x, float y, float w, float h, float chamfer) {
+  if (draw == nullptr || gLensFlareLevel <= 0.01f || w < 16.0f || h < 14.0f) { return; }
+  const float c = std::min(chamfer, std::max(0.0f, std::min(w, h) * 0.32f));
+  const float span = std::clamp(std::min(h * 0.85f, 12.0f + w * 0.07f), 12.0f, 42.0f);
+  const float weight = w >= 240.0f ? 0.84f : (w >= 90.0f ? 0.68f : 0.52f);
+  PaintVerticalFlareIm(draw, x + 0.5f, y + c, span, weight, false);
+  PaintVerticalFlareIm(draw, x + w - 0.5f, y + h - c, span, weight, true);
+}
+
 float ClampChamfer(float w, float h, float chamfer) {
   const float limit = std::max(0.0f, std::min(w, h) * 0.32f);
   return std::min(chamfer, limit);
@@ -120,6 +259,7 @@ void PaintChamferDoubleLinesRay(const Area& box, float chamfer, ::Color outerLin
     StrokeChamferRay(box.x + kDoubleInset, box.y + kDoubleInset,
                      box.w - 2.0f * kDoubleInset, box.h - 2.0f * kDoubleInset, ci, innerLine);
   }
+  EmitChamferEdgeFlaresRay(box, chamfer);
 }
 
 void PaintChamferBoxRay(const Area& box, float chamfer, ::Color fill, ::Color outerLine,
@@ -207,6 +347,7 @@ void PaintChamferBoxIm(ImDrawList* draw, float x, float y, float w, float h, flo
     StrokeChamferIm(draw, x + kDoubleInset, y + kDoubleInset, w - 2.0f * kDoubleInset,
                     h - 2.0f * kDoubleInset, ci, innerLine);
   }
+  EmitChamferEdgeFlaresIm(draw, x, y, w, h, chamfer);
 }
 
 // Theme progress fill, with the original #7ec63f right edge.
@@ -578,6 +719,12 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
 
   ClearBackground(ToRay(theme_.palette.content));
 
+  gLensFlareLevel = 0.0f;
+  gLensFlarePhase = 0.0f;
+  gQueueChamferFlares = false;
+  gSeenFlareBoxes.clear();
+  gQueuedFlares.clear();
+
   if (splashActive_) {
     PaintSplash(nowMs);
     return;
@@ -622,6 +769,10 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   // matching the HTA's #content { overflow:auto }. Every screen paints inside
   // this transform, and Click() offsets the cursor by the same amount so
   // obscured content can never be clicked.
+  gLensFlareLevel = std::clamp(static_cast<float>(sim.State().options.lensFlare), 0.0f, 2.0f);
+  gLensFlarePhase = sim.State().reducedMotion ? 0.0f : static_cast<float>(nowMs * 0.001);
+  gQueueChamferFlares = gLensFlareLevel > 0.01f;
+
   Camera2D scrollCam{{0.0f, 0.0f}, {0.0f, contentScroll_}, 0.0f, 1.0f};
   contentPaintBottom_ = layout_.content.y;
   paintingContent_ = true;
@@ -693,6 +844,14 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
       }
     }
   }
+  gQueueChamferFlares = false;
+  if (!gQueuedFlares.empty()) {
+    for (const QueuedFlare& flare : gQueuedFlares) {
+      PaintVerticalFlareRay(flare.x, flare.y, flare.halfLen, flare.weight, flare.warm);
+    }
+    gQueuedFlares.clear();
+    gSeenFlareBoxes.clear();
+  }
   EndMode2D();
   paintingContent_ = false;
   contentMaxScroll_ = std::max(0.0f, contentPaintBottom_ - actionBandTop_);
@@ -701,6 +860,7 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   PaintChrome(sim, nowMs);
   if (!LossVisible(sim)) { PaintPopup(sim); }
   if (LossVisible(sim)) { PaintLoss(sim); }
+  gLensFlareLevel = 0.0f;
 
   // Action marks last, over everything, because they are the player's hand.
   for (const ActionMark& mark : marks_) {
@@ -1117,6 +1277,10 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
                       ImVec2(layout_.sidefoot.Right(), layout_.sidefoot.Bottom()), ToIm(p.chrome));
   draw->AddLine(ImVec2(0.0f, layout_.sidefoot.y),
                 ImVec2(layout_.sidefoot.Right(), layout_.sidefoot.y), ToIm(p.border));
+  PaintVerticalFlareIm(draw, layout_.sidefoot.Right() - 0.5f, Metrics::kTaskbarH + 2.0f, 34.0f,
+                       0.78f, false);
+  PaintVerticalFlareIm(draw, layout_.sidefoot.Right() - 0.5f, layout_.sidefoot.y, 34.0f, 0.78f,
+                       true);
   for (const SideHit& hit : hits) {
     if (!hit.pinned) { continue; }
     if (hit.action == SideAction::Manifest || hit.action == SideAction::Log ||
@@ -2089,10 +2253,97 @@ void ShellView::PaintWrenExterior(const Simulation& sim) {
       const float z = item.localZ > 0.0f ? item.localZ : SampleWrenHullZ(item.normUV.x, item.normUV.y);
       liveAnchors.push_back(projectUv(item.normUV.x, item.normUV.y, z));
     }
+
+    if (gLensFlareLevel > 0.01f && !wrenSdf_.sdf.empty() && wrenSdf_.w > 4 && wrenSdf_.h > 4) {
+      auto topEdgeV = [&](float u, float* outV) -> bool {
+        const int sx = std::clamp(static_cast<int>(std::round(u * static_cast<float>(wrenSdf_.w - 1))),
+                                  0, wrenSdf_.w - 1);
+        for (int sy = 0; sy < wrenSdf_.h; ++sy) {
+          if (wrenSdf_.sdf[static_cast<std::size_t>(sy) * wrenSdf_.w + sx] >= 0.0f) {
+            *outV = static_cast<float>(sy) / static_cast<float>(wrenSdf_.h - 1);
+            return true;
+          }
+        }
+        return false;
+      };
+      auto botEdgeV = [&](float u, float* outV) -> bool {
+        const int sx = std::clamp(static_cast<int>(std::round(u * static_cast<float>(wrenSdf_.w - 1))),
+                                  0, wrenSdf_.w - 1);
+        for (int sy = wrenSdf_.h - 1; sy >= 0; --sy) {
+          if (wrenSdf_.sdf[static_cast<std::size_t>(sy) * wrenSdf_.w + sx] >= 0.0f) {
+            *outV = static_cast<float>(sy) / static_cast<float>(wrenSdf_.h - 1);
+            return true;
+          }
+        }
+        return false;
+      };
+      int minX = wrenSdf_.w, maxX = -1, bowY = wrenSdf_.h / 2;
+      for (int sy = 0; sy < wrenSdf_.h; ++sy) {
+        for (int sx = 0; sx < wrenSdf_.w; ++sx) {
+          if (wrenSdf_.sdf[static_cast<std::size_t>(sy) * wrenSdf_.w + sx] >= 0.0f) {
+            if (sx < minX) { minX = sx; }
+            if (sx > maxX) { maxX = sx; bowY = sy; }
+          }
+        }
+      }
+      if (maxX > minX) {
+        const float uMin = static_cast<float>(minX) / static_cast<float>(wrenSdf_.w - 1);
+        const float uMax = static_cast<float>(maxX) / static_cast<float>(wrenSdf_.w - 1);
+        const float uSpan = uMax - uMin;
+        const float flightBoost = inFlight ? 1.25f : 1.0f;
+        const float baseLen = std::clamp(image.h * 0.42f, 44.0f, 92.0f);
+
+        for (float nv : {0.28f, 0.49f, 0.69f}) {
+          const int sy = std::clamp(static_cast<int>(std::round(nv * static_cast<float>(wrenSdf_.h - 1))),
+                                    0, wrenSdf_.h - 1);
+          for (int sx = 0; sx < wrenSdf_.w / 3; ++sx) {
+            if (wrenSdf_.sdf[static_cast<std::size_t>(sy) * wrenSdf_.w + sx] >= 0.0f) {
+              const float u = static_cast<float>(sx) / static_cast<float>(wrenSdf_.w - 1);
+              const Vector2 pt = projectUv(u, nv, 0.0f);
+              const bool mainNozzle = std::fabs(nv - 0.49f) < 0.05f;
+              PaintVerticalFlareRay(pt.x, pt.y, baseLen * (mainNozzle ? 1.18f : 0.88f) * flightBoost,
+                                    (mainNozzle ? 1.22f : 0.96f) * flightBoost, true);
+              break;
+            }
+          }
+        }
+
+        static constexpr float kTopFracs[4] = {0.19f, 0.41f, 0.67f, 0.89f};
+        static constexpr float kTopScale[4] = {0.82f, 1.18f, 0.78f, 0.72f};
+        for (int i = 0; i < 4; ++i) {
+          float vEdge = 0.0f;
+          const float u = uMin + uSpan * kTopFracs[i];
+          if (topEdgeV(u, &vEdge)) {
+            const Vector2 pt = projectUv(u, vEdge, 0.0f);
+            PaintVerticalFlareRay(pt.x, pt.y, baseLen * kTopScale[i], 0.96f * kTopScale[i],
+                                  i == 1);
+          }
+        }
+        static constexpr float kBotFracs[2] = {0.31f, 0.56f};
+        for (int i = 0; i < 2; ++i) {
+          float vEdge = 0.0f;
+          const float u = uMin + uSpan * kBotFracs[i];
+          if (botEdgeV(u, &vEdge)) {
+            const Vector2 pt = projectUv(u, vEdge, 0.0f);
+            PaintVerticalFlareRay(pt.x, pt.y, baseLen * 0.76f, 0.84f, i == 0);
+          }
+        }
+
+        const Vector2 bow = projectUv(uMax, static_cast<float>(bowY) / static_cast<float>(wrenSdf_.h - 1), 0.0f);
+        PaintVerticalFlareRay(bow.x, bow.y, baseLen * 1.06f, 1.12f, false);
+      }
+    }
   } else {
     DrawTexturePro(*texture,
                    Rectangle{0, 0, static_cast<float>(texture->width), static_cast<float>(texture->height)},
                    Rectangle{image.x, image.y, image.w, image.h}, Vector2{0, 0}, 0, WHITE);
+    if (gLensFlareLevel > 0.01f) {
+      const float baseLen = std::clamp(image.h * 0.40f, 40.0f, 84.0f);
+      PaintVerticalFlareRay(image.x + image.w * 0.03f, image.y + image.h * 0.49f, baseLen * 1.1f, 1.15f, true);
+      PaintVerticalFlareRay(image.x + image.w * 0.36f, image.y + image.h * 0.14f, baseLen, 1.0f, true);
+      PaintVerticalFlareRay(image.x + image.w * 0.68f, image.y + image.h * 0.35f, baseLen * 0.8f, 0.85f, false);
+      PaintVerticalFlareRay(image.x + image.w * 0.97f, image.y + image.h * 0.45f, baseLen, 1.05f, false);
+    }
     for (const ExteriorCallout& item : exterior_.callouts) {
       liveAnchors.push_back(item.anchor);
     }
@@ -4450,6 +4701,53 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     const float reach = itP->second.screenR + 6.0f;
     navHits_.push_back(NavHit{Area{cx - reach, cy - reach, reach * 2.0f, reach * 2.0f},
                               "select", body->id});
+  }
+
+  if (gLensFlareLevel > 0.01f) {
+    int sparseCount = 0;
+    for (const NavBodyView* body : ordered) {
+      const auto itP = projById.find(body->id);
+      if (itP == projById.end() || !itP->second.onScreen) { continue; }
+      const float cx = itP->second.docPos.x;
+      const float cy = itP->second.docPos.y;
+      if (cx < box.x + 2.0f || cx > box.Right() - 2.0f ||
+          cy < box.y + 2.0f || cy > box.Bottom() - 2.0f) {
+        continue;
+      }
+      const ChartLook look = ChartLookOf(*body);
+      const float r = itP->second.screenR;
+      const bool focus = body->selected || body->here;
+      if (look == ChartLook::Star) {
+        PaintVerticalFlareRay(cx, cy, std::clamp(box.h * 0.36f, 72.0f, 146.0f), 1.42f, true);
+      } else if (look == ChartLook::Region || look == ChartLook::Origin) {
+        PaintVerticalFlareRay(cx, cy, std::clamp(box.h * (focus ? 0.30f : 0.22f), 46.0f, 112.0f),
+                              focus ? 1.26f : 1.04f, look == ChartLook::Region);
+      } else if (look == ChartLook::System) {
+        if (focus) {
+          PaintVerticalFlareRay(cx, cy, 78.0f, 1.28f, true);
+        } else {
+          std::size_t h = 2166136261u;
+          for (unsigned char ch : body->id) { h = (h ^ ch) * 16777619u; }
+          const unsigned int stride = chart.layer == "sector" ? 8u : 7u;
+          const int cap = chart.layer == "sector" ? 22 : 26;
+          if ((h % stride) != 0u || sparseCount >= cap) { continue; }
+          ++sparseCount;
+          const float len = (chart.layer == "sector" ? 36.0f : 28.0f) + static_cast<float>(h % 24u);
+          PaintVerticalFlareRay(cx, cy, len, chart.layer == "sector" ? 0.92f : 0.76f,
+                                (h & 2u) != 0u);
+        }
+      } else if (chart.layer == "system") {
+        const float edgeX = cx + (focus ? 0.0f : -r * 0.82f);
+        const bool warmBody = body->type == "station" || body->type == "beacon" || focus;
+        PaintVerticalFlareRay(edgeX, cy, focus ? 58.0f : std::clamp(26.0f + r * 2.4f, 26.0f, 50.0f),
+                              focus ? 1.12f : 0.82f, warmBody);
+      }
+    }
+    if (chart.hasMarker && markerOnScreen &&
+        markerDocPos.x >= box.x && markerDocPos.x <= box.Right() &&
+        markerDocPos.y >= box.y && markerDocPos.y <= box.Bottom()) {
+      PaintVerticalFlareRay(markerDocPos.x, markerDocPos.y, 70.0f, 1.24f, true);
+    }
   }
 
   for (const NavBodyView* body : ordered) {
@@ -6866,10 +7164,19 @@ void ShellView::PaintSettingsControls(Simulation& sim, const PopupModel& model) 
         action("glow", std::to_string(glow));
       }
       ImGui::EndDisabled();
-      if (displayAdjustmentAvailable_ && button("Reset display adjustment", "display-reset")) {
-        action("display-gamma", "1"); action("display-brightness", "1");
-        action("radiation-wave", "1");
-        action("color-shift", "0"); action("glow", "1");
+      float lensFlare = model.lensFlare;
+      ImGui::SetNextItemWidth(-1);
+      if (ImGui::SliderFloat("##lens-flare", &lensFlare, 0.0f, 2.0f,
+                             lensFlare <= 0.01f ? "Lens flare: Off" : "Lens flare: %.2f")) {
+        action("lens-flare", std::to_string(lensFlare));
+      }
+      if (button("Reset display adjustment", "display-reset")) {
+        if (displayAdjustmentAvailable_) {
+          action("display-gamma", "1"); action("display-brightness", "1");
+          action("radiation-wave", "1");
+          action("color-shift", "0"); action("glow", "1");
+        }
+        action("lens-flare", "1");
       }
       for (const auto& toggle : model.toggles) {
         heading(toggle.heading); text(toggle.help);
@@ -7948,6 +8255,28 @@ void ShellView::PaintDiagram(const DiagramModel& diagram, const Area& stageBox, 
       DrawRectangleLinesEx(Rectangle{static_cast<float>(x), static_cast<float>(y),
                                      static_cast<float>(w), static_cast<float>(h)},
                            2.0f, frame);
+    }
+  }
+
+  if (gLensFlareLevel > 0.01f && !diagram.hull.empty()) {
+    float minX = 1e9f, maxX = -1e9f, minY = 1e9f, maxY = -1e9f;
+    float aftY = 0.0f, bowY = 0.0f, topX = 0.0f, botX = 0.0f;
+    for (const HullPart& part : diagram.hull) {
+      const float px = ox + static_cast<float>(part.box.x);
+      const float py = oy + static_cast<float>(part.box.y);
+      const float pw = static_cast<float>(part.box.w);
+      const float ph = static_cast<float>(part.box.h);
+      if (px < minX) { minX = px; aftY = py + ph * 0.5f; }
+      if (px + pw > maxX) { maxX = px + pw; bowY = py + ph * 0.5f; }
+      if (py < minY) { minY = py; topX = px + pw * 0.5f; }
+      if (py + ph > maxY) { maxY = py + ph; botX = px + pw * 0.5f; }
+    }
+    if (maxX > minX) {
+      const float baseLen = std::clamp((maxY - minY) * 0.36f, 38.0f, 76.0f);
+      PaintVerticalFlareRay(minX, aftY, baseLen * 1.05f, 1.12f, true);
+      PaintVerticalFlareRay(topX, minY, baseLen * 0.92f, 0.95f, false);
+      PaintVerticalFlareRay(botX, maxY, baseLen * 0.78f, 0.82f, false);
+      PaintVerticalFlareRay(maxX, bowY, baseLen, 1.05f, true);
     }
   }
 
