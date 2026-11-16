@@ -232,6 +232,7 @@ uniform vec2 uWaveDir;
 uniform float uIntensity;
 uniform float uOptionScale;
 uniform vec3 uWarmTint;
+uniform float uAlertLevel;
 out vec4 finalColor;
 void main() {
   vec2 uv = fragTexCoord;
@@ -260,7 +261,8 @@ void main() {
     // Subtle milky grey/amber black-level lift & contrast dip on sensor saturation.
     float luma = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
     vec3 milkyFloor = mix(vec3(0.26, 0.24, 0.21), uWarmTint, 0.42);
-    float dip = crest * clamp(uIntensity * uOptionScale, 0.0, 1.5) * 0.055;
+    milkyFloor = mix(milkyFloor, vec3(1.0, 0.03, 0.02), uAlertLevel);
+    float dip = crest * clamp(uIntensity * uOptionScale, 0.0, 1.5) * mix(0.055, 0.25, uAlertLevel);
     rgb = mix(rgb, milkyFloor, dip * (1.0 - 0.58 * luma));
     if (uGlow > 0.0) {
       vec3 bloom = vec3(0.0);
@@ -310,6 +312,7 @@ void main() {
     intensityLoc_ = GetShaderLocation(shader_, "uIntensity");
     optionScaleLoc_ = GetShaderLocation(shader_, "uOptionScale");
     warmTintLoc_ = GetShaderLocation(shader_, "uWarmTint");
+    alertLevelLoc_ = GetShaderLocation(shader_, "uAlertLevel");
     shaderReady_ = IsShaderValid(shader_) && gammaLoc_ >= 0 && brightnessLoc_ >= 0;
     if (!shaderReady_) {
       std::fprintf(stderr, "spaceship: display adjustment shader unavailable; using unadjusted display\n");
@@ -333,7 +336,8 @@ void main() {
   bool Ready() const { return shaderReady_ && IsRenderTextureValid(target_); }
   void Begin() const { BeginTextureMode(target_); }
   void End(double gamma, double brightness, float waveTime, float waveDirX, float waveDirY,
-           float intensity, float optionScale, float warmBias, float colorShift, float glow) const {
+           float intensity, float optionScale, float warmBias, float alertLevel,
+           float colorShift, float glow) const {
     EndTextureMode();
     const float g = static_cast<float>(ship::EffectiveDisplayGamma(gamma));
     const float b = static_cast<float>(ship::DisplayBrightness(brightness));
@@ -354,6 +358,7 @@ void main() {
     if (intensityLoc_ >= 0) SetShaderValue(shader_, intensityLoc_, &intensity, SHADER_UNIFORM_FLOAT);
     if (optionScaleLoc_ >= 0) SetShaderValue(shader_, optionScaleLoc_, &optionScale, SHADER_UNIFORM_FLOAT);
     if (warmTintLoc_ >= 0) SetShaderValue(shader_, warmTintLoc_, tint, SHADER_UNIFORM_VEC3);
+    if (alertLevelLoc_ >= 0) SetShaderValue(shader_, alertLevelLoc_, &alertLevel, SHADER_UNIFORM_FLOAT);
     BeginShaderMode(shader_);
     DrawTexturePro(target_.texture,
                    Rectangle{0, 0, static_cast<float>(width_), -static_cast<float>(height_)},
@@ -371,7 +376,7 @@ void main() {
   int gammaLoc_ = -1, brightnessLoc_ = -1;
   int colorShiftLoc_ = -1, glowLoc_ = -1;
   int resLoc_ = -1, timeLoc_ = -1, waveDirLoc_ = -1;
-  int intensityLoc_ = -1, optionScaleLoc_ = -1, warmTintLoc_ = -1;
+  int intensityLoc_ = -1, optionScaleLoc_ = -1, warmTintLoc_ = -1, alertLevelLoc_ = -1;
   int width_ = 0, height_ = 0;
   bool shaderReady_ = false;
 };
@@ -676,7 +681,8 @@ int main(int argc, char** argv) {
     }
     smoothedWave.baseIntensity += (targetWave.baseIntensity - smoothedWave.baseIntensity) * blend;
     smoothedWave.warmBias += (targetWave.warmBias - smoothedWave.warmBias) * blend;
-    if (!sim.State().reducedMotion) { waveTime += dt; }
+    smoothedWave.alertLevel += (targetWave.alertLevel - smoothedWave.alertLevel) * blend;
+    if (!sim.State().reducedMotion) { waveTime += dt * (1.0f + 3.0f * smoothedWave.alertLevel); }
 
     const float waveScale = sim.State().reducedMotion
                                 ? 0.0f
@@ -707,7 +713,7 @@ int main(int argc, char** argv) {
       display.End(sim.State().options.displayGamma, sim.State().options.displayBrightness,
                   waveTime, smoothedWave.waveDirX, smoothedWave.waveDirY,
                   smoothedWave.baseIntensity, waveScale, smoothedWave.warmBias,
-                  static_cast<float>(sim.State().options.colorShift),
+                  smoothedWave.alertLevel, static_cast<float>(sim.State().options.colorShift),
                   static_cast<float>(sim.State().options.glow));
     }
     EndDrawing();

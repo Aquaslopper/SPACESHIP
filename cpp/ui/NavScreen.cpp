@@ -6,6 +6,7 @@
 #include "core/JsNumber.h"
 #include "data/ChartExpansion.h"
 #include "ui/Widgets.h"
+#include "ui/Shell.h"
 
 #include <algorithm>
 #include <cctype>
@@ -1155,6 +1156,11 @@ RadiationTelemetry ComputeRadiationTelemetry(const Simulation& sim) {
   out.baseIntensity =
       std::clamp(0.18f + 0.48f * starProx + 0.36f * nebulaProx, 0.15f, 1.0f);
   out.warmBias = starProx / std::max(0.001f, starProx + nebulaProx);
+  for (const IndicatorLine& line : IndicatorLines(sim)) {
+    if (line.grow) {
+      out.alertLevel = std::max(out.alertLevel, std::clamp(line.pct, 0, 100) / 100.0f);
+    }
+  }
   return out;
 }
 

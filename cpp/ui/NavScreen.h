@@ -204,6 +204,7 @@ struct RadiationTelemetry {
   float waveDirY = 0.65f;
   float baseIntensity = 0.25f;   // [0..1] combined proximity baseline
   float warmBias = 0.65f;        // 1.0 solar amber <-> 0.0 nebula violet-cyan
+  float alertLevel = 0.0f;
 };
 
 RadiationTelemetry ComputeRadiationTelemetry(const Simulation& sim);
