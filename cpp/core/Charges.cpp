@@ -17,9 +17,9 @@ void Simulation::TickButtonCharges() {
     } else if (entry.first.find("press:room:fuel-split:") != std::string::npos ||
                entry.first.find("press:room:warp:") != std::string::npos) {
       if (charge.left < charge.volume) charge.refillClicks += 1;
-      if (charge.refillClicks >= 2) {
+      if (charge.refillClicks >= (entry.first.find("press:room:warp:") != std::string::npos ? 5 : 2)) {
         charge.left = std::min(charge.volume, charge.left + 1);
-        charge.refillClicks -= 2;
+        charge.refillClicks -= entry.first.find("press:room:warp:") != std::string::npos ? 5 : 2;
       }
     } else if (entry.first == kEngineButtonChargeKey && state_.engineerRun &&
                AssignedEngineer() != nullptr) {

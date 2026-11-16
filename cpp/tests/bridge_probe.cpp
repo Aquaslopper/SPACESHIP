@@ -23,25 +23,33 @@ int main() {
   for (int i=0;i<4;++i) {
     assert(ship::PressRoomAction(sim,"warp"));
     assert(sim.State().charges.at(key).left == 3-i);
-    assert(sim.StatValue("fuel") == 90-10*i);
+    assert(sim.StatValue("fuel") == 80-20*i);
   }
   assert(!ship::PressRoomAction(sim,"warp"));
   assert(sim.FindOngoing("bridge-probe-work")->left == 80);
   sim.MutableState().ongoing.clear();
   assert(sim.ActionCount() == count && sim.State().positiveClicks == 20);
-  assert(sim.State().fuelUsed == 40);
+  assert(sim.State().fuelUsed == 80);
   ship::PressWithoutCharge(sim,[&](){sim.PerformAction();return true;});
   assert(sim.State().charges.at(key).left == 0);
   auto loaded = ship::Simulation::NewVoyage(catalog);
   std::string error;
   if (!loaded.LoadJson(sim.SaveJson(),&error)) { std::cerr << error << "\n"; return 1; }
   assert(loaded.State().charges.at(key).refillClicks == 1);
-  assert(loaded.State().fuelUsed == 40 && loaded.State().positiveClicks == 20);
+  assert(loaded.State().fuelUsed == 80 && loaded.State().positiveClicks == 20);
+  for (int i=0;i<3;++i) {
+    ship::PressWithoutCharge(sim,[&](){sim.PerformAction();return true;});
+    assert(sim.State().charges.at(key).left == 0);
+  }
   ship::PressWithoutCharge(sim,[&](){sim.PerformAction();return true;});
   assert(sim.State().charges.at(key).left == 1);
-  sim.FindStat("fuel")->value = 9;
+  sim.FindStat("fuel")->value = 19;
   assert(!ship::PressRoomAction(sim,"warp"));
   assert(sim.State().charges.at(key).left == 1);
+  sim.ProAction(4);
+  assert(sim.State().charges.at(key).left == 1);
+  sim.ProAction(1);
+  assert(sim.State().charges.at(key).left == 2);
   auto split = ship::Simulation::NewVoyage(catalog);
   ship::OpenTask(split,"room","bridge",true);
   split.FindStat("energy")->value=10;
@@ -72,5 +80,5 @@ int main() {
   ship::Tab tab;tab.kind="room";tab.id="bridge";
   const auto screen=ship::BuildTabScreen(split,tab);
   assert(screen.panels.size()==4 && screen.panels[1].id=="bridge-totals" && screen.panels[2].id=="bridge-feed" && screen.panels[3].id=="bridge-course");
-  std::cout << "PASS: Bridge controls, four WARP uses / 40 fuel / 20 positive clicks, no self-refill, two-click quarter refills, cell requirements, persistence and information panels\n";
+  std::cout << "PASS: Bridge controls, four WARP uses / 80 fuel / 20 positive clicks, no self-refill, five-click WARP quarter refills, unchanged two-click split refills, cell requirements, persistence and information panels\n";
 }

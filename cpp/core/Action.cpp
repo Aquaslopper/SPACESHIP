@@ -285,8 +285,8 @@ void Simulation::ProAction(double n) {
         entry.first.find("press:room:warp:") != std::string::npos) {
       if (entry.first == pressedButton_) continue;
       if (charge.left < charge.volume) charge.refillClicks += n;
-      charge.left = std::min(charge.volume, charge.left + std::floor(charge.refillClicks / 2));
-      charge.refillClicks = charge.left == charge.volume ? 0 : std::fmod(charge.refillClicks, 2);
+      charge.left = std::min(charge.volume, charge.left + std::floor(charge.refillClicks / (entry.first.find("press:room:warp:") != std::string::npos ? 5 : 2)));
+      charge.refillClicks = charge.left == charge.volume ? 0 : std::fmod(charge.refillClicks, entry.first.find("press:room:warp:") != std::string::npos ? 5 : 2);
     } else {
       charge.left = std::min(charge.volume, charge.left + n);
     }

@@ -95,9 +95,9 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
     model.rows.push_back(split);
     ActionRowView warp;
     warp.id = "warp";
-    warp.label = "WARP: advance time +5 clicks for 10 fuel";
+    warp.label = "WARP: advance time +5 clicks for 20 fuel";
     warp.cost = "+5 Pro-Action";
-    warp.enabled = sim.StatValue("fuel") >= 10;
+    warp.enabled = sim.StatValue("fuel") >= 20;
     model.rows.push_back(warp);
     return model;
   }
@@ -217,11 +217,11 @@ bool PressRoomActionRaw(Simulation& sim, const std::string& action, const std::s
     return true;
   }
   if (action == "warp") {
-    if (sim.StatValue("fuel") < 10) return false;
-    sim.ClampStat("fuel", -10);
+    if (sim.StatValue("fuel") < 20) return false;
+    sim.ClampStat("fuel", -20);
     sim.MutableState().charges.at(ButtonChargeKey(sim, "press:room:warp:")).left -= 1;
     sim.ProAction(5);
-    sim.FreeCommit("WARP advanced work by 5 positive clicks for 10 fuel");
+    sim.FreeCommit("WARP advanced work by 5 positive clicks for 20 fuel");
     return true;
   }
   if (action == "fuel-split") {

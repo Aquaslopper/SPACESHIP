@@ -12,7 +12,7 @@ move 5 500
 open room bridge
 frames 3
 stat energy 30
-stat fuel 60
+stat fuel 100
 frames 3
 shot bridge-ready
 clickhit nav row | warp
@@ -31,4 +31,9 @@ shot bridge-one-refill-click
 clickhit nav row | fuel-split
 frames 3
 state
-shot bridge-quarter-refilled
+shot bridge-two-refill-clicks
+clickhit nav row | fuel-split
+frames 3
+clickhit nav row | fuel-split
+frames 3
+shot bridge-four-refill-clicks
