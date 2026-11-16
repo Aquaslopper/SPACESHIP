@@ -17,10 +17,11 @@ int main() {
     assert(sim.StartCookingSelf("", false));
     const auto before = nlohmann::ordered_json::parse(sim.SaveJson());
     const auto originalFields = sim.Ship().fields;
-    sim.MutableState().shiplets = 1;
+    const double price = std::stod(sim.World().shipFields.at(kind).at("price"));
+    sim.MutableState().shiplets = price;
     const auto market = ship::BuildStationScreen(sim, sim.Map().here);
     const auto* offer = ship::FindStationItem(market, "yard", "ship-buy:" + kind);
-    assert(offer && offer->enabled && offer->free && offer->commit == "Buy - 1 sh");
+    assert(offer && offer->enabled && offer->free && !offer->commit.empty());
     assert(ship::PressStationAction(sim, "ship-buy:" + kind));
     assert(sim.State().shipClass == kind && sim.State().shiplets == 0);
     assert(sim.CargoCapacity() == 20 && sim.Ship().Berths() == 6);
@@ -31,7 +32,7 @@ int main() {
     }
     assert(before["state"]["ongoing"] == after["state"]["ongoing"]);
     for (const auto& field : originalFields) {
-      if (field.first != "name" && field.first != "className") {
+      if (field.first != "name" && field.first != "className" && field.first != "price") {
         assert(sim.Ship().Get(field.first) == field.second);
       }
     }
@@ -46,7 +47,7 @@ int main() {
     assert(loaded.State().shipClass == kind && loaded.CargoCapacity() == 20);
     assert(&ship::ActivePlan(loaded) == &loaded.World().wren);
     assert(loaded.Rooms().size() == sim.Rooms().size());
-    loaded.MutableState().shiplets = 1500;
+    loaded.MutableState().shiplets = 4000;
     assert(loaded.BuyUpgrade("bay") && loaded.CargoCapacity() == 60);
     assert(loaded.BuyUpgrade("bay2") && loaded.CargoCapacity() == 90);
     loaded.MutableState().shiplets = 4000;
@@ -54,6 +55,6 @@ int main() {
     assert(loaded.State().shipClass == "kestrel");
     auto reference = ship::Simulation::ReferenceVoyage(catalog);
     assert(reference.ShipCargoCapacity(kind, 0) == reference.ShipCargoCapacity("wren", 0));
-    std::cout << "PASS: " << kind << " costs 1 shiplet; Wren stats, six berths, rooms/layout, ongoing work, refits and save/load retained\n";
+    std::cout << "PASS: " << kind << " uses listed price; Wren stats, six berths, rooms/layout, ongoing work, refits and save/load retained\n";
   }
 }

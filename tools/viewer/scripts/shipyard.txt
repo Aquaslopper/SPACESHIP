@@ -1,0 +1,38 @@
+# Both selected anime-inspired side elevations, bought through the shipyard controls.
+title 0
+frames 3
+clickhit title new-voyage
+frames 3
+clickhit title setup-pick-galaxy | gal-gen-9
+frames 3
+clickhit title setup-pick-system | sec-gen-205
+frames 3
+clickhit title setup-launch
+frames 400
+move 5 500
+textlog on
+open station st-gen-205
+frames 3
+clickhit nav station-cat:yard
+frames 3
+purse 500000
+clickhit nav station-item:ship-buy:cargo-spine
+frames 3
+shot shipyard-sell-park
+clickhit nav row | ship-disposition:park
+clickhit nav row | ship-buy:cargo-spine
+frames 3
+state
+shot shipyard-parked
+clickhit nav row | ship-buy:wren
+frames 3
+state
+clickhit nav station-item:ship-buy:cargo-bulk
+frames 3
+clickhit nav row | ship-disposition:sell
+frames 3
+shot shipyard-sell-selected
+clickhit nav row | ship-buy:cargo-bulk
+frames 3
+state
+shot shipyard-sold

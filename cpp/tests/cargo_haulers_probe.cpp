@@ -15,14 +15,14 @@ int main() {
   assert(sim.StartCookingSelf("", false));
   const auto before = nlohmann::ordered_json::parse(sim.SaveJson());
   const auto roomCount = sim.Rooms().size();
-  sim.MutableState().shiplets = 1;
+  sim.MutableState().shiplets = 16000;
   auto market = ship::BuildStationScreen(sim, sim.Map().here);
   for (const std::string kind : {"cargo-spine", "cargo-bulk"}) {
     const auto* row = ship::FindStationItem(market, "yard", "ship-buy:" + kind);
-    assert(row && row->free && row->enabled && row->commit == "Buy - 1 sh");
+    assert(row && row->free && row->enabled && !row->commit.empty());
   }
   assert(ship::PressStationAction(sim, "ship-buy:cargo-spine"));
-  assert(sim.State().shipClass == "cargo-spine" && sim.State().shiplets == 0);
+  assert(sim.State().shipClass == "cargo-spine" && sim.State().shiplets == 4000);
   assert(sim.CargoCapacity() == 120 && sim.Rooms().size() == roomCount);
   assert(ship::BuildCargoRoom(sim).shipLabel == "SC Cargo Spine");
   assert(!sim.BuyLargerShip("cargo-bulk"));
@@ -32,7 +32,7 @@ int main() {
     assert(before.at(key) == after.at(key));
   }
   assert(before["state"]["ongoing"] == after["state"]["ongoing"]);
-  sim.MutableState().shiplets = 1000;
+  sim.MutableState().shiplets = 17500;
   assert(sim.BuyUpgrade("bay"));
   assert(sim.CargoCapacity() == 180);
   assert(ship::PressStationAction(sim, "ship-buy:cargo-bulk"));
@@ -48,7 +48,7 @@ int main() {
   loaded.MutableGoods().front().vol = 250;
   assert(loaded.BuyLargerShip("cargo-spine"));
   assert(loaded.CargoCapacity() == 180 && loaded.CargoUsed() == 250);
-  loaded.MutableState().shiplets = 1000;
+  loaded.MutableState().shiplets = 2500;
   assert(loaded.BuyUpgrade("bay2"));
   assert(loaded.CargoCapacity() == 240);
   assert(loaded.BuyLargerShip("cargo-bulk"));
@@ -62,5 +62,5 @@ int main() {
   original.MutableState().shiplets = 4000;
   assert(original.BuyLargerShip());
   assert(original.State().shipClass == "kestrel" && original.State().shiplets == 0);
-  std::cout << "PASS: shipyard offers, 1-shiplet purchases, unchanged rooms/crew/cargo/stats, refits, ship switching, save/load, dock requirement and original Kestrel purchase\n";
+  std::cout << "PASS: shipyard offers, listed-price purchases, unchanged rooms/crew/cargo/stats, refits, ship switching, save/load, dock requirement and original Kestrel purchase\n";
 }

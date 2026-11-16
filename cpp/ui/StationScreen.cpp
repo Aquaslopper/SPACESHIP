@@ -9,7 +9,7 @@
 //    middle    only what the open card holds. Free to pick.
 //    right     everything about the one picked item, and its single button.
 //
-//    Market, Shipyard and crew   shiplets only, 0 actions, no click spent.
+//    Market, Shipyard   shiplets only, 0 actions, no click spent.
 //    Starmap                     free, and there is nothing to commit: the
 //                                station's page for its system, read planet
 //                                by planet.
@@ -38,16 +38,11 @@ const double kRepairKit = 50;
 const double kMedkit = 50;
 const double kCanister = 45;
 const double kRations = 80;
-const double kBayOne = 500;
-const double kBayTwo = 900;
-const double kDrive = 900;
-const double kRack = 900;
-const double kScanner = 600;
-const double kScannerTwo = 1100;
-const double kGalley = 400;
-const double kFilter = 600;
-const double kHullService = 520;
-const double kLargeShip = 4000;
+const double kBayOne = 1500;
+const double kBayTwo = 2500;
+const double kGalley = 3000;
+const double kFilter = 1500;
+const double kHullService = 500;
 
 const char* kFree = "0 clicks";
 const char* kOneAction = "1 click";
@@ -676,74 +671,42 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     board.rows.push_back(row);
   }
 
-  // ---- 6. the shipyard and crew -------------------------------------------
+  // ---- 6. the shipyard -------------------------------------------
   StationColumn yard;
   yard.id = "yard";
-  yard.title = "Shipyard and crew";
+  yard.title = "Shipyard";
   yard.badge = Num(purse) + " sh, hull " + Num(sim.StatValue("hull")) + "%";
-  yard.notes.push_back("Shiplets only: no click is spent and nothing is locked. A one-time "
-                       "refit, room or hire greys out once it is owned.");
-  if ((sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta" || sim.State().shipClass == "yamato" || sim.State().shipClass == "arcadia")) {
-    yard.notes.push_back(
-        "Your compact " + sim.Ship().Get("name") + ": " + Num(capacity) + " m3 cargo, 6 berths. Trade up to the "
-        "Kestrel-series SC Tessellate: " +
-        Num(sim.ShipCargoCapacity("kestrel", sim.CargoRefitLevel())) +
-        " m3 with your current refits, 14 berths, and a larger deck plan. The crew, "
-        "cargo, active work, equipment and all voyage records transfer; hull and "
-        "systems keep their condition.");
-    StationRow ship;
-    ship.id = "ship-buy";
-    ship.label = "Buy larger ship SC Tessellate - 4,000 sh";
-    ship.cost = kFree;
-    ship.free = true;
-    ship.commit = "Buy - 4,000 sh";
-    ship.enabled = purse >= kLargeShip;
-    ship.confirm =
-        "Buy SC Tessellate for 4,000 shiplets? The crew, cargo, equipment, refits, tasks "
-        "and voyage records transfer. This purchase is permanent.";
-    ship.details.push_back("Kestrel-series SC Tessellate: " +
-                           Num(sim.ShipCargoCapacity("kestrel", sim.CargoRefitLevel())) +
-                           " m3 with your refits, 14 berths, a larger deck plan.");
-    ship.details.push_back("Price: " + Num(kLargeShip) + " sh. Purse: " + Num(purse) + " sh.");
-    ship.details.push_back("Crew, cargo, active work, equipment, refits, condition and every "
-                           "voyage record transfer.");
-    ship.details.push_back("Permanent, and it costs no click: shiplets only.");
-    if (!ship.enabled) { ship.details.push_back("Not affordable from this purse."); }
-    yard.rows.push_back(ship);
-  } else if (sim.State().shipClass == "kestrel") {
-    yard.notes.push_back("Your Kestrel-series ship: " + Num(capacity) + " m3 cargo, " +
-                         Num(sim.Ship().Berths()) + " berths.");
-    StationRow ship;
-    ship.id = "ship-buy";
-    ship.label = "Buy larger ship SC Tessellate - 4,000 sh";
-    ship.cost = kDone;
-    ship.commit = "Owned";
-    ship.enabled = false;
-    ship.done = true;
-    ship.details.push_back("You are already flying the Kestrel-series SC Tessellate.");
-    ship.details.push_back("Hull: " + Num(capacity) + " m3 cargo, " + Num(sim.Ship().Berths()) +
-                           " berths.");
-    yard.rows.push_back(ship);
-  }
-
-  for (const std::string kind : {"cargo-spine", "cargo-bulk", "explorer-needle", "explorer-manta", "yamato", "arcadia"}) {
+  yard.notes.push_back("Shiplets only; no click spent. Choose sell or park before buying. Parked hulls can be switched here; crew, cargo, rooms, refits and condition transfer.");
+  for (const std::string kind : {"kestrel", "cargo-spine", "cargo-bulk", "explorer-needle", "explorer-manta", "yamato", "arcadia"}) {
     const auto& fields = sim.World().shipFields.at(kind);
+    const double price = std::stod(fields.at("price"));
+    const bool parked = std::find(sim.State().parkedShips.begin(), sim.State().parkedShips.end(), kind) != sim.State().parkedShips.end();
+    const double resale = sim.State().sellCurrentShip && !parked
+        ? std::stod(sim.World().shipFields.at(sim.State().shipClass).at("price")) / 3.0 : 0;
     StationRow ship;
     ship.id = "ship-buy:" + kind;
     ship.label = fields.at("name") +
-        (kind == "yamato" || kind == "arcadia" ? " - anime ship - 1 sh" :
-         kind == "explorer-needle" || kind == "explorer-manta" ? " - explorer - 1 sh" : " - cargo hauler - 1 sh");
+        (kind == "yamato" || kind == "arcadia" ? " - anime ship" :
+         kind == "explorer-needle" || kind == "explorer-manta" ? " - explorer" :
+         kind == "cargo-spine" || kind == "cargo-bulk" ? " - cargo hauler" : "") +
+        (parked ? " - parked" : " - " + Num(price) + " sh");
     ship.free = true;
     ship.done = sim.State().shipClass == kind;
-    ship.enabled = !ship.done && purse >= 1;
+    ship.enabled = !ship.done && purse + resale >= (parked ? 0 : price);
     ship.cost = ship.done ? kDone : kFree;
-    ship.commit = ship.done ? "Owned" : "Buy - 1 sh";
-    ship.confirm = "Buy " + fields.at("name") + " for 1 shiplet? Crew, installed rooms, cargo, "
-                   "equipment, refits, tasks and condition transfer unchanged.";
-    ship.details.push_back(Num(sim.ShipCargoCapacity(kind, sim.CargoRefitLevel())) +
-                           " m3 cargo with current refits. Same installed rooms; " +
-                           fields.at("berths") + " berths.");
-    ship.details.push_back("Cargo is retained even when switching to a smaller hold.");
+    ship.commit = ship.done ? "Owned" : parked ? "Switch to parked ship" : "Buy - " + Num(price) + " sh";
+    ship.details.push_back(Num(sim.ShipCargoCapacity(kind, sim.CargoRefitLevel())) + " m3 cargo; " + fields.at("berths") + " berths.");
+    ship.details.push_back("Crew, cargo, rooms, refits, tasks and condition transfer.");
+    yard.rows.push_back(ship);
+  }
+  for (const std::string& kind : sim.State().parkedShips) {
+    if (kind != "wren") continue;
+    StationRow ship;
+    ship.id = "ship-buy:wren";
+    ship.label = sim.World().shipFields.at(kind).at("name") + " - parked";
+    ship.commit = "Switch to parked ship";
+    ship.free = true;
+    ship.enabled = true;
     yard.rows.push_back(ship);
   }
 
@@ -766,8 +729,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     } else {
       row.cost = kFree;
       row.free = true;
-      row.commit = id == "scanner2" ? "Buy - 1,100 sh"
-                                    : "Buy - " + Num(price) + " sh";
+      row.commit = "Buy - " + Num(price) + " sh";
       row.enabled = available && purse >= price;
       row.details.push_back("Shiplets only: no click spent.");
       if (!row.enabled) {
@@ -777,44 +739,35 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     }
     yard.rows.push_back(row);
   };
-  upgrade("bay", "Expand cargo hold to " + Num(bay1) + " m3 - 500 sh",
+  upgrade("bay", "Expand cargo hold to " + Num(bay1) + " m3 - 1500 sh",
           "Cargo refit 1: the hold grows to " + Num(bay1) + " m3.", kBayOne, true,
           Owned(sim, "bay"));
-  upgrade("bay2", "Expand cargo hold to " + Num(bay2) + " m3 - 900 sh",
+  upgrade("bay2", "Expand cargo hold to " + Num(bay2) + " m3 - 2500 sh",
           "Cargo refit 2: the hold grows to " + Num(bay2) + " m3. Needs refit 1 first.", kBayTwo,
           Owned(sim, "bay"), Owned(sim, "bay2"));
-  upgrade("drive", "Fit efficient drive: fuel use -20% - 900 sh",
-          "Efficient drive: every crossing burns a fifth less fuel.", kDrive, true,
-          Owned(sim, "drive"));
-  upgrade("rack", "Expand O2 rack to 15 - 400 sh",
-          "O2 rack expansion: the canister rack holds 15.", kRack, true, Owned(sim, "rack"));
-  upgrade("galley", "Expand galley rack to 34 - 400 sh",
+
+
+  upgrade("galley", "Expand galley rack to 34 - 3000 sh",
           "Galley refit: the counter holds 34 instead of 24, so the cook can keep a "
           "round and a half ahead of the crew.",
           kGalley, true, Owned(sim, "galley"));
-  upgrade("filter", "Re-sleeve filter cores: a charge holds 300 clicks - 600 sh",
+  upgrade("filter", "Re-sleeve filter cores: a charge holds 300 clicks - 1500 sh",
           "Filter refit: one bank charge lasts 300 clicks instead of 200.",
           kFilter, true, Owned(sim, "filter"));
-  upgrade("scanner", "Upgrade sensors: scans take 3 + regional lock - 600 sh",
-          "Sensor upgrade: a scan costs 3 clicks and the first locked entry opens, with "
-          "deep scans inside this region.",
-          kScanner, true, Owned(sim, "scanner"));
-  upgrade("scanner2", "Fit deep-array sensors: full unlock + deep-region scans - 1,100 sh",
-          "Deep array: every locked survey entry opens, deep scans reach any region, and "
-          "survey data is worth a quarter more. Needs the sensor upgrade first.",
-          kScannerTwo, Owned(sim, "scanner"), Owned(sim, "scanner2"));
+
+
   {
     const double hull = sim.StatValue("hull");
     StationRow row;
     row.id = "hull-service";
-    row.label = "Station hull service (+50%) - 120 sh";
+    row.label = "Station hull service (+5%) - 500 sh";
     row.cost = kFree;
     row.free = true;
     row.commit = "Buy service - " + Num(kHullService) + " sh";
     row.enabled = hull < 100 && purse >= kHullService;
-    row.details.push_back("The yard patches the hull for half again its condition.");
+    row.details.push_back("The yard restores 5 percentage points of hull.");
     row.details.push_back("Hull now: " + Num(hull) + "%. After service: " +
-                          Num(std::min(100.0, hull + 50.0)) + "%.");
+                          Num(std::min(100.0, hull + 5.0)) + "%.");
     row.details.push_back("Price: " + Num(kHullService) + " sh. Purse: " + Num(purse) + " sh.");
     row.details.push_back("Repeatable while the hull is short and the purse allows it; it "
                           "costs no click.");
@@ -825,33 +778,17 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     yard.rows.push_back(row);
   }
 
-  {
-    StationRow heading;
-    heading.label = "Optional rooms - 500 sh each";
-    heading.reading = true;
-    yard.rows.push_back(heading);
-    const DeckPlan& plan = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta" || sim.State().shipClass == "yamato" || sim.State().shipClass == "arcadia") ? sim.World().wren : sim.World().kestrel;
-    for (const Room& room : plan.rooms) {
-      if (Simulation::StandardRoom(room.id) || sim.HasRoom(room.id)) continue;
-      StationRow row;
-      row.id = "room-buy:" + room.id;
-      row.label = "Install " + room.name + " - 500 sh";
-      row.cost = kFree;
-      row.free = true;
-      row.commit = "Install - " + Num(Simulation::RoomPrice()) + " sh";
-      row.enabled = model.docked && purse >= Simulation::RoomPrice();
-      row.confirm = "Install " + room.name + " for 500 shiplets?";
-      row.details.push_back("Optional room: " + room.name + ".");
-      if (!room.tag.empty()) { row.details.push_back("Fitted as: " + room.tag + "."); }
-      row.details.push_back("Price: " + Num(Simulation::RoomPrice()) +
-                            " sh, added to the deck plan of the ship you are flying.");
-      row.details.push_back("Purse: " + Num(purse) + " sh. Shiplets only: no click.");
-      if (!row.enabled) { row.details.push_back("Needs a dock at this station and the price."); }
-      yard.rows.push_back(row);
-    }
+  for (const std::string service : {"repair-hull", "tank-fuel", "maintenance"}) {
+    const double price = service == "repair-hull" ? 100 : service == "tank-fuel" ? 50 : 250;
+    StationRow row;
+    row.id = service;
+    row.label = service == "repair-hull" ? "Repair hull (+10%) - 100 sh" : service == "tank-fuel" ? "Tank fuel (+10%) - 50 sh" : "Ship maintenance: energy and shield to 100% - 250 sh";
+    row.commit = "Buy - " + Num(price) + " sh";
+    row.details.push_back(row.label);
+    row.free = true;
+    row.enabled = purse >= price;
+    yard.rows.push_back(row);
   }
-
-
 
   // ---- 7. the tavern / bar -------------------------------------------------
   StationColumn tavern;
@@ -1026,6 +963,8 @@ bool PressStationActionRaw(Simulation& sim, const std::string& action,
   if (action.compare(0, 5, "hire:") == 0) return sim.HireCrew(action.substr(5));
   if (action.compare(0, 8, "upgrade:") == 0) return sim.BuyUpgrade(action.substr(8));
   if (action == "ship-buy") return sim.BuyLargerShip();
+  if (action == "ship-buy:kestrel") return sim.BuyLargerShip("kestrel");
+  if (action == "ship-buy:wren") return sim.BuyLargerShip("wren");
   if (action == "ship-buy:cargo-spine") return sim.BuyLargerShip("cargo-spine");
   if (action == "ship-buy:cargo-bulk") return sim.BuyLargerShip("cargo-bulk");
   if (action == "ship-buy:explorer-needle") return sim.BuyLargerShip("explorer-needle");
@@ -1038,11 +977,24 @@ bool PressStationActionRaw(Simulation& sim, const std::string& action,
   }
   if (action == "commission-collect") return sim.CollectCommission();
   if (action == "commission-abandon") return sim.AbandonCommission();
+  if (action == "repair-hull" || action == "tank-fuel" || action == "maintenance") {
+    const double price = action == "repair-hull" ? 100 : action == "tank-fuel" ? 50 : 250;
+    if (!sim.State().docked || sim.State().shiplets < price) return false;
+    sim.MutableState().shiplets -= price;
+    if (action == "repair-hull") sim.ClampStat("hull", 10);
+    if (action == "tank-fuel") sim.ClampStat("fuel", 10);
+    if (action == "maintenance") {
+      sim.ClampStat("energy", 100 - sim.StatValue("energy"));
+      sim.ClampStat("shield", 100 - sim.StatValue("shield"));
+    }
+    sim.FreeCommit("Shipyard service completed");
+    return true;
+  }
   if (action == "hull-service") {
     if (sim.State().gameOver.size() != 0 || !sim.State().docked) return false;
     if (sim.StatValue("hull") >= 100 || sim.State().shiplets < kHullService) return false;
     sim.MutableState().shiplets -= kHullService;
-    sim.ClampStat("hull", 50);
+    sim.ClampStat("hull", 5);
     sim.FreeCommit("Station repaired the hull");
     return true;
   }
@@ -1108,6 +1060,10 @@ bool PressStationAction(Simulation& sim, const std::string& action, const std::s
   // The shop, the shipyard and a hire are paid in shiplets: money is their whole
   // gate, so they hold no clicks and start no green. A trade confirmation and
   // every other commit row is one click of the clock, like the rest of the ship.
+  if (action == "ship-disposition:sell" || action == "ship-disposition:park") {
+    sim.MutableState().sellCurrentShip = action == "ship-disposition:sell";
+    return true;
+  }
   const StationScreenModel model = BuildStationScreen(sim, sim.Map().here);
   const StationRow* row = FindStationRowById(model, action);
   if (row != nullptr && row->free) {
