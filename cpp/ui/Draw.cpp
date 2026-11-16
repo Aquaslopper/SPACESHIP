@@ -466,6 +466,7 @@ void ShellView::ResetContentScroll() { contentScroll_ = 0.0f; }
 
 void ShellView::Draw(Simulation& sim, double nowMs) {
   frameTimeMs_ = nowMs;
+  if (!titleActive_ && !splashActive_) sim.MutableState().playedSeconds += GetFrameTime();
   const float contentH = height_ - Metrics::kContentTop - Metrics::kStatusH;
   layout_ = ComputeLayout(width_, height_, contentH, others_, theme_.stageCompact);
 
@@ -7471,6 +7472,50 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
   const float searchTop = layout_.content.y + headerH + 8.0f;
   PaintWikiSearch(Area{layout_.content.x, searchTop, layout_.content.w, 0.0f});
   float top = searchTop + (panelsKind_ == ScreenKind::Wiki ? 38.0f : 0.0f);
+  if (screen.panels.size() == 3 && screen.panels.front().id == "bridge-controls") {
+    const float gap = 24.0f;
+    const float controlW = (right - left - 2 * gap) * 0.23f;
+    const float imageX = left + controlW + gap;
+    const float imageW = right - left - 2 * controlW - 2 * gap;
+    const float imageTop = top + 48.0f;
+    const float heroH = imageW * 0.64f;
+    float buttonH = 48.0f;
+    for (const CommandRowView& row : screen.panelRows[0]) {
+      buttonH = std::max(buttonH, WrapText(row.label, controlW - 20.0f, TypePx(10), SelectFont(TypePx(10), false)).size() * theme_.LineHeight() + 16.0f);
+    }
+    PaintChamferBoxRay(Area{imageX, imageTop, imageW, heroH}, kChamferPanel, ToRay(p.panel), ToRay(p.borderDark), ToRay(p.border));
+    const Texture2D* image = static_cast<const Texture2D*>(bridgeArt);
+    if (image != nullptr && image->id != 0) {
+      const float scale = std::min((imageW - 12) / image->width, (heroH - 12) / image->height);
+      const float w = image->width * scale;
+      const float h = image->height * scale;
+      DrawTexturePro(*image, Rectangle{0, 0, static_cast<float>(image->width), static_cast<float>(image->height)},
+                     Rectangle{imageX + (imageW - w) / 2, imageTop + (heroH - h) / 2, w, h}, Vector2{0, 0}, 0, WHITE);
+    }
+    const float y = imageTop + heroH - buttonH - 16.0f;
+    for (std::size_t r = 0; r < screen.panelRows[0].size(); ++r) {
+      const CommandRowView& row = screen.panelRows[0][r];
+      const auto lines = WrapText(row.label, controlW - 20.0f, TypePx(10), SelectFont(TypePx(10), false));
+      const Area box{r == 0 ? left : imageX + imageW + gap, y, controlW, buttonH};
+      FillChamferRay(box, kChamferCard, ToRay(row.enabled ? p.control : p.panel3));
+      if (row.charged) PaintProgressFill(box, row.chargePercent, p, kChamferCard);
+      PaintChamferDoubleLinesRay(box, kChamferCard, ToRay(p.borderDark), ToRay(p.border));
+      float textY = y + 8.0f;
+      for (const std::string& line : lines) {
+        Text(line.c_str(), static_cast<int>(box.x + 10.0f), static_cast<int>(textY), TypePx(10), ToRay(row.enabled ? p.ink : p.muted));
+        textY += theme_.LineHeight();
+      }
+      if (row.enabled) navHits_.push_back(NavHit{box, "row", screen.panelRowIds[0][r]});
+    }
+    const float rightW = (right - left) * 0.29f;
+    const float rightX = right - rightW;
+    const float bottomTop = imageTop + heroH + 40.0f;
+    const float panelH = std::max(280.0f, MeasurePanelHeight(screen.panels[1], rightW));
+    PaintPanel(screen.panels[2], Area{left, bottomTop, rightX - 16.0f - left, panelH});
+    PaintPanel(screen.panels[1], Area{rightX, bottomTop, rightW, panelH});
+    contentPaintBottom_ = std::max(contentPaintBottom_, bottomTop + panelH);
+    return;
+  }
   if (screen.hasHero) {
     PaintHero(screen.hero, Area{left, top, right - left, screen.hero.hero.h});
     top += screen.hero.hero.h + 8.0f;

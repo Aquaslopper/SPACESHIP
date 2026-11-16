@@ -217,6 +217,8 @@ int main(int argc, char** argv) {
   selectImGuiFont(sim.State().options.fontStep, sim.State().options.largeText);
   ship::ui::ApplyPalette(theme);
 
+  Texture2D bridgeTexture = LoadTexture("assets/art/rooms/bridge.png");
+  SetTextureFilter(bridgeTexture, TEXTURE_FILTER_BILINEAR);
   Texture2D titleTexture = LoadTexture("assets/art/title.jpg");
   if (titleTexture.id != 0) { SetTextureFilter(titleTexture, TEXTURE_FILTER_BILINEAR); }
   Texture2D setupTexture = LoadTexture("assets/art/setupscreen.png");
@@ -255,6 +257,7 @@ int main(int argc, char** argv) {
   ship::ShellView shell;
   shell.SetSaveDir(saveDir.u8string());
   shell.SetFonts(fonts.body, fonts.bold, fonts.mono);
+  shell.bridgeArt = &bridgeTexture;
   shell.SetTitleTexture(&titleTexture);
   shell.SetSetupTexture(&setupTexture);
   shell.SetSplashTexture(&splashTexture);
@@ -700,6 +703,7 @@ int main(int argc, char** argv) {
     std::fflush(stdout);
   }
 
+  UnloadTexture(bridgeTexture);
   rlImGuiShutdown();
   CloseWindow();
   if (problems > 0) { std::printf("viewer: %d script line(s) could not be carried out\n", problems); }

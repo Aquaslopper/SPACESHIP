@@ -275,12 +275,21 @@ void Simulation::TickWorld() {
 }
 
 void Simulation::ProAction(double n) {
+  state_.positiveClicks += n;
   AdvanceTasks(n);
   for (auto& entry : state_.charges) {
     if (entry.first.find("|command:hold:0") != std::string::npos ||
         entry.first.find("|command:change-course:0") != std::string::npos) { continue; }
     Charge& charge = entry.second;
-    charge.left = std::min(charge.volume, charge.left + n);
+    if (entry.first.find("press:room:fuel-split:") != std::string::npos ||
+        entry.first.find("press:room:warp:") != std::string::npos) {
+      if (entry.first == pressedButton_) continue;
+      if (charge.left < charge.volume) charge.refillClicks += n;
+      charge.left = std::min(charge.volume, charge.left + std::floor(charge.refillClicks / (entry.first.find("press:room:warp:") != std::string::npos ? 5 : 2)));
+      charge.refillClicks = charge.left == charge.volume ? 0 : std::fmod(charge.refillClicks, entry.first.find("press:room:warp:") != std::string::npos ? 5 : 2);
+    } else {
+      charge.left = std::min(charge.volume, charge.left + n);
+    }
   }
 }
 
@@ -303,6 +312,7 @@ void Simulation::ClampStat(const std::string& id, double delta) {
   if (stat == nullptr) { return; }
   const double before = stat->value;
   stat->value = std::max(0.0, std::min(100.0, stat->value + delta));
+  if (id == "fuel" && stat->value < before) state_.fuelUsed += before - stat->value;
 
   if (id == "energy" && before > 0 && stat->value == 0) {
     LogLine("Power exhausted. The filter bank has stopped; restore energy to restart it.");

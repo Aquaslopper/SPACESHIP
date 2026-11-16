@@ -117,18 +117,21 @@ bool Simulation::BuySupply(const std::string& id) {
 
   if (id == "fuel-cell" && state_.shiplets >= 45) {
     state_.shiplets -= 45;
+    state_.moneySpent += 45;
     state_.fuelCells += 1;
     FreeCommit("Fuel cell purchased");
     return true;
   }
   if (id == "repair-kit" && state_.shiplets >= 70) {
     state_.shiplets -= 70;
+    state_.moneySpent += 70;
     state_.repairKits += 1;
     FreeCommit("Repair kit purchased");
     return true;
   }
   if (id == "medkit" && state_.shiplets >= 50) {
     state_.shiplets -= 50;
+    state_.moneySpent += 50;
     state_.medkits += 1;
     FreeCommit("Medkit purchased");
     return true;
@@ -136,6 +139,7 @@ bool Simulation::BuySupply(const std::string& id) {
   if (id == "canister" && state_.shiplets >= 25 && life_.canisters < life_.capacity &&
       FindOngoing("project-oxygen") == nullptr) {
     state_.shiplets -= 25;
+    state_.moneySpent += 25;
     life_.canisters += 1;
     FreeCommit("O2 canister purchased");
     return true;
@@ -144,6 +148,7 @@ bool Simulation::BuySupply(const std::string& id) {
       mess_.rations <= mess_.rationCapacity - 6 &&
       FindOngoing("project-food") == nullptr) {
     state_.shiplets -= 20;
+    state_.moneySpent += 20;
     mess_.rations += 4;  // dry rations go in the larder; the galley cooks them
     FreeCommit("Rations purchased");
     return true;
@@ -173,6 +178,7 @@ bool Simulation::BuyGood(const std::string& goodId) {
   if (CargoUsed() + CargoReserved() + good->vol > cargo_.capacity) { return false; }
 
   state_.shiplets -= price;
+  state_.moneySpent += price;
   state_.lotSerial += 1;
   GoodsLot lot = probe;
   lot.id = "lot-" + js::NumToString(state_.lotSerial);
@@ -412,6 +418,7 @@ bool Simulation::HireCrew(const std::string& candidateId) {
   if (state_.shiplets < candidate->fee) { return false; }
 
   state_.shiplets -= candidate->fee;
+  state_.moneySpent += candidate->fee;
   state_.hired[candidateId] = true;
   crew_.push_back(MakeCrew(candidate->crew));
   for (const CandidateDefinition& hand : HandsHere()) {
@@ -1003,6 +1010,8 @@ bool Simulation::SettleTrade(const std::string& mode, const std::string& to,
     }
   }
 
+  if (mode == "station") state_.completedTrades += 1;
+  else state_.completedFreelance += 1;
   state_.shiplets += TradeOfferPayout(trade, priceTier);
   state_.freelanceRejects.erase(tradeKey);
   state_.spentTrades[tradeKey] = true;
@@ -1103,6 +1112,7 @@ bool Simulation::BuyUpgrade(const std::string& upgradeId) {
   if (upgradeId == "bay" && !Truthy(state_.upgrades, "bay") && state_.shiplets >= 1500) {
     const double capacity = ShipCargoCapacity(className, 1);
     state_.shiplets -= 1500;
+    state_.moneySpent += 1500;
     state_.upgrades["bay"] = true;
     cargo_.capacity = std::max(cargo_.capacity, capacity);
     FreeCommit("Cargo hold expanded");
@@ -1112,6 +1122,7 @@ bool Simulation::BuyUpgrade(const std::string& upgradeId) {
       state_.shiplets >= 2500) {
     const double capacity = ShipCargoCapacity(className, 2);
     state_.shiplets -= 2500;
+    state_.moneySpent += 2500;
     state_.upgrades["bay2"] = true;
     cargo_.capacity = std::max(cargo_.capacity, capacity);
     FreeCommit("Cargo hold enlarged again");
@@ -1121,6 +1132,7 @@ bool Simulation::BuyUpgrade(const std::string& upgradeId) {
 
   if (upgradeId == "galley" && !Truthy(state_.upgrades, "galley") && state_.shiplets >= 3000) {
     state_.shiplets -= 3000;
+    state_.moneySpent += 3000;
     state_.upgrades["galley"] = true;
     // The ceiling is what the cook fills to, so a bigger rack is a deeper buffer
     // between the crew and the starve line, not a faster kitchen.
@@ -1130,6 +1142,7 @@ bool Simulation::BuyUpgrade(const std::string& upgradeId) {
   }
   if (upgradeId == "filter" && !Truthy(state_.upgrades, "filter") && state_.shiplets >= 1500) {
     state_.shiplets -= 1500;
+    state_.moneySpent += 1500;
     state_.upgrades["filter"] = true;
     // `lifeMax` is the length of one charge in clicks, and every reader of it -
     // the bank, the O2 screen, the save - reads it from here.
@@ -1141,6 +1154,7 @@ bool Simulation::BuyUpgrade(const std::string& upgradeId) {
 
   if (upgradeId == "hull" && StatValue("hull") < 100 && state_.shiplets >= 500) {
     state_.shiplets -= 500;
+    state_.moneySpent += 500;
     ClampStat("hull", 5);
     FreeCommit("Station repaired the hull");
     return true;

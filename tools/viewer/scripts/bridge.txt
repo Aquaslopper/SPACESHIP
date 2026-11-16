@@ -1,0 +1,39 @@
+title 0
+frames 3
+clickhit title new-voyage
+frames 3
+clickhit title setup-pick-galaxy | gal-gen-9
+frames 3
+clickhit title setup-pick-system | sec-gen-205
+frames 3
+clickhit title setup-launch
+frames 400
+move 5 500
+open room bridge
+frames 3
+stat energy 30
+stat fuel 100
+frames 3
+shot bridge-ready
+clickhit nav row | warp
+frames 3
+clickhit nav row | warp
+frames 3
+clickhit nav row | warp
+frames 3
+clickhit nav row | warp
+frames 3
+state
+shot bridge-warp-empty
+clickhit nav row | fuel-split
+frames 3
+shot bridge-one-refill-click
+clickhit nav row | fuel-split
+frames 3
+state
+shot bridge-two-refill-clicks
+clickhit nav row | fuel-split
+frames 3
+clickhit nav row | fuel-split
+frames 3
+shot bridge-four-refill-clicks

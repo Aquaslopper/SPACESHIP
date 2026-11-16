@@ -149,6 +149,12 @@ std::string Simulation::SaveJson() const {
   s["popups"] = Num(state_.popups);
   s["reducedMotion"] = state_.reducedMotion;
   s["shipClass"] = state_.shipClass;
+  s["playedSeconds"] = Num(state_.playedSeconds);
+  s["moneySpent"] = Num(state_.moneySpent);
+  s["fuelUsed"] = Num(state_.fuelUsed);
+  s["positiveClicks"] = Num(state_.positiveClicks);
+  s["completedTrades"] = Num(state_.completedTrades);
+  s["completedFreelance"] = Num(state_.completedFreelance);
   s["parkedShips"] = state_.parkedShips;
   s["previousShip"] = state_.previousShip;
 
@@ -222,7 +228,8 @@ std::string Simulation::SaveJson() const {
   Json charges = Json::object();
   for (const auto& entry : state_.charges) {
     charges[entry.first] = Json{{"left", Num(entry.second.left)},
-                                {"volume", Num(entry.second.volume)}};
+                                {"volume", Num(entry.second.volume)},
+                                {"refillClicks", Num(entry.second.refillClicks)}};
   }
   s["charges"] = charges;
 
@@ -1056,6 +1063,12 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     state_.popups = GetNumber(s, "popups");
     state_.reducedMotion = GetBool(s, "reducedMotion");
     state_.shipClass = GetString(s, "shipClass", "wren");
+    state_.playedSeconds = GetNumber(s, "playedSeconds", 0);
+    state_.moneySpent = GetNumber(s, "moneySpent", 0);
+    state_.fuelUsed = GetNumber(s, "fuelUsed", 0);
+    state_.positiveClicks = GetNumber(s, "positiveClicks", 0);
+    state_.completedTrades = GetNumber(s, "completedTrades", 0);
+    state_.completedFreelance = GetNumber(s, "completedFreelance", 0);
     state_.parkedShips = s.value("parkedShips", std::vector<std::string>{});
     state_.previousShip = s.value("previousShip", std::string{});
     state_.medkits = GetNumber(s, "medkits", 2);
@@ -1160,6 +1173,7 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
         Charge charge;
         charge.left = GetNumber(entry.value(), "left");
         charge.volume = GetNumber(entry.value(), "volume");
+        charge.refillClicks = GetNumber(entry.value(), "refillClicks", 0);
         state_.charges[entry.key()] = charge;
       }
     }

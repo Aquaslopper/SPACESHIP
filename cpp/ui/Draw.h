@@ -59,6 +59,7 @@ class ShellView {
     boldFont_ = bold;
     monoFont_ = mono;
   }
+  void* bridgeArt = nullptr;
   void SetTitleTexture(void* texture) { titleArt_ = texture; }
   void SetSetupTexture(void* texture) { setupArt_ = texture; }
   void SetSplashTexture(void* texture) { splashArt_ = texture; }

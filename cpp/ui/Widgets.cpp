@@ -971,6 +971,53 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       screen.progress = room.buttons;
       screen.hero = BuildVignette(sim, tab.id);
       screen.hasHero = true;
+      if (tab.id == "bridge") {
+        screen.panels.clear();
+        NavPanel controls;
+        controls.id = "bridge-controls";
+        controls.title = "Flight and watch control";
+        screen.panels.push_back(controls);
+        NavPanel totals;
+        totals.id = "bridge-totals";
+        totals.title = "Voyage information";
+        totals.Field("Time played", Num(std::floor(sim.State().playedSeconds)) + " seconds");
+        totals.Field("Clicks", Num(sim.ActionCount()));
+        totals.Field("Positive clicks", Num(sim.State().positiveClicks));
+        totals.Field("Money spent", Num(sim.State().moneySpent) + " sh");
+        totals.Field("Fuel used", Num(sim.State().fuelUsed) + "%");
+        totals.Field("Trades completed", Num(sim.State().completedTrades));
+        totals.Field("Freelance completed", Num(sim.State().completedFreelance));
+        screen.panels.push_back(totals);
+        NavPanel feed;
+        feed.id = "bridge-feed";
+        feed.title = "Active feed - latest 4 entries";
+        for (auto it = sim.State().feed.rbegin(); it != sim.State().feed.rend() && feed.lines.size() < 4; ++it) {
+          feed.Note(it->stamp + " " + it->text);
+        }
+        screen.panels.push_back(feed);
+        NavPanel course;
+        course.id = "bridge-course";
+        course.title = "Current location / course and alerts";
+        const Body* here = sim.FindBodyById(sim.Map().here);
+        course.Field("Location", here == nullptr ? sim.Map().here : here->name);
+        course.Field("Position", sim.InSpace() ? "In space" : sim.State().docked ? "Docked" : "Undocked");
+        const Task* travel = sim.FindOngoing("travel");
+        const Body* target = travel != nullptr ? sim.FindBodyById(travel->target) :
+            sim.State().navTarget ? sim.FindBodyById(*sim.State().navTarget) : nullptr;
+        course.Field("Course", target == nullptr ? "No course plotted" : target->name);
+        if (travel != nullptr) course.Field("Remaining", Num(travel->left) + " clicks");
+        if (sim.Events().empty()) course.Note("No active alerts");
+        for (const Incident& event : sim.Events()) {
+          for (const IncidentType& type : sim.World().incidentTypes) {
+            if (type.id != event.type) continue;
+            course.Sub(type.title);
+            if (event.stage >= 0 && event.stage < static_cast<int>(type.stages.size())) course.Note(type.stages[event.stage].text);
+          }
+        }
+        screen.panels[1].Sub("");
+        screen.panels[1].Sub(course.title);
+        screen.panels[1].lines.insert(screen.panels[1].lines.end(), course.lines.begin(), course.lines.end());
+      }
       return screen;
     }
     case ScreenKind::Wiki: {

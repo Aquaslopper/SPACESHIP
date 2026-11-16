@@ -210,6 +210,7 @@ bool Simulation::CommitOrders() {
   orderSheets_.clear();
   state_.pendingOrders.clear();
   state_.shiplets -= fee;
+  state_.moneySpent += fee;
 
   for (const auto& entry : sheet) { ClearOngoing("cw-" + entry.first); }
 

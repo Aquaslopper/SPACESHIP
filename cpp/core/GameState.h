@@ -171,6 +171,7 @@ struct Options {
 struct Charge {
   double volume = 0.0;
   double left = 0.0;
+  double refillClicks = 0.0;
 };
 
 struct FeedLine {
@@ -286,6 +287,12 @@ struct Passenger {
 
 struct GameState {
   double medkits = 2;
+  double playedSeconds = 0;
+  double moneySpent = 0;
+  double fuelUsed = 0;
+  double positiveClicks = 0;
+  double completedTrades = 0;
+  double completedFreelance = 0;
 
   bool reducedMotion = false;
   std::string shipClass = "wren";
