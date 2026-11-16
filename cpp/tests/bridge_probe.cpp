@@ -81,7 +81,10 @@ int main() {
   for (int i=0;i<12;++i) split.FreeCommit("Bridge feed clamp probe " + std::to_string(i));
   const auto storedFeedSize = split.State().feed.size();
   const auto screen=ship::BuildTabScreen(split,tab);
-  assert(screen.panels.size()==4 && screen.panels[1].id=="bridge-totals" && screen.panels[2].id=="bridge-feed" && screen.panels[3].id=="bridge-course");
+  assert(screen.panels.size()==3 && screen.panels[1].id=="bridge-totals" && screen.panels[2].id=="bridge-feed");
+  bool hasLocation = false;
+  for (const auto& line : screen.panels[1].lines) if (line.key == "Location") hasLocation = true;
+  assert(hasLocation);
   assert(screen.panels[2].lines.size() == 4);
   assert(screen.panels[2].lines.front().value.find("Bridge feed clamp probe 11") != std::string::npos);
   assert(split.State().feed.size() == storedFeedSize && storedFeedSize > 4);

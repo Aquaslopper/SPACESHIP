@@ -1014,7 +1014,9 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
             if (event.stage >= 0 && event.stage < static_cast<int>(type.stages.size())) course.Note(type.stages[event.stage].text);
           }
         }
-        screen.panels.push_back(course);
+        screen.panels[1].Sub("");
+        screen.panels[1].Sub(course.title);
+        screen.panels[1].lines.insert(screen.panels[1].lines.end(), course.lines.begin(), course.lines.end());
       }
       return screen;
     }
