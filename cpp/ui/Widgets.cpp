@@ -990,8 +990,8 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         screen.panels.push_back(totals);
         NavPanel feed;
         feed.id = "bridge-feed";
-        feed.title = "Active feed";
-        for (auto it = sim.State().feed.rbegin(); it != sim.State().feed.rend(); ++it) {
+        feed.title = "Active feed - latest 4 entries";
+        for (auto it = sim.State().feed.rbegin(); it != sim.State().feed.rend() && feed.lines.size() < 4; ++it) {
           feed.Note(it->stamp + " " + it->text);
         }
         screen.panels.push_back(feed);

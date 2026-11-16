@@ -7474,19 +7474,30 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
   float top = searchTop + (panelsKind_ == ScreenKind::Wiki ? 38.0f : 0.0f);
   if (screen.panels.size() == 4 && screen.panels.front().id == "bridge-controls") {
     const float gap = 8.0f;
-    const float leftW = (right - left - gap) * 0.64f;
-    const float rightX = left + leftW + gap;
-    const float rightW = right - rightX;
+    const float leftW = (right - left - 2 * gap) * 0.29f;
+    const float rightW = leftW;
+    const float rightX = right - rightW;
+    const float imageX = left + leftW + gap;
+    const float imageW = rightX - gap - imageX;
     const float totalsH = MeasurePanelHeight(screen.panels[1], rightW);
     const float controlW = leftW - 32.0f;
     float controlsH = 0;
     for (const CommandRowView& row : screen.panelRows[0]) {
       controlsH += std::max(40.0f, WrapText(row.label, controlW - 20.0f, TypePx(10), SelectFont(TypePx(10), false)).size() * theme_.LineHeight() + 16.0f) + 8.0f;
     }
-    const float heroH = std::max(totalsH, screen.hero.hero.h + controlsH + 20.0f);
-    PaintChamferBoxRay(Area{left, top, leftW, heroH}, kChamferPanel, ToRay(p.panel), ToRay(p.borderDark), ToRay(p.border));
-    PaintHero(screen.hero, Area{left, top, leftW, screen.hero.hero.h});
-    float y = top + screen.hero.hero.h + 8.0f;
+    const float heroH = std::max({totalsH, MeasurePanelHeight(screen.panels[3], rightW), controlsH + 90.0f, imageW * 0.67f});
+    PaintPanel(screen.panels[0], Area{left, top, leftW, heroH});
+    Text(screen.hero.code.c_str(), static_cast<int>(left + 16), static_cast<int>(top + 40), TypePx(10), ToRay(p.coffee));
+    PaintChamferBoxRay(Area{imageX, top, imageW, heroH}, kChamferPanel, ToRay(p.panel), ToRay(p.borderDark), ToRay(p.border));
+    const Texture2D* image = static_cast<const Texture2D*>(bridgeArt);
+    if (image != nullptr && image->id != 0) {
+      const float scale = std::min((imageW - 12) / image->width, (heroH - 12) / image->height);
+      const float w = image->width * scale;
+      const float h = image->height * scale;
+      DrawTexturePro(*image, Rectangle{0, 0, static_cast<float>(image->width), static_cast<float>(image->height)},
+                     Rectangle{imageX + (imageW - w) / 2, top + (heroH - h) / 2, w, h}, Vector2{0, 0}, 0, WHITE);
+    }
+    float y = top + 76.0f;
     for (std::size_t r = 0; r < screen.panelRows[0].size(); ++r) {
       const CommandRowView& row = screen.panelRows[0][r];
       const auto lines = WrapText(row.label, controlW - 20.0f, TypePx(10), SelectFont(TypePx(10), false));
@@ -7505,12 +7516,9 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
     }
     PaintPanel(screen.panels[1], Area{rightX, top, rightW, heroH});
     const float bottomTop = top + heroH + gap;
-    const float halfW = (right - left - gap) / 2;
-    const float feedH = MeasurePanelHeight(screen.panels[2], halfW);
-    const float courseH = MeasurePanelHeight(screen.panels[3], halfW);
-    PaintPanel(screen.panels[2], Area{left, bottomTop, halfW, feedH});
-    PaintPanel(screen.panels[3], Area{left + halfW + gap, bottomTop, halfW, courseH});
-    contentPaintBottom_ = std::max(contentPaintBottom_, bottomTop + std::max(feedH, courseH));
+    PaintPanel(screen.panels[2], Area{left, bottomTop, rightX - gap - left, heroH});
+    PaintPanel(screen.panels[3], Area{rightX, bottomTop, rightW, heroH});
+    contentPaintBottom_ = std::max(contentPaintBottom_, bottomTop + heroH);
     return;
   }
   if (screen.hasHero) {

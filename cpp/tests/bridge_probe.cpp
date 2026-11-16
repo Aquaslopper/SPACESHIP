@@ -78,7 +78,13 @@ int main() {
   const auto room = ship::BuildRoomScreen(split,"bridge");
   assert(room.rows.size()==2 && room.rows[0].id=="fuel-split" && room.rows[1].id=="warp");
   ship::Tab tab;tab.kind="room";tab.id="bridge";
+  for (int i=0;i<12;++i) split.FreeCommit("Bridge feed clamp probe " + std::to_string(i));
+  const auto storedFeedSize = split.State().feed.size();
   const auto screen=ship::BuildTabScreen(split,tab);
   assert(screen.panels.size()==4 && screen.panels[1].id=="bridge-totals" && screen.panels[2].id=="bridge-feed" && screen.panels[3].id=="bridge-course");
+  assert(screen.panels[2].lines.size() == 4);
+  assert(screen.panels[2].lines.front().value.find("Bridge feed clamp probe 11") != std::string::npos);
+  assert(split.State().feed.size() == storedFeedSize && storedFeedSize > 4);
+  std::cout << "PASS: bounded latest-four Bridge feed with full history retained\n";
   std::cout << "PASS: Bridge controls, four WARP uses / 80 fuel / 20 positive clicks, no self-refill, five-click WARP quarter refills, unchanged two-click split refills, cell requirements, persistence and information panels\n";
 }
