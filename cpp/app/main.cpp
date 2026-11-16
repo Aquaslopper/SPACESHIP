@@ -294,29 +294,29 @@ void main() {
   if (uDangerPulse > 0.001) {
     vec2 res = max(uResolution, vec2(1.0));
     vec2 texel = 1.0 / res;
-    vec2 staticDir = normalize(vec2(-0.72, 0.69));
+    vec2 staticDir = normalize(vec2(0.76, -0.65));
     vec2 screenPos = vec2(uv.x, 1.0 - uv.y) * res;
     vec2 centered = (screenPos - 0.5 * res) / min(res.x, res.y);
     float staticProj = dot(centered, staticDir);
-    float dangerCrest = pow(0.5 + 0.5 * cos(staticProj * 2.8), 4.5);
+    float dangerCrest = pow(0.5 + 0.5 * cos(staticProj * 2.25), 3.5);
     float pulse = clamp(uDangerPulse, 0.0, 1.0) * dangerCrest;
 
     if (pulse > 0.001) {
-      float shiftPx = 0.75 * pulse;
-      vec2 shiftUV = vec2(staticDir.x, -staticDir.y) * (shiftPx * texel);
-      vec3 baseSample = center.rgb * colDiffuse.rgb * fragColor.rgb;
-      vec3 shiftedSample = vec3(
-          texture(texture0, clamp(uv + shiftUV, vec2(0.0), vec2(1.0))).r,
-          center.g,
-          texture(texture0, clamp(uv - shiftUV, vec2(0.0), vec2(1.0))).b) * colDiffuse.rgb * fragColor.rgb;
-      rgb = clamp(rgb + (shiftedSample - baseSample), 0.0, 1.0);
-
-      float luma = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
-      vec3 redFloor = vec3(0.74, 0.15, 0.13);
-      float redMix = pulse * 0.22;
-      rgb = mix(rgb, redFloor, redMix * (1.0 - 0.45 * luma));
-      rgb.r = clamp(rgb.r + pulse * 0.10 * (1.0 - rgb.r * 0.5), 0.0, 1.0);
-      rgb.gb *= 1.0 - pulse * 0.12;
+      vec3 cN = texture(texture0, clamp(uv + vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb;
+      vec3 cS = texture(texture0, clamp(uv - vec2(0.0, texel.y), vec2(0.0), vec2(1.0))).rgb;
+      vec3 cE = texture(texture0, clamp(uv + vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb;
+      vec3 cW = texture(texture0, clamp(uv - vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb;
+      float lC = dot(center.rgb, vec3(0.2126, 0.7152, 0.0722));
+      float lN = dot(cN, vec3(0.2126, 0.7152, 0.0722));
+      float lS = dot(cS, vec3(0.2126, 0.7152, 0.0722));
+      float lE = dot(cE, vec3(0.2126, 0.7152, 0.0722));
+      float lW = dot(cW, vec3(0.2126, 0.7152, 0.0722));
+      float edge = max(max(abs(lN - lC), abs(lS - lC)),
+                       max(abs(lE - lC), abs(lW - lC)));
+      float fineMask = smoothstep(0.06, 0.32, edge);
+      vec3 redPulseCol = vec3(0.86, 0.16, 0.14);
+      float strength = mix(0.68, 0.28, lC) * pulse * fineMask;
+      rgb = mix(rgb, redPulseCol, strength);
     }
   }
   float angle = radians(uColorShift);
