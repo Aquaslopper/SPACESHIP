@@ -232,6 +232,7 @@ uniform vec2 uWaveDir;
 uniform float uIntensity;
 uniform float uOptionScale;
 uniform vec3 uWarmTint;
+uniform float uRedLevel;
 out vec4 finalColor;
 void main() {
   vec2 uv = fragTexCoord;
@@ -255,7 +256,12 @@ void main() {
     vec2 shiftUV = vec2(dir.x, -dir.y) * (shiftPx * texel);
     float r = texture(texture0, clamp(uv + shiftUV, vec2(0.0), vec2(1.0))).r;
     float b = texture(texture0, clamp(uv - shiftUV, vec2(0.0), vec2(1.0))).b;
-    rgb = vec3(r, center.g, b) * colDiffuse.rgb * fragColor.rgb;
+    float dr = r - center.r;
+    float db = b - center.b;
+    vec3 redWave = clamp(vec3(center.r + max(max(dr, db), 0.0),
+                              center.g + min(min(dr, db), 0.0),
+                              center.b + min(min(dr, db), 0.0)), 0.0, 1.0);
+    rgb = mix(vec3(r, center.g, b), redWave, uRedLevel) * colDiffuse.rgb * fragColor.rgb;
 
     // Subtle milky grey/amber black-level lift & contrast dip on sensor saturation.
     float luma = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
@@ -287,6 +293,7 @@ void main() {
           weights += weight;
         }
       }
+      bloom = vec3(bloom.r + bloom.b * uRedLevel, 0.0, bloom.b * (1.0 - uRedLevel));
       rgb += bloom * colDiffuse.rgb * fragColor.rgb * (uGlow / weights);
     }
   }
@@ -310,6 +317,7 @@ void main() {
     intensityLoc_ = GetShaderLocation(shader_, "uIntensity");
     optionScaleLoc_ = GetShaderLocation(shader_, "uOptionScale");
     warmTintLoc_ = GetShaderLocation(shader_, "uWarmTint");
+    redLevelLoc_ = GetShaderLocation(shader_, "uRedLevel");
     shaderReady_ = IsShaderValid(shader_) && gammaLoc_ >= 0 && brightnessLoc_ >= 0;
     if (!shaderReady_) {
       std::fprintf(stderr, "spaceship: display adjustment shader unavailable; using unadjusted display\n");
@@ -333,16 +341,17 @@ void main() {
   bool Ready() const { return shaderReady_ && IsRenderTextureValid(target_); }
   void Begin() const { BeginTextureMode(target_); }
   void End(double gamma, double brightness, float waveTime, float waveDirX, float waveDirY,
-           float intensity, float optionScale, float warmBias, float colorShift, float glow) const {
+           float intensity, float optionScale, float warmBias, float redLevel,
+           float colorShift, float glow) const {
     EndTextureMode();
     const float g = static_cast<float>(ship::EffectiveDisplayGamma(gamma));
     const float b = static_cast<float>(ship::DisplayBrightness(brightness));
     const float res[2] = {static_cast<float>(width_), static_cast<float>(height_)};
     const float dir[2] = {waveDirX, waveDirY};
     const float tint[3] = {
-        0.64f + (0.88f - 0.64f) * warmBias,
-        0.58f + (0.68f - 0.58f) * warmBias,
-        0.82f + (0.42f - 0.82f) * warmBias,
+        (0.64f + (0.88f - 0.64f) * warmBias) * (1.0f - redLevel) + 0.95f * redLevel,
+        (0.58f + (0.68f - 0.58f) * warmBias) * (1.0f - redLevel) + 0.18f * redLevel,
+        (0.82f + (0.42f - 0.82f) * warmBias) * (1.0f - redLevel) + 0.14f * redLevel,
     };
     SetShaderValue(shader_, colorShiftLoc_, &colorShift, SHADER_UNIFORM_FLOAT);
     SetShaderValue(shader_, glowLoc_, &glow, SHADER_UNIFORM_FLOAT);
@@ -354,6 +363,7 @@ void main() {
     if (intensityLoc_ >= 0) SetShaderValue(shader_, intensityLoc_, &intensity, SHADER_UNIFORM_FLOAT);
     if (optionScaleLoc_ >= 0) SetShaderValue(shader_, optionScaleLoc_, &optionScale, SHADER_UNIFORM_FLOAT);
     if (warmTintLoc_ >= 0) SetShaderValue(shader_, warmTintLoc_, tint, SHADER_UNIFORM_VEC3);
+    if (redLevelLoc_ >= 0) SetShaderValue(shader_, redLevelLoc_, &redLevel, SHADER_UNIFORM_FLOAT);
     BeginShaderMode(shader_);
     DrawTexturePro(target_.texture,
                    Rectangle{0, 0, static_cast<float>(width_), -static_cast<float>(height_)},
@@ -371,7 +381,7 @@ void main() {
   int gammaLoc_ = -1, brightnessLoc_ = -1;
   int colorShiftLoc_ = -1, glowLoc_ = -1;
   int resLoc_ = -1, timeLoc_ = -1, waveDirLoc_ = -1;
-  int intensityLoc_ = -1, optionScaleLoc_ = -1, warmTintLoc_ = -1;
+  int intensityLoc_ = -1, optionScaleLoc_ = -1, warmTintLoc_ = -1, redLevelLoc_ = -1;
   int width_ = 0, height_ = 0;
   bool shaderReady_ = false;
 };
@@ -704,9 +714,13 @@ int main(int argc, char** argv) {
     if (!shell.TitleActive()) voyageStarted = true;
     rlImGuiEnd();
     if (adjusted) {
+      float redLevel = 0.0f;
+      for (const ship::IndicatorLine& line : ship::IndicatorLines(sim)) {
+        if (line.grow) { redLevel = std::max(redLevel, std::clamp(line.pct, 0, 100) * 0.01f); }
+      }
       display.End(sim.State().options.displayGamma, sim.State().options.displayBrightness,
                   waveTime, smoothedWave.waveDirX, smoothedWave.waveDirY,
-                  smoothedWave.baseIntensity, waveScale, smoothedWave.warmBias,
+                  smoothedWave.baseIntensity, waveScale, smoothedWave.warmBias, redLevel,
                   static_cast<float>(sim.State().options.colorShift),
                   static_cast<float>(sim.State().options.glow));
     }
