@@ -334,6 +334,7 @@ void main() {
 in vec2 fragTexCoord;
 in vec4 fragColor;
 uniform sampler2D texture0;
+uniform sampler2D uMaskTex;
 uniform vec2 uResolution;
 uniform float uTime;
 uniform vec2 uWaveDir;
@@ -346,6 +347,11 @@ out vec4 finalColor;
 float Luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
 void main() {
   vec2 uv = fragTexCoord;
+  vec3 mask = texture(uMaskTex, uv).rgb;
+  if (max(mask.r, max(mask.g, mask.b)) <= 0.01) {
+    finalColor = vec4(0.0, 0.0, 0.0, 1.0);
+    return;
+  }
   vec2 res = max(uResolution, vec2(1.0));
   vec2 texel = 1.0 / res;
   float dirLen = length(uWaveDir);
@@ -357,6 +363,10 @@ void main() {
   float wave01 = clamp(0.5 + 0.5 * cos(phase), 0.0, 1.0);
   float crest = pow(wave01, 3.5);
   float glint = pow(wave01, 8.0);
+  if (crest <= 0.001) {
+    finalColor = vec4(0.0, 0.0, 0.0, 1.0);
+    return;
+  }
   float baseShift = clamp(mix(0.45, 0.90, clamp(uIntensity, 0.0, 1.0)) * uOptionScale, 0.0, 1.35);
   float shiftPx = baseShift * crest;
   vec2 shiftUV = vec2(dir.x, -dir.y) * (shiftPx * texel);
@@ -375,53 +385,56 @@ void main() {
 
   vec3 shimmer = mix(0.5 * (sh0 + sh1), max(sh0, sh1), 0.60);
   float shEnergy = max(shimmer.r, shimmer.b) + 0.35 * min(shimmer.r, shimmer.b);
-  float shKnee = smoothstep(0.024, 0.25, shEnergy);
-  shKnee *= sqrt(shKnee) * smoothstep(0.0, 0.18, crest);
-  if (shKnee <= 0.0001) {
-    finalColor = vec4(0.0, 0.0, 0.0, 1.0);
-    return;
-  }
+  float waveFade = crest * smoothstep(0.0, 0.16, crest);
 
   float lC = Luma(c0);
   float lL1 = Luma(texture(texture0, clamp(uv + vec2(-2.0 * texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb);
   float lR1 = Luma(texture(texture0, clamp(uv + vec2( 2.0 * texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb);
   float lU1 = Luma(texture(texture0, clamp(uv + vec2(0.0,  2.0 * texel.y), vec2(0.0), vec2(1.0))).rgb);
   float lD1 = Luma(texture(texture0, clamp(uv + vec2(0.0, -2.0 * texel.y), vec2(0.0), vec2(1.0))).rgb);
-  float lL2 = Luma(texture(texture0, clamp(uv + vec2(-5.0 * texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb);
-  float lR2 = Luma(texture(texture0, clamp(uv + vec2( 5.0 * texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb);
-  float lL3 = Luma(texture(texture0, clamp(uv + vec2(-9.0 * texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb);
-  float lR3 = Luma(texture(texture0, clamp(uv + vec2( 9.0 * texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb);
-  float lU2 = Luma(texture(texture0, clamp(uv + vec2(0.0,  5.0 * texel.y), vec2(0.0), vec2(1.0))).rgb);
-  float lD2 = Luma(texture(texture0, clamp(uv + vec2(0.0, -5.0 * texel.y), vec2(0.0), vec2(1.0))).rgb);
+  float lL2 = Luma(texture(texture0, clamp(uv + vec2(-4.0 * texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb);
+  float lR2 = Luma(texture(texture0, clamp(uv + vec2( 4.0 * texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb);
+  float lU2 = Luma(texture(texture0, clamp(uv + vec2(0.0,  4.0 * texel.y), vec2(0.0), vec2(1.0))).rgb);
+  float lD2 = Luma(texture(texture0, clamp(uv + vec2(0.0, -4.0 * texel.y), vec2(0.0), vec2(1.0))).rgb);
 
+  float gx = max(abs(lR1 - lL1), abs(lC - 0.5 * (lL1 + lR1)) * 1.6);
+  float gy = max(abs(lD1 - lU1), abs(lC - 0.5 * (lU1 + lD1)) * 1.6);
+  float grad = length(vec2(gx, gy));
+  float corner = sqrt(max(0.0, gx * gy));
   float surround = (lL1 + lR1 + lU1 + lD1 + lL2 + lR2 + lU2 + lD2) * 0.125;
-  float outerSpan = max(abs(lL2 - lR2), abs(lU2 - lD2));
-  float darkSpeck = smoothstep(0.05, 0.20, surround - lC) * (1.0 - smoothstep(0.04, 0.16, outerSpan));
-  float chatL = abs(lL1 - lC) + abs(lL2 - lL1) + abs(lL3 - lL2);
-  float chatR = abs(lR1 - lC) + abs(lR2 - lR1) + abs(lR3 - lR2);
-  float textRun = smoothstep(0.14, 0.44, min(chatL, chatR)) * smoothstep(0.28, 0.78, max(chatL, chatR));
-  float cleanMask = (1.0 - 0.94 * darkSpeck) * (1.0 - 0.90 * textRun);
 
   vec3 hiCol = max(max(c0, c1), max(c0P, c0M));
   float hiLuma = Luma(hiCol);
   float peakL = max(lC, Luma(c1));
-  float starHit = smoothstep(0.042, 0.25, peakL - surround) * (0.72 + 0.88 * hiLuma);
-  float gx = abs(lR1 - lL1);
-  float gy = abs(lD1 - lU1);
-  float specHit = smoothstep(0.052, 0.26, sqrt(max(0.0, gx * gy))) * smoothstep(0.24, 0.86, hiLuma);
-  float edgeHit = smoothstep(0.085, 0.30, length(vec2(gx, gy))) * smoothstep(0.28, 0.90, hiLuma);
+
+  // 1) Cassette-futurism fine 1px outer & inner panel lines (mask.r): never touches font.
+  float lineVis = smoothstep(0.022, 0.16, max(grad, shEnergy * 1.4));
+  float cornerGlint = smoothstep(0.024, 0.15, corner);
+  float panelEnergy = mask.r * lineVis * waveFade
+                      * ((0.36 + 0.92 * glint) + cornerGlint * (1.55 + 2.90 * glint));
+
+  // 2) Spaceship hull, engine nozzles, and bevels (mask.g).
+  float shipKnee = smoothstep(0.026, 0.24, shEnergy);
+  shipKnee *= sqrt(shipKnee) * waveFade;
+  float shipSpec = smoothstep(0.04, 0.24, peakL - surround) * (1.25 + 2.00 * glint)
+                   + smoothstep(0.05, 0.25, corner) * smoothstep(0.20, 0.85, hiLuma)
+                     * (0.95 + 1.90 * glint);
+  float shipEnergy = mask.g * shipKnee * shipSpec;
+
+  // 3) Stars & celestial bodies on the star map (mask.b).
+  float starContrast = max(abs(peakL - surround), max(grad * 0.75, shEnergy));
+  float starVis = smoothstep(0.025, 0.20, starContrast);
+  float starEnergy = mask.b * starVis * waveFade * (2.40 + 4.40 * glint);
 
   float waveGain = clamp(uIntensity * uOptionScale, 0.0, 2.0)
                    * (0.85 + 0.25 * clamp(uGlow, 0.0, 2.0));
-  float energy = shKnee * cleanMask
-                 * (starHit * (2.90 + 4.10 * glint)
-                    + specHit * (1.35 + 2.65 * glint)
-                    + edgeHit * (0.28 + 0.65 * glint))
-                 * waveGain;
+  float energy = (panelEnergy + shipEnergy + starEnergy) * waveGain;
 
   vec3 coatCool = vec3(0.10, 0.56, 1.00);
   vec3 coatWarm = mix(vec3(1.00, 0.64, 0.22), uWarmTint, 0.30);
-  float redShare = shimmer.r / max(shimmer.r + shimmer.b, 0.0001);
+  float redShare = (shimmer.r + shimmer.b > 0.004)
+                       ? (shimmer.r / (shimmer.r + shimmer.b))
+                       : 0.32;
   float warmFactor = clamp(uWarmTint.r - uWarmTint.b + 0.35, 0.0, 1.0);
   float warmMix = clamp(0.06 + 0.50 * redShare * (0.35 + 0.65 * warmFactor), 0.0, 0.64);
   vec3 coat = mix(coatCool, coatWarm, warmMix);
@@ -487,6 +500,7 @@ void main() {
       return;
     }
     extractShader_ = LoadShaderFromMemory(nullptr, extractFragment);
+    extMaskLoc_ = GetShaderLocation(extractShader_, "uMaskTex");
     extResLoc_ = GetShaderLocation(extractShader_, "uResolution");
     extTimeLoc_ = GetShaderLocation(extractShader_, "uTime");
     extWaveDirLoc_ = GetShaderLocation(extractShader_, "uWaveDir");
@@ -502,7 +516,7 @@ void main() {
     blurVertLoc_ = GetShaderLocation(blurShader_, "uVertTap");
     blurFalloffLoc_ = GetShaderLocation(blurShader_, "uFalloff");
     flareShadersReady_ = IsShaderValid(extractShader_) && IsShaderValid(blurShader_) &&
-                         lensFlareLoc_ >= 0 && flareCoreLoc_ >= 0 &&
+                         extMaskLoc_ >= 0 && lensFlareLoc_ >= 0 && flareCoreLoc_ >= 0 &&
                          flareMidLoc_ >= 0 && flareWideLoc_ >= 0;
     Resize(width, height);
   }
@@ -521,12 +535,13 @@ void main() {
       if (flareShadersReady_) {
         const int fw = std::max(1, width / 2);
         const int fh = std::max(1, height / 2);
-        bool hdr0 = false, hdr1 = false, hdr2 = false;
-        flareCore_ = CreateFlareTarget(fw, fh, &hdr0);
-        flareMid_ = CreateFlareTarget(fw, fh, &hdr1);
-        flareWide_ = CreateFlareTarget(fw, fh, &hdr2);
-        if (IsFlareTargetValid(flareCore_) && IsFlareTargetValid(flareMid_) &&
-            IsFlareTargetValid(flareWide_)) {
+        bool maskHdr = false, hdr0 = false, hdr1 = false, hdr2 = false;
+        flareMask_ = CreateColorTarget(width, height, false, &maskHdr);
+        flareCore_ = CreateColorTarget(fw, fh, true, &hdr0);
+        flareMid_ = CreateColorTarget(fw, fh, true, &hdr1);
+        flareWide_ = CreateColorTarget(fw, fh, true, &hdr2);
+        if (IsFlareTargetValid(flareMask_) && IsFlareTargetValid(flareCore_) &&
+            IsFlareTargetValid(flareMid_) && IsFlareTargetValid(flareWide_)) {
           const bool allHdr = hdr0 && hdr1 && hdr2;
           flarePack_ = allHdr ? 1.0f : 0.25f;
           flareUnpack_ = allHdr ? 1.0f : 4.0f;
@@ -541,7 +556,7 @@ void main() {
   void Begin() const { BeginTextureMode(target_); }
   void End(double gamma, double brightness, float waveTime, float waveDirX, float waveDirY,
            float intensity, float optionScale, float warmBias, float colorShift, float glow,
-           float lensFlare) const {
+           float lensFlare, const std::vector<ship::FlareMaskOp>& maskOps) const {
     EndTextureMode();
     const float g = static_cast<float>(ship::EffectiveDisplayGamma(gamma));
     const float b = static_cast<float>(ship::DisplayBrightness(brightness));
@@ -553,8 +568,10 @@ void main() {
         0.82f + (0.42f - 0.82f) * warmBias,
     };
     const bool runFlare = flareReady_ && lensFlare > 0.001f &&
-                          optionScale > 0.001f && intensity > 0.001f;
+                          optionScale > 0.001f && intensity > 0.001f && !maskOps.empty();
     if (runFlare) {
+      rlDisableColorBlend();
+      PaintFlareMask(maskOps);
       if (extResLoc_ >= 0) SetShaderValue(extractShader_, extResLoc_, res, SHADER_UNIFORM_VEC2);
       if (extTimeLoc_ >= 0) SetShaderValue(extractShader_, extTimeLoc_, &waveTime, SHADER_UNIFORM_FLOAT);
       if (extWaveDirLoc_ >= 0) SetShaderValue(extractShader_, extWaveDirLoc_, dir, SHADER_UNIFORM_VEC2);
@@ -568,9 +585,26 @@ void main() {
           1.0f / static_cast<float>(flareCore_.texture.height),
       };
       if (blurTexelLoc_ >= 0) SetShaderValue(blurShader_, blurTexelLoc_, fTexel, SHADER_UNIFORM_VEC2);
-      auto blitPass = [](const RenderTexture2D& dst, const Texture2D& src, const Shader& sh) {
+      BeginTextureMode(flareWide_);
+      BeginShaderMode(extractShader_);
+      SetShaderValueTexture(extractShader_, extMaskLoc_, flareMask_.texture);
+      DrawTexturePro(
+          target_.texture,
+          Rectangle{0, 0, static_cast<float>(target_.texture.width),
+                    -static_cast<float>(target_.texture.height)},
+          Rectangle{0, 0, static_cast<float>(flareWide_.texture.width),
+                    static_cast<float>(flareWide_.texture.height)},
+          Vector2{0, 0}, 0.0f, WHITE);
+      EndShaderMode();
+      EndTextureMode();
+      auto runBlur = [&](const RenderTexture2D& dst, const Texture2D& src,
+                         float stride, float disp, float vert, float falloff) {
+        if (blurStrideLoc_ >= 0) SetShaderValue(blurShader_, blurStrideLoc_, &stride, SHADER_UNIFORM_FLOAT);
+        if (blurDispLoc_ >= 0) SetShaderValue(blurShader_, blurDispLoc_, &disp, SHADER_UNIFORM_FLOAT);
+        if (blurVertLoc_ >= 0) SetShaderValue(blurShader_, blurVertLoc_, &vert, SHADER_UNIFORM_FLOAT);
+        if (blurFalloffLoc_ >= 0) SetShaderValue(blurShader_, blurFalloffLoc_, &falloff, SHADER_UNIFORM_FLOAT);
         BeginTextureMode(dst);
-        BeginShaderMode(sh);
+        BeginShaderMode(blurShader_);
         DrawTexturePro(
             src,
             Rectangle{0, 0, static_cast<float>(src.width), -static_cast<float>(src.height)},
@@ -579,16 +613,6 @@ void main() {
         EndShaderMode();
         EndTextureMode();
       };
-      auto runBlur = [&](const RenderTexture2D& dst, const Texture2D& src,
-                         float stride, float disp, float vert, float falloff) {
-        if (blurStrideLoc_ >= 0) SetShaderValue(blurShader_, blurStrideLoc_, &stride, SHADER_UNIFORM_FLOAT);
-        if (blurDispLoc_ >= 0) SetShaderValue(blurShader_, blurDispLoc_, &disp, SHADER_UNIFORM_FLOAT);
-        if (blurVertLoc_ >= 0) SetShaderValue(blurShader_, blurVertLoc_, &vert, SHADER_UNIFORM_FLOAT);
-        if (blurFalloffLoc_ >= 0) SetShaderValue(blurShader_, blurFalloffLoc_, &falloff, SHADER_UNIFORM_FLOAT);
-        blitPass(dst, src, blurShader_);
-      };
-      rlDisableColorBlend();
-      blitPass(flareWide_, target_.texture, extractShader_);
       runBlur(flareCore_, flareWide_.texture, 1.0f, 0.04f, 0.65f, 0.14f);
       runBlur(flareMid_, flareCore_.texture, 4.2f, 0.09f, 0.18f, 0.11f);
       runBlur(flareWide_, flareMid_.texture, 18.0f, 0.14f, 0.00f, 0.09f);
@@ -626,10 +650,80 @@ void main() {
     if (shader_.locs != nullptr) UnloadShader(shader_);
   }
  private:
+  static std::array<Vector2, 6> MakeChamferPts(float x, float y, float w, float h, float ch) {
+    const float c = std::min(ch, std::max(0.0f, std::min(w, h) * 0.32f));
+    return {{{x + c, y}, {x + w, y}, {x + w, y + h - c},
+             {x + w - c, y + h}, {x, y + h}, {x, y + c}}};
+  }
+  void PaintFlareMask(const std::vector<ship::FlareMaskOp>& ops) const {
+    BeginTextureMode(flareMask_);
+    ClearBackground(BLACK);
+    int curX = -1, curY = -1, curW = -1, curH = -1;
+    bool scissorOn = false;
+    for (const ship::FlareMaskOp& op : ops) {
+      const int sx = std::clamp(static_cast<int>(std::floor(op.clipX)), 0, width_);
+      const int sy = std::clamp(static_cast<int>(std::floor(op.clipY)), 0, height_);
+      const int ex = std::clamp(static_cast<int>(std::ceil(op.clipX + op.clipW)), sx, width_);
+      const int ey = std::clamp(static_cast<int>(std::ceil(op.clipY + op.clipH)), sy, height_);
+      const int sw = ex - sx;
+      const int sh = ey - sy;
+      if (sw <= 0 || sh <= 0) continue;
+      if (!scissorOn || sx != curX || sy != curY || sw != curW || sh != curH) {
+        if (scissorOn) EndScissorMode();
+        BeginScissorMode(sx, sy, sw, sh);
+        curX = sx; curY = sy; curW = sw; curH = sh;
+        scissorOn = true;
+      }
+      switch (op.kind) {
+        case ship::FlareMaskOp::ClearChamfer: {
+          const auto pts = MakeChamferPts(op.x, op.y, op.w, op.h, op.param);
+          Vector2 ctr{0.0f, 0.0f};
+          for (const Vector2& pt : pts) { ctr.x += pt.x; ctr.y += pt.y; }
+          ctr.x /= 6.0f; ctr.y /= 6.0f;
+          for (std::size_t i = 0; i < pts.size(); ++i) {
+            const Vector2& a = pts[i];
+            const Vector2& b = pts[(i + 1) % pts.size()];
+            const float cr = (a.x - ctr.x) * (b.y - ctr.y) - (a.y - ctr.y) * (b.x - ctr.x);
+            if (cr > 0.0f) DrawTriangle(ctr, b, a, BLACK);
+            else DrawTriangle(ctr, a, b, BLACK);
+          }
+          break;
+        }
+        case ship::FlareMaskOp::ChamferLine: {
+          const float l = std::round(op.x) + 0.5f;
+          const float t = std::round(op.y) + 0.5f;
+          const float r = std::round(op.x + op.w) - 0.5f;
+          const float bt = std::round(op.y + op.h) - 0.5f;
+          const auto pts = MakeChamferPts(l, t, std::max(1.0f, r - l),
+                                          std::max(1.0f, bt - t), op.param);
+          const Color red{255, 0, 0, 255};
+          for (std::size_t i = 0; i < pts.size(); ++i) {
+            DrawLineEx(pts[i], pts[(i + 1) % pts.size()], 1.5f, red);
+            DrawRectangleRec(Rectangle{pts[i].x - 0.75f, pts[i].y - 0.75f, 1.5f, 1.5f}, red);
+          }
+          break;
+        }
+        case ship::FlareMaskOp::FineLine:
+          DrawLineEx(Vector2{op.x, op.y}, Vector2{op.w, op.h}, 1.5f, Color{255, 0, 0, 255});
+          break;
+        case ship::FlareMaskOp::ShipRect:
+          DrawRectangleRec(Rectangle{op.x, op.y, op.w, op.h}, Color{0, 255, 0, 255});
+          break;
+        case ship::FlareMaskOp::StarDisc: {
+          const unsigned char bv = static_cast<unsigned char>(
+              std::lround(std::clamp(op.param, 0.0f, 1.0f) * 255.0f));
+          DrawCircleV(Vector2{op.x, op.y}, std::max(1.5f, op.w), Color{0, 0, bv, 255});
+          break;
+        }
+      }
+    }
+    if (scissorOn) EndScissorMode();
+    EndTextureMode();
+  }
   static bool IsFlareTargetValid(const RenderTexture2D& rt) {
     return rt.id > 0 && IsTextureValid(rt.texture);
   }
-  static RenderTexture2D CreateFlareTarget(int width, int height, bool* isHdr) {
+  static RenderTexture2D CreateColorTarget(int width, int height, bool preferHdr, bool* isHdr) {
     auto makeWithFormat = [&](int pixelFormat) {
       RenderTexture2D rt{};
       rt.id = rlLoadFramebuffer();
@@ -654,15 +748,18 @@ void main() {
       SetTextureWrap(rt.texture, TEXTURE_WRAP_CLAMP);
       return rt;
     };
-    RenderTexture2D rt = makeWithFormat(PIXELFORMAT_UNCOMPRESSED_R16G16B16A16);
-    if (IsFlareTargetValid(rt)) {
-      if (isHdr != nullptr) *isHdr = true;
-      return rt;
+    if (preferHdr) {
+      RenderTexture2D rt = makeWithFormat(PIXELFORMAT_UNCOMPRESSED_R16G16B16A16);
+      if (IsFlareTargetValid(rt)) {
+        if (isHdr != nullptr) *isHdr = true;
+        return rt;
+      }
     }
     if (isHdr != nullptr) *isHdr = false;
     return makeWithFormat(PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
   }
   void ReleaseFlareTargets() {
+    if (flareMask_.id != 0) { UnloadRenderTexture(flareMask_); flareMask_ = RenderTexture2D{}; }
     if (flareCore_.id != 0) { UnloadRenderTexture(flareCore_); flareCore_ = RenderTexture2D{}; }
     if (flareMid_.id != 0) { UnloadRenderTexture(flareMid_); flareMid_ = RenderTexture2D{}; }
     if (flareWide_.id != 0) { UnloadRenderTexture(flareWide_); flareWide_ = RenderTexture2D{}; }
@@ -673,6 +770,7 @@ void main() {
   Shader extractShader_{};
   Shader blurShader_{};
   RenderTexture2D target_{};
+  RenderTexture2D flareMask_{};
   RenderTexture2D flareCore_{};
   RenderTexture2D flareMid_{};
   RenderTexture2D flareWide_{};
@@ -681,7 +779,7 @@ void main() {
   int flareCoreLoc_ = -1, flareMidLoc_ = -1, flareWideLoc_ = -1;
   int resLoc_ = -1, timeLoc_ = -1, waveDirLoc_ = -1;
   int intensityLoc_ = -1, optionScaleLoc_ = -1, warmTintLoc_ = -1;
-  int extResLoc_ = -1, extTimeLoc_ = -1, extWaveDirLoc_ = -1;
+  int extMaskLoc_ = -1, extResLoc_ = -1, extTimeLoc_ = -1, extWaveDirLoc_ = -1;
   int extIntensityLoc_ = -1, extOptionScaleLoc_ = -1, extGlowLoc_ = -1;
   int extWarmTintLoc_ = -1, extPackLoc_ = -1;
   int blurTexelLoc_ = -1, blurStrideLoc_ = -1, blurDispLoc_ = -1;
@@ -1026,7 +1124,8 @@ int main(int argc, char** argv) {
                   smoothedWave.baseIntensity, waveScale, smoothedWave.warmBias,
                   static_cast<float>(sim.State().options.colorShift),
                   static_cast<float>(sim.State().options.glow),
-                  static_cast<float>(std::clamp(sim.State().options.lensFlare, 0.0, 2.0)));
+                  static_cast<float>(std::clamp(sim.State().options.lensFlare, 0.0, 2.0)),
+                  shell.FlareMask());
     }
     EndDrawing();
   }

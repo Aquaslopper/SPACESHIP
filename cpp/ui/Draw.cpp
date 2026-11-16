@@ -47,6 +47,32 @@ constexpr float kChamferCard = 5.0f;
 constexpr float kChamferSmall = 4.0f;
 constexpr float kDoubleInset = 3.0f;
 
+struct FlareRecordCtx {
+  std::vector<FlareMaskOp>* ops = nullptr;
+  float yOffset = 0.0f;
+  float clipX = 0.0f, clipY = 0.0f, clipW = 0.0f, clipH = 0.0f;
+  bool suppressFillClear = false;
+};
+FlareRecordCtx gFlareCtx{};
+
+void PushFlareRayOp(FlareMaskOp::Kind kind, float x, float y, float w, float h, float param) {
+  if (gFlareCtx.ops == nullptr || gFlareCtx.clipW <= 0.0f || gFlareCtx.clipH <= 0.0f) { return; }
+  gFlareCtx.ops->push_back(FlareMaskOp{
+      kind, x, y + gFlareCtx.yOffset, w, h, param,
+      gFlareCtx.clipX, gFlareCtx.clipY, gFlareCtx.clipW, gFlareCtx.clipH});
+}
+
+void PushFlareImOp(ImDrawList* draw, FlareMaskOp::Kind kind, float x, float y, float w, float h,
+                   float param) {
+  if (gFlareCtx.ops == nullptr || draw == nullptr) { return; }
+  const ImVec2 cMin = draw->GetClipRectMin();
+  const ImVec2 cMax = draw->GetClipRectMax();
+  const float cw = cMax.x - cMin.x;
+  const float ch = cMax.y - cMin.y;
+  if (cw <= 0.0f || ch <= 0.0f) { return; }
+  gFlareCtx.ops->push_back(FlareMaskOp{kind, x, y, w, h, param, cMin.x, cMin.y, cw, ch});
+}
+
 float ClampChamfer(float w, float h, float chamfer) {
   const float limit = std::max(0.0f, std::min(w, h) * 0.32f);
   return std::min(chamfer, limit);
@@ -94,6 +120,9 @@ void FillChamferRay(const Area& box, float chamfer, ::Color fill) {
   if (box.w <= 0.0f || box.h <= 0.0f) { return; }
   const auto pts = ChamferPolyRay(box.x, box.y, box.w, box.h, chamfer);
   FillPolyRay(pts.data(), pts.size(), fill);
+  if (!gFlareCtx.suppressFillClear && fill.a >= 180) {
+    PushFlareRayOp(FlareMaskOp::ClearChamfer, box.x, box.y, box.w, box.h, chamfer);
+  }
 }
 
 void StrokeChamferRay(float x, float y, float w, float h, float chamfer, ::Color color) {
@@ -108,6 +137,9 @@ void StrokeChamferRay(float x, float y, float w, float h, float chamfer, ::Color
   for (std::size_t i = 0; i < pts.size(); ++i) {
     DrawLineEx(pts[i], pts[(i + 1) % pts.size()], 1.0f, color);
     DrawRectangleRec(Rectangle{pts[i].x - 0.5f, pts[i].y - 0.5f, 1.0f, 1.0f}, color);
+  }
+  if (color.a >= 180) {
+    PushFlareRayOp(FlareMaskOp::ChamferLine, x, y, w, h, chamfer);
   }
 }
 
@@ -184,6 +216,9 @@ void FillChamferIm(ImDrawList* draw, float x, float y, float w, float h, float c
   if (w <= 0.0f || h <= 0.0f) { return; }
   const auto pts = ChamferPolyIm(x, y, w, h, chamfer);
   draw->AddConvexPolyFilled(pts.data(), static_cast<int>(pts.size()), fill);
+  if (!gFlareCtx.suppressFillClear && ((fill >> IM_COL32_A_SHIFT) & 0xffu) >= 180u) {
+    PushFlareImOp(draw, FlareMaskOp::ClearChamfer, x, y, w, h, chamfer);
+  }
 }
 
 void StrokeChamferIm(ImDrawList* draw, float x, float y, float w, float h, float chamfer,
@@ -196,6 +231,9 @@ void StrokeChamferIm(ImDrawList* draw, float x, float y, float w, float h, float
   const auto pts = ChamferPolyIm(left, top, std::max(1.0f, right - left),
                                 std::max(1.0f, bottom - top), chamfer);
   draw->AddPolyline(pts.data(), static_cast<int>(pts.size()), color, ImDrawFlags_Closed, 1.0f);
+  if (((color >> IM_COL32_A_SHIFT) & 0xffu) >= 180u) {
+    PushFlareImOp(draw, FlareMaskOp::ChamferLine, x, y, w, h, chamfer);
+  }
 }
 
 void PaintChamferBoxIm(ImDrawList* draw, float x, float y, float w, float h, float chamfer,
@@ -577,6 +615,11 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   if (sim.State().gameOver.empty()) { lossDismissed_ = false; }
 
   ClearBackground(ToRay(theme_.palette.content));
+  flareMask_.clear();
+  struct FlareCtxGuard {
+    ~FlareCtxGuard() { gFlareCtx = FlareRecordCtx{}; }
+  } flareCtxGuard;
+  gFlareCtx = FlareRecordCtx{&flareMask_, 0.0f, 0.0f, 0.0f, width_, height_, false};
 
   if (splashActive_) {
     PaintSplash(nowMs);
@@ -625,6 +668,11 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   Camera2D scrollCam{{0.0f, 0.0f}, {0.0f, contentScroll_}, 0.0f, 1.0f};
   contentPaintBottom_ = layout_.content.y;
   paintingContent_ = true;
+  gFlareCtx.yOffset = -contentScroll_;
+  gFlareCtx.clipX = layout_.content.x;
+  gFlareCtx.clipY = layout_.content.y;
+  gFlareCtx.clipW = layout_.content.w;
+  gFlareCtx.clipH = layout_.content.h;
   BeginMode2D(scrollCam);
 
   if (sim.State().activeTab == "home") {
@@ -695,6 +743,11 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   }
   EndMode2D();
   paintingContent_ = false;
+  gFlareCtx.yOffset = 0.0f;
+  gFlareCtx.clipX = 0.0f;
+  gFlareCtx.clipY = 0.0f;
+  gFlareCtx.clipW = width_;
+  gFlareCtx.clipH = height_;
   contentMaxScroll_ = std::max(0.0f, contentPaintBottom_ - actionBandTop_);
   contentScroll_ = std::min(contentScroll_, contentMaxScroll_);
 
@@ -912,6 +965,8 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
                       ToIm(theme_.id == "classic" ? p.panel2 : p.chrome));
   draw->AddLine(ImVec2(0.0f, Metrics::kTaskbarH - 1.0f),
                 ImVec2(width_, Metrics::kTaskbarH - 1.0f), ToIm(p.borderDark));
+  PushFlareImOp(draw, FlareMaskOp::FineLine, 0.0f, Metrics::kTaskbarH - 0.5f,
+                width_, Metrics::kTaskbarH - 0.5f, 0.0f);
 
   std::vector<TabView> tabs = TabBar(sim);
   tabs.erase(std::remove_if(tabs.begin(), tabs.end(), [](const TabView& tab) {
@@ -1117,6 +1172,8 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
                       ImVec2(layout_.sidefoot.Right(), layout_.sidefoot.Bottom()), ToIm(p.chrome));
   draw->AddLine(ImVec2(0.0f, layout_.sidefoot.y),
                 ImVec2(layout_.sidefoot.Right(), layout_.sidefoot.y), ToIm(p.border));
+  PushFlareImOp(draw, FlareMaskOp::FineLine, 0.0f, layout_.sidefoot.y + 0.5f,
+                layout_.sidefoot.Right(), layout_.sidefoot.y + 0.5f, 0.0f);
   for (const SideHit& hit : hits) {
     if (!hit.pinned) { continue; }
     if (hit.action == SideAction::Manifest || hit.action == SideAction::Log ||
@@ -2097,6 +2154,8 @@ void ShellView::PaintWrenExterior(const Simulation& sim) {
       liveAnchors.push_back(item.anchor);
     }
   }
+  PushFlareRayOp(FlareMaskOp::ShipRect, image.x - 10.0f, image.y - 10.0f,
+                 image.w + 20.0f, image.h + 20.0f, 1.0f);
 
   const auto hovered = [&](const ExteriorCallout& item) {
     return layout_.content.Contains(mouseX_, mouseY_) && item.box.Contains(mouseX_, mouseY_ + contentScroll_);
@@ -4050,7 +4109,22 @@ void ShellView::PaintNavScreen(Simulation& sim) {
   const std::string layer = chart.layer;
           rlVertex3f(v0.x, v0.y, v0.z); rlVertex3f(v2.x, v2.y, v2.z); rlVertex3f(v3.x, v3.y, v3.z);
         };
-        if (bright) { emitQuad(sz * 1.9f, Fade(amberCol, 0.24f)); }
+        if (bright) {
+          emitQuad(sz * 1.9f, Fade(amberCol, 0.24f));
+          Vector2 starSp{};
+          if (ProjectWorld3D(sc, mvp, width_, height_, &starSp, nullptr)) {
+            const float cix = box.x + kDoubleInset;
+            const float ciy = box.y + kDoubleInset - contentScroll_;
+            const float ciw = std::max(0.0f, box.w - 2.0f * kDoubleInset);
+            const float cih = std::max(0.0f, box.h - 2.0f * kDoubleInset);
+            if (starSp.x >= cix && starSp.x <= cix + ciw &&
+                starSp.y >= ciy && starSp.y <= ciy + cih) {
+              flareMask_.push_back(FlareMaskOp{
+                  FlareMaskOp::StarDisc, starSp.x, starSp.y, 2.2f, 2.2f, 0.55f,
+                  cix, ciy, ciw, cih});
+            }
+          }
+        }
         emitQuad(sz, c);
       }
       rlEnd();
@@ -4450,6 +4524,32 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     const float reach = itP->second.screenR + 6.0f;
     navHits_.push_back(NavHit{Area{cx - reach, cy - reach, reach * 2.0f, reach * 2.0f},
                               "select", body->id});
+  }
+
+  {
+    const float cix = box.x + kDoubleInset;
+    const float ciy = std::max(layout_.content.y, box.y + kDoubleInset - contentScroll_);
+    const float ciw = std::max(0.0f, box.w - 2.0f * kDoubleInset);
+    const float ciBot = std::min(layout_.content.Bottom(), box.Bottom() - kDoubleInset - contentScroll_);
+    const float cih = std::max(0.0f, ciBot - ciy);
+    if (ciw > 0.0f && cih > 0.0f) {
+      for (const NavBodyView* body : ordered) {
+        const auto itP = projById.find(body->id);
+        if (itP == projById.end() || !itP->second.onScreen) { continue; }
+        const float sxPos = itP->second.docPos.x;
+        const float syPos = itP->second.docPos.y - contentScroll_;
+        if (sxPos < cix || sxPos > cix + ciw || syPos < ciy || syPos > ciy + cih) { continue; }
+        const ChartLook look = ChartLookOf(*body);
+        const bool isStar = (look == ChartLook::Star || look == ChartLook::System ||
+                             look == ChartLook::Region || look == ChartLook::Origin);
+        const float starR = std::clamp(itP->second.screenR * (isStar ? 0.90f : 0.72f),
+                                       2.4f, isStar ? 10.0f : 7.5f);
+        const float starW = isStar ? 1.0f : 0.68f;
+        flareMask_.push_back(FlareMaskOp{
+            FlareMaskOp::StarDisc, sxPos, syPos, starR, starR, starW,
+            cix, ciy, ciw, cih});
+      }
+    }
   }
 
   for (const NavBodyView* body : ordered) {
@@ -7116,6 +7216,8 @@ void ShellView::PaintSetup(Simulation& sim) {
       const bool sel = dot.id == setupGalaxyId_;
       DrawCircle(static_cast<int>(pt.x), static_cast<int>(pt.y), sel ? 5.0f : 3.0f,
                  ToRay(sel ? p.terracotta : p.coffee));
+      PushFlareRayOp(FlareMaskOp::StarDisc, pt.x, pt.y, sel ? 5.2f : 3.2f,
+                     sel ? 5.2f : 3.2f, sel ? 1.0f : 0.80f);
       titleHits_.push_back({Area{pt.x - 8, pt.y - 8, 16, 16}, "setup-pick-galaxy", dot.id});
     }
   } else {
@@ -7128,6 +7230,8 @@ void ShellView::PaintSetup(Simulation& sim) {
       const bool sel = dot.id == setupSystemId_;
       DrawCircle(static_cast<int>(pt.x), static_cast<int>(pt.y), sel ? 4.5f : 2.5f,
                  ToRay(sel ? p.terracotta : p.coffee));
+      PushFlareRayOp(FlareMaskOp::StarDisc, pt.x, pt.y, sel ? 4.8f : 2.8f,
+                     sel ? 4.8f : 2.8f, sel ? 1.0f : 0.80f);
       titleHits_.push_back({Area{pt.x - 7, pt.y - 7, 14, 14}, "setup-pick-system", dot.id});
     }
   }
@@ -7232,6 +7336,24 @@ void ShellView::PaintTitleBody(Simulation& sim, double nowMs) {
                              static_cast<float>(texture->height)},
                    Rectangle{card.x, card.y, card.w, card.h}, Vector2{0.0f, 0.0f}, 0.0f,
                    ToRay(p.white));
+    auto titleSeg = [&](float x0, float y0, float x1, float y1) {
+      PushFlareRayOp(FlareMaskOp::FineLine,
+                     card.x + card.w * (x0 / 1672.0f), card.y + card.h * (y0 / 941.0f),
+                     card.x + card.w * (x1 / 1672.0f), card.y + card.h * (y1 / 941.0f), 0.0f);
+    };
+    titleSeg(50.0f, 28.0f, 1621.0f, 28.0f);
+    titleSeg(1621.0f, 28.0f, 1649.0f, 56.0f);
+    titleSeg(1649.0f, 56.0f, 1649.0f, 648.0f);
+    titleSeg(1649.0f, 648.0f, 1385.0f, 912.0f);
+    titleSeg(1385.0f, 912.0f, 22.0f, 912.0f);
+    titleSeg(22.0f, 912.0f, 22.0f, 56.0f);
+    titleSeg(22.0f, 56.0f, 50.0f, 28.0f);
+    titleSeg(56.0f, 39.5f, 1615.0f, 39.5f);
+    titleSeg(1615.0f, 39.5f, 1637.5f, 62.0f);
+    titleSeg(1637.5f, 62.0f, 1637.5f, 630.0f);
+    titleSeg(1637.5f, 630.0f, 1372.0f, 895.0f);
+    titleSeg(33.0f, 895.0f, 33.0f, 62.0f);
+    titleSeg(33.0f, 62.0f, 56.0f, 39.5f);
   }
 
   // A missing optional title image must never leave a blank window. Keep the
@@ -7293,6 +7415,7 @@ void ShellView::PaintTitleBody(Simulation& sim, double nowMs) {
   if (ImGui::Begin("##title-sheet", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
                    ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize |
                    ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBackground)) {
+    const std::size_t sheetFlareStart = flareMask_.size();
     const ImVec2 winPos = ImGui::GetWindowPos();
     ImDrawList* draw = ImGui::GetWindowDrawList();
     draw->ChannelsSplit(2);
@@ -7366,8 +7489,14 @@ void ShellView::PaintTitleBody(Simulation& sim, double nowMs) {
     draw->ChannelsSetCurrent(0);
     draw->PushClipRect(ImVec2(winPos.x - 2.0f, winPos.y - 2.0f),
                        ImVec2(winPos.x + w + 2.0f, winPos.y + finalH + 2.0f), false);
+    flareMask_.insert(flareMask_.begin() + static_cast<std::ptrdiff_t>(sheetFlareStart),
+                      FlareMaskOp{FlareMaskOp::ClearChamfer, winPos.x, winPos.y, w, finalH,
+                                  kChamferPanel, winPos.x - 2.0f, winPos.y - 2.0f,
+                                  w + 4.0f, finalH + 4.0f});
+    gFlareCtx.suppressFillClear = true;
     PaintChamferBoxIm(draw, winPos.x, winPos.y, w, finalH, kChamferPanel,
                       ToIm(p.titleDialog), ToIm(p.titleBorder), ToIm(p.border));
+    gFlareCtx.suppressFillClear = false;
     draw->PopClipRect();
     draw->ChannelsMerge();
   }
@@ -7742,6 +7871,7 @@ void ShellView::PaintPopup(Simulation& sim) {
       const float closeH = std::max(18.0f, headerH - 6.0f);
       const float dragW = std::max(24.0f, hdrW - closeW - 14.0f);
 
+      const std::size_t popFlareStart = flareMask_.size();
       winDraw->ChannelsSplit(2);
       winDraw->ChannelsSetCurrent(1);
 
@@ -7868,8 +7998,14 @@ void ShellView::PaintPopup(Simulation& sim) {
       winDraw->ChannelsSetCurrent(0);
       winDraw->PushClipRect(ImVec2(winPos.x - 2.0f, winPos.y - 2.0f),
                             ImVec2(winPos.x + w + 2.0f, winPos.y + finalH + 2.0f), false);
+      flareMask_.insert(flareMask_.begin() + static_cast<std::ptrdiff_t>(popFlareStart),
+                        FlareMaskOp{FlareMaskOp::ClearChamfer, winPos.x, winPos.y, w, finalH,
+                                    kChamferPanel, winPos.x - 2.0f, winPos.y - 2.0f,
+                                    w + 4.0f, finalH + 4.0f});
+      gFlareCtx.suppressFillClear = true;
       PaintChamferBoxIm(winDraw, winPos.x, winPos.y, w, finalH, kChamferPanel,
                         ToIm(p.panel), ToIm(p.borderDark), ToIm(p.border));
+      gFlareCtx.suppressFillClear = false;
       const float hdrCi = InnerChamfer(kChamferPanel, w, finalH, kDoubleInset + 1.0f);
       const std::array<ImVec2, 5> hdrPts = {{
           ImVec2(hdrX + hdrCi, hdrY),
@@ -7882,6 +8018,8 @@ void ShellView::PaintPopup(Simulation& sim) {
                                    ToIm(p.panel2));
       winDraw->AddLine(ImVec2(hdrX, hdrY + headerH), ImVec2(hdrX + hdrW, hdrY + headerH),
                        ToIm(p.borderDark));
+      PushFlareImOp(winDraw, FlareMaskOp::FineLine, hdrX, hdrY + headerH + 0.5f,
+                    hdrX + hdrW, hdrY + headerH + 0.5f, 0.0f);
       winDraw->PopClipRect();
       winDraw->ChannelsMerge();
     }

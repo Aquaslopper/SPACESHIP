@@ -43,6 +43,14 @@ namespace ship {
 
 enum class HitButton { None, Left, Right };
 
+struct FlareMaskOp {
+  enum Kind : unsigned char { ClearChamfer, ChamferLine, FineLine, ShipRect, StarDisc };
+  Kind kind = ChamferLine;
+  float x = 0.0f, y = 0.0f, w = 0.0f, h = 0.0f;
+  float param = 0.0f;
+  float clipX = 0.0f, clipY = 0.0f, clipW = 0.0f, clipH = 0.0f;
+};
+
 class ShellView {
  public:
   ShellView();
@@ -115,6 +123,7 @@ class ShellView {
 
   const Theme& CurrentTheme() const { return theme_; }
   void SetTheme(const Theme& theme) { theme_ = theme; }
+  const std::vector<FlareMaskOp>& FlareMask() const { return flareMask_; }
 
  private:
   struct NavHit {
@@ -437,6 +446,7 @@ class ShellView {
   std::string lossMessage_;
   LossModel loss_;
   std::vector<NavHit> lossHits_;
+  std::vector<FlareMaskOp> flareMask_;
 };
 
 }  // namespace ship
