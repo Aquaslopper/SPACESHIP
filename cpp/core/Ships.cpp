@@ -15,7 +15,7 @@
 namespace ship {
 
 double Simulation::ShipCargoCapacity(const std::string& kind, int level) const {
-  if (kind == "explorer-needle" || kind == "explorer-manta") {
+  if (kind == "explorer-needle" || kind == "explorer-manta" || kind == "yamato" || kind == "arcadia") {
     return ShipCargoCapacity("wren", level);
   }
   const int index = std::max(0, std::min(2, level));
@@ -48,7 +48,7 @@ bool Simulation::HasRoom(const std::string& id) const {
 bool Simulation::BuyRoom(const std::string& id) {
   if (!state_.gameOver.empty() || !state_.docked || HerePort() == nullptr ||
       state_.shiplets < RoomPrice() || StandardRoom(id) || HasRoom(id)) return false;
-  const DeckPlan& plan = (state_.shipClass == "wren" || state_.shipClass == "explorer-needle" || state_.shipClass == "explorer-manta") ? catalog_.wren : catalog_.kestrel;
+  const DeckPlan& plan = (state_.shipClass == "wren" || state_.shipClass == "explorer-needle" || state_.shipClass == "explorer-manta" || state_.shipClass == "yamato" || state_.shipClass == "arcadia") ? catalog_.wren : catalog_.kestrel;
   const Room* room = plan.FindRoom(id);
   if (room == nullptr) return false;
   const std::string name = room->name;
@@ -62,7 +62,7 @@ void Simulation::ApplyShipLayout() {
   // The reference keeps ROOM_BLUEPRINTS as the large plan and SMALL_ROOMS as the
   // compact one, and rewrites every room's box from the plan for the class the
   // voyage is flying. Unrecognised legacy rooms are preserved, not dropped.
-  const DeckPlan& plan = (state_.shipClass == "wren" || state_.shipClass == "explorer-needle" || state_.shipClass == "explorer-manta") ? catalog_.wren : catalog_.kestrel;
+  const DeckPlan& plan = (state_.shipClass == "wren" || state_.shipClass == "explorer-needle" || state_.shipClass == "explorer-manta" || state_.shipClass == "yamato" || state_.shipClass == "arcadia") ? catalog_.wren : catalog_.kestrel;
   for (Room& room : rooms_) {
     const Room* authored = plan.FindRoom(room.id);
     if (authored == nullptr) { continue; }
@@ -80,7 +80,7 @@ bool Simulation::BuyLargerShip(const std::string& kind) {
   if (!state_.gameOver.empty() || !state_.docked) { return false; }
   const Port* port = HerePort();
   if (port == nullptr || (kind == "kestrel" && state_.shipClass != "wren" &&
-                          state_.shipClass != "explorer-needle" && state_.shipClass != "explorer-manta") ||
+                          state_.shipClass != "explorer-needle" && state_.shipClass != "explorer-manta" && state_.shipClass != "yamato" && state_.shipClass != "arcadia") ||
       state_.shipClass == kind || state_.shiplets < price) { return false; }
 
   state_.shiplets -= price;

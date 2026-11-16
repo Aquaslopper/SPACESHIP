@@ -172,7 +172,7 @@ int main(int argc, char** argv) {
   theme.largeText = sim.State().options.largeText;
   theme.hideCrewLabels = sim.State().options.hideCrewLabels;
   theme.reducedMotion = sim.State().reducedMotion;
-  theme.stageCompact = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta");
+  theme.stageCompact = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta" || sim.State().shipClass == "yamato" || sim.State().shipClass == "arcadia");
 
   // Fonts. "segoe" stands in for the Windows faces with Selawik, which carries
   // Segoe UI's advance widths; "dejavu" is what the repository ships.
@@ -226,7 +226,7 @@ int main(int argc, char** argv) {
   Texture2D wrenExterior = LoadTexture("assets/art/ships/wren-exterior.png");
   if (wrenExterior.id != 0) { SetTextureFilter(wrenExterior, TEXTURE_FILTER_BILINEAR); }
   std::map<std::string, Texture2D> cargoExteriors;
-  for (const std::string kind : {"cargo-spine", "cargo-bulk", "explorer-needle", "explorer-manta"}) {
+  for (const std::string kind : {"cargo-spine", "cargo-bulk", "explorer-needle", "explorer-manta", "yamato", "arcadia"}) {
     cargoExteriors[kind] = LoadTexture(("assets/art/ships/" + kind + "-exterior.png").c_str());
     SetTextureFilter(cargoExteriors[kind], TEXTURE_FILTER_BILINEAR);
   }
@@ -290,7 +290,7 @@ int main(int argc, char** argv) {
     next.largeText = sim.State().options.largeText;
     next.hideCrewLabels = sim.State().options.hideCrewLabels;
     next.reducedMotion = sim.State().reducedMotion;
-    next.stageCompact = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta");
+    next.stageCompact = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta" || sim.State().shipClass == "yamato" || sim.State().shipClass == "arcadia");
     const bool changed = next.id != theme.id || next.fontStep != theme.fontStep ||
                          next.largeText != theme.largeText ||
                          next.hideCrewLabels != theme.hideCrewLabels ||

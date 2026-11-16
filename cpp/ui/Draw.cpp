@@ -844,7 +844,7 @@ void ShellView::PaintLaunchCard(double elapsedMs) {
 }
 
 void ShellView::SyncIdleDots(const Simulation& sim, double nowMs) {
-  const bool compact = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta");
+  const bool compact = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta" || sim.State().shipClass == "yamato" || sim.State().shipClass == "arcadia");
   // Reconcile by identity, not just count. Retain cosmetic movement while
   // refreshing its effective room (job, medical, social or corridor) every frame.
   std::vector<DriftDot> current;
@@ -1854,7 +1854,7 @@ bool ShellView::HasWrenExterior(const Simulation& sim) const {
   const Texture2D* texture = static_cast<const Texture2D*>(wrenExteriorArt_);
   if ((sim.State().shipClass != "wren" && sim.State().shipClass != "cargo-spine" &&
        sim.State().shipClass != "cargo-bulk" && sim.State().shipClass != "explorer-needle" &&
-       sim.State().shipClass != "explorer-manta") || texture == nullptr || texture->id == 0 ||
+       sim.State().shipClass != "explorer-manta" && sim.State().shipClass != "yamato" && sim.State().shipClass != "arcadia") || texture == nullptr || texture->id == 0 ||
       texture->width <= 0 || texture->height <= 0) return false;
   // Selected exterior artwork remains visible throughout the voyage. The callouts
   // are built from sim.Rooms(), so only installed rooms are usable.
@@ -1944,7 +1944,8 @@ ShellView::ExteriorLayout ShellView::BuildExteriorLayout(const Simulation& sim, 
     const float nx = std::clamp(static_cast<float>((rooms[i].box.x + rooms[i].box.w * 0.5) / 600.0), 0.0f, 1.0f);
     const float ny = std::clamp(static_cast<float>((rooms[i].box.y + rooms[i].box.h * 0.5) / 365.0), 0.0f, 1.0f);
     const float u = 0.07f + 0.86f * nx;
-    const float v = 0.30f + 0.42f * ny;
+    const float v = sim.State().shipClass == "yamato" || sim.State().shipClass == "arcadia"
+        ? 0.68f + 0.18f * ny : 0.30f + 0.42f * ny;
     item.normUV = Vector2{u, v};
     item.localZ = SampleWrenHullZ(u, v);
     item.anchor = {out.image.x + out.image.w * u,

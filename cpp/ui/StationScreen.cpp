@@ -683,7 +683,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   yard.badge = Num(purse) + " sh, hull " + Num(sim.StatValue("hull")) + "%";
   yard.notes.push_back("Shiplets only: no click is spent and nothing is locked. A one-time "
                        "refit, room or hire greys out once it is owned.");
-  if ((sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta")) {
+  if ((sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta" || sim.State().shipClass == "yamato" || sim.State().shipClass == "arcadia")) {
     yard.notes.push_back(
         "Your compact " + sim.Ship().Get("name") + ": " + Num(capacity) + " m3 cargo, 6 berths. Trade up to the "
         "Kestrel-series SC Tessellate: " +
@@ -726,12 +726,13 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     yard.rows.push_back(ship);
   }
 
-  for (const std::string kind : {"cargo-spine", "cargo-bulk", "explorer-needle", "explorer-manta"}) {
+  for (const std::string kind : {"cargo-spine", "cargo-bulk", "explorer-needle", "explorer-manta", "yamato", "arcadia"}) {
     const auto& fields = sim.World().shipFields.at(kind);
     StationRow ship;
     ship.id = "ship-buy:" + kind;
     ship.label = fields.at("name") +
-        (kind == "explorer-needle" || kind == "explorer-manta" ? " - explorer - 1 sh" : " - cargo hauler - 1 sh");
+        (kind == "yamato" || kind == "arcadia" ? " - anime ship - 1 sh" :
+         kind == "explorer-needle" || kind == "explorer-manta" ? " - explorer - 1 sh" : " - cargo hauler - 1 sh");
     ship.free = true;
     ship.done = sim.State().shipClass == kind;
     ship.enabled = !ship.done && purse >= 1;
@@ -829,7 +830,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     heading.label = "Optional rooms - 500 sh each";
     heading.reading = true;
     yard.rows.push_back(heading);
-    const DeckPlan& plan = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta") ? sim.World().wren : sim.World().kestrel;
+    const DeckPlan& plan = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta" || sim.State().shipClass == "yamato" || sim.State().shipClass == "arcadia") ? sim.World().wren : sim.World().kestrel;
     for (const Room& room : plan.rooms) {
       if (Simulation::StandardRoom(room.id) || sim.HasRoom(room.id)) continue;
       StationRow row;
@@ -1029,6 +1030,8 @@ bool PressStationActionRaw(Simulation& sim, const std::string& action,
   if (action == "ship-buy:cargo-bulk") return sim.BuyLargerShip("cargo-bulk");
   if (action == "ship-buy:explorer-needle") return sim.BuyLargerShip("explorer-needle");
   if (action == "ship-buy:explorer-manta") return sim.BuyLargerShip("explorer-manta");
+  if (action == "ship-buy:yamato") return sim.BuyLargerShip("yamato");
+  if (action == "ship-buy:arcadia") return sim.BuyLargerShip("arcadia");
   if (action.compare(0, 9, "room-buy:") == 0) return sim.BuyRoom(action.substr(9));
   if (action.compare(0, 17, "commission-accept") == 0) {
     return sim.AcceptCommission(action.substr(18));

@@ -455,7 +455,7 @@ int main(int argc, char** argv) {
   theme.largeText = sim.State().options.largeText;
   theme.hideCrewLabels = sim.State().options.hideCrewLabels;
   theme.reducedMotion = sim.State().reducedMotion;
-  theme.stageCompact = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta");
+  theme.stageCompact = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta" || sim.State().shipClass == "yamato" || sim.State().shipClass == "arcadia");
 
   // rlImGui owns the ImGui context, so add the four reading sizes between its
   // two init halves. The renderer builds/uploads the complete atlas afterward.
@@ -486,7 +486,7 @@ int main(int argc, char** argv) {
     std::fprintf(stderr, "spaceship: Wren exterior unavailable; using deck plan\n");
   }
   std::map<std::string, Texture2D> cargoExteriors;
-  for (const std::string kind : {"cargo-spine", "cargo-bulk", "explorer-needle", "explorer-manta"}) {
+  for (const std::string kind : {"cargo-spine", "cargo-bulk", "explorer-needle", "explorer-manta", "yamato", "arcadia"}) {
     const auto path = assets / "art" / "ships" / (kind + "-exterior.png");
     Texture2D texture = LoadTexture(path.string().c_str());
     if (texture.id != 0) {
@@ -636,7 +636,7 @@ int main(int argc, char** argv) {
     nextTheme.largeText = sim.State().options.largeText;
     nextTheme.hideCrewLabels = sim.State().options.hideCrewLabels;
     nextTheme.reducedMotion = sim.State().reducedMotion;
-    nextTheme.stageCompact = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta");
+    nextTheme.stageCompact = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta" || sim.State().shipClass == "yamato" || sim.State().shipClass == "arcadia");
     const bool themeChanged = nextTheme.id != theme.id ||
                               nextTheme.fontStep != theme.fontStep ||
                               nextTheme.largeText != theme.largeText ||

@@ -8,7 +8,7 @@
 
 int main() {
   const auto catalog = ship::Catalog::LoadFromAssets("assets");
-  for (const std::string kind : {"explorer-needle", "explorer-manta"}) {
+  for (const std::string kind : {"explorer-needle", "explorer-manta", "yamato", "arcadia"}) {
     auto sim = ship::Simulation::NewVoyage(catalog);
     sim.MutableMap().here = sim.World().ports.front().id;
     sim.MutableMap().inSpace = false;
