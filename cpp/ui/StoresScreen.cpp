@@ -135,7 +135,7 @@ CargoRoomModel BuildCargoRoom(const Simulation& sim, CargoSelection* selection) 
   model.head.kind = "ROOM";
   model.head.title = "Cargo Hold";
   model.head.sub = "Freight, lots and the space they take";
-  model.shipLabel = sim.State().shipClass == "kestrel" ? "SC Tessellate" : "SC Wren";
+  model.shipLabel = sim.Ship().Get("name");
   model.selectedLotId = sel.lotId;
 
   model.used = sim.CargoUsed();

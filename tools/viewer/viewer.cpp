@@ -172,7 +172,7 @@ int main(int argc, char** argv) {
   theme.largeText = sim.State().options.largeText;
   theme.hideCrewLabels = sim.State().options.hideCrewLabels;
   theme.reducedMotion = sim.State().reducedMotion;
-  theme.stageCompact = sim.State().shipClass == "wren";
+  theme.stageCompact = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta" || sim.State().shipClass == "yamato" || sim.State().shipClass == "arcadia");
 
   // Fonts. "segoe" stands in for the Windows faces with Selawik, which carries
   // Segoe UI's advance widths; "dejavu" is what the repository ships.
@@ -225,6 +225,11 @@ int main(int argc, char** argv) {
   if (splashTexture.id != 0) { SetTextureFilter(splashTexture, TEXTURE_FILTER_BILINEAR); }
   Texture2D wrenExterior = LoadTexture("assets/art/ships/wren-exterior.png");
   if (wrenExterior.id != 0) { SetTextureFilter(wrenExterior, TEXTURE_FILTER_BILINEAR); }
+  std::map<std::string, Texture2D> cargoExteriors;
+  for (const std::string kind : {"cargo-spine", "cargo-bulk", "explorer-needle", "explorer-manta", "yamato", "arcadia"}) {
+    cargoExteriors[kind] = LoadTexture(("assets/art/ships/" + kind + "-exterior.png").c_str());
+    SetTextureFilter(cargoExteriors[kind], TEXTURE_FILTER_BILINEAR);
+  }
   std::array<Texture2D, 6> tutorialTextures{};
   for (std::size_t i = 0; i < tutorialTextures.size(); ++i) {
     const std::string path = "assets/art/tutorial/spaceship0" + std::to_string(i + 1) + ".png";
@@ -273,12 +278,19 @@ int main(int argc, char** argv) {
     else if (imButton == 0) { ImGui::GetIO().AddMouseButtonEvent(0, false); imButton = -1; }
     shell.Move(mouseX, mouseY);
 
+    const auto cargoExterior = cargoExteriors.find(sim.State().shipClass);
+    if (cargoExterior != cargoExteriors.end()) {
+      shell.SetWrenExteriorTexture(&cargoExterior->second,
+          "art/ships/" + cargoExterior->first + "-exterior.png");
+    } else {
+      shell.SetWrenExteriorTexture(&wrenExterior);
+    }
     ship::Theme next = ship::Theme::ById(sim.State().options.theme);
     next.fontStep = sim.State().options.fontStep;
     next.largeText = sim.State().options.largeText;
     next.hideCrewLabels = sim.State().options.hideCrewLabels;
     next.reducedMotion = sim.State().reducedMotion;
-    next.stageCompact = sim.State().shipClass == "wren";
+    next.stageCompact = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta" || sim.State().shipClass == "yamato" || sim.State().shipClass == "arcadia");
     const bool changed = next.id != theme.id || next.fontStep != theme.fontStep ||
                          next.largeText != theme.largeText ||
                          next.hideCrewLabels != theme.hideCrewLabels ||

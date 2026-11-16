@@ -1,0 +1,44 @@
+# Both selected side-elevation explorer hulls, bought through the shipyard controls.
+title 0
+frames 3
+clickhit title new-voyage
+frames 3
+clickhit title setup-pick-galaxy | gal-gen-9
+frames 3
+clickhit title setup-pick-system | sec-gen-205
+frames 3
+clickhit title setup-launch
+frames 400
+move 5 500
+textlog on
+open station st-gen-205
+frames 3
+clickhit nav station-cat:yard
+frames 3
+shot explorer-shipyard
+clickhit nav station-item:ship-buy:explorer-needle
+frames 3
+clickhit nav row | ship-buy:explorer-needle
+frames 3
+state
+tab home
+frames 3
+shot explorer-needle-home
+open room cargo
+frames 3
+shot explorer-needle-hold
+open station st-gen-205
+frames 3
+clickhit nav station-cat:yard
+frames 3
+clickhit nav station-item:ship-buy:explorer-manta
+frames 3
+clickhit nav row | ship-buy:explorer-manta
+frames 3
+state
+tab home
+frames 3
+shot explorer-manta-home
+open room cargo
+frames 3
+shot explorer-manta-hold

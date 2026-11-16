@@ -1,5 +1,11 @@
 {
   "cargoByClass": {
+    "yamato": [40, 60, 90],
+    "arcadia": [40, 60, 90],
+    "explorer-needle": [40, 60, 90],
+    "explorer-manta": [40, 60, 90],
+    "cargo-spine": [120, 180, 240],
+    "cargo-bulk": [240, 360, 480],
     "kestrel": [
       60,
       90,
@@ -730,6 +736,80 @@
     ]
   },
   "ships": {
+    "yamato": {
+      "beam": "28 m",
+      "berths": "6",
+      "built": "2388",
+      "className": "Yamato anime-inspired hull",
+      "commander": "Commander",
+      "decks": "3",
+      "drive": "Single nacelle, compact core",
+      "height": "22 m",
+      "length": "88 m",
+      "mass": "2,100 t laden",
+      "name": "Yamato",
+      "refit": "Compact multipurpose fit",
+      "registry": "WN-1083",
+      "yard": "Kessler Cooperative Yards"
+    },
+    "arcadia": {
+      "beam": "28 m",
+      "berths": "6",
+      "built": "2388",
+      "className": "Arcadia anime-inspired hull",
+      "commander": "Commander",
+      "decks": "3",
+      "drive": "Single nacelle, compact core",
+      "height": "22 m",
+      "length": "88 m",
+      "mass": "2,100 t laden",
+      "name": "Arcadia",
+      "refit": "Compact multipurpose fit",
+      "registry": "WN-1083",
+      "yard": "Kessler Cooperative Yards"
+    },
+    "explorer-needle": {
+      "beam": "28 m",
+      "berths": "6",
+      "built": "2388",
+      "className": "Needle exploration ship",
+      "commander": "Commander",
+      "decks": "3",
+      "drive": "Single nacelle, compact core",
+      "height": "22 m",
+      "length": "88 m",
+      "mass": "2,100 t laden",
+      "name": "SC Needle",
+      "refit": "Compact multipurpose fit",
+      "registry": "WN-1083",
+      "yard": "Kessler Cooperative Yards"
+    },
+    "explorer-manta": {
+      "beam": "28 m",
+      "berths": "6",
+      "built": "2388",
+      "className": "Manta exploration ship",
+      "commander": "Commander",
+      "decks": "3",
+      "drive": "Single nacelle, compact core",
+      "height": "22 m",
+      "length": "88 m",
+      "mass": "2,100 t laden",
+      "name": "SC Manta",
+      "refit": "Compact multipurpose fit",
+      "registry": "WN-1083",
+      "yard": "Kessler Cooperative Yards"
+    },
+    "cargo-spine": {
+      "name": "SC Cargo Spine",
+      "className": "Spine cargo hauler",
+      "berths": "14"
+    },
+    "cargo-bulk": {
+      "name": "SC Cargo Bulk",
+      "className": "Bulk cargo hauler",
+      "berths": "14"
+    },
     "kestrel": {
       "beam": "64 m",
       "berths": "14",
