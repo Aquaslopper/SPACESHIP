@@ -1197,7 +1197,7 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
       }
       state_.options.displayBrightness = DisplayBrightness(GetNumber(*it, "displayBrightness", 1.0));
       state_.options.colorShift = GetNumber(*it, "colorShift", 0.0);
-      state_.options.glow = GetNumber(*it, "glow", 0.0);
+      state_.options.glow = GetNumber(*it, "glow", 1.0);
       state_.options.radiationWave =
           RadiationWaveStrength(GetNumber(*it, "radiationWave", kRadiationWaveDefault));
       const double step = GetNumber(*it, "fontStep", 0.0);
