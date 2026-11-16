@@ -832,13 +832,16 @@ int main(int argc, char** argv) {
 
     const float waveScale = sim.State().reducedMotion
                                 ? 0.0f
-                                : static_cast<float>(ship::RadiationWaveStrength(
+                                : static_cast<float>(ship::EffectiveRadiationWave(
                                       sim.State().options.radiationWave));
+    const float glowScale = static_cast<float>(ship::EffectiveGlow(sim.State().options.glow));
+    const float flareScale =
+        static_cast<float>(ship::EffectiveLensFlare(sim.State().options.lensFlare));
     const bool adjusted = display.Ready() &&
         (ship::EffectiveDisplayGamma(sim.State().options.displayGamma) != 1.0 ||
          ship::DisplayBrightness(sim.State().options.displayBrightness) != 1.0 ||
          waveScale > 0.001f || sim.State().options.colorShift != 0.0 ||
-         sim.State().options.glow > 0.0);
+         glowScale > 0.0f);
     if (adjusted) {
       display.Begin();
       // The offscreen texture uses logical screen pixels even on Retina
@@ -860,9 +863,7 @@ int main(int argc, char** argv) {
                   waveTime, smoothedWave.waveDirX, smoothedWave.waveDirY,
                   smoothedWave.baseIntensity, waveScale, smoothedWave.warmBias,
                   static_cast<float>(sim.State().options.colorShift),
-                  static_cast<float>(sim.State().options.glow),
-                  static_cast<float>(std::clamp(sim.State().options.lensFlare, 0.0, 2.0)),
-                  shell.FlareTargets());
+                  glowScale, flareScale, shell.FlareTargets());
     }
     EndDrawing();
   }

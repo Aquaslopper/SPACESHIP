@@ -64,7 +64,7 @@ struct PopupModel {
   std::string audioLevel;
   float displayGamma = 1.0f;
   float displayBrightness = 1.0f;
-  float radiationWave = 1.3f;
+  float radiationWave = 1.0f;
   float colorShift = 0.0f;
   float glow = 1.0f;
   float lensFlare = 1.0f;
