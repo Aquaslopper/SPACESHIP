@@ -164,6 +164,7 @@ struct Options {
   double radiationWave = 1.3;
   double colorShift = 0.0;
   double glow = 1.0;
+  double lensFlare = 1.0;
   int fontStep = 2;
   bool fullscreen = true;
 };

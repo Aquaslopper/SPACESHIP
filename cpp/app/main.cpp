@@ -226,6 +226,10 @@ uniform float displayGamma;
 uniform float displayBrightness;
 uniform float uColorShift;
 uniform float uGlow;
+uniform float uLensFlare;
+uniform sampler2D uFlareCoreTex;
+uniform sampler2D uFlareMidTex;
+uniform sampler2D uFlareWideTex;
 uniform vec2 uResolution;
 uniform float uTime;
 uniform vec2 uWaveDir;
@@ -289,6 +293,33 @@ void main() {
       }
       rgb += bloom * colDiffuse.rgb * fragColor.rgb * (uGlow / weights);
     }
+    if (uLensFlare > 0.001) {
+      vec3 fCore = texture(uFlareCoreTex, uv).rgb;
+      vec3 fMid = texture(uFlareMidTex, uv).rgb;
+      vec3 fWide = texture(uFlareWideTex, uv).rgb;
+      vec3 fGhost = texture(uFlareWideTex, vec2(1.0 - uv.x, uv.y)).rgb;
+      float corePeak = max(fCore.r, max(fCore.g, fCore.b));
+      float widePeak = max(fWide.r, max(fWide.g, fWide.b));
+      vec3 hotCore = mix(fCore, vec3(1.0, 0.97, 0.90) * corePeak, 0.62);
+      vec3 wideAnam = mix(fWide, vec3(0.12, 0.58, 1.00) * widePeak, 0.28);
+      vec3 streak = hotCore * 0.85 + fMid * 1.55 + wideAnam * 3.30
+                    + fGhost * vec3(0.11, 0.26, 0.48);
+      vec3 flare = max(streak * uLensFlare, vec3(0.0)) * colDiffuse.rgb * fragColor.rgb;
+      vec3 base = clamp(rgb, 0.0, 1.0);
+      vec3 exposed = vec3(1.0) - (vec3(1.0) - base) * exp(-flare * 0.85);
+      float fPeak = max(flare.r, max(flare.g, flare.b));
+      if (fPeak > 0.0004) {
+        vec3 fChroma = flare / fPeak;
+        float coreHot = clamp(corePeak * uLensFlare * 0.72, 0.0, 0.68);
+        vec3 beamTint = mix(mix(fChroma, vec3(0.86, 0.96, 1.0), 0.14),
+                            vec3(1.0, 0.99, 0.96), coreHot);
+        float daylight = smoothstep(0.54, 0.94, luma);
+        float veil = (1.0 - exp(-fPeak * 0.88)) * daylight * 0.52;
+        rgb = mix(exposed, beamTint, veil);
+      } else {
+        rgb = exposed;
+      }
+    }
   }
   float angle = radians(uColorShift);
   vec3 axis = normalize(vec3(1.0));
@@ -299,9 +330,149 @@ void main() {
   finalColor = vec4(clamp(calibrated, 0.0, 1.0), 1.0);
 }
 )GLSL";
+    static const char* extractFragment = R"GLSL(#version 330
+in vec2 fragTexCoord;
+in vec4 fragColor;
+uniform sampler2D texture0;
+uniform vec2 uResolution;
+uniform float uTime;
+uniform vec2 uWaveDir;
+uniform float uIntensity;
+uniform float uOptionScale;
+uniform float uGlow;
+uniform vec3 uWarmTint;
+uniform float uFlarePack;
+out vec4 finalColor;
+float Luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+void main() {
+  vec2 uv = fragTexCoord;
+  vec2 res = max(uResolution, vec2(1.0));
+  vec2 texel = 1.0 / res;
+  float dirLen = length(uWaveDir);
+  vec2 dir = dirLen > 0.0001 ? (uWaveDir / dirLen) : vec2(0.76, 0.65);
+  vec2 screenPos = vec2(uv.x, 1.0 - uv.y) * res;
+  vec2 centered = (screenPos - 0.5 * res) / min(res.x, res.y);
+  float proj = dot(centered, dir);
+  float phase = proj * 2.25 - uTime * 0.42 + 0.16 * sin(proj * 1.1 + uTime * 0.13);
+  float wave01 = clamp(0.5 + 0.5 * cos(phase), 0.0, 1.0);
+  float crest = pow(wave01, 3.5);
+  float glint = pow(wave01, 8.0);
+  float baseShift = clamp(mix(0.45, 0.90, clamp(uIntensity, 0.0, 1.0)) * uOptionScale, 0.0, 1.35);
+  float shiftPx = baseShift * crest;
+  vec2 shiftUV = vec2(dir.x, -dir.y) * (shiftPx * texel);
+
+  vec2 uv0 = clamp(uv + vec2(-0.35, -0.35) * texel, vec2(0.0), vec2(1.0));
+  vec3 c0 = texture(texture0, uv0).rgb;
+  vec3 c0P = texture(texture0, clamp(uv0 + shiftUV, vec2(0.0), vec2(1.0))).rgb;
+  vec3 c0M = texture(texture0, clamp(uv0 - shiftUV, vec2(0.0), vec2(1.0))).rgb;
+  vec3 sh0 = max(vec3(c0P.r, c0.g, c0M.b) - c0, vec3(0.0));
+
+  vec2 uv1 = clamp(uv + vec2(0.65, 0.65) * texel, vec2(0.0), vec2(1.0));
+  vec3 c1 = texture(texture0, uv1).rgb;
+  vec3 c1P = texture(texture0, clamp(uv1 + shiftUV, vec2(0.0), vec2(1.0))).rgb;
+  vec3 c1M = texture(texture0, clamp(uv1 - shiftUV, vec2(0.0), vec2(1.0))).rgb;
+  vec3 sh1 = max(vec3(c1P.r, c1.g, c1M.b) - c1, vec3(0.0));
+
+  vec3 shimmer = mix(0.5 * (sh0 + sh1), max(sh0, sh1), 0.60);
+  float shEnergy = max(shimmer.r, shimmer.b) + 0.35 * min(shimmer.r, shimmer.b);
+  float shKnee = smoothstep(0.024, 0.25, shEnergy);
+  shKnee *= sqrt(shKnee) * smoothstep(0.0, 0.18, crest);
+  if (shKnee <= 0.0001) {
+    finalColor = vec4(0.0, 0.0, 0.0, 1.0);
+    return;
+  }
+
+  float lC = Luma(c0);
+  float lL1 = Luma(texture(texture0, clamp(uv + vec2(-2.0 * texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb);
+  float lR1 = Luma(texture(texture0, clamp(uv + vec2( 2.0 * texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb);
+  float lU1 = Luma(texture(texture0, clamp(uv + vec2(0.0,  2.0 * texel.y), vec2(0.0), vec2(1.0))).rgb);
+  float lD1 = Luma(texture(texture0, clamp(uv + vec2(0.0, -2.0 * texel.y), vec2(0.0), vec2(1.0))).rgb);
+  float lL2 = Luma(texture(texture0, clamp(uv + vec2(-5.0 * texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb);
+  float lR2 = Luma(texture(texture0, clamp(uv + vec2( 5.0 * texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb);
+  float lL3 = Luma(texture(texture0, clamp(uv + vec2(-9.0 * texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb);
+  float lR3 = Luma(texture(texture0, clamp(uv + vec2( 9.0 * texel.x, 0.0), vec2(0.0), vec2(1.0))).rgb);
+  float lU2 = Luma(texture(texture0, clamp(uv + vec2(0.0,  5.0 * texel.y), vec2(0.0), vec2(1.0))).rgb);
+  float lD2 = Luma(texture(texture0, clamp(uv + vec2(0.0, -5.0 * texel.y), vec2(0.0), vec2(1.0))).rgb);
+
+  float surround = (lL1 + lR1 + lU1 + lD1 + lL2 + lR2 + lU2 + lD2) * 0.125;
+  float outerSpan = max(abs(lL2 - lR2), abs(lU2 - lD2));
+  float darkSpeck = smoothstep(0.05, 0.20, surround - lC) * (1.0 - smoothstep(0.04, 0.16, outerSpan));
+  float chatL = abs(lL1 - lC) + abs(lL2 - lL1) + abs(lL3 - lL2);
+  float chatR = abs(lR1 - lC) + abs(lR2 - lR1) + abs(lR3 - lR2);
+  float textRun = smoothstep(0.14, 0.44, min(chatL, chatR)) * smoothstep(0.28, 0.78, max(chatL, chatR));
+  float cleanMask = (1.0 - 0.94 * darkSpeck) * (1.0 - 0.90 * textRun);
+
+  vec3 hiCol = max(max(c0, c1), max(c0P, c0M));
+  float hiLuma = Luma(hiCol);
+  float peakL = max(lC, Luma(c1));
+  float starHit = smoothstep(0.042, 0.25, peakL - surround) * (0.72 + 0.88 * hiLuma);
+  float gx = abs(lR1 - lL1);
+  float gy = abs(lD1 - lU1);
+  float specHit = smoothstep(0.052, 0.26, sqrt(max(0.0, gx * gy))) * smoothstep(0.24, 0.86, hiLuma);
+  float edgeHit = smoothstep(0.085, 0.30, length(vec2(gx, gy))) * smoothstep(0.28, 0.90, hiLuma);
+
+  float waveGain = clamp(uIntensity * uOptionScale, 0.0, 2.0)
+                   * (0.85 + 0.25 * clamp(uGlow, 0.0, 2.0));
+  float energy = shKnee * cleanMask
+                 * (starHit * (2.90 + 4.10 * glint)
+                    + specHit * (1.35 + 2.65 * glint)
+                    + edgeHit * (0.28 + 0.65 * glint))
+                 * waveGain;
+
+  vec3 coatCool = vec3(0.10, 0.56, 1.00);
+  vec3 coatWarm = mix(vec3(1.00, 0.64, 0.22), uWarmTint, 0.30);
+  float redShare = shimmer.r / max(shimmer.r + shimmer.b, 0.0001);
+  float warmFactor = clamp(uWarmTint.r - uWarmTint.b + 0.35, 0.0, 1.0);
+  float warmMix = clamp(0.06 + 0.50 * redShare * (0.35 + 0.65 * warmFactor), 0.0, 0.64);
+  vec3 coat = mix(coatCool, coatWarm, warmMix);
+  float srcMax = max(hiCol.r, max(hiCol.g, hiCol.b));
+  float srcMin = min(hiCol.r, min(hiCol.g, hiCol.b));
+  float srcSat = clamp((srcMax - srcMin) / max(srcMax, 0.1), 0.0, 1.0);
+  vec3 col = mix(coat, hiCol / max(srcMax, 0.15), 0.26 * srcSat);
+  finalColor = vec4(clamp(col * energy * uFlarePack, vec3(0.0), vec3(10.0)), 1.0);
+}
+)GLSL";
+    static const char* blurFragment = R"GLSL(#version 330
+in vec2 fragTexCoord;
+in vec4 fragColor;
+uniform sampler2D texture0;
+uniform vec2 uTexel;
+uniform float uStride;
+uniform float uDispersion;
+uniform float uVertTap;
+uniform float uFalloff;
+out vec4 finalColor;
+void main() {
+  vec2 uv = fragTexCoord;
+  vec3 acc = vec3(0.0);
+  float wSum = 0.0;
+  for (int i = -8; i <= 8; ++i) {
+    float fi = float(i);
+    float w = exp(-0.042 * fi * fi - abs(fi) * uFalloff);
+    float dx = fi * uStride * uTexel.x;
+    float r = texture(texture0, clamp(uv + vec2(dx * (1.0 - uDispersion), 0.0), vec2(0.0), vec2(1.0))).r;
+    float g = texture(texture0, clamp(uv + vec2(dx, 0.0), vec2(0.0), vec2(1.0))).g;
+    float b = texture(texture0, clamp(uv + vec2(dx * (1.0 + uDispersion), 0.0), vec2(0.0), vec2(1.0))).b;
+    vec3 s = vec3(r, g, b);
+    if (uVertTap > 0.001 && abs(i) <= 2) {
+      float dy = uVertTap * uTexel.y;
+      vec3 su = texture(texture0, clamp(uv + vec2(dx,  dy), vec2(0.0), vec2(1.0))).rgb;
+      vec3 sd = texture(texture0, clamp(uv + vec2(dx, -dy), vec2(0.0), vec2(1.0))).rgb;
+      s = s * 0.68 + (su + sd) * 0.16;
+    }
+    acc += s * w;
+    wSum += w;
+  }
+  finalColor = vec4(acc / max(wSum, 0.0001), 1.0);
+}
+)GLSL";
     shader_ = LoadShaderFromMemory(nullptr, fragment);
     colorShiftLoc_ = GetShaderLocation(shader_, "uColorShift");
     glowLoc_ = GetShaderLocation(shader_, "uGlow");
+    lensFlareLoc_ = GetShaderLocation(shader_, "uLensFlare");
+    flareCoreLoc_ = GetShaderLocation(shader_, "uFlareCoreTex");
+    flareMidLoc_ = GetShaderLocation(shader_, "uFlareMidTex");
+    flareWideLoc_ = GetShaderLocation(shader_, "uFlareWideTex");
     gammaLoc_ = GetShaderLocation(shader_, "displayGamma");
     brightnessLoc_ = GetShaderLocation(shader_, "displayBrightness");
     resLoc_ = GetShaderLocation(shader_, "uResolution");
@@ -315,12 +486,31 @@ void main() {
       std::fprintf(stderr, "spaceship: display adjustment shader unavailable; using unadjusted display\n");
       return;
     }
+    extractShader_ = LoadShaderFromMemory(nullptr, extractFragment);
+    extResLoc_ = GetShaderLocation(extractShader_, "uResolution");
+    extTimeLoc_ = GetShaderLocation(extractShader_, "uTime");
+    extWaveDirLoc_ = GetShaderLocation(extractShader_, "uWaveDir");
+    extIntensityLoc_ = GetShaderLocation(extractShader_, "uIntensity");
+    extOptionScaleLoc_ = GetShaderLocation(extractShader_, "uOptionScale");
+    extGlowLoc_ = GetShaderLocation(extractShader_, "uGlow");
+    extWarmTintLoc_ = GetShaderLocation(extractShader_, "uWarmTint");
+    extPackLoc_ = GetShaderLocation(extractShader_, "uFlarePack");
+    blurShader_ = LoadShaderFromMemory(nullptr, blurFragment);
+    blurTexelLoc_ = GetShaderLocation(blurShader_, "uTexel");
+    blurStrideLoc_ = GetShaderLocation(blurShader_, "uStride");
+    blurDispLoc_ = GetShaderLocation(blurShader_, "uDispersion");
+    blurVertLoc_ = GetShaderLocation(blurShader_, "uVertTap");
+    blurFalloffLoc_ = GetShaderLocation(blurShader_, "uFalloff");
+    flareShadersReady_ = IsShaderValid(extractShader_) && IsShaderValid(blurShader_) &&
+                         lensFlareLoc_ >= 0 && flareCoreLoc_ >= 0 &&
+                         flareMidLoc_ >= 0 && flareWideLoc_ >= 0;
     Resize(width, height);
   }
   void Resize(int width, int height) {
     if (!shaderReady_ || width < 1 || height < 1) return;
     if (width == width_ && height == height_) return;
     if (target_.id != 0) UnloadRenderTexture(target_);
+    ReleaseFlareTargets();
     target_ = LoadRenderTexture(width, height);
     width_ = width; height_ = height;
     if (!IsRenderTextureValid(target_)) {
@@ -328,12 +518,30 @@ void main() {
     } else {
       SetTextureFilter(target_.texture, TEXTURE_FILTER_BILINEAR);
       SetTextureWrap(target_.texture, TEXTURE_WRAP_CLAMP);
+      if (flareShadersReady_) {
+        const int fw = std::max(1, width / 2);
+        const int fh = std::max(1, height / 2);
+        bool hdr0 = false, hdr1 = false, hdr2 = false;
+        flareCore_ = CreateFlareTarget(fw, fh, &hdr0);
+        flareMid_ = CreateFlareTarget(fw, fh, &hdr1);
+        flareWide_ = CreateFlareTarget(fw, fh, &hdr2);
+        if (IsFlareTargetValid(flareCore_) && IsFlareTargetValid(flareMid_) &&
+            IsFlareTargetValid(flareWide_)) {
+          const bool allHdr = hdr0 && hdr1 && hdr2;
+          flarePack_ = allHdr ? 1.0f : 0.25f;
+          flareUnpack_ = allHdr ? 1.0f : 4.0f;
+          flareReady_ = true;
+        } else {
+          ReleaseFlareTargets();
+        }
+      }
     }
   }
   bool Ready() const { return shaderReady_ && IsRenderTextureValid(target_); }
   void Begin() const { BeginTextureMode(target_); }
   void End(double gamma, double brightness, float waveTime, float waveDirX, float waveDirY,
-           float intensity, float optionScale, float warmBias, float colorShift, float glow) const {
+           float intensity, float optionScale, float warmBias, float colorShift, float glow,
+           float lensFlare) const {
     EndTextureMode();
     const float g = static_cast<float>(ship::EffectiveDisplayGamma(gamma));
     const float b = static_cast<float>(ship::DisplayBrightness(brightness));
@@ -344,8 +552,52 @@ void main() {
         0.58f + (0.68f - 0.58f) * warmBias,
         0.82f + (0.42f - 0.82f) * warmBias,
     };
+    const bool runFlare = flareReady_ && lensFlare > 0.001f &&
+                          optionScale > 0.001f && intensity > 0.001f;
+    if (runFlare) {
+      if (extResLoc_ >= 0) SetShaderValue(extractShader_, extResLoc_, res, SHADER_UNIFORM_VEC2);
+      if (extTimeLoc_ >= 0) SetShaderValue(extractShader_, extTimeLoc_, &waveTime, SHADER_UNIFORM_FLOAT);
+      if (extWaveDirLoc_ >= 0) SetShaderValue(extractShader_, extWaveDirLoc_, dir, SHADER_UNIFORM_VEC2);
+      if (extIntensityLoc_ >= 0) SetShaderValue(extractShader_, extIntensityLoc_, &intensity, SHADER_UNIFORM_FLOAT);
+      if (extOptionScaleLoc_ >= 0) SetShaderValue(extractShader_, extOptionScaleLoc_, &optionScale, SHADER_UNIFORM_FLOAT);
+      if (extGlowLoc_ >= 0) SetShaderValue(extractShader_, extGlowLoc_, &glow, SHADER_UNIFORM_FLOAT);
+      if (extWarmTintLoc_ >= 0) SetShaderValue(extractShader_, extWarmTintLoc_, tint, SHADER_UNIFORM_VEC3);
+      if (extPackLoc_ >= 0) SetShaderValue(extractShader_, extPackLoc_, &flarePack_, SHADER_UNIFORM_FLOAT);
+      const float fTexel[2] = {
+          1.0f / static_cast<float>(flareCore_.texture.width),
+          1.0f / static_cast<float>(flareCore_.texture.height),
+      };
+      if (blurTexelLoc_ >= 0) SetShaderValue(blurShader_, blurTexelLoc_, fTexel, SHADER_UNIFORM_VEC2);
+      auto blitPass = [](const RenderTexture2D& dst, const Texture2D& src, const Shader& sh) {
+        BeginTextureMode(dst);
+        BeginShaderMode(sh);
+        DrawTexturePro(
+            src,
+            Rectangle{0, 0, static_cast<float>(src.width), -static_cast<float>(src.height)},
+            Rectangle{0, 0, static_cast<float>(dst.texture.width), static_cast<float>(dst.texture.height)},
+            Vector2{0, 0}, 0.0f, WHITE);
+        EndShaderMode();
+        EndTextureMode();
+      };
+      auto runBlur = [&](const RenderTexture2D& dst, const Texture2D& src,
+                         float stride, float disp, float vert, float falloff) {
+        if (blurStrideLoc_ >= 0) SetShaderValue(blurShader_, blurStrideLoc_, &stride, SHADER_UNIFORM_FLOAT);
+        if (blurDispLoc_ >= 0) SetShaderValue(blurShader_, blurDispLoc_, &disp, SHADER_UNIFORM_FLOAT);
+        if (blurVertLoc_ >= 0) SetShaderValue(blurShader_, blurVertLoc_, &vert, SHADER_UNIFORM_FLOAT);
+        if (blurFalloffLoc_ >= 0) SetShaderValue(blurShader_, blurFalloffLoc_, &falloff, SHADER_UNIFORM_FLOAT);
+        blitPass(dst, src, blurShader_);
+      };
+      rlDisableColorBlend();
+      blitPass(flareWide_, target_.texture, extractShader_);
+      runBlur(flareCore_, flareWide_.texture, 1.0f, 0.04f, 0.65f, 0.14f);
+      runBlur(flareMid_, flareCore_.texture, 4.2f, 0.09f, 0.18f, 0.11f);
+      runBlur(flareWide_, flareMid_.texture, 18.0f, 0.14f, 0.00f, 0.09f);
+      rlEnableColorBlend();
+    }
+    const float flareAmount = runFlare ? (lensFlare * flareUnpack_) : 0.0f;
     SetShaderValue(shader_, colorShiftLoc_, &colorShift, SHADER_UNIFORM_FLOAT);
     SetShaderValue(shader_, glowLoc_, &glow, SHADER_UNIFORM_FLOAT);
+    if (lensFlareLoc_ >= 0) SetShaderValue(shader_, lensFlareLoc_, &flareAmount, SHADER_UNIFORM_FLOAT);
     SetShaderValue(shader_, gammaLoc_, &g, SHADER_UNIFORM_FLOAT);
     SetShaderValue(shader_, brightnessLoc_, &b, SHADER_UNIFORM_FLOAT);
     if (resLoc_ >= 0) SetShaderValue(shader_, resLoc_, res, SHADER_UNIFORM_VEC2);
@@ -355,6 +607,11 @@ void main() {
     if (optionScaleLoc_ >= 0) SetShaderValue(shader_, optionScaleLoc_, &optionScale, SHADER_UNIFORM_FLOAT);
     if (warmTintLoc_ >= 0) SetShaderValue(shader_, warmTintLoc_, tint, SHADER_UNIFORM_VEC3);
     BeginShaderMode(shader_);
+    if (runFlare) {
+      SetShaderValueTexture(shader_, flareCoreLoc_, flareCore_.texture);
+      SetShaderValueTexture(shader_, flareMidLoc_, flareMid_.texture);
+      SetShaderValueTexture(shader_, flareWideLoc_, flareWide_.texture);
+    }
     DrawTexturePro(target_.texture,
                    Rectangle{0, 0, static_cast<float>(width_), -static_cast<float>(height_)},
                    Rectangle{0, 0, static_cast<float>(width_), static_cast<float>(height_)},
@@ -362,18 +619,78 @@ void main() {
     EndShaderMode();
   }
   void Shutdown() {
+    ReleaseFlareTargets();
     if (target_.id != 0) UnloadRenderTexture(target_);
+    if (extractShader_.locs != nullptr) UnloadShader(extractShader_);
+    if (blurShader_.locs != nullptr) UnloadShader(blurShader_);
     if (shader_.locs != nullptr) UnloadShader(shader_);
   }
  private:
+  static bool IsFlareTargetValid(const RenderTexture2D& rt) {
+    return rt.id > 0 && IsTextureValid(rt.texture);
+  }
+  static RenderTexture2D CreateFlareTarget(int width, int height, bool* isHdr) {
+    auto makeWithFormat = [&](int pixelFormat) {
+      RenderTexture2D rt{};
+      rt.id = rlLoadFramebuffer();
+      if (rt.id == 0) return rt;
+      rlEnableFramebuffer(rt.id);
+      rt.texture.id = rlLoadTexture(nullptr, width, height, pixelFormat, 1);
+      rt.texture.width = width;
+      rt.texture.height = height;
+      rt.texture.format = pixelFormat;
+      rt.texture.mipmaps = 1;
+      if (rt.texture.id > 0) {
+        rlFramebufferAttach(rt.id, rt.texture.id, RL_ATTACHMENT_COLOR_CHANNEL0,
+                            RL_ATTACHMENT_TEXTURE2D, 0);
+      }
+      const bool ok = rt.texture.id > 0 && rlFramebufferComplete(rt.id);
+      rlDisableFramebuffer();
+      if (!ok) {
+        UnloadRenderTexture(rt);
+        return RenderTexture2D{};
+      }
+      SetTextureFilter(rt.texture, TEXTURE_FILTER_BILINEAR);
+      SetTextureWrap(rt.texture, TEXTURE_WRAP_CLAMP);
+      return rt;
+    };
+    RenderTexture2D rt = makeWithFormat(PIXELFORMAT_UNCOMPRESSED_R16G16B16A16);
+    if (IsFlareTargetValid(rt)) {
+      if (isHdr != nullptr) *isHdr = true;
+      return rt;
+    }
+    if (isHdr != nullptr) *isHdr = false;
+    return makeWithFormat(PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+  }
+  void ReleaseFlareTargets() {
+    if (flareCore_.id != 0) { UnloadRenderTexture(flareCore_); flareCore_ = RenderTexture2D{}; }
+    if (flareMid_.id != 0) { UnloadRenderTexture(flareMid_); flareMid_ = RenderTexture2D{}; }
+    if (flareWide_.id != 0) { UnloadRenderTexture(flareWide_); flareWide_ = RenderTexture2D{}; }
+    flareReady_ = false;
+  }
+
   Shader shader_{};
+  Shader extractShader_{};
+  Shader blurShader_{};
   RenderTexture2D target_{};
+  RenderTexture2D flareCore_{};
+  RenderTexture2D flareMid_{};
+  RenderTexture2D flareWide_{};
   int gammaLoc_ = -1, brightnessLoc_ = -1;
-  int colorShiftLoc_ = -1, glowLoc_ = -1;
+  int colorShiftLoc_ = -1, glowLoc_ = -1, lensFlareLoc_ = -1;
+  int flareCoreLoc_ = -1, flareMidLoc_ = -1, flareWideLoc_ = -1;
   int resLoc_ = -1, timeLoc_ = -1, waveDirLoc_ = -1;
   int intensityLoc_ = -1, optionScaleLoc_ = -1, warmTintLoc_ = -1;
+  int extResLoc_ = -1, extTimeLoc_ = -1, extWaveDirLoc_ = -1;
+  int extIntensityLoc_ = -1, extOptionScaleLoc_ = -1, extGlowLoc_ = -1;
+  int extWarmTintLoc_ = -1, extPackLoc_ = -1;
+  int blurTexelLoc_ = -1, blurStrideLoc_ = -1, blurDispLoc_ = -1;
+  int blurVertLoc_ = -1, blurFalloffLoc_ = -1;
+  float flarePack_ = 1.0f, flareUnpack_ = 1.0f;
   int width_ = 0, height_ = 0;
   bool shaderReady_ = false;
+  bool flareShadersReady_ = false;
+  bool flareReady_ = false;
 };
 
 }  // namespace
@@ -686,7 +1003,7 @@ int main(int argc, char** argv) {
         (ship::EffectiveDisplayGamma(sim.State().options.displayGamma) != 1.0 ||
          ship::DisplayBrightness(sim.State().options.displayBrightness) != 1.0 ||
          waveScale > 0.001f || sim.State().options.colorShift != 0.0 ||
-         sim.State().options.glow > 0.0);
+         sim.State().options.glow > 0.0 || sim.State().options.lensFlare > 0.0);
     if (adjusted) {
       display.Begin();
       // The offscreen texture uses logical screen pixels even on Retina
@@ -708,7 +1025,8 @@ int main(int argc, char** argv) {
                   waveTime, smoothedWave.waveDirX, smoothedWave.waveDirY,
                   smoothedWave.baseIntensity, waveScale, smoothedWave.warmBias,
                   static_cast<float>(sim.State().options.colorShift),
-                  static_cast<float>(sim.State().options.glow));
+                  static_cast<float>(sim.State().options.glow),
+                  static_cast<float>(std::clamp(sim.State().options.lensFlare, 0.0, 2.0)));
     }
     EndDrawing();
   }

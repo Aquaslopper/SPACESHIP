@@ -156,6 +156,7 @@ PopupModel BuildPopup(const Simulation& sim, const std::string& key,
   model.displayBrightness = static_cast<float>(DisplayBrightness(options.displayBrightness));
   model.colorShift = static_cast<float>(options.colorShift);
   model.glow = static_cast<float>(options.glow);
+  model.lensFlare = static_cast<float>(std::clamp(options.lensFlare, 0.0, 2.0));
   model.radiationWave = static_cast<float>(RadiationWaveStrength(options.radiationWave));
   model.audioChoices = {{"0.18", "Quiet"}, {"0.4", "Standard"},
                         {"0.65", "Loud"}, {"0.9", "Very loud"}};
@@ -245,7 +246,8 @@ bool PressPopupAction(Simulation& sim, const std::string& key,
       return true;
     }
     if (action == "display-gamma" || action == "display-brightness" ||
-        action == "radiation-wave" || action == "color-shift" || action == "glow") {
+        action == "radiation-wave" || action == "color-shift" ||
+        action == "glow" || action == "lens-flare") {
       try {
         std::size_t parsed = 0;
         const double value = std::stod(arg, &parsed);
@@ -254,6 +256,7 @@ bool PressPopupAction(Simulation& sim, const std::string& key,
         else if (action == "display-brightness") { options.displayBrightness = DisplayBrightness(value); }
         else if (action == "color-shift") { options.colorShift = std::clamp(value, -180.0, 180.0); }
         else if (action == "glow") { options.glow = std::clamp(value, 0.0, 2.0); }
+        else if (action == "lens-flare") { options.lensFlare = std::clamp(value, 0.0, 2.0); }
         else { options.radiationWave = RadiationWaveStrength(value); }
         return true;
       } catch (const std::exception&) { return false; }

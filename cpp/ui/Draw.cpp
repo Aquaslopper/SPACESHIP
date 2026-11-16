@@ -6857,6 +6857,7 @@ void ShellView::PaintSettingsControls(Simulation& sim, const PopupModel& model) 
       }
       float colorShift = model.colorShift;
       float glow = model.glow;
+      float lensFlare = model.lensFlare;
       ImGui::SetNextItemWidth(-1);
       if (ImGui::SliderFloat("##color-shift", &colorShift, -180.0f, 180.0f, "Colorshift: %.0f degrees")) {
         action("color-shift", std::to_string(colorShift));
@@ -6865,11 +6866,16 @@ void ShellView::PaintSettingsControls(Simulation& sim, const PopupModel& model) 
       if (ImGui::SliderFloat("##glow", &glow, 0.0f, 2.0f, "Glow: %.2f")) {
         action("glow", std::to_string(glow));
       }
+      ImGui::SetNextItemWidth(-1);
+      if (ImGui::SliderFloat("##lens-flare", &lensFlare, 0.0f, 2.0f,
+                             lensFlare <= 0.01f ? "Lens flare: Off" : "Lens flare: %.2f")) {
+        action("lens-flare", std::to_string(lensFlare));
+      }
       ImGui::EndDisabled();
       if (displayAdjustmentAvailable_ && button("Reset display adjustment", "display-reset")) {
         action("display-gamma", "1"); action("display-brightness", "1");
         action("radiation-wave", "1");
-        action("color-shift", "0"); action("glow", "1");
+        action("color-shift", "0"); action("glow", "1"); action("lens-flare", "1");
       }
       for (const auto& toggle : model.toggles) {
         heading(toggle.heading); text(toggle.help);
