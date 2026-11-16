@@ -578,6 +578,8 @@ int main(int argc, char** argv) {
 
   ship::PointerOwnership leftPointer, rightPointer, middlePointer;
   ship::RadiationTelemetry smoothedWave = ship::ComputeRadiationTelemetry(sim);
+  float preRedWarmBias = smoothedWave.warmBias;
+  float redLevel = 0.0f;
   float waveTime = 0.0f;
   while (!WindowShouldClose() && !shell.QuitRequested()) {
     if (IsKeyPressed(KEY_ESCAPE)) { shell.Escape(sim); }
@@ -684,8 +686,19 @@ int main(int argc, char** argv) {
       smoothedWave.waveDirX /= dirLen;
       smoothedWave.waveDirY /= dirLen;
     }
+    float targetRed = 0.0f;
+    for (const ship::IndicatorLine& line : ship::IndicatorLines(sim)) {
+      if (line.grow) { targetRed = std::max(targetRed, std::clamp(line.pct, 0, 100) * 0.01f); }
+    }
     smoothedWave.baseIntensity += (targetWave.baseIntensity - smoothedWave.baseIntensity) * blend;
-    smoothedWave.warmBias += (targetWave.warmBias - smoothedWave.warmBias) * blend;
+    if (targetRed == 0.0f && redLevel == 0.0f) {
+      smoothedWave.warmBias += (targetWave.warmBias - smoothedWave.warmBias) * blend;
+      preRedWarmBias = smoothedWave.warmBias;
+    } else {
+      smoothedWave.warmBias = preRedWarmBias;
+    }
+    redLevel += (targetRed - redLevel) * blend;
+    if (targetRed == 0.0f && redLevel < 0.001f) { redLevel = 0.0f; }
     if (!sim.State().reducedMotion) { waveTime += dt; }
 
     const float waveScale = sim.State().reducedMotion
@@ -714,10 +727,6 @@ int main(int argc, char** argv) {
     if (!shell.TitleActive()) voyageStarted = true;
     rlImGuiEnd();
     if (adjusted) {
-      float redLevel = 0.0f;
-      for (const ship::IndicatorLine& line : ship::IndicatorLines(sim)) {
-        if (line.grow) { redLevel = std::max(redLevel, std::clamp(line.pct, 0, 100) * 0.01f); }
-      }
       display.End(sim.State().options.displayGamma, sim.State().options.displayBrightness,
                   waveTime, smoothedWave.waveDirX, smoothedWave.waveDirY,
                   smoothedWave.baseIntensity, waveScale, smoothedWave.warmBias, redLevel,
