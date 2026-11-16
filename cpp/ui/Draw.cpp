@@ -6869,7 +6869,7 @@ void ShellView::PaintSettingsControls(Simulation& sim, const PopupModel& model) 
       if (displayAdjustmentAvailable_ && button("Reset display adjustment", "display-reset")) {
         action("display-gamma", "1"); action("display-brightness", "1");
         action("radiation-wave", "1");
-        action("color-shift", "0"); action("glow", "0");
+        action("color-shift", "0"); action("glow", "1");
       }
       for (const auto& toggle : model.toggles) {
         heading(toggle.heading); text(toggle.help);
