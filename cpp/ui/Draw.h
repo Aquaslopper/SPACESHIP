@@ -43,6 +43,11 @@ namespace ship {
 
 enum class HitButton { None, Left, Right };
 
+struct FlareTarget {
+  enum Kind : unsigned char { PanelEdge, ShipPoint, StarPoint, Occlude } kind = PanelEdge;
+  float x0 = 0.0f, y0 = 0.0f, x1 = 0.0f, y1 = 0.0f, weight = 1.0f;
+};
+
 class ShellView {
  public:
   ShellView();
@@ -85,6 +90,7 @@ class ShellView {
   void Escape(Simulation& sim);
 
   bool QuitRequested() const { return quitRequested_; }
+  const std::vector<FlareTarget>& FlareTargets() const { return flareTargets_; }
 
   const Description& Selection() const { return selection_; }
   bool HasSelection() const { return floating_.HasBriefings(); }
@@ -437,6 +443,7 @@ class ShellView {
   std::string lossMessage_;
   LossModel loss_;
   std::vector<NavHit> lossHits_;
+  std::vector<FlareTarget> flareTargets_;
 };
 
 }  // namespace ship

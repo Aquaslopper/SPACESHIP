@@ -315,6 +315,38 @@ void main() {
       std::fprintf(stderr, "spaceship: display adjustment shader unavailable; using unadjusted display\n");
       return;
     }
+    static const char* flareFrag = R"GLSL(#version 330
+in vec2 fragTexCoord;
+in vec4 fragColor;
+uniform float uFlareGain;
+out vec4 finalColor;
+void main() {
+  vec2 p = fragTexCoord * 2.0 - 1.0;
+  float ax = abs(p.x);
+  float ay = abs(p.y);
+  float edge = smoothstep(1.0, 0.70, max(ax, ay));
+  if (edge <= 0.001) discard;
+  vec2 cp = vec2(p.x * 5.2, p.y);
+  float r2 = dot(cp, cp);
+  float core = exp(-r2 * 16.0);
+  float halo = exp(-r2 * 2.8) * 0.38;
+  float yThin = exp(-ay * ay * 46.0);
+  float ySoft = exp(-ay * ay * 8.5) * 0.26;
+  float sR = exp(-pow(ax * 1.18, 1.3) * 3.4) * yThin;
+  float sG = exp(-pow(ax * 1.00, 1.3) * 3.4) * (yThin + ySoft * 0.7);
+  float sB = exp(-pow(ax * 0.86, 1.3) * 3.4) * (yThin + ySoft);
+  vec3 streak = vec3(sR * 0.78, sG * 0.98, sB * 1.22) * fragColor.rgb
+                + fragColor.rgb * halo
+                + vec3(1.0, 0.98, 0.94) * (core * 1.35);
+  float gain = fragColor.a * uFlareGain * edge;
+  vec3 emit = vec3(1.0) - exp(-streak * gain);
+  float a = clamp(max(emit.r, max(emit.g, emit.b)) * 0.56, 0.0, 0.72);
+  finalColor = vec4(emit, a);
+}
+)GLSL";
+    flareShader_ = LoadShaderFromMemory(nullptr, flareFrag);
+    flareGainLoc_ = GetShaderLocation(flareShader_, "uFlareGain");
+    flareReady_ = IsShaderValid(flareShader_);
     Resize(width, height);
   }
   void Resize(int width, int height) {
@@ -332,8 +364,11 @@ void main() {
   }
   bool Ready() const { return shaderReady_ && IsRenderTextureValid(target_); }
   void Begin() const { BeginTextureMode(target_); }
+  static constexpr float kFlareTailPx = 58.0f;  // horizontal flare half-length in px
+
   void End(double gamma, double brightness, float waveTime, float waveDirX, float waveDirY,
-           float intensity, float optionScale, float warmBias, float colorShift, float glow) const {
+           float intensity, float optionScale, float warmBias, float colorShift, float glow,
+           float lensFlare, const std::vector<ship::FlareTarget>& targets) const {
     EndTextureMode();
     const float g = static_cast<float>(ship::EffectiveDisplayGamma(gamma));
     const float b = static_cast<float>(ship::DisplayBrightness(brightness));
@@ -360,20 +395,155 @@ void main() {
                    Rectangle{0, 0, static_cast<float>(width_), static_cast<float>(height_)},
                    Vector2{0, 0}, 0, WHITE);
     EndShaderMode();
+    if (flareReady_ && lensFlare > 0.001f && optionScale > 0.001f &&
+        intensity > 0.001f && !targets.empty()) {
+      DrawFlares(waveTime, waveDirX, waveDirY, intensity, optionScale, warmBias,
+                 colorShift, b, lensFlare, targets);
+    }
   }
   void Shutdown() {
     if (target_.id != 0) UnloadRenderTexture(target_);
+    if (flareShader_.locs != nullptr) UnloadShader(flareShader_);
     if (shader_.locs != nullptr) UnloadShader(shader_);
   }
  private:
+  void DrawFlares(float waveTime, float waveDirX, float waveDirY, float intensity,
+                  float optionScale, float warmBias, float colorShift, float brightness,
+                  float lensFlare, const std::vector<ship::FlareTarget>& targets) const {
+    const float dLen = std::hypot(waveDirX, waveDirY);
+    const float dx = dLen > 1e-4f ? waveDirX / dLen : 1.0f;
+    const float dy = dLen > 1e-4f ? waveDirY / dLen : 0.0f;
+    const float w = static_cast<float>(width_);
+    const float h = static_cast<float>(height_);
+    const float minRes = std::max(1.0f, std::min(w, h));
+    constexpr float kTwoPi = 6.2831853f;
+    auto phaseAt = [&](float sx, float sy) {
+      const float proj = ((sx - 0.5f * w) * dx + (sy - 0.5f * h) * dy) / minRes;
+      return proj * 2.25f - waveTime * 0.42f + 0.16f * std::sin(proj * 1.1f + waveTime * 0.13f);
+    };
+    auto fadeAt = [](float dPhase) {
+      const float c = std::clamp(0.5f + 0.5f * std::cos(dPhase), 0.0f, 1.0f);
+      return std::pow(c, 12.0f);
+    };
+
+    occs_.clear();
+    for (std::size_t i = 0; i < targets.size(); ++i) {
+      const auto& t = targets[i];
+      if (t.kind == ship::FlareTarget::Occlude) occs_.push_back({i, t.x0, t.y0, t.x1, t.y1});
+    }
+    auto occluded = [&](std::size_t idx, float sx, float sy) {
+      for (const Occ& o : occs_) {
+        if (o.idx > idx && sx >= o.x0 && sx <= o.x1 && sy >= o.y0 && sy <= o.y1) return true;
+      }
+      return false;
+    };
+
+    spots_.clear();
+    auto addSpot = [&](std::size_t idx, float sx, float sy, float s, float sc,
+                       ship::FlareTarget::Kind kind) {
+      if (s < 0.012f || occluded(idx, sx, sy)) return;
+      if (kind == ship::FlareTarget::PanelEdge) {
+        for (Spot& e : spots_) {
+          if (e.kind == kind && (sx - e.x) * (sx - e.x) + (sy - e.y) * (sy - e.y) < 196.0f) {
+            if (s > e.strength) { e.x = sx; e.y = sy; e.strength = s; }
+            return;
+          }
+        }
+      }
+      spots_.push_back({sx, sy, std::min(s, 1.0f), sc, kind});
+    };
+
+    for (std::size_t i = 0; i < targets.size(); ++i) {
+      const auto& t = targets[i];
+      if (t.kind == ship::FlareTarget::Occlude) continue;
+      if (t.kind == ship::FlareTarget::PanelEdge) {
+        const float p0 = phaseAt(t.x0, t.y0);
+        const float p1 = phaseAt(t.x1, t.y1);
+        const float dp = p1 - p0;
+        const int k0 = static_cast<int>(std::lround(std::min(p0, p1) / kTwoPi));
+        const int k1 = static_cast<int>(std::lround(std::max(p0, p1) / kTwoPi));
+        for (int k = k0; k <= k1; ++k) {
+          const float crest = static_cast<float>(k) * kTwoPi;
+          float u = std::fabs(dp) > 1e-3f ? std::clamp((crest - p0) / dp, 0.0f, 1.0f) : 0.5f;
+          float px = t.x0 + (t.x1 - t.x0) * u;
+          float py = t.y0 + (t.y1 - t.y0) * u;
+          if (std::fabs(dp) > 0.05f && u > 0.0f && u < 1.0f) {
+            u = std::clamp(u + (crest - phaseAt(px, py)) / dp, 0.0f, 1.0f);
+            px = t.x0 + (t.x1 - t.x0) * u;
+            py = t.y0 + (t.y1 - t.y0) * u;
+          }
+          addSpot(i, px, py, fadeAt(phaseAt(px, py) - crest) * t.weight, 0.90f, t.kind);
+        }
+      } else {
+        const float sc = (t.kind == ship::FlareTarget::ShipPoint) ? 1.15f : 1.05f;
+        addSpot(i, t.x0, t.y0, fadeAt(phaseAt(t.x0, t.y0)) * t.weight, sc, t.kind);
+      }
+    }
+    if (spots_.empty()) return;
+
+    const float wb = std::clamp(warmBias, 0.0f, 1.0f);
+    float tr = 0.34f + 0.66f * wb * 0.72f;
+    float tg = 0.78f - 0.14f * wb * 0.72f;
+    float tb = 1.00f - 0.58f * wb * 0.72f;
+    if (std::fabs(colorShift) > 0.01f) {
+      const float ang = colorShift * 0.01745329f;
+      const float ca = std::cos(ang), sa = std::sin(ang);
+      constexpr float k = 0.57735027f;
+      const float dot = k * (tr + tg + tb);
+      const float nr = tr * ca + k * (tb - tg) * sa + k * dot * (1.0f - ca);
+      const float ng = tg * ca + k * (tr - tb) * sa + k * dot * (1.0f - ca);
+      const float nb = tb * ca + k * (tg - tr) * sa + k * dot * (1.0f - ca);
+      tr = std::clamp(nr, 0.0f, 1.0f);
+      tg = std::clamp(ng, 0.0f, 1.0f);
+      tb = std::clamp(nb, 0.0f, 1.0f);
+    }
+    const unsigned char cr = static_cast<unsigned char>(std::lround(std::clamp(tr, 0.0f, 1.0f) * 255.0f));
+    const unsigned char cg = static_cast<unsigned char>(std::lround(std::clamp(tg, 0.0f, 1.0f) * 255.0f));
+    const unsigned char cb = static_cast<unsigned char>(std::lround(std::clamp(tb, 0.0f, 1.0f) * 255.0f));
+    const float gain = lensFlare * std::clamp(intensity * optionScale, 0.0f, 1.6f) * 1.15f *
+                       std::clamp(brightness, 0.4f, 1.4f);
+    if (flareGainLoc_ >= 0) SetShaderValue(flareShader_, flareGainLoc_, &gain, SHADER_UNIFORM_FLOAT);
+
+    rlSetBlendFactors(RL_ONE, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD);
+    BeginBlendMode(BLEND_CUSTOM);
+    BeginShaderMode(flareShader_);
+    rlDisableBackfaceCulling();
+    rlSetTexture(rlGetTextureIdDefault());
+    rlBegin(RL_QUADS);
+    for (const Spot& s : spots_) {
+      rlCheckRenderBatchLimit(4);
+      const float rx = kFlareTailPx * s.scale;
+      const float ry = std::max(8.0f, rx * 0.19f);
+      const unsigned char ca = static_cast<unsigned char>(std::lround(s.strength * 255.0f));
+      rlColor4ub(cr, cg, cb, ca);
+      rlTexCoord2f(0.0f, 0.0f); rlVertex2f(s.x - rx, s.y - ry);
+      rlTexCoord2f(0.0f, 1.0f); rlVertex2f(s.x - rx, s.y + ry);
+      rlTexCoord2f(1.0f, 1.0f); rlVertex2f(s.x + rx, s.y + ry);
+      rlTexCoord2f(1.0f, 0.0f); rlVertex2f(s.x + rx, s.y - ry);
+    }
+    rlEnd();
+    rlDrawRenderBatchActive();
+    rlSetTexture(0);
+    rlEnableBackfaceCulling();
+    EndShaderMode();
+    EndBlendMode();
+  }
+
   Shader shader_{};
+  Shader flareShader_{};
   RenderTexture2D target_{};
   int gammaLoc_ = -1, brightnessLoc_ = -1;
   int colorShiftLoc_ = -1, glowLoc_ = -1;
   int resLoc_ = -1, timeLoc_ = -1, waveDirLoc_ = -1;
   int intensityLoc_ = -1, optionScaleLoc_ = -1, warmTintLoc_ = -1;
+  int flareGainLoc_ = -1;
   int width_ = 0, height_ = 0;
   bool shaderReady_ = false;
+  bool flareReady_ = false;
+  struct Occ { std::size_t idx; float x0, y0, x1, y1; };
+  struct Spot { float x, y, strength, scale; ship::FlareTarget::Kind kind; };
+  mutable std::vector<Occ> occs_;
+  mutable std::vector<Spot> spots_;
 };
 
 }  // namespace
@@ -708,7 +878,9 @@ int main(int argc, char** argv) {
                   waveTime, smoothedWave.waveDirX, smoothedWave.waveDirY,
                   smoothedWave.baseIntensity, waveScale, smoothedWave.warmBias,
                   static_cast<float>(sim.State().options.colorShift),
-                  static_cast<float>(sim.State().options.glow));
+                  static_cast<float>(sim.State().options.glow),
+                  static_cast<float>(std::clamp(sim.State().options.lensFlare, 0.0, 2.0)),
+                  shell.FlareTargets());
     }
     EndDrawing();
   }

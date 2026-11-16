@@ -67,6 +67,7 @@ struct PopupModel {
   float radiationWave = 1.3f;
   float colorShift = 0.0f;
   float glow = 1.0f;
+  float lensFlare = 1.0f;
   std::vector<PopupChoice> audioChoices;
   // Phase 9: the reading-size ladder (18/19/20/21 px) and the borderless
   // window switch. Both are preferences; both are drawn as their own rows.
