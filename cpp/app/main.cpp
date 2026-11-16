@@ -256,13 +256,15 @@ void main() {
     vec2 shiftUV = vec2(dir.x, -dir.y) * (shiftPx * texel);
     float r = texture(texture0, clamp(uv + shiftUV, vec2(0.0), vec2(1.0))).r;
     float b = texture(texture0, clamp(uv - shiftUV, vec2(0.0), vec2(1.0))).b;
+    float edge = max(abs(r - center.r), abs(b - center.b));
+    r = mix(r, center.r + edge, uAlertLevel);
+    b = mix(b, center.b, uAlertLevel);
     rgb = vec3(r, center.g, b) * colDiffuse.rgb * fragColor.rgb;
 
     // Subtle milky grey/amber black-level lift & contrast dip on sensor saturation.
     float luma = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
     vec3 milkyFloor = mix(vec3(0.26, 0.24, 0.21), uWarmTint, 0.42);
-    milkyFloor = mix(milkyFloor, vec3(1.0, 0.03, 0.02), uAlertLevel);
-    float dip = crest * clamp(uIntensity * uOptionScale, 0.0, 1.5) * mix(0.055, 0.25, uAlertLevel);
+    float dip = crest * clamp(uIntensity * uOptionScale, 0.0, 1.5) * 0.055;
     rgb = mix(rgb, milkyFloor, dip * (1.0 - 0.58 * luma));
     if (uGlow > 0.0) {
       vec3 bloom = vec3(0.0);
@@ -285,6 +287,9 @@ void main() {
               texture(texture0, clamp(sampleUV + sampleShiftUV, vec2(0.0), vec2(1.0))).r,
               original.g,
               texture(texture0, clamp(sampleUV - sampleShiftUV, vec2(0.0), vec2(1.0))).b);
+          float sampleEdge = max(abs(shifted.r - original.r), abs(shifted.b - original.b));
+          shifted.r = mix(shifted.r, original.r + sampleEdge, uAlertLevel);
+          shifted.b = mix(shifted.b, original.b, uAlertLevel);
           bloom += max(shifted - original, vec3(0.0)) * weight;
           weights += weight;
         }
