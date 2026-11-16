@@ -44,7 +44,7 @@ namespace ship {
 enum class HitButton { None, Left, Right };
 
 struct FlareTarget {
-  enum Kind : unsigned char { PanelEdge, ShipPoint, StarPoint, Occlude } kind = PanelEdge;
+  enum Kind : unsigned char { PanelCorner, ShipPoint, StarPoint, Occlude } kind = PanelCorner;
   float x0 = 0.0f, y0 = 0.0f, x1 = 0.0f, y1 = 0.0f, weight = 1.0f;
 };
 

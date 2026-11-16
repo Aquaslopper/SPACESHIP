@@ -324,23 +324,24 @@ void main() {
   vec2 p = fragTexCoord * 2.0 - 1.0;
   float ax = abs(p.x);
   float ay = abs(p.y);
-  float edge = smoothstep(1.0, 0.70, max(ax, ay));
+  float edge = smoothstep(1.0, 0.52, max(ax, ay));
   if (edge <= 0.001) discard;
-  vec2 cp = vec2(p.x * 5.2, p.y);
+  vec2 cp = vec2(p.x * 2.1, p.y);
   float r2 = dot(cp, cp);
-  float core = exp(-r2 * 16.0);
-  float halo = exp(-r2 * 2.8) * 0.38;
-  float yThin = exp(-ay * ay * 46.0);
-  float ySoft = exp(-ay * ay * 8.5) * 0.26;
-  float sR = exp(-pow(ax * 1.18, 1.3) * 3.4) * yThin;
-  float sG = exp(-pow(ax * 1.00, 1.3) * 3.4) * (yThin + ySoft * 0.7);
-  float sB = exp(-pow(ax * 0.86, 1.3) * 3.4) * (yThin + ySoft);
-  vec3 streak = vec3(sR * 0.78, sG * 0.98, sB * 1.22) * fragColor.rgb
-                + fragColor.rgb * halo
-                + vec3(1.0, 0.98, 0.94) * (core * 1.35);
+  float core = exp(-r2 * 36.0) * 0.34;
+  float innerGlow = exp(-r2 * 4.6) * 0.40;
+  float outerBloom = exp(-sqrt(r2) * 2.05) * 0.44;
+  float yLine = exp(-ay * ay * 150.0) * 0.46;
+  float yBloom = exp(-ay * ay * 14.0) * 0.34;
+  float sR = exp(-pow(ax * 1.16, 1.25) * 3.1) * (yLine + yBloom * 0.65);
+  float sG = exp(-pow(ax * 1.00, 1.25) * 3.1) * (yLine + yBloom * 0.85);
+  float sB = exp(-pow(ax * 0.86, 1.25) * 3.1) * (yLine + yBloom);
+  vec3 bloom = fragColor.rgb * (innerGlow + outerBloom);
+  vec3 streak = vec3(sR * 0.80, sG * 0.98, sB * 1.20) * fragColor.rgb;
+  vec3 col = bloom + streak + mix(fragColor.rgb, vec3(1.0, 0.98, 0.95), 0.70) * core;
   float gain = fragColor.a * uFlareGain * edge;
-  vec3 emit = vec3(1.0) - exp(-streak * gain);
-  float a = clamp(max(emit.r, max(emit.g, emit.b)) * 0.56, 0.0, 0.72);
+  vec3 emit = vec3(1.0) - exp(-col * gain);
+  float a = clamp(max(emit.r, max(emit.g, emit.b)) * 0.44, 0.0, 0.50);
   finalColor = vec4(emit, a);
 }
 )GLSL";
@@ -416,13 +417,12 @@ void main() {
     const float w = static_cast<float>(width_);
     const float h = static_cast<float>(height_);
     const float minRes = std::max(1.0f, std::min(w, h));
-    constexpr float kTwoPi = 6.2831853f;
     auto phaseAt = [&](float sx, float sy) {
       const float proj = ((sx - 0.5f * w) * dx + (sy - 0.5f * h) * dy) / minRes;
       return proj * 2.25f - waveTime * 0.42f + 0.16f * std::sin(proj * 1.1f + waveTime * 0.13f);
     };
-    auto fadeAt = [](float dPhase) {
-      const float c = std::clamp(0.5f + 0.5f * std::cos(dPhase), 0.0f, 1.0f);
+    auto fadeAt = [](float phase) {
+      const float c = std::clamp(0.5f + 0.5f * std::cos(phase), 0.0f, 1.0f);
       return std::pow(c, 12.0f);
     };
 
@@ -439,45 +439,27 @@ void main() {
     };
 
     spots_.clear();
-    auto addSpot = [&](std::size_t idx, float sx, float sy, float s, float sc,
-                       ship::FlareTarget::Kind kind) {
-      if (s < 0.012f || occluded(idx, sx, sy)) return;
-      if (kind == ship::FlareTarget::PanelEdge) {
-        for (Spot& e : spots_) {
-          if (e.kind == kind && (sx - e.x) * (sx - e.x) + (sy - e.y) * (sy - e.y) < 196.0f) {
-            if (s > e.strength) { e.x = sx; e.y = sy; e.strength = s; }
-            return;
-          }
-        }
-      }
-      spots_.push_back({sx, sy, std::min(s, 1.0f), sc, kind});
-    };
-
     for (std::size_t i = 0; i < targets.size(); ++i) {
       const auto& t = targets[i];
       if (t.kind == ship::FlareTarget::Occlude) continue;
-      if (t.kind == ship::FlareTarget::PanelEdge) {
-        const float p0 = phaseAt(t.x0, t.y0);
-        const float p1 = phaseAt(t.x1, t.y1);
-        const float dp = p1 - p0;
-        const int k0 = static_cast<int>(std::lround(std::min(p0, p1) / kTwoPi));
-        const int k1 = static_cast<int>(std::lround(std::max(p0, p1) / kTwoPi));
-        for (int k = k0; k <= k1; ++k) {
-          const float crest = static_cast<float>(k) * kTwoPi;
-          float u = std::fabs(dp) > 1e-3f ? std::clamp((crest - p0) / dp, 0.0f, 1.0f) : 0.5f;
-          float px = t.x0 + (t.x1 - t.x0) * u;
-          float py = t.y0 + (t.y1 - t.y0) * u;
-          if (std::fabs(dp) > 0.05f && u > 0.0f && u < 1.0f) {
-            u = std::clamp(u + (crest - phaseAt(px, py)) / dp, 0.0f, 1.0f);
-            px = t.x0 + (t.x1 - t.x0) * u;
-            py = t.y0 + (t.y1 - t.y0) * u;
+      const float s = fadeAt(phaseAt(t.x0, t.y0)) * t.weight;
+      if (s < 0.012f || occluded(i, t.x0, t.y0)) continue;
+      if (t.kind == ship::FlareTarget::PanelCorner) {
+        bool merged = false;
+        for (Spot& e : spots_) {
+          if (e.kind == t.kind &&
+              (t.x0 - e.x) * (t.x0 - e.x) + (t.y0 - e.y) * (t.y0 - e.y) < 196.0f) {
+            if (s > e.strength) { e.x = t.x0; e.y = t.y0; e.strength = s; }
+            merged = true;
+            break;
           }
-          addSpot(i, px, py, fadeAt(phaseAt(px, py) - crest) * t.weight, 0.90f, t.kind);
         }
-      } else {
-        const float sc = (t.kind == ship::FlareTarget::ShipPoint) ? 1.15f : 1.05f;
-        addSpot(i, t.x0, t.y0, fadeAt(phaseAt(t.x0, t.y0)) * t.weight, sc, t.kind);
+        if (merged) continue;
       }
+      const float sc = (t.kind == ship::FlareTarget::ShipPoint)
+                           ? 1.15f
+                           : (t.kind == ship::FlareTarget::StarPoint ? 1.05f : 0.92f);
+      spots_.push_back({t.x0, t.y0, std::min(s, 1.0f), sc, t.kind});
     }
     if (spots_.empty()) return;
 
@@ -500,7 +482,7 @@ void main() {
     const unsigned char cr = static_cast<unsigned char>(std::lround(std::clamp(tr, 0.0f, 1.0f) * 255.0f));
     const unsigned char cg = static_cast<unsigned char>(std::lround(std::clamp(tg, 0.0f, 1.0f) * 255.0f));
     const unsigned char cb = static_cast<unsigned char>(std::lround(std::clamp(tb, 0.0f, 1.0f) * 255.0f));
-    const float gain = lensFlare * std::clamp(intensity * optionScale, 0.0f, 1.6f) * 1.15f *
+    const float gain = lensFlare * std::clamp(intensity * optionScale, 0.0f, 1.5f) * 0.36f *
                        std::clamp(brightness, 0.4f, 1.4f);
     if (flareGainLoc_ >= 0) SetShaderValue(flareShader_, flareGainLoc_, &gain, SHADER_UNIFORM_FLOAT);
 
@@ -513,7 +495,7 @@ void main() {
     for (const Spot& s : spots_) {
       rlCheckRenderBatchLimit(4);
       const float rx = kFlareTailPx * s.scale;
-      const float ry = std::max(8.0f, rx * 0.19f);
+      const float ry = std::max(14.0f, rx * 0.48f);
       const unsigned char ca = static_cast<unsigned char>(std::lround(s.strength * 255.0f));
       rlColor4ub(cr, cg, cb, ca);
       rlTexCoord2f(0.0f, 0.0f); rlVertex2f(s.x - rx, s.y - ry);

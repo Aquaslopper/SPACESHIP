@@ -117,35 +117,22 @@ struct FlareRec {
   float cx0 = 0.0f, cy0 = 0.0f, cx1 = 0.0f, cy1 = 0.0f;
 } gFlare;
 
-void PushFlareSeg(float x0, float y0, float x1, float y1,
-                  float cx0, float cy0, float cx1, float cy1, float w = 0.85f) {
-  if (gFlare.out == nullptr || cx1 <= cx0 || cy1 <= cy0) { return; }
-  float t0 = 0.0f, t1 = 1.0f;
-  const float dx = x1 - x0, dy = y1 - y0;
-  auto clip = [&](float p, float q) {
-    if (std::fabs(p) < 1e-6f) { return q >= 0.0f; }
-    const float r = q / p;
-    if (p < 0.0f) { if (r > t1) return false; if (r > t0) t0 = r; }
-    else          { if (r < t0) return false; if (r < t1) t1 = r; }
-    return true;
-  };
-  if (!clip(-dx, x0 - cx0) || !clip(dx, cx1 - x0) ||
-      !clip(-dy, y0 - cy0) || !clip(dy, cy1 - y0) || t1 <= t0) { return; }
-  gFlare.out->push_back(FlareTarget{FlareTarget::PanelEdge,
-      x0 + dx * t0, y0 + dy * t0, x0 + dx * t1, y0 + dy * t1, w});
+void PushFlareCorner(float sx, float sy, float cx0, float cy0, float cx1, float cy1,
+                     float w = 0.78f) {
+  if (gFlare.out == nullptr || sx < cx0 || sx > cx1 || sy < cy0 || sy > cy1) { return; }
+  gFlare.out->push_back(FlareTarget{FlareTarget::PanelCorner, sx, sy, 0.0f, 0.0f, w});
 }
 
 void PushFlareChamfer(float x, float y, float w, float h, float chamfer,
                       float cx0, float cy0, float cx1, float cy1) {
   if (gFlare.out == nullptr || w < 10.0f || h < 10.0f) { return; }
   const float in = (w >= 14.0f && h >= 14.0f) ? kDoubleInset * 0.5f : 0.5f;
-  const auto pts = ChamferPolyRay(x + in, y + in, w - 2.0f * in, h - 2.0f * in,
-                                  std::max(0.0f, chamfer - in * 0.4f));
-  for (std::size_t i = 0; i < pts.size(); ++i) {
-    const Vector2& a = pts[i];
-    const Vector2& b = pts[(i + 1) % pts.size()];
-    PushFlareSeg(a.x, a.y, b.x, b.y, cx0, cy0, cx1, cy1);
-  }
+  const float bx = x + in, by = y + in, bw = w - 2.0f * in, bh = h - 2.0f * in;
+  const float c = ClampChamfer(bw, bh, std::max(0.0f, chamfer - in * 0.4f));
+  PushFlareCorner(bx + c * 0.5f, by + c * 0.5f, cx0, cy0, cx1, cy1);
+  PushFlareCorner(bx + bw, by, cx0, cy0, cx1, cy1);
+  PushFlareCorner(bx + bw - c * 0.5f, by + bh - c * 0.5f, cx0, cy0, cx1, cy1);
+  PushFlareCorner(bx, by + bh, cx0, cy0, cx1, cy1);
 }
 
 void PushFlarePt(FlareTarget::Kind kind, float sx, float sy, float w) {
@@ -2158,10 +2145,10 @@ void ShellView::PaintWrenExterior(const Simulation& sim) {
     static constexpr float kHullUV[][2] = {
         {0.03f, 0.49f}, {0.07f, 0.30f}, {0.07f, 0.68f}, {0.23f, 0.26f},
         {0.25f, 0.72f}, {0.43f, 0.16f}, {0.43f, 0.81f}, {0.57f, 0.30f},
-        {0.58f, 0.68f}, {0.75f, 0.37f}, {0.75f, 0.60f}, {0.93f, 0.49f}};
+        {0.58f, 0.68f}, {0.77f, 0.34f}, {0.77f, 0.63f}, {0.93f, 0.49f}};
     for (const auto& uv : kHullUV) {
       const Vector2 sp = projectUv(uv[0], uv[1], SampleWrenHullZ(uv[0], uv[1]));
-      PushFlarePt(FlareTarget::ShipPoint, sp.x, sp.y - contentScroll_, 1.0f);
+      PushFlarePt(FlareTarget::ShipPoint, sp.x, sp.y - contentScroll_, 0.95f);
     }
   } else {
     DrawTexturePro(*texture,
@@ -2173,10 +2160,10 @@ void ShellView::PaintWrenExterior(const Simulation& sim) {
     static constexpr float kHullUV[][2] = {
         {0.03f, 0.49f}, {0.07f, 0.30f}, {0.07f, 0.68f}, {0.23f, 0.26f},
         {0.25f, 0.72f}, {0.43f, 0.16f}, {0.43f, 0.81f}, {0.57f, 0.30f},
-        {0.58f, 0.68f}, {0.75f, 0.37f}, {0.75f, 0.60f}, {0.93f, 0.49f}};
+        {0.58f, 0.68f}, {0.77f, 0.34f}, {0.77f, 0.63f}, {0.93f, 0.49f}};
     for (const auto& uv : kHullUV) {
       PushFlarePt(FlareTarget::ShipPoint, image.x + uv[0] * image.w,
-                  image.y + uv[1] * image.h - contentScroll_, 1.0f);
+                  image.y + uv[1] * image.h - contentScroll_, 0.95f);
     }
   }
 
@@ -7331,15 +7318,12 @@ void ShellView::PaintTitleBody(Simulation& sim, double nowMs) {
                              static_cast<float>(texture->height)},
                    Rectangle{card.x, card.y, card.w, card.h}, Vector2{0.0f, 0.0f}, 0.0f,
                    ToRay(p.white));
-    static constexpr float kTitleFrame[][4] = {
-        {50.0f, 34.0f, 1621.0f, 34.0f},   {1621.0f, 34.0f, 1644.0f, 58.0f},
-        {1644.0f, 58.0f, 1644.0f, 640.0f},{1644.0f, 640.0f, 1379.0f, 905.0f},
-        {1379.0f, 905.0f, 50.0f, 905.0f}, {50.0f, 905.0f, 28.0f, 882.0f},
-        {28.0f, 882.0f, 28.0f, 58.0f},    {28.0f, 58.0f, 50.0f, 34.0f}};
-    for (const auto& s : kTitleFrame) {
-      PushFlareSeg(card.x + card.w * (s[0] / 1672.0f), card.y + card.h * (s[1] / 941.0f),
-                   card.x + card.w * (s[2] / 1672.0f), card.y + card.h * (s[3] / 941.0f),
-                   0.0f, 0.0f, width_, height_);
+    static constexpr float kTitleCorners[][2] = {
+        {39.0f, 46.0f}, {1632.0f, 46.0f}, {1644.0f, 640.0f},
+        {1379.0f, 905.0f}, {39.0f, 894.0f}};
+    for (const auto& c : kTitleCorners) {
+      PushFlareCorner(card.x + card.w * (c[0] / 1672.0f), card.y + card.h * (c[1] / 941.0f),
+                      0.0f, 0.0f, width_, height_);
     }
   }
 
