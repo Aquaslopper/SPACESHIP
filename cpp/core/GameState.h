@@ -289,7 +289,7 @@ struct GameState {
 
   bool reducedMotion = false;
   std::string shipClass = "wren";
-  bool sellCurrentShip = false;
+  std::string previousShip;
   std::vector<std::string> parkedShips;
 
   Options options = {};

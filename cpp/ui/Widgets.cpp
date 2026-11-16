@@ -767,6 +767,7 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         view.confirm = item->confirm;
         view.enabled = item->enabled;
         view.live = item->enabled;
+        view.charged = item->free && item->enabled;
         if (!item->free) {
           BindCommandCharge(sim, view, ButtonChargeKey(sim, "press:station:" + item->id + ":"),
                             ButtonChargeTier(view.label));
@@ -775,23 +776,28 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         commitIds.push_back(item->id);
         if (item->id.compare(0, 9, "ship-buy:") == 0) {
           CommandRowView sell;
-          sell.label = "Sell current ship for " + js::NumToString(std::stod(sim.World().shipFields.at(sim.State().shipClass).at("price")) / 3.0) + " sh";
-          sell.enabled = true;
+          const std::string& old = sim.State().previousShip;
+          sell.label = "Sell old ship for " + js::NumToString(old.empty() || old == "wren" ? 1000 : std::stod(sim.World().shipFields.at(old).at("price")) / 3.0) + " sh";
+          sell.enabled = !old.empty() && item->done;
+          sell.live = sell.enabled;
+          sell.charged = sell.enabled;
           sell.hideCost = true;
-          sell.selected = sim.State().sellCurrentShip;
           commitRows.push_back(sell);
           commitIds.push_back("ship-disposition:sell");
           CommandRowView park;
-          park.label = "Park current ship";
-          park.enabled = true;
+          park.label = "Park old ship";
+          park.enabled = !old.empty() && item->done;
+          park.live = park.enabled;
+          park.charged = park.enabled;
           park.hideCost = true;
-          park.selected = !sim.State().sellCurrentShip;
           commitRows.push_back(park);
           commitIds.push_back("ship-disposition:park");
           for (const std::string& kind : sim.State().parkedShips) {
             CommandRowView parked;
             parked.label = "Parked: " + sim.World().shipFields.at(kind).at("name") + " - switch";
             parked.enabled = true;
+            parked.live = true;
+            parked.charged = true;
             parked.hideCost = true;
             commitRows.push_back(parked);
             commitIds.push_back("ship-buy:" + kind);

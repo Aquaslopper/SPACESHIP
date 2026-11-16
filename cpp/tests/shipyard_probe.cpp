@@ -14,26 +14,46 @@ int main() {
   for (const auto& entry : prices) assert(std::stod(sim.World().shipFields.at(entry.first).at("price")) == entry.second);
   auto resale = sim;
   resale.MutableState().shiplets = 6000;
-  assert(ship::PressStationAction(resale, "ship-disposition:sell"));
+  assert(!ship::PressStationAction(resale, "ship-disposition:sell"));
   assert(ship::PressStationAction(resale, "ship-buy:explorer-manta"));
-  assert(std::abs(resale.State().shiplets - 1000.0 / 3.0) < 1e-9);
+  assert(resale.State().shiplets == 0);
+  assert(ship::PressStationAction(resale, "ship-disposition:sell"));
+  assert(resale.State().shiplets == 1000);
+  assert(!ship::PressStationAction(resale, "ship-disposition:sell"));
   assert(resale.State().parkedShips.empty());
   sim.MutableState().shiplets = 12000;
-  assert(ship::PressStationAction(sim, "ship-disposition:park"));
+  ship::Tab tab;
+  tab.kind = "station";
+  tab.id = sim.Map().here;
+  ship::StationSelection selection{"yard", "ship-buy:cargo-spine"};
+  auto screen = ship::BuildTabScreen(sim, tab, ship::WikiView(), &selection);
+  assert(screen.panelRows.back().at(0).charged);
+  assert(!screen.panelRows.back().at(1).enabled && !screen.panelRows.back().at(2).enabled);
+  assert(screen.panelRows.back().at(1).label == "Sell old ship for 1000 sh");
+  const auto yard = ship::BuildStationScreen(sim, sim.Map().here);
+  for (const auto& col : yard.columns) if (col.id == "yard") {
+    assert(col.rows.at(3).id == "ship-buy:explorer-manta");
+    assert(col.rows.at(4).id == "ship-buy:kestrel");
+  }
+  assert(!ship::PressStationAction(sim, "ship-disposition:park"));
   assert(ship::PressStationAction(sim, "ship-buy:cargo-spine"));
   assert(sim.State().shiplets == 0 && sim.State().parkedShips.at(0) == "wren");
+  screen = ship::BuildTabScreen(sim, tab, ship::WikiView(), &selection);
+  assert(screen.panelRows.back().at(1).enabled && screen.panelRows.back().at(2).enabled);
+  assert(ship::PressStationAction(sim, "ship-disposition:park"));
   assert(ship::PressStationAction(sim, "ship-buy:wren"));
   assert(sim.State().shipClass == "wren" && sim.State().parkedShips.at(0) == "cargo-spine");
   assert(ship::PressStationAction(sim, "ship-buy:cargo-spine"));
-  sim.MutableState().shiplets = 12000;
-  assert(ship::PressStationAction(sim, "ship-disposition:sell"));
+  sim.MutableState().shiplets = 16000;
   assert(ship::PressStationAction(sim, "ship-buy:cargo-bulk"));
-  assert(sim.State().shiplets == 0 && sim.State().parkedShips.size() == 1);
+  assert(sim.State().previousShip == "cargo-spine");
+  assert(ship::PressStationAction(sim, "ship-disposition:sell"));
+  assert(sim.State().shiplets == 4000 && sim.State().parkedShips.size() == 1);
   auto loaded = ship::Simulation::NewVoyage(catalog);
   std::string error;
   assert(loaded.LoadJson(sim.SaveJson(), &error));
   assert(loaded.State().parkedShips == sim.State().parkedShips);
-  assert(loaded.State().sellCurrentShip);
+  assert(loaded.State().previousShip.empty());
   sim.MutableState().shiplets = 10000;
   sim.ClampStat("hull", -100); sim.ClampStat("hull", 40);
   sim.ClampStat("fuel", -100); sim.ClampStat("fuel", 20);
@@ -63,5 +83,5 @@ int main() {
       assert(row.id != "upgrade:drive" && row.id != "upgrade:rack" && row.id != "upgrade:scanner" && row.id != "upgrade:scanner2");
     }
   }
-  std::cout << "PASS: listed ship prices, one-third resale, parking/switching, saved parked hulls, shop removals, refit prices and all four services\n";
+  std::cout << "PASS: Wren resale 1000 sh, buy-first sell/park controls, Tessellate ordering, green purchase marker, parking/switching, save/load, prices and services\n";
 }

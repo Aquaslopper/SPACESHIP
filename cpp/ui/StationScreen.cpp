@@ -676,13 +676,11 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   yard.id = "yard";
   yard.title = "Shipyard";
   yard.badge = Num(purse) + " sh, hull " + Num(sim.StatValue("hull")) + "%";
-  yard.notes.push_back("Shiplets only; no click spent. Choose sell or park before buying. Parked hulls can be switched here; crew, cargo, rooms, refits and condition transfer.");
-  for (const std::string kind : {"kestrel", "cargo-spine", "cargo-bulk", "explorer-needle", "explorer-manta", "yamato", "arcadia"}) {
+  yard.notes.push_back("Shiplets only; no click spent. Buy first, then sell or park the old ship. Parked hulls can be switched here; crew, cargo, rooms, refits and condition transfer.");
+  for (const std::string kind : {"cargo-spine", "cargo-bulk", "explorer-needle", "explorer-manta", "kestrel", "yamato", "arcadia"}) {
     const auto& fields = sim.World().shipFields.at(kind);
     const double price = std::stod(fields.at("price"));
     const bool parked = std::find(sim.State().parkedShips.begin(), sim.State().parkedShips.end(), kind) != sim.State().parkedShips.end();
-    const double resale = sim.State().sellCurrentShip && !parked
-        ? std::stod(sim.World().shipFields.at(sim.State().shipClass).at("price")) / 3.0 : 0;
     StationRow ship;
     ship.id = "ship-buy:" + kind;
     ship.label = fields.at("name") +
@@ -692,7 +690,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
         (parked ? " - parked" : " - " + Num(price) + " sh");
     ship.free = true;
     ship.done = sim.State().shipClass == kind;
-    ship.enabled = !ship.done && purse + resale >= (parked ? 0 : price);
+    ship.enabled = !ship.done && purse >= (parked ? 0 : price);
     ship.cost = ship.done ? kDone : kFree;
     ship.commit = ship.done ? "Owned" : parked ? "Switch to parked ship" : "Buy - " + Num(price) + " sh";
     ship.details.push_back(Num(sim.ShipCargoCapacity(kind, sim.CargoRefitLevel())) + " m3 cargo; " + fields.at("berths") + " berths.");
@@ -1061,7 +1059,16 @@ bool PressStationAction(Simulation& sim, const std::string& action, const std::s
   // gate, so they hold no clicks and start no green. A trade confirmation and
   // every other commit row is one click of the clock, like the rest of the ship.
   if (action == "ship-disposition:sell" || action == "ship-disposition:park") {
-    sim.MutableState().sellCurrentShip = action == "ship-disposition:sell";
+    auto& state = sim.MutableState();
+    if (state.previousShip.empty()) return false;
+    if (action == "ship-disposition:sell") {
+      auto old = std::find(state.parkedShips.begin(), state.parkedShips.end(), state.previousShip);
+      if (old == state.parkedShips.end()) return false;
+      state.shiplets += state.previousShip == "wren" ? 1000 :
+          std::stod(sim.World().shipFields.at(state.previousShip).at("price")) / 3.0;
+      state.parkedShips.erase(old);
+    }
+    state.previousShip.clear();
     return true;
   }
   const StationScreenModel model = BuildStationScreen(sim, sim.Map().here);

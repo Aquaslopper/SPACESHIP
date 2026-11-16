@@ -19,20 +19,21 @@ purse 500000
 clickhit nav station-item:ship-buy:cargo-spine
 frames 3
 shot shipyard-sell-park
-clickhit nav row | ship-disposition:park
 clickhit nav row | ship-buy:cargo-spine
 frames 3
 state
 shot shipyard-parked
+clickhit nav row | ship-disposition:park
+frames 3
 clickhit nav row | ship-buy:wren
 frames 3
 state
 clickhit nav station-item:ship-buy:cargo-bulk
 frames 3
-clickhit nav row | ship-disposition:sell
+clickhit nav row | ship-buy:cargo-bulk
 frames 3
 shot shipyard-sell-selected
-clickhit nav row | ship-buy:cargo-bulk
+clickhit nav row | ship-disposition:sell
 frames 3
 state
 shot shipyard-sold

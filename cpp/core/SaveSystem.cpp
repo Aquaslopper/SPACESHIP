@@ -150,7 +150,7 @@ std::string Simulation::SaveJson() const {
   s["reducedMotion"] = state_.reducedMotion;
   s["shipClass"] = state_.shipClass;
   s["parkedShips"] = state_.parkedShips;
-  s["sellCurrentShip"] = state_.sellCurrentShip;
+  s["previousShip"] = state_.previousShip;
 
   s["options"] = Json{{"largeText", state_.options.largeText},
                       {"confirmRisk", state_.options.confirmRisk},
@@ -1057,7 +1057,7 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     state_.reducedMotion = GetBool(s, "reducedMotion");
     state_.shipClass = GetString(s, "shipClass", "wren");
     state_.parkedShips = s.value("parkedShips", std::vector<std::string>{});
-    state_.sellCurrentShip = s.value("sellCurrentShip", false);
+    state_.previousShip = s.value("previousShip", std::string{});
     state_.medkits = GetNumber(s, "medkits", 2);
     state_.engineCondition = GetNumber(s, "engineCondition");
     state_.wearTick = GetNumber(s, "wearTick");
