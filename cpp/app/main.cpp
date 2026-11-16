@@ -292,13 +292,32 @@ void main() {
     }
   }
   if (uDangerPulse > 0.001) {
-    float luma = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
-    vec3 redFloor = vec3(0.74, 0.15, 0.13);
-    float pulse = clamp(uDangerPulse, 0.0, 1.0);
-    float redMix = pulse * 0.18;
-    rgb = mix(rgb, redFloor, redMix * (1.0 - 0.45 * luma));
-    rgb.r = clamp(rgb.r + pulse * 0.08 * (1.0 - rgb.r * 0.5), 0.0, 1.0);
-    rgb.gb *= 1.0 - pulse * 0.10;
+    vec2 res = max(uResolution, vec2(1.0));
+    vec2 texel = 1.0 / res;
+    vec2 staticDir = normalize(vec2(-0.72, 0.69));
+    vec2 screenPos = vec2(uv.x, 1.0 - uv.y) * res;
+    vec2 centered = (screenPos - 0.5 * res) / min(res.x, res.y);
+    float staticProj = dot(centered, staticDir);
+    float dangerCrest = pow(0.5 + 0.5 * cos(staticProj * 2.8), 4.5);
+    float pulse = clamp(uDangerPulse, 0.0, 1.0) * dangerCrest;
+
+    if (pulse > 0.001) {
+      float shiftPx = 0.75 * pulse;
+      vec2 shiftUV = vec2(staticDir.x, -staticDir.y) * (shiftPx * texel);
+      vec3 baseSample = center.rgb * colDiffuse.rgb * fragColor.rgb;
+      vec3 shiftedSample = vec3(
+          texture(texture0, clamp(uv + shiftUV, vec2(0.0), vec2(1.0))).r,
+          center.g,
+          texture(texture0, clamp(uv - shiftUV, vec2(0.0), vec2(1.0))).b) * colDiffuse.rgb * fragColor.rgb;
+      rgb = clamp(rgb + (shiftedSample - baseSample), 0.0, 1.0);
+
+      float luma = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
+      vec3 redFloor = vec3(0.74, 0.15, 0.13);
+      float redMix = pulse * 0.22;
+      rgb = mix(rgb, redFloor, redMix * (1.0 - 0.45 * luma));
+      rgb.r = clamp(rgb.r + pulse * 0.10 * (1.0 - rgb.r * 0.5), 0.0, 1.0);
+      rgb.gb *= 1.0 - pulse * 0.12;
+    }
   }
   float angle = radians(uColorShift);
   vec3 axis = normalize(vec3(1.0));
