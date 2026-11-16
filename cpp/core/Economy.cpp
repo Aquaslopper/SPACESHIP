@@ -467,8 +467,8 @@ namespace {
 constexpr double kTradeEpoch = 100.0;  // actions between two draws of a board
 constexpr int kTradeMinPerMode = 10;   // minimum delivery and freelance offers per station
 constexpr double kTradeHold = 20.0;    // the cubic metres a voyage starts with
-constexpr double kTradeFloor = 40.0;   // a run that pays less than this is no run
-constexpr double kTradeValue = 1200.0;  // the goods value a single run may commit
+constexpr double kTradeFloor = 20.0;   // a run that pays less than this is no run
+constexpr double kTradeValue = 1000.0;  // the goods value a single run may commit
 
 // The chart's own generator, so a board is a pure function of its seed.
 struct TradeRng {
