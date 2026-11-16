@@ -65,7 +65,7 @@ int main() {
   assert(ship::PressStationAction(sim, "hull-service"));
   assert(sim.StatValue("hull") == 55 && sim.State().shiplets == 9400);
   assert(ship::PressStationAction(sim, "tank-fuel"));
-  assert(sim.StatValue("fuel") == 30 && sim.State().shiplets == 9350);
+  assert(sim.StatValue("fuel") == 50 && sim.State().shiplets == 9350);
   assert(ship::PressStationAction(sim, "maintenance"));
   assert(sim.StatValue("energy") == 100 && sim.StatValue("shield") == 100);
   assert(sim.State().engineCondition == engine && sim.State().shiplets == 9100);

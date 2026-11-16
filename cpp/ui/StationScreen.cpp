@@ -780,7 +780,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     const double price = service == "repair-hull" ? 100 : service == "tank-fuel" ? 50 : 250;
     StationRow row;
     row.id = service;
-    row.label = service == "repair-hull" ? "Repair hull (+10%) - 100 sh" : service == "tank-fuel" ? "Tank fuel (+10%) - 50 sh" : "Ship maintenance: energy and shield to 100% - 250 sh";
+    row.label = service == "repair-hull" ? "Repair hull (+10%) - 100 sh" : service == "tank-fuel" ? "Tank fuel (+30%) - 50 sh" : "Ship maintenance: energy and shield to 100% - 250 sh";
     row.commit = "Buy - " + Num(price) + " sh";
     row.details.push_back(row.label);
     row.free = true;
@@ -981,7 +981,7 @@ bool PressStationActionRaw(Simulation& sim, const std::string& action,
     sim.MutableState().shiplets -= price;
     sim.MutableState().moneySpent += price;
     if (action == "repair-hull") sim.ClampStat("hull", 10);
-    if (action == "tank-fuel") sim.ClampStat("fuel", 10);
+    if (action == "tank-fuel") sim.ClampStat("fuel", 30);
     if (action == "maintenance") {
       sim.ClampStat("energy", 100 - sim.StatValue("energy"));
       sim.ClampStat("shield", 100 - sim.StatValue("shield"));
