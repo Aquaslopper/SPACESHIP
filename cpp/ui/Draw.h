@@ -45,7 +45,7 @@ enum class HitButton { None, Left, Right };
 
 struct FlareTarget {
   enum Kind : unsigned char { PanelCorner, ShipPoint, StarPoint, Occlude } kind = PanelCorner;
-  float x0 = 0.0f, y0 = 0.0f, x1 = 0.0f, y1 = 0.0f, weight = 1.0f;
+  float x0 = 0.0f, y0 = 0.0f, x1 = 0.0f, y1 = 0.0f, weight = 3.0f;
 };
 
 class ShellView {
