@@ -466,6 +466,7 @@ void ShellView::ResetContentScroll() { contentScroll_ = 0.0f; }
 
 void ShellView::Draw(Simulation& sim, double nowMs) {
   frameTimeMs_ = nowMs;
+  if (!titleActive_ && !splashActive_) sim.MutableState().playedSeconds += GetFrameTime();
   const float contentH = height_ - Metrics::kContentTop - Metrics::kStatusH;
   layout_ = ComputeLayout(width_, height_, contentH, others_, theme_.stageCompact);
 
@@ -7471,6 +7472,47 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
   const float searchTop = layout_.content.y + headerH + 8.0f;
   PaintWikiSearch(Area{layout_.content.x, searchTop, layout_.content.w, 0.0f});
   float top = searchTop + (panelsKind_ == ScreenKind::Wiki ? 38.0f : 0.0f);
+  if (screen.panels.size() == 4 && screen.panels.front().id == "bridge-controls") {
+    const float gap = 8.0f;
+    const float leftW = (right - left - gap) * 0.64f;
+    const float rightX = left + leftW + gap;
+    const float rightW = right - rightX;
+    const float totalsH = MeasurePanelHeight(screen.panels[1], rightW);
+    const float controlW = leftW - 32.0f;
+    float controlsH = 0;
+    for (const CommandRowView& row : screen.panelRows[0]) {
+      controlsH += std::max(40.0f, WrapText(row.label, controlW - 20.0f, TypePx(10), SelectFont(TypePx(10), false)).size() * theme_.LineHeight() + 16.0f) + 8.0f;
+    }
+    const float heroH = std::max(totalsH, screen.hero.hero.h + controlsH + 20.0f);
+    PaintChamferBoxRay(Area{left, top, leftW, heroH}, kChamferPanel, ToRay(p.panel), ToRay(p.borderDark), ToRay(p.border));
+    PaintHero(screen.hero, Area{left, top, leftW, screen.hero.hero.h});
+    float y = top + screen.hero.hero.h + 8.0f;
+    for (std::size_t r = 0; r < screen.panelRows[0].size(); ++r) {
+      const CommandRowView& row = screen.panelRows[0][r];
+      const auto lines = WrapText(row.label, controlW - 20.0f, TypePx(10), SelectFont(TypePx(10), false));
+      const float h = std::max(40.0f, lines.size() * theme_.LineHeight() + 16.0f);
+      const Area box{left + 16.0f, y, controlW, h};
+      FillChamferRay(box, kChamferCard, ToRay(row.enabled ? p.control : p.panel3));
+      if (row.charged) PaintProgressFill(box, row.chargePercent, p, kChamferCard);
+      PaintChamferDoubleLinesRay(box, kChamferCard, ToRay(p.borderDark), ToRay(p.border));
+      float textY = y + 8.0f;
+      for (const std::string& line : lines) {
+        Text(line.c_str(), static_cast<int>(box.x + 10.0f), static_cast<int>(textY), TypePx(10), ToRay(row.enabled ? p.ink : p.muted));
+        textY += theme_.LineHeight();
+      }
+      if (row.enabled) navHits_.push_back(NavHit{box, "row", screen.panelRowIds[0][r]});
+      y += h + 8.0f;
+    }
+    PaintPanel(screen.panels[1], Area{rightX, top, rightW, heroH});
+    const float bottomTop = top + heroH + gap;
+    const float halfW = (right - left - gap) / 2;
+    const float feedH = MeasurePanelHeight(screen.panels[2], halfW);
+    const float courseH = MeasurePanelHeight(screen.panels[3], halfW);
+    PaintPanel(screen.panels[2], Area{left, bottomTop, halfW, feedH});
+    PaintPanel(screen.panels[3], Area{left + halfW + gap, bottomTop, halfW, courseH});
+    contentPaintBottom_ = std::max(contentPaintBottom_, bottomTop + std::max(feedH, courseH));
+    return;
+  }
   if (screen.hasHero) {
     PaintHero(screen.hero, Area{left, top, right - left, screen.hero.hero.h});
     top += screen.hero.hero.h + 8.0f;

@@ -54,6 +54,7 @@ bool Simulation::BuyRoom(const std::string& id) {
   const std::string name = room->name;
   rooms_.push_back(*room);
   state_.shiplets -= RoomPrice();
+  state_.moneySpent += RoomPrice();
   FreeCommit("Installed " + name);
   return true;
 }
@@ -85,6 +86,7 @@ bool Simulation::BuyLargerShip(const std::string& kind) {
   state_.parkedShips.push_back(state_.shipClass);
   if (!switching) state_.previousShip = state_.shipClass;
   state_.shiplets -= price;
+  state_.moneySpent += price;
   state_.shipClass = kind;
   auto fields = catalog_.shipFields.find(kind);
   if (fields != catalog_.shipFields.end()) { ship_.fields = fields->second; }

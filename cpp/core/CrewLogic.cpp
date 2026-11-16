@@ -163,6 +163,7 @@ void Simulation::TickPayroll() {
     const double wage = WageOf(*crew);
     if (state_.shiplets >= wage) {
       state_.shiplets -= wage;
+      state_.moneySpent += wage;
       crew->wallet += wage;
       spent += wage;
       paid += 1;

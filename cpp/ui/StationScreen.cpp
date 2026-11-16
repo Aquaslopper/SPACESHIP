@@ -979,6 +979,7 @@ bool PressStationActionRaw(Simulation& sim, const std::string& action,
     const double price = action == "repair-hull" ? 100 : action == "tank-fuel" ? 50 : 250;
     if (!sim.State().docked || sim.State().shiplets < price) return false;
     sim.MutableState().shiplets -= price;
+    sim.MutableState().moneySpent += price;
     if (action == "repair-hull") sim.ClampStat("hull", 10);
     if (action == "tank-fuel") sim.ClampStat("fuel", 10);
     if (action == "maintenance") {
@@ -992,6 +993,7 @@ bool PressStationActionRaw(Simulation& sim, const std::string& action,
     if (sim.State().gameOver.size() != 0 || !sim.State().docked) return false;
     if (sim.StatValue("hull") >= 100 || sim.State().shiplets < kHullService) return false;
     sim.MutableState().shiplets -= kHullService;
+    sim.MutableState().moneySpent += kHullService;
     sim.ClampStat("hull", 5);
     sim.FreeCommit("Station repaired the hull");
     return true;
