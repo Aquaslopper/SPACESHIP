@@ -76,13 +76,14 @@ void Simulation::ApplyShipLayout() {
 }
 
 bool Simulation::BuyLargerShip(const std::string& kind) {
-  const double price = kind == "kestrel" ? 4000 : 1;
-  if (!state_.gameOver.empty() || !state_.docked) { return false; }
-  const Port* port = HerePort();
-  if (port == nullptr || (kind == "kestrel" && state_.shipClass != "wren" &&
-                          state_.shipClass != "explorer-needle" && state_.shipClass != "explorer-manta" && state_.shipClass != "yamato" && state_.shipClass != "arcadia") ||
-      state_.shipClass == kind || state_.shiplets < price) { return false; }
-
+  auto parked = std::find(state_.parkedShips.begin(), state_.parkedShips.end(), kind);
+  const bool switching = parked != state_.parkedShips.end();
+  const double price = switching ? 0 : std::stod(catalog_.shipFields.at(kind).at("price"));
+  if (!state_.docked || HerePort() == nullptr || state_.shipClass == kind ||
+      state_.shiplets < price) return false;
+  if (switching) state_.parkedShips.erase(parked);
+  state_.parkedShips.push_back(state_.shipClass);
+  if (!switching) state_.previousShip = state_.shipClass;
   state_.shiplets -= price;
   state_.shipClass = kind;
   auto fields = catalog_.shipFields.find(kind);

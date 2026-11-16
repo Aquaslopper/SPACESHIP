@@ -1100,38 +1100,27 @@ bool Simulation::BuyUpgrade(const std::string& upgradeId) {
   if (!state_.docked || HerePort() == nullptr) { return false; }
 
   const std::string className = state_.shipClass;
-  if (upgradeId == "bay" && !Truthy(state_.upgrades, "bay") && state_.shiplets >= 500) {
+  if (upgradeId == "bay" && !Truthy(state_.upgrades, "bay") && state_.shiplets >= 1500) {
     const double capacity = ShipCargoCapacity(className, 1);
-    state_.shiplets -= 500;
+    state_.shiplets -= 1500;
     state_.upgrades["bay"] = true;
     cargo_.capacity = std::max(cargo_.capacity, capacity);
     FreeCommit("Cargo hold expanded");
     return true;
   }
   if (upgradeId == "bay2" && Truthy(state_.upgrades, "bay") && !Truthy(state_.upgrades, "bay2") &&
-      state_.shiplets >= 900) {
+      state_.shiplets >= 2500) {
     const double capacity = ShipCargoCapacity(className, 2);
-    state_.shiplets -= 900;
+    state_.shiplets -= 2500;
     state_.upgrades["bay2"] = true;
     cargo_.capacity = std::max(cargo_.capacity, capacity);
     FreeCommit("Cargo hold enlarged again");
     return true;
   }
-  if (upgradeId == "drive" && !Truthy(state_.upgrades, "drive") && state_.shiplets >= 900) {
-    state_.shiplets -= 900;
-    state_.upgrades["drive"] = true;
-    FreeCommit("Efficient drive fitted");
-    return true;
-  }
-  if (upgradeId == "rack" && !Truthy(state_.upgrades, "rack") && state_.shiplets >= 400) {
-    state_.shiplets -= 400;
-    state_.upgrades["rack"] = true;
-    life_.capacity = 15;
-    FreeCommit("O2 rack expanded");
-    return true;
-  }
-  if (upgradeId == "galley" && !Truthy(state_.upgrades, "galley") && state_.shiplets >= 400) {
-    state_.shiplets -= 400;
+
+
+  if (upgradeId == "galley" && !Truthy(state_.upgrades, "galley") && state_.shiplets >= 3000) {
+    state_.shiplets -= 3000;
     state_.upgrades["galley"] = true;
     // The ceiling is what the cook fills to, so a bigger rack is a deeper buffer
     // between the crew and the starve line, not a faster kitchen.
@@ -1139,8 +1128,8 @@ bool Simulation::BuyUpgrade(const std::string& upgradeId) {
     FreeCommit("Galley rack enlarged");
     return true;
   }
-  if (upgradeId == "filter" && !Truthy(state_.upgrades, "filter") && state_.shiplets >= 600) {
-    state_.shiplets -= 600;
+  if (upgradeId == "filter" && !Truthy(state_.upgrades, "filter") && state_.shiplets >= 1500) {
+    state_.shiplets -= 1500;
     state_.upgrades["filter"] = true;
     // `lifeMax` is the length of one charge in clicks, and every reader of it -
     // the bank, the O2 screen, the save - reads it from here.
@@ -1148,24 +1137,11 @@ bool Simulation::BuyUpgrade(const std::string& upgradeId) {
     FreeCommit("Filter cores re-sleeved");
     return true;
   }
-  if (upgradeId == "scanner" && !Truthy(state_.upgrades, "scanner") && state_.shiplets >= 600) {
-    state_.shiplets -= 600;
-    state_.upgrades["scanner"] = true;
-    scanCost_ = 3;
-    FreeCommit("Sensors upgraded");
-    return true;
-  }
-  if (upgradeId == "scanner2" && Truthy(state_.upgrades, "scanner") &&
-      !Truthy(state_.upgrades, "scanner2") && state_.shiplets >= 1100) {
-    state_.shiplets -= 1100;
-    state_.upgrades["scanner2"] = true;
-    scanCost_ = 2;
-    FreeCommit("Deep-array sensors fitted");
-    return true;
-  }
-  if (upgradeId == "hull" && StatValue("hull") < 100 && state_.shiplets >= 120) {
-    state_.shiplets -= 120;
-    ClampStat("hull", 50);
+
+
+  if (upgradeId == "hull" && StatValue("hull") < 100 && state_.shiplets >= 500) {
+    state_.shiplets -= 500;
+    ClampStat("hull", 5);
     FreeCommit("Station repaired the hull");
     return true;
   }

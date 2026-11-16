@@ -289,6 +289,8 @@ struct GameState {
 
   bool reducedMotion = false;
   std::string shipClass = "wren";
+  std::string previousShip;
+  std::vector<std::string> parkedShips;
 
   Options options = {};
   Chronicle chronicle = {};
