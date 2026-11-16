@@ -333,17 +333,21 @@ void main() {
   bool Ready() const { return shaderReady_ && IsRenderTextureValid(target_); }
   void Begin() const { BeginTextureMode(target_); }
   void End(double gamma, double brightness, float waveTime, float waveDirX, float waveDirY,
-           float intensity, float optionScale, float warmBias, float colorShift, float glow) const {
+           float intensity, float optionScale, float warmBias, float distress,
+           const ship::Theme& theme, float colorShift, float glow) const {
     EndTextureMode();
     const float g = static_cast<float>(ship::EffectiveDisplayGamma(gamma));
     const float b = static_cast<float>(ship::DisplayBrightness(brightness));
     const float res[2] = {static_cast<float>(width_), static_cast<float>(height_)};
     const float dir[2] = {waveDirX, waveDirY};
-    const float tint[3] = {
+    float tint[3] = {
         0.64f + (0.88f - 0.64f) * warmBias,
         0.58f + (0.68f - 0.58f) * warmBias,
         0.82f + (0.42f - 0.82f) * warmBias,
     };
+    tint[0] += (static_cast<float>(theme.palette.terracotta.r) / 255.0f - tint[0]) * distress;
+    tint[1] += (static_cast<float>(theme.palette.terracotta.g) / 255.0f - tint[1]) * distress;
+    tint[2] += (static_cast<float>(theme.palette.terracotta.b) / 255.0f - tint[2]) * distress;
     SetShaderValue(shader_, colorShiftLoc_, &colorShift, SHADER_UNIFORM_FLOAT);
     SetShaderValue(shader_, glowLoc_, &glow, SHADER_UNIFORM_FLOAT);
     SetShaderValue(shader_, gammaLoc_, &g, SHADER_UNIFORM_FLOAT);
@@ -567,8 +571,11 @@ int main(int argc, char** argv) {
   }
 
   ship::PointerOwnership leftPointer, rightPointer, middlePointer;
+  constexpr float kDistressOnset = 70.0f;
+  constexpr float kDistressSpeedGain = 2.0f;
   ship::RadiationTelemetry smoothedWave = ship::ComputeRadiationTelemetry(sim);
   float waveTime = 0.0f;
+  float distress = 0.0f;
   while (!WindowShouldClose() && !shell.QuitRequested()) {
     if (IsKeyPressed(KEY_ESCAPE)) { shell.Escape(sim); }
     if (IsKeyPressed(KEY_LEFT)) { shell.PageTutorial(-1, GetTime() * 1000.0); }
@@ -676,7 +683,14 @@ int main(int argc, char** argv) {
     }
     smoothedWave.baseIntensity += (targetWave.baseIntensity - smoothedWave.baseIntensity) * blend;
     smoothedWave.warmBias += (targetWave.warmBias - smoothedWave.warmBias) * blend;
-    if (!sim.State().reducedMotion) { waveTime += dt; }
+    float distressTarget = 0.0f;
+    for (const ship::IndicatorLine& line : ship::IndicatorLines(sim)) {
+      if (line.grow) { distressTarget = std::max(distressTarget, static_cast<float>(line.pct)); }
+    }
+    const float distressRaw = std::clamp((distressTarget - kDistressOnset) /
+                                         (100.0f - kDistressOnset), 0.0f, 1.0f);
+    distress += (distressRaw - distress) * blend;
+    if (!sim.State().reducedMotion) { waveTime += dt * (1.0f + kDistressSpeedGain * distress); }
 
     const float waveScale = sim.State().reducedMotion
                                 ? 0.0f
@@ -707,7 +721,7 @@ int main(int argc, char** argv) {
       display.End(sim.State().options.displayGamma, sim.State().options.displayBrightness,
                   waveTime, smoothedWave.waveDirX, smoothedWave.waveDirY,
                   smoothedWave.baseIntensity, waveScale, smoothedWave.warmBias,
-                  static_cast<float>(sim.State().options.colorShift),
+                  distress, theme, static_cast<float>(sim.State().options.colorShift),
                   static_cast<float>(sim.State().options.glow));
     }
     EndDrawing();
