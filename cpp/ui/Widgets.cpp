@@ -631,8 +631,6 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
 
       TaskScreenModel screen;
       screen.head = model.head;
-      screen.welcomeLine = model.welcomeLine;
-      screen.welcomePort = model.portId;
       screen.panelColumns = {0, 1, 2};
 
       NavPanel cards;

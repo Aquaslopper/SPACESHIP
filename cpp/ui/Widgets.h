@@ -191,8 +191,6 @@ struct TaskScreenModel {
   std::vector<ProgressButton> progress;
   std::vector<CommandRowView> commands;
   std::string bandNote;
-  std::string welcomeLine;
-  std::string welcomePort;
   bool hasStage = false;
 
   Vignette hero;
