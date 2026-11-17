@@ -215,7 +215,8 @@ Simulation Simulation::ReferenceVoyage(const Catalog& catalog) {
 void Simulation::BeginVoyage(const ChartSettings& settings, const std::string& startSystemId) {
   const Options options = state_.options;
   const bool motion = state_.reducedMotion;
-  const Catalog source = sourceCatalog_.regions.empty() ? catalog_ : sourceCatalog_;
+  const Catalog& source =
+      (sourceCatalog_ && !sourceCatalog_->regions.empty()) ? *sourceCatalog_ : *catalog_;
   const bool reference = referenceFit_;
   *this = reference ? Simulation::ReferenceVoyage(source)
                     : Simulation::NewVoyage(source, settings, startSystemId);
@@ -476,11 +477,5 @@ bool Simulation::ApplyJob(const std::string& crewId, const std::string& jobId) {
   return true;
 }
 
-std::vector<std::string> Simulation::FeedText() const {
-  std::vector<std::string> out;
-  out.reserve(state_.feed.size());
-  for (const FeedLine& line : state_.feed) { out.push_back(line.text); }
-  return out;
-}
 
 }  // namespace ship
