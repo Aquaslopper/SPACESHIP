@@ -465,6 +465,7 @@ bool Simulation::TalkToPatron(const std::string& patronId) {
 
 namespace {
 constexpr double kTradeEpoch = 100.0;  // actions between two draws of a board
+constexpr double kCrewEpoch = 50.0;    // actions between two draws of the hire offer
 constexpr int kTradeMinPerMode = 10;   // minimum delivery and freelance offers per station
 constexpr double kTradeHold = 20.0;    // the cubic metres a voyage starts with
 constexpr double kTradeFloor = 20.0;   // a run that pays less than this is no run
@@ -592,7 +593,7 @@ std::vector<CandidateDefinition> Simulation::HandsHere() const {
   if (map_.here.empty() || catalog_.FindPort(map_.here) == nullptr) { return hands; }
   if (catalog_.candidates.empty()) { return hands; }
 
-  const long long epoch = static_cast<long long>(std::floor(ActionCount() / kTradeEpoch));
+  const long long epoch = static_cast<long long>(std::floor(ActionCount() / kCrewEpoch));
   TradeRng rng(TradeHash(map_.here + "#tavern#" + std::to_string(epoch)));
 
   std::vector<std::size_t> pool;
