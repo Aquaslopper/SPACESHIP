@@ -324,7 +324,7 @@ void main() {
   vec2 p = fragTexCoord * 2.0 - 1.0;
   float ax = abs(p.x);
   float ay = abs(p.y);
-  float edge = smoothstep(1.0, 0.75, max(ax, ay));
+  float edge = clamp((1.0 - d) / 0.4, 0.0, 1.0);
   if (edge <= 0.0001) discard;
   float hTaper = clamp(1.0 - pow(ax, 2.2), 0.0, 1.0);
   vec2 cp = vec2(p.x * 0.95, p.y);
@@ -332,7 +332,7 @@ void main() {
   float core = exp(-r2 * 120.0) * 1.8;
   float innerGlow = exp(-r2 * 14.0)  * 0.35;
   float outerBloom = exp(-sqrt(r2) * 4.5) * 0.15;
-  float laserSharpness = 1100.0 + ax * 900.0; // 1100.0 = Razor sharp
+  float laserSharpness = 400.0 + ax * 900.0;
   float yLine = exp(-ay * ay * laserSharpness) * 1.4;
   float yBloom = exp(-ay * ay * 65.0) * 0.18;
   float streakShape = (yLine + yBloom) * hTaper;
