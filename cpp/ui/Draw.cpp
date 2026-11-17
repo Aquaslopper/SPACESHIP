@@ -8472,6 +8472,73 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
     buttons.push_back(yes); buttons.push_back(no);
   }
   if (!buttons.empty() || !note.empty()) PaintActionBand("Work in progress", note, buttons, pendingConfirm_);
+  if (panelsKind_ == ScreenKind::Station) {
+    const Tab* stationTab = FindTab(sim.State(), taskTabKey_);
+    const auto welcome = sim.State().stationWelcome.find(stationTab->id);
+    const int welcomeStep = welcome == sim.State().stationWelcome.end() ? 0 : welcome->second;
+    if (welcomeStep < 3) {
+      const std::string message =
+          welcomeStep == 0 ? "Welcome to the Spacestation " + screen.head.title
+          : welcomeStep == 1 ? "Make some money through trade contracts or freelancer jobs, but you have to buy the goods yourself."
+                              : "Always have enough fuel cells with you.";
+      const float panelWidth = std::min(560.0f, layout_.content.w - 24.0f);
+      const float portraitWidth = std::min(150.0f, panelWidth * 0.3f);
+      const float panelX = layout_.content.Right() - panelWidth - 12.0f;
+      const float textX = panelX + 16.0f;
+      const float portraitX = panelX + panelWidth - portraitWidth - 14.0f;
+      const float textWidth = portraitX - textX - 12.0f;
+      const int textSize = TypePx(10);
+      const std::vector<std::string> messageLines =
+          WrapText(message, textWidth, textSize, SelectFont(textSize, false));
+      const int continueSize = TypePx(9);
+      const float buttonWidth = TextWidth("Continue", continueSize) + 22.0f;
+      const float buttonHeight = std::max(25.0f, theme_.LineHeight() + 5.0f);
+      const float panelHeight =
+          std::max(168.0f, static_cast<float>(messageLines.size()) * theme_.LineHeight() +
+                               buttonHeight + 46.0f);
+      const Area panel{panelX, layout_.content.Bottom() - panelHeight - 12.0f + contentScroll_,
+                       panelWidth, panelHeight};
+      const Area portraitBox{portraitX, panel.y + 14.0f, portraitWidth, panel.h - 28.0f};
+      const Area button{portraitX - 12.0f - buttonWidth,
+                        panel.Bottom() - buttonHeight - 14.0f, buttonWidth, buttonHeight};
+      PaintChamferBoxRay(panel, kChamferPanel, ToRay(p.panel), ToRay(p.borderDark), ToRay(p.border));
+      FillChamferRay(portraitBox, kChamferCard, ToRay(p.panel2));
+      const Texture2D* portrait = CrewTexture(crewArt_, "moetorial");
+      if (portrait != nullptr) {
+        const float inset = 6.0f;
+        const float imageW = portraitBox.w - inset * 2.0f;
+        const float imageH = portraitBox.h - inset * 2.0f;
+        const float fit = std::min(imageW / static_cast<float>(portrait->width),
+                                   imageH / static_cast<float>(portrait->height));
+        const float width = static_cast<float>(portrait->width) * fit;
+        const float height = static_cast<float>(portrait->height) * fit;
+        DrawTexturePro(*portrait,
+                       Rectangle{0, 0, static_cast<float>(portrait->width),
+                                 static_cast<float>(portrait->height)},
+                       Rectangle{portraitBox.x + (portraitBox.w - width) * 0.5f,
+                                 portraitBox.y + (portraitBox.h - height) * 0.5f,
+                                 width, height},
+                       Vector2{0, 0}, 0.0f, WHITE);
+      }
+      MaskChamferInnerCornersRay(portraitBox, kChamferCard, ToRay(p.panel2));
+      PaintChamferDoubleLinesRay(portraitBox, kChamferCard, ToRay(p.borderDark), ToRay(p.border));
+      float messageY = panel.y + 18.0f;
+      for (const std::string& line : messageLines) {
+        Text(line.c_str(), static_cast<int>(textX), static_cast<int>(messageY), textSize,
+             ToRay(p.ink));
+        messageY += theme_.LineHeight();
+      }
+      const bool hovered = layout_.content.Contains(mouseX_, mouseY_) &&
+                           button.Contains(mouseX_, mouseY_ + contentScroll_);
+      PaintChamferBoxRay(button, kChamferSmall, ToRay(hovered ? p.hover : p.control),
+                         ToRay(p.borderDark), ToRay(p.border));
+      Text("Continue", static_cast<int>(button.x + (button.w - TextWidth("Continue", continueSize)) * 0.5f),
+           static_cast<int>(button.y + (button.h - static_cast<float>(continueSize)) * 0.5f - 1.0f),
+           continueSize, ToRay(p.coffee));
+      navHits_.insert(navHits_.begin(), NavHit{panel, "station-welcome-box", stationTab->id});
+      navHits_.insert(navHits_.begin(), NavHit{button, "station-welcome-next", stationTab->id});
+    }
+  }
   (void)sim;
 }
 
@@ -9188,6 +9255,17 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
   // content scrolled out of view can never be clicked.
   if (!layout_.content.Contains(x, y)) { return; }
   const float scrollY = contentScroll_;
+
+  if (screenPanels_ && panelsKind_ == ScreenKind::Station) {
+    for (const NavHit& hit : navHits_) {
+      if ((hit.action != "station-welcome-next" && hit.action != "station-welcome-box") ||
+          !hit.box.Contains(x, y + scrollY)) {
+        continue;
+      }
+      if (hit.action == "station-welcome-next") { ++sim.MutableState().stationWelcome[hit.arg]; }
+      return;
+    }
+  }
 
   if (y >= actionBandTop_) {
     for (const auto& hit : actionBandHits_) {

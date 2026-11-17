@@ -334,6 +334,7 @@ struct GameState {
   std::map<std::string, bool> upgrades;
   std::map<std::string, bool> hired;
   std::map<std::string, bool> visitedPorts;
+  std::map<std::string, int> stationWelcome;
   std::map<std::string, int> systemSerials;
   int nextSystemSerial = 1;
   std::vector<TradeContract> trades;
