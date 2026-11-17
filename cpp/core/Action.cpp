@@ -56,13 +56,13 @@ Simulation Simulation::NewVoyage(const Catalog& catalog) {
 Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& settings,
                                  const std::string& startSystemId) {
   Simulation sim;
-  if (!catalog.chartExpanded) { sim.sourceCatalog_ = catalog; }
+  sim.sourceCatalog_ = std::make_shared<const Catalog>(catalog);
   sim.chartSettings_ = settings;
-  sim.catalog_ = sim.sourceCatalog_;
-  sim.catalog_.chartExpanded = false;
-  ExpandChart(sim.catalog_, settings);
-  sim.rules_ = sim.catalog_.rules;
-  sim.scanCost_ = catalog.rules.scanCost;
+  Catalog built = catalog;
+  built.chartExpanded = false;
+  ExpandChart(built, settings);
+  sim.catalog_ = std::make_shared<const Catalog>(std::move(built));
+  sim.rules_ = sim.catalog_->rules;
 
   // ---- crew --------------------------------------------------------------
   for (const CrewDefinition& def : catalog.startingCrew) {
