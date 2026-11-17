@@ -2981,12 +2981,6 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
       }
     }
     EndScissorMode();
-    DrawRectangleRec(Rectangle{origin.x + 234.0f * bridgeScaleX, origin.y + 51.0f * scale,
-                               5.0f * bridgeScaleX, 150.0f * scale}, metal);
-    DrawRectangleRec(Rectangle{origin.x + 360.0f * bridgeScaleX, origin.y + 51.0f * scale,
-                               5.0f * bridgeScaleX, 150.0f * scale}, metal);
-    DrawRectangleRec(Rectangle{origin.x + 102.0f * bridgeScaleX, origin.y + 123.0f * scale,
-                               396.0f * bridgeScaleX, 5.0f * scale}, metal);
     DrawRectangleLinesEx(Rectangle{origin.x + 94.0f * bridgeScaleX, origin.y + 43.0f * scale,
                                    412.0f * bridgeScaleX, 166.0f * scale},
                          std::max(1.0f, 1.4f * scale), trim);
@@ -7749,36 +7743,38 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
   PaintWikiSearch(Area{layout_.content.x, searchTop, layout_.content.w, 0.0f});
   float top = searchTop + (panelsKind_ == ScreenKind::Wiki ? 38.0f : 0.0f);
   if (screen.panels.size() == 3 && screen.panels.front().id == "bridge-controls") {
-    const float gap = 24.0f;
-    const float controlW = (right - left - 2 * gap) * 0.23f;
-    const float imageX = left + controlW + gap;
-    const float imageW = right - left - 2 * controlW - 2 * gap;
     const float imageTop = top + 18.0f;
-    const float rightW = (right - left) * 0.29f;
+    const float rightW = (right - left) * 0.36f;
     const float rightX = right - rightW;
-    const float feedW = rightX - 16.0f - left;
-    const float panelH = std::max({280.0f,
-                                   MeasurePanelHeight(screen.panels[2], feedW),
-                                   MeasurePanelHeight(screen.panels[1], rightW)});
-    const float fitScale = std::min((imageW - 12.0f) / screen.stage.width,
-                                    (layout_.content.Bottom() - imageTop - panelH - 24.0f) /
-                                        screen.stage.height);
-    TaskStage bridgeStage = screen.stage;
-    bridgeStage.typePx = theme_.FontPx() / fitScale;
-    const float scale = StageScale(bridgeStage, theme_);
-    const float stageW = bridgeStage.width * scale;
-    const float stageH = bridgeStage.height * scale;
-    const float stageX = imageX + (imageW - stageW) * 0.5f;
+    const float imageW = rightX - 16.0f - left;
+    const float voyageH = MeasurePanelHeight(screen.panels[1], rightW);
+    const float feedH = std::max(MeasurePanelHeight(screen.panels[2], imageW),
+                                 TypeStep(26.0f) + 4.0f * TypeStep(16.0f) + TypeStep(14.0f) + 6.0f);
+    float scale = std::min(1.4f, imageW / screen.stage.width);
     float buttonH = 48.0f;
-    for (const CommandRowView& row : screen.panelRows[0]) {
-      buttonH = std::max(buttonH, WrapText(row.label, controlW - 20.0f, TypePx(10), SelectFont(TypePx(10), false)).size() * theme_.LineHeight() + 16.0f);
+    for (int pass = 0; pass < 3; ++pass) {
+      const float controlW = (screen.stage.width * scale - 36.0f) * 0.5f;
+      buttonH = 48.0f;
+      for (const CommandRowView& row : screen.panelRows[0]) {
+        buttonH = std::max(buttonH, WrapText(row.label, controlW - 20.0f, TypePx(10), SelectFont(TypePx(10), false)).size() * theme_.LineHeight() + 16.0f);
+      }
+      const float fitScale = (layout_.content.Bottom() - imageTop - feedH - buttonH - 32.0f) /
+                             screen.stage.height;
+      scale = std::min(scale, std::max(0.65f, fitScale));
     }
+    TaskStage bridgeStage = screen.stage;
+    bridgeStage.typePx = theme_.FontPx() / scale;
+    const float stageW = bridgeStage.width * scale;
+    const float stageX = left + (imageW - stageW) * 0.5f;
+    const float controlW = (stageW - 36.0f) * 0.5f;
+    bridgeStage.height += (buttonH + 24.0f) / scale;
+    const float stageH = bridgeStage.height * scale;
     PaintStage(sim, bridgeStage, Area{stageX, imageTop, stageW, stageH});
-    const float y = imageTop + stageH - buttonH - 16.0f;
+    const float y = imageTop + stageH - buttonH - 12.0f;
     for (std::size_t r = 0; r < screen.panelRows[0].size(); ++r) {
       const CommandRowView& row = screen.panelRows[0][r];
       const auto lines = WrapText(row.label, controlW - 20.0f, TypePx(10), SelectFont(TypePx(10), false));
-      const Area box{r == 0 ? left : imageX + imageW + gap, y, controlW, buttonH};
+      const Area box{stageX + 12.0f + static_cast<float>(r) * (controlW + 12.0f), y, controlW, buttonH};
       FillChamferRay(box, kChamferCard, ToRay(row.enabled ? p.control : p.panel3));
       if (row.charged) PaintProgressFill(box, row.chargePercent, p, kChamferCard);
       PaintChamferDoubleLinesRay(box, kChamferCard, ToRay(p.borderDark), ToRay(p.border));
@@ -7789,10 +7785,10 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
       }
       if (row.enabled) navHits_.push_back(NavHit{box, "row", screen.panelRowIds[0][r]});
     }
-    const float bottomTop = imageTop + stageH + 16.0f;
-    PaintPanel(screen.panels[2], Area{left, bottomTop, feedW, panelH});
-    PaintPanel(screen.panels[1], Area{rightX, bottomTop, rightW, panelH});
-    contentPaintBottom_ = std::max(contentPaintBottom_, bottomTop + panelH);
+    PaintPanel(screen.panels[1], Area{rightX, imageTop, rightW, voyageH});
+    PaintPanel(screen.panels[2], Area{left, imageTop + stageH + 8.0f, imageW, feedH});
+    contentPaintBottom_ = std::max(contentPaintBottom_,
+                                   imageTop + std::max(voyageH, stageH + 8.0f + feedH));
     return;
   }
   if (screen.hasHero) {
