@@ -324,26 +324,23 @@ void main() {
   vec2 p = fragTexCoord * 2.0 - 1.0;
   float ax = abs(p.x);
   float ay = abs(p.y);
-  float edge = smoothstep(0.98, 0.40, max(ax, ay));
-  if (edge <= 0.0001) discard;
-  float hTaper = clamp(1.0 - pow(ax, 2.2), 0.0, 1.0);
-  vec2 cp = vec2(p.x * 0.95, p.y);
+  float edge = 1.0 - smoothstep(0.40, 0.98, max(ax, ay));
+  vec2 cp = vec2(p.x, p.y);
   float r2 = dot(cp, cp);
   float core = exp(-r2 * 120.0) * 1.8;
   float innerGlow = exp(-r2 * 14.0)  * 0.35;
   float outerBloom = exp(-sqrt(r2) * 3.0) * 0.35;
   float yLine = exp(-ay * ay * 220.0) * 1.0;
   float yBloom = exp(-ay * ay * 22.0) * 0.35;
-  float streakShape = yLine + yBloom;
-  float sR = exp(-ax * 2.5) * streakShape;
-  float sG = exp(-ax * 0.8) * streakShape;
-  float sB = exp(-ax * 0.3) * streakShape;
-  vec3 bloom = fragColor.rgb * (innerGlow + outerBloom);
-  vec3 streak = vec3(sR * 0.25, sG * 1.1, sB * 2.2) * fragColor.rgb;
+  float sR = exp(-pow(ax * 1.60, 1.10) * 2.2) * (yLine + yBloom * 0.40);
+  float sG = exp(-pow(ax * 0.75, 1.10) * 1.2) * (yLine + yBloom * 0.80);
+  float sB = exp(-pow(ax * 0.45, 1.10) * 0.9) * (yLine + yBloom * 1.00);
+  vec3 bloom = vec3(innerGlow + outerBloom);
+  vec3 streak = vec3(sR * 0.25, sG * 1.1, sB * 2.2);
   vec3 col = bloom + streak + vec3(1.0, 0.98, 0.92) * core;
-  float gain = fragColor.a * uFlareGain * edge;
+  float gain = max(fragColor.a * uFlareGain * edge, 0.0);
   vec3 emit = vec3(1.0) - exp(-col * gain);
-  float a = clamp(max(emit.r, max(emit.g, emit.b)) * 0.9, 0.0, 0.95);
+  float a = max(emit.r, max(emit.g, emit.b)) * 0.9;
   finalColor = vec4(emit, a);
 }
 )GLSL";
@@ -433,19 +430,32 @@ void main() {
       const auto& t = targets[i];
       if (t.kind == ship::FlareTarget::Occlude) occs_.push_back({i, t.x0, t.y0, t.x1, t.y1});
     }
-    auto occluded = [&](std::size_t idx, float sx, float sy) {
+    
+    auto occlusionFade = [&](std::size_t idx, float sx, float sy) {
+      float fade = 1.0f;
+      const float margin = 56.0f;
       for (const Occ& o : occs_) {
-        if (o.idx > idx && sx >= o.x0 && sx <= o.x1 && sy >= o.y0 && sy <= o.y1) return true;
+        if (o.idx <= idx) continue;
+        const float dx = std::max(o.x0 - sx, sx - o.x1);
+        const float dy = std::max(o.y0 - sy, sy - o.y1);
+        const float dist = std::max(dx, dy);
+        const float t01 = std::clamp(dist / margin, 0.0f, 1.0f);
+        fade = std::min(fade, t01 * t01 * (3.0f - 2.0f * t01));
       }
-      return false;
+      return fade;
     };
 
     spots_.clear();
     for (std::size_t i = 0; i < targets.size(); ++i) {
       const auto& t = targets[i];
       if (t.kind == ship::FlareTarget::Occlude) continue;
-      const float s = fadeAt(phaseAt(t.x0, t.y0)) * t.weight;
-      if (s < 0.012f || occluded(i, t.x0, t.y0)) continue;
+     const float borderT = std::clamp(std::min(std::min(t.x0, w - t.x0),
+                                                std::min(t.y0, h - t.y0)) / 64.0f,
+                                       0.0f, 1.0f);
+      const float s = fadeAt(phaseAt(t.x0, t.y0)) * t.weight
+                      * occlusionFade(i, t.x0, t.y0)
+                      * borderT * borderT * (3.0f - 2.0f * borderT);
+      if (s < 0.012f) continue;
       if (t.kind == ship::FlareTarget::PanelCorner) {
         bool merged = false;
         for (Spot& e : spots_) {
