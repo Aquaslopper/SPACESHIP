@@ -87,10 +87,6 @@ double Simulation::MaintCostActions() const { return MaintCost(); }
 
 bool Simulation::MaintRunningAny() const { return MaintRunning(); }
 
-double Simulation::CleanerIntervalOf(const CrewMember& crew) const {
-  return CleanerInterval(crew);
-}
-
 double Simulation::CookThreshold(const CrewMember& crew) const {
   const double threshold = std::max(rules_.mess.cookBelow, crew.jobAt);
   return std::min(mess_.capacity - 1.0, threshold);

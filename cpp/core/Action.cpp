@@ -56,13 +56,13 @@ Simulation Simulation::NewVoyage(const Catalog& catalog) {
 Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& settings,
                                  const std::string& startSystemId) {
   Simulation sim;
-  if (!catalog.chartExpanded) { sim.sourceCatalog_ = catalog; }
-  else { sim.sourceCatalog_ = catalog; }
+  sim.sourceCatalog_ = std::make_shared<const Catalog>(catalog);
   sim.chartSettings_ = settings;
-  sim.catalog_ = sim.sourceCatalog_;
-  sim.catalog_.chartExpanded = false;
-  ExpandChart(sim.catalog_, settings);
-  sim.rules_ = sim.catalog_.rules;
+  Catalog built = catalog;
+  built.chartExpanded = false;
+  ExpandChart(built, settings);
+  sim.catalog_ = std::make_shared<const Catalog>(std::move(built));
+  sim.rules_ = sim.catalog_->rules;
   sim.scanCost_ = catalog.rules.scanCost;
 
   // ---- crew --------------------------------------------------------------
@@ -111,7 +111,7 @@ Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& se
 
   // ---- the chart ---------------------------------------------------------
   sim.map_ = MapView();
-  sim.map_.zoom = sim.catalog_.map.zoom;
+  sim.map_.zoom = sim.catalog_->map.zoom;
   sim.ApplyChartBoard();
   for (const std::string& layer : catalog.layerOrder) { sim.views_[layer] = LayerView(); }
 
@@ -181,11 +181,11 @@ Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& se
   state.contracts["arrival"] = "active";
 
   if (!startSystemId.empty()) {
-    const Body* system = sim.catalog_.FindSystem(startSystemId);
-    for (const Port& port : sim.catalog_.ports) {
-      const Body* body = sim.catalog_.FindBody(port.id);
+    const Body* system = sim.catalog_->FindSystem(startSystemId);
+    for (const Port& port : sim.catalog_->ports) {
+      const Body* body = sim.catalog_->FindBody(port.id);
       if (body == nullptr) { continue; }
-      if (sim.catalog_.BodySystem(*body) != startSystemId) { continue; }
+      if (sim.catalog_->BodySystem(*body) != startSystemId) { continue; }
       sim.map_.here = port.id;
       sim.state_.docked = true;
       if (system != nullptr) { sim.map_.sector = system->region; }
@@ -212,14 +212,11 @@ Simulation Simulation::ReferenceVoyage(const Catalog& catalog) {
   return sim;
 }
 
-void Simulation::RestartVoyage() {
-  BeginVoyage(chartSettings_, std::string());
-}
-
 void Simulation::BeginVoyage(const ChartSettings& settings, const std::string& startSystemId) {
   const Options options = state_.options;
   const bool motion = state_.reducedMotion;
-  const Catalog source = sourceCatalog_.regions.empty() ? catalog_ : sourceCatalog_;
+  const Catalog& source =
+      (sourceCatalog_ && !sourceCatalog_->regions.empty()) ? *sourceCatalog_ : *catalog_;
   const bool reference = referenceFit_;
   *this = reference ? Simulation::ReferenceVoyage(source)
                     : Simulation::NewVoyage(source, settings, startSystemId);
@@ -478,13 +475,6 @@ bool Simulation::ApplyJob(const std::string& crewId, const std::string& jobId) {
   crew->jobAt = job->baseAt;
   LogLine(crew->name + " now holds the " + Lower(job->label) + " job.");
   return true;
-}
-
-std::vector<std::string> Simulation::FeedText() const {
-  std::vector<std::string> out;
-  out.reserve(state_.feed.size());
-  for (const FeedLine& line : state_.feed) { out.push_back(line.text); }
-  return out;
 }
 
 }  // namespace ship

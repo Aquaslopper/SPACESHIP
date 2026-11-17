@@ -49,15 +49,15 @@ bool IsProceduralId(const std::string& id) {
 // ---------------------------------------------------------------------------
 
 const Body* Simulation::FindBodyById(const std::string& id) const {
-  if (const Body* body = catalog_.FindBody(id)) { return body; }
-  if (const Body* system = catalog_.FindSystem(id)) { return system; }
-  if (const Body* region = catalog_.FindRegion(id)) { return region; }
+  if (const Body* body = catalog_->FindBody(id)) { return body; }
+  if (const Body* system = catalog_->FindSystem(id)) { return system; }
+  if (const Body* region = catalog_->FindRegion(id)) { return region; }
   return nullptr;
 }
 
 std::string Simulation::CurrentSystemId() const {
   const Body* here = FindBodyById(map_.here);
-  return here == nullptr ? std::string("sec-kessler") : catalog_.BodySystem(*here);
+  return here == nullptr ? std::string("sec-kessler") : catalog_->BodySystem(*here);
 }
 
 const Body* Simulation::CurrentSystem() const { return FindBodyById(CurrentSystemId()); }
@@ -65,7 +65,7 @@ const Body* Simulation::CurrentSystem() const { return FindBodyById(CurrentSyste
 bool Simulation::InRange(const Body& body) const {
   if (body.type == "region") { return false; }
   if (body.type == "system") { return !body.entry.empty(); }
-  return catalog_.BodySystem(body) == CurrentSystemId();
+  return catalog_->BodySystem(body) == CurrentSystemId();
 }
 
 int Simulation::SensorTier() const {
@@ -81,7 +81,7 @@ int Simulation::SensorTier() const {
 bool Simulation::CanScan(const Body& body) const {
   const int tier = SensorTier();
   const std::string curSysId = CurrentSystemId();
-  if (body.type != "region" && body.type != "system" && catalog_.BodySystem(body) == curSysId) {
+  if (body.type != "region" && body.type != "system" && catalog_->BodySystem(body) == curSysId) {
     return true;
   }
   if (tier <= 0) { return false; }
@@ -91,7 +91,7 @@ bool Simulation::CanScan(const Body& body) const {
   if (tier == 1) {
     if (body.type == "region") { return false; }
     if (body.type == "system") { return !curRegion.empty() && body.region == curRegion; }
-    const Body* ownerSys = catalog_.FindSystem(catalog_.BodySystem(body));
+    const Body* ownerSys = catalog_->FindSystem(catalog_->BodySystem(body));
     return ownerSys != nullptr && !curRegion.empty() && ownerSys->region == curRegion;
   }
   // Tier 2 deep-array sensors reach systems, regions, and charted bodies across outer sectors.
@@ -101,7 +101,7 @@ bool Simulation::CanScan(const Body& body) const {
 double Simulation::EffectiveScanCost(const Body& body) const {
   const double base = std::max(1.0, scanCost_);
   const std::string curSysId = CurrentSystemId();
-  if (body.type != "region" && body.type != "system" && catalog_.BodySystem(body) == curSysId) {
+  if (body.type != "region" && body.type != "system" && catalog_->BodySystem(body) == curSysId) {
     return base;
   }
   const Body* curSys = CurrentSystem();
@@ -110,7 +110,7 @@ double Simulation::EffectiveScanCost(const Body& body) const {
   if (body.type == "region") {
     targetRegion = body.id;
   } else if (body.type != "system") {
-    const Body* ownerSys = catalog_.FindSystem(catalog_.BodySystem(body));
+    const Body* ownerSys = catalog_->FindSystem(catalog_->BodySystem(body));
     if (ownerSys != nullptr) { targetRegion = ownerSys->region; }
   }
   if (!curRegion.empty() && targetRegion == curRegion && body.type != "region") {
@@ -244,9 +244,9 @@ const Body* Simulation::HomeBody() const {
 }
 
 void Simulation::ApplyChartBoard() {
-  const MapGeometry& authored = catalog_.map;
-  auto it = catalog_.layerBoards.find(map_.layer);
-  const MapGeometry& board = it == catalog_.layerBoards.end() ? authored : it->second;
+  const MapGeometry& authored = catalog_->map;
+  auto it = catalog_->layerBoards.find(map_.layer);
+  const MapGeometry& board = it == catalog_->layerBoards.end() ? authored : it->second;
   map_.w = board.w;
   map_.h = board.h;
   map_.cx = board.cx;
@@ -257,7 +257,7 @@ void Simulation::ApplyChartBoard() {
   map_.zmax = board.zmax;
   map_.zstep = board.zstep;
   {
-    const double scale = MapSizeScale(catalog_.chartSettings.mapSize);
+    const double scale = MapSizeScale(catalog_->chartSettings.mapSize);
     if (map_.layer == "system") {
       map_.zmax = std::max(map_.zmax, kSystemZoomMax * scale);
       map_.zmin = std::min(map_.zmin, kSystemZoomMin);
@@ -272,26 +272,6 @@ void Simulation::ApplyChartBoard() {
   map_.rungPow = board.rungPow;
   map_.pxPerAction = board.pxPerAction;
   map_.lyPerAction = board.lyPerAction;
-}
-
-std::vector<const Body*> Simulation::CurBodies() const {
-  std::vector<const Body*> out;
-  if (map_.layer == "galaxy") {
-    out.reserve(catalog_.regions.size());
-    for (const Body& body : catalog_.regions) { out.push_back(&body); }
-    return out;
-  }
-  if (map_.layer == "system") {
-    const auto& indices = catalog_.BodiesInSystem(CurrentSystemId());
-    out.reserve(indices.size());
-    for (std::size_t idx : indices) {
-      if (idx < catalog_.bodies.size()) { out.push_back(&catalog_.bodies[idx]); }
-    }
-    return out;
-  }
-  out.reserve(catalog_.systems.size());
-  for (const Body& body : catalog_.systems) { out.push_back(&body); }
-  return out;
 }
 
 void Simulation::SetLayer(const std::string& key) {
@@ -334,7 +314,7 @@ void Simulation::PanMap(double dx, double dy) {
 }
 
 bool Simulation::ViewSector(const std::string& regionId) {
-  const Body* region = catalog_.FindRegion(regionId);
+  const Body* region = catalog_->FindRegion(regionId);
   if (region == nullptr) { return false; }
 
   const Body* system = CurrentSystem();
@@ -344,15 +324,15 @@ bool Simulation::ViewSector(const std::string& regionId) {
 
   // Centre the sector camera over the chosen galactic region's star cluster so
   // clicking any galaxy on Layer 3 frames its systems immediately.
-  const auto& sysIndices = catalog_.SystemsInRegion(regionId);
-  auto boardIt = catalog_.layerBoards.find("sector");
-  const MapGeometry& secBoard = boardIt == catalog_.layerBoards.end() ? catalog_.map : boardIt->second;
+  const auto& sysIndices = catalog_->SystemsInRegion(regionId);
+  auto boardIt = catalog_->layerBoards.find("sector");
+  const MapGeometry& secBoard = boardIt == catalog_->layerBoards.end() ? catalog_->map : boardIt->second;
   if (!sysIndices.empty()) {
     double sumX = 0.0;
     double sumY = 0.0;
     for (std::size_t idx : sysIndices) {
-      sumX += catalog_.systems[idx].x;
-      sumY += catalog_.systems[idx].y;
+      sumX += catalog_->systems[idx].x;
+      sumY += catalog_->systems[idx].y;
     }
     const double meanX = sumX / static_cast<double>(sysIndices.size());
     const double meanY = sumY / static_cast<double>(sysIndices.size());
@@ -378,22 +358,15 @@ bool Simulation::SelectTarget(const std::string& bodyId) {
 // navMetrics(): what a crossing would cost
 // ---------------------------------------------------------------------------
 
-CrewMember* Simulation::AssignedNavigator() {
-  for (CrewMember& crew : crew_) {
-    if (crew.job == "navigation" && CrewBusy(crew) == nullptr) { return &crew; }
-  }
-  return nullptr;
-}
-
 Simulation::NavMetrics Simulation::MetricsFor(const Body& body) const {
   static const std::string kDefaultSystem = "sec-kessler";
-  const Body* here = catalog_.FindBody(map_.here);
+  const Body* here = catalog_->FindBody(map_.here);
   const std::string& curSysId =
       (here == nullptr || here->system.empty()) ? kDefaultSystem : here->system;
   double distance = 0;
 
   if (body.type == "system") {
-    const Body* origin = catalog_.FindSystem(curSysId);
+    const Body* origin = catalog_->FindSystem(curSysId);
     double px = 0;
     if (origin != nullptr && body.region == origin->region) {
       const auto at = map_.inSpace ? map_.flightOrigin.at("sector")
@@ -402,8 +375,8 @@ Simulation::NavMetrics Simulation::MetricsFor(const Body& body) const {
       const double dy = body.y - at.second;
       px = std::sqrt(dx * dx + dy * dy);
     } else if (origin != nullptr) {
-      const Body* fromRegion = catalog_.FindRegion(origin->region);
-      const Body* toRegion = catalog_.FindRegion(body.region);
+      const Body* fromRegion = catalog_->FindRegion(origin->region);
+      const Body* toRegion = catalog_->FindRegion(body.region);
       double dx = 0;
       double dy = 0;
       if (fromRegion != nullptr && toRegion != nullptr) {
@@ -479,12 +452,12 @@ bool Simulation::HoldTravel() {
     if (entry.first == "system" && destination->type == "system") { continue; }
     if (entry.first == "sector") {
       target = destination->type == "system" ? destination
-          : catalog_.FindSystem(catalog_.BodySystem(*destination));
+          : catalog_->FindSystem(catalog_->BodySystem(*destination));
     }
     if (entry.first == "galaxy") {
       const Body* system = destination->type == "system" ? destination
-          : catalog_.FindSystem(catalog_.BodySystem(*destination));
-      target = system == nullptr ? nullptr : catalog_.FindRegion(system->region);
+          : catalog_->FindSystem(catalog_->BodySystem(*destination));
+      target = system == nullptr ? nullptr : catalog_->FindRegion(system->region);
     }
     if (target != nullptr) {
       entry.second.first += (target->x - entry.second.first) * part;
@@ -518,7 +491,7 @@ bool Simulation::StartTravel() {
   if (!map_.inSpace) {
     const Body* here = FindBodyById(map_.here);
     const Body* system = CurrentSystem();
-    const Body* region = system == nullptr ? nullptr : catalog_.FindRegion(system->region);
+    const Body* region = system == nullptr ? nullptr : catalog_->FindRegion(system->region);
     map_.flightOrigin["system"] = {here == nullptr ? 0.0 : here->x, here == nullptr ? 0.0 : here->y};
     map_.flightOrigin["sector"] = {system == nullptr ? 0.0 : system->x, system == nullptr ? 0.0 : system->y};
     map_.flightOrigin["galaxy"] = {region == nullptr ? 0.0 : region->x, region == nullptr ? 0.0 : region->y};
@@ -541,7 +514,7 @@ bool Simulation::StartScan() {
   // Same ordering rule as a crossing: the initiating action first.
   double cost = EffectiveScanCost(*body);
   const bool remote = body->type == "system" || body->type == "region" ||
-                      catalog_.BodySystem(*body) != CurrentSystemId();
+                      catalog_->BodySystem(*body) != CurrentSystemId();
   if (!remote) { cost = 1.0; } 
   PerformAction((remote ? "Long-range scan started - " : "Deep scan started - ") + body->name);
   if (!state_.gameOver.empty()) { return true; }
@@ -629,13 +602,13 @@ void Simulation::RevealScan(const std::string& bodyId) {
   CheckCommendations();
 
   if (body->type == "system") {
-    const auto& localIdx = catalog_.BodiesInSystem(body->id);
+    const auto& localIdx = catalog_->BodiesInSystem(body->id);
     int ports = 0;
     int deposits = 0;
     for (std::size_t idx : localIdx) {
-      if (idx >= catalog_.bodies.size()) { continue; }
-      const Body& local = catalog_.bodies[idx];
-      if (catalog_.FindPort(local.id) != nullptr) { ++ports; }
+      if (idx >= catalog_->bodies.size()) { continue; }
+      const Body& local = catalog_->bodies[idx];
+      if (catalog_->FindPort(local.id) != nullptr) { ++ports; }
       if (CanExtractBody(local)) { ++deposits; }
     }
     LogLine("Remote system survey filed: " + body->name + " (" +
@@ -645,13 +618,13 @@ void Simulation::RevealScan(const std::string& bodyId) {
     return;
   }
   if (body->type == "region") {
-    const auto& sysIdx = catalog_.SystemsInRegion(body->id);
+    const auto& sysIdx = catalog_->SystemsInRegion(body->id);
     LogLine("Deep-region cluster survey filed: " + body->name + " (" +
             std::to_string(sysIdx.size()) + " star systems catalogued in Science).");
     return;
   }
 
-  if (catalog_.BodySystem(*body) == CurrentSystemId()) {
+  if (catalog_->BodySystem(*body) == CurrentSystemId()) {
     views_["system"].sel = body->id;
     if (map_.layer == "system") { state_.navTarget = body->id; }
   }
@@ -668,8 +641,8 @@ void Simulation::FileSurvey(const Body& body) {
   } else if (body.type == "region") {
     worth = 145;
   } else {
-    auto it = catalog_.surveyWorth.find(body.type);
-    if (it != catalog_.surveyWorth.end()) { worth = it->second; }
+    auto it = catalog_->surveyWorth.find(body.type);
+    if (it != catalog_->surveyWorth.end()) { worth = it->second; }
   }
   if (SensorTier() >= 2) {
     worth = js::Ceil(worth * 1.25);
@@ -685,7 +658,7 @@ void Simulation::FileSurvey(const Body& body) {
 }
 
 void Simulation::FinishExtraction(const std::string& bodyId, double reservedVol) {
-  const Body* body = catalog_.FindBody(bodyId);
+  const Body* body = catalog_->FindBody(bodyId);
   if (body == nullptr || !CanExtractBody(*body)) { return; }
 
   const int pass = 1;
@@ -789,8 +762,8 @@ void Simulation::FinishExtraction(const std::string& bodyId, double reservedVol)
   const std::uint64_t threshold =
       (feature == "Unstable hulk") ? 55ULL : (pass >= 2 ? 70ULL : 80ULL);
   if (hazardRoll >= threshold) {
-    const Body* sys = catalog_.FindSystem(catalog_.BodySystem(*body));
-    const Body* reg = sys == nullptr ? nullptr : catalog_.FindRegion(sys->region);
+    const Body* sys = catalog_->FindSystem(catalog_->BodySystem(*body));
+    const Body* reg = sys == nullptr ? nullptr : catalog_->FindRegion(sys->region);
     const std::string auth = reg == nullptr ? std::string() : DetailValue(*reg, "Authority");
     if ((auth == "None" || auth == "Free Captains") && hazardRoll >= 90ULL) {
       SpawnMapIncident("map-pirate-toll",
@@ -822,7 +795,7 @@ void Simulation::ChronicleVisit(const Body* system) {
 void Simulation::ArriveAt(const std::string& bodyId) {
   const Body* prevSystem = CurrentSystem();
   const std::string prevRegion = prevSystem == nullptr ? std::string() : prevSystem->region;
-  const Body* system = catalog_.FindSystem(bodyId);
+  const Body* system = catalog_->FindSystem(bodyId);
 
   const std::string localId = system != nullptr ? system->entry : bodyId;
   const Body* body = FindBodyById(localId);
@@ -862,7 +835,7 @@ void Simulation::ResolveMapArrivalEvents(const Body& localBody, const Body* jump
     const std::string visitKey = "map-jump:" + jumpedSystem->id;
     if (!state_.mapMarks[visitKey]) {
       state_.mapMarks[visitKey] = true;
-      const Body* region = catalog_.FindRegion(jumpedSystem->region);
+      const Body* region = catalog_->FindRegion(jumpedSystem->region);
       const std::string hazard = region == nullptr ? std::string() : DetailValue(*region, "Dominant hazard");
       const std::string auth = region == nullptr ? std::string() : DetailValue(*region, "Authority");
       const bool crossGalaxy = !prevRegion.empty() && prevRegion != jumpedSystem->region;
@@ -952,11 +925,11 @@ void Simulation::ResolveMapScanEvents(const Body& body, bool firstScan) {
               ": hold full, stripped 1 field repair kit from the cache.");
     }
   } else if (feature == "Ancient nav buoy") {
-    const auto& peers = catalog_.BodiesInSystem(catalog_.BodySystem(body));
+    const auto& peers = catalog_->BodiesInSystem(catalog_->BodySystem(body));
     int revealed = 0;
     for (std::size_t idx : peers) {
-      if (revealed >= 2 || idx >= catalog_.bodies.size()) { break; }
-      const Body& peer = catalog_.bodies[idx];
+      if (revealed >= 2 || idx >= catalog_->bodies.size()) { break; }
+      const Body& peer = catalog_->bodies[idx];
       if (peer.id == body.id || state_.scanned[peer.id]) { continue; }
       state_.scanned[peer.id] = true;
       FileSurvey(peer);

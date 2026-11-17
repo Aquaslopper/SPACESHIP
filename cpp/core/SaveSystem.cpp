@@ -490,7 +490,7 @@ std::string Simulation::SaveJson() const {
   };
 
   Json views = Json::object();
-  for (const std::string& layer : catalog_.layerOrder) {
+  for (const std::string& layer : catalog_->layerOrder) {
     auto it = views_.find(layer);
     const LayerView view = it == views_.end() ? LayerView() : it->second;
     views[layer] = Json{{"zoom", Num(view.zoom)},
@@ -1024,7 +1024,8 @@ void Simulation::ApplySnapshotDefaults() {
 
 bool Simulation::LoadJson(const std::string& text, std::string* error) {
   std::string why;
-  const Catalog& source = sourceCatalog_.regions.empty() ? catalog_ : sourceCatalog_;
+  const Catalog& source =
+      (sourceCatalog_ && !sourceCatalog_->regions.empty()) ? *sourceCatalog_ : *catalog_;
   if (!ValidSave(text, source, &why)) {
     if (error != nullptr) { *error = "The save is incomplete or has an unsupported format: " + why; }
     return false;
@@ -1037,9 +1038,10 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     const Json d = Json::parse(text);
     chartSettings_ = ReadChartSettings(d, chartSettings_);
     if (!source.chartExpanded) {
-      catalog_ = source;
-      catalog_.chartExpanded = false;
-      ExpandChart(catalog_, chartSettings_);
+      Catalog built = source;
+      built.chartExpanded = false;
+      ExpandChart(built, chartSettings_);
+      catalog_ = std::make_shared<const Catalog>(std::move(built));
     }
     const Json& s = d.at("state");
 
@@ -1385,7 +1387,7 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     map_.inSpace = GetBool(map, "inSpace", FindOngoing("travel") != nullptr);
     const Body* flightBody = FindBodyById(map_.here);
     const Body* flightSystem = CurrentSystem();
-    const Body* flightRegion = flightSystem == nullptr ? nullptr : catalog_.FindRegion(flightSystem->region);
+    const Body* flightRegion = flightSystem == nullptr ? nullptr : catalog_->FindRegion(flightSystem->region);
     map_.flightOrigin = {
         {"system", {flightBody == nullptr ? 0.0 : flightBody->x, flightBody == nullptr ? 0.0 : flightBody->y}},
         {"sector", {flightSystem == nullptr ? 0.0 : flightSystem->x, flightSystem == nullptr ? 0.0 : flightSystem->y}},
@@ -1409,7 +1411,7 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     }
 
     views_.clear();
-    for (const std::string& layer : catalog_.layerOrder) {
+    for (const std::string& layer : catalog_->layerOrder) {
       LayerView view;
       if (auto it = d.at("views").find(layer); it != d.at("views").end() && it->is_object()) {
         view.zoom = GetNumber(*it, "zoom", 1);

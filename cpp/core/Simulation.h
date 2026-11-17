@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -60,10 +61,7 @@ class Simulation {
   static Simulation ReferenceVoyage(const Catalog& catalog);
 
   void PerformAction(const std::string& detail = std::string());
-  void RestartVoyage();
   void BeginVoyage(const ChartSettings& settings, const std::string& startSystemId);
-  const ChartSettings& VoyageChart() const { return chartSettings_; }
-  const Catalog& SourceWorld() const { return sourceCatalog_.regions.empty() ? catalog_ : sourceCatalog_; }
 
   void ProAction(double n);
   void FreeCommit(const std::string& detail = std::string());
@@ -91,12 +89,11 @@ class Simulation {
   const std::vector<Stat>& Stats() const { return stats_; }
   const LifeStore& Life() const { return life_; }
   LifeStore& MutableLife() { return life_; }
-  Cargo& MutableCargo() { return cargo_; }
   Mess& MutableMess() { return mess_; }
   std::vector<GoodsLot>& MutableGoods() { return goods_; }
   const std::vector<Incident>& Events() const { return events_; }
   const std::vector<GoodsLot>& Goods() const { return goods_; }
-  const Catalog& World() const { return catalog_; }
+  const Catalog& World() const { return *catalog_; }
   const MapView& Map() const { return map_; }
   MapView& MutableMap() { return map_; }
   const std::map<std::string, LayerView>& Views() const { return views_; }
@@ -109,9 +106,8 @@ class Simulation {
   const std::vector<InfoRow>& Infos() const { return infos_; }
   const Cargo& CargoStore() const { return cargo_; }
   const std::vector<Passenger>& Passengers() const { return state_.passengers; }
-  const std::vector<Good>& Market() const { return catalog_.goods; }
+  const std::vector<Good>& Market() const { return catalog_->goods; }
   const std::vector<SurveyRecord>& Survey() const { return survey_; }
-  std::vector<SurveyRecord>& MutableSurvey() { return survey_; }
   double ScanCost() const { return scanCost_; }
   int SensorTier() const;
   bool CanScan(const Body& body) const;
@@ -140,9 +136,7 @@ class Simulation {
     std::string transit;
   };
   NavMetrics MetricsFor(const Body& body) const;
-  CrewMember* AssignedNavigator();
   const Rules& GameRules() const { return rules_; }
-  std::vector<std::string> FeedText() const;
 
   const std::vector<JobDef>& Jobs() const { return jobs_; }
   const JobDef* FindJobDef(const std::string& jobId) const;
@@ -150,11 +144,8 @@ class Simulation {
   std::string StagedJob(const CrewMember& crew) const;
   bool StageJob(const std::string& crewId, const std::string& jobId);
   bool ToggleOrder(const std::string& crewId, const std::string& orderId);
-  void ClearOrders();
   int OrderedCount() const;
   bool HasPendingLayoff() const;
-  bool OrdersRunning() const;
-  bool CrewAvailable(const CrewMember& crew) const;
   double JobCost(const std::string& jobId) const;
   double OrderCostFor(const std::string& jobId, const std::string& orderId) const;
   double OrderCost(const CrewMember& crew, const std::string& orderId) const;
@@ -304,7 +295,6 @@ class Simulation {
   double ReadyCommendations() const;
   double EarnedCommendations() const;
   std::string CaptainRank() const;
-  std::string RewardText(const std::string& commendationId) const;
   std::string RewardTextOf(const Commendation& commendation) const;
   bool ClaimCommendation(const std::string& id);
 
@@ -317,14 +307,12 @@ class Simulation {
   const CrewMember* Cook() const;
   double MaintCostActions() const;
   bool MaintRunningAny() const;
-  double CleanerIntervalOf(const CrewMember& crew) const;
   double CookThreshold(const CrewMember& crew) const;
 
  private:
   void TickWorld();
 
   void WearEngine();
-  void TickDryFuel();
   void TickFilters();
 
   void TickCrew();
@@ -363,7 +351,6 @@ class Simulation {
   void FinishExtraction(const std::string& bodyId, double reservedVol);
   void FileSurvey(const Body& body);
   void ChronicleVisit(const Body* system);
-  std::vector<const Body*> CurBodies() const;
   void ApplyChartBoard();
 
   const Port* HerePort() const;
@@ -392,8 +379,8 @@ class Simulation {
   void AutoFilters();
   void AutoMess();
 
-  Catalog catalog_;
-  Catalog sourceCatalog_;
+  std::shared_ptr<const Catalog> catalog_ = std::make_shared<const Catalog>();
+  std::shared_ptr<const Catalog> sourceCatalog_;
   ChartSettings chartSettings_;
   Rules rules_;
   GameState state_;

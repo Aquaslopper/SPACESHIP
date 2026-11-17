@@ -21,7 +21,7 @@ double Simulation::ChronicleValue(const std::string& metric) const {
   }
   if (metric == "scans") {
     double count = 0;
-    for (const Body& body : catalog_.bodies) {
+    for (const Body& body : catalog_->bodies) {
       auto it = state_.scanned.find(body.id);
       if (it != state_.scanned.end() && it->second) { count += 1; }
     }
@@ -29,7 +29,7 @@ double Simulation::ChronicleValue(const std::string& metric) const {
   }
   if (metric == "contracts") {
     double count = 0;
-    for (const Contract& contract : catalog_.contracts) {
+    for (const Contract& contract : catalog_->contracts) {
       auto it = state_.contracts.find(contract.id);
       if (it != state_.contracts.end() && it->second == "complete") { count += 1; }
     }
@@ -50,7 +50,7 @@ double Simulation::ChronicleValue(const std::string& metric) const {
 }
 
 const Commendation* Simulation::FindCommendation(const std::string& id) const {
-  for (const Commendation& award : catalog_.commendations) {
+  for (const Commendation& award : catalog_->commendations) {
     if (award.id == id) { return &award; }
   }
   return nullptr;
@@ -58,7 +58,7 @@ const Commendation* Simulation::FindCommendation(const std::string& id) const {
 
 double Simulation::ReadyCommendations() const {
   double ready = 0;
-  for (const Commendation& award : catalog_.commendations) {
+  for (const Commendation& award : catalog_->commendations) {
     auto earned = state_.chronicle.earned.find(award.id);
     auto claimed = state_.chronicle.claimed.find(award.id);
     const bool has = earned != state_.chronicle.earned.end() && earned->second;
@@ -78,16 +78,12 @@ double Simulation::EarnedCommendations() const {
 
 std::string Simulation::CaptainRank() const {
   const double earned = EarnedCommendations();
-  const double total = static_cast<double>(catalog_.commendations.size());
+  const double total = static_cast<double>(catalog_->commendations.size());
   if (earned >= total && total > 0) { return "Constellation"; }
   if (earned >= 10) { return "Voyager"; }
   if (earned >= 6) { return "Wayfinder"; }
   if (earned >= 3) { return "Keeper"; }
   return "New Watch";
-}
-
-std::string Simulation::RewardText(const std::string& id) const {
-  return RewardTextOf(*FindCommendation(id));
 }
 
 std::string Simulation::RewardTextOf(const Commendation& award) const {
@@ -124,7 +120,7 @@ bool Simulation::ClaimCommendation(const std::string& id) {
 }
 
 void Simulation::CheckCommendations(bool silent) {
-  for (const Commendation& award : catalog_.commendations) {
+  for (const Commendation& award : catalog_->commendations) {
     auto earned = state_.chronicle.earned.find(award.id);
     const bool already = earned != state_.chronicle.earned.end() && earned->second;
     if (already) { continue; }
