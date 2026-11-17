@@ -606,6 +606,9 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
 
   actionBandTop_ = layout_.content.Bottom();
   actionBandHits_.clear();
+  stationWelcomeBox_ = Area{};
+  stationWelcomeContinue_ = Area{};
+  stationWelcomePort_.clear();
   feedActive_ = sim.State().activeTab == "home" && !titleActive_;
   if (!feedActive_) draggingFeed_ = false;
   UpdateMarks(marks_, nowMs);
@@ -750,6 +753,110 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   gFlare.cy1 = height_;
   contentMaxScroll_ = std::max(0.0f, contentPaintBottom_ - actionBandTop_);
   contentScroll_ = std::min(contentScroll_, contentMaxScroll_);
+
+  if (sim.State().activeTab != "home" && screenPanels_ &&
+      panelsKind_ == ScreenKind::Station && !taskScreen_.welcomeLine.empty()) {
+    const Palette& p = theme_.palette;
+    const int size = TypePx(10);
+    const float lineH = theme_.LineHeight();
+    const float pad = 12.0f;
+    const float gap = 12.0f;
+    const float colW = (layout_.content.w - 32.0f) / 3.0f;
+    const float outerW =
+        std::min(std::clamp(colW, 320.0f, 460.0f), std::max(240.0f, layout_.content.w - 16.0f));
+    const auto moeIt = crewArt_.find("moetorial");
+    const Texture2D* moe =
+        (moeIt != crewArt_.end() && moeIt->second != nullptr)
+            ? static_cast<const Texture2D*>(moeIt->second)
+            : nullptr;
+    const bool hasMoe = moe != nullptr && moe->id != 0 && moe->width > 0 && moe->height > 0;
+    const float aspect =
+        hasMoe ? static_cast<float>(moe->height) / static_cast<float>(moe->width) : 1.336f;
+    const float portraitW = std::min(132.0f, std::max(72.0f, std::round(outerW * 0.31f)));
+    const float portraitH = std::round(portraitW * aspect);
+    const float textW = std::max(60.0f, outerW - 2.0f * pad - gap - portraitW);
+    const auto wrapped = WrapText(taskScreen_.welcomeLine, textW, size, SelectFont(size, false));
+    const float textH = static_cast<float>(wrapped.size()) * lineH;
+    const char* btnLabel = "Continue";
+    const float btnW = TextWidth(btnLabel, size) + 22.0f;
+    const float btnH = lineH + 8.0f;
+    const float bodyH = std::max(portraitH, textH);
+    const float outerH = pad + bodyH + 10.0f + btnH + pad;
+    const float outerX = layout_.content.Right() - 8.0f - outerW;
+    const float bottomEdge = std::min(layout_.content.Bottom(), actionBandTop_) - 14.0f;
+    const float outerY = std::max(layout_.content.y + 8.0f, bottomEdge - outerH);
+    const Area outer{std::round(outerX), std::round(outerY), std::round(outerW), std::round(outerH)};
+    const Area portraitBox{std::round(outer.Right() - pad - portraitW),
+                           std::round(outer.y + pad),
+                           std::round(portraitW), std::round(portraitH)};
+    const Area btnBox{std::round(outer.x + pad),
+                      std::round(outer.y + pad + bodyH + 10.0f),
+                      std::round(btnW), std::round(btnH)};
+
+    if (gFlare.out != nullptr) {
+      flareTargets_.push_back(FlareTarget{FlareTarget::Occlude, outer.x, outer.y,
+                                          outer.Right(), outer.Bottom(), 0.0f});
+    }
+    PaintChamferBoxRay(outer, kChamferPanel, ToRay(p.panel),
+                       ToRay(p.borderDark), ToRay(p.border));
+
+    float ty = outer.y + pad;
+    for (const std::string& row : wrapped) {
+      Text(row.c_str(), static_cast<int>(outer.x + pad), static_cast<int>(ty),
+           size, ToRay(p.ink));
+      ty += lineH;
+    }
+
+    const ::Color portraitBg = ToRay(p.panel2);
+    FillChamferRay(portraitBox, kChamferCard, portraitBg);
+    if (hasMoe) {
+      const float inX = portraitBox.x + kDoubleInset;
+      const float inY = portraitBox.y + kDoubleInset;
+      const float inW = std::max(1.0f, portraitBox.w - 2.0f * kDoubleInset);
+      const float inH = std::max(1.0f, portraitBox.h - 2.0f * kDoubleInset);
+      const float fit = std::min(inW / static_cast<float>(moe->width),
+                                 inH / static_cast<float>(moe->height));
+      const float drawW = static_cast<float>(moe->width) * fit;
+      const float drawH = static_cast<float>(moe->height) * fit;
+      BeginScissorMode(static_cast<int>(inX), static_cast<int>(inY),
+                       std::max(1, static_cast<int>(inW)),
+                       std::max(1, static_cast<int>(inH)));
+      if (displayAdjustmentAvailable_) {
+        rlSetBlendFactorsSeparate(RL_SRC_ALPHA, RL_ONE_MINUS_SRC_ALPHA,
+                                  RL_ZERO, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD, RL_FUNC_ADD);
+        BeginBlendMode(BLEND_CUSTOM_SEPARATE);
+      }
+      DrawTexturePro(*moe,
+                     Rectangle{0.0f, 0.0f, static_cast<float>(moe->width),
+                               static_cast<float>(moe->height)},
+                     Rectangle{std::round(inX + (inW - drawW) * 0.5f),
+                               std::round(inY + inH - drawH), drawW, drawH},
+                     Vector2{0.0f, 0.0f}, 0.0f, WHITE);
+      if (displayAdjustmentAvailable_) {
+        rlSetBlendFactorsSeparate(RL_SRC_ALPHA, RL_ONE_MINUS_SRC_ALPHA,
+                                  RL_ONE, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD, RL_FUNC_ADD);
+        BeginBlendMode(BLEND_CUSTOM_SEPARATE);
+      }
+      EndScissorMode();
+      MaskChamferInnerCornersRay(portraitBox, kChamferCard, portraitBg);
+    }
+    PaintChamferDoubleLinesRay(portraitBox, kChamferCard,
+                               ToRay(p.borderDark), ToRay(p.border));
+
+    const bool btnHover =
+        popupKey_.empty() && !LossVisible(sim) && btnBox.Contains(mouseX_, mouseY_);
+    PaintChamferBoxRay(btnBox, kChamferSmall, ToRay(btnHover ? p.panel3 : p.control),
+                       ToRay(p.borderDark), ToRay(p.border));
+    const float btnTextW = TextWidth(btnLabel, size);
+    Text(btnLabel, static_cast<int>(std::round(btnBox.x + (btnBox.w - btnTextW) * 0.5f)),
+         static_cast<int>(std::round(btnBox.y + (btnBox.h - lineH) * 0.5f)),
+         size, ToRay(p.ink));
+
+    stationWelcomeBox_ = outer;
+    stationWelcomeContinue_ = btnBox;
+    stationWelcomePort_ = taskScreen_.welcomePort;
+    navHits_.push_back(NavHit{btnBox, "station-welcome", taskScreen_.welcomePort});
+  }
 
   PaintChrome(sim, nowMs);
   if (!LossVisible(sim)) { PaintPopup(sim); }
@@ -9187,6 +9294,12 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
   // down by the same amount so hit testing matches what is painted, and
   // content scrolled out of view can never be clicked.
   if (!layout_.content.Contains(x, y)) { return; }
+  if (stationWelcomeBox_.w > 0.0f && stationWelcomeBox_.Contains(x, y)) {
+    if (button == HitButton::Left && stationWelcomeContinue_.Contains(x, y)) {
+      PressStationAction(sim, "station-welcome", stationWelcomePort_);
+    }
+    return;
+  }
   const float scrollY = contentScroll_;
 
   if (y >= actionBandTop_) {

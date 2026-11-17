@@ -239,6 +239,21 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   model.portId = portId;
   model.portName = port == nullptr ? "Station" : port->name;
   model.docked = sim.State().docked && sim.Map().here == portId;
+  if (port != nullptr && model.docked) {
+    const Body* berth = sim.FindBodyById(portId);
+    const std::string systemId = berth == nullptr ? std::string() : sim.World().BodySystem(*berth);
+    const std::string welcomeKey = systemId.empty() ? portId : (systemId + "#" + portId);
+    const auto welcomeIt = sim.State().stationWelcome.find(welcomeKey);
+    const int welcomeStep = welcomeIt == sim.State().stationWelcome.end() ? 0 : welcomeIt->second;
+    const std::string welcomeLines[3] = {
+        "Welcome to the Spacestation " + model.portName + " [" + model.portId + "].",
+        "Make some money through trade contracts or freelancer jobs, but you have to buy the goods yourself.",
+        "Always have enough fuel cells with you.",
+    };
+    if (welcomeStep >= 0 && welcomeStep < 3) {
+      model.welcomeLine = welcomeLines[welcomeStep];
+    }
+  }
 
   model.head.kind = "STATION";
   model.head.title = model.portName;
@@ -1057,6 +1072,15 @@ const StationRow* FindStationRowById(const StationScreenModel& model, const std:
 }  // namespace
 
 bool PressStationAction(Simulation& sim, const std::string& action, const std::string& arg) {
+  if (action == "station-welcome") {
+    const std::string portId = arg.empty() ? sim.Map().here : arg;
+    if (portId.empty()) return false;
+    const Body* berth = sim.FindBodyById(portId);
+    const std::string systemId = berth == nullptr ? std::string() : sim.World().BodySystem(*berth);
+    const std::string welcomeKey = systemId.empty() ? portId : (systemId + "#" + portId);
+    ++sim.MutableState().stationWelcome[welcomeKey];
+    return true;
+  }
   // The shop, the shipyard and a hire are paid in shiplets: money is their whole
   // gate, so they hold no clicks and start no green. A trade confirmation and
   // every other commit row is one click of the clock, like the rest of the ship.
