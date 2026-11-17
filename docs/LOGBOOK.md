@@ -128,3 +128,20 @@ You must append a compressed summary of **every single reply and action you take
 - Native drawing, audio and main entry-point syntax checks passed.
 - ID-prefix check and git diff whitespace check passed.
 - Native graphical interaction and Windows executable not verified locally.
+
+### Entry #008
+- Timestamp: 2026-11-17 UTC.
+- Owner requested a CPU-hotspot pass, file by file, beginning with cpp/app.
+- Owner approved full replacement of the fragile synthesizer audio port with a simple audio system keeping music, SFX cues, options and feed-triggered cues.
+- Owner approved making the radiation/glow bloom shader cheaper while keeping the wave distortion and color shift unchanged.
+- Owner approved appending this entry; no gameplay logic, save format or options plumbing changed.
+- Deleted cpp/audio/Audio.h and cpp/audio/Audio.cpp (RenderMusic, RenderCue, Sequencer, ToWav, drone and six-note phrase).
+- Rewrote cpp/audio/AudioDevice.{h,cpp} as a small raylib file player: streamed playlist from assets/audio/music, four cue files from assets/audio/sfx, silent when missing, no synthesized fallback.
+- Kept the same public surface used by the client (Start, Shutdown, Configure, Cue, Tick, External, Status); main.cpp needed no behavioral change beyond the include drop.
+- Configure now applies volume/play/stop only when soundEffects, music or audioLevel actually change; previously it rewrote every cue and stream volume every frame.
+- Feed-based cue triggers and master cap (clamp(audioLevel) * 0.62) retained; no new options, keys, tiers or helpers added.
+- Made the bloom loop in the display-adjustment fragment shader stride 2 (9x9 taps to 5x5), footprint and gaussian weighting unchanged; wave, glow color math, lens flare untouched.
+- Build verified headless: cmake configure + Release build of spaceship_core and spaceship_console clean; GUI sources (Draw.cpp, AudioDevice.cpp, main.cpp) pass check-gui-syntax.sh -Wall -Wextra -Wpedantic against pinned raylib 6.0 / imgui 1.92.7 / rlImGui.
+- Named gate (anti-roguelike), proposal only, NOT implemented: the inert-button gate in BuildProgressButton that makes non scan/travel/extract/o2-run/maint tasks unpressable during a run; minimal removal would be dropping the `inert = ...` assignment and its dispatch check, leaving running-state and charge refusals as the only blockers.
+- Not implemented: removal of any gate, any gameplay change, LOGBOOK beyond this entry.
+- Native client run, Windows exe, GPU fill-rate for the shader change and audio output not verified in this sandbox (no display, no audio device); owner must verify on the target machine.

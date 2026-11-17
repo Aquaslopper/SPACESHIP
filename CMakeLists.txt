@@ -215,7 +215,6 @@ add_library(spaceship_core STATIC
   cpp/ui/CrewRecord.cpp
   cpp/ui/QuartersScreen.cpp
   cpp/ui/Popups.cpp
-  cpp/audio/Audio.cpp
   cpp/ui/RoomsScreen.cpp
   cpp/ui/AwardsScreen.cpp
   cpp/ui/EventScreen.cpp

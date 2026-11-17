@@ -24,7 +24,6 @@
 #include "rlImGui.h"
 #include "rlgl.h"
 
-#include "audio/Audio.h"
 #include "audio/AudioDevice.h"
 #include "core/Simulation.h"
 #include "core/AutoSave.h"
@@ -265,8 +264,8 @@ void main() {
     if (uGlow > 0.0) {
       vec3 bloom = vec3(0.0);
       float weights = 0.0;
-      for (int y = -4; y <= 4; ++y) {
-        for (int x = -4; x <= 4; ++x) {
+      for (int y = -4; y <= 4; y += 2) {
+        for (int x = -4; x <= 4; x += 2) {
           vec2 offset = vec2(x, y);
           float weight = exp(-dot(offset, offset) / 8.0);
           vec2 sampleUV = clamp(uv + offset * 2.0 * texel, vec2(0.0), vec2(1.0));
