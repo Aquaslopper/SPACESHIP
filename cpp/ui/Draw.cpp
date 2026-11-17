@@ -2923,170 +2923,606 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
   }
 
   if (bridgeStage) {
-    const float bridgeScaleX = scale * (stage.width / 600.0f);
-    const Color wall = night ? ToRay(p.chrome) : HexColor("#e8dfd0", ToRay(p.panel2));
-    const Color panel = night ? ToRay(p.panel) : HexColor("#f4efe6", ToRay(p.panel));
-    const Color metal = night ? ToRay(p.panel3) : HexColor("#d4c6ad", ToRay(p.panel3));
-    const Color trim = night ? ToRay(p.border) : HexColor("#8c6f4e", ToRay(p.coffeeDark));
-    const Color console = night ? ToRay(p.panel2) : HexColor("#cbb89c", ToRay(p.panel2));
-    const Color glass{14, 20, 32, 255};
-    const Color display{24, 36, 49, 255};
+    const auto SX = [&](float v) { return origin.x + v * scale; };
+    const auto SY = [&](float v) { return origin.y + v * scale; };
+    const auto S = [&](float v) { return v * scale; };
+    const auto V = [&](float vx, float vy) { return Vector2{SX(vx), SY(vy)}; };
+    const auto fillQuad = [&](Vector2 q0, Vector2 q1, Vector2 q2, Vector2 q3, Color col) {
+      DrawTriCCWRay(q0, q1, q2, col);
+      DrawTriCCWRay(q0, q2, q3, col);
+    };
 
-    DrawRectangleRec(Rectangle{origin.x + 7.0f * bridgeScaleX, origin.y + 7.0f * scale,
-                               586.0f * bridgeScaleX, 346.0f * scale}, wall);
-    DrawRectangleRec(Rectangle{origin.x + 15.0f * bridgeScaleX, origin.y + 13.0f * scale,
-                               570.0f * bridgeScaleX, 39.0f * scale}, panel);
-    DrawRectangleLinesEx(Rectangle{origin.x + 15.0f * bridgeScaleX, origin.y + 13.0f * scale,
-                                   570.0f * bridgeScaleX, 39.0f * scale},
-                         std::max(1.0f, scale), trim);
-    for (int rib = 0; rib < 8; ++rib) {
-      const float rx = 25.0f + static_cast<float>(rib) * 78.0f;
-      DrawLineEx(Vector2{origin.x + rx * bridgeScaleX, origin.y + 16.0f * scale},
-                 Vector2{origin.x + (rx + 21.0f) * bridgeScaleX, origin.y + 50.0f * scale},
-                 std::max(1.0f, scale), trim);
+    const Color wallTop = darkHousing ? ColorBrightness(ToRay(p.panel), -0.08f)
+                                      : HexColor("#f3ede2", ToRay(p.panel));
+    const Color wallSide = darkHousing ? ToRay(p.panel2) : HexColor("#e7decb", ToRay(p.panel2));
+    const Color wallBack = darkHousing ? ToRay(p.panel) : HexColor("#ede5d6", ToRay(p.panel));
+    const Color deckCol = darkHousing ? ColorBrightness(ToRay(p.chrome), -0.06f)
+                                      : HexColor("#ddd1bc", ToRay(p.panel3));
+    const Color deckGrate = darkHousing ? ColorBrightness(ToRay(p.panel3), -0.14f)
+                                        : HexColor("#cfc0a6", ToRay(p.panel3));
+    const Color metal = darkHousing ? ToRay(p.panel3) : HexColor("#d2c3a8", ToRay(p.panel3));
+    const Color metalDark = darkHousing ? ColorBrightness(ToRay(p.chrome), -0.18f)
+                                        : HexColor("#b9a689", ToRay(p.border));
+    const Color trim = darkHousing ? ToRay(p.border) : HexColor("#8c6f4e", ToRay(p.coffeeDark));
+    const Color trimSoft = Fade(trim, darkHousing ? 0.55f : 0.45f);
+    const Color consoleCol = darkHousing ? ToRay(p.panel2) : HexColor("#cbb89c", ToRay(p.panel2));
+    const Color consoleTop = darkHousing ? ToRay(p.panel3) : HexColor("#dfd2bc", ToRay(p.panel));
+    const Color seatFill = darkHousing ? ToRay(p.panel2) : HexColor("#e2d6c1", ToRay(p.panel2));
+    const Color seatShade = darkHousing ? ColorBrightness(ToRay(p.panel3), -0.10f)
+                                        : HexColor("#cbbba1", ToRay(p.panel3));
+    const Color bayHousing = darkHousing ? ColorBrightness(ToRay(p.chrome), -0.12f)
+                                         : HexColor("#d6c7ae", ToRay(p.panel3));
+    const Color baySocket = darkHousing ? ColorBrightness(ToRay(p.chrome), -0.24f)
+                                        : HexColor("#c3b194", ToRay(p.panel2));
+    const Color displayBg{17, 26, 38, 255};
+    const Color displayGrid{48, 72, 96, 150};
+    const float line1 = std::max(1.0f, S(1.0f));
+    const float line15 = std::max(1.0f, S(1.45f));
+    const float line2 = std::max(1.2f, S(2.0f));
+
+    const float energyRatio =
+        std::clamp(static_cast<float>(sim.StatValue("energy")) / 100.0f, 0.0f, 1.0f);
+    const float fuelRatio =
+        std::clamp(static_cast<float>(sim.StatValue("fuel")) / 100.0f, 0.0f, 1.0f);
+    const float shieldRatio =
+        std::clamp(static_cast<float>(sim.StatValue("shield")) / 100.0f, 0.0f, 1.0f);
+    const bool alertActive = !sim.Events().empty() || condRatio < 0.35f || sim.AirStageIndex() < 3;
+
+    // --- 1. Perspective Bridge Shell (960 x 460 uniform space) --------------
+    constexpr float oL = 10.0f, oR = 950.0f, oT = 10.0f;
+    constexpr float deckFrontY = 368.0f, stageBotY = 456.0f;
+    constexpr float bL = 132.0f, bR = 828.0f, bT = 48.0f, bB = 322.0f;
+
+    // Ceiling, side bulkheads, forward bulkhead, and perspective deck floor
+    fillQuad(V(oL, oT), V(oR, oT), V(bR, bT), V(bL, bT), wallTop);
+    fillQuad(V(oL, oT), V(bL, bT), V(bL, bB), V(oL, deckFrontY), wallSide);
+    fillQuad(V(bR, bT), V(oR, oT), V(oR, deckFrontY), V(bR, bB), wallSide);
+    DrawRectangleRec(Rectangle{SX(bL), SY(bT), S(bR - bL), S(bB - bT)}, wallBack);
+    fillQuad(V(bL, bB), V(bR, bB), V(oR, deckFrontY), V(oL, deckFrontY), deckCol);
+
+    // Symmetrical ceiling ribs (strictly interpolated along ceiling trapezoid)
+    for (int rib = 1; rib <= 7; ++rib) {
+      const float u = static_cast<float>(rib) / 8.0f;
+      const float topX = oL + (oR - oL) * u;
+      const float botX = bL + (bR - bL) * u;
+      DrawLineEx(V(topX, oT + 1.0f), V(botX, bT - 1.0f), line1,
+                 rib == 4 ? trim : trimSoft);
+    }
+    // Transverse ceiling purlin
+    {
+      const float py = 29.0f;
+      const float u = (py - oT) / (bT - oT);
+      const float lx = oL + (bL - oL) * u;
+      const float rx = oR + (bR - oR) * u;
+      DrawLineEx(V(lx, py), V(rx, py), line1, trimSoft);
+    }
+    // Overhead status luminaire pod centered above viewport
+    {
+      const Area pod{SX(364.0f), SY(16.0f), S(232.0f), S(24.0f)};
+      PaintChamferBoxRay(pod, S(5.0f), consoleCol, trim, ToRay(p.border));
+      DrawRectangleRec(Rectangle{SX(376.0f), SY(21.0f), S(208.0f), S(14.0f)}, displayBg);
+      for (int lamp = 0; lamp < 7; ++lamp) {
+        const float lx = 386.0f + static_cast<float>(lamp) * 28.5f;
+        Color lc = ToRay(p.sage);
+        if (alertActive && (lamp == 0 || lamp == 6)) {
+          lc = ToRay(p.terracotta);
+        } else if (underway && (lamp == 2 || lamp == 3 || lamp == 4)) {
+          lc = ToRay(p.amber);
+        } else if (lamp == 3) {
+          lc = ToRay(p.amber);
+        }
+        DrawRectangleRec(Rectangle{SX(lx), SY(25.0f), S(17.0f), S(6.0f)},
+                         Fade(lc, 0.88f));
+      }
     }
 
-    DrawRectangleRec(Rectangle{origin.x + 94.0f * bridgeScaleX, origin.y + 43.0f * scale,
-                               412.0f * bridgeScaleX, 166.0f * scale}, trim);
-    DrawRectangleRec(Rectangle{origin.x + 101.0f * bridgeScaleX, origin.y + 50.0f * scale,
-                               398.0f * bridgeScaleX, 152.0f * scale}, metal);
-    DrawRectangleRec(Rectangle{origin.x + 109.0f * bridgeScaleX, origin.y + 58.0f * scale,
-                               382.0f * bridgeScaleX, 136.0f * scale}, glass);
-    BeginScissorMode(static_cast<int>(origin.x + 110.0f * bridgeScaleX),
-                     static_cast<int>(origin.y + 59.0f * scale - contentScroll_),
-                     std::max(1, static_cast<int>(380.0f * bridgeScaleX)),
-                     std::max(1, static_cast<int>(134.0f * scale)));
-    for (int star = 0; star < 48; ++star) {
-      const float baseX = std::fmod(static_cast<float>(star) * 83.0f, 380.0f);
-      const float drift = underway && !reduced
-                              ? std::fmod(tSec * (28.0f + static_cast<float>(star % 6) * 12.0f), 380.0f)
-                              : 0.0f;
-      const float starX = 110.0f + std::fmod(baseX + 380.0f - drift, 380.0f);
-      const float starY = 64.0f + std::fmod(static_cast<float>(star) * 47.0f, 122.0f);
-      const float px = origin.x + starX * bridgeScaleX;
-      const float py = origin.y + starY * scale;
-      const float radius = std::max(1.0f, (star % 11 == 0 ? 1.8f : 0.9f) * scale);
-      const Color starInk = star % 9 == 0 ? ToRay(p.amber) : ToRay(p.white);
-      if (underway && !reduced && star % 5 == 0) {
-        const float trail = (7.0f + static_cast<float>(star % 4) * 4.0f) * bridgeScaleX;
-        DrawLineEx(Vector2{px, py}, Vector2{px + trail, py}, std::max(1.0f, scale),
-                   Fade(starInk, 0.58f));
+    // Structural seam lines between ceiling, side walls, forward bulkhead & floor
+    DrawLineEx(V(oL, oT), V(bL, bT), line15, trim);
+    DrawLineEx(V(oR, oT), V(bR, bT), line15, trim);
+    DrawLineEx(V(bL, bT), V(bR, bT), line15, trim);
+    DrawLineEx(V(bL, bT), V(bL, bB), line15, trim);
+    DrawLineEx(V(bR, bT), V(bR, bB), line15, trim);
+    DrawLineEx(V(oL, deckFrontY), V(bL, bB), line15, trim);
+    DrawLineEx(V(oR, deckFrontY), V(bR, bB), line15, trim);
+    DrawLineEx(V(bL, bB), V(bR, bB), line1, trim);
+
+    // --- 2. Single Panoramic Bow Canopy Window & Deep-Space Viewport --------
+    constexpr float winOuterL = 144.0f, winOuterR = 816.0f;
+    constexpr float winOuterT = 56.0f, winOuterB = 274.0f;
+    constexpr float glassL = 158.0f, glassR = 802.0f;
+    constexpr float glassT = 68.0f, glassB = 262.0f;
+    constexpr float glassW = glassR - glassL;
+    constexpr float glassH = glassB - glassT;
+    constexpr float topChamf = 34.0f, botChamf = 14.0f;
+
+    // Outer armored canopy collar
+    {
+      const Vector2 outerPts[8] = {
+          V(winOuterL + topChamf, winOuterT), V(winOuterR - topChamf, winOuterT),
+          V(winOuterR, winOuterT + topChamf), V(winOuterR, winOuterB - botChamf),
+          V(winOuterR - botChamf, winOuterB), V(winOuterL + botChamf, winOuterB),
+          V(winOuterL, winOuterB - botChamf), V(winOuterL, winOuterT + topChamf)};
+      FillPolyRay(outerPts, 8, metalDark);
+      for (int i = 0; i < 8; ++i) {
+        DrawLineEx(outerPts[i], outerPts[(i + 1) % 8], line2, trim);
       }
-      DrawCircleV(Vector2{px, py}, radius, Fade(starInk, star % 9 == 0 ? 0.98f : 0.84f));
-      if (star % 17 == 0) {
-        DrawLineEx(Vector2{px - 3.0f * bridgeScaleX, py}, Vector2{px + 3.0f * bridgeScaleX, py},
-                   std::max(1.0f, scale), Fade(starInk, 0.82f));
-        DrawLineEx(Vector2{px, py - 3.0f * scale}, Vector2{px, py + 3.0f * scale},
-                   std::max(1.0f, scale), Fade(starInk, 0.82f));
+      const float in = 6.0f;
+      const Vector2 midPts[8] = {
+          V(winOuterL + topChamf + in * 0.5f, winOuterT + in),
+          V(winOuterR - topChamf - in * 0.5f, winOuterT + in),
+          V(winOuterR - in, winOuterT + topChamf + in * 0.5f),
+          V(winOuterR - in, winOuterB - botChamf - in * 0.5f),
+          V(winOuterR - botChamf - in * 0.5f, winOuterB - in),
+          V(winOuterL + botChamf + in * 0.5f, winOuterB - in),
+          V(winOuterL + in, winOuterB - botChamf - in * 0.5f),
+          V(winOuterL + in, winOuterT + topChamf + in * 0.5f)};
+      FillPolyRay(midPts, 8, metal);
+    }
+
+    // Space glass backdrop + radial 3D starfield clipped strictly to glass bounds
+    const int scX = static_cast<int>( std::floor(SX(glassL)) );
+    const int scY = static_cast<int>( std::floor(SY(glassT) - contentScroll_) );
+    const int scW = std::max(1, static_cast<int>( std::ceil(S(glassW)) ));
+    const int scH = std::max(1, static_cast<int>( std::ceil(S(glassH)) ));
+    BeginScissorMode(scX, scY, scW, scH);
+    {
+      // Deep cosmic 3-band gradient (zenith obsidian -> mid void -> horizon slate)
+      const int gY0 = static_cast<int>(std::floor(SY(glassT)));
+      const int gY1 = static_cast<int>(std::floor(SY(glassT + glassH * 0.48f)));
+      const int gY2 = static_cast<int>(std::floor(SY(glassT + glassH * 0.78f)));
+      const int gY3 = static_cast<int>(std::ceil(SY(glassB)));
+      DrawRectangleGradientV(scX, gY0, scW, std::max(1, gY1 - gY0 + 1),
+                             Color{5, 8, 15, 255}, Color{9, 14, 26, 255});
+      DrawRectangleGradientV(scX, gY1, scW, std::max(1, gY2 - gY1 + 1),
+                             Color{9, 14, 26, 255}, Color{13, 21, 36, 255});
+      DrawRectangleGradientV(scX, gY2, scW, std::max(1, gY3 - gY2),
+                             Color{13, 21, 36, 255}, Color{19, 31, 50, 255});
+
+      // Fine tilted Galactic Star-Dust Band (artifact-free starlight field)
+      for (std::uint32_t d = 0; d < 190u; ++d) {
+        std::uint32_t dh1 = (d + 17u) * 2654435761u;
+        dh1 ^= (dh1 >> 15);
+        std::uint32_t dh2 = (d + 17u) * 2246822519u + 0x9e3779b9u;
+        dh2 ^= (dh2 >> 13);
+        const float u = static_cast<float>(dh1 & 0xFFFFu) / 65535.0f;
+        const float spread =
+            (static_cast<float>(dh2 & 0xFFu) / 255.0f +
+             static_cast<float>((dh2 >> 8) & 0xFFu) / 255.0f - 1.0f);
+        const float dx = glassL + 8.0f + u * (glassW - 16.0f);
+        const float bandCenterY = glassT + 152.0f - u * 84.0f + std::sin(u * 4.2f) * 8.0f;
+        const float dy = bandCenterY + spread * 46.0f;
+        if (dy < glassT + 2.0f || dy > glassB - 2.0f) { continue; }
+        const Color dustCol =
+            (d % 5u == 0u) ? Color{216, 192, 148, 72} : Color{148, 178, 224, 68};
+        const float dSz = std::max(1.0f, S(d % 9u == 0u ? 1.35f : 0.95f));
+        DrawRectangleRec(Rectangle{SX(dx), SY(dy), dSz, dSz}, dustCol);
+      }
+
+      // Distant crescent world with subtle tilted ring low on the port-bow horizon
+      {
+        const float px = 258.0f, py = 232.0f, pr = 42.0f;
+        // Back half of planetary ring
+        for (int rs = 0; rs < 16; ++rs) {
+          const float a0 = PI + static_cast<float>(rs) * (PI / 16.0f);
+          const float a1 = PI + static_cast<float>(rs + 1) * (PI / 16.0f);
+          const Vector2 r0 = V(px + std::cos(a0) * 68.0f - std::sin(a0) * 4.0f,
+                               py + std::sin(a0) * 13.0f - std::cos(a0) * 11.0f);
+          const Vector2 r1 = V(px + std::cos(a1) * 68.0f - std::sin(a1) * 4.0f,
+                               py + std::sin(a1) * 13.0f - std::cos(a1) * 11.0f);
+          DrawLineEx(r0, r1, std::max(1.0f, S(2.0f)), Color{118, 136, 164, 72});
+        }
+        // Lit atmospheric crescent limb + dark planet body
+        DrawCircleV(V(px - 2.2f, py - 2.0f), S(pr + 0.8f), Color{124, 152, 192, 135});
+        DrawCircleV(V(px - 1.0f, py - 1.0f), S(pr + 0.4f), Fade(ToRay(p.amber), 0.22f));
+        DrawCircleV(V(px, py), S(pr), Color{8, 13, 23, 255});
+        // Front half of planetary ring crossing the dark disc
+        for (int rs = 0; rs < 16; ++rs) {
+          const float a0 = static_cast<float>(rs) * (PI / 16.0f);
+          const float a1 = static_cast<float>(rs + 1) * (PI / 16.0f);
+          const Vector2 r0 = V(px + std::cos(a0) * 68.0f - std::sin(a0) * 4.0f,
+                               py + std::sin(a0) * 13.0f - std::cos(a0) * 11.0f);
+          const Vector2 r1 = V(px + std::cos(a1) * 68.0f - std::sin(a1) * 4.0f,
+                               py + std::sin(a1) * 13.0f - std::cos(a1) * 11.0f);
+          DrawLineEx(r0, r1, std::max(1.0f, S(2.2f)), Color{150, 168, 196, 108});
+        }
+      }
+
+      // 3D Radial Perspective Starfield projected from bow focal vanishing point
+      constexpr float vpX = 480.0f;
+      constexpr float vpY = 158.0f;
+      constexpr float projW = 352.0f;
+      constexpr float projH = 128.0f;
+      constexpr float zNear = 0.070f;
+      const float travelRate = (0.24f + 0.26f * condRatio);
+      const float idleDriftX = (!underway && !reduced) ? std::sin(tSec * 0.37f) * 2.2f : 0.0f;
+      const float idleDriftY = (!underway && !reduced) ? std::cos(tSec * 0.29f) * 1.3f : 0.0f;
+
+      for (std::uint32_t i = 0; i < 164u; ++i) {
+        std::uint32_t h1 = (i + 1u) * 2654435761u;
+        h1 ^= (h1 >> 15);
+        std::uint32_t h2 = (i + 1u) * 2246822519u + 0x9e3779b9u;
+        h2 ^= (h2 >> 13);
+        std::uint32_t h3 = (i + 1u) * 3266489917u + 0x85ebca6bu;
+        h3 ^= (h3 >> 16);
+
+        // Spread stars in 3D cone outside dead-center singularity
+        const float angle = static_cast<float>(h1 & 0xFFFFu) / 65535.0f * (2.0f * PI);
+        const float radial = 0.055f + 0.945f * std::sqrt(static_cast<float>(h2 & 0xFFFFu) / 65535.0f);
+        const float sx = std::cos(angle) * radial * 1.12f;
+        const float sy = std::sin(angle) * radial * 0.92f;
+        const float zSeed = static_cast<float>(h3 & 0xFFFFu) / 65535.0f;
+
+        float z = zNear + (1.0f - zNear) * zSeed;
+        if (underway && !reduced) {
+          float phase = std::fmod(zSeed - tSec * travelRate, 1.0f);
+          if (phase < 0.0f) { phase += 1.0f; }
+          z = zNear + (1.0f - zNear) * phase;
+        }
+
+        const float invZ = 1.0f / z;
+        const float hx = vpX + sx * projW * invZ + idleDriftX * (0.4f + 0.6f * (1.0f - z));
+        const float hy = vpY + sy * projH * invZ + idleDriftY * (0.4f + 0.6f * (1.0f - z));
+        if (hx < glassL - 32.0f || hx > glassR + 32.0f ||
+            hy < glassT - 32.0f || hy > glassB + 32.0f) {
+          continue;
+        }
+
+        const float closeness = std::clamp(1.0f - (z - zNear) / (1.0f - zNear), 0.0f, 1.0f);
+        // Smooth fade-in from deep distance so stars never pop abruptly near vp
+        const float farFade = std::clamp((1.0f - z) * 5.8f, 0.20f, 1.0f);
+        const float twinkle =
+            (!underway && !reduced && (i % 7u == 0u))
+                ? (0.82f + 0.18f * std::sin(tSec * (1.8f + static_cast<float>(i % 5u) * 0.6f) +
+                                            static_cast<float>(i)))
+                : 1.0f;
+
+        Color starCol = ToRay(p.white);
+        if (i % 13u == 0u) {
+          starCol = ToRay(p.amber);
+        } else if (i % 11u == 0u) {
+          starCol = Color{188, 216, 255, 255};
+        } else if (i % 19u == 0u) {
+          starCol = Color{255, 228, 184, 255};
+        }
+
+        const float baseAlpha = (0.36f + 0.62f * closeness) * farFade * twinkle;
+        const float radius =
+            std::max(0.85f, (0.68f + 1.40f * closeness + (i % 17u == 0u ? 0.55f : 0.0f)) * scale);
+
+        if (underway) {
+          const float streakDz =
+              (reduced ? 0.032f : (0.055f + 0.075f * condRatio)) * (0.45f + 0.75f * closeness);
+          const float zMid = std::min(1.0f, z + streakDz * 0.42f);
+          const float zTail = std::min(1.0f, z + streakDz);
+          const float mx = vpX + sx * projW / zMid;
+          const float my = vpY + sy * projH / zMid;
+          const float tx = vpX + sx * projW / zTail;
+          const float ty = vpY + sy * projH / zTail;
+          DrawLineEx(V(tx, ty), V(mx, my), std::max(1.0f, radius * 0.68f),
+                     Fade(starCol, baseAlpha * 0.30f));
+          DrawLineEx(V(mx, my), V(hx, hy), std::max(1.0f, radius * 1.08f),
+                     Fade(starCol, baseAlpha * 0.78f));
+        }
+
+        DrawCircleV(V(hx, hy), radius, Fade(starCol, baseAlpha));
+        if (!underway && (i % 23u == 0u) && closeness > 0.45f) {
+          const float glint = S(3.2f + 1.8f * closeness);
+          DrawLineEx(Vector2{SX(hx) - glint, SY(hy)}, Vector2{SX(hx) + glint, SY(hy)}, 1.0f,
+                     Fade(starCol, baseAlpha * 0.55f));
+          DrawLineEx(Vector2{SX(hx), SY(hy) - glint}, Vector2{SX(hx), SY(hy) + glint}, 1.0f,
+                     Fade(starCol, baseAlpha * 0.55f));
+        }
+      }
+
+      // Subtle canopy glass sheen & etched bow optics (single window, zero mullions)
+      fillQuad(V(glassL + 18.0f, glassT), V(glassL + 96.0f, glassT),
+               V(glassL + 36.0f, glassB), V(glassL - 12.0f, glassB),
+               Color{220, 236, 255, 9});
+      fillQuad(V(glassR - 86.0f, glassT), V(glassR - 38.0f, glassT),
+               V(glassR - 92.0f, glassB), V(glassR - 140.0f, glassB),
+               Color{220, 236, 255, 7});
+
+      const Color hudInk = Fade(ToRay(p.amber), underway ? 0.34f : 0.18f);
+      // Upper bow heading tape ticks
+      DrawLineEx(V(350.0f, glassT + 10.0f), V(610.0f, glassT + 10.0f), 1.0f, hudInk);
+      for (int t = -6; t <= 6; ++t) {
+        const float tx = 480.0f + static_cast<float>(t) * 20.0f;
+        const float th = (t == 0) ? 6.0f : (t % 3 == 0 ? 4.0f : 2.5f);
+        DrawLineEx(V(tx, glassT + 10.0f), V(tx, glassT + 10.0f + th), 1.0f, hudInk);
+      }
+      // Subtle center bow bore-sight brackets & forward flight vector chevrons
+      const float br = underway ? 13.0f : 9.0f;
+      DrawLineEx(V(vpX - br, vpY - 6.0f), V(vpX - br + 4.0f, vpY - 6.0f), 1.0f, hudInk);
+      DrawLineEx(V(vpX - br, vpY - 6.0f), V(vpX - br, vpY + 6.0f), 1.0f, hudInk);
+      DrawLineEx(V(vpX - br, vpY + 6.0f), V(vpX - br + 4.0f, vpY + 6.0f), 1.0f, hudInk);
+      DrawLineEx(V(vpX + br, vpY - 6.0f), V(vpX + br - 4.0f, vpY - 6.0f), 1.0f, hudInk);
+      DrawLineEx(V(vpX + br, vpY - 6.0f), V(vpX + br, vpY + 6.0f), 1.0f, hudInk);
+      DrawLineEx(V(vpX + br, vpY + 6.0f), V(vpX + br - 4.0f, vpY + 6.0f), 1.0f, hudInk);
+      if (underway) {
+        DrawCircleV(V(vpX, vpY), std::max(1.0f, S(1.4f)), hudInk);
+        DrawLineEx(V(vpX - 30.0f, vpY), V(vpX - 18.0f, vpY), 1.0f, hudInk);
+        DrawLineEx(V(vpX + 18.0f, vpY), V(vpX + 30.0f, vpY), 1.0f, hudInk);
       }
     }
     EndScissorMode();
-    DrawRectangleRec(Rectangle{origin.x + 234.0f * bridgeScaleX, origin.y + 51.0f * scale,
-                               5.0f * bridgeScaleX, 150.0f * scale}, metal);
-    DrawRectangleRec(Rectangle{origin.x + 360.0f * bridgeScaleX, origin.y + 51.0f * scale,
-                               5.0f * bridgeScaleX, 150.0f * scale}, metal);
-    DrawRectangleRec(Rectangle{origin.x + 102.0f * bridgeScaleX, origin.y + 123.0f * scale,
-                               396.0f * bridgeScaleX, 5.0f * scale}, metal);
-    DrawRectangleLinesEx(Rectangle{origin.x + 94.0f * bridgeScaleX, origin.y + 43.0f * scale,
-                                   412.0f * bridgeScaleX, 166.0f * scale},
-                         std::max(1.0f, 1.4f * scale), trim);
 
-    DrawRectangleRec(Rectangle{origin.x + 17.0f * bridgeScaleX, origin.y + 56.0f * scale,
-                               69.0f * bridgeScaleX, 222.0f * scale}, panel);
-    DrawRectangleRec(Rectangle{origin.x + 514.0f * bridgeScaleX, origin.y + 56.0f * scale,
-                               69.0f * bridgeScaleX, 222.0f * scale}, panel);
-    DrawRectangleLinesEx(Rectangle{origin.x + 17.0f * bridgeScaleX, origin.y + 56.0f * scale,
-                                   69.0f * bridgeScaleX, 222.0f * scale},
-                         std::max(1.0f, scale), trim);
-    DrawRectangleLinesEx(Rectangle{origin.x + 514.0f * bridgeScaleX, origin.y + 56.0f * scale,
-                                   69.0f * bridgeScaleX, 222.0f * scale},
-                         std::max(1.0f, scale), trim);
-    for (int side = 0; side < 2; ++side) {
-      const float sx = side == 0 ? 24.0f : 522.0f;
-      DrawRectangleRec(Rectangle{origin.x + sx * bridgeScaleX, origin.y + 69.0f * scale,
-                                 55.0f * bridgeScaleX, 66.0f * scale}, glass);
-      DrawRectangleLinesEx(Rectangle{origin.x + sx * bridgeScaleX, origin.y + 69.0f * scale,
-                                     55.0f * bridgeScaleX, 66.0f * scale},
-                           std::max(1.0f, scale), trim);
-      DrawRectangleRec(Rectangle{origin.x + (sx + 5.0f) * bridgeScaleX, origin.y + 145.0f * scale,
-                                 45.0f * bridgeScaleX, 42.0f * scale}, display);
-      DrawRectangleLinesEx(Rectangle{origin.x + (sx + 5.0f) * bridgeScaleX, origin.y + 145.0f * scale,
-                                     45.0f * bridgeScaleX, 42.0f * scale},
-                           std::max(1.0f, scale), trim);
-      for (int row = 0; row < 3; ++row) {
-        for (int col = 0; col < 4; ++col) {
-          const Color key = (row + col) % 4 == 0 ? ToRay(p.amber) : metal;
-          DrawRectangleRec(Rectangle{origin.x + (sx + 4.0f + col * 12.0f) * bridgeScaleX,
-                                     origin.y + (194.0f + row * 12.0f) * scale,
-                                     7.0f * bridgeScaleX, 6.0f * scale}, key);
+    // Chamfer corner bevel masks over the glass rectangle + crisp inner glass rim
+    {
+      const float gcTop = 28.0f, gcBot = 10.0f;
+      DrawTriCCWRay(V(glassL - 1.0f, glassT - 1.0f), V(glassL + gcTop, glassT - 1.0f),
+                    V(glassL - 1.0f, glassT + gcTop), metal);
+      DrawTriCCWRay(V(glassR + 1.0f, glassT - 1.0f), V(glassR + 1.0f, glassT + gcTop),
+                    V(glassR - gcTop, glassT - 1.0f), metal);
+      DrawTriCCWRay(V(glassL - 1.0f, glassB + 1.0f), V(glassL - 1.0f, glassB - gcBot),
+                    V(glassL + gcBot, glassB + 1.0f), metal);
+      DrawTriCCWRay(V(glassR + 1.0f, glassB + 1.0f), V(glassR - gcBot, glassB + 1.0f),
+                    V(glassR + 1.0f, glassB - gcBot), metal);
+
+      const Vector2 glassRim[8] = {
+          V(glassL + gcTop, glassT), V(glassR - gcTop, glassT),
+          V(glassR, glassT + gcTop), V(glassR, glassB - gcBot),
+          V(glassR - gcBot, glassB), V(glassL + gcBot, glassB),
+          V(glassL, glassB - gcBot), V(glassL, glassT + gcTop)};
+      for (int i = 0; i < 8; ++i) {
+        DrawLineEx(glassRim[i], glassRim[(i + 1) % 8], line15, trim);
+      }
+    }
+
+    // --- 3. Port & Starboard Perspective Bridge Wing Stations ---------------
+    // Port wing: Attitude / Systems monitor + auxiliary bus panel
+    {
+      const Vector2 pFrame[4] = {V(24.0f, 52.0f), V(120.0f, 74.0f),
+                                 V(120.0f, 286.0f), V(24.0f, 320.0f)};
+      fillQuad(pFrame[0], pFrame[1], pFrame[2], pFrame[3], consoleCol);
+      for (int i = 0; i < 4; ++i) {
+        DrawLineEx(pFrame[i], pFrame[(i + 1) % 4], line15, trim);
+      }
+      // Upper attitude CRT screen
+      const Vector2 pScr[4] = {V(32.0f, 68.0f), V(112.0f, 84.0f),
+                               V(112.0f, 162.0f), V(32.0f, 154.0f)};
+      fillQuad(pScr[0], pScr[1], pScr[2], pScr[3], displayBg);
+      for (int i = 0; i < 4; ++i) {
+        DrawLineEx(pScr[i], pScr[(i + 1) % 4], line1, trim);
+      }
+      // Artificial horizon + pitch ladder inside port screen
+      const float roll = (!reduced && underway) ? std::sin(tSec * 0.9f) * 3.0f : 0.0f;
+      DrawLineEx(V(38.0f, 113.0f - roll), V(106.0f, 121.0f + roll), line1,
+                 Fade(ToRay(p.sage), 0.85f));
+      DrawLineEx(V(52.0f, 99.0f), V(94.0f, 105.0f), 1.0f, displayGrid);
+      DrawLineEx(V(52.0f, 129.0f), V(94.0f, 134.0f), 1.0f, displayGrid);
+      DrawCircleLinesV(V(72.0f, 117.0f), S(16.0f), Fade(ToRay(p.amber), 0.55f));
+
+      // Mid telemetry bar sub-screen (Energy / Fuel / Shield / Drive)
+      const Vector2 pSub[4] = {V(32.0f, 168.0f), V(112.0f, 174.0f),
+                               V(112.0f, 232.0f), V(32.0f, 234.0f)};
+      fillQuad(pSub[0], pSub[1], pSub[2], pSub[3], displayBg);
+      for (int i = 0; i < 4; ++i) {
+        DrawLineEx(pSub[i], pSub[(i + 1) % 4], line1, trim);
+      }
+      const float ratios[4] = {energyRatio, fuelRatio, shieldRatio, condRatio};
+      const Color barCols[4] = {ToRay(p.amber), ToRay(p.sage), Color{110, 168, 214, 255},
+                                condRatio < 0.5f ? ToRay(p.terracotta) : ToRay(p.sage)};
+      for (int b = 0; b < 4; ++b) {
+        const float ly = 180.0f + static_cast<float>(b) * 13.0f;
+        const float ry = 184.0f + static_cast<float>(b) * 11.5f;
+        DrawLineEx(V(39.0f, ly), V(105.0f, ry), std::max(2.0f, S(4.0f)),
+                   Color{34, 48, 64, 255});
+        const float fillEnd = 39.0f + 66.0f * ratios[b];
+        const float fillEndY = ly + (ry - ly) * ratios[b];
+        if (ratios[b] > 0.02f) {
+          DrawLineEx(V(39.0f, ly), V(fillEnd, fillEndY), std::max(2.0f, S(4.0f)), barCols[b]);
+        }
+      }
+      // Illuminated switch matrix at bottom of port wing
+      for (int r = 0; r < 3; ++r) {
+        for (int c = 0; c < 4; ++c) {
+          const float u = (static_cast<float>(c) + 0.3f) / 4.3f;
+          const float kx = 33.0f + u * 76.0f;
+          const float kyTop = 248.0f + static_cast<float>(r) * 18.0f;
+          const float ky = kyTop - u * (6.0f + static_cast<float>(r) * 2.0f);
+          const Color kc = ((r + c) % 5 == 0) ? ToRay(p.amber)
+                           : ((r == 0 && c == 2) ? ToRay(p.sage) : metal);
+          DrawRectangleRec(Rectangle{SX(kx), SY(ky), S(12.0f), S(7.0f)}, kc);
         }
       }
     }
 
-    DrawLineEx(Vector2{origin.x + 87.0f * bridgeScaleX, origin.y + 54.0f * scale},
-               Vector2{origin.x + 101.0f * bridgeScaleX, origin.y + 81.0f * scale},
-               std::max(1.0f, 2.0f * scale), trim);
-    DrawLineEx(Vector2{origin.x + 513.0f * bridgeScaleX, origin.y + 54.0f * scale},
-               Vector2{origin.x + 499.0f * bridgeScaleX, origin.y + 81.0f * scale},
-               std::max(1.0f, 2.0f * scale), trim);
-    DrawLineEx(Vector2{origin.x + 18.0f * bridgeScaleX, origin.y + 278.0f * scale},
-               Vector2{origin.x + 582.0f * bridgeScaleX, origin.y + 278.0f * scale},
-               std::max(1.0f, scale), trim);
+    // Starboard wing: Polar Sector Radar + Navigation Relay matrix
+    {
+      const Vector2 sFrame[4] = {V(840.0f, 74.0f), V(936.0f, 52.0f),
+                                 V(936.0f, 320.0f), V(840.0f, 286.0f)};
+      fillQuad(sFrame[0], sFrame[1], sFrame[2], sFrame[3], consoleCol);
+      for (int i = 0; i < 4; ++i) {
+        DrawLineEx(sFrame[i], sFrame[(i + 1) % 4], line15, trim);
+      }
+      // Upper radar scope
+      const Vector2 sScr[4] = {V(848.0f, 84.0f), V(928.0f, 68.0f),
+                               V(928.0f, 154.0f), V(848.0f, 162.0f)};
+      fillQuad(sScr[0], sScr[1], sScr[2], sScr[3], displayBg);
+      for (int i = 0; i < 4; ++i) {
+        DrawLineEx(sScr[i], sScr[(i + 1) % 4], line1, trim);
+      }
+      const Vector2 rCenter = V(888.0f, 115.0f);
+      DrawCircleLinesV(rCenter, S(28.0f), displayGrid);
+      DrawCircleLinesV(rCenter, S(16.0f), displayGrid);
+      DrawLineEx(V(858.0f, 118.0f), V(918.0f, 112.0f), 1.0f, displayGrid);
+      DrawLineEx(V(888.0f, 86.0f), V(888.0f, 144.0f), 1.0f, displayGrid);
+      const float sweep = reduced ? -0.8f : (tSec * (underway ? 1.8f : 0.55f));
+      DrawLineEx(rCenter,
+                 Vector2{rCenter.x + std::cos(sweep) * S(27.0f),
+                         rCenter.y + std::sin(sweep) * S(27.0f)},
+                 line15, Fade(ToRay(p.sage), 0.85f));
+      DrawCircleV(V(899.0f, 103.0f), std::max(1.5f, S(2.2f)), ToRay(p.amber));
 
-    const Color seat = night ? ToRay(p.panel2) : HexColor("#e0d4bf", ToRay(p.panel2));
-    DrawRectangleRounded(Rectangle{origin.x + 184.0f * bridgeScaleX, origin.y + 190.0f * scale,
-                                   34.0f * bridgeScaleX, 40.0f * scale},
-                         0.16f, 6, seat);
-    DrawRectangleRoundedLinesEx(Rectangle{origin.x + 184.0f * bridgeScaleX, origin.y + 190.0f * scale,
-                                          34.0f * bridgeScaleX, 40.0f * scale},
-                                0.16f, 6, std::max(1.0f, scale), trim);
-    DrawRectangleRounded(Rectangle{origin.x + 279.0f * bridgeScaleX, origin.y + 188.0f * scale,
-                                   42.0f * bridgeScaleX, 42.0f * scale},
-                         0.16f, 6, seat);
-    DrawRectangleRoundedLinesEx(Rectangle{origin.x + 279.0f * bridgeScaleX, origin.y + 188.0f * scale,
-                                          42.0f * bridgeScaleX, 42.0f * scale},
-                                0.16f, 6, std::max(1.0f, scale), trim);
-    DrawRectangleRounded(Rectangle{origin.x + 382.0f * bridgeScaleX, origin.y + 190.0f * scale,
-                                   34.0f * bridgeScaleX, 40.0f * scale},
-                         0.16f, 6, seat);
-    DrawRectangleRoundedLinesEx(Rectangle{origin.x + 382.0f * bridgeScaleX, origin.y + 190.0f * scale,
-                                          34.0f * bridgeScaleX, 40.0f * scale},
-                                0.16f, 6, std::max(1.0f, scale), trim);
-    DrawRectangleRec(Rectangle{origin.x + 197.0f * bridgeScaleX, origin.y + 228.0f * scale,
-                               8.0f * bridgeScaleX, 14.0f * scale}, trim);
-    DrawRectangleRec(Rectangle{origin.x + 296.0f * bridgeScaleX, origin.y + 228.0f * scale,
-                               8.0f * bridgeScaleX, 14.0f * scale}, trim);
-    DrawRectangleRec(Rectangle{origin.x + 395.0f * bridgeScaleX, origin.y + 228.0f * scale,
-                               8.0f * bridgeScaleX, 14.0f * scale}, trim);
+      // Mid course waveform / vector display
+      const Vector2 sSub[4] = {V(848.0f, 174.0f), V(928.0f, 168.0f),
+                               V(928.0f, 234.0f), V(848.0f, 232.0f)};
+      fillQuad(sSub[0], sSub[1], sSub[2], sSub[3], displayBg);
+      for (int i = 0; i < 4; ++i) {
+        DrawLineEx(sSub[i], sSub[(i + 1) % 4], line1, trim);
+      }
+      for (int seg = 0; seg < 10; ++seg) {
+        const float x0 = 854.0f + static_cast<float>(seg) * 6.8f;
+        const float x1 = x0 + 6.8f;
+        const float ph = reduced ? 0.0f : tSec * (underway ? 3.2f : 1.0f);
+        const float y0 = 202.0f + std::sin(ph + static_cast<float>(seg) * 0.75f) *
+                                      (underway ? 11.0f : 4.5f);
+        const float y1 = 202.0f + std::sin(ph + static_cast<float>(seg + 1) * 0.75f) *
+                                      (underway ? 11.0f : 4.5f);
+        DrawLineEx(V(x0, y0), V(x1, y1), line15,
+                   underway ? ToRay(p.amber) : Fade(ToRay(p.sage), 0.85f));
+      }
+      // Illuminated switch matrix at bottom of starboard wing
+      for (int r = 0; r < 3; ++r) {
+        for (int c = 0; c < 4; ++c) {
+          const float u = (static_cast<float>(c) + 0.3f) / 4.3f;
+          const float kx = 851.0f + u * 76.0f;
+          const float kyTop = 242.0f + static_cast<float>(r) * 16.0f;
+          const float ky = kyTop + u * (6.0f + static_cast<float>(r) * 2.0f);
+          const Color kc = ((r + c) % 4 == 1) ? ToRay(p.amber)
+                           : ((r == 1 && c == 1) ? ToRay(p.sage) : metal);
+          DrawRectangleRec(Rectangle{SX(kx), SY(ky), S(12.0f), S(7.0f)}, kc);
+        }
+      }
+    }
 
-    PaintChamferBoxRay(Area{origin.x + 143.0f * bridgeScaleX, origin.y + 242.0f * scale,
-                            314.0f * bridgeScaleX, 63.0f * scale},
-                       5.0f * scale, console, trim, ToRay(p.border));
-    DrawRectangleRec(Rectangle{origin.x + 164.0f * bridgeScaleX, origin.y + 251.0f * scale,
-                               272.0f * bridgeScaleX, 37.0f * scale}, display);
-    DrawRectangleLinesEx(Rectangle{origin.x + 164.0f * bridgeScaleX, origin.y + 251.0f * scale,
-                                   272.0f * bridgeScaleX, 37.0f * scale},
-                         std::max(1.0f, scale), trim);
-    for (int key = 0; key < 14; ++key) {
-      const float kx = 173.0f + static_cast<float>(key) * 18.0f;
-      const Color keyInk = key % 5 == 0 ? ToRay(p.sage) : ToRay(p.amber);
-      DrawRectangleRec(Rectangle{origin.x + kx * bridgeScaleX, origin.y + 256.0f * scale,
-                                 8.0f * bridgeScaleX, 6.0f * scale}, keyInk);
-      DrawLineEx(Vector2{origin.x + kx * bridgeScaleX, origin.y + 274.0f * scale},
-                 Vector2{origin.x + (kx + 12.0f) * bridgeScaleX, origin.y + 274.0f * scale},
-                 std::max(1.0f, scale), metal);
+    // --- 4. Perspective Deck Plating & Recessed Floor Gratings --------------
+    for (int seam = 1; seam <= 7; ++seam) {
+      if (seam == 3 || seam == 4 || seam == 5) { continue; }  // Covered by central dais
+      const float u = static_cast<float>(seam) / 8.0f;
+      const float bx = bL + (bR - bL) * u;
+      const float fx = oL + (oR - oL) * u;
+      DrawLineEx(V(bx, bB), V(fx, deckFrontY), 1.0f, trimSoft);
     }
-    DrawRectangleRec(Rectangle{origin.x + 18.0f * bridgeScaleX, origin.y + 314.0f * scale,
-                               564.0f * bridgeScaleX, 31.0f * scale}, wall);
-    DrawRectangleLinesEx(Rectangle{origin.x + 18.0f * bridgeScaleX, origin.y + 314.0f * scale,
-                                   564.0f * bridgeScaleX, 31.0f * scale},
-                         std::max(1.0f, scale), trim);
-    for (int floorLine = 0; floorLine < 9; ++floorLine) {
-      const float fx = 28.0f + static_cast<float>(floorLine) * 68.0f;
-      DrawLineEx(Vector2{origin.x + fx * bridgeScaleX, origin.y + 317.0f * scale},
-                 Vector2{origin.x + (fx + 31.0f) * bridgeScaleX, origin.y + 342.0f * scale},
-                 std::max(1.0f, scale), ToRay(p.border));
+    // Port & Starboard deck grating panels (strictly clipped to quad vertices)
+    auto paintDeckGrate = [&](float backX0, float backX1, float frontX0, float frontX1) {
+      const float gy0 = 331.0f, gy1 = 361.0f;
+      fillQuad(V(backX0, gy0), V(backX1, gy0), V(frontX1, gy1), V(frontX0, gy1), deckGrate);
+      DrawLineEx(V(backX0, gy0), V(backX1, gy0), 1.0f, trim);
+      DrawLineEx(V(backX1, gy0), V(frontX1, gy1), 1.0f, trim);
+      DrawLineEx(V(frontX1, gy1), V(frontX0, gy1), 1.0f, trim);
+      DrawLineEx(V(frontX0, gy1), V(backX0, gy0), 1.0f, trim);
+      for (int slat = 1; slat <= 5; ++slat) {
+        const float u = static_cast<float>(slat) / 6.0f;
+        DrawLineEx(V(backX0 + (backX1 - backX0) * u, gy0 + 1.0f),
+                   V(frontX0 + (frontX1 - frontX0) * u, gy1 - 1.0f), 1.0f, trimSoft);
+      }
+      const float midY = (gy0 + gy1) * 0.5f;
+      DrawLineEx(V((backX0 + frontX0) * 0.5f, midY),
+                 V((backX1 + frontX1) * 0.5f, midY), 1.0f, trimSoft);
+    };
+    paintDeckGrate(148.0f, 328.0f, 78.0f, 306.0f);
+    paintDeckGrate(632.0f, 812.0f, 654.0f, 882.0f);
+
+    // --- 5. Grounded Forward Wraparound Helm & Navigation Desk --------------
+    {
+      // Recessed dark plinth anchoring desk solidly to the forward bulkhead
+      DrawRectangleRec(Rectangle{SX(142.0f), SY(310.0f), S(676.0f), S(14.0f)}, metalDark);
+      DrawRectangleLinesEx(Rectangle{SX(142.0f), SY(310.0f), S(676.0f), S(14.0f)}, line1, trim);
+
+      // Sloped upper instrument desk surface + front fascia
+      fillQuad(V(146.0f, 274.0f), V(814.0f, 274.0f), V(828.0f, 293.0f), V(132.0f, 293.0f),
+               consoleTop);
+      DrawRectangleRec(Rectangle{SX(132.0f), SY(293.0f), S(696.0f), S(19.0f)}, consoleCol);
+      DrawLineEx(V(146.0f, 274.0f), V(814.0f, 274.0f), line15, trim);
+      DrawLineEx(V(146.0f, 274.0f), V(132.0f, 293.0f), line15, trim);
+      DrawLineEx(V(814.0f, 274.0f), V(828.0f, 293.0f), line15, trim);
+      DrawLineEx(V(132.0f, 293.0f), V(828.0f, 293.0f), line1, trim);
+      DrawLineEx(V(132.0f, 312.0f), V(828.0f, 312.0f), line1, trim);
+
+      // Three forward console MFD clusters (Port Helm, Center Telemetry, Starboard Nav)
+      const float clusterX[3] = {166.0f, 392.0f, 618.0f};
+      for (int cl = 0; cl < 3; ++cl) {
+        const float cx = clusterX[cl];
+        fillQuad(V(cx + 4.0f, 277.0f), V(cx + 172.0f, 277.0f),
+                 V(cx + 176.0f, 290.0f), V(cx, 290.0f), displayBg);
+        for (int k = 0; k < 8; ++k) {
+          const float kx = cx + 10.0f + static_cast<float>(k) * 20.0f;
+          const Color kc = (k % 3 == 0) ? ToRay(p.amber)
+                           : (k % 4 == 1 ? ToRay(p.sage) : Color{84, 114, 146, 255});
+          DrawRectangleRec(Rectangle{SX(kx), SY(281.0f), S(11.0f), S(4.2f)}, kc);
+          DrawRectangleRec(Rectangle{SX(kx), SY(298.0f), S(12.0f), S(5.0f)},
+                           (k + cl) % 4 == 0 ? ToRay(p.amber) : metal);
+        }
+      }
     }
+
+    // --- 6. Three Grounded Bridge Stations & Raised Central Command Dais ----
+    // Stepped octagonal central command dais
+    {
+      const Area daisLower{SX(344.0f), SY(340.0f), S(272.0f), S(23.0f)};
+      const Area daisUpper{SX(368.0f), SY(328.0f), S(224.0f), S(16.0f)};
+      PaintChamferBoxRay(daisLower, S(10.0f), metalDark, trim, ToRay(p.border));
+      PaintChamferBoxRay(daisUpper, S(8.0f), consoleTop, trim, ToRay(p.border));
+      DrawLineEx(V(358.0f, 352.0f), V(602.0f, 352.0f), line1, trimSoft);
+    }
+
+    auto paintBridgeChair = [&](float cx, float topY, float w, float h, bool captain) {
+      const float baseY = topY + h;
+      // Bolted deck baseplate & hydraulic pedestal column
+      const Area footPlate{SX(cx - w * 0.36f), SY(baseY + 10.0f), S(w * 0.72f), S(7.0f)};
+      PaintChamferBoxRay(footPlate, S(2.5f), metalDark, trim, ToRay(p.border));
+      DrawRectangleRec(Rectangle{SX(cx - w * 0.12f), SY(baseY - 2.0f), S(w * 0.24f), S(13.0f)},
+                       metalDark);
+      DrawRectangleLinesEx(Rectangle{SX(cx - w * 0.12f), SY(baseY - 2.0f), S(w * 0.24f), S(13.0f)},
+                           line1, trim);
+      // Side armrests with control grips
+      const Area leftArm{SX(cx - w * 0.62f), SY(topY + h * 0.56f), S(w * 0.16f), S(h * 0.28f)};
+      const Area rightArm{SX(cx + w * 0.46f), SY(topY + h * 0.56f), S(w * 0.16f), S(h * 0.28f)};
+      PaintChamferBoxRay(leftArm, S(2.5f), consoleCol, trim, ToRay(p.border));
+      PaintChamferBoxRay(rightArm, S(2.5f), consoleCol, trim, ToRay(p.border));
+      if (captain) {
+        DrawRectangleRec(Rectangle{SX(cx + w * 0.49f), SY(topY + h * 0.52f), S(4.0f), S(4.0f)},
+                         ToRay(p.amber));
+      }
+      // Sculpted high-back armored seat shell
+      const Area backShell{SX(cx - w * 0.48f), SY(topY + 14.0f), S(w * 0.96f), S(h - 14.0f)};
+      PaintChamferBoxRay(backShell, S(6.0f), seatFill, trim, ToRay(p.border));
+      const Area innerBack{SX(cx - w * 0.34f), SY(topY + 21.0f), S(w * 0.68f), S(h - 27.0f)};
+      DrawRectangleRec(Rectangle{innerBack.x, innerBack.y, innerBack.w, innerBack.h}, seatShade);
+      DrawRectangleLinesEx(Rectangle{innerBack.x, innerBack.y, innerBack.w, innerBack.h},
+                           1.0f, trimSoft);
+      DrawLineEx(V(cx - w * 0.30f, topY + h * 0.62f), V(cx + w * 0.30f, topY + h * 0.62f),
+                 1.0f, trim);
+      // Headrest
+      const Area headrest{SX(cx - w * 0.30f), SY(topY), S(w * 0.60f), S(16.0f)};
+      PaintChamferBoxRay(headrest, S(4.0f), seatFill, trim, ToRay(p.border));
+    };
+
+    // Port Helm Chair, Starboard Nav Chair, and Central Captain's Chair
+    paintBridgeChair(266.0f, 253.0f, 62.0f, 73.0f, false);
+    paintBridgeChair(694.0f, 253.0f, 62.0f, 73.0f, false);
+    paintBridgeChair(480.0f, 236.0f, 74.0f, 80.0f, true);
+
+    // --- 7. Foreground Command Deck Housing (Holds the Two Live Controls) ---
+    {
+      const Area deckBar{SX(oL), SY(deckFrontY), S(oR - oL), S(stageBotY - deckFrontY)};
+      PaintChamferBoxRay(deckBar, S(7.0f), bayHousing, trim, ToRay(p.border));
+      DrawLineEx(V(oL + 8.0f, deckFrontY + 4.0f), V(oR - 8.0f, deckFrontY + 4.0f),
+                 line1, Fade(ToRay(p.white), darkHousing ? 0.10f : 0.35f));
+
+      // Recessed sockets framing the Port (fuel-split) and Starboard (warp) controls
+      const Area portSocket{SX(18.0f), SY(375.0f), S(432.0f), S(76.0f)};
+      const Area stbdSocket{SX(510.0f), SY(375.0f), S(432.0f), S(76.0f)};
+      PaintChamferBoxRay(portSocket, S(6.0f), baySocket, trim, ToRay(p.border));
+      PaintChamferBoxRay(stbdSocket, S(6.0f), baySocket, trim, ToRay(p.border));
+
+      // Central Bridge Core Medallion between the two gameplay controls
+      const Area coreBox{SX(456.0f), SY(375.0f), S(48.0f), S(76.0f)};
+      PaintChamferBoxRay(coreBox, S(5.0f), consoleCol, trim, ToRay(p.border));
+      DrawRectangleRec(Rectangle{SX(463.0f), SY(383.0f), S(34.0f), S(60.0f)}, displayBg);
+      DrawRectangleLinesEx(Rectangle{SX(463.0f), SY(383.0f), S(34.0f), S(60.0f)}, 1.0f, trim);
+      // Three status bars inside medallion (Flight / Power / Fuel)
+      const Color cTop = underway ? ToRay(p.amber) : ToRay(p.sage);
+      const Color cMid = energyRatio > 0.2f ? ToRay(p.sage) : ToRay(p.terracotta);
+      const Color cBot = alertActive ? ToRay(p.terracotta) : Color{86, 126, 164, 255};
+      DrawRectangleRec(Rectangle{SX(468.0f), SY(392.0f), S(24.0f), S(8.0f)}, cTop);
+      DrawRectangleRec(Rectangle{SX(468.0f), SY(408.0f), S(24.0f * std::max(0.22f, energyRatio)), S(7.0f)}, cMid);
+      DrawRectangleRec(Rectangle{SX(468.0f), SY(424.0f), S(24.0f * std::max(0.22f, fuelRatio)), S(7.0f)}, cBot);
+    }
+
+    // Outer interior bulkhead frame
+    DrawRectangleLinesEx(Rectangle{SX(oL), SY(oT), S(oR - oL), S(stageBotY - oT)}, line15, trim);
   }
 
   // --- Priority 2 Overlay: Spinning turbines, rotating core encoder, sweeping needles & coolant loop ---
@@ -7749,49 +8185,132 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
   PaintWikiSearch(Area{layout_.content.x, searchTop, layout_.content.w, 0.0f});
   float top = searchTop + (panelsKind_ == ScreenKind::Wiki ? 38.0f : 0.0f);
   if (screen.panels.size() == 3 && screen.panels.front().id == "bridge-controls") {
-    const float gap = 24.0f;
-    const float controlW = (right - left - 2 * gap) * 0.23f;
-    const float imageX = left + controlW + gap;
-    const float imageW = right - left - 2 * controlW - 2 * gap;
-    const float imageTop = top + 18.0f;
-    const float rightW = (right - left) * 0.29f;
-    const float rightX = right - rightW;
-    const float feedW = rightX - 16.0f - left;
-    const float panelH = std::max({280.0f,
-                                   MeasurePanelHeight(screen.panels[2], feedW),
-                                   MeasurePanelHeight(screen.panels[1], rightW)});
-    const float fitScale = std::min((imageW - 12.0f) / screen.stage.width,
-                                    (layout_.content.Bottom() - imageTop - panelH - 24.0f) /
-                                        screen.stage.height);
+    NavPanel voyagePanel;
+    voyagePanel.id = screen.panels[1].id;
+    voyagePanel.title = screen.panels[1].title;
+    NavPanel coursePanel;
+    coursePanel.id = "bridge-course";
+    coursePanel.title = "Current location / course and alerts";
+    bool inCourse = false;
+    for (const PanelLine& item : screen.panels[1].lines) {
+      if (!inCourse && item.kind == PanelLine::Kind::Sub &&
+          item.value == "Current location / course and alerts") {
+        inCourse = true;
+        continue;
+      }
+      if (!inCourse) {
+        if (item.kind == PanelLine::Kind::Sub && item.value.empty()) { continue; }
+        voyagePanel.lines.push_back(item);
+      } else {
+        coursePanel.lines.push_back(item);
+      }
+    }
+
+    const float availW = std::max(1.0f, right - left);
+    const float colGap = 12.0f;
+    const float innerW = std::max(1.0f, availW - 2.0f * colGap);
+    const float voyageW = std::max(275.0f, std::floor(innerW * 0.235f));
+    const float courseW =
+        std::max({304.0f, std::floor(innerW * 0.31f),
+                  TextWidth(coursePanel.title.c_str(), TypePx(11)) + 24.0f});
+    const float feedW = std::max(1.0f, innerW - voyageW - courseW);
+
+    const float panelH = std::max({MeasurePanelHeight(screen.panels[2], feedW),
+                                   MeasurePanelHeight(voyagePanel, voyageW),
+                                   MeasurePanelHeight(coursePanel, courseW)});
+    const float imageTop = top + 4.0f;
+    const float bottomGap = 10.0f;
+    const float bottomPad = 6.0f;
+    const float availStageH =
+        std::max(160.0f, layout_.content.Bottom() - bottomPad - panelH - bottomGap - imageTop);
+
     TaskStage bridgeStage = screen.stage;
+    bridgeStage.width = 960.0f;
+    bridgeStage.height = 460.0f;
+    const float fitScale =
+        std::min(availW / bridgeStage.width, availStageH / bridgeStage.height);
     bridgeStage.typePx = theme_.FontPx() / fitScale;
     const float scale = StageScale(bridgeStage, theme_);
     const float stageW = bridgeStage.width * scale;
     const float stageH = bridgeStage.height * scale;
-    const float stageX = imageX + (imageW - stageW) * 0.5f;
-    float buttonH = 48.0f;
-    for (const CommandRowView& row : screen.panelRows[0]) {
-      buttonH = std::max(buttonH, WrapText(row.label, controlW - 20.0f, TypePx(10), SelectFont(TypePx(10), false)).size() * theme_.LineHeight() + 16.0f);
-    }
+    const float stageX = left + (availW - stageW) * 0.5f;
+
     PaintStage(sim, bridgeStage, Area{stageX, imageTop, stageW, stageH});
-    const float y = imageTop + stageH - buttonH - 16.0f;
-    for (std::size_t r = 0; r < screen.panelRows[0].size(); ++r) {
-      const CommandRowView& row = screen.panelRows[0][r];
-      const auto lines = WrapText(row.label, controlW - 20.0f, TypePx(10), SelectFont(TypePx(10), false));
-      const Area box{r == 0 ? left : imageX + imageW + gap, y, controlW, buttonH};
-      FillChamferRay(box, kChamferCard, ToRay(row.enabled ? p.control : p.panel3));
-      if (row.charged) PaintProgressFill(box, row.chargePercent, p, kChamferCard);
-      PaintChamferDoubleLinesRay(box, kChamferCard, ToRay(p.borderDark), ToRay(p.border));
-      float textY = y + 8.0f;
-      for (const std::string& line : lines) {
-        Text(line.c_str(), static_cast<int>(box.x + 10.0f), static_cast<int>(textY), TypePx(10), ToRay(row.enabled ? p.ink : p.muted));
-        textY += theme_.LineHeight();
+
+    // Embed the two live gameplay controls inside the lower Command Bay sockets.
+    // The controls live inside the scaled stage image, so their text scales with
+    // the image and each box stays clamped inside its socket at every resolution.
+    if (!screen.panelRows.empty()) {
+      const float btnW = 422.0f * scale;
+      const int lblPx = std::max(11, static_cast<int>(std::lround(TypePx(10) * scale)));
+      const int badPx = std::max(10, static_cast<int>(std::lround(TypePx(9) * scale)));
+      const float btnLine = std::max(14.0f, static_cast<float>(std::lround(lblPx * 1.32f)));
+      const float btnPad = 11.0f * scale;
+      float buttonH = 48.0f * scale;
+      for (const CommandRowView& row : screen.panelRows[0]) {
+        const std::string cost =
+            row.hideCost ? std::string() : (row.displayCost.empty() ? "1 click" : row.displayCost);
+        const float badgeW = cost.empty() ? 0.0f : (TextWidth(cost.c_str(), badPx) + 14.0f * scale);
+        const float labelW = std::max(60.0f * scale,
+                                      btnW - 2.0f * btnPad - (badgeW > 0.0f ? badgeW + 10.0f * scale : 0.0f));
+        const auto lines = WrapText(row.label, labelW, lblPx, SelectFont(lblPx, false));
+        buttonH = std::max(buttonH,
+                           static_cast<float>(lines.size()) * btnLine + 14.0f * scale);
       }
-      if (row.enabled) navHits_.push_back(NavHit{box, "row", screen.panelRowIds[0][r]});
+      // The sockets run 375..451 in stage space; keep the controls inside them.
+      const float socketTop = imageTop + 375.0f * scale;
+      const float socketBottom = imageTop + 451.0f * scale;
+      float btnY = imageTop + 413.0f * scale - buttonH * 0.5f;
+      if (btnY < socketTop) { btnY = socketTop; }
+      const float socketMaxY = socketBottom - buttonH;
+      if (btnY > socketMaxY) { btnY = socketMaxY; }
+
+      for (std::size_t r = 0; r < screen.panelRows[0].size(); ++r) {
+        const CommandRowView& row = screen.panelRows[0][r];
+        const float bx = stageX + (r == 0 ? 23.0f : 515.0f) * scale;
+        const Area box{bx, btnY, btnW, buttonH};
+        const bool hovered = row.enabled && layout_.content.Contains(mouseX_, mouseY_) &&
+                             box.Contains(mouseX_, mouseY_ + contentScroll_);
+
+        FillChamferRay(box, kChamferCard, ToRay(row.enabled ? p.control : p.panel3));
+        if (row.charged) { PaintProgressFill(box, row.chargePercent, p, kChamferCard); }
+        PaintChamferDoubleLinesRay(box, kChamferCard,
+                                   ToRay(hovered ? p.coffeeDark : p.borderDark),
+                                   ToRay(hovered ? p.amber : p.border));
+
+        const std::string cost =
+            row.hideCost ? std::string() : (row.displayCost.empty() ? "1 click" : row.displayCost);
+        const float badgeW = cost.empty() ? 0.0f : (TextWidth(cost.c_str(), badPx) + 14.0f * scale);
+        const float labelW = std::max(60.0f * scale,
+                                      box.w - 2.0f * btnPad - (badgeW > 0.0f ? badgeW + 10.0f * scale : 0.0f));
+        const auto lines = WrapText(row.label, labelW, lblPx, SelectFont(lblPx, false));
+        const float totalTextH = static_cast<float>(lines.size()) * btnLine;
+        float textY = box.y + std::max(5.0f * scale, (box.h - totalTextH) * 0.5f);
+        for (const std::string& line : lines) {
+          Text(line.c_str(), static_cast<int>(box.x + btnPad), static_cast<int>(textY), lblPx,
+               ToRay(row.enabled ? p.ink : p.muted));
+          textY += btnLine;
+        }
+        if (!cost.empty()) {
+          const float badgeH = std::max(20.0f * scale, static_cast<float>(badPx) + 10.0f * scale);
+          const Area badge{box.Right() - badgeW - 9.0f * scale, box.y + (box.h - badgeH) * 0.5f,
+                           badgeW, badgeH};
+          PaintChamferBoxRay(badge, kChamferSmall, ToRay(p.panel2),
+                             ToRay(p.borderDark), ToRay(p.border));
+          Text(cost.c_str(), static_cast<int>(badge.x + 7.0f * scale),
+               static_cast<int>(badge.y + (badge.h - static_cast<float>(badPx)) * 0.5f - 1.0f),
+               badPx, ToRay(row.enabled ? p.coffee : p.muted));
+        }
+        if (row.enabled && r < screen.panelRowIds[0].size()) {
+          navHits_.push_back(NavHit{box, "row", screen.panelRowIds[0][r]});
+        }
+      }
     }
-    const float bottomTop = imageTop + stageH + 16.0f;
+
+    const float bottomTop = imageTop + stageH + bottomGap;
     PaintPanel(screen.panels[2], Area{left, bottomTop, feedW, panelH});
-    PaintPanel(screen.panels[1], Area{rightX, bottomTop, rightW, panelH});
+    PaintPanel(voyagePanel, Area{left + feedW + colGap, bottomTop, voyageW, panelH});
+    PaintPanel(coursePanel, Area{left + feedW + voyageW + 2.0f * colGap, bottomTop, courseW, panelH});
     contentPaintBottom_ = std::max(contentPaintBottom_, bottomTop + panelH);
     return;
   }
