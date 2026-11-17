@@ -321,7 +321,7 @@ in vec4 fragColor;
 uniform float uFlareGain;
 out vec4 finalColor;
 void main() {
-  vec2 p = (fragTexCoord * 2.0 - 1.0) * vec2(uResolution.x / uResolution.y, 1.0);
+  vec2 p = fragTexCoord * 2.0 - 1.0;
   float ax = abs(p.x);
   float ay = abs(p.y);
   float edge = smoothstep(1.4, 0.52, length(p));
