@@ -170,6 +170,7 @@ std::string Simulation::SaveJson() const {
                       {"displayBrightness", Num(DisplayBrightness(state_.options.displayBrightness))},
                       {"colorShift", Num(state_.options.colorShift)},
                       {"glow", Num(state_.options.glow)},
+                      {"lensFlare", Num(state_.options.lensFlare)},
                       {"radiationWave", Num(RadiationWaveStrength(state_.options.radiationWave))},
                       // Phase 9: the reading size and the window travel too.
                       {"fontStep", Num(static_cast<double>(state_.options.fontStep))},
@@ -1198,6 +1199,7 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
       state_.options.displayBrightness = DisplayBrightness(GetNumber(*it, "displayBrightness", 1.0));
       state_.options.colorShift = GetNumber(*it, "colorShift", 0.0);
       state_.options.glow = GetNumber(*it, "glow", 1.0);
+      state_.options.lensFlare = std::clamp(GetNumber(*it, "lensFlare", 1.0), 0.0, 2.0);
       state_.options.radiationWave =
           RadiationWaveStrength(GetNumber(*it, "radiationWave", kRadiationWaveDefault));
       const double step = GetNumber(*it, "fontStep", 0.0);
