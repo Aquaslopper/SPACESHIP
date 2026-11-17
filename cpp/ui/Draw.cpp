@@ -7673,7 +7673,7 @@ void ShellView::PaintTutorial(const Simulation& sim, double nowMs) {
 }
 
 void ShellView::RebuildSetupPreview(const Simulation& sim) {
-  setupPreview_ = BuildChartPreview(sim.SourceWorld(), setupSettings_);
+  setupPreview_ = BuildChartPreview(sim.World(), setupSettings_);
   setupPreviewDirty_ = false;
 }
 

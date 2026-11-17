@@ -30,12 +30,12 @@ bool Truthy(const std::map<std::string, bool>& map, const std::string& key) {
 
 const Port* Simulation::HerePort() const {
   if (map_.inSpace) { return nullptr; }
-  return catalog_.FindPort(map_.here);
+  return catalog_->FindPort(map_.here);
 }
 
 double Simulation::SurveyWorth(const std::string& type) const {
-  auto it = catalog_.surveyWorth.find(type);
-  return it == catalog_.surveyWorth.end() ? 60.0 : it->second;
+  auto it = catalog_->surveyWorth.find(type);
+  return it == catalog_->surveyWorth.end() ? 60.0 : it->second;
 }
 
 double Simulation::LotPrice(const GoodsLot& lot) const {
@@ -52,7 +52,7 @@ double Simulation::CargoCapacity() const { return cargo_.capacity; }
 
 double Simulation::GoodCounterPrice(const std::string& goodId) const {
   const Good* good = nullptr;
-  for (const Good& candidate : catalog_.goods) {
+  for (const Good& candidate : catalog_->goods) {
     if (candidate.id == goodId) { good = &candidate; }
   }
   if (good == nullptr) { return 0.0; }
@@ -160,7 +160,7 @@ bool Simulation::BuyGood(const std::string& goodId) {
   if (!state_.docked || HerePort() == nullptr) { return false; }
 
   const Good* good = nullptr;
-  for (const Good& candidate : catalog_.goods) {
+  for (const Good& candidate : catalog_->goods) {
     if (candidate.id == goodId) { good = &candidate; }
   }
   if (good == nullptr) { return false; }
@@ -293,7 +293,7 @@ bool Simulation::PackageSurvey(const std::string& recordId) {
 // ---------------------------------------------------------------------------
 
 void Simulation::ContractProgress(const std::string& goal, const std::string& target) {
-  for (const Contract& contract : catalog_.contracts) {
+  for (const Contract& contract : catalog_->contracts) {
     auto state = state_.contracts.find(contract.id);
     if (state == state_.contracts.end() || state->second != "active") { continue; }
     if (contract.target != target) { continue; }
@@ -330,7 +330,7 @@ bool Simulation::AcceptContract(const std::string& contractId) {
   if (!state_.docked) { return false; }
 
   const Contract* contract = nullptr;
-  for (const Contract& candidate : catalog_.contracts) {
+  for (const Contract& candidate : catalog_->contracts) {
     if (candidate.id == contractId) { contract = &candidate; }
   }
   if (contract == nullptr) { return false; }
@@ -383,7 +383,7 @@ bool Simulation::CollectContract(const std::string& contractId) {
   if (state == state_.contracts.end() || state->second != "ready") { return false; }
 
   const Contract* contract = nullptr;
-  for (const Contract& candidate : catalog_.contracts) {
+  for (const Contract& candidate : catalog_->contracts) {
     if (candidate.id == contractId) { contract = &candidate; }
   }
   if (contract == nullptr) { return false; }
@@ -406,7 +406,7 @@ bool Simulation::HireCrew(const std::string& candidateId) {
 
   const std::vector<CandidateDefinition> hands = HandsHere();
   const CandidateDefinition* candidate = nullptr;
-  for (const CandidateDefinition& entry : catalog_.candidates) {
+  for (const CandidateDefinition& entry : catalog_->candidates) {
     if (entry.crew.id == candidateId) { candidate = &entry; }
   }
   for (const CandidateDefinition& entry : hands) {
@@ -431,7 +431,7 @@ bool Simulation::HireCrew(const std::string& candidateId) {
 
 std::string Simulation::PatronName(const std::string& patronId) const {
   if (patronId == "trader") { return "the trader"; }
-  for (const CandidateDefinition& entry : catalog_.candidates) {
+  for (const CandidateDefinition& entry : catalog_->candidates) {
     if (entry.crew.id == patronId) { return entry.crew.name; }
   }
   return patronId;
@@ -590,17 +590,17 @@ double TradePays(const Body& destination, const std::string& goodId) {
 
 std::vector<CandidateDefinition> Simulation::HandsHere() const {
   std::vector<CandidateDefinition> hands;
-  if (map_.here.empty() || catalog_.FindPort(map_.here) == nullptr) { return hands; }
-  if (catalog_.candidates.empty()) { return hands; }
+  if (map_.here.empty() || catalog_->FindPort(map_.here) == nullptr) { return hands; }
+  if (catalog_->candidates.empty()) { return hands; }
 
   const long long epoch = static_cast<long long>(std::floor(ActionCount() / kCrewEpoch));
   TradeRng rng(TradeHash(map_.here + "#tavern#" + std::to_string(epoch)));
 
   std::vector<std::size_t> pool;
-  for (std::size_t i = 0; i < catalog_.candidates.size(); ++i) { pool.push_back(i); }
+  for (std::size_t i = 0; i < catalog_->candidates.size(); ++i) { pool.push_back(i); }
   for (int i = 0; i < 5 && !pool.empty(); ++i) {
     const std::size_t pick = static_cast<std::size_t>(rng.Below(static_cast<int>(pool.size())));
-    CandidateDefinition def = catalog_.candidates[pool[pick]];
+    CandidateDefinition def = catalog_->candidates[pool[pick]];
     pool.erase(pool.begin() + static_cast<long>(pick));
     def.port = map_.here;
     hands.push_back(std::move(def));
@@ -618,14 +618,14 @@ bool Simulation::TradeAccepted(const std::string& mode, const std::string& to,
 
 std::vector<TradeRun> Simulation::TradeBoard(const std::string& portId) const {
   std::vector<TradeRun> board;
-  const Port* port = catalog_.FindPort(portId);
-  const Body* berth = catalog_.FindBody(portId);
+  const Port* port = catalog_->FindPort(portId);
+  const Body* berth = catalog_->FindBody(portId);
   if (port == nullptr || berth == nullptr) { return board; }
-  const std::string systemId = catalog_.BodySystem(*berth);
+  const std::string systemId = catalog_->BodySystem(*berth);
 
   std::vector<const Body*> destinations;
-  for (const std::size_t index : catalog_.BodiesInSystem(systemId)) {
-    const Body& body = catalog_.bodies[index];
+  for (const std::size_t index : catalog_->BodiesInSystem(systemId)) {
+    const Body& body = catalog_->bodies[index];
     if (!WantsOf(TradeRole(body)).empty()) { destinations.push_back(&body); }
   }
 
@@ -642,7 +642,7 @@ std::vector<TradeRun> Simulation::TradeBoard(const std::string& portId) const {
 
     for (const Body* to : destinations) {
       for (const Want& want : WantsOf(TradeRole(*to))) {
-        const Good* good = MarketGood(catalog_, want.good);
+        const Good* good = MarketGood(*catalog_, want.good);
         if (good == nullptr) { continue; }
         if (Truthy(state_.spentTrades, TradeKey(modeName, to->id, good->id))) { continue; }
 
@@ -810,19 +810,19 @@ bool Simulation::AcceptTrade(const std::string& mode, const std::string& to,
 
   if (mode == "station") {
     if (to.empty() || to == map_.here) { return false; }
-    const Port* destination = catalog_.FindPort(to);
+    const Port* destination = catalog_->FindPort(to);
     if (destination == nullptr) { return false; }
     // Only a station the player has actually stood in can carry the other end of
     // a station-to-station trade.
     if (!Truthy(state_.visitedPorts, to)) { return false; }
     if (TradeAccepted(mode, to, good)) { return false; }
     trade.label = here->name + " - " + destination->name;
-    const Body* hereBody = catalog_.FindBody(map_.here);
-    const Body* destBody = catalog_.FindBody(to);
+    const Body* hereBody = catalog_->FindBody(map_.here);
+    const Body* destBody = catalog_->FindBody(to);
     const Body* hereSys =
-        hereBody == nullptr ? nullptr : catalog_.FindSystem(catalog_.BodySystem(*hereBody));
+        hereBody == nullptr ? nullptr : catalog_->FindSystem(catalog_->BodySystem(*hereBody));
     const Body* destSys =
-        destBody == nullptr ? nullptr : catalog_.FindSystem(catalog_.BodySystem(*destBody));
+        destBody == nullptr ? nullptr : catalog_->FindSystem(catalog_->BodySystem(*destBody));
     if (hereSys != nullptr && destSys != nullptr && hereSys->id != destSys->id) {
       const double dist = std::hypot(destSys->x - hereSys->x, destSys->y - hereSys->y);
       trade.fee = js::Round(std::max(160.0, SurveyWorth("station") + 70.0 + dist * 0.45));
@@ -843,8 +843,8 @@ bool Simulation::AcceptTrade(const std::string& mode, const std::string& to,
       if (run.mode == mode && run.to == to && run.good == good) { offered = &run; }
     }
     if (offered == nullptr || offered->accepted) { return false; }
-    const Body* destination = catalog_.FindBody(to);
-    const Good* commodity = MarketGood(catalog_, good);
+    const Body* destination = catalog_->FindBody(to);
+    const Good* commodity = MarketGood(*catalog_, good);
     if (destination == nullptr || commodity == nullptr) { return false; }
     trade.crates = offered->crates;
     trade.fee = offered->fee;
@@ -867,7 +867,7 @@ bool Simulation::AcceptTrade(const std::string& mode, const std::string& to,
       lot.risk = commodity->risk;
       lot.contractId = "trade:" + TradeKey(mode, to, good);
       {
-        const std::string systemId = catalog_.BodySystem(*destination);
+        const std::string systemId = catalog_->BodySystem(*destination);
         if (!systemId.empty() &&
             state_.systemSerials.find(systemId) == state_.systemSerials.end()) {
           state_.systemSerials[systemId] = state_.nextSystemSerial++;
@@ -914,8 +914,8 @@ std::vector<TradeContract> Simulation::TradesHere() const {
 // station's own consignment, so it pays its flat fee; a survey run likewise.
 double Simulation::TradePayout(const TradeContract& trade) const {
   if (trade.mode == "delivery" || trade.mode == "station") { return trade.fee; }
-  const Body* destination = catalog_.FindBody(trade.to);
-  const Good* good = MarketGood(catalog_, trade.good);
+  const Body* destination = catalog_->FindBody(trade.to);
+  const Good* good = MarketGood(*catalog_, trade.good);
   if (destination == nullptr || good == nullptr) { return trade.fee; }
   const double market = good->value * trade.crates * TradePays(*destination, trade.good);
   return js::Round(market + trade.freight);
@@ -936,7 +936,7 @@ int Simulation::FreelanceRejectMask(const TradeContract& trade) const {
 
 bool Simulation::HasFreelanceGoods(const TradeContract& trade) const {
   if (trade.mode != "freelance") { return false; }
-  const Good* commodity = MarketGood(catalog_, trade.good);
+  const Good* commodity = MarketGood(*catalog_, trade.good);
   if (commodity == nullptr) { return false; }
   double aboard = 0.0;
   for (const GoodsLot& lot : goods_) {
@@ -978,7 +978,7 @@ bool Simulation::SettleTrade(const std::string& mode, const std::string& to,
                  goods_.end());
   } else if (mode == "freelance") {
     // The player's own lots are the consignment: the run needs the goods aboard.
-    const Good* commodity = MarketGood(catalog_, trade.good);
+    const Good* commodity = MarketGood(*catalog_, trade.good);
     if (commodity == nullptr) { return false; }
     if (!HasFreelanceGoods(trade)) { return false; }
     if (priceTier > 0) {
@@ -1237,12 +1237,12 @@ std::optional<Commission> Simulation::CommissionOffer(const std::string& kind) c
 
     if (kind == "visit") {
       // Iterate ports directly rather than scanning every body in the galaxy.
-      all.reserve(catalog_.ports.size());
-      for (const Port& port : catalog_.ports) {
+      all.reserve(catalog_->ports.size());
+      for (const Port& port : catalog_->ports) {
         if (port.id == map_.here) { continue; }
-        const Body* body = catalog_.FindBody(port.id);
+        const Body* body = catalog_->FindBody(port.id);
         if (body == nullptr) { continue; }
-        const Body* system = catalog_.FindSystem(catalog_.BodySystem(*body));
+        const Body* system = catalog_->FindSystem(catalog_->BodySystem(*body));
         if (system == nullptr) { continue; }
         all.push_back(body);
         if (here != nullptr && system->region == here->region) {
@@ -1253,12 +1253,12 @@ std::optional<Commission> Simulation::CommissionOffer(const std::string& kind) c
       // Scan regional systems first via the O(1) region/system index; only scan
       // the full galaxy when the local region has no eligible targets.
       if (here != nullptr) {
-        const auto& regSystems = catalog_.SystemsInRegion(here->region);
+        const auto& regSystems = catalog_->SystemsInRegion(here->region);
         for (std::size_t sysIdx : regSystems) {
-          const Body& sys = catalog_.systems[sysIdx];
+          const Body& sys = catalog_->systems[sysIdx];
           if (sys.id == curSysId) { continue; }
-          for (std::size_t bodyIdx : catalog_.BodiesInSystem(sys.id)) {
-            const Body& body = catalog_.bodies[bodyIdx];
+          for (std::size_t bodyIdx : catalog_->BodiesInSystem(sys.id)) {
+            const Body& body = catalog_->bodies[bodyIdx];
             if (body.type == "origin") { continue; }
             local.push_back(&body);
             auto sc = state_.scanned.find(body.id);
@@ -1267,10 +1267,10 @@ std::optional<Commission> Simulation::CommissionOffer(const std::string& kind) c
         }
       }
       if (fresh.empty() && local.empty()) {
-        for (const Body& body : catalog_.bodies) {
-          const std::string systemId = catalog_.BodySystem(body);
+        for (const Body& body : catalog_->bodies) {
+          const std::string systemId = catalog_->BodySystem(body);
           if (systemId == curSysId || body.type == "origin") { continue; }
-          if (catalog_.FindSystem(systemId) != nullptr) { all.push_back(&body); }
+          if (catalog_->FindSystem(systemId) != nullptr) { all.push_back(&body); }
         }
       }
     }
@@ -1284,7 +1284,7 @@ std::optional<Commission> Simulation::CommissionOffer(const std::string& kind) c
         double best = 1e18;
         for (const Body* body : all) {
           if (std::find(local.begin(), local.end(), body) != local.end()) { continue; }
-          const Body* system = catalog_.FindSystem(catalog_.BodySystem(*body));
+          const Body* system = catalog_->FindSystem(catalog_->BodySystem(*body));
           if (system == nullptr) { continue; }
           const Body* candidateRegion = FindBodyById(system->region);
           double distance = 1e18;

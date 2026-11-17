@@ -178,12 +178,10 @@ struct Counts {
   int ships = 0;
   int roomsKestrel = 0;
   int roomsWren = 0;
-  int fittedRooms = 0;
   int crew = 0;
   int hires = 0;
   int jobs = 0;
   int orders = 0;
-  int commodities = 0;
   int regions = 0;
   int systems = 0;
   int bodies = 0;

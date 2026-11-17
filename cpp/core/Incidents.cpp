@@ -15,7 +15,7 @@
 namespace ship {
 
 const IncidentType* Simulation::IncidentSpec(const Incident& incident) const {
-  for (const IncidentType& type : catalog_.incidentTypes) {
+  for (const IncidentType& type : catalog_->incidentTypes) {
     if (type.id == incident.type) { return &type; }
   }
   return nullptr;
@@ -137,7 +137,7 @@ void Simulation::TickIncidents() {
   }
 
   // ---- open new ones -----------------------------------------------------
-  for (const IncidentType& spec : catalog_.incidentTypes) {
+  for (const IncidentType& spec : catalog_->incidentTypes) {
     bool exists = false;
     for (const Incident& incident : events_) {
       if (incident.type == spec.id) { exists = true; }
@@ -172,7 +172,7 @@ void Simulation::TickIncidents() {
 bool Simulation::SpawnMapIncident(const std::string& typeId, const std::string& contextNote) {
   if (!state_.gameOver.empty() || events_.size() >= 4) { return false; }
   const IncidentType* spec = nullptr;
-  for (const IncidentType& candidate : catalog_.incidentTypes) {
+  for (const IncidentType& candidate : catalog_->incidentTypes) {
     if (candidate.id == typeId) {
       spec = &candidate;
       break;

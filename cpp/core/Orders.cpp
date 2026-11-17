@@ -41,7 +41,7 @@ double Simulation::JobCost(const std::string& jobId) const {
 
 double Simulation::OrderCostFor(const std::string& jobId, const std::string& orderId) const {
   const Catalog::JobDefinition* job = nullptr;
-  for (const Catalog::JobDefinition& def : catalog_.jobDefs) {
+  for (const Catalog::JobDefinition& def : catalog_->jobDefs) {
     if (def.id == jobId) { job = &def; }
   }
   if (orderId == "doc") { return 1; }
@@ -53,7 +53,7 @@ double Simulation::OrderCostFor(const std::string& jobId, const std::string& ord
 
 double Simulation::OrderFeeFor(const std::string& jobId, const std::string& orderId) const {
   const Catalog::JobDefinition* job = nullptr;
-  for (const Catalog::JobDefinition& def : catalog_.jobDefs) {
+  for (const Catalog::JobDefinition& def : catalog_->jobDefs) {
     if (def.id == jobId) { job = &def; }
   }
   if (job == nullptr) { return 0; }
@@ -71,7 +71,7 @@ double Simulation::CrewCostOf(const CrewMember& crew) const {
   if (sheet == nullptr) { return 0; }
   if (sheet->Has("fire")) { return OrderCostFor(crew.job, "fire"); }
   double total = sheet->hasJob ? JobCost(sheet->job) : 0.0;
-  for (const Catalog::OrderDefinition& order : catalog_.orderDefs) {
+  for (const Catalog::OrderDefinition& order : catalog_->orderDefs) {
     if (sheet->Has(order.id)) { total += OrderCostFor(StagedJob(crew), order.id); }
   }
   return total;
@@ -81,7 +81,7 @@ double Simulation::CrewFeeOf(const CrewMember& crew) const {
   const OrderSheet* sheet = SheetOf(crew);
   if (sheet == nullptr || sheet->Has("fire")) { return 0; }
   double total = 0;
-  for (const Catalog::OrderDefinition& order : catalog_.orderDefs) {
+  for (const Catalog::OrderDefinition& order : catalog_->orderDefs) {
     if (sheet->Has(order.id)) { total += OrderFeeFor(StagedJob(crew), order.id); }
   }
   return total;
@@ -89,7 +89,7 @@ double Simulation::CrewFeeOf(const CrewMember& crew) const {
 
 double Simulation::SheetCost(const CrewMember& crew, const OrderSheet& sheet) const {
   double total = sheet.hasJob ? JobCost(sheet.job) : 0.0;
-  for (const Catalog::OrderDefinition& order : catalog_.orderDefs) {
+  for (const Catalog::OrderDefinition& order : catalog_->orderDefs) {
     if (sheet.Has(order.id)) {
       total += OrderCostFor(sheet.hasJob ? sheet.job : crew.job, order.id);
     }
@@ -124,17 +124,6 @@ bool Simulation::HasPendingLayoff() const {
   return false;
 }
 
-bool Simulation::OrdersRunning() const { return FindOngoing("crew-assign") != nullptr; }
-
-bool Simulation::CrewAvailable(const CrewMember& crew) const {
-  return CrewBusy(crew) == nullptr;
-}
-
-void Simulation::ClearOrders() {
-  orderSheets_.clear();
-  state_.pendingOrders.clear();
-}
-
 bool Simulation::StageJob(const std::string& crewId, const std::string& jobId) {
   CrewMember* crew = FindCrew(crewId);
   if (crew == nullptr) { return false; }
@@ -159,7 +148,7 @@ bool Simulation::ToggleOrder(const std::string& crewId, const std::string& order
     return false;
   }
   bool known = false;
-  for (const Catalog::OrderDefinition& order : catalog_.orderDefs) {
+  for (const Catalog::OrderDefinition& order : catalog_->orderDefs) {
     if (order.id == orderId) { known = true; }
   }
   if (!known) { return false; }
@@ -278,7 +267,7 @@ void Simulation::ApplyJobTo(CrewMember& crew, const std::string& jobId) {
 
 void Simulation::TrainCrew(CrewMember& crew, int steps, const std::string& where) {
   const Catalog::JobDefinition* job = nullptr;
-  for (const Catalog::JobDefinition& def : catalog_.jobDefs) {
+  for (const Catalog::JobDefinition& def : catalog_->jobDefs) {
     if (def.id == crew.job) { job = &def; }
   }
   crew.skill = (crew.skill.empty() || crew.skill == "Untrained") ? "Trained" : "Practised";

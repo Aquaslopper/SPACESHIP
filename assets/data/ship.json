@@ -191,48 +191,6 @@
     ]
   },
   "priceKestrel": 4000,
-  "roomFits": {
-    "r1": [
-      "Medical Bay",
-      "Triage / treatment"
-    ],
-    "r10": [
-      "Fuel Reserve",
-      "Salvage / fuel cells"
-    ],
-    "r11": [
-      "Damage Control",
-      "Emergency hull patching"
-    ],
-    "r13": [
-      "Recreation",
-      "Crew relationships"
-    ],
-    "r2": [
-      "Workshop",
-      "Salvage / repair kits"
-    ],
-    "r5": [
-      "Thermal Control",
-      "Drive cooling"
-    ],
-    "r6": [
-      "Power Bus",
-      "Emergency distribution"
-    ],
-    "r7": [
-      "Shield Array",
-      "Power / shield transfer"
-    ],
-    "r8": [
-      "Hydroponics",
-      "Produce / dry rations"
-    ],
-    "r9": [
-      "Recyclers",
-      "Salvage / O2 canisters"
-    ]
-  },
   "roomScenes": {
     "bridge": {
       "accent": "#dfb85e",
@@ -275,83 +233,6 @@
       "description": "Six berths, lockers and a shared watch board.",
       "glyph": "habitat",
       "label": "Crew quarters"
-    },
-    "r1": {
-      "accent": "#d66d71",
-      "code": "MEDICAL / 05",
-      "description": "A compact care station with monitored recovery beds.",
-      "glyph": "medical",
-      "label": "Triage and treatment"
-    },
-    "r10": {
-      "accent": "#d39a51",
-      "code": "FUEL RESERVE / 17",
-      "description": "A small press recovers one fuel cell from salvage.",
-      "glyph": "cargo",
-      "label": "Cell refinery"
-    },
-    "r11": {
-      "accent": "#d56d5d",
-      "code": "DAMAGE CONTROL / 18",
-      "description": "Brace plates are cut to fit the damaged section.",
-      "glyph": "cargo",
-      "label": "Hull patch station"
-    },
-    "r13": {
-      "accent": "#c68eb4",
-      "code": "RECREATION / 21",
-      "description": "Two crew can share a meal.",
-      "glyph": "habitat",
-      "label": "Common room"
-    },
-    "r2": {
-      "accent": "#ce9564",
-      "code": "WORKSHOP / 09",
-      "description": "Recovered alloys become tools and repair kits.",
-      "glyph": "cargo",
-      "label": "Fabrication bench"
-    },
-    "r5": {
-      "accent": "#e37e57",
-      "code": "THERMAL / 12",
-      "description": "Heat exchangers protect the worn drive.",
-      "glyph": "reactor",
-      "label": "Radiator control"
-    },
-    "r6": {
-      "accent": "#e0b85e",
-      "code": "POWER / 13",
-      "description": "A protected bus routes power between systems.",
-      "glyph": "reactor",
-      "label": "Emergency distribution"
-    },
-    "r7": {
-      "accent": "#6d9fc6",
-      "code": "DEFENCE / 14",
-      "description": "The array trades reserve power for protection.",
-      "glyph": "network",
-      "label": "Shield harmonics"
-    },
-    "r8": {
-      "accent": "#7daf69",
-      "code": "HYDROPONICS / 15",
-      "description": "Produce can be turned into dry rations for the galley.",
-      "glyph": "garden",
-      "label": "Grow beds"
-    },
-    "r9": {
-      "accent": "#69b88a",
-      "code": "RECYCLING / 16",
-      "description": "Salvage is separated into useful life-support stock.",
-      "glyph": "filter",
-      "label": "Material recovery"
-    },
-    "science": {
-      "accent": "#6ebed4",
-      "code": "SCIENCE / 07",
-      "description": "Scans, observations and packaged data are filed here.",
-      "glyph": "orbit",
-      "label": "Survey archive"
     }
   },
   "rooms": {
@@ -402,17 +283,6 @@
       },
       {
         "h": 94,
-        "id": "r1",
-        "name": "Medical Bay",
-        "systems": "Triage / treatment",
-        "tag": "DECK A",
-        "tone": "#fdfbf7",
-        "w": 150,
-        "x": 690,
-        "y": 112
-      },
-      {
-        "h": 94,
         "id": "cargo",
         "name": "Cargo Hold",
         "systems": "Storage - 3 bays",
@@ -421,112 +291,6 @@
         "w": 308,
         "x": 100,
         "y": 240
-      },
-      {
-        "h": 94,
-        "id": "science",
-        "name": "Science Room",
-        "systems": "Survey records / scan logs",
-        "tag": "DECK B",
-        "tone": "#faf7f2",
-        "w": 160,
-        "x": 416,
-        "y": 240
-      },
-      {
-        "h": 94,
-        "id": "r2",
-        "name": "Workshop",
-        "systems": "Salvage / repair kits",
-        "tag": "DECK B",
-        "tone": "#fdfbf7",
-        "w": 158,
-        "x": 682,
-        "y": 240
-      },
-      {
-        "h": 44,
-        "id": "r5",
-        "name": "Thermal Control",
-        "small": true,
-        "systems": "Drive cooling",
-        "tag": "SPINE",
-        "tone": "#faf7f2",
-        "w": 106,
-        "x": 434,
-        "y": 54
-      },
-      {
-        "h": 44,
-        "id": "r6",
-        "name": "Power Bus",
-        "small": true,
-        "systems": "Emergency distribution",
-        "tag": "SPINE",
-        "tone": "#fdfbf7",
-        "w": 106,
-        "x": 548,
-        "y": 54
-      },
-      {
-        "h": 44,
-        "id": "r7",
-        "name": "Shield Array",
-        "small": true,
-        "systems": "Power / shield transfer",
-        "tag": "SPINE",
-        "tone": "#faf7f2",
-        "w": 106,
-        "x": 662,
-        "y": 54
-      },
-      {
-        "h": 44,
-        "id": "r8",
-        "name": "Hydroponics",
-        "small": true,
-        "systems": "Produce / dry rations",
-        "tag": "POD",
-        "tone": "#faf7f2",
-        "w": 106,
-        "x": 252,
-        "y": 366
-      },
-      {
-        "h": 44,
-        "id": "r9",
-        "name": "Recyclers",
-        "small": true,
-        "systems": "Salvage / O2 canisters",
-        "tag": "POD",
-        "tone": "#fdfbf7",
-        "w": 106,
-        "x": 366,
-        "y": 366
-      },
-      {
-        "h": 44,
-        "id": "r10",
-        "name": "Fuel Reserve",
-        "small": true,
-        "systems": "Salvage / fuel cells",
-        "tag": "POD",
-        "tone": "#faf7f2",
-        "w": 106,
-        "x": 480,
-        "y": 366
-      },
-      {
-        "h": 44,
-        "id": "r11",
-        "name": "Damage Control",
-        "small": true,
-        "systems": "Emergency hull patching",
-        "tag": "POD",
-        "tone": "#fdfbf7",
-        "w": 106,
-        "x": 594,
-        "y": 366
       },
       {
         "h": 68,
@@ -538,18 +302,6 @@
         "w": 210,
         "x": 890,
         "y": 196
-      },
-      {
-        "h": 32,
-        "id": "r13",
-        "name": "Recreation",
-        "small": true,
-        "systems": "Crew relationships",
-        "tag": "LENS",
-        "tone": "#fdfbf7",
-        "w": 110,
-        "x": 940,
-        "y": 268
       }
     ],
     "wren": [
@@ -602,18 +354,6 @@
         "y": 86
       },
       {
-        "h": 64,
-        "id": "r1",
-        "name": "Medical Bay",
-        "small": false,
-        "systems": "Triage / treatment",
-        "tag": "DECK A",
-        "tone": "#fdfbf7",
-        "w": 79,
-        "x": 367,
-        "y": 86
-      },
-      {
         "h": 76,
         "id": "cargo",
         "name": "Cargo Hold",
@@ -626,114 +366,6 @@
         "y": 184
       },
       {
-        "h": 76,
-        "id": "science",
-        "name": "Science Room",
-        "small": false,
-        "systems": "Survey records / scan logs",
-        "tag": "DECK B",
-        "tone": "#faf7f2",
-        "w": 97,
-        "x": 144,
-        "y": 184
-      },
-      {
-        "h": 76,
-        "id": "r2",
-        "name": "Workshop",
-        "small": false,
-        "systems": "Salvage / repair kits",
-        "tag": "DECK B",
-        "tone": "#fdfbf7",
-        "w": 100,
-        "x": 346,
-        "y": 184
-      },
-      {
-        "h": 33,
-        "id": "r5",
-        "name": "Thermal Control",
-        "small": true,
-        "systems": "Drive cooling",
-        "tag": "SPINE",
-        "tone": "#faf7f2",
-        "w": 67,
-        "x": 212,
-        "y": 41
-      },
-      {
-        "h": 33,
-        "id": "r6",
-        "name": "Power Bus",
-        "small": true,
-        "systems": "Emergency distribution",
-        "tag": "SPINE",
-        "tone": "#fdfbf7",
-        "w": 67,
-        "x": 283,
-        "y": 41
-      },
-      {
-        "h": 33,
-        "id": "r7",
-        "name": "Shield Array",
-        "small": true,
-        "systems": "Power / shield transfer",
-        "tag": "SPINE",
-        "tone": "#faf7f2",
-        "w": 67,
-        "x": 354,
-        "y": 41
-      },
-      {
-        "h": 65,
-        "id": "r8",
-        "name": "Hydroponics",
-        "small": true,
-        "systems": "Produce / dry rations",
-        "tag": "DECK C",
-        "tone": "#faf7f2",
-        "w": 99,
-        "x": 35,
-        "y": 270
-      },
-      {
-        "h": 65,
-        "id": "r9",
-        "name": "Recyclers",
-        "small": true,
-        "systems": "Salvage / O2 canisters",
-        "tag": "DECK C",
-        "tone": "#fdfbf7",
-        "w": 99,
-        "x": 138,
-        "y": 270
-      },
-      {
-        "h": 65,
-        "id": "r10",
-        "name": "Fuel Reserve",
-        "small": true,
-        "systems": "Salvage / fuel cells",
-        "tag": "DECK C",
-        "tone": "#faf7f2",
-        "w": 99,
-        "x": 241,
-        "y": 270
-      },
-      {
-        "h": 65,
-        "id": "r11",
-        "name": "Damage Control",
-        "small": true,
-        "systems": "Emergency hull patching",
-        "tag": "DECK C",
-        "tone": "#fdfbf7",
-        "w": 99,
-        "x": 344,
-        "y": 270
-      },
-      {
         "h": 58,
         "id": "bridge",
         "name": "Bridge",
@@ -744,18 +376,6 @@
         "w": 122,
         "x": 448,
         "y": 169
-      },
-      {
-        "h": 27,
-        "id": "r13",
-        "name": "Recreation",
-        "small": true,
-        "systems": "Crew relationships",
-        "tag": "LENS",
-        "tone": "#fdfbf7",
-        "w": 74,
-        "x": 465,
-        "y": 230
       }
     ]
   },

@@ -20,8 +20,8 @@ double Simulation::ShipCargoCapacity(const std::string& kind, int level) const {
   }
   const int index = std::max(0, std::min(2, level));
   if (kind == "wren" && index == 0 && !referenceFit_) return 20;
-  auto it = catalog_.cargoByClass.find(kind);
-  if (it == catalog_.cargoByClass.end() || it->second.empty()) {
+  auto it = catalog_->cargoByClass.find(kind);
+  if (it == catalog_->cargoByClass.end() || it->second.empty()) {
     const int values[3] = {kind == "wren" ? 40 : 60, kind == "wren" ? 60 : 90, kind == "wren" ? 90 : 120};
     return values[index];
   }
@@ -48,7 +48,7 @@ bool Simulation::HasRoom(const std::string& id) const {
 bool Simulation::BuyRoom(const std::string& id) {
   if (!state_.gameOver.empty() || !state_.docked || HerePort() == nullptr ||
       state_.shiplets < RoomPrice() || StandardRoom(id) || HasRoom(id)) return false;
-  const DeckPlan& plan = (state_.shipClass == "wren" || state_.shipClass == "explorer-needle" || state_.shipClass == "explorer-manta" || state_.shipClass == "yamato" || state_.shipClass == "arcadia") ? catalog_.wren : catalog_.kestrel;
+  const DeckPlan& plan = (state_.shipClass == "wren" || state_.shipClass == "explorer-needle" || state_.shipClass == "explorer-manta" || state_.shipClass == "yamato" || state_.shipClass == "arcadia") ? catalog_->wren : catalog_->kestrel;
   const Room* room = plan.FindRoom(id);
   if (room == nullptr) return false;
   const std::string name = room->name;
@@ -63,7 +63,7 @@ void Simulation::ApplyShipLayout() {
   // The reference keeps ROOM_BLUEPRINTS as the large plan and SMALL_ROOMS as the
   // compact one, and rewrites every room's box from the plan for the class the
   // voyage is flying. Unrecognised legacy rooms are preserved, not dropped.
-  const DeckPlan& plan = (state_.shipClass == "wren" || state_.shipClass == "explorer-needle" || state_.shipClass == "explorer-manta" || state_.shipClass == "yamato" || state_.shipClass == "arcadia") ? catalog_.wren : catalog_.kestrel;
+  const DeckPlan& plan = (state_.shipClass == "wren" || state_.shipClass == "explorer-needle" || state_.shipClass == "explorer-manta" || state_.shipClass == "yamato" || state_.shipClass == "arcadia") ? catalog_->wren : catalog_->kestrel;
   for (Room& room : rooms_) {
     const Room* authored = plan.FindRoom(room.id);
     if (authored == nullptr) { continue; }
@@ -79,7 +79,7 @@ void Simulation::ApplyShipLayout() {
 bool Simulation::BuyLargerShip(const std::string& kind) {
   auto parked = std::find(state_.parkedShips.begin(), state_.parkedShips.end(), kind);
   const bool switching = parked != state_.parkedShips.end();
-  const double price = switching ? 0 : std::stod(catalog_.shipFields.at(kind).at("price"));
+  const double price = switching ? 0 : std::stod(catalog_->shipFields.at(kind).at("price"));
   if (!state_.docked || HerePort() == nullptr || state_.shipClass == kind ||
       state_.shiplets < price) return false;
   if (switching) state_.parkedShips.erase(parked);
@@ -88,8 +88,8 @@ bool Simulation::BuyLargerShip(const std::string& kind) {
   state_.shiplets -= price;
   state_.moneySpent += price;
   state_.shipClass = kind;
-  auto fields = catalog_.shipFields.find(kind);
-  if (fields != catalog_.shipFields.end()) { ship_.fields = fields->second; }
+  auto fields = catalog_->shipFields.find(kind);
+  if (fields != catalog_->shipFields.end()) { ship_.fields = fields->second; }
   cargo_.capacity = kind == "kestrel"
       ? std::max(cargo_.capacity, ShipCargoCapacity(kind, CargoRefitLevel()))
       : ShipCargoCapacity(kind, CargoRefitLevel());

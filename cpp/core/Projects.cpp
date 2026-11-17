@@ -18,11 +18,10 @@ int Simulation::ProjectLot(const std::string& kind) const {
 
 std::string Simulation::ProjectBlock(const std::string& id) const {
   const ProjectDef* project = nullptr;
-  for (const ProjectDef& candidate : catalog_.projects) {
+  for (const ProjectDef& candidate : catalog_->projects) {
     if (candidate.id == id) { project = &candidate; }
   }
   if (project == nullptr) { return "Unknown project."; }
-  if (!HasRoom(project->room)) return "Install the required room at a space station.";
 
   if (FindOngoing("project-" + id) != nullptr) { return "Already in progress."; }
   if (StatValue("energy") <= project->energy) {
@@ -56,7 +55,7 @@ std::string Simulation::ProjectBlock(const std::string& id) const {
 
 bool Simulation::StartProject(const std::string& id) {
   const ProjectDef* project = nullptr;
-  for (const ProjectDef& candidate : catalog_.projects) {
+  for (const ProjectDef& candidate : catalog_->projects) {
     if (candidate.id == id) { project = &candidate; }
   }
   if (project == nullptr || !state_.gameOver.empty()) { return false; }

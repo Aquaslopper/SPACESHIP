@@ -211,8 +211,6 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     scene.accent = Text(it.value(), "accent", where2);
     catalog.roomScenes[it.key()] = scene;
   }
-  catalog.counts.fittedRooms =
-      static_cast<int>(Field(ship, "roomFits", "ship.json").size());
   catalog.counts.ships = static_cast<int>(Field(ship, "ships", "ship.json").size());
   for (auto it = Field(ship, "cargoByClass", "ship.json").begin();
        it != Field(ship, "cargoByClass", "ship.json").end(); ++it) {
@@ -535,8 +533,6 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
   }
 
   const Json survival = LoadFile(data / "survival.json");
-  catalog.counts.commodities =
-      static_cast<int>(Field(survival, "goods", "survival.json").size());
 
   for (const Json& stat : Field(survival, "stats", "survival.json")) {
     StatDefinition def;
