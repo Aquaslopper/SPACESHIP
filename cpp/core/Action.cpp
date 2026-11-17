@@ -211,9 +211,6 @@ Simulation Simulation::ReferenceVoyage(const Catalog& catalog) {
   return sim;
 }
 
-void Simulation::RestartVoyage() {
-  BeginVoyage(chartSettings_, std::string());
-}
 
 void Simulation::BeginVoyage(const ChartSettings& settings, const std::string& startSystemId) {
   const Options options = state_.options;
