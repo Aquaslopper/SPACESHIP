@@ -57,7 +57,6 @@ Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& se
                                  const std::string& startSystemId) {
   Simulation sim;
   if (!catalog.chartExpanded) { sim.sourceCatalog_ = catalog; }
-  else { sim.sourceCatalog_ = catalog; }
   sim.chartSettings_ = settings;
   sim.catalog_ = sim.sourceCatalog_;
   sim.catalog_.chartExpanded = false;
