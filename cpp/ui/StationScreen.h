@@ -118,6 +118,7 @@ struct StationScreenModel {
   std::string portId;
   std::string portName;
   std::string tip;
+  std::string welcomeLine;
   std::vector<StationColumn> columns;  // Market | Starmap | Trade | Sales | Board | Yard | Tavern
   // The trade card's three buttons and the lists behind them.
   std::vector<TradeMode> tradeModes;
