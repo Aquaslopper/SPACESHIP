@@ -973,7 +973,7 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       screen.hasHero = true;
       if (tab.id == "bridge") {
         screen.stage.id = "bridge";
-        screen.stage.width = 600.0f;
+        screen.stage.width = 660.0f;
         screen.stage.height = 360.0f;
         screen.hasStage = true;
         screen.panels.clear();

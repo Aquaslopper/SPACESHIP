@@ -2923,6 +2923,7 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
   }
 
   if (bridgeStage) {
+    const float bridgeScaleX = scale * (stage.width / 600.0f);
     const Color wall = night ? ToRay(p.chrome) : HexColor("#e8dfd0", ToRay(p.panel2));
     const Color panel = night ? ToRay(p.panel) : HexColor("#f4efe6", ToRay(p.panel));
     const Color metal = night ? ToRay(p.panel3) : HexColor("#d4c6ad", ToRay(p.panel3));
@@ -2931,29 +2932,29 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
     const Color glass{14, 20, 32, 255};
     const Color display{24, 36, 49, 255};
 
-    DrawRectangleRec(Rectangle{origin.x + 7.0f * scale, origin.y + 7.0f * scale,
-                               586.0f * scale, 346.0f * scale}, wall);
-    DrawRectangleRec(Rectangle{origin.x + 15.0f * scale, origin.y + 13.0f * scale,
-                               570.0f * scale, 39.0f * scale}, panel);
-    DrawRectangleLinesEx(Rectangle{origin.x + 15.0f * scale, origin.y + 13.0f * scale,
-                                   570.0f * scale, 39.0f * scale},
+    DrawRectangleRec(Rectangle{origin.x + 7.0f * bridgeScaleX, origin.y + 7.0f * scale,
+                               586.0f * bridgeScaleX, 346.0f * scale}, wall);
+    DrawRectangleRec(Rectangle{origin.x + 15.0f * bridgeScaleX, origin.y + 13.0f * scale,
+                               570.0f * bridgeScaleX, 39.0f * scale}, panel);
+    DrawRectangleLinesEx(Rectangle{origin.x + 15.0f * bridgeScaleX, origin.y + 13.0f * scale,
+                                   570.0f * bridgeScaleX, 39.0f * scale},
                          std::max(1.0f, scale), trim);
     for (int rib = 0; rib < 8; ++rib) {
       const float rx = 25.0f + static_cast<float>(rib) * 78.0f;
-      DrawLineEx(Vector2{origin.x + rx * scale, origin.y + 16.0f * scale},
-                 Vector2{origin.x + (rx + 21.0f) * scale, origin.y + 50.0f * scale},
+      DrawLineEx(Vector2{origin.x + rx * bridgeScaleX, origin.y + 16.0f * scale},
+                 Vector2{origin.x + (rx + 21.0f) * bridgeScaleX, origin.y + 50.0f * scale},
                  std::max(1.0f, scale), trim);
     }
 
-    DrawRectangleRec(Rectangle{origin.x + 94.0f * scale, origin.y + 43.0f * scale,
-                               412.0f * scale, 166.0f * scale}, trim);
-    DrawRectangleRec(Rectangle{origin.x + 101.0f * scale, origin.y + 50.0f * scale,
-                               398.0f * scale, 152.0f * scale}, metal);
-    DrawRectangleRec(Rectangle{origin.x + 109.0f * scale, origin.y + 58.0f * scale,
-                               382.0f * scale, 136.0f * scale}, glass);
-    BeginScissorMode(static_cast<int>(origin.x + 110.0f * scale),
+    DrawRectangleRec(Rectangle{origin.x + 94.0f * bridgeScaleX, origin.y + 43.0f * scale,
+                               412.0f * bridgeScaleX, 166.0f * scale}, trim);
+    DrawRectangleRec(Rectangle{origin.x + 101.0f * bridgeScaleX, origin.y + 50.0f * scale,
+                               398.0f * bridgeScaleX, 152.0f * scale}, metal);
+    DrawRectangleRec(Rectangle{origin.x + 109.0f * bridgeScaleX, origin.y + 58.0f * scale,
+                               382.0f * bridgeScaleX, 136.0f * scale}, glass);
+    BeginScissorMode(static_cast<int>(origin.x + 110.0f * bridgeScaleX),
                      static_cast<int>(origin.y + 59.0f * scale - contentScroll_),
-                     std::max(1, static_cast<int>(380.0f * scale)),
+                     std::max(1, static_cast<int>(380.0f * bridgeScaleX)),
                      std::max(1, static_cast<int>(134.0f * scale)));
     for (int star = 0; star < 48; ++star) {
       const float baseX = std::fmod(static_cast<float>(star) * 83.0f, 380.0f);
@@ -2962,128 +2963,128 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
                               : 0.0f;
       const float starX = 110.0f + std::fmod(baseX + 380.0f - drift, 380.0f);
       const float starY = 64.0f + std::fmod(static_cast<float>(star) * 47.0f, 122.0f);
-      const float px = origin.x + starX * scale;
+      const float px = origin.x + starX * bridgeScaleX;
       const float py = origin.y + starY * scale;
       const float radius = std::max(1.0f, (star % 11 == 0 ? 1.8f : 0.9f) * scale);
       const Color starInk = star % 9 == 0 ? ToRay(p.amber) : ToRay(p.white);
       if (underway && !reduced && star % 5 == 0) {
-        const float trail = (7.0f + static_cast<float>(star % 4) * 4.0f) * scale;
+        const float trail = (7.0f + static_cast<float>(star % 4) * 4.0f) * bridgeScaleX;
         DrawLineEx(Vector2{px, py}, Vector2{px + trail, py}, std::max(1.0f, scale),
                    Fade(starInk, 0.58f));
       }
       DrawCircleV(Vector2{px, py}, radius, Fade(starInk, star % 9 == 0 ? 0.98f : 0.84f));
       if (star % 17 == 0) {
-        DrawLineEx(Vector2{px - 3.0f * scale, py}, Vector2{px + 3.0f * scale, py},
+        DrawLineEx(Vector2{px - 3.0f * bridgeScaleX, py}, Vector2{px + 3.0f * bridgeScaleX, py},
                    std::max(1.0f, scale), Fade(starInk, 0.82f));
         DrawLineEx(Vector2{px, py - 3.0f * scale}, Vector2{px, py + 3.0f * scale},
                    std::max(1.0f, scale), Fade(starInk, 0.82f));
       }
     }
     EndScissorMode();
-    DrawRectangleRec(Rectangle{origin.x + 234.0f * scale, origin.y + 51.0f * scale,
-                               5.0f * scale, 150.0f * scale}, metal);
-    DrawRectangleRec(Rectangle{origin.x + 360.0f * scale, origin.y + 51.0f * scale,
-                               5.0f * scale, 150.0f * scale}, metal);
-    DrawRectangleRec(Rectangle{origin.x + 102.0f * scale, origin.y + 123.0f * scale,
-                               396.0f * scale, 5.0f * scale}, metal);
-    DrawRectangleLinesEx(Rectangle{origin.x + 94.0f * scale, origin.y + 43.0f * scale,
-                                   412.0f * scale, 166.0f * scale},
+    DrawRectangleRec(Rectangle{origin.x + 234.0f * bridgeScaleX, origin.y + 51.0f * scale,
+                               5.0f * bridgeScaleX, 150.0f * scale}, metal);
+    DrawRectangleRec(Rectangle{origin.x + 360.0f * bridgeScaleX, origin.y + 51.0f * scale,
+                               5.0f * bridgeScaleX, 150.0f * scale}, metal);
+    DrawRectangleRec(Rectangle{origin.x + 102.0f * bridgeScaleX, origin.y + 123.0f * scale,
+                               396.0f * bridgeScaleX, 5.0f * scale}, metal);
+    DrawRectangleLinesEx(Rectangle{origin.x + 94.0f * bridgeScaleX, origin.y + 43.0f * scale,
+                                   412.0f * bridgeScaleX, 166.0f * scale},
                          std::max(1.0f, 1.4f * scale), trim);
 
-    DrawRectangleRec(Rectangle{origin.x + 17.0f * scale, origin.y + 56.0f * scale,
-                               69.0f * scale, 222.0f * scale}, panel);
-    DrawRectangleRec(Rectangle{origin.x + 514.0f * scale, origin.y + 56.0f * scale,
-                               69.0f * scale, 222.0f * scale}, panel);
-    DrawRectangleLinesEx(Rectangle{origin.x + 17.0f * scale, origin.y + 56.0f * scale,
-                                   69.0f * scale, 222.0f * scale},
+    DrawRectangleRec(Rectangle{origin.x + 17.0f * bridgeScaleX, origin.y + 56.0f * scale,
+                               69.0f * bridgeScaleX, 222.0f * scale}, panel);
+    DrawRectangleRec(Rectangle{origin.x + 514.0f * bridgeScaleX, origin.y + 56.0f * scale,
+                               69.0f * bridgeScaleX, 222.0f * scale}, panel);
+    DrawRectangleLinesEx(Rectangle{origin.x + 17.0f * bridgeScaleX, origin.y + 56.0f * scale,
+                                   69.0f * bridgeScaleX, 222.0f * scale},
                          std::max(1.0f, scale), trim);
-    DrawRectangleLinesEx(Rectangle{origin.x + 514.0f * scale, origin.y + 56.0f * scale,
-                                   69.0f * scale, 222.0f * scale},
+    DrawRectangleLinesEx(Rectangle{origin.x + 514.0f * bridgeScaleX, origin.y + 56.0f * scale,
+                                   69.0f * bridgeScaleX, 222.0f * scale},
                          std::max(1.0f, scale), trim);
     for (int side = 0; side < 2; ++side) {
       const float sx = side == 0 ? 24.0f : 522.0f;
-      DrawRectangleRec(Rectangle{origin.x + sx * scale, origin.y + 69.0f * scale,
-                                 55.0f * scale, 66.0f * scale}, glass);
-      DrawRectangleLinesEx(Rectangle{origin.x + sx * scale, origin.y + 69.0f * scale,
-                                     55.0f * scale, 66.0f * scale},
+      DrawRectangleRec(Rectangle{origin.x + sx * bridgeScaleX, origin.y + 69.0f * scale,
+                                 55.0f * bridgeScaleX, 66.0f * scale}, glass);
+      DrawRectangleLinesEx(Rectangle{origin.x + sx * bridgeScaleX, origin.y + 69.0f * scale,
+                                     55.0f * bridgeScaleX, 66.0f * scale},
                            std::max(1.0f, scale), trim);
-      DrawRectangleRec(Rectangle{origin.x + (sx + 5.0f) * scale, origin.y + 145.0f * scale,
-                                 45.0f * scale, 42.0f * scale}, display);
-      DrawRectangleLinesEx(Rectangle{origin.x + (sx + 5.0f) * scale, origin.y + 145.0f * scale,
-                                     45.0f * scale, 42.0f * scale},
+      DrawRectangleRec(Rectangle{origin.x + (sx + 5.0f) * bridgeScaleX, origin.y + 145.0f * scale,
+                                 45.0f * bridgeScaleX, 42.0f * scale}, display);
+      DrawRectangleLinesEx(Rectangle{origin.x + (sx + 5.0f) * bridgeScaleX, origin.y + 145.0f * scale,
+                                     45.0f * bridgeScaleX, 42.0f * scale},
                            std::max(1.0f, scale), trim);
       for (int row = 0; row < 3; ++row) {
         for (int col = 0; col < 4; ++col) {
           const Color key = (row + col) % 4 == 0 ? ToRay(p.amber) : metal;
-          DrawRectangleRec(Rectangle{origin.x + (sx + 4.0f + col * 12.0f) * scale,
+          DrawRectangleRec(Rectangle{origin.x + (sx + 4.0f + col * 12.0f) * bridgeScaleX,
                                      origin.y + (194.0f + row * 12.0f) * scale,
-                                     7.0f * scale, 6.0f * scale}, key);
+                                     7.0f * bridgeScaleX, 6.0f * scale}, key);
         }
       }
     }
 
-    DrawLineEx(Vector2{origin.x + 87.0f * scale, origin.y + 54.0f * scale},
-               Vector2{origin.x + 101.0f * scale, origin.y + 81.0f * scale},
+    DrawLineEx(Vector2{origin.x + 87.0f * bridgeScaleX, origin.y + 54.0f * scale},
+               Vector2{origin.x + 101.0f * bridgeScaleX, origin.y + 81.0f * scale},
                std::max(1.0f, 2.0f * scale), trim);
-    DrawLineEx(Vector2{origin.x + 513.0f * scale, origin.y + 54.0f * scale},
-               Vector2{origin.x + 499.0f * scale, origin.y + 81.0f * scale},
+    DrawLineEx(Vector2{origin.x + 513.0f * bridgeScaleX, origin.y + 54.0f * scale},
+               Vector2{origin.x + 499.0f * bridgeScaleX, origin.y + 81.0f * scale},
                std::max(1.0f, 2.0f * scale), trim);
-    DrawLineEx(Vector2{origin.x + 18.0f * scale, origin.y + 278.0f * scale},
-               Vector2{origin.x + 582.0f * scale, origin.y + 278.0f * scale},
+    DrawLineEx(Vector2{origin.x + 18.0f * bridgeScaleX, origin.y + 278.0f * scale},
+               Vector2{origin.x + 582.0f * bridgeScaleX, origin.y + 278.0f * scale},
                std::max(1.0f, scale), trim);
 
     const Color seat = night ? ToRay(p.panel2) : HexColor("#e0d4bf", ToRay(p.panel2));
-    DrawRectangleRounded(Rectangle{origin.x + 188.0f * scale, origin.y + 160.0f * scale,
-                                   42.0f * scale, 67.0f * scale},
+    DrawRectangleRounded(Rectangle{origin.x + 184.0f * bridgeScaleX, origin.y + 190.0f * scale,
+                                   34.0f * bridgeScaleX, 40.0f * scale},
                          0.16f, 6, seat);
-    DrawRectangleRoundedLinesEx(Rectangle{origin.x + 188.0f * scale, origin.y + 160.0f * scale,
-                                          42.0f * scale, 67.0f * scale},
+    DrawRectangleRoundedLinesEx(Rectangle{origin.x + 184.0f * bridgeScaleX, origin.y + 190.0f * scale,
+                                          34.0f * bridgeScaleX, 40.0f * scale},
                                 0.16f, 6, std::max(1.0f, scale), trim);
-    DrawRectangleRounded(Rectangle{origin.x + 271.0f * scale, origin.y + 145.0f * scale,
-                                   58.0f * scale, 86.0f * scale},
+    DrawRectangleRounded(Rectangle{origin.x + 279.0f * bridgeScaleX, origin.y + 188.0f * scale,
+                                   42.0f * bridgeScaleX, 42.0f * scale},
                          0.16f, 6, seat);
-    DrawRectangleRoundedLinesEx(Rectangle{origin.x + 271.0f * scale, origin.y + 145.0f * scale,
-                                          58.0f * scale, 86.0f * scale},
+    DrawRectangleRoundedLinesEx(Rectangle{origin.x + 279.0f * bridgeScaleX, origin.y + 188.0f * scale,
+                                          42.0f * bridgeScaleX, 42.0f * scale},
                                 0.16f, 6, std::max(1.0f, scale), trim);
-    DrawRectangleRounded(Rectangle{origin.x + 370.0f * scale, origin.y + 160.0f * scale,
-                                   42.0f * scale, 67.0f * scale},
+    DrawRectangleRounded(Rectangle{origin.x + 382.0f * bridgeScaleX, origin.y + 190.0f * scale,
+                                   34.0f * bridgeScaleX, 40.0f * scale},
                          0.16f, 6, seat);
-    DrawRectangleRoundedLinesEx(Rectangle{origin.x + 370.0f * scale, origin.y + 160.0f * scale,
-                                          42.0f * scale, 67.0f * scale},
+    DrawRectangleRoundedLinesEx(Rectangle{origin.x + 382.0f * bridgeScaleX, origin.y + 190.0f * scale,
+                                          34.0f * bridgeScaleX, 40.0f * scale},
                                 0.16f, 6, std::max(1.0f, scale), trim);
-    DrawRectangleRec(Rectangle{origin.x + 204.0f * scale, origin.y + 224.0f * scale,
-                               10.0f * scale, 23.0f * scale}, trim);
-    DrawRectangleRec(Rectangle{origin.x + 294.0f * scale, origin.y + 226.0f * scale,
-                               12.0f * scale, 25.0f * scale}, trim);
-    DrawRectangleRec(Rectangle{origin.x + 386.0f * scale, origin.y + 224.0f * scale,
-                               10.0f * scale, 23.0f * scale}, trim);
+    DrawRectangleRec(Rectangle{origin.x + 197.0f * bridgeScaleX, origin.y + 228.0f * scale,
+                               8.0f * bridgeScaleX, 14.0f * scale}, trim);
+    DrawRectangleRec(Rectangle{origin.x + 296.0f * bridgeScaleX, origin.y + 228.0f * scale,
+                               8.0f * bridgeScaleX, 14.0f * scale}, trim);
+    DrawRectangleRec(Rectangle{origin.x + 395.0f * bridgeScaleX, origin.y + 228.0f * scale,
+                               8.0f * bridgeScaleX, 14.0f * scale}, trim);
 
-    PaintChamferBoxRay(Area{origin.x + 143.0f * scale, origin.y + 242.0f * scale,
-                            314.0f * scale, 63.0f * scale},
+    PaintChamferBoxRay(Area{origin.x + 143.0f * bridgeScaleX, origin.y + 242.0f * scale,
+                            314.0f * bridgeScaleX, 63.0f * scale},
                        5.0f * scale, console, trim, ToRay(p.border));
-    DrawRectangleRec(Rectangle{origin.x + 164.0f * scale, origin.y + 251.0f * scale,
-                               272.0f * scale, 37.0f * scale}, display);
-    DrawRectangleLinesEx(Rectangle{origin.x + 164.0f * scale, origin.y + 251.0f * scale,
-                                   272.0f * scale, 37.0f * scale},
+    DrawRectangleRec(Rectangle{origin.x + 164.0f * bridgeScaleX, origin.y + 251.0f * scale,
+                               272.0f * bridgeScaleX, 37.0f * scale}, display);
+    DrawRectangleLinesEx(Rectangle{origin.x + 164.0f * bridgeScaleX, origin.y + 251.0f * scale,
+                                   272.0f * bridgeScaleX, 37.0f * scale},
                          std::max(1.0f, scale), trim);
     for (int key = 0; key < 14; ++key) {
       const float kx = 173.0f + static_cast<float>(key) * 18.0f;
       const Color keyInk = key % 5 == 0 ? ToRay(p.sage) : ToRay(p.amber);
-      DrawRectangleRec(Rectangle{origin.x + kx * scale, origin.y + 256.0f * scale,
-                                 8.0f * scale, 6.0f * scale}, keyInk);
-      DrawLineEx(Vector2{origin.x + kx * scale, origin.y + 274.0f * scale},
-                 Vector2{origin.x + (kx + 12.0f) * scale, origin.y + 274.0f * scale},
+      DrawRectangleRec(Rectangle{origin.x + kx * bridgeScaleX, origin.y + 256.0f * scale,
+                                 8.0f * bridgeScaleX, 6.0f * scale}, keyInk);
+      DrawLineEx(Vector2{origin.x + kx * bridgeScaleX, origin.y + 274.0f * scale},
+                 Vector2{origin.x + (kx + 12.0f) * bridgeScaleX, origin.y + 274.0f * scale},
                  std::max(1.0f, scale), metal);
     }
-    DrawRectangleRec(Rectangle{origin.x + 18.0f * scale, origin.y + 314.0f * scale,
-                               564.0f * scale, 31.0f * scale}, wall);
-    DrawRectangleLinesEx(Rectangle{origin.x + 18.0f * scale, origin.y + 314.0f * scale,
-                                   564.0f * scale, 31.0f * scale},
+    DrawRectangleRec(Rectangle{origin.x + 18.0f * bridgeScaleX, origin.y + 314.0f * scale,
+                               564.0f * bridgeScaleX, 31.0f * scale}, wall);
+    DrawRectangleLinesEx(Rectangle{origin.x + 18.0f * bridgeScaleX, origin.y + 314.0f * scale,
+                                   564.0f * bridgeScaleX, 31.0f * scale},
                          std::max(1.0f, scale), trim);
     for (int floorLine = 0; floorLine < 9; ++floorLine) {
       const float fx = 28.0f + static_cast<float>(floorLine) * 68.0f;
-      DrawLineEx(Vector2{origin.x + fx * scale, origin.y + 317.0f * scale},
-                 Vector2{origin.x + (fx + 31.0f) * scale, origin.y + 342.0f * scale},
+      DrawLineEx(Vector2{origin.x + fx * bridgeScaleX, origin.y + 317.0f * scale},
+                 Vector2{origin.x + (fx + 31.0f) * bridgeScaleX, origin.y + 342.0f * scale},
                  std::max(1.0f, scale), ToRay(p.border));
     }
   }
@@ -7759,10 +7760,9 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
     const float panelH = std::max({280.0f,
                                    MeasurePanelHeight(screen.panels[2], feedW),
                                    MeasurePanelHeight(screen.panels[1], rightW)});
-    const float fitScale = std::min(
-        1.0f, std::min((imageW - 12.0f) / screen.stage.width,
-                       (layout_.content.Bottom() - imageTop - panelH - 24.0f) /
-                           screen.stage.height));
+    const float fitScale = std::min((imageW - 12.0f) / screen.stage.width,
+                                    (layout_.content.Bottom() - imageTop - panelH - 24.0f) /
+                                        screen.stage.height);
     TaskStage bridgeStage = screen.stage;
     bridgeStage.typePx = theme_.FontPx() / fitScale;
     const float scale = StageScale(bridgeStage, theme_);
