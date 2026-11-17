@@ -630,8 +630,6 @@ int main(int argc, char** argv) {
   SelectImGuiFont(fonts, sim.State().options.fontStep, sim.State().options.largeText);
   ship::ui::ApplyPalette(theme);
 
-  Texture2D bridgeTexture = LoadTexture((assets / "art" / "rooms" / "bridge.png").string().c_str());
-  SetTextureFilter(bridgeTexture, TEXTURE_FILTER_BILINEAR);
   Texture2D titleTexture = LoadTitleTexture(assets);
   Texture2D setupTexture = LoadSetupTexture(assets);
   Texture2D splashTexture = LoadSplashTexture(assets);
@@ -693,7 +691,6 @@ int main(int argc, char** argv) {
   ship::ShellView shell;
   shell.SetSaveDir(saveDir.u8string());
   shell.SetFonts(fonts.body, fonts.bold, fonts.mono);
-  shell.bridgeArt = &bridgeTexture;
   shell.SetTitleTexture(&titleTexture);
   shell.SetSetupTexture(&setupTexture);
   shell.SetSplashTexture(&splashTexture);
@@ -892,7 +889,6 @@ int main(int argc, char** argv) {
   rlImGuiShutdown();
   display.Shutdown();
   shell.ReleaseGraphics();
-  if (bridgeTexture.id != 0) UnloadTexture(bridgeTexture);
   if (titleTexture.id != 0) { UnloadTexture(titleTexture); }
   if (setupTexture.id != 0) { UnloadTexture(setupTexture); }
   if (splashTexture.id != 0) { UnloadTexture(splashTexture); }
