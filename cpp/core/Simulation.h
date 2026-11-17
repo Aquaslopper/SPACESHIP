@@ -60,11 +60,8 @@ class Simulation {
   static Simulation ReferenceVoyage(const Catalog& catalog);
 
   void PerformAction(const std::string& detail = std::string());
-  void RestartVoyage();
   void BeginVoyage(const ChartSettings& settings, const std::string& startSystemId);
-  const ChartSettings& VoyageChart() const { return chartSettings_; }
-
-
+  
   void ProAction(double n);
   void FreeCommit(const std::string& detail = std::string());
 
@@ -96,7 +93,7 @@ class Simulation {
   std::vector<GoodsLot>& MutableGoods() { return goods_; }
   const std::vector<Incident>& Events() const { return events_; }
   const std::vector<GoodsLot>& Goods() const { return goods_; }
-  const Catalog& World() const { return catalog_; }
+  const Catalog& World() const { return *catalog_; }
   const MapView& Map() const { return map_; }
   MapView& MutableMap() { return map_; }
   const std::map<std::string, LayerView>& Views() const { return views_; }
@@ -153,8 +150,6 @@ class Simulation {
   void ClearOrders();
   int OrderedCount() const;
   bool HasPendingLayoff() const;
-  bool OrdersRunning() const;
-  bool CrewAvailable(const CrewMember& crew) const;
   double JobCost(const std::string& jobId) const;
   double OrderCostFor(const std::string& jobId, const std::string& orderId) const;
   double OrderCost(const CrewMember& crew, const std::string& orderId) const;
