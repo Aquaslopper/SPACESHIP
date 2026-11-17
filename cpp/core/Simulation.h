@@ -387,8 +387,8 @@ class Simulation {
   void AutoFilters();
   void AutoMess();
 
-  Catalog catalog_;
-  Catalog sourceCatalog_;
+  std::shared_ptr<const Catalog> catalog_ = std::make_shared<const Catalog>();
+  std::shared_ptr<const Catalog> sourceCatalog_;
   ChartSettings chartSettings_;
   Rules rules_;
   GameState state_;
