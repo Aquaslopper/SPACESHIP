@@ -533,8 +533,6 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
   }
 
   const Json survival = LoadFile(data / "survival.json");
-  catalog.counts.commodities =
-      static_cast<int>(Field(survival, "goods", "survival.json").size());
 
   for (const Json& stat : Field(survival, "stats", "survival.json")) {
     StatDefinition def;
