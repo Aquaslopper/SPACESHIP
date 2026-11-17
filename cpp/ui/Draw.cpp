@@ -757,13 +757,14 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   if (sim.State().activeTab != "home" && screenPanels_ &&
       panelsKind_ == ScreenKind::Station && !taskScreen_.welcomeLine.empty()) {
     const Palette& p = theme_.palette;
-    const int size = TypePx(10);
-    const float lineH = theme_.LineHeight();
-    const float pad = 12.0f;
-    const float gap = 12.0f;
-    const float colW = (layout_.content.w - 32.0f) / 3.0f;
-    const float outerW =
-        std::min(std::clamp(colW, 320.0f, 460.0f), std::max(240.0f, layout_.content.w - 16.0f));
+    const float pad = 22.0f;
+    const float gap = 24.0f;
+    const float btnGap = 16.0f;
+    const float bottomEdge = std::min(layout_.content.Bottom(), actionBandTop_) - 14.0f;
+    const float availW = std::max(260.0f, layout_.content.w - 24.0f);
+    const float availH = std::max(220.0f, bottomEdge - (layout_.content.y + 12.0f));
+    const float outerW = std::min(
+        std::clamp(std::round(layout_.content.w * 0.62f), 580.0f, 1060.0f), availW);
     const auto moeIt = crewArt_.find("moetorial");
     const Texture2D* moe =
         (moeIt != crewArt_.end() && moeIt->second != nullptr)
@@ -772,25 +773,31 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
     const bool hasMoe = moe != nullptr && moe->id != 0 && moe->width > 0 && moe->height > 0;
     const float aspect =
         hasMoe ? static_cast<float>(moe->height) / static_cast<float>(moe->width) : 1.336f;
-    const float portraitW = std::min(132.0f, std::max(72.0f, std::round(outerW * 0.31f)));
+    const float maxPortraitH = std::max(96.0f, availH - 2.0f * pad);
+    const float portraitW =
+        std::min(std::min(420.0f, std::max(140.0f, std::round(outerW * 0.40f))),
+                 std::floor(maxPortraitH / aspect));
     const float portraitH = std::round(portraitW * aspect);
-    const float textW = std::max(60.0f, outerW - 2.0f * pad - gap - portraitW);
-    const auto wrapped = WrapText(taskScreen_.welcomeLine, textW, size, SelectFont(size, false));
+    const float textW = std::max(80.0f, outerW - 2.0f * pad - gap - portraitW);
+    const int size =
+        std::clamp(std::max(TypePx(15), static_cast<int>(std::lround(outerW * 0.032f))), 21, 32);
+    const float lineH = Theme::LineHeightForPx(static_cast<float>(size));
+    const auto wrapped = WrapText(taskScreen_.welcomeLine, textW, size, bodyFont_);
     const float textH = static_cast<float>(wrapped.size()) * lineH;
     const char* btnLabel = "Continue";
-    const float btnW = TextWidth(btnLabel, size) + 22.0f;
-    const float btnH = lineH + 8.0f;
-    const float bodyH = std::max(portraitH, textH);
-    const float outerH = pad + bodyH + 10.0f + btnH + pad;
-    const float outerX = layout_.content.Right() - 8.0f - outerW;
-    const float bottomEdge = std::min(layout_.content.Bottom(), actionBandTop_) - 14.0f;
-    const float outerY = std::max(layout_.content.y + 8.0f, bottomEdge - outerH);
+    const float btnTextW = MeasureTextEx(bodyFont_, btnLabel, static_cast<float>(size), 1.0f).x;
+    const float btnW = std::min(textW, btnTextW + std::round(static_cast<float>(size) * 1.9f));
+    const float btnH = lineH + std::round(static_cast<float>(size) * 0.6f);
+    const float bodyH = std::max(portraitH, textH + btnGap + btnH);
+    const float outerH = pad + bodyH + pad;
+    const float outerX = layout_.content.Right() - 12.0f - outerW;
+    const float outerY = std::max(layout_.content.y + 12.0f, bottomEdge - outerH);
     const Area outer{std::round(outerX), std::round(outerY), std::round(outerW), std::round(outerH)};
     const Area portraitBox{std::round(outer.Right() - pad - portraitW),
-                           std::round(outer.y + pad),
+                           std::round(outer.Bottom() - pad - portraitH),
                            std::round(portraitW), std::round(portraitH)};
     const Area btnBox{std::round(outer.x + pad),
-                      std::round(outer.y + pad + bodyH + 10.0f),
+                      std::round(outer.Bottom() - pad - btnH),
                       std::round(btnW), std::round(btnH)};
 
     if (gFlare.out != nullptr) {
@@ -802,8 +809,8 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
 
     float ty = outer.y + pad;
     for (const std::string& row : wrapped) {
-      Text(row.c_str(), static_cast<int>(outer.x + pad), static_cast<int>(ty),
-           size, ToRay(p.ink));
+      DrawTextEx(bodyFont_, row.c_str(), Vector2{std::round(outer.x + pad), std::round(ty)},
+                 static_cast<float>(size), 1.0f, ToRay(p.ink));
       ty += lineH;
     }
 
@@ -847,10 +854,10 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
         popupKey_.empty() && !LossVisible(sim) && btnBox.Contains(mouseX_, mouseY_);
     PaintChamferBoxRay(btnBox, kChamferSmall, ToRay(btnHover ? p.panel3 : p.control),
                        ToRay(p.borderDark), ToRay(p.border));
-    const float btnTextW = TextWidth(btnLabel, size);
-    Text(btnLabel, static_cast<int>(std::round(btnBox.x + (btnBox.w - btnTextW) * 0.5f)),
-         static_cast<int>(std::round(btnBox.y + (btnBox.h - lineH) * 0.5f)),
-         size, ToRay(p.ink));
+    DrawTextEx(bodyFont_, btnLabel,
+               Vector2{std::round(btnBox.x + (btnBox.w - btnTextW) * 0.5f),
+                       std::round(btnBox.y + (btnBox.h - lineH) * 0.5f)},
+               static_cast<float>(size), 1.0f, ToRay(p.ink));
 
     stationWelcomeBox_ = outer;
     stationWelcomeContinue_ = btnBox;
