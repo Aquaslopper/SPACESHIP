@@ -324,28 +324,26 @@ void main() {
   vec2 p = fragTexCoord * 2.0 - 1.0;
   float ax = abs(p.x);
   float ay = abs(p.y);
-  float edge = clamp((1.0 - d) / 0.4, 0.0, 1.0);
+  float edge = smoothstep(0.98, 0.40, max(ax, ay));
   if (edge <= 0.0001) discard;
   float hTaper = clamp(1.0 - pow(ax, 2.2), 0.0, 1.0);
   vec2 cp = vec2(p.x * 0.95, p.y);
   float r2 = dot(cp, cp);
   float core = exp(-r2 * 120.0) * 1.8;
   float innerGlow = exp(-r2 * 14.0)  * 0.35;
-  float outerBloom = exp(-sqrt(r2) * 4.5) * 0.15;
-  float laserSharpness = 400.0 + ax * 900.0;
-  float yLine = exp(-ay * ay * laserSharpness) * 1.4;
-  float yBloom = exp(-ay * ay * 65.0) * 0.18;
-  float streakShape = (yLine + yBloom) * hTaper;
+  float outerBloom = exp(-sqrt(r2) * 3.0) * 0.35;
+  float yLine = exp(-ay * ay * 220.0) * 1.0;
+  float yBloom = exp(-ay * ay * 22.0) * 0.35;
+  float streakShape = yLine + yBloom;
   float sR = exp(-ax * 2.5) * streakShape;
   float sG = exp(-ax * 0.8) * streakShape;
   float sB = exp(-ax * 0.3) * streakShape;
-  vec3 bloomCol = fragColor.rgb * innerGlow;
-  vec3 streakCol = vec3(sR * 0.25, sG * 1.25, sB * 2.6) * fragColor.rgb
-  vec3 coreCol = vec3(1.0, 1.0, 1.0) * core;
-  vec3 col = bloomCol + streakCol + coreCol;
+  vec3 bloom = fragColor.rgb * (innerGlow + outerBloom);
+  vec3 streak = vec3(sR * 0.25, sG * 1.1, sB * 2.2) * fragColor.rgb;
+  vec3 col = bloom + streak + vec3(1.0, 0.98, 0.92) * core;
   float gain = fragColor.a * uFlareGain * edge;
   vec3 emit = vec3(1.0) - exp(-col * gain);
-  float a = clamp(max(emit.r, max(emit.g, emit.b)) * 1.15, 0.0, 1.0);
+  float a = clamp(max(emit.r, max(emit.g, emit.b)) * 0.9, 0.0, 0.95);
   finalColor = vec4(emit, a);
 }
 )GLSL";
