@@ -330,13 +330,13 @@ void main() {
   float core = exp(-r2 * 120.0) * 1.8;
   float innerGlow = exp(-r2 * 14.0)  * 0.35;
   float outerBloom = exp(-sqrt(r2) * 3.0) * 0.35;
-  float yLine = exp(-ay * ay * 220.0) * 1.0;
-  float yBloom = exp(-ay * ay * 22.0) * 0.35;
+  float yLine = exp(-ay * ay * 420.0) * 1.0;
+  float yBloom = exp(-ay * ay * 70.0) * 0.35;
   float sR = exp(-pow(ax * 1.60, 1.10) * 2.2) * (yLine + yBloom * 0.40);
   float sG = exp(-pow(ax * 0.75, 1.10) * 1.2) * (yLine + yBloom * 0.80);
   float sB = exp(-pow(ax * 0.45, 1.10) * 0.9) * (yLine + yBloom * 1.00);
   vec3 bloom = vec3(innerGlow + outerBloom);
-  vec3 streak = vec3(sR * 0.25, sG * 1.1, sB * 2.2);
+  vec3 streak = vec3(sR * 0.85, sG * 1.05, sB * 1.25);
   vec3 col = bloom + streak + vec3(1.0, 0.98, 0.92) * core;
   float gain = max(fragColor.a * uFlareGain * edge, 0.0);
   vec3 emit = vec3(1.0) - exp(-col * gain);
@@ -364,7 +364,7 @@ void main() {
   }
   bool Ready() const { return shaderReady_ && IsRenderTextureValid(target_); }
   void Begin() const { BeginTextureMode(target_); }
-  static constexpr float kFlareTailPx = 58.0f;  // horizontal flare half-length in px
+  static constexpr float kFlareTailPx = 110.0f;  // horizontal flare half-length in px
 
   void End(double gamma, double brightness, float waveTime, float waveDirX, float waveDirY,
            float intensity, float optionScale, float warmBias, float colorShift, float glow,
@@ -460,8 +460,8 @@ void main() {
         bool merged = false;
         for (Spot& e : spots_) {
           if (e.kind == t.kind &&
-              (t.x0 - e.x) * (t.x0 - e.x) + (t.y0 - e.y) * (t.y0 - e.y) < 196.0f) {
-            if (s > e.strength) { e.x = t.x0; e.y = t.y0; e.strength = s; }
+              (t.x0 - e.x) * (t.x0 - e.x) + (t.y0 - e.y) * (t.y0 - e.y) < 4.0f) {
+            if (s > e.strength) { e.strength = s; }
             merged = true;
             break;
           }
@@ -507,7 +507,7 @@ void main() {
     for (const Spot& s : spots_) {
       rlCheckRenderBatchLimit(4);
       const float rx = kFlareTailPx * s.scale;
-      const float ry = std::max(14.0f, rx * 0.48f);
+      const float ry = std::max(10.0f, rx * 0.24f);
       const unsigned char ca = static_cast<unsigned char>(std::lround(s.strength * 255.0f));
       rlColor4ub(cr, cg, cb, ca);
       rlTexCoord2f(0.0f, 0.0f); rlVertex2f(s.x - rx, s.y - ry);
