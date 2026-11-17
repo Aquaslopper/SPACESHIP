@@ -123,6 +123,7 @@ class Catalog {
   std::vector<OrbitalWorld> orbitalWorlds;
   std::vector<std::string> orbitalPlanetNames;
   std::vector<std::string> orbitalMoonNames;
+  std::vector<std::string> moespeak;
 
   std::vector<std::string> taskTypes;
   std::vector<std::string> layerOrder;               // system, sector, galaxy

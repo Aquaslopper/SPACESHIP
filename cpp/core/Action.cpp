@@ -4,8 +4,11 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <ctime>
+#include <random>
 #include <utility>
 
 namespace ship {
@@ -177,6 +180,17 @@ Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& se
   state.fuelCells = 6;
   state.repairKits = 3;
   state.lotSerial = 0;
+  {
+    static std::uint64_t seq = 0;
+    std::random_device rd;
+    const auto steady = static_cast<std::uint64_t>(
+        std::chrono::steady_clock::now().time_since_epoch().count());
+    const auto sys = static_cast<std::uint64_t>(
+        std::chrono::system_clock::now().time_since_epoch().count());
+    state.welcomeSalt = (static_cast<std::uint64_t>(rd()) << 32) ^
+                        static_cast<std::uint64_t>(rd()) ^ steady ^ (sys << 17) ^
+                        ((++seq) * 0x9e3779b97f4a7c15ULL);
+  }
   state.gameOver.clear();
   state.contracts["arrival"] = "active";
 

@@ -439,6 +439,13 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
   catalog.counts.themes = static_cast<int>(Field(content, "themes", "content.json").size());
   catalog.counts.taskTypes = static_cast<int>(catalog.taskTypes.size());
 
+  const Json moespeak = LoadFile(data / "moespeak.json");
+  for (const Json& line : Field(moespeak, "lines", "moespeak.json")) {
+    if (line.is_string() && !line.get<std::string>().empty()) {
+      catalog.moespeak.push_back(line.get<std::string>());
+    }
+  }
+
   // ---- crew and survival (counted now, consumed from Phase 1) ------------
   const Json crew = LoadFile(data / "crew.json");
   for (const Json& member : Field(crew, "crew", "crew.json")) {

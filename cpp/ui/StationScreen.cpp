@@ -24,6 +24,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <map>
 #include <set>
 
@@ -245,10 +246,36 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
     const std::string welcomeKey = systemId.empty() ? portId : (systemId + "#" + portId);
     const auto welcomeIt = sim.State().stationWelcome.find(welcomeKey);
     const int welcomeStep = welcomeIt == sim.State().stationWelcome.end() ? 0 : welcomeIt->second;
+    const auto& pool = sim.World().moespeak;
+    std::string line1;
+    std::string line2;
+    if (!pool.empty()) {
+      std::uint64_t h = sim.State().welcomeSalt ^ 0xcbf29ce484222325ULL;
+      for (unsigned char c : welcomeKey) {
+        h ^= c;
+        h *= 0x100000001b3ULL;
+      }
+      h ^= h >> 30;
+      h *= 0xbf58476d1ce4e5b9ULL;
+      h ^= h >> 27;
+      h *= 0x94d049bb133111ebULL;
+      h ^= h >> 31;
+      std::uint64_t h2 = h + 0x9e3779b97f4a7c15ULL;
+      h2 = (h2 ^ (h2 >> 30)) * 0xbf58476d1ce4e5b9ULL;
+      h2 = (h2 ^ (h2 >> 27)) * 0x94d049bb133111ebULL;
+      h2 ^= h2 >> 31;
+      const std::size_t first = static_cast<std::size_t>(h % pool.size());
+      const std::size_t second =
+          pool.size() > 1
+              ? (first + 1 + static_cast<std::size_t>(h2 % (pool.size() - 1))) % pool.size()
+              : first;
+      line1 = pool[first];
+      line2 = pool[second];
+    }
     const std::string welcomeLines[3] = {
         "Welcome to the Spacestation " + model.portName + " [" + model.portId + "].",
-        "Make some money through trade contracts or freelancer jobs, but you have to buy the goods yourself.",
-        "Always have enough fuel cells with you.",
+        line1,
+        line2,
     };
     if (welcomeStep >= 0 && welcomeStep < 3) {
       model.welcomeLine = welcomeLines[welcomeStep];
