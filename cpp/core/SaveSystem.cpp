@@ -315,12 +315,6 @@ std::string Simulation::SaveJson() const {
   for (const auto& entry : state_.visitedPorts) { visited[entry.first] = entry.second; }
   s["visitedPorts"] = visited;
 
-  Json stationWelcome = Json::object();
-  for (const auto& entry : state_.stationWelcome) {
-    stationWelcome[entry.first] = Num(entry.second);
-  }
-  s["stationWelcome"] = stationWelcome;
-
   Json trades = Json::array();
   for (const TradeContract& trade : state_.trades) {
     trades.push_back(Json{{"mode", trade.mode},
@@ -1124,14 +1118,6 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     state_.visitedPorts.clear();
     if (auto it = s.find("visitedPorts"); it != s.end() && it->is_object()) {
       readBoolMap(*it, &state_.visitedPorts);
-    }
-    state_.stationWelcome.clear();
-    if (auto it = s.find("stationWelcome"); it != s.end() && it->is_object()) {
-      for (auto entry = it->begin(); entry != it->end(); ++entry) {
-        if (entry.value().is_number()) {
-          state_.stationWelcome[entry.key()] = static_cast<int>(entry.value().get<double>());
-        }
-      }
     }
     state_.trades.clear();
     if (auto it = s.find("trades"); it != s.end() && it->is_array()) {

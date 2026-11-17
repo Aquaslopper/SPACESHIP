@@ -132,9 +132,6 @@ class ShellView {
   // nothing, so it is kept here and not in the voyage.
   StationSelection stationSelection_;
   CargoSelection cargoSelection_;
-  Area stationWelcomeBox_{};
-  Area stationWelcomeContinue_{};
-  std::string stationWelcomePort_;
 
   struct ExteriorCallout {
     Area box;
