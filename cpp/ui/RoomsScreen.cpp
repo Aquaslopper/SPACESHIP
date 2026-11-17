@@ -73,7 +73,7 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
   if (roomId == "bridge") {
     const CrewMember* navigator = nullptr;
     for (const CrewMember& crew : sim.Crew()) {
-      if (crew.job == "navigation") { navigator = &crew; if (sim.CrewBusy(crew) == nullptr) { break; } }
+      if (crew.job == "navigation") { navigator = &crew; break; }
     }
     model.body.Field("Location", sim.FindBodyById(sim.Map().here) == nullptr
                                      ? sim.Map().here
@@ -120,47 +120,6 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
     }
     row.cost = "1 click";
     model.rows.push_back(row);
-    return model;
-  }
-
-  if (roomId == "r1") {
-    model.body.Note(
-        "A medkit and 2% energy start a three-click treatment (up to +25 health); "
-        "treatment pauses without power. The ordinary medical order in Crew Quarters "
-        "remains available without a medkit.");
-    model.body.Dim("Medkits aboard: " + Num(sim.State().medkits));
-    for (const CrewMember& crew : sim.Crew()) {
-      const bool busy = sim.CrewBusy(crew) != nullptr;
-      const bool ready = crew.health < 100 && !busy && sim.State().medkits > 0 && energy > 2;
-      model.buttons.push_back(BuildProgressButton(
-          sim, "doc-" + crew.id, "Treat " + crew.name + " (health " + Num(crew.health) + "%)",
-          ready));
-    }
-    return model;
-  }
-
-  if (roomId == "r13") {
-    model.body.Note(
-        "A shared meal uses two units of cooked food from the galley counter and one click; it "
-        "takes three more clicks. It gives each person 4 morale.");
-    if (sim.Crew().size() < 2) {
-      model.body.Dim("At least two crew members are needed.");
-      return model;
-    }
-    const bool mealBusy = sim.FindOngoing("project-social") != nullptr;
-    for (std::size_t i = 0; i < sim.Crew().size(); ++i) {
-      for (std::size_t j = i + 1; j < sim.Crew().size(); ++j) {
-        const CrewMember& one = sim.Crew()[i];
-        const CrewMember& two = sim.Crew()[j];
-        ActionRowView row;
-        row.id = "meal:" + one.id + ":" + two.id;
-        row.label = "Share a meal: " + one.name + " and " + two.name;
-        row.cost = "1 click + 3 work";
-        row.enabled = !mealBusy && sim.CrewBusy(one) == nullptr &&
-                      sim.CrewBusy(two) == nullptr && sim.MessRack() >= 2;
-        model.rows.push_back(row);
-      }
-    }
     return model;
   }
 
@@ -248,12 +207,6 @@ bool PressRoomActionRaw(Simulation& sim, const std::string& action, const std::s
     sim.ClampStat("shield", 15);
     sim.PerformAction("Power diverted to shields");
     return true;
-  }
-  if (action.compare(0, 5, "meal:") == 0) {
-    const std::string rest = action.substr(5);
-    const std::size_t cut = rest.find(':');
-    if (cut == std::string::npos) { return false; }
-    return sim.StartSocial(rest.substr(0, cut), rest.substr(cut + 1));
   }
   return false;
 }

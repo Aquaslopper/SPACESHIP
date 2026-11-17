@@ -384,7 +384,6 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
       if (reward.contains("cash")) { c.reward.cash = reward["cash"].get<double>(); }
       if (reward.contains("fuel")) { c.reward.fuel = reward["fuel"].get<double>(); }
       if (reward.contains("kits")) { c.reward.kits = reward["kits"].get<double>(); }
-      if (reward.contains("med")) { c.reward.med = reward["med"].get<double>(); }
     }
     catalog.commendations.push_back(c);
   }

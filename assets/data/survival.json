@@ -155,10 +155,6 @@
       "label": "Repair kits"
     },
     {
-      "from": "medkits",
-      "label": "Medkits"
-    },
-    {
       "from": "o2",
       "label": "O2 tanks"
     },

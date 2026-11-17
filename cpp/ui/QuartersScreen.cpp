@@ -105,21 +105,12 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
     row.name = member.name;
     row.colour = member.colour;
     row.selected = selected != nullptr && member.id == selected->id;
-    const Task* busy = sim.CrewBusy(member);
-    row.busy = busy != nullptr;
     row.hasOrder = sim.SheetOf(member) != nullptr;
-    if (busy != nullptr) {
-      row.flag = js::NumToString(busy->left);
-    } else if (row.hasOrder) {
+    if (row.hasOrder) {
       row.flag = "order";
     }
-    if (busy != nullptr) {
-      row.role = sim.FindOngoing("doc-" + member.id) != nullptr ? "In the medical bay"
-                                                               : "Carrying out orders";
-    } else {
-      row.role = ShortRole(member.role);
-      if (!member.job.empty()) { row.role += " - " + JobLabel(sim, member.job); }
-    }
+    row.role = ShortRole(member.role);
+    if (!member.job.empty()) { row.role += " - " + JobLabel(sim, member.job); }
     model.roster.push_back(row);
   }
 
@@ -203,16 +194,18 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
   stand.Dim(hand.traits);
 
   // --- the pad ------------------------------------------------------------
-  const Task* busy = sim.CrewBusy(hand);
+  const Task* docTask = sim.FindOngoing("doc-" + hand.id);
+  const Task* orderTask = sim.FindOngoing("cw-" + hand.id);
+  const Task* busy = docTask != nullptr ? docTask : orderTask;
   ordersPanel.Name(hand.name);
   if (busy != nullptr) {
     const Task* task = busy;
     model.closedText =
-        (sim.FindOngoing("doc-" + hand.id) != nullptr
+        (docTask != nullptr
              ? std::string("In the medical bay.")
              : "Carrying out orders.") +
-        " " + js::NumToString(task == nullptr ? 0 : task->left) + " click" +
-        (task != nullptr && task->left == 1 ? "" : "s") + " remaining.";
+        " " + js::NumToString(task->left) + " click" +
+        (task->left == 1 ? "" : "s") + " remaining.";
     ordersPanel.Dim(model.closedText);
   }
   ordersPanel.Field("Standing job", JobLabel(sim, sim.StagedJob(hand)));

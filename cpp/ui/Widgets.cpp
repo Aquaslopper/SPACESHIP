@@ -100,7 +100,7 @@ std::string ButtonChargeTier(const std::string& subject,
     return "routine";
   }
   if (ContainsAny(s, {"o2", "oxygen", "filter", "engine", "maintenance", "cook",
-                      "project", "medical", "treat", "incident", "resolve", "assign",
+                      "project", "incident", "resolve", "assign",
                       "sensor", "shield", "power", "recycl", "workshop", "hydropon",
                       "fuel reserve", "damage control", "thermal", "package", "hull",
                       "repair", "service", "recharge", "transfer", "split", "upgrade",
@@ -328,18 +328,13 @@ bool PressProgressButton(Simulation& sim, const ProgressButton& button) {
                               if (taskId == "extract") { return sim.StartExtraction(); }
                               if (taskId == "crew-assign") { return sim.CommitOrders(); }
                               if (taskId.compare(0, 8, "project-") == 0) {
-                                const std::string id = taskId.substr(8);
-                                if (id == "social") { return false; }
-                                return sim.StartProject(id);
+                                return sim.StartProject(taskId.substr(8));
                               }
                               if (taskId.compare(0, 4, "pkg-") == 0) {
                                 return sim.PackageSurvey(taskId.substr(4));
                               }
                               if (taskId.compare(0, 8, "salvage-") == 0) {
                                 return sim.StartSalvage(std::stoi(taskId.substr(8)));
-                              }
-                              if (taskId.compare(0, 4, "doc-") == 0) {
-                                return sim.StartMedical(taskId.substr(4));
                               }
                               return false;
                             });
@@ -1144,7 +1139,7 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
 // ---------------------------------------------------------------------------
 const std::vector<std::string>& SceneGlyphs() {
   static const std::vector<std::string> glyphs = {
-      "reactor", "filter", "habitat", "medical", "cargo",
+      "reactor", "filter", "habitat", "cargo",
       "orbit",   "core",   "network", "garden"};
   return glyphs;
 }

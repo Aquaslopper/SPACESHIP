@@ -35,7 +35,6 @@ std::string Num(double value) { return js::NumToString(value); }
 
 const double kFuelCell = 45;
 const double kRepairKit = 50;
-const double kMedkit = 50;
 const double kCanister = 45;
 const double kRations = 80;
 const double kBayOne = 1500;
@@ -296,8 +295,6 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
          {"Rack: " + Num(sim.State().fuelCells) + " fuel cells aboard."});
   supply("buy-repair", "Repair kit - 50 sh", "One repair kit for the machines.", kRepairKit, true,
          {"Rack: " + Num(sim.State().repairKits) + " repair kits aboard."});
-  supply("buy-medkit", "Medkit - 50 sh", "One medkit for the medical bay.", kMedkit, true,
-         {"Rack: " + Num(sim.State().medkits) + " medkits aboard."});
   supply("buy-canister", "O2 canister - 25 sh", "One O2 canister for the filter rack.", kCanister,
          sim.Life().canisters < sim.Life().capacity &&
              sim.FindOngoing("project-oxygen") == nullptr,
@@ -944,7 +941,6 @@ bool PressStationActionRaw(Simulation& sim, const std::string& action,
   // The economy names its fixed-price stores; the station names the verbs.
   if (action == "buy-fuel") return sim.BuySupply("fuel-cell");
   if (action == "buy-repair") return sim.BuySupply("repair-kit");
-  if (action == "buy-medkit") return sim.BuySupply("medkit");
   if (action == "buy-canister") return sim.BuySupply("canister");
   if (action == "buy-rations") return sim.BuySupply("rations");
   if (action.compare(0, 9, "buy-good:") == 0) return sim.BuyGood(action.substr(9));

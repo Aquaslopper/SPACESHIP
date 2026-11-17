@@ -25,9 +25,6 @@
       "goal": 1,
       "id": "eyes",
       "metric": "scans",
-      "reward": {
-        "med": 1
-      },
       "title": "Eyes Open"
     },
     {
@@ -61,33 +58,10 @@
       "title": "Seven Horizons"
     },
     {
-      "detail": "Complete three ship projects, treatments or meals.",
-      "goal": 3,
-      "id": "work",
-      "metric": "projects",
-      "reward": {
-        "kits": 2
-      },
-      "title": "Working Hands"
-    },
-    {
-      "detail": "Complete two shared meals.",
-      "goal": 2,
-      "id": "table",
-      "metric": "meals",
-      "reward": {
-        "cash": 150
-      },
-      "title": "A Table for Two"
-    },
-    {
       "detail": "Resolve three incident reports.",
       "goal": 3,
       "id": "crisis",
       "metric": "incidents",
-      "reward": {
-        "med": 2
-      },
       "title": "Crisis Hand"
     },
     {

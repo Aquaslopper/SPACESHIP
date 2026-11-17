@@ -222,7 +222,6 @@ std::vector<SideBlock> SideBlocks(const Simulation& sim) {
       {"Fuel cells", Num(state.fuelCells)},
       {"Dry rations", Num(sim.MessRations())},
       {"Repair kits", Num(state.repairKits)},
-      {"Medkits", Num(state.medkits)},
       {"O2 tanks", Num(sim.Life().canisters)},
       {"Goods", Num(sim.CargoUsed()) + " m3"},
       {"Survey data", Num(static_cast<double>(sim.Survey().size())) + " logs"},

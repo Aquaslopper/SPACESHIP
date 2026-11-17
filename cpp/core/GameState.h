@@ -113,8 +113,6 @@ struct Chronicle {
   std::map<std::string, bool> systems;
   std::map<std::string, bool> regions;
   double banks = 0;
-  double projects = 0;
-  double meals = 0;
   double incidents = 0;
   std::map<std::string, bool> earned;
   std::map<std::string, bool> claimed;
@@ -287,7 +285,6 @@ struct Passenger {
 };
 
 struct GameState {
-  double medkits = 2;
   double playedSeconds = 0;
   double moneySpent = 0;
   double fuelUsed = 0;

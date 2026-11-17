@@ -77,53 +77,6 @@ bool Simulation::StartProject(const std::string& id) {
   return true;
 }
 
-bool Simulation::StartMedical(const std::string& crewId) {
-  if (!HasRoom("r1")) return false;
-  CrewMember* crew = FindCrew(crewId);
-  if (crew == nullptr || crew->health >= 100 || CrewBusy(*crew) != nullptr) { return false; }
-  if (state_.medkits <= 0 || StatValue("energy") <= 2 || !state_.gameOver.empty()) { return false; }
-
-  state_.medkits -= 1;
-  ClampStat("energy", -2);
-  crewClaims_[crewId] = true;
-  const std::string name = crew->name;
-  PerformAction("Treatment started for " + name);
-  crewClaims_.erase(crewId);
-  if (!state_.gameOver.empty() || FindCrew(crewId) == nullptr) { return true; }
-
-  Task* task = AddOngoing("doc-" + crewId, "Treating " + name, 3, "shipProject", "medical");
-  if (task != nullptr) {
-    task->who = crewId;
-    if (CrewMember* patient = FindCrew(crewId)) { patient->activity = "In the medical bay"; }
-  }
-  return true;
-}
-
-bool Simulation::StartSocial(const std::string& a, const std::string& b) {
-  if (!HasRoom("r13")) return false;
-  CrewMember* one = FindCrew(a);
-  CrewMember* two = FindCrew(b);
-  if (one == nullptr || two == nullptr || a == b) { return false; }
-  if (CrewBusy(*one) != nullptr || CrewBusy(*two) != nullptr) { return false; }
-  if (FindOngoing("project-social") != nullptr || mess_.rack < 2 || !state_.gameOver.empty()) { return false; }
-
-  mess_.rack -= 2;
-  crewClaims_[a] = true;
-  crewClaims_[b] = true;
-  const std::string names = one->name + " and " + two->name;
-  PerformAction(names + " arranged a meal");
-  crewClaims_.erase(a);
-  crewClaims_.erase(b);
-  if (!state_.gameOver.empty() || FindCrew(a) == nullptr || FindCrew(b) == nullptr) { return true; }
-
-  Task* task = AddOngoing("project-social", "Sharing a meal", 3, "shipProject", "social");
-  if (task != nullptr) {
-    task->who = a;
-    task->other = b;
-  }
-  return true;
-}
-
 void Simulation::ProjectDone(Task& task) {
   const std::string id = task.target;
   std::string text;
@@ -144,27 +97,7 @@ void Simulation::ProjectDone(Task& task) {
     text = "Thermal control stabilized the drive.";
   }
 
-  if (id == "medical") {
-    if (CrewMember* patient = FindCrew(task.who)) {
-      patient->health = std::min(100.0, patient->health + 25);
-      patient->activity = "Back on station";
-      text = patient->name + " recovered in the medical bay.";
-    }
-  }
-
-  if (id == "social") {
-    CrewMember* one = FindCrew(task.who);
-    CrewMember* other = FindCrew(task.other);
-    if (one != nullptr && other != nullptr) {
-      one->morale = std::min(100.0, one->morale + 4);
-      other->morale = std::min(100.0, other->morale + 4);
-      text = one->name + " and " + other->name + " shared a meal and talked.";
-    }
-  }
-
   if (!text.empty()) {
-    state_.chronicle.projects += 1;
-    if (id == "social") { state_.chronicle.meals += 1; }
     CheckCommendations();
     LogLine(text);
   }

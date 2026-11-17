@@ -154,7 +154,6 @@ class Simulation {
   int OrderedCount() const;
   bool HasPendingLayoff() const;
   bool OrdersRunning() const;
-  bool CrewAvailable(const CrewMember& crew) const;
   double JobCost(const std::string& jobId) const;
   double OrderCostFor(const std::string& jobId, const std::string& orderId) const;
   double OrderCost(const CrewMember& crew, const std::string& orderId) const;
@@ -250,8 +249,6 @@ class Simulation {
 
   // Projects and the shipyard (Projects.cpp, Ships.cpp)
   bool StartProject(const std::string& id);
-  bool StartMedical(const std::string& crewId);
-  bool StartSocial(const std::string& a, const std::string& b);
   std::string ProjectBlock(const std::string& id) const;
   void ApplyShipLayout();
   bool BuyLargerShip(const std::string& kind = "kestrel");
@@ -291,7 +288,6 @@ class Simulation {
 
   CrewMember* FindCrew(const std::string& id);
   const CrewMember* FindCrew(const std::string& id) const;
-  const Task* CrewBusy(const CrewMember& crew) const;
 
   void RunBank(const std::string& line);
   void LayOff(CrewMember& crew, const std::string& why);
@@ -424,7 +420,6 @@ class Simulation {
   bool cookClaim_ = false;
   std::string projectClaim_;
   bool cookRestock_ = false;
-  std::map<std::string, bool> crewClaims_;
 };
 
 double CommissionGoal(const std::string& kind);

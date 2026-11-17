@@ -187,8 +187,6 @@ std::string Simulation::SaveJson() const {
     if (entry.second) { chronicle["regions"][entry.first] = true; }
   }
   chronicle["banks"] = Num(state_.chronicle.banks);
-  chronicle["projects"] = Num(state_.chronicle.projects);
-  chronicle["meals"] = Num(state_.chronicle.meals);
   chronicle["incidents"] = Num(state_.chronicle.incidents);
   chronicle["earned"] = Json::object();
   for (const auto& entry : state_.chronicle.earned) {
@@ -267,7 +265,6 @@ std::string Simulation::SaveJson() const {
   }
   s["mapMarks"] = mapMarks;
 
-  s["medkits"] = Num(state_.medkits);
   s["engineCondition"] = Num(state_.engineCondition);
   s["wearTick"] = Num(state_.wearTick);
   s["engineerRun"] = state_.engineerRun;
@@ -896,23 +893,11 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
 
     if (type == "shipProject") {
       if (taskState != "running") { return fail("a project that finished but was not announced"); }
-      bool known = target == "medical" || target == "social";
+      bool known = false;
       for (const ProjectDef& project : catalog.projects) {
         if (project.id == target) { known = true; }
       }
       if (!known) { return fail("a project that does not exist"); }
-      if (target == "medical" && id != "doc-" + GetString(task, "who")) { return fail("medical work for the wrong patient"); }
-      if (target == "social" && id != "project-social") { return fail("a shared meal with the wrong id"); }
-      if (target == "medical" || target == "social") {
-        bool whoThere = false;
-        for (const Json& member : *crew) {
-          if (GetString(member, "id") == GetString(task, "who")) { whoThere = true; }
-        }
-        if (!whoThere) { return fail("work about a crew member who is not aboard"); }
-      }
-      if (target == "social" && GetString(task, "other") == GetString(task, "who")) {
-        return fail("a meal shared with oneself");
-      }
     }
   }
 
@@ -1072,7 +1057,6 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     state_.completedFreelance = GetNumber(s, "completedFreelance", 0);
     state_.parkedShips = s.value("parkedShips", std::vector<std::string>{});
     state_.previousShip = s.value("previousShip", std::string{});
-    state_.medkits = GetNumber(s, "medkits", 2);
     state_.engineCondition = GetNumber(s, "engineCondition");
     state_.wearTick = GetNumber(s, "wearTick");
     state_.engineerRun = GetBool(s, "engineerRun");
@@ -1210,8 +1194,6 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     state_.chronicle = Chronicle();
     if (auto it = s.find("chronicle"); it != s.end() && it->is_object()) {
       state_.chronicle.banks = GetNumber(*it, "banks");
-      state_.chronicle.projects = GetNumber(*it, "projects");
-      state_.chronicle.meals = GetNumber(*it, "meals");
       state_.chronicle.incidents = GetNumber(*it, "incidents");
       if (auto systems = it->find("systems"); systems != it->end()) { readBoolMap(*systems, &state_.chronicle.systems); }
       if (auto regions = it->find("regions"); regions != it->end()) { readBoolMap(*regions, &state_.chronicle.regions); }

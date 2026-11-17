@@ -103,7 +103,7 @@ double Simulation::CleanerInterval(const CrewMember& crew) const {
 void Simulation::TickCleaner() {
   const CrewMember* best = nullptr;
   for (const CrewMember& crew : crew_) {
-    if (crew.job != "cleaner" || CrewBusy(crew) != nullptr) { continue; }
+    if (crew.job != "cleaner") { continue; }
     if (best == nullptr || CleanerInterval(crew) < CleanerInterval(*best)) { best = &crew; }
   }
   if (best == nullptr) { return; }
@@ -261,8 +261,6 @@ std::string Simulation::JobThreshold(const CrewMember& crew) const {
 }
 
 std::string Simulation::CrewWhere(const CrewMember& crew) const {
-  const Task* work = CrewBusy(crew);
-  if (work != nullptr && work->target == "social") { return "Recreation"; }
   if (FindOngoing("doc-" + crew.id) != nullptr) { return "Medical Bay"; }
   if (crew.job.empty()) { return "Corridor - no job"; }
   for (const Room& room : rooms_) {
@@ -272,9 +270,7 @@ std::string Simulation::CrewWhere(const CrewMember& crew) const {
 }
 
 std::string Simulation::ActivityOf(const CrewMember& crew) const {
-  const Task* work = CrewBusy(crew);
   if (FindOngoing("doc-" + crew.id) != nullptr) { return "In medical care"; }
-  if (work != nullptr && work->by == crew.name) { return work->label; }
   return crew.activity;
 }
 
@@ -373,30 +369,6 @@ std::string Simulation::CrewNameOf(const std::string& id) const {
   return crew != nullptr ? crew->name : std::string("a former crew member");
 }
 
-const Task* Simulation::CrewBusy(const CrewMember& crew) const {
-  if (crewClaims_.count(crew.id) != 0) {
-    static const Task claimed = [] {
-      Task task;
-      task.id = "claimed";
-      task.label = "Working";
-      task.total = 1;
-      task.left = 1;
-      task.state = "running";
-      return task;
-    }();
-    return &claimed;
-  }
-  if (const Task* doc = FindOngoing("doc-" + crew.id)) { return doc; }
-  if (const Task* social = FindOngoing("project-social")) {
-    if (social->who == crew.id || social->other == crew.id) { return social; }
-  }
-  if (const Task* own = FindOngoing("cw-" + crew.id)) { return own; }
-  for (const Task& task : state_.ongoing) {
-    if (task.state == "running" && task.by == crew.name) { return &task; }
-  }
-  return nullptr;
-}
-
 void Simulation::AutoMaint() {
   CrewMember* worker = AssignedEngineer();
   if (worker == nullptr || state_.engineCondition >= 100.0 || EngineButtonChargeLeft() < 1.0) {
@@ -412,7 +384,6 @@ void Simulation::AutoMaint() {
   }
   */
   if (engineClicking_ /* || MaintRunning() */) { return; }
-  // if (CrewBusy(*worker) != nullptr) { return; }
 
   const long long interval =
       worker->jobAt >= 60.0 ? 1 : (worker->jobAt >= 45.0 ? 2 : 3);
@@ -433,7 +404,6 @@ void Simulation::AutoFilters() {
   CrewMember* worker = AssignedFilterHand();
   if (o2Claim_ || state_.filterLife > 0 || StatValue("energy") <= 0) { return; }
   if (worker == nullptr || BankRunning()) { return; }
-  // if (CrewBusy(*worker) != nullptr) { return; }
 
   const int line = std::clamp(static_cast<int>(worker->jobAt), 1, 3);
   if (AirStageIndex() > line) { return; }
@@ -482,7 +452,6 @@ void Simulation::AutoMess() {
     return;
   }
   if (FindOngoing("cook") != nullptr) { return; }
-  // if (CrewBusy(*worker) != nullptr) { return; }
   if (!cookRestock_ && mess_.rack > CookThreshold(*worker)) { return; }
   if (mess_.rack >= mess_.capacity) {
     cookRestock_ = false;

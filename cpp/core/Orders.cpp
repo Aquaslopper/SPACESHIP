@@ -126,10 +126,6 @@ bool Simulation::HasPendingLayoff() const {
 
 bool Simulation::OrdersRunning() const { return FindOngoing("crew-assign") != nullptr; }
 
-bool Simulation::CrewAvailable(const CrewMember& crew) const {
-  return CrewBusy(crew) == nullptr;
-}
-
 void Simulation::ClearOrders() {
   orderSheets_.clear();
   state_.pendingOrders.clear();
@@ -214,9 +210,7 @@ bool Simulation::CommitOrders() {
 
   for (const auto& entry : sheet) { ClearOngoing("cw-" + entry.first); }
 
-  for (const auto& entry : sheet) { crewClaims_[entry.first] = true; }
   PerformAction("Crew assignments issued");
-  crewClaims_.clear();
   if (!state_.gameOver.empty()) { return true; }
 
   if (fee > 0) {
@@ -305,7 +299,6 @@ void Simulation::FireCrew(CrewMember& crew) {
   const bool hadJob = !crew.job.empty();
   orderSheets_.erase(id);
   state_.pendingOrders.erase(id);
-  crewClaims_.erase(id);
   ClearOngoing("cw-" + id);
   for (std::size_t i = state_.ongoing.size(); i-- > 0;) {
     const Task task = state_.ongoing[i];

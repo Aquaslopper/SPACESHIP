@@ -28,15 +28,6 @@ CrewLook LookForCrew(const Simulation& sim, const CrewMember& crew) {
   CrewLook look;
   const Catalog& art = sim.World();
   const OrderSheet* sheet = sim.SheetOf(crew);
-  const bool atDoc = sim.FindOngoing("doc-" + crew.id) != nullptr;
-  if ((sheet != nullptr && sheet->Has("doc")) || atDoc) {
-    // The patient gown. Even the buckle goes quiet.
-    look.cloth = "#e8e2d6";
-    look.dark = "#cbb89c";
-    look.btn = "#cbb89c";
-    return look;
-  }
-
   const std::string jobId = sheet != nullptr && sheet->hasJob ? sheet->job : crew.job;
   const JobDef* job = sim.FindJobDef(jobId);
   // Nobody: the reference's JOBS[0], the grey of a hand with no trade.
@@ -132,8 +123,6 @@ CrewScene BuildCrewScene(const Simulation& sim, const CrewMember& crew) {
                                                   : crew.id + "-portrait";
   const double cell = SpriteCell(sim);
   const OrderSheet* sheet = sim.SheetOf(crew);
-  const bool atDoc = sim.FindOngoing("doc-" + crew.id) != nullptr;
-  const bool doc = (sheet != nullptr && sheet->Has("doc")) || atDoc;
   const bool schooling = sheet != nullptr && (sheet->Has("learnOn") || sheet->Has("learnSt"));
 
   CrewLook look = LookForCrew(sim, crew);
@@ -151,8 +140,7 @@ CrewScene BuildCrewScene(const Simulation& sim, const CrewMember& crew) {
     const std::size_t cols = rows.empty() ? 0 : rows.front().size();
     return middle - static_cast<double>(cols) * cell / 2.0;
   };
-  // The middles of the bare wall left and right of the door.
-  const double wallLeft = kCrewFigureX - (kCrewDoorW + kCrewBareWall) / 2.0;
+  // The middle of the bare wall right of the door.
   const double wallRight = kCrewFigureX + (kCrewDoorW + kCrewBareWall) / 2.0;
   // The figure as a picture: "<id>-<pose>", feet on the deck line, wearing the
   // colour the rectangles would wear.
@@ -161,30 +149,6 @@ CrewScene BuildCrewScene(const Simulation& sim, const CrewMember& crew) {
     scene.figureArt.push_back(
         ScenePicture{who + "-" + pose, kCrewFigureX, kCrewDeckY, look.cloth});
   };
-
-  if (doc) {
-    look.pose = "lie";
-    scene.pose = "lie";
-    const SpriteFrame& bed = art.props.at("bed");
-    const double bedX = leftOf(bed.rows);
-    const double bedY = OnDeck(sim, bed.rows.size());
-    // The sign hangs on the wall beside the door. It goes up first: a picture
-    // of the patient brings its own cot and replaces the one here.
-    if (art.props.count("cross") != 0) {
-      prop("cross", leftOf(art.props.at("cross").rows, wallLeft), bedY - 21.0 * cell);
-    }
-    scene.figureFrom = scene.pixels.size();
-    prop("bed", bedX, bedY);
-    scene.figureX = bedX + cell;
-    scene.figureY = bedY - static_cast<double>(art.lie.rows.size()) * cell + 3.0 * cell;
-    for (SpritePixel& pixel :
-         Rasterise(sim, crew, look, art.lie, scene.figureX, scene.figureY)) {
-      scene.pixels.push_back(pixel);
-    }
-    picture("lie");
-    scene.signature = crew.id + "|lie|" + look.cloth;
-    return scene;
-  }
 
   if (schooling) {
     prop("desk", kCrewFigureX - 24.0 * cell, OnDeck(sim, art.props.at("desk").rows.size()));

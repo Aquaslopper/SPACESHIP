@@ -43,8 +43,6 @@ double Simulation::ChronicleValue(const std::string& metric) const {
     return (value == "ready" || value == "complete") ? 1.0 : 0.0;
   }
   if (metric == "banks") { return chronicle.banks; }
-  if (metric == "projects") { return chronicle.projects; }
-  if (metric == "meals") { return chronicle.meals; }
   if (metric == "incidents") { return chronicle.incidents; }
   return 0.0;
 }
@@ -100,7 +98,6 @@ std::string Simulation::RewardTextOf(const Commendation& award) const {
   };
   push(reward.fuel, std::string("fuel cell"));
   push(reward.kits, std::string("repair kit"));
-  push(reward.med, std::string("medkit"));
   std::string out;
   for (const std::string& part : parts) { out += (out.empty() ? "" : " + ") + part; }
   return out;
@@ -118,7 +115,6 @@ bool Simulation::ClaimCommendation(const std::string& id) {
   state_.shiplets += award->reward.cash;
   state_.fuelCells += award->reward.fuel;
   state_.repairKits += award->reward.kits;
-  state_.medkits += award->reward.med;
   LogLine("Reward claimed: " + award->title + " - " + RewardTextOf(*award) + ".");
   return true;
 }

@@ -899,7 +899,7 @@ void ShellView::PaintLaunchCard(double elapsedMs) {
 void ShellView::SyncIdleDots(const Simulation& sim, double nowMs) {
   const bool compact = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta" || sim.State().shipClass == "yamato" || sim.State().shipClass == "arcadia");
   // Reconcile by identity, not just count. Retain cosmetic movement while
-  // refreshing its effective room (job, medical, social or corridor) every frame.
+  // refreshing its effective room (job or corridor) every frame.
   std::vector<DriftDot> current;
   for (const DiagramCrew& crew : idle_.diagram.crew) {
     const auto old = std::find_if(dots_.begin(), dots_.end(),
@@ -5602,7 +5602,7 @@ bool HasCrewProp(const CrewScene& scene, const std::string& propName) {
 }
 
 bool IsVectorCrewProp(const std::string& name) {
-  return name == "cross" || name == "desk" || name == "crate" || name == "zzz" ||
+  return name == "desk" || name == "crate" || name == "zzz" ||
          name == "mop" || name == "chart" || name == "wrench" || name == "tank" ||
          name == "ladle";
 }
@@ -5623,7 +5623,6 @@ struct ChibiPose {
   float headScaleX = 1.0f;     // subtle 2.5D perspective compression on head turn
   float shadowScale = 1.0f;    // dynamic ground contact shadow width factor
   bool isSleeping = false;
-  bool isMedical = false;
   bool hasDesk = false;
   bool hasCrate = false;
   bool perked = false;
@@ -5634,7 +5633,6 @@ ChibiPose ComputeChibiPose(const Simulation& sim, const CrewMember* crew, const 
                            float tSec, float stageScale) {
   ChibiPose pose;
   pose.isSleeping = (scene.pose == "sit");
-  pose.isMedical = (scene.pose == "lie");
   pose.hasDesk = HasCrewProp(scene, "desk");
   pose.hasCrate = HasCrewProp(scene, "crate");
   pose.perked = hovered || hasSaid;
@@ -5649,23 +5647,6 @@ ChibiPose ComputeChibiPose(const Simulation& sim, const CrewMember* crew, const 
 
   // Static posture offsets remain legible even under reducedMotion while all
   // time-varying motion zeroes cleanly when reducedMotion is enabled.
-  if (pose.isMedical) {
-    pose.hipDipY = 1.5f * stageScale;
-    pose.torsoTiltRad = -0.11f;
-    pose.headTiltRad = -0.045f;
-    pose.headNodY = 0.8f * stageScale;
-    pose.shadowScale = 1.15f;
-    if (!reduced) {
-      const float br = 0.5f + 0.5f * std::sin(tSec * 1.45f * cadence + phase);
-      pose.breath = br;
-      pose.breathLiftY = -1.75f * br * stageScale;
-      pose.armFloatY = 0.60f * std::sin(tSec * 1.45f * cadence + phase - 0.6f) * stageScale;
-      pose.headTiltRad += 0.018f * std::sin(tSec * 0.9f + phase);
-      pose.headNodY += 0.60f * br * stageScale;
-    }
-    return pose;
-  }
-
   if (pose.isSleeping) {
     pose.hipDipY = 3.2f * stageScale;
     pose.torsoTiltRad = 0.026f;
@@ -5967,10 +5948,7 @@ void PaintQuartersCorridorFx(const Simulation& sim, const Palette& p, const Area
     Color led = ToRay(p.borderDark);
     float ledPulse = 0.75f;
     if (hasCrew) {
-      if (scene.pose == "lie") {
-        led = ToRay(p.terracotta);
-        ledPulse = reduced ? 0.85f : (0.5f + 0.5f * std::sin(tSec * 3.8f));
-      } else if (scene.pose == "sit") {
+      if (scene.pose == "sit") {
         led = ToRay(p.amber);
         ledPulse = reduced ? 0.75f : (0.4f + 0.6f * std::sin(tSec * 1.8f));
       } else {
@@ -6004,7 +5982,6 @@ void PaintQuartersSchematicProps(const Simulation& sim, const Palette& p, const 
                                  const Font& textFont, int smallPx) {
   const bool reduced = sim.State().reducedMotion;
   const float doorX = kCrewFigureX - kCrewDoorW * 0.5f;
-  const float wallLeftCenter = kCrewFigureX - (kCrewDoorW + kCrewBareWall) * 0.5f;   // 327
   const float wallRightCenter = kCrewFigureX + (kCrewDoorW + kCrewBareWall) * 0.5f;  // 475
   const Color edge = ToRay(p.borderDark);
   const Color cardBg = ToRay(p.panel);
@@ -6018,44 +5995,7 @@ void PaintQuartersSchematicProps(const Simulation& sim, const Palette& p, const 
   };
 
   for (const std::string& propName : scene.propNames) {
-    if (propName == "cross") {
-      // Wall medical placard + scrolling cardiac telemetry line
-      const Area pl = propArea(wallLeftCenter - 20.0f, 118.0f, 40.0f, 52.0f);
-      PaintChamferBoxRay(pl, 3.0f * stageScale, cardBg, edge, ToRay(p.border));
-      const float cx = pl.x + pl.w * 0.5f;
-      const float cy = pl.y + 15.0f * stageScale;
-      const Color redCol = ToRay(p.terracotta);
-      DrawRectangle(static_cast<int>(cx - 3.0f * stageScale),
-                    static_cast<int>(cy - 8.5f * stageScale),
-                    std::max(2, static_cast<int>(6.0f * stageScale)),
-                    std::max(4, static_cast<int>(17.0f * stageScale)), redCol);
-      DrawRectangle(static_cast<int>(cx - 8.5f * stageScale),
-                    static_cast<int>(cy - 3.0f * stageScale),
-                    std::max(4, static_cast<int>(17.0f * stageScale)),
-                    std::max(2, static_cast<int>(6.0f * stageScale)), redCol);
-      // Mini EKG glass display at bottom of placard
-      const Area scr{pl.x + 5.0f * stageScale, pl.y + 30.0f * stageScale,
-                     pl.w - 10.0f * stageScale, 15.0f * stageScale};
-      DrawRectangleRec(Rectangle{scr.x, scr.y, scr.w, scr.h},
-                       Blend(cardBg, ToRay(p.ink), 0.78f));
-      DrawRectangleLinesEx(Rectangle{scr.x, scr.y, scr.w, scr.h}, 1.0f, edge);
-      const float midY = scr.y + scr.h * 0.55f;
-      const float phase = reduced ? 0.5f : std::fmod(tSec * 0.85f, 1.0f);
-      Vector2 prev{scr.x + 2.0f * stageScale, midY};
-      for (int i = 1; i <= 14; ++i) {
-        const float u = static_cast<float>(i) / 14.0f;
-        const float d = std::fabs(u - phase);
-        float spike = 0.0f;
-        if (d < 0.08f) {
-          const float k = (u - phase) / 0.08f;
-          spike = k < 0.0f ? 2.5f * (1.0f + k) : (k < 0.45f ? -5.0f * (1.0f - k * 2.2f) : 2.2f * (1.0f - (k - 0.45f) * 1.8f));
-        }
-        const Vector2 cur{scr.x + (2.0f + u * (pl.w / stageScale - 14.0f)) * stageScale,
-                          midY + spike * stageScale};
-        DrawLineEx(prev, cur, 1.3f * stageScale, ToRay(p.sage));
-        prev = cur;
-      }
-    } else if (propName == "desk") {
+    if (propName == "desk") {
       // Study terminal console left of the figure, staying cleanly clear of Locker 01
       const Area desk = propArea(298.0f, 218.0f, 52.0f, 60.0f);
       // Legs & tabletop
@@ -6335,21 +6275,10 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
   // Evaluate crew persona pose & corridor atmospheric fx
   const CrewScene& scene = quarters_.scene;
   const ScenePicture* shown = nullptr;
-  ScenePicture medicalStandFallback{};
   const Texture2D* figure = nullptr;
   for (const ScenePicture& candidate : scene.figureArt) {
     figure = CrewTexture(crewArt_, candidate.name);
     if (figure != nullptr) { shown = &candidate; break; }
-  }
-  if (figure == nullptr && scene.pose == "lie" && !scene.figureArt.empty()) {
-    const ScenePicture& orig = scene.figureArt.front();
-    const std::size_t pos = orig.name.rfind("-lie");
-    if (pos != std::string::npos) {
-      medicalStandFallback = orig;
-      medicalStandFallback.name = orig.name.substr(0, pos) + "-stand";
-      figure = CrewTexture(crewArt_, medicalStandFallback.name);
-      if (figure != nullptr) { shown = &medicalStandFallback; }
-    }
   }
   const CrewMember* selectedCrew = quarters_.hasCrew ? sim.FindCrew(quarters_.selectedId) : nullptr;
   const Area talkBtn{hall.x + quarters_.talk.x * stageScale, hall.y + quarters_.talk.y * stageScale,
@@ -6390,27 +6319,9 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
       }
     }
 
-    if (pose.isMedical) {
-      // Medical bay headboard + pillow behind the patient chibi
-      const float cotL = hall.x + (kCrewFigureX - 46.0f) * stageScale;
-      const float cotW = 92.0f * stageScale;
-      const Color medEdge = ToRay(p.borderDark);
-      const Color frameCol = ToRay(p.coffeeDark);
-      PaintChamferBoxRay(Area{cotL, hall.y + 190.0f * stageScale, 12.0f * stageScale, 88.0f * stageScale},
-                         2.5f * stageScale, frameCol, medEdge, ToRay(p.border));
-      PaintChamferBoxRay(Area{cotL + cotW - 10.0f * stageScale, hall.y + 220.0f * stageScale,
-                              10.0f * stageScale, 58.0f * stageScale},
-                         2.0f * stageScale, frameCol, medEdge, ToRay(p.border));
-      // Soft pillow propped against the headboard behind head/shoulders
-      PaintChamferBoxRay(Area{cotL + 10.0f * stageScale, hall.y + 194.0f * stageScale,
-                              32.0f * stageScale, 32.0f * stageScale},
-                         6.0f * stageScale, ToRay(p.white), medEdge, ToRay(p.border));
-    }
-
     // 2.5D articulated chibi render: uniform layer underneath tinted by job color,
     // then character ink & features seamlessly stitched on top.
     ScenePicture drawShown = *shown;
-    if (pose.isMedical) { drawShown.base -= 10.0; }
     const Texture2D* cloth = CrewTexture(crewArt_, shown->name + "-cloth");
     if (displayAdjustmentAvailable_) {
       rlSetBlendFactorsSeparate(RL_SRC_ALPHA, RL_ONE_MINUS_SRC_ALPHA,
@@ -6428,33 +6339,6 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
       BeginBlendMode(BLEND_CUSTOM_SEPARATE);
     }
 
-    if (pose.isMedical) {
-      // Medical mattress & folded recovery blanket tucked cleanly over waist & legs
-      const float cotL = hall.x + (kCrewFigureX - 44.0f) * stageScale;
-      const float cotW = 88.0f * stageScale;
-      const Color medEdge = ToRay(p.borderDark);
-      PaintChamferBoxRay(Area{cotL + 2.0f * stageScale, hall.y + 226.0f * stageScale,
-                              cotW - 4.0f * stageScale, 42.0f * stageScale},
-                         4.0f * stageScale, Blend(ToRay(p.panel), ToRay(p.sage), 0.34f),
-                         medEdge, ToRay(p.border));
-      // Folded crisp white top cuff of the blanket
-      DrawRectangleRec(Rectangle{cotL + 4.0f * stageScale, hall.y + 226.0f * stageScale,
-                                 cotW - 8.0f * stageScale, 7.0f * stageScale},
-                       ToRay(p.white));
-      DrawLineEx(Vector2{cotL + 4.0f * stageScale, hall.y + 233.0f * stageScale},
-                 Vector2{cotL + cotW - 4.0f * stageScale, hall.y + 233.0f * stageScale},
-                 1.2f * stageScale, medEdge);
-      // Bed frame & rolling legs down to deck
-      DrawRectangleRec(Rectangle{cotL + 4.0f * stageScale, hall.y + 266.0f * stageScale,
-                                 cotW - 8.0f * stageScale, 4.0f * stageScale},
-                       ToRay(p.coffeeDark));
-      DrawRectangleRec(Rectangle{cotL + 6.0f * stageScale, hall.y + 270.0f * stageScale,
-                                 5.0f * stageScale, 8.0f * stageScale},
-                       ToRay(p.coffeeDark));
-      DrawRectangleRec(Rectangle{cotL + cotW - 11.0f * stageScale, hall.y + 270.0f * stageScale,
-                                 5.0f * stageScale, 8.0f * stageScale},
-                       ToRay(p.coffeeDark));
-    }
   } else {
     // Procedural pixel-grid crew fallback with gentle idle breathing & sway
     const std::size_t cells = scene.pixels.size();

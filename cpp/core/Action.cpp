@@ -161,7 +161,6 @@ Simulation Simulation::NewVoyage(const Catalog& catalog, const ChartSettings& se
 
   // ---- STATE -------------------------------------------------------------
   GameState& state = sim.state_;
-  state.medkits = 2;
   state.shipClass = "wren";
   state.engineCondition = 60;
   state.wearTick = 0;

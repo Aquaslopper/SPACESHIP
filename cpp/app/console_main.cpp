@@ -29,7 +29,7 @@
 //    contract accept|collect <id>
 //    commission accept <kind> | commission collect | commission abandon
 //    hire <candidateId> | upgrade <id> | shipyard
-//    project <id> | medical <crewId> | social <a> <b>
+//    project <id>
 //    save <file> [utf16]  |  load <file>
 //    saveslot <1|2|3> | loadslot <1|2|3>   the HTA's own three slots
 //    crew-set <id> <numeric field> <value>   survival boundary test setup
@@ -297,10 +297,6 @@ int main(int argc, char** argv) {
       simulation.ClaimCommendation(parts[1]);
     } else if (command == "remedy" && parts.size() >= 2) {
       simulation.RemedyIncident(parts[1]);
-    } else if (command == "medical" && parts.size() >= 2) {
-      simulation.StartMedical(parts[1]);
-    } else if (command == "social" && parts.size() >= 3) {
-      simulation.StartSocial(parts[1], parts[2]);
     } else if (command == "save" && parts.size() >= 2) {
       const bool utf16 = parts.size() >= 3 && parts[2] == "utf16";
       std::string error;

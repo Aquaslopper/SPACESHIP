@@ -154,7 +154,7 @@ void Simulation::AdvanceTasks(double n) {
     if (task->type == "travel") { ClampStat("fuel", -1); }
     const bool needsPower = task->type == "scan" || task->type == "salvage" ||
                             task->type == "extract" ||
-                            (task->type == "shipProject" && task->target != "social");
+                            task->type == "shipProject";
     const bool needsDrive = task->type == "travel";
     if (needsDrive && (state_.engineCondition <= 0 || StatValue("energy") <= 0)) { continue; }
     if (needsPower && StatValue("energy") <= 0) { continue; }

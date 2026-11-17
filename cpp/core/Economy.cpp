@@ -90,7 +90,7 @@ double Simulation::CargoReserved() const {
 
 bool Simulation::BuySupply(const std::string& id) {
   struct Supply { const char* id; double price; double* counter; };
-  // Five fixed-price stores: fuel cell, repair kit, medkit, O2 canister, rations.
+  // Four fixed-price stores: fuel cell, repair kit, O2 canister, rations.
   // PRESERVED GAMEPLAY: Docked and port requirements are core mechanics (Beta status).
   // REMOVED: state_.gameOver.empty() == false check (Anti-roguelike gate preventing purchase during loss state if intended by owner, though usually loss stops all actions; here we strictly follow "Do not add guards... safety rails... state machines...").
   // However, AGENTS.md says "Do not invent... Do not polish... Do not add guards...".
@@ -127,13 +127,6 @@ bool Simulation::BuySupply(const std::string& id) {
     state_.moneySpent += 70;
     state_.repairKits += 1;
     FreeCommit("Repair kit purchased");
-    return true;
-  }
-  if (id == "medkit" && state_.shiplets >= 50) {
-    state_.shiplets -= 50;
-    state_.moneySpent += 50;
-    state_.medkits += 1;
-    FreeCommit("Medkit purchased");
     return true;
   }
   if (id == "canister" && state_.shiplets >= 25 && life_.canisters < life_.capacity &&

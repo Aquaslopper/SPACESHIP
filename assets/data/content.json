@@ -240,7 +240,7 @@
       "id": "care",
       "link": "mess",
       "linkLabel": "Open Mess Hall",
-      "text": "Crew eat cooked food from the galley counter on their own staggered clocks. With no cooked food, hunger rises; severe hunger damages health. The galley cooks one dry ration into five cooked food over five clicks, an assigned cook starts at ten food or below (earlier with training) until the 24-food counter is full, and Hydroponics turns produce into dry rations. Medical Bay treatment uses a medkit and energy; the slower medical order in Crew Quarters needs no medkit.",
+      "text": "Crew eat cooked food from the galley counter on their own staggered clocks. With no cooked food, hunger rises; severe hunger damages health. The galley cooks one dry ration into five cooked food over five clicks, an assigned cook starts at ten food or below (earlier with training) until the 24-food counter is full, and Hydroponics turns produce into dry rations.",
       "title": "Food and medicine"
     },
     {
@@ -282,21 +282,19 @@
     {
       "group": "Crew",
       "id": "needs",
-      "link": "r13",
-      "linkLabel": "Open Recreation",
-      "text": "Health, air, fatigue, hunger, morale and work shape a crew member's outlook. Recreation lets two available hands share a meal, raising their morale. A person already assigned to work cannot be double-booked.",
+      "text": "Health, air, fatigue, hunger, morale and work shape a crew member's outlook.",
       "title": "Needs"
     },
     {
       "group": "Ship systems",
       "id": "rooms",
-      "text": "Workshop makes repair kits; Recyclers make canisters; Fuel Reserve refines cells; Damage Control patches the hull. Each uses salvage and power. Hydroponics makes dry rations from produce, and the Galley turns them into cooked food for the counter; Thermal Control stabilizes the drive, and the Medical Bay treats crew. Inputs are consumed at the start; powered work pauses without energy.",
+      "text": "Workshop makes repair kits; Recyclers make canisters; Fuel Reserve refines cells; Damage Control patches the hull. Each uses salvage and power. Hydroponics makes dry rations from produce, and the Galley turns them into cooked food for the counter; Thermal Control stabilizes the drive. Inputs are consumed at the start; powered work pauses without energy.",
       "title": "Fitted rooms and production"
     },
     {
       "group": "Ship systems",
       "id": "interlocks",
-      "text": "Cargo recovery reserves hold space while it runs. Canister and dry-ration production reserve their output space. Crew cannot be assigned to simultaneous medical, social or order work. Check the room's status when a click is unavailable.",
+      "text": "Cargo recovery reserves hold space while it runs. Canister and dry-ration production reserve their output space. Check the room's status when a click is unavailable.",
       "title": "Reservations and space"
     },
     {

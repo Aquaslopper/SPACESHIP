@@ -8,9 +8,9 @@
 //  but DrawRectangle.
 //
 //  Posture follows what the sheet is about to do to the hand - not what they
-//  are doing now. A body being sent to the doc lies on a cot; someone being
-//  schooled stands at a bench; a trade change puts a crate at their feet; and a
-//  hand nobody wants sits on the deck with zzz over their head.
+//  are doing now. Someone being schooled stands at a bench; a trade change
+//  puts a crate at their feet; and a hand nobody wants sits on the deck with
+//  zzz over their head.
 //
 //  A crew member may also have pictures under assets/art/crew: a figure for
 //  the stage and a portrait for the card beside it. The scene only names them.
@@ -59,7 +59,7 @@ struct ScenePicture {
 };
 
 struct CrewLook {
-  std::string pose = "stand";   // stand / lie / sit
+  std::string pose = "stand";   // stand / sit
   std::string cloth;
   std::string dark;
   std::string btn;
@@ -68,8 +68,7 @@ struct CrewLook {
 };
 
 // spriteLook(): what the figure is wearing. The STAGED job, not the saved one,
-// so the player sees the change before paying for it. A patient wears the gown,
-// and even the buckle goes quiet.
+// so the player sees the change before paying for it.
 CrewLook LookForCrew(const Simulation& sim, const CrewMember& crew);
 
 // The colour behind one letter of a sprite row.
@@ -95,7 +94,7 @@ struct CrewScene {
   std::string signature;              // what the layer would look different by
   std::vector<SpritePixel> pixels;    // props, then the figure, then the hat
   // pixels[figureFrom] onwards are what a figure picture stands in for: the
-  // figure and its hat, and the cot under a patient.
+  // figure and its hat.
   std::size_t figureFrom = 0;
   std::vector<std::string> propNames;
   double figureX = 0;

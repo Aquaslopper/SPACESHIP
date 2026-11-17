@@ -109,7 +109,7 @@ NavPoint TravelMarker(const Simulation& sim) {
 
 const CrewMember* NavigatorOf(const Simulation& sim) {
   for (const CrewMember& crew : sim.Crew()) {
-    if (crew.job == "navigation" && sim.CrewBusy(crew) == nullptr) { return &crew; }
+    if (crew.job == "navigation") { return &crew; }
   }
   return nullptr;
 }

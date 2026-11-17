@@ -380,7 +380,7 @@ bool Simulation::SelectTarget(const std::string& bodyId) {
 
 CrewMember* Simulation::AssignedNavigator() {
   for (CrewMember& crew : crew_) {
-    if (crew.job == "navigation" && CrewBusy(crew) == nullptr) { return &crew; }
+    if (crew.job == "navigation") { return &crew; }
   }
   return nullptr;
 }
@@ -432,12 +432,11 @@ Simulation::NavMetrics Simulation::MetricsFor(const Body& body) const {
   }
 
    // The navigator shortens the crossing itself: a plotted course is fewer clicks
-  // under way, and training buys a shorter one. A busy navigator plots nothing,
-  // so only a free hand counts. Fuel follows the distance, so it is not
-  // discounted a second time.
+  // under way, and training buys a shorter one. Fuel follows the distance, so
+  // it is not discounted a second time.
   const CrewMember* navigator = nullptr;
   for (const CrewMember& crew : crew_) {
-    if (crew.job == "navigation" && CrewBusy(crew) == nullptr) { navigator = &crew; break; }
+    if (crew.job == "navigation") { navigator = &crew; break; }
   }
   const double saving =
       navigator == nullptr ? 0.0 : 10.0 * std::max(0.0, std::min(5.0, navigator->jobAt));

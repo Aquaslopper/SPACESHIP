@@ -123,7 +123,7 @@ void Simulation::RunBank(const std::string& line) {
 }
 
 bool Simulation::ServiceSystem(const std::string& statId) {
-  // PRESERVED GAMEPLAY: Stat repair/fuel/medkit logic, kit usage.
+  // PRESERVED GAMEPLAY: Stat repair/fuel logic, kit usage.
   // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
   Stat* stat = FindStat(statId);
   if (stat == nullptr || stat->value >= 100.0) { return false; }

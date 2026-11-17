@@ -31,13 +31,6 @@ const DeckPlan& ActivePlan(const Simulation& sim) {
 }
 
 const Room* CrewRoom(const Simulation& sim, const CrewMember& crew) {
-  const Task* work = sim.CrewBusy(crew);
-  if (work != nullptr && work->target == "social") {
-    return sim.HasRoom("r13") ? ActivePlan(sim).FindRoom("r13") : nullptr;
-  }
-  if (sim.FindOngoing("doc-" + crew.id) != nullptr) {
-    return sim.HasRoom("r1") ? ActivePlan(sim).FindRoom("r1") : nullptr;
-  }
   if (crew.job.empty()) { return nullptr; }  // the corridor: the dole queue
   return sim.HasRoom(crew.room) ? ActivePlan(sim).FindRoom(crew.room) : nullptr;
 }

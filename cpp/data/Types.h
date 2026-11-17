@@ -258,7 +258,6 @@ struct Reward {
   double cash = 0;
   double fuel = 0;   // fuel cells
   double kits = 0;   // repair kits
-  double med = 0;    // medkits
 };
 
 struct Commendation {

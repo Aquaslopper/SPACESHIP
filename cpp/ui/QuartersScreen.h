@@ -27,9 +27,8 @@ struct CrewRowView {
   std::string name;
   std::string colour;
   std::string role;    // shortRole(role) + " - " + job label
-  std::string flag;    // "" / "order" / the busy countdown
+  std::string flag;    // "" / "order"
   bool selected = false;
-  bool busy = false;
   bool hasOrder = false;
 };
 

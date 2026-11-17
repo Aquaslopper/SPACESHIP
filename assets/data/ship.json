@@ -192,10 +192,6 @@
   },
   "priceKestrel": 4000,
   "roomFits": {
-    "r1": [
-      "Medical Bay",
-      "Triage / treatment"
-    ],
     "r10": [
       "Fuel Reserve",
       "Salvage / fuel cells"
@@ -203,10 +199,6 @@
     "r11": [
       "Damage Control",
       "Emergency hull patching"
-    ],
-    "r13": [
-      "Recreation",
-      "Crew relationships"
     ],
     "r2": [
       "Workshop",
@@ -276,13 +268,6 @@
       "glyph": "habitat",
       "label": "Crew quarters"
     },
-    "r1": {
-      "accent": "#d66d71",
-      "code": "MEDICAL / 05",
-      "description": "A compact care station with monitored recovery beds.",
-      "glyph": "medical",
-      "label": "Triage and treatment"
-    },
     "r10": {
       "accent": "#d39a51",
       "code": "FUEL RESERVE / 17",
@@ -296,13 +281,6 @@
       "description": "Brace plates are cut to fit the damaged section.",
       "glyph": "cargo",
       "label": "Hull patch station"
-    },
-    "r13": {
-      "accent": "#c68eb4",
-      "code": "RECREATION / 21",
-      "description": "Two crew can share a meal.",
-      "glyph": "habitat",
-      "label": "Common room"
     },
     "r2": {
       "accent": "#ce9564",
@@ -398,17 +376,6 @@
         "tone": "#faf7f2",
         "w": 142,
         "x": 540,
-        "y": 112
-      },
-      {
-        "h": 94,
-        "id": "r1",
-        "name": "Medical Bay",
-        "systems": "Triage / treatment",
-        "tag": "DECK A",
-        "tone": "#fdfbf7",
-        "w": 150,
-        "x": 690,
         "y": 112
       },
       {
@@ -538,18 +505,6 @@
         "w": 210,
         "x": 890,
         "y": 196
-      },
-      {
-        "h": 32,
-        "id": "r13",
-        "name": "Recreation",
-        "small": true,
-        "systems": "Crew relationships",
-        "tag": "LENS",
-        "tone": "#fdfbf7",
-        "w": 110,
-        "x": 940,
-        "y": 268
       }
     ],
     "wren": [
@@ -599,18 +554,6 @@
         "tone": "#faf7f2",
         "w": 79,
         "x": 284,
-        "y": 86
-      },
-      {
-        "h": 64,
-        "id": "r1",
-        "name": "Medical Bay",
-        "small": false,
-        "systems": "Triage / treatment",
-        "tag": "DECK A",
-        "tone": "#fdfbf7",
-        "w": 79,
-        "x": 367,
         "y": 86
       },
       {
@@ -744,18 +687,6 @@
         "w": 122,
         "x": 448,
         "y": 169
-      },
-      {
-        "h": 27,
-        "id": "r13",
-        "name": "Recreation",
-        "small": true,
-        "systems": "Crew relationships",
-        "tag": "LENS",
-        "tone": "#fdfbf7",
-        "w": 74,
-        "x": 465,
-        "y": 230
       }
     ]
   },
