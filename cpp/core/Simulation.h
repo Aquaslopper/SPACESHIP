@@ -63,7 +63,7 @@ class Simulation {
   void RestartVoyage();
   void BeginVoyage(const ChartSettings& settings, const std::string& startSystemId);
   const ChartSettings& VoyageChart() const { return chartSettings_; }
-  const Catalog& SourceWorld() const { return sourceCatalog_.regions.empty() ? catalog_ : sourceCatalog_; }
+
 
   void ProAction(double n);
   void FreeCommit(const std::string& detail = std::string());
