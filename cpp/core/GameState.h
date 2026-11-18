@@ -154,7 +154,6 @@ struct TradeContract {
 struct Options {
   bool largeText = false;
   bool confirmRisk = false;
-  bool hideCrewLabels = false;
   std::string theme = "classic";
   bool soundEffects = true;
   bool music = true;

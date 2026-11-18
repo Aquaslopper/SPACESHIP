@@ -4,7 +4,7 @@
 //  Phase 2 turns the Phase 0 skeleton into the cockpit: the window opens at the
 //  reference's size, the catalogue loads, a voyage begins, and ShellView paints
 //  the taskbar, the sidebar, the pinned foot, the status bar and the idle
-//  screen's ship cross-section. Task windows arrive in Phase 3.
+//  screen. Task windows arrive in Phase 3.
 //
 //  Everything the shell decides is in cpp/ui's headless view-models; this file
 //  is only the loop that turns a mouse into a verb and a frame into a paint.
@@ -616,7 +616,6 @@ int main(int argc, char** argv) {
   ship::Theme theme = ship::Theme::ById(sim.State().options.theme);
   theme.fontStep = sim.State().options.fontStep;   // Phase 9's reading size
   theme.largeText = sim.State().options.largeText;
-  theme.hideCrewLabels = sim.State().options.hideCrewLabels;
   theme.reducedMotion = sim.State().reducedMotion;
   theme.stageCompact = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta" || sim.State().shipClass == "yamato" || sim.State().shipClass == "arcadia");
 
@@ -646,7 +645,7 @@ int main(int argc, char** argv) {
     }
   }
   if (wrenExterior.id == 0) {
-    std::fprintf(stderr, "spaceship: Wren exterior unavailable; using deck plan\n");
+    std::fprintf(stderr, "spaceship: Wren exterior unavailable\n");
   }
   std::map<std::string, Texture2D> cargoExteriors;
   for (const std::string kind : {"cargo-spine", "cargo-bulk", "explorer-needle", "explorer-manta", "yamato", "arcadia"}) {
@@ -797,13 +796,11 @@ int main(int argc, char** argv) {
     ship::Theme nextTheme = ship::Theme::ById(sim.State().options.theme);
     nextTheme.fontStep = sim.State().options.fontStep;
     nextTheme.largeText = sim.State().options.largeText;
-    nextTheme.hideCrewLabels = sim.State().options.hideCrewLabels;
     nextTheme.reducedMotion = sim.State().reducedMotion;
     nextTheme.stageCompact = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta" || sim.State().shipClass == "yamato" || sim.State().shipClass == "arcadia");
     const bool themeChanged = nextTheme.id != theme.id ||
                               nextTheme.fontStep != theme.fontStep ||
                               nextTheme.largeText != theme.largeText ||
-                              nextTheme.hideCrewLabels != theme.hideCrewLabels ||
                               nextTheme.reducedMotion != theme.reducedMotion ||
                               nextTheme.stageCompact != theme.stageCompact;
     const bool resized = IsWindowResized();

@@ -120,8 +120,7 @@ Strip NavStrip(const Simulation& sim, const Area& box) {
 }
 
 IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout,
-                                const Theme& theme, bool hideCrewLabels,
-                                float othersHeight, FxRng& rng) {
+                                const Theme& theme) {
   IdleScreenModel out;
   out.content = layout.content;
 
@@ -189,18 +188,11 @@ IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout
   out.nav.box.y += panelShift;
   out.eventsBox.y += panelShift;
   for (auto& event : out.events) { event.box.y += panelShift; }
-  (void)othersHeight;
   out.feedBox = Area{layout.content.x + 8.0f, feedY, inner, out.feedHeight};
 
-  out.diagram = BuildDiagram(sim, out.stageArea, hideCrewLabels, rng);
   out.feed = FeedLinesNewestFirst(sim, 200);
   (void)theme;  // the palette travels with the model; the arithmetic does not need it
   return out;
-}
-
-IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout,
-                                const Theme& theme, bool hideCrewLabels, FxRng& rng) {
-  return BuildIdleScreen(sim, layout, theme, hideCrewLabels, 0, rng);
 }
 
 }  // namespace ship

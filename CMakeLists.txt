@@ -197,14 +197,12 @@ add_library(spaceship_core STATIC
   cpp/core/Ships.cpp
   cpp/core/SaveSystem.cpp
   cpp/core/AutoSave.cpp
-  # The cockpit's arithmetic: theme, layout, tab routing, briefing text and the
-  # cross-section. Pure data - no window, no graphics library - so CTest can hold
-  # every rectangle and every sentence to the reference.
+  # The cockpit's arithmetic: theme, layout, tab routing and briefing text.
+  # Pure data - no window, no graphics library - so CTest can check its models.
   cpp/ui/Theme.cpp
   cpp/ui/Layout.cpp
   cpp/ui/Describe.cpp
   cpp/ui/Shell.cpp
-  cpp/ui/ShipDiagram.cpp
   cpp/ui/IdleScreen.cpp
   cpp/ui/Fx.cpp
   cpp/ui/Widgets.cpp

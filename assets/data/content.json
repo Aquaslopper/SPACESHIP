@@ -39,7 +39,6 @@
     "options": {
       "audioLevel": 0.4,
       "confirmRisk": false,
-      "hideCrewLabels": false,
       "largeText": false,
       "music": true,
       "soundEffects": true,

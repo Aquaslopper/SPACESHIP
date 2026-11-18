@@ -65,7 +65,6 @@ struct Theme {
   // Phase 9: the typography floor and its four steps. Step 0 is 18 px — the
   // general UI floor — and each step adds 5% of that floor, rounded.
   int fontStep = 0;
-  bool hideCrewLabels = false;
   bool reducedMotion = false;
 
   // The compact deck: a Wren is drawn at 600x365, a Kestrel at 1160x460.
