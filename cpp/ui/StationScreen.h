@@ -118,7 +118,7 @@ struct StationScreenModel {
   std::string portId;
   std::string portName;
   std::string tip;
-  std::vector<StationColumn> columns;  // Market | Starmap | Trade | Sales | Board | Yard | Tavern
+  std::vector<StationColumn> columns;  // Market | Starmap | Trade | Sales | Yard | Tavern
   // The trade card's three buttons and the lists behind them.
   std::vector<TradeMode> tradeModes;
   std::string purseLine;
@@ -130,7 +130,8 @@ struct StationScreenModel {
   StationSelection selection;
 };
 
-StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& portId);
+StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& portId,
+                                      const StationSelection* selection = nullptr);
 
 // The station's starmap: the system it stands in, read out of the chart. Every
 // station writes its own; nothing is per port and nothing is cached,
@@ -154,6 +155,7 @@ bool PressStationAction(Simulation& sim, const std::string& action,
 
 // What the rule table would have chosen for this row, kept for the audit that
 // reads the station's labels; the station itself spends no click.
-std::string StationActionCategory(const Simulation& sim, const std::string& action);
+std::string StationActionCategory(const Simulation& sim, const std::string& action,
+                                  const StationScreenModel* model = nullptr);
 
 }  // namespace ship

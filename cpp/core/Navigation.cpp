@@ -635,15 +635,7 @@ void Simulation::FileSurvey(const Body& body) {
   for (const SurveyRecord& record : survey_) {
     if (record.id == "sv-" + body.id) { return; }  // already held
   }
-  double worth = 60;
-  if (body.type == "system") {
-    worth = 95;
-  } else if (body.type == "region") {
-    worth = 145;
-  } else {
-    auto it = catalog_->surveyWorth.find(body.type);
-    if (it != catalog_->surveyWorth.end()) { worth = it->second; }
-  }
+  double worth = SurveyWorth(body.type);
   if (SensorTier() >= 2) {
     worth = js::Ceil(worth * 1.25);
   }
