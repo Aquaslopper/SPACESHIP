@@ -306,6 +306,7 @@ class ShellView {
   TaskScreenModel taskScreen_;
   std::vector<std::pair<Area, std::string>> taskButtons_;
   std::string taskTabKey_;
+  bool stationWelcome_ = false;
 
   struct NavCacheKey {
     bool valid = false;
