@@ -1,15 +1,5 @@
 // ============================================================================
 //  Palette.h — the theme, handed to Dear ImGui.
-//  ---------------------------------------------------------------------------
-//  The colours themselves live in Theme.h, which is headless so the tests can
-//  read them without a graphics library. This header is the only place that
-//  converts them into the types ImGui and Raylib want, and the only place that
-//  styles ImGui at all.
-//
-//  The rule from the plan stands: no widget may fall back to the stock
-//  dark-blue ImGui theme. Every colour ImGui can be told about is set here,
-//  from the same role table the rest of the cockpit uses - so a tab, a button
-//  and the hull outline are always the same coffee.
 // ============================================================================
 #pragma once
 

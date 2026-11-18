@@ -4,10 +4,6 @@
 //  Looking at a crew member is free. Writing an order down is free. Changing
 //  your mind is free. Orders cost an action when the sheet is handed out;
 //  conversations are separate paid actions that improve morale.
-//
-//  The price is the point. An order's price is also how long it takes to carry
-//  out, so the bottom button counts the lot down as one bar, and nobody takes
-//  new orders until it is empty.
 // ============================================================================
 #pragma once
 

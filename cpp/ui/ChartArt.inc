@@ -342,9 +342,7 @@ int ChartPaintRank(ChartLook look) {
 // region put those stars last in the list, so a click on a galaxy always
 // resolved to a star inside it, no region was ever selected, and the
 // "View ... sector chart" row - the only way off the core chart - never
-// appeared. The reference never has this problem because each body is its own
-// stacked element and the browser hit-tests topmost-first; the port collapses
-// them into one list and has to state the order.
+// appeared.
 int ChartHitRank(const NavBodyView& body) {
   if (body.selected) { return 3; }
   if (body.type == "region") { return 2; }

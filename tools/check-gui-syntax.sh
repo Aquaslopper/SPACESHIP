@@ -1,19 +1,13 @@
 #!/usr/bin/env bash
 # ============================================================================
-#  check-gui-syntax.sh — prove the drawing code still compiles.
-#  ---------------------------------------------------------------------------
-#  This machine may not have X11 or OpenGL development files, so the client
-#  cannot link here - but the compiler can still parse it. That is the check
-#  that matters during the port: a rename in raylib or ImGui must fail loudly
-#  now, not on the first machine with a display.
+#  check-gui-syntax.sh — syntax checking only; no linking or rendering.
 #
 #  Finds the three headers wherever they are:
 #    SPACESHIP_GUI_INCLUDE  colon-separated include roots, if set
 #    build/_deps/*-src      what FetchContent leaves behind
 #    /tmp/deps/*            a pre-vendored copy
 #
-#  Exit 0 = clean, 1 = the compiler complained, 77 = not installed here (CTest
-#  reports a skip rather than a failure).
+#  Exit 0 = clean, 1 = the compiler complained, 77 = headers not found.
 # ============================================================================
 set -u
 

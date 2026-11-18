@@ -225,8 +225,6 @@ void Simulation::BeginVoyage(const ChartSettings& settings, const std::string& s
 }
 
 void Simulation::PerformAction(const std::string& detail) {
-  // PRESERVED GAMEPLAY: Action clock, world tick, cargo mix, commendations.
-  // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
 
   actionCounter_ += 1;
 
@@ -241,8 +239,6 @@ void Simulation::PerformAction(const std::string& detail) {
 }
 
 void Simulation::FreeCommit(const std::string& detail) {
-  // PRESERVED GAMEPLAY: Action clock, commendations.
-  // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
   if (!detail.empty()) { LogLine(detail + "."); }
   CheckCommendations();
 }

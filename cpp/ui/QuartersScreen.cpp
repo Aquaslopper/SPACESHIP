@@ -235,12 +235,10 @@ QuartersScreenModel BuildQuartersScreen(const Simulation& sim) {
     line.fee = sim.OrderFeeFor(sim.StagedJob(hand), order.id);
     const bool on = staged != nullptr && staged->Has(order.id);
     line.on = on;
-    line.locked = (order.id == "learnSt" && !sim.State().docked) ||
-                  (order.id == "rest" && hand.fatigue < 25 && hand.morale >= 70 && !on);
+    line.locked = order.id == "learnSt" && !sim.State().docked;
     line.cost = js::NumToString(line.actions);
     if (line.fee > 0) { line.cost += " - " + js::NumToString(line.fee) + " sh"; }
-    line.note = line.locked ? (order.id == "rest" ? "already rested" : "no station in reach")
-                            : order.note;
+    line.note = line.locked ? "no station in reach" : order.note;
     line.state = line.locked ? "off" : (on ? "on" : "");
     model.orders.push_back(line);
   }

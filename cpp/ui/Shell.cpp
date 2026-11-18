@@ -1,11 +1,7 @@
 // ============================================================================
 //  Shell.cpp — tabs, sidebar, foot, status line.
 //  ---------------------------------------------------------------------------
-//  Implements the native tab system, sidebar and status bar corresponding to
-//  Sections H, J and L of the HTA. This correspondence is not by itself proof
-//  of visual or interaction parity. UI-only state tracks open tabs, the active
-//  screen, unread-tab pulses and folded sidebar blocks; voyage values are read
-//  from the simulation on each paint to avoid stale displayed ship state.
+//  Voyage values are read from the simulation on each paint.
 // ============================================================================
 #include "ui/Shell.h"
 

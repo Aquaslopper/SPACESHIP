@@ -33,7 +33,6 @@ Rgb Hex(const char* hex) {
 }
 
 Palette ClassicPalette() {
-  // Literal Section 1 CSS roles; do not derive one role from another.
   Palette p;
   p.white = Hex("#fffaf2"); p.panel = Hex("#f4e6d0");
   p.panel2 = Hex("#ead5b5"); p.panel3 = Hex("#e3c9a3");
@@ -184,8 +183,6 @@ float Theme::LineHeightForPx(float px) {
 
 const std::vector<ThemeSpec>& Theme::Specs() {
   static const std::vector<ThemeSpec> specs = {
-      // The HTA's five themes, in the reference's order. The ids are the
-      // reference's so a save keeps its choice; the labels match the HTA.
       {"classic", "Flight Deck - parchment", {139, 111, 78}},
       {"void", "Deep Space - cyan", {0x5b, 0xb8, 0xd5}},
       {"aurora", "Aurora - mint", {0x5b, 0xbe, 0x9d}},

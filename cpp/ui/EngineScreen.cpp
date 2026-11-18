@@ -268,7 +268,7 @@ EngineScreenModel BuildEngineScreen(const Simulation& sim) {
   drive.id = "eng-drive";
   drive.title = "Drive";
   drive.placement = "np-last";
-  drive.Field("Class", "Kestrel light hauler");
+  drive.Field("Class", sim.Ship().Get("className"));
   drive.Field("Core", "Primary - single");
   drive.Field("Cylinders", "12 in bank 1");
   screen.left.push_back(drive);

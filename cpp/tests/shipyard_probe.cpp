@@ -33,7 +33,7 @@ int main() {
   const auto yard = ship::BuildStationScreen(sim, sim.Map().here);
   for (const auto& col : yard.columns) if (col.id == "yard") {
     assert(col.rows.at(3).id == "ship-buy:explorer-manta");
-    assert(col.rows.at(4).id == "ship-buy:kestrel");
+    assert(col.rows.at(4).id == "ship-buy:yamato");
   }
   assert(!ship::PressStationAction(sim, "ship-disposition:park"));
   assert(ship::PressStationAction(sim, "ship-buy:cargo-spine"));
@@ -89,5 +89,5 @@ int main() {
       assert(row.id != "upgrade:drive" && row.id != "upgrade:rack" && row.id != "upgrade:scanner" && row.id != "upgrade:scanner2");
     }
   }
-  std::cout << "PASS: Wren resale 1000 sh, buy-first sell/park controls, Tessellate ordering, green purchase marker, parking/switching, save/load, prices and services\n";
+  std::cout << "PASS: Wren resale 1000 sh, buy-first sell/park controls, offer ordering, green purchase marker, parking/switching, save/load, prices and services\n";
 }

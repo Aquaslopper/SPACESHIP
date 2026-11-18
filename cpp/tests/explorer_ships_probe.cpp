@@ -1,5 +1,4 @@
 #include "core/Simulation.h"
-#include "ui/ShipDiagram.h"
 #include "ui/StationScreen.h"
 #include "ui/StoresScreen.h"
 #include <cassert>
@@ -25,7 +24,6 @@ int main() {
     assert(ship::PressStationAction(sim, "ship-buy:" + kind));
     assert(sim.State().shipClass == kind && sim.State().shiplets == 0);
     assert(sim.CargoCapacity() == 20 && sim.Ship().Berths() == 6);
-    assert(&ship::ActivePlan(sim) == &sim.World().wren);
     const auto after = nlohmann::ordered_json::parse(sim.SaveJson());
     for (const char* key : {"rooms", "crew", "goods", "stats", "life", "mess", "map"}) {
       assert(before.at(key) == after.at(key));
@@ -45,14 +43,14 @@ int main() {
     std::string error;
     assert(loaded.LoadJson(sim.SaveJson(), &error));
     assert(loaded.State().shipClass == kind && loaded.CargoCapacity() == 20);
-    assert(&ship::ActivePlan(loaded) == &loaded.World().wren);
+    assert(nlohmann::ordered_json::parse(loaded.SaveJson()).at("rooms") == after.at("rooms"));
     assert(loaded.Rooms().size() == sim.Rooms().size());
     loaded.MutableState().shiplets = 4000;
     assert(loaded.BuyUpgrade("bay") && loaded.CargoCapacity() == 60);
     assert(loaded.BuyUpgrade("bay2") && loaded.CargoCapacity() == 90);
-    loaded.MutableState().shiplets = 4000;
-    assert(loaded.BuyLargerShip());
-    assert(loaded.State().shipClass == "kestrel");
+    loaded.MutableState().shiplets = 12000;
+    assert(loaded.BuyLargerShip("cargo-spine"));
+    assert(loaded.State().shipClass == "cargo-spine" && loaded.CargoCapacity() == 240);
     auto reference = ship::Simulation::ReferenceVoyage(catalog);
     assert(reference.ShipCargoCapacity(kind, 0) == reference.ShipCargoCapacity("wren", 0));
     std::cout << "PASS: " << kind << " uses listed price; Wren stats, six berths, rooms/layout, ongoing work, refits and save/load retained\n";

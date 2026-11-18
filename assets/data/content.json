@@ -39,7 +39,6 @@
     "options": {
       "audioLevel": 0.4,
       "confirmRisk": false,
-      "hideCrewLabels": false,
       "largeText": false,
       "music": true,
       "soundEffects": true,
@@ -204,19 +203,19 @@
     {
       "group": "Getting started",
       "id": "controls",
-      "text": "Left-click a ship element for a briefing; right-click it to open a task tab. Use the arrows to scroll tabs and Home to return to the ship. The disk icon has three independent save slots, a new-voyage command and a return to the main menu; slot one reads the original save. The gear holds five bridge palettes, ambient music, sound effects, volume, motion, reading, crew labels and confirmations. Rapid repeat clicks are briefly ignored while each command settles. Reading and changing options are free.",
+      "text": "On Home, left-click a room callout or indicator for a briefing; right-click it to open a task tab. Use the arrows to scroll tabs and Home to return to the ship. The disk icon has three independent save slots, a new-voyage command and a return to the main menu. The gear holds five bridge palettes, ambient music, sound effects, volume, motion, reading size and confirmations. Reading and changing options are free.",
       "title": "Controls, tabs and saves"
     },
     {
       "group": "Getting started",
       "id": "ships",
-      "text": "A new voyage begins on the compact Wren courier: 40 m3 of cargo and six berths, with all ship systems fitted. At any station shipyard, buy the larger Kestrel-series SC Tessellate for 4,000 shiplets. It has 60 m3 of cargo and 14 berths before refits. Cargo, crew, active work, equipment, refits, condition and records transfer; the purchase is permanent and takes one click. Cargo refits increase the Wren to 60 then 90 m3; the same refits carry over to 90 then 120 m3 on the Kestrel.",
+      "text": "A new voyage begins on the compact Wren courier: 20 m3 of cargo and six berths. At a station shipyard, you can buy another hull for shiplets without spending a click. Cargo, crew, active work, rooms, equipment, refits, condition and records transfer. Cargo refits increase the Wren to 60 then 90 m3.",
       "title": "Your ships and the shipyard"
     },
     {
       "group": "Getting started",
       "id": "actions",
-      "text": "One committed click advances the ship clock once. Starting a process costs one click, then its remaining work progresses on later clicks. Completed crossings and scans must be acknowledged; acknowledging a scan costs one click. Use Stand watch in Navigation to spend one click advancing work and survival clocks, even with a full hold. The filter bank grants ten units of work progress without advancing the world clock. Opening tabs, reading and selecting map targets never cost a click.",
+      "text": "One committed click advances the ship clock once. Starting a process costs one click, then its remaining work progresses on later clicks. Completed crossings and scans must be acknowledged; acknowledging a scan costs one click. The filter bank grants ten units of work progress without advancing the world clock. Opening tabs, reading and selecting map targets never cost a click.",
       "title": "Actions and ongoing work"
     },
     {

@@ -1,23 +1,5 @@
 // ============================================================================
-//  NavScreen.h — the star chart: three scales, one projection, and the two
-//  things on it that cost anything.
-//  ---------------------------------------------------------------------------
-//  Section I-2 of the reference draws the chart out of absolutely positioned
-//  dots, and every dot goes through the same pair of functions:
-//
-//      mapX(wx) = (cx + (wx - cx) * zoom) * (vw / w)  + panX
-//      mapY(wy) = (cy + (wy - cy) * zoom) * (vh / h)  + panY
-//
-//  ...so the chart can be any size at all and nothing comes loose from
-//  anything else. That pair, the perspective raster behind it, the pan clamp
-//  and the zoom ladder all live here as plain functions, which is why the
-//  geometry can be checked character-for-character without a window.
-//
-//  Nothing in this file touches a renderer, and nothing in the chart model
-//  touches game state. Looking is free: selecting, zooming, panning and
-//  reading panels never reach PerformAction. Two controls do - Start Travel
-//  and Run Deep Scan - and they do it through the same PressNavAction() the
-//  tests drive.
+//  NavScreen.h — the star chart.
 // ============================================================================
 #pragma once
 
@@ -30,7 +12,6 @@
 
 namespace ship {
 
-// The reference's exact words for a contact the ship cannot measure.
 const char* NavOutOfRange();
 
 // ---------------------------------------------------------------------------
@@ -57,7 +38,7 @@ struct NavRaster {
 
 NavRaster BuildNavRaster(const Simulation& sim);
 
-// The one hairline through (vx,vy) and (bx,by), as the reference computes it.
+// The hairline through (vx,vy) and (bx,by).
 NavRasterLine NavRasterThrough(double w, double h, double vx, double vy,
                                double bx, double by);
 
@@ -78,7 +59,7 @@ NavPoint NavProjectPanned(const MapView& map, const LayerView& view,
                           double wx, double wy);
 
 // zoomMap(dir): one step on the ladder, clamped to [zmin, zmax], rounded to a
-// tenth, exactly as the reference rounds it.
+// tenth.
 double NavZoomStep(double zoom, int dir, double zmin, double zmax, double zstep);
 
 // clampPan(): the chart may be pulled half a screen out of place, no further.
@@ -183,9 +164,6 @@ struct NavScreenModel {
 NavScreenModel BuildNavScreen(const Simulation& sim);
 
 // What a click on the chart, a layer button, the zoom pair or an action does.
-// Every "free" verb is refused nothing and spends nothing; the two commitments
-// go through the simulation's own StartTravel/StartScan, so a test drives the
-// same path a window does.
 bool PressNavAction(Simulation& sim, const std::string& action,
                     const std::string& arg = std::string());
 

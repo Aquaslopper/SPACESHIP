@@ -1,10 +1,8 @@
 // ============================================================================
 //  Ships.cpp — the hull the voyage is happening in.
 //  ---------------------------------------------------------------------------
-//  Wren, Kestrel and two cargo haulers share the existing deck plans. Buying a hull is
-//  the same voyage in another hull. The crew, the hold, the equipment, the work
-//  in progress and every record transfer; only the deck plan and the berths
-//  change.
+//  Changing hulls keeps the crew, hold contents, equipment, work in progress
+//  and voyage records.
 // ============================================================================
 #include "core/JsNumber.h"
 #include "core/Simulation.h"
@@ -48,7 +46,8 @@ bool Simulation::HasRoom(const std::string& id) const {
 bool Simulation::BuyRoom(const std::string& id) {
   if (!state_.gameOver.empty() || !state_.docked || HerePort() == nullptr ||
       state_.shiplets < RoomPrice() || StandardRoom(id) || HasRoom(id)) return false;
-  const DeckPlan& plan = (state_.shipClass == "wren" || state_.shipClass == "explorer-needle" || state_.shipClass == "explorer-manta" || state_.shipClass == "yamato" || state_.shipClass == "arcadia") ? catalog_->wren : catalog_->kestrel;
+  const DeckPlan& plan = (state_.shipClass == "cargo-spine" || state_.shipClass == "cargo-bulk")
+      ? catalog_->hauler : catalog_->wren;
   const Room* room = plan.FindRoom(id);
   if (room == nullptr) return false;
   const std::string name = room->name;
@@ -60,10 +59,8 @@ bool Simulation::BuyRoom(const std::string& id) {
 }
 
 void Simulation::ApplyShipLayout() {
-  // The reference keeps ROOM_BLUEPRINTS as the large plan and SMALL_ROOMS as the
-  // compact one, and rewrites every room's box from the plan for the class the
-  // voyage is flying. Unrecognised legacy rooms are preserved, not dropped.
-  const DeckPlan& plan = (state_.shipClass == "wren" || state_.shipClass == "explorer-needle" || state_.shipClass == "explorer-manta" || state_.shipClass == "yamato" || state_.shipClass == "arcadia") ? catalog_->wren : catalog_->kestrel;
+  const DeckPlan& plan = (state_.shipClass == "cargo-spine" || state_.shipClass == "cargo-bulk")
+      ? catalog_->hauler : catalog_->wren;
   for (Room& room : rooms_) {
     const Room* authored = plan.FindRoom(room.id);
     if (authored == nullptr) { continue; }
@@ -90,9 +87,7 @@ bool Simulation::BuyLargerShip(const std::string& kind) {
   state_.shipClass = kind;
   auto fields = catalog_->shipFields.find(kind);
   if (fields != catalog_->shipFields.end()) { ship_.fields = fields->second; }
-  cargo_.capacity = kind == "kestrel"
-      ? std::max(cargo_.capacity, ShipCargoCapacity(kind, CargoRefitLevel()))
-      : ShipCargoCapacity(kind, CargoRefitLevel());
+  cargo_.capacity = ShipCargoCapacity(kind, CargoRefitLevel());
   ApplyShipLayout();
 
   FreeCommit("Commissioned " + ship_.fields["name"]);

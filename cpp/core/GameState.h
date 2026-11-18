@@ -1,7 +1,3 @@
-// Remove all state machines and gates enforcing anti-roguelike logic, //
-// while strictly preserving core gameplay mechanics. //
-
-
 #pragma once
 
 #include <map>
@@ -154,7 +150,6 @@ struct TradeContract {
 struct Options {
   bool largeText = false;
   bool confirmRisk = false;
-  bool hideCrewLabels = false;
   std::string theme = "classic";
   bool soundEffects = true;
   bool music = true;

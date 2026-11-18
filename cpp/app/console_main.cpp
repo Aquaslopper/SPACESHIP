@@ -1,10 +1,8 @@
 // ============================================================================
 //  console_main.cpp — spaceship_console, the scriptable harness.
 //  ---------------------------------------------------------------------------
-//  Runs a command script against the headless simulation and prints the
-//  canonical trace at every checkpoint. The same script, run through
-//  tools/trace-voyage.cjs against the reference edition, must produce the same
-//  stream; tests/parity/differential.test.cjs does that comparison.
+//  Runs a command script against the headless simulation. `trace` prints a
+//  snapshot of the simulation, not a recording of clicks in the client.
 //
 //  Script syntax, one command per line, '#' starts a comment:
 //
@@ -17,7 +15,6 @@
 //    target <body>        select a chart body (free)
 //    travel               startTravel()          — plot a crossing
 //    scan                 startScan()            — run the sensors
-//    watch                standWatch()           — one action, nothing else
 //    ack <taskId>         press a finished task's button (arrival, scan readout)
 //    dock | undock        the station berth
 //    layer <key>          switch chart scale (free)
@@ -28,10 +25,10 @@
 //    salvage <bay>        recover route salvage while under way
 //    contract accept|collect <id>
 //    commission accept <kind> | commission collect | commission abandon
-//    hire <candidateId> | upgrade <id> | shipyard
+//    hire <candidateId> | upgrade <id>
 //    project <id> | medical <crewId> | social <a> <b>
 //    save <file> [utf16]  |  load <file>
-//    saveslot <1|2|3> | loadslot <1|2|3>   the HTA's own three slots
+//    saveslot <1|2|3> | loadslot <1|2|3>
 //    crew-set <id> <numeric field> <value>   survival boundary test setup
 //    survival-set <field> <value>            survival boundary test setup
 //    active <tab>         select the tab whose buttons are inspected
@@ -57,9 +54,7 @@
 
 namespace {
 
-// The save root every script uses. Defaults to the game's own runtime/saves,
-// but a test can point it anywhere with SPACESHIP_SAVE_DIR - which is what
-// keeps parallel CTest runs from fighting over one Spaceship_save.txt.
+// The save root defaults to runtime/saves and can be set with SPACESHIP_SAVE_DIR.
 std::string SaveRootPath() {
   const char* override = std::getenv("SPACESHIP_SAVE_DIR");
   if (override != nullptr && override[0] != '\0') { return std::string(override); }
@@ -206,8 +201,6 @@ int main(int argc, char** argv) {
     } else if (command == "job" && parts.size() >= 3) {
       simulation.ApplyJob(parts[1], parts[2]);
     } else if (command == "stat" && parts.size() >= 3) {
-      // Setup only: a parity script may need a voyage in a particular condition
-      // (a dead hull, say) without spending a hundred actions to get there.
       ship::Stat* stat = simulation.FindStat(parts[1]);
       if (stat == nullptr) {
         std::fprintf(stderr, "spaceship_console: no such stat '%s'\n", parts[1].c_str());
@@ -226,8 +219,6 @@ int main(int argc, char** argv) {
       simulation.StartTravel();
     } else if (command == "scan") {
       simulation.StartScan();
-    } else if (command == "watch") {
-      simulation.StandWatch();
     } else if (command == "ack" && parts.size() >= 2) {
       simulation.Acknowledge(parts[1]);
     } else if (command == "dock") {
@@ -289,8 +280,6 @@ int main(int argc, char** argv) {
       simulation.HireCrew(parts[1]);
     } else if (command == "upgrade" && parts.size() >= 2) {
       simulation.BuyUpgrade(parts[1]);
-    } else if (command == "shipyard") {
-      simulation.BuyLargerShip();
     } else if (command == "project" && parts.size() >= 2) {
       simulation.StartProject(parts[1]);
     } else if (command == "claim" && parts.size() >= 2) {

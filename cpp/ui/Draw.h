@@ -189,7 +189,6 @@ class ShellView {
   void PaintScrollbar(const Area& viewport, float contentHeight, float scroll) const;
   void ResetContentScroll();
 
-  void SyncIdleDots(const Simulation& sim, double nowMs);
   void PaintChrome(Simulation& sim, double nowMs);
   void OpenBriefing(const Simulation& sim, const std::string& kind, const std::string& id);
   void PaintTaskScreen(Simulation& sim);
@@ -212,7 +211,6 @@ class ShellView {
   float PaintActionBand(const std::string& title, const std::string& note,
                        const std::vector<ProgressButton>& buttons,
                        const std::string& warning = "", bool measureOnly = false);
-  void PaintDiagram(const DiagramModel& diagram, const Area& stageBox, float scale);
   bool PressPanelRow(Simulation& sim, ScreenKind kind, const std::string& id);
 
   Theme theme_;
@@ -220,17 +218,10 @@ class ShellView {
   Font boldFont_{};
   Font monoFont_{};
   ShellLayout layout_;
-  FxRng rng_;
-  FxRng driftRng_;
-  double lastDriftMs_ = 0.0;
   std::vector<ActionMark> marks_;
-  std::vector<DriftDot> dots_;
   IdleScreenModel idle_;
-  Area idleStageBox_{};
-  float idleDiagramScale_ = 1.0f;
   void* wrenExteriorArt_ = nullptr;
   std::string exteriorArtPath_ = "art/ships/wren-exterior.png";
-  bool exteriorView_ = true;
   ExteriorLayout exterior_;
   WrenSdfGrid wrenSdf_;
   Mesh wrenMesh_{};

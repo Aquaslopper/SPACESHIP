@@ -1,31 +1,5 @@
 // ============================================================================
 //  GalaxyGen.h — the generator, not its output.
-//  ---------------------------------------------------------------------------
-//  The reference does not ship a finished galaxy. Spaceship.hta lays out seven
-//  regions and one system, then builds the rest at load time from a
-//  table of forty-seven rows (STAR_CATALOG) and a second pass that gives every
-//  system an outer world and a moon (expandLocalCharts). assets/data/chart.json
-//  is the *result* of those two passes, exported once by tools/export-data.cjs.
-//
-//  The first port loaded the export and never ported the passes, so the sky was
-//  a photograph of a galaxy rather than a galaxy. This header puts the two
-//  passes back. They are transcribed from the reference, row for row:
-//
-//    * BuildGalaxyFromRows() is buildGalaxyContent(): for each row it creates
-//      the system if it is not there yet, joins the first system of a region to
-//      that region's hub, then adds three local bodies - an entry star, a world
-//      (a belt when the name says Belt) and a landmark, which is a station and
-//      a priced port when the row names a trade profile.
-//    * ExpandLocalCharts() is expandLocalCharts(): system i gains an outer
-//      world of profile i % 4 and a moon, and the system's summary strings are
-//      rewritten to match.
-//
-//  Together they reproduce the exported chart exactly - bodies, names,
-//  coordinates, klass strings, detail rows, scans, ports and lanes - which
-//  cpp/tests/galaxy_gen_tests.cpp checks field by field. That check is what
-//  lets the rest of the port treat generated and exported content as the same
-//  thing, and it is what makes it honest to grow the chart: a generated system
-//  is built by the same function that built the forty-seven.
 // ============================================================================
 #pragma once
 

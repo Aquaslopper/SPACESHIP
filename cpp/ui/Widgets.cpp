@@ -1,7 +1,3 @@
-// Remove all state machines and gates enforcing anti-roguelike logic, 
-// while strictly preserving core gameplay mechanics.
-
-
 #include "ui/Widgets.h"
 
 #include <algorithm>

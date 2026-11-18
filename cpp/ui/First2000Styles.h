@@ -1,6 +1,3 @@
-// Literal scene CSS from Spaceship.hta lines 918–1199 only.
-// Checked against the bounded source by tools/check-first-2000.cjs.
-// Reference type sizes are retained, subject to the approved 18 px native floor.
 #pragma once
 #include <string>
 namespace ship {

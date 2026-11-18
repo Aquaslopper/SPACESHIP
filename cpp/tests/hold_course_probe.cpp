@@ -82,7 +82,7 @@ int main() {
  assert(sim.FindOngoing("travel")->target==home);
  assert(position==sim.Map().flightOrigin);
  sim.PerformAction("return flight");
- assert(ship::PressWithoutCharge(sim, [&]() { return sim.StandWatch(); }));
+ assert(ship::PressWithoutCharge(sim, [&]() { sim.PerformAction("Test click"); return true; }));
  assert(ship::PressNavAction(sim,"hold"));
  assert(position!=sim.Map().flightOrigin);
  sim.SelectTarget(destination->id); assert(sim.StartTravel());
@@ -125,7 +125,7 @@ int main() {
  auto clicks=battery.ActionCount();
  assert(!ship::PressNavAction(battery,"hold"));
  assert(battery.ActionCount()==clicks);
- assert(ship::PressWithoutCharge(battery,[&](){return battery.StandWatch();}));
+ assert(ship::PressWithoutCharge(battery,[&](){battery.PerformAction("Test click"); return true;}));
  assert(ship::ChargePercent(battery,holdRow.chargeKey,holdRow.tier)==50);
  assert(!ship::BuildNavScreen(battery).screen.commands.front().enabled);
  assert(battery.Map().flightOrigin==held);
@@ -133,7 +133,7 @@ int main() {
  assert(partial.LoadJson(battery.SaveJson(),&error));
  assert(ship::ChargePercent(partial,holdRow.chargeKey,holdRow.tier)==50);
  assert(!ship::PressNavAction(partial,"hold"));
- assert(ship::PressWithoutCharge(battery,[&](){return battery.StandWatch();}));
+ assert(ship::PressWithoutCharge(battery,[&](){battery.PerformAction("Test click"); return true;}));
  assert(ship::ChargePercent(battery,holdRow.chargeKey,holdRow.tier)==100);
  battery.SelectTarget(home);
  assert(ship::PressNavAction(battery,"change-course"));
@@ -149,10 +149,10 @@ int main() {
  assert(battery.ActionCount()==clicks);
  assert(battery.FindOngoing("travel")->left==remaining);
  assert(battery.Map().flightOrigin==coursePosition);
- assert(ship::PressWithoutCharge(battery,[&](){return battery.StandWatch();}));
+ assert(ship::PressWithoutCharge(battery,[&](){battery.PerformAction("Test click"); return true;}));
  assert(ship::ChargePercent(battery,courseRow.chargeKey,courseRow.tier)==50);
  assert(!ship::PressNavAction(battery,"change-course"));
- assert(ship::PressWithoutCharge(battery,[&](){return battery.StandWatch();}));
+ assert(ship::PressWithoutCharge(battery,[&](){battery.PerformAction("Test click"); return true;}));
  assert(ship::ChargePercent(battery,courseRow.chargeKey,courseRow.tier)==100);
  battery.SelectTarget(destination->id);
  assert(ship::PressNavAction(battery,"change-course"));

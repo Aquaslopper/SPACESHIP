@@ -1,13 +1,5 @@
 // ============================================================================
 //  Layout.h — the cockpit's measurements, as arithmetic.
-//  ---------------------------------------------------------------------------
-//  The reference measures itself with the browser: `offsetHeight` for what is
-//  already drawn, then one leftover number handed to the feed. That is a sound
-//  design with an unsound implementation (a browser is not a test), so the port
-//  keeps the design and replaces the measuring with numbers: every anchor below
-//  is the pixel the stylesheet pins, and `Give` is the same
-//  "measure - subtract - give the rest away" step, written so CTest can check it
-//  without a window.
 // ============================================================================
 #pragma once
 
@@ -28,8 +20,6 @@ struct Area {
   }
 };
 
-// §6.4 / stylesheet: the fixed furniture. Nothing below is negotiable at
-// runtime; the window may grow, these do not.
 struct Metrics {
   static constexpr float kTaskbarH = 35.0f;     // #taskbar height
   static constexpr float kControlsW = 48.0f;    // right-hand tab-scroll arrows
@@ -100,8 +90,7 @@ ShellLayout ComputeLayout(float windowW, float windowH, float contentHeight,
                            float homeWidth = Metrics::kHomeW);
 
 // The stage is a fixed rectangle, centred in the content column. If the window
-// is narrower than the ship the ship keeps its size and the column scrolls -
-// the reference's `.screen` does exactly that.
+// is narrower than the ship the ship keeps its size and the column scrolls.
 Area StageRect(const Area& content, bool compactStage);
 
 // Bottom-up lines: index 0 is the leftmost, one 5px pitch apart, 104px tall.

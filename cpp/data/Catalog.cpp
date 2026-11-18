@@ -58,8 +58,7 @@ Rect ReadRect(const Json& object, const std::string& where) {
 Json LoadFile(const std::filesystem::path& path) {
   std::ifstream in(path, std::ios::binary);
   if (!in) {
-    throw CatalogError("cannot open " + path.string() +
-                       " (run: node tools/export-data.cjs)");
+    throw CatalogError("cannot open " + path.string());
   }
   std::ostringstream buffer;
   buffer << in.rdbuf();
@@ -70,21 +69,9 @@ Json LoadFile(const std::filesystem::path& path) {
   }
 }
 
-DeckPlan ReadDeckPlan(const Json& hulls, const Json& corridors, const Json& rooms,
-                      const std::string& key) {
+DeckPlan ReadDeckPlan(const Json& rooms, const std::string& key) {
   const std::string where = "ship.json/" + key;
   DeckPlan plan;
-
-  for (const Json& part : Field(hulls, key.c_str(), "ship.json/hulls")) {
-    HullPart p;
-    p.id = Text(part, "id", where + "/hull");
-    p.cls = Text(part, "cls", where + "/hull");
-    p.box = ReadRect(part, where + "/hull");
-    plan.hull.push_back(p);
-  }
-
-  const Json& corridor = Field(corridors, key.c_str(), "ship.json/corridors");
-  plan.corridor = ReadRect(corridor, where + "/corridor");
 
   for (const Json& room : Field(rooms, key.c_str(), "ship.json/rooms")) {
     Room r;
@@ -194,12 +181,9 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
 
   // ---- ship --------------------------------------------------------------
   const Json ship = LoadFile(data / "ship.json");
-  catalog.wren = ReadDeckPlan(Field(ship, "hulls", "ship.json"),
-                              Field(ship, "corridors", "ship.json"),
-                              Field(ship, "rooms", "ship.json"), "wren");
-  catalog.kestrel = ReadDeckPlan(Field(ship, "hulls", "ship.json"),
-                                 Field(ship, "corridors", "ship.json"),
-                                 Field(ship, "rooms", "ship.json"), "kestrel");
+  const Json& rooms = Field(ship, "rooms", "ship.json");
+  catalog.wren = ReadDeckPlan(rooms, "wren");
+  catalog.hauler = ReadDeckPlan(rooms, "hauler");
   for (auto it = Field(ship, "roomScenes", "ship.json").begin();
        it != Field(ship, "roomScenes", "ship.json").end(); ++it) {
     const std::string where2 = "ship.json/roomScenes/" + it.key();
@@ -224,7 +208,7 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
     catalog.shipFields[it.key()] = fields;
   }
   catalog.counts.roomsWren = static_cast<int>(catalog.wren.rooms.size());
-  catalog.counts.roomsKestrel = static_cast<int>(catalog.kestrel.rooms.size());
+  catalog.counts.roomsHauler = static_cast<int>(catalog.hauler.rooms.size());
 
   // ---- chart -------------------------------------------------------------
   const Json chart = LoadFile(data / "chart.json");
@@ -437,7 +421,7 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
   catalog.counts.themes = static_cast<int>(Field(content, "themes", "content.json").size());
   catalog.counts.taskTypes = static_cast<int>(catalog.taskTypes.size());
 
-  // ---- crew and survival (counted now, consumed from Phase 1) ------------
+  // ---- crew and survival ------------------------------------------------
   const Json crew = LoadFile(data / "crew.json");
   for (const Json& member : Field(crew, "crew", "crew.json")) {
     catalog.startingCrew.push_back(ReadCrew(member));
@@ -840,11 +824,9 @@ std::vector<std::string> Catalog::Validate() const {
   }
 
   // ---- deck plans --------------------------------------------------------
-  for (const DeckPlan* plan : {&wren, &kestrel}) {
-    const bool isWren = plan == &wren;
-    const char* name = isWren ? "wren" : "kestrel";
+  for (const DeckPlan* plan : {&wren, &hauler}) {
+    const char* name = plan == &wren ? "wren" : "hauler";
     std::set<std::string> ids;
-    if (plan->hull.empty()) { problems.push_back(std::string(name) + " hull is empty"); }
     for (const Room& room : plan->rooms) {
       if (!ids.insert(room.id).second) {
         problems.push_back(std::string(name) + " deck plan repeats room '" + room.id + "'");

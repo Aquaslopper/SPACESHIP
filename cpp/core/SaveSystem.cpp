@@ -1,8 +1,5 @@
 // ============================================================================
 //  SaveSystem.cpp — the voyage, on disk, in both directions.
-//  ---------------------------------------------------------------------------
-// Remove all state machines and gates enforcing anti-roguelike logic, 
-// while strictly preserving core gameplay mechanics.
 // ============================================================================
 #include <nlohmann/json.hpp>
 
@@ -160,7 +157,6 @@ std::string Simulation::SaveJson() const {
 
   s["options"] = Json{{"largeText", state_.options.largeText},
                       {"confirmRisk", state_.options.confirmRisk},
-                      {"hideCrewLabels", state_.options.hideCrewLabels},
                       {"theme", state_.options.theme},
                       {"soundEffects", state_.options.soundEffects},
                       {"music", state_.options.music},
@@ -172,7 +168,6 @@ std::string Simulation::SaveJson() const {
                       {"glow", Num(state_.options.glow)},
                       {"lensFlare", Num(state_.options.lensFlare)},
                       {"radiationWave", Num(RadiationWaveStrength(state_.options.radiationWave))},
-                      // Phase 9: the reading size and the window travel too.
                       {"fontStep", Num(static_cast<double>(state_.options.fontStep))},
                       {"fullscreen", state_.options.fullscreen}};
 
@@ -1092,8 +1087,6 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     state_.lotSerial = GetNumber(s, "lotSerial");
     state_.gameOver = GetString(s, "gameOver");
 
-    // PRESERVED GAMEPLAY: Nav target state from save.
-    // REMOVED: state_.navTarget.reset() (Anti-game logic gate/silent reset).
     if (auto it = s.find("navTarget"); it != s.end() && it->is_string()) {
       state_.navTarget = it->get<std::string>();
     }
@@ -1184,7 +1177,6 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     if (auto it = s.find("options"); it != s.end() && it->is_object()) {
       state_.options.largeText = GetBool(*it, "largeText");
       state_.options.confirmRisk = GetBool(*it, "confirmRisk");
-      state_.options.hideCrewLabels = GetBool(*it, "hideCrewLabels");
       state_.options.theme = GetString(*it, "theme", "classic");
       state_.options.soundEffects = GetBool(*it, "soundEffects", true);
       state_.options.music = GetBool(*it, "music", true);

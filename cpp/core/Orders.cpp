@@ -142,11 +142,6 @@ bool Simulation::ToggleOrder(const std::string& crewId, const std::string& order
   if (orderId == "learnSt" && !state_.docked) { return false; }
   CrewMember* crew = FindCrew(crewId);
   if (crew == nullptr) { return false; }
-  const OrderSheet* existing = SheetOf(*crew);
-  if (orderId == "rest" && crew->fatigue < 25 && crew->morale >= 70 &&
-      !(existing != nullptr && existing->Has("rest"))) {
-    return false;
-  }
   bool known = false;
   for (const Catalog::OrderDefinition& order : catalog_->orderDefs) {
     if (order.id == orderId) { known = true; }

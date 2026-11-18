@@ -169,7 +169,6 @@ int main(int argc, char** argv) {
   ship::Theme theme = ship::Theme::ById(sim.State().options.theme);
   theme.fontStep = sim.State().options.fontStep;
   theme.largeText = sim.State().options.largeText;
-  theme.hideCrewLabels = sim.State().options.hideCrewLabels;
   theme.reducedMotion = sim.State().reducedMotion;
   theme.stageCompact = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta" || sim.State().shipClass == "yamato" || sim.State().shipClass == "arcadia");
 
@@ -287,12 +286,10 @@ int main(int argc, char** argv) {
     ship::Theme next = ship::Theme::ById(sim.State().options.theme);
     next.fontStep = sim.State().options.fontStep;
     next.largeText = sim.State().options.largeText;
-    next.hideCrewLabels = sim.State().options.hideCrewLabels;
     next.reducedMotion = sim.State().reducedMotion;
     next.stageCompact = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta" || sim.State().shipClass == "yamato" || sim.State().shipClass == "arcadia");
     const bool changed = next.id != theme.id || next.fontStep != theme.fontStep ||
                          next.largeText != theme.largeText ||
-                         next.hideCrewLabels != theme.hideCrewLabels ||
                          next.reducedMotion != theme.reducedMotion ||
                          next.stageCompact != theme.stageCompact;
     if (changed) {

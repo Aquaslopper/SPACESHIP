@@ -1,15 +1,3 @@
-// ============================================================================
-//  Catalog.h — loads the extracted catalogues and proves they are complete.
-//  ---------------------------------------------------------------------------
-//  The JSON under assets/data is generated from Spaceship.hta by
-//  tools/export-data.cjs. This class is the only place that knows the file
-//  layout; the rest of the port asks it questions.
-//
-//  LoadFromAssets() is strict: a missing or malformed file throws, because a
-//  half-loaded catalogue would produce a voyage that quietly differs from the
-//  reference. Validate() is separate and returns every integrity problem it can
-//  find, so the test suite can report them all at once instead of the first.
-// ============================================================================
 #pragma once
 
 #include <cstddef>
@@ -51,8 +39,6 @@ class Catalog {
   // source tree during development. A packaged build can pass its own path.
   static const std::filesystem::path& DefaultAssetDir();
 
-  // Referential integrity, mirroring the assertions in tests/galaxy.test.cjs.
-  // An empty result means the catalogue is sound.
   std::vector<std::string> Validate() const;
 
   // ---- lookups -----------------------------------------------------------
@@ -93,13 +79,12 @@ class Catalog {
   std::map<std::string, std::pair<double, double>> galaxyPositions;
 
   DeckPlan wren;
-  DeckPlan kestrel;
+  DeckPlan hauler;
   // ROOM_SCENES, by room id., never computed.
   std::map<std::string, RoomScene> roomScenes;
   // WORLD_HISTORY: two lines per region: its history, then its traffic.
   std::map<std::string, std::vector<std::string>> worldHistory;
 
-  // WIKI: twenty-one handbook entries, in the reference's order.
   std::vector<WikiEntry> wiki;
 
   std::vector<Body> regions;
@@ -112,8 +97,6 @@ class Catalog {
   std::vector<Good> goods;
   std::vector<Contract> contracts;
 
-  // The reference builds the chart from these tables rather than shipping the
-  // result (see data/GalaxyGen.h). They are data, exported as-is:
   //   portPrices  PORT_PRICES: trade profile -> commodity kind -> multiplier
   //   portHints   PORT_HINTS: trade profile -> the line appended to a port's tip
   //   orbitalWorlds / orbitalPlanetNames / orbitalMoonNames: the local-chart
@@ -131,7 +114,6 @@ class Catalog {
   std::map<std::string, std::map<std::string, std::string>> shipFields;  // by class
   std::map<std::string, std::vector<double>> cargoByClass;  // refit levels 0..2
 
-  // starting values and definitions (Phase 1).
   std::vector<CrewDefinition> startingCrew;
   std::vector<StatDefinition> startingStats;
   std::vector<IncidentType> incidentTypes;

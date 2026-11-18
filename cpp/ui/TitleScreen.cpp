@@ -28,13 +28,13 @@ const std::vector<TutorialCard>& TutorialCards() {
        "Planning is free.", "assets/art/tutorial/spaceship01.png"},
       {"A quiet voyage", "The numbers and destination are examples. Your actual status is shown in the game. To begin, open Navigation and plot a course to Tolme Anchorage.",
        "Observe before you decide.", "assets/art/tutorial/spaceship02.png"},
-      {"The idle screen", "Left-click the ship or its indicators to read about them; right-click to open their task windows. The illustrated layout is conceptual.",
+      {"The idle screen", "Left-click a room callout or indicator to read about it; right-click to open its task window. The illustrated layout is conceptual.",
        "Exploring and opening tabs do not advance time.", "assets/art/tutorial/spaceship03.png"},
       {"The click economy", "Not every click in a task window costs a click: only committed clicks do. Later clicks advance work, subject to power and other requirements.",
        "The filter bank also grants work progress; completed crossings and scans need acknowledgement.", "assets/art/tutorial/spaceship04.png"},
       {"Systems and indicators", "Actions advance survival systems as well as work. Seat three O2 canisters and start the filter bank to keep the air clean.",
        "The image shows an illustrative cascade, not a fixed sequence.", "assets/art/tutorial/spaceship05.png"},
-      {"Your crew", "The artwork illustrates possible roles; the actual starting roster is in the game. Right-click a crew member to open their task tab.",
+      {"Your crew", "The artwork illustrates possible roles; the actual starting roster is in the game. Open Crew Quarters to see the roster.",
        "Talking costs one click and raises that crew member's morale by up to 5 points.", "assets/art/tutorial/spaceship06.png"},
   };
   return cards;

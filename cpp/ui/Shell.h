@@ -1,17 +1,5 @@
 // ============================================================================
 //  Shell.h — the frame the game is played inside.
-//  ---------------------------------------------------------------------------
-//  The reference's chrome is four pieces of furniture and one rule:
-//
-//    taskbar   Home, plus one tab per open task, plus < > and the home slot
-//    sidebar   five fold blocks that cost nothing to open, and one strip that
-//              is always visible because it is the glance
-//    foot      four ship functions, Wiki and Rewards
-//    status    one line, visible from every screen
-//
-//  The rule is that opening a tab is free and drawing the sidebar is free -
-//  nothing in this file spends an action, and nothing here is saved except the
-//  state the reference itself saves (tabs, activeTab, freshTabs, spOpen).
 // ============================================================================
 #pragma once
 

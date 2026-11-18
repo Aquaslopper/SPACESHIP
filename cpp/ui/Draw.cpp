@@ -1,8 +1,5 @@
 // ============================================================================
 //  Draw.cpp — the skin.
-//  ---------------------------------------------------------------------------
-// Remove all state machines and gates enforcing anti-roguelike logic, 
-// while strictly preserving core gameplay mechanics.
 // ============================================================================
 #include "ui/Draw.h"
 #include "core/DisplaySettings.h"
@@ -348,8 +345,7 @@ bool PaintMessStockIcon(const MachinePart& part, const Area& origin, const Palet
   return true;
 }
 
-// WrapText(): greedy wrapping by measured width, so a long paragraph in a
-// dialog or an article breaks where the reference's CSS would break it.
+// WrapText(): greedy wrapping by measured width.
 std::vector<std::string> WrapText(const std::string& text, float width, int size,
                                   const Font& font) {
   std::vector<std::string> lines;
@@ -514,23 +510,17 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
     draggingChart_ = false;
   }
 
-  // Wren, cargo haulers and explorers use their selected exterior artwork;
-  // Kestrel retains its interactive deck plan.
+  // Exterior-equipped ships use their selected artwork.
   if (sim.State().activeTab == "home" && HasWrenExterior(sim)) {
-    if (exteriorView_) {
-      layout_.stage = {layout_.content.x + 8.0f, layout_.content.y,
-                       std::max(1.0f, layout_.content.w - 16.0f),
-                       Metrics::kHomeStageMinH};
-      layout_.stage.h = BuildExteriorLayout(sim, layout_.stage).height;
-    }
+    layout_.stage = {layout_.content.x + 8.0f, layout_.content.y,
+                     std::max(1.0f, layout_.content.w - 16.0f),
+                     Metrics::kHomeStageMinH};
+    layout_.stage.h = BuildExteriorLayout(sim, layout_.stage).height;
   }
 
-  // Always build Home, including when reduced motion is enabled. Keep drift
-  // state across frames and advance it at the reference cadence; rebuilding
-  // random dots every frame caused teleporting and a blank reduced-motion view.
+  // Build the Home screen data.
   if (sim.State().activeTab == "home") {
-    FxRng seeded = rng_;
-    idle_ = BuildIdleScreen(sim, layout_, theme_, theme_.hideCrewLabels, seeded);
+    idle_ = BuildIdleScreen(sim, layout_, theme_);
     if (HasWrenExterior(sim)) {
       exterior_ = BuildExteriorLayout(sim, idle_.stageArea);
       // No tutorial copy or view-switch row is drawn above the ship.
@@ -594,8 +584,6 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
       for (auto& event : idle_.events) { event.box.y += panelShift; }
       idle_.feedBox.h = idle_.feedHeight;
     }
-    rng_ = seeded;
-    SyncIdleDots(sim, nowMs);
     // The whole home column scrolls when it is taller than the content area
     // (the HTA's #content { overflow:auto }). The ceiling is the feed's bottom
     // edge; anything past the content bottom is reachable only by scrolling.
@@ -691,8 +679,6 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
     taskButtons_.clear();
     PaintIdle(sim);
   } else {
-    // Ask the router for the window the active tab owns - the same function the
-    // tests drive, so what is painted is what was proven.
     const Tab* tab = FindTab(sim.State(), sim.State().activeTab);
     const ScreenKind kind = tab == nullptr || !DescribeTargetExists(sim, tab->kind, tab->id)
                                 ? ScreenKind::Described : ScreenKindFor(*tab);
@@ -935,54 +921,6 @@ void ShellView::PaintLaunchCard(double elapsedMs) {
     const float lw = TextWidth(fadeLabel_.c_str(), linePx, true);
     Text(fadeLabel_.c_str(), static_cast<int>(barX + barW - lw), static_cast<int>(midY + 22.0f),
          linePx, ToRay(p.titleMenuBorder), true);
-  }
-}
-
-void ShellView::SyncIdleDots(const Simulation& sim, double nowMs) {
-  const bool compact = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta" || sim.State().shipClass == "yamato" || sim.State().shipClass == "arcadia");
-  // Reconcile by identity, not just count. Retain cosmetic movement while
-  // refreshing its effective room (job, medical, social or corridor) every frame.
-  std::vector<DriftDot> current;
-  for (const DiagramCrew& crew : idle_.diagram.crew) {
-    const auto old = std::find_if(dots_.begin(), dots_.end(),
-                                [&crew](const DriftDot& d) { return d.id == crew.id; });
-    DriftDot dot;
-    if (old != dots_.end()) { dot = *old; }
-    else {
-      dot.id = crew.id;
-      dot.x = dot.tx = crew.dot.x;
-      dot.y = dot.ty = crew.dot.y;
-    }
-    dot.roomId = crew.roomId;
-    current.push_back(dot);
-  }
-  dots_ = std::move(current);
-  if (!sim.State().reducedMotion && lastDriftMs_ <= 0.0) { lastDriftMs_ = nowMs; }
-  const int ticks = sim.State().reducedMotion || lastDriftMs_ <= 0.0
-                        ? 0
-                        : std::min(8, static_cast<int>((nowMs - lastDriftMs_) / FxTiming::kDriftMs));
-  if (ticks > 0) {
-    for (DriftDot& dot : dots_) {
-      const auto room = std::find_if(idle_.diagram.rooms.begin(), idle_.diagram.rooms.end(),
-                                     [&dot](const Room& r) { return r.id == dot.roomId; });
-      if (room == idle_.diagram.rooms.end() && dot.roomId != "corridor") { continue; }
-      const Area roomBox = dot.roomId == "corridor" ? idle_.diagram.corridor :
-          Area{static_cast<float>(room->box.x), static_cast<float>(room->box.y),
-               static_cast<float>(room->box.w), static_cast<float>(room->box.h)};
-      for (int i = 0; i < ticks; ++i) { DriftStep(dot, roomBox, compact, driftRng_); }
-    }
-    lastDriftMs_ += static_cast<double>(ticks * FxTiming::kDriftMs);
-  }
-  for (DiagramCrew& crew : idle_.diagram.crew) {
-    const auto dot = std::find_if(dots_.begin(), dots_.end(),
-                                  [&crew](const DriftDot& d) { return d.id == crew.id; });
-    if (dot == dots_.end()) { continue; }
-    const float dx = dot->x - crew.dot.x;
-    const float dy = dot->y - crew.dot.y;
-    crew.dot.x = dot->x;
-    crew.dot.y = dot->y;
-    crew.label.x += dx;
-    crew.label.y += dy;
   }
 }
 
@@ -1992,8 +1930,6 @@ ShellView::ExteriorLayout ShellView::BuildExteriorLayout(const Simulation& sim, 
     const float rowT = rows > 1 ? static_cast<float>(row) / static_cast<float>(rows - 1) : 0.0f;
     CalloutPlacement placement{left, row, 0.0f, sideW, 0.69f * rowT};
     if (rows == 3) {
-      // Match the reference composition: each lower callout steps inward by
-      // a different amount on each side instead of forming two rigid columns.
       static constexpr float leftY[] = {0.0f, 0.354f, 0.542f};
       static constexpr float rightY[] = {0.0f, 0.306f, 0.527f};
       static constexpr float leftWidth[] = {1.0f, 0.90f, 0.78f};
@@ -2287,11 +2223,7 @@ void ShellView::PaintIdle(Simulation& sim) {
                   4, HexColor(cell.colour, ToRay(theme.palette.coffee)));
   }
 
-  if (HasWrenExterior(sim) && exteriorView_) {
-    PaintWrenExterior(sim);
-  } else {
-    PaintDiagram(idle_.diagram, idle_.stageArea, idleDiagramScale_);
-  }
+  if (HasWrenExterior(sim)) { PaintWrenExterior(sim); }
   // ---- info rail, navigation and dock strip -----------------------------
   auto paintStrip = [this, &theme, &hovered](const Strip& strip) {
     PaintChamferBoxRay(strip.box, kChamferCard, ToRay(hovered(strip.box) ? theme.palette.panel3 : theme.palette.panel),
@@ -5531,7 +5463,6 @@ void ShellView::PaintNavScreen(Simulation& sim) {
     std::string action;
     if (row.label == "HOLD") { action = "hold"; }
     if (row.label == "Change Course") { action = "change-course"; }
-    if (row.label.find("Stand watch") == 0) { action = "stand-watch"; }
     if (row.label.find("Dock at ") == 0) { action = "dock"; }
     if (row.label.find("View ") == 0) { action = "view-sector"; }
     if (!action.empty() && row.enabled) {
@@ -7462,11 +7393,6 @@ void ShellView::PaintHero(const Vignette& vignette, const Area& box) {
 }
 
 
-// ============================================================================
-//  The main menu (Section N). The card is the reference's: a 3:2 crop of the
-//  1672x941 art, five free commands down the left, and one dialog beside them.
-//  Nothing here can advance the clock: the menu is not a place in the voyage.
-// ============================================================================
 void ShellView::OpenPopup(const std::string& key) {
   if (std::find(PopupKeys().begin(), PopupKeys().end(), key) == PopupKeys().end()) { return; }
   auto& panel = floating_.Open(key);
@@ -8744,138 +8670,6 @@ void ShellView::PaintPopup(Simulation& sim) {
   popupKey_ = floating_.Panels().empty() ? "" : floating_.Panels().back().key;
 }
 
-void ShellView::PaintDiagram(const DiagramModel& diagram, const Area& stageBox, float scale) {
-  (void)scale;
-  const ::Color frame = ToRay(theme_.palette.coffee);
-  const ::Color hull = ToRay(theme_.palette.white);
-  const ::Color spine = ToRay(theme_.palette.panel);
-  const float ox = diagram.stage.x;
-  const float oy = diagram.stage.y;
-  const bool overStage = layout_.content.Contains(mouseX_, mouseY_) &&
-                         stageBox.Contains(mouseX_, mouseY_ + contentScroll_);
-  const float localX = mouseX_ - ox;
-  const float localY = mouseY_ + contentScroll_ - oy;
-  const auto crewHovered = [&](const DiagramCrew& crew) {
-    const Area dot{crew.dot.x - 6.0f, crew.dot.y - 6.0f, 27.0f, 27.0f};
-    const Area label{crew.label.x, crew.label.y,
-                     crew.labelled ? TextWidth(crew.firstName.c_str(), TypePx(9)) : 0.0f,
-                     crew.labelled ? TypeStep(12.0f) : 0.0f};
-    return overStage && (dot.Contains(localX, localY) || label.Contains(localX, localY));
-  };
-  const auto hoveredCrew = std::find_if(diagram.crew.begin(), diagram.crew.end(), crewHovered);
-  const bool overCrew = hoveredCrew != diagram.crew.end();
-
-  for (const HullPart& part : diagram.hull) {
-    const int x = static_cast<int>(ox + part.box.x);
-    const int y = static_cast<int>(oy + part.box.y);
-    const int w = static_cast<int>(part.box.w);
-    const int h = static_cast<int>(part.box.h);
-    PushFlarePt(FlareTarget::ShipPoint, x + w * 0.5f, y - contentScroll_, 0.9f);
-    PushFlarePt(FlareTarget::ShipPoint, x + w * 0.5f, y + h - contentScroll_, 0.9f);
-    const float radius = HullRadius(part.cls);
-    if (part.cls == "hp-lens") {
-      DrawCircle(static_cast<int>(x + w / 2.0f), static_cast<int>(y + h / 2.0f),
-                 static_cast<float>(w) / 2.0f, hull);
-      DrawRing(Vector2{x + w / 2.0f, y + h / 2.0f}, static_cast<float>(w) / 2.0f - 2.0f,
-               static_cast<float>(w) / 2.0f, 0.0f, 360.0f, 64, frame);
-    } else if (radius > 0.0f) {
-      DrawRectangleRounded(Rectangle{static_cast<float>(x), static_cast<float>(y),
-                                     static_cast<float>(w), static_cast<float>(h)},
-                           radius / static_cast<float>(std::max(w, h)),
-                           part.cls == "hp-nacelle" ? 6 : 12,
-                           part.cls == "hp-spine" ? spine : hull);
-      DrawRectangleRoundedLinesEx(
-          Rectangle{static_cast<float>(x), static_cast<float>(y),
-                    static_cast<float>(w), static_cast<float>(h)},
-          radius / static_cast<float>(std::max(w, h)),
-          part.cls == "hp-nacelle" ? 6 : 12, 2.0f, frame);
-    } else {
-      DrawRectangle(x, y, w, h, hull);
-      DrawRectangleLinesEx(Rectangle{static_cast<float>(x), static_cast<float>(y),
-                                     static_cast<float>(w), static_cast<float>(h)},
-                           2.0f, frame);
-    }
-  }
-
-  for (const Area& bar : diagram.nacBars) {
-    DrawRectangle(static_cast<int>(ox + bar.x), static_cast<int>(oy + bar.y),
-                  static_cast<int>(bar.w), static_cast<int>(bar.h),
-                  ToRay(theme_.palette.borderDark));
-  }
-
-  DrawRectangleLines(static_cast<int>(ox + diagram.corridor.x),
-                     static_cast<int>(oy + diagram.corridor.y),
-                     static_cast<int>(diagram.corridor.w),
-                     static_cast<int>(diagram.corridor.h),
-                     ToRay(theme_.palette.borderDark));
-  Text(diagram.corridorLabel.c_str(),
-           static_cast<int>(ox + diagram.corridorLabelBox.x),
-           static_cast<int>(oy + diagram.corridorLabelBox.y), TypePx(9) ,
-           ToRay(theme_.palette.muted));
-
-  DrawRectangle(static_cast<int>(ox + diagram.conduit.x),
-                static_cast<int>(oy + diagram.conduit.y),
-                static_cast<int>(diagram.conduit.w),
-                static_cast<int>(diagram.conduit.h), ToRay(theme_.palette.panel3));
-
-  for (const Room& room : diagram.rooms) {
-    const int x = static_cast<int>(ox + room.box.x);
-    const int y = static_cast<int>(oy + room.box.y);
-    const int w = static_cast<int>(room.box.w);
-    const int h = static_cast<int>(room.box.h);
-    const bool hover = overStage && !overCrew && localX >= room.box.x && localY >= room.box.y &&
-                       localX < room.box.x + room.box.w && localY < room.box.y + room.box.h;
-    DrawRectangle(x, y, w, h, hover ? ToRay(theme_.palette.panel3)
-                                   : (theme_.id == "classic" ? HexColor(room.tone, ToRay(theme_.palette.panel2))
-                                                              : ToRay(theme_.palette.panel2)));
-    DrawRectangleLines(x, y, w, h, ToRay(theme_.palette.borderDark));
-    const auto accent = diagram.roomAccents.find(room.id);
-    DrawRectangle(x, y, 3, h, accent == diagram.roomAccents.end() ? ToRay(theme_.palette.coffee) : HexColor(accent->second, ToRay(theme_.palette.coffee)));
-    // Room names are always shown: in the reference the compact deck keeps
-    // names at 10 px and hides only tags/sys codes. The 18 px floor applies,
-    // so names may be large in compact rooms but are never hidden.
-    Text(room.name.c_str(), x + 6, y + 4, TypePx(10), ToRay(theme_.palette.ink));
-    if (!diagram.compact && !room.small) {
-      Text(room.tag.c_str(), x + w - 30, y + h - 14, TypePx(8),
-           ToRay(theme_.palette.muted));
-    }
-  }
-
-  for (const Area& divider : diagram.dividers) {
-    DrawLine(static_cast<int>(ox + divider.x),
-             static_cast<int>(oy + divider.y),
-             static_cast<int>(ox + divider.x),
-             static_cast<int>(oy + divider.Bottom()),
-             ToRay(theme_.palette.border));
-  }
-
-  for (const Area& nozzle : diagram.nozzles) {
-    DrawRectangle(static_cast<int>(ox + nozzle.x), static_cast<int>(oy + nozzle.y),
-                  static_cast<int>(nozzle.w), static_cast<int>(nozzle.h),
-                  ToRay(theme_.palette.panel3));
-    DrawRectangleLines(static_cast<int>(ox + nozzle.x), static_cast<int>(oy + nozzle.y),
-                       static_cast<int>(nozzle.w), static_cast<int>(nozzle.h), frame);
-  }
-
-  for (const DiagramCrew& crew : diagram.crew) {
-    if (overCrew && &crew == &*hoveredCrew) {
-      DrawRectangle(static_cast<int>(ox + crew.dot.x - 3), static_cast<int>(oy + crew.dot.y - 3),
-                    21, 21, ToRay(theme_.palette.panel3));
-      if (crew.labelled) {
-        DrawRectangle(static_cast<int>(ox + crew.label.x), static_cast<int>(oy + crew.label.y),
-                      static_cast<int>(TextWidth(crew.firstName.c_str(), TypePx(9))),
-                      static_cast<int>(TypeStep(12.0f)), ToRay(theme_.palette.panel3));
-      }
-    }
-    DrawRectangle(static_cast<int>(ox + crew.dot.x), static_cast<int>(oy + crew.dot.y),
-                  15, 15, HexColor(crew.colour, ToRay(theme_.palette.coffeeDark)));
-    if (crew.labelled) {
-      Text(crew.firstName.c_str(), static_cast<int>(ox + crew.label.x),
-               static_cast<int>(oy + crew.label.y), TypePx(9) , ToRay(theme_.palette.muted));
-    }
-  }
-}
-
 void ShellView::Move(float x, float y) {
   mouseX_ = x;
   mouseY_ = y;
@@ -9400,49 +9194,12 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
     // cursor down by the same amount so a click lands on what is actually
     // painted, and never on content scrolled out of view.
     const float scrollY = contentScroll_;
-    // The view switch and room callouts are presentation only. They route to
-    // exactly the same room handlers as the original deck plan.
-    if (HasWrenExterior(sim) && exteriorView_) {
+    // The 3D exterior callouts are the only ship view for exterior-equipped ships.
+    if (HasWrenExterior(sim)) {
       for (const ExteriorCallout& item : exterior_.callouts) {
         if (!item.box.Contains(x, y + scrollY)) continue;
         if (button == HitButton::Right) { OpenTask(sim, "room", item.id, false); }
         else { OpenBriefing(sim, "room", item.id); }
-        return;
-      }
-      if (exterior_.image.Contains(x, y + scrollY)) {
-        exteriorView_ = false;
-        return;
-      }
-    } else if (idle_.stageArea.Contains(x, y + scrollY)) {
-      const float localX = x - idle_.diagram.stage.x;
-      const float localY = y + scrollY - idle_.diagram.stage.y;
-      for (const DiagramCrew& crew : idle_.diagram.crew) {
-        const Area hit{crew.dot.x - 6.0f, crew.dot.y - 6.0f, 27.0f, 27.0f};
-        const Area labelHit{crew.label.x, crew.label.y,
-                            crew.labelled ? TextWidth(crew.firstName.c_str(), TypePx(9)) : 0.0f,
-                            crew.labelled ? TypeStep(12.0f) : 0.0f};
-        if (!hit.Contains(localX, localY) && !labelHit.Contains(localX, localY)) { continue; }
-        if (button == HitButton::Right) {
-          OpenTask(sim, "crew", crew.id, false);
-        } else {
-          OpenBriefing(sim, "crew", crew.id);
-        }
-        return;
-      }
-      for (const Room& room : idle_.diagram.rooms) {
-        if (localX < room.box.x || localY < room.box.y ||
-            localX >= room.box.x + room.box.w || localY >= room.box.y + room.box.h) {
-          continue;
-        }
-        if (button == HitButton::Right) {
-          OpenTask(sim, "room", room.id, false);
-        } else {
-          OpenBriefing(sim, "room", room.id);
-        }
-        return;
-      }
-      if (HasWrenExterior(sim)) {
-        exteriorView_ = true;
         return;
       }
     }

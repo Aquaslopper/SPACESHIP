@@ -1,6 +1,3 @@
-// Remove all state machines and gates enforcing anti-roguelike logic, 
-// while strictly preserving core gameplay mechanics.
-
 #include "ui/NavScreen.h"
 
 #include "core/JsNumber.h"
@@ -928,7 +925,6 @@ bool PressNavActionRaw(Simulation& sim, const std::string& action, const std::st
   if (action == "travel") { return PressProgressButton(sim, "travel"); }
   if (action == "scan") { return PressProgressButton(sim, "scan"); }
   if (action == "extract") { return PressProgressButton(sim, "extract"); }
-  if (action == "stand-watch") { return sim.StandWatch(); }
   if (action == "dock") { return sim.Dock(); }
   if (action == "view-sector") { return sim.ViewSector(arg); }
   if (action == "layer") {
@@ -962,7 +958,6 @@ bool PressNavAction(Simulation& sim, const std::string& action, const std::strin
     const bool matches =
         (action == "hold" && row.label == "HOLD") ||
         (action == "change-course" && row.label == "Change Course") ||
-        (action == "stand-watch" && row.label.find("Stand watch") == 0) ||
         (action == "dock" && row.label.find("Dock at ") == 0) ||
         (action == "view-sector" && row.label.find("View ") == 0);
     if (!matches) { continue; }
@@ -977,7 +972,7 @@ bool PressNavAction(Simulation& sim, const std::string& action, const std::strin
           return acted;
         });
   }
-  if (action == "stand-watch" || action == "dock" || action == "view-sector") {
+  if (action == "dock" || action == "view-sector") {
     return false;
   }
   return PressNavActionRaw(sim, action, arg);

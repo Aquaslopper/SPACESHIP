@@ -1,8 +1,7 @@
 // ============================================================================
 //  StoresScreen.h — the cargo hold and the science room.
 //  ---------------------------------------------------------------------------
-//  Both rooms are one panel and a list, exactly as the reference builds them:
-//  the hold counts what is in it and lets a bay recover salvage during a
+//  The hold counts what is in it and lets a bay recover salvage during a
 //  crossing; the science room files deep scans and packages them, which costs
 //  one action now and two more of work.
 // ============================================================================

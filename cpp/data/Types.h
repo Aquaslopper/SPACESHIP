@@ -1,15 +1,6 @@
 // ============================================================================
 //  Types.h — the catalogues, as plain data.
 //  ---------------------------------------------------------------------------
-//  Every struct here corresponds to a table in the reference edition
-//  (Spaceship.hta). They hold *content*: coordinates, names, prices, prose.
-//  No behaviour lives in this header; the simulation reads these values and
-//  the renderer draws them, and neither may invent a field that the reference
-//  does not have.
-//
-//  Field names follow the JavaScript where the JavaScript name is already
-//  clear (id, name, x, y, w, h, klass), because a reviewer comparing the two
-//  editions should not have to translate twice.
 // ============================================================================
 #pragma once
 
@@ -22,8 +13,7 @@
 namespace ship {
 
 // ---------------------------------------------------------------------------
-// Geometry. Stage coordinates are pixels on a fixed board: the ship diagrams
-// are 1160x460 (large hull) or compact, the chart is a 638x278 world.
+// Geometry in pixels.
 // ---------------------------------------------------------------------------
 struct Rect {
   double x = 0.0;
@@ -32,16 +22,6 @@ struct Rect {
   double h = 0.0;
 };
 
-// One piece of hull silhouette: hp-body, hp-spine, hp-pod, hp-lens, ...
-struct HullPart {
-  std::string id;
-  std::string cls;   // CSS class in the reference; the drawing recipe here
-  Rect box;
-};
-
-// A compartment. `tone` is the background hex; `small` marks the
-// compartments that get the compact treatment inside the dorsal spine,
-// the ventral pod and the command lens.
 struct Room {
   std::string id;
   std::string name;
@@ -63,8 +43,6 @@ struct RoomScene {
 };
 
 struct DeckPlan {
-  std::vector<HullPart> hull;
-  Rect corridor;
   std::vector<Room> rooms;
 
   const Room* FindRoom(const std::string& id) const {
@@ -160,8 +138,6 @@ struct Contract {
   bool recognizePrior = false;
 };
 
-// The chart's own drawing board. Distances are derived from these numbers and
-// never, so they must not be adjusted for the port's window size.
 struct MapGeometry {
   double w = 638, h = 278;
   double cx = 319, cy = 139;
@@ -176,7 +152,7 @@ struct MapGeometry {
 
 struct Counts {
   int ships = 0;
-  int roomsKestrel = 0;
+  int roomsHauler = 0;
   int roomsWren = 0;
   int crew = 0;
   int hires = 0;

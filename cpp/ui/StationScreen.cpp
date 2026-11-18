@@ -563,7 +563,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   yard.title = "Shipyard";
   yard.badge = Num(purse) + " sh, hull " + Num(sim.StatValue("hull")) + "%";
   yard.notes.push_back("Shiplets only; no click spent. Buy first, then sell or park the old ship. Parked hulls can be switched here; crew, cargo, rooms, refits and condition transfer.");
-  for (const std::string kind : {"cargo-spine", "cargo-bulk", "explorer-needle", "explorer-manta", "kestrel", "yamato", "arcadia"}) {
+  for (const std::string kind : {"cargo-spine", "cargo-bulk", "explorer-needle", "explorer-manta", "yamato", "arcadia"}) {
     const auto& fields = sim.World().shipFields.at(kind);
     const double price = std::stod(fields.at("price"));
     const bool parked = std::find(sim.State().parkedShips.begin(), sim.State().parkedShips.end(), kind) != sim.State().parkedShips.end();
@@ -830,8 +830,6 @@ bool PressStationActionRaw(Simulation& sim, const std::string& action,
   }
   if (action.compare(0, 5, "hire:") == 0) return sim.HireCrew(action.substr(5));
   if (action.compare(0, 8, "upgrade:") == 0) return sim.BuyUpgrade(action.substr(8));
-  if (action == "ship-buy") return sim.BuyLargerShip();
-  if (action == "ship-buy:kestrel") return sim.BuyLargerShip("kestrel");
   if (action == "ship-buy:wren") return sim.BuyLargerShip("wren");
   if (action == "ship-buy:cargo-spine") return sim.BuyLargerShip("cargo-spine");
   if (action == "ship-buy:cargo-bulk") return sim.BuyLargerShip("cargo-bulk");

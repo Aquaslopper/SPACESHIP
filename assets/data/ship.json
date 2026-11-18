@@ -30,167 +30,13 @@
       360,
       480
     ],
-    "kestrel": [
-      60,
-      90,
-      120
-    ],
     "wren": [
       40,
       60,
       90
     ]
   },
-  "comment": "Hull geometry, deck plans and ship classes. Stage coordinates, pixels.",
-  "corridors": {
-    "kestrel": {
-      "h": 26,
-      "w": 740,
-      "x": 100,
-      "y": 210
-    },
-    "wren": {
-      "h": 24,
-      "w": 411,
-      "x": 35,
-      "y": 154
-    }
-  },
-  "hulls": {
-    "kestrel": [
-      {
-        "cls": "hp-nacelle",
-        "h": 30,
-        "id": "nac-d",
-        "w": 420,
-        "x": 140,
-        "y": 6
-      },
-      {
-        "cls": "hp-pylon",
-        "h": 12,
-        "id": "pyl-d1",
-        "w": 18,
-        "x": 214,
-        "y": 36
-      },
-      {
-        "cls": "hp-pylon",
-        "h": 12,
-        "id": "pyl-d2",
-        "w": 18,
-        "x": 468,
-        "y": 36
-      },
-      {
-        "cls": "hp-spine",
-        "h": 58,
-        "id": "spine",
-        "w": 580,
-        "x": 200,
-        "y": 46
-      },
-      {
-        "cls": "hp-body",
-        "h": 256,
-        "id": "body",
-        "w": 810,
-        "x": 90,
-        "y": 102
-      },
-      {
-        "cls": "hp-pod",
-        "h": 58,
-        "id": "pod",
-        "w": 480,
-        "x": 240,
-        "y": 358
-      },
-      {
-        "cls": "hp-pylon",
-        "h": 8,
-        "id": "pyl-v1",
-        "w": 18,
-        "x": 300,
-        "y": 416
-      },
-      {
-        "cls": "hp-pylon",
-        "h": 8,
-        "id": "pyl-v2",
-        "w": 18,
-        "x": 642,
-        "y": 416
-      },
-      {
-        "cls": "hp-nacelle",
-        "h": 30,
-        "id": "nac-v",
-        "w": 420,
-        "x": 230,
-        "y": 424
-      },
-      {
-        "cls": "hp-lens",
-        "h": 160,
-        "id": "lens",
-        "w": 290,
-        "x": 850,
-        "y": 150
-      }
-    ],
-    "wren": [
-      {
-        "cls": "hp-nacelle",
-        "h": 22,
-        "id": "nac-d",
-        "w": 280,
-        "x": 55,
-        "y": 3
-      },
-      {
-        "cls": "hp-pylon",
-        "h": 10,
-        "id": "pyl-d1",
-        "w": 14,
-        "x": 108,
-        "y": 25
-      },
-      {
-        "cls": "hp-pylon",
-        "h": 10,
-        "id": "pyl-d2",
-        "w": 14,
-        "x": 300,
-        "y": 25
-      },
-      {
-        "cls": "hp-spine",
-        "h": 44,
-        "id": "spine",
-        "w": 360,
-        "x": 65,
-        "y": 35
-      },
-      {
-        "cls": "hp-body",
-        "h": 270,
-        "id": "body",
-        "w": 420,
-        "x": 25,
-        "y": 78
-      },
-      {
-        "cls": "hp-lens",
-        "h": 140,
-        "id": "lens",
-        "w": 175,
-        "x": 415,
-        "y": 130
-      }
-    ]
-  },
-  "priceKestrel": 4000,
+  "comment": "Room plans and ship classes. Room coordinates are in pixels.",
   "roomScenes": {
     "bridge": {
       "accent": "#dfb85e",
@@ -236,7 +82,7 @@
     }
   },
   "rooms": {
-    "kestrel": [
+    "hauler": [
       {
         "h": 94,
         "id": "engine",
@@ -459,23 +305,6 @@
       "className": "Bulk cargo hauler",
       "berths": "14",
       "price": "16000"
-    },
-    "kestrel": {
-      "beam": "64 m",
-      "berths": "14",
-      "built": "2387",
-      "className": "Kestrel-series light hauler",
-      "commander": "Commander",
-      "decks": "4",
-      "drive": "Twin nacelle, single primary core",
-      "height": "48 m",
-      "length": "212 m",
-      "mass": "9,400 t laden",
-      "name": "SC Tessellate",
-      "refit": "2391 - spine and dorsal pod added",
-      "registry": "TX-4471",
-      "yard": "Halvan Reach Yards, slip 9",
-      "price": "4000"
     },
     "wren": {
       "beam": "28 m",

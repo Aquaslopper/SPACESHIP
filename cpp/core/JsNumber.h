@@ -1,23 +1,3 @@
-// ============================================================================
-//  JsNumber.h — the reference edition's arithmetic, exactly.
-//  ---------------------------------------------------------------------------
-//  Spaceship.hta is JavaScript, and a port that uses C++'s defaults instead of
-//  JavaScript's would drift in three places that players can see: rounding at
-//  halves, how a number becomes a string in the feed, and fixed-decimal
-//  readouts. Every game number therefore goes through these helpers.
-//
-//    Math.round          rounds halves toward +Infinity   (C++ lround: away
-//                        from zero, and -0.5 -> -1 instead of -0)
-//    Math.ceil/floor     return -0 for negative fractions  (sign is visible
-//                        through 1/x and Object.is)
-//    String(n)           shortest round-trip decimal, giving up on exponent
-//                        form only outside 1e-6 .. 1e21
-//    n.toFixed(d)        ties away from zero, and falls back to String(n)
-//                        at or above 1e21
-//
-//  Header-only would be tempting, but these run once per rendered number and
-//  benefit from a single out-of-line copy.
-// ============================================================================
 #pragma once
 
 #include <string>

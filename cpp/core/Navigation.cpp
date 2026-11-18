@@ -1,8 +1,5 @@
 // ============================================================================
 //  Navigation.cpp — the chart, the crossing and the sensors.
-//  ---------------------------------------------------------------------------
-// Remove all state machines and gates enforcing anti-roguelike logic, 
-// while strictly preserving core gameplay mechanics.
 // ============================================================================
 #include "core/JsNumber.h"
 #include "core/Simulation.h"
@@ -548,18 +545,12 @@ bool Simulation::StartExtraction() {
   return true;
 }
 
-bool Simulation::StandWatch() {
-  if (!state_.gameOver.empty()) { return false; }
-  PerformAction("Stood watch");
-  return true;
-}
-
 bool Simulation::Acknowledge(const std::string& taskId) {
   Task* task = FindOngoing(taskId);
   if (task == nullptr || task->state != "done") { return false; }
 
   // The hook runs BEFORE the task is cleared: the arrival happens while the
-  // crossing is still on the books, exactly as the reference does it.
+  // crossing is still on the books.
   const std::string type = task->type;
   const std::string target = task->target;
   const double reservedVol = task->vol;

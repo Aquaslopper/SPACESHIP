@@ -69,8 +69,6 @@ struct PopupModel {
   float glow = 1.1f;
   float lensFlare = 0.7f;
   std::vector<PopupChoice> audioChoices;
-  // Phase 9: the reading-size ladder (18/19/20/21 px) and the borderless
-  // window switch. Both are preferences; both are drawn as their own rows.
   int fontStep = 2;
   std::vector<std::string> fontStepLabels;
   std::string fontStepLine;    // "Reading size: +5% (19 px)"

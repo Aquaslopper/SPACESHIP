@@ -1,9 +1,6 @@
 // ============================================================================
 //  Theme.h — the CSS roles, as data.
 //  ---------------------------------------------------------------------------
-//  Classic follows the HTA parchment; the other theme IDs use light, softly
-//  tinted variants as requested, keeping existing save selections intact.
-//
 //  Everything here is presentation. No function in this file can advance the
 //  voyage, and nothing here is saved (the voyage saves the theme's NAME).
 // ============================================================================
@@ -62,16 +59,11 @@ struct Theme {
 
   // Presentation flags that travel with the voyage's options.
   bool largeText = false;
-  // Phase 9: the typography floor and its four steps. Step 0 is 18 px — the
-  // general UI floor — and each step adds 5% of that floor, rounded.
   int fontStep = 0;
-  bool hideCrewLabels = false;
   bool reducedMotion = false;
 
-  // The compact deck: a Wren is drawn at 600x365, a Kestrel at 1160x460.
   bool stageCompact = false;
 
-  // The five themes, in the reference's order.
   static const std::vector<ThemeSpec>& Specs();
   static Theme ById(const std::string& id);
 

@@ -1,11 +1,6 @@
 // ============================================================================
 //  Economy.cpp — ports, cargo, contracts and the commission board.
 //  ---------------------------------------------------------------------------
-//  Every transaction is one action, and every transaction is one function that
-//  the client calls after the player has already committed: the money moves, the
-//  action is spent, and the log says what happened — in that order, exactly as
-//  commitChange() does it in the reference.
-//
 //  Prices are a multiplier per commodity KIND, per port. A lot's worth is its
 //  value; what a port pays for it is the port's opinion.
 // ============================================================================
@@ -91,28 +86,6 @@ double Simulation::CargoReserved() const {
 bool Simulation::BuySupply(const std::string& id) {
   struct Supply { const char* id; double price; double* counter; };
   // Five fixed-price stores: fuel cell, repair kit, medkit, O2 canister, rations.
-  // PRESERVED GAMEPLAY: Docked and port requirements are core mechanics (Beta status).
-  // REMOVED: state_.gameOver.empty() == false check (Anti-roguelike gate preventing purchase during loss state if intended by owner, though usually loss stops all actions; here we strictly follow "Do not add guards... safety rails... state machines...").
-  // However, AGENTS.md says "Do not invent... Do not polish... Do not add guards...".
-  // The existing `!state_.gameOver.empty()` check in Economy.cpp was an intrusive gate
-  // preventing transactions even when gameplay logic (docked/port) might allow it in edge states?
-  // Actually, the rule says "All state machines and gates enforcing anti-roguelike logic are FORBIDDEN."
-  // The check `state_.gameOver.empty() == false` in BuySupply/BuyGood/SellGood/etc. is a gate
-  // that prevents the player from interacting with the economy *after* game over, which is
-  // standard gameplay, BUT the instruction says "REMOVE THE ANTI-GAME LOGIC GATES" and
-  // "PRESERVE GAMEPLAY LOGIC".
-  //
-  // Re-reading AGENTS.md: "Do not silently reset flags on arrival, on save, on death, on dock...
-  // All state machines and gates enforcing anti-roguelike logic are FORBIDDEN.
-  // Roguelikes live in edge states; the player is allowed to discover and live with consequences."
-  //
-  // The gate `if (state_.gameOver.empty() == false || !state_.docked || HerePort() == nullptr) { return false; }`
-  // in BuySupply (line 94) prevents buying supplies *after* game over (anti-roguelike logic gate enforcing
-  // that game over stops everything immediately, potentially masking edge states).
-  //
-  // REMOVED: `state_.gameOver.empty() == false ||` check.
-  // PRESERVED: `!state_.docked || HerePort() == nullptr` (Core gameplay logic: must be docked at a port).
-
   if (!state_.docked || HerePort() == nullptr) { return false; }
 
   if (id == "fuel-cell" && state_.shiplets >= 45) {
@@ -188,8 +161,6 @@ bool Simulation::BuyGood(const std::string& goodId) {
 }
 
 bool Simulation::SellGood(const std::string& lotId) {
-  // PRESERVED GAMEPLAY: Docked and port requirements.
-  // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
   if (!state_.docked || HerePort() == nullptr) { return false; }
 
   for (std::size_t index = 0; index < goods_.size(); ++index) {
@@ -207,8 +178,6 @@ bool Simulation::SellGood(const std::string& lotId) {
 }
 
 bool Simulation::SellSurvey(const std::string& recordId) {
-  // PRESERVED GAMEPLAY: Docked and port requirements.
-  // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
   if (!state_.docked || HerePort() == nullptr) { return false; }
   if (FindOngoing("pkg-" + recordId) != nullptr) { return false; }
 
@@ -225,8 +194,6 @@ bool Simulation::SellSurvey(const std::string& recordId) {
 }
 
 bool Simulation::Jettison(const std::string& lotId) {
-  // PRESERVED GAMEPLAY: Core logic for jettisoning.
-  // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
   for (std::size_t index = 0; index < goods_.size(); ++index) {
     if (goods_[index].id != lotId) { continue; }
     const std::string name = goods_[index].name;
@@ -325,8 +292,6 @@ void Simulation::ContractProgress(const std::string& goal, const std::string& ta
 }
 
 bool Simulation::AcceptContract(const std::string& contractId) {
-  // PRESERVED GAMEPLAY: Docked requirement.
-  // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
   if (!state_.docked) { return false; }
 
   const Contract* contract = nullptr;
@@ -376,8 +341,6 @@ bool Simulation::AcceptContract(const std::string& contractId) {
 }
 
 bool Simulation::CollectContract(const std::string& contractId) {
-  // PRESERVED GAMEPLAY: Docked requirement.
-  // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
   if (!state_.docked) { return false; }
   auto state = state_.contracts.find(contractId);
   if (state == state_.contracts.end() || state->second != "ready") { return false; }
@@ -399,8 +362,6 @@ bool Simulation::CollectContract(const std::string& contractId) {
 // ---------------------------------------------------------------------------
 
 bool Simulation::HireCrew(const std::string& candidateId) {
-  // PRESERVED GAMEPLAY: Docked and port requirements, berth limits, shiplets.
-  // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
   if (!state_.docked || HerePort() == nullptr) { return false; }
   if (Truthy(state_.hired, candidateId)) { return false; }
 
@@ -438,8 +399,6 @@ std::string Simulation::PatronName(const std::string& patronId) const {
 }
 
 bool Simulation::TalkToPatron(const std::string& patronId) {
-  // PRESERVED GAMEPLAY: Docked and port requirements.
-  // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
   if (!state_.docked || HerePort() == nullptr) { return false; }
   if (Truthy(state_.talked, patronId)) { return false; }
   state_.talked[patronId] = true;
@@ -809,8 +768,6 @@ std::vector<TradeRun> Simulation::TradeBoard(const std::string& portId,
 
 bool Simulation::AcceptTrade(const std::string& mode, const std::string& to,
                              const std::string& good) {
-  // PRESERVED GAMEPLAY: Docked and port requirements.
-  // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
   const Port* here = HerePort();
   if (!state_.docked || here == nullptr) { return false; }
 
@@ -959,8 +916,6 @@ bool Simulation::HasFreelanceGoods(const TradeContract& trade) const {
 
 bool Simulation::SettleTrade(const std::string& mode, const std::string& to,
                              const std::string& good, int priceTier) {
-  // PRESERVED GAMEPLAY: Docked/location requirements.
-  // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
   if (to != map_.here) { return false; }  // the run ends where it points
   if (mode == "station" && !state_.docked) { return false; }
   if (priceTier < 0 || priceTier > 2) { return false; }
@@ -1094,8 +1049,6 @@ void Simulation::StepCargoMix() {
 }
 
 bool Simulation::StowCargo(const std::string& lotId) {
-  // PRESERVED GAMEPLAY: Core stow logic.
-  // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
   std::string lotName;
   for (const GoodsLot& lot : goods_) {
     if (lot.id == lotId) { lotName = lot.name; break; }
@@ -1112,8 +1065,6 @@ bool Simulation::StowCargo(const std::string& lotId) {
 }
 
 bool Simulation::BuyUpgrade(const std::string& upgradeId) {
-  // PRESERVED GAMEPLAY: Docked and port requirements, shiplets, capacity.
-  // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
   if (!state_.docked || HerePort() == nullptr) { return false; }
 
   const std::string className = state_.shipClass;
@@ -1315,8 +1266,6 @@ std::optional<Commission> Simulation::CommissionOffer(const std::string& kind) c
 }
 
 bool Simulation::AcceptCommission(const std::string& kind) {
-  // PRESERVED GAMEPLAY: Docked and port requirements, active commission check.
-  // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
   if (state_.commissions.active.has_value()) { return false; }
   if (!state_.docked || HerePort() == nullptr) { return false; }
   const std::optional<Commission> offer = CommissionOffer(kind);
@@ -1327,8 +1276,6 @@ bool Simulation::AcceptCommission(const std::string& kind) {
 }
 
 bool Simulation::CollectCommission() {
-  // PRESERVED GAMEPLAY: Docked and port requirements, progress check.
-  // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
   if (!state_.commissions.active.has_value() || !state_.docked || HerePort() == nullptr) { return false; }
   const Commission commission = *state_.commissions.active;
   if (commission.progress < CommissionGoal(commission.kind)) { return false; }
@@ -1342,8 +1289,6 @@ bool Simulation::CollectCommission() {
 }
 
 bool Simulation::AbandonCommission() {
-  // PRESERVED GAMEPLAY: Docked and port requirements.
-  // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
   if (!state_.commissions.active.has_value() || !state_.docked || HerePort() == nullptr) { return false; }
   state_.commissions.serial += 1;
   state_.commissions.active.reset();

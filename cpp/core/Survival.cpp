@@ -17,8 +17,6 @@ void Simulation::ServiceDrive(const std::string& by) {
 }
 
 bool Simulation::EngineClick(const std::string& by) {
-  // PRESERVED GAMEPLAY: Engine condition, click state, service drive.
-  // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
   if (engineClicking_) { return false; }
   if (state_.engineCondition >= 100.0) { return false; }
   // if (MaintRunning()) { return false; }
@@ -123,8 +121,6 @@ void Simulation::RunBank(const std::string& line) {
 }
 
 bool Simulation::ServiceSystem(const std::string& statId) {
-  // PRESERVED GAMEPLAY: Stat repair/fuel/medkit logic, kit usage.
-  // REMOVED: !state_.gameOver.empty() gate (Anti-game logic).
   Stat* stat = FindStat(statId);
   if (stat == nullptr || stat->value >= 100.0) { return false; }
 

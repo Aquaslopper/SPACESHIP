@@ -1,11 +1,3 @@
-// Remove all state machines and gates enforcing anti-roguelike logic, 
-// while strictly preserving core gameplay mechanics.
-// 
-// NOTE: Removed intrusive anti-game logic gates (e.g., state machines enforcing
-// anti-roguelike logic, event systems for button presses, or silent resets)
-// as per AGENTS.md. Core gameplay logic (hull/fuel/air checks, dock/buy/sell
-// requirements, crew logic) is preserved.
-
 #pragma once
 
 #include <cstdint>
@@ -179,7 +171,6 @@ class Simulation {
   bool HoldTravel();
   bool StartScan();
   bool StartExtraction();
-  bool StandWatch();
   bool Acknowledge(const std::string& taskId);
   void SetLayer(const std::string& key);
   bool ZoomMap(int dir);
@@ -246,7 +237,7 @@ class Simulation {
   bool StartSocial(const std::string& a, const std::string& b);
   std::string ProjectBlock(const std::string& id) const;
   void ApplyShipLayout();
-  bool BuyLargerShip(const std::string& kind = "kestrel");
+  bool BuyLargerShip(const std::string& kind);
   double ShipCargoCapacity(const std::string& kind, int level) const;
   int CargoRefitLevel() const;
 

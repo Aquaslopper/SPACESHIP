@@ -56,11 +56,5 @@ int main() {
   assert(loaded.BuyLargerShip("cargo-spine"));
   loaded.MutableState().docked = false;
   assert(!loaded.BuyLargerShip("cargo-bulk"));
-  auto original = ship::Simulation::NewVoyage(catalog);
-  original.MutableMap().here = original.World().ports.front().id;
-  original.MutableState().docked = true;
-  original.MutableState().shiplets = 4000;
-  assert(original.BuyLargerShip());
-  assert(original.State().shipClass == "kestrel" && original.State().shiplets == 0);
-  std::cout << "PASS: shipyard offers, listed-price purchases, unchanged rooms/crew/cargo/stats, refits, ship switching, save/load, dock requirement and original Kestrel purchase\n";
+  std::cout << "PASS: shipyard offers, listed-price purchases, unchanged rooms/crew/cargo/stats, refits, ship switching, save/load and dock requirement\n";
 }
