@@ -685,6 +685,9 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   for (const CandidateDefinition& candidate : hands) {
     if (!candidate.port.empty() && candidate.port != portId) { continue; }
     if (Hired(sim, candidate.crew.id)) { continue; }  // aboard now, not at the bar
+    if (model.docked && candidate.crew.id == "moetorial") {
+      model.head.sub = "Moetorial: Welcome to " + model.portName + ", Captain!";
+    }
     const CrewDefinition& person = candidate.crew;
     const bool said = Talked(sim, person.id);
     StationRow row;
