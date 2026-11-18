@@ -724,7 +724,9 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
       taskScreen_ = navScreen_.screen;
       PaintNavScreen(sim);
     } else {
-      taskScreen_ = BuildTabScreen(sim, *activeTab, wiki_, &stationSelection_);
+      if (screenCargo_) { cargoModel_ = BuildCargoRoom(sim, &cargoSelection_); }
+      taskScreen_ = BuildTabScreen(sim, *activeTab, wiki_, &stationSelection_,
+                                   screenCargo_ ? &cargoModel_ : nullptr);
       if (screenQuarters_) {
         quarters_ = BuildQuartersScreen(sim);
         PaintQuartersScreen(sim);
@@ -6589,7 +6591,6 @@ void ShellView::PaintQuartersScreen(Simulation& sim) {
 void ShellView::PaintCargoScreen(Simulation& sim) {
   navHits_.clear();
   taskButtons_.clear();
-  cargoModel_ = BuildCargoRoom(sim, &cargoSelection_);
   const CargoRoomModel& cargo = cargoModel_;
   const Palette& p = theme_.palette;
 
@@ -9205,7 +9206,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
               mark = row.charged ||
                      (panelsKind_ == ScreenKind::Station && !row.plain &&
                       (action.rfind("buy-", 0) == 0 || action == "ship-buy" ||
-                       action.rfind("upgrade:", 0) == 0 || action == "hull-service" ||
+                       action.rfind("upgrade:", 0) == 0 ||
                        action.rfind("room-buy:", 0) == 0 || action.rfind("hire:", 0) == 0 ||
                        action.rfind("trade-accept:", 0) == 0));
             }
@@ -9304,7 +9305,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
       const bool stationPurchaseOrTrade =
           panelsKind_ == ScreenKind::Station && clickedRow != nullptr && !clickedRow->plain &&
           (hit.arg.rfind("buy-", 0) == 0 || hit.arg == "ship-buy" ||
-           hit.arg.rfind("upgrade:", 0) == 0 || hit.arg == "hull-service" ||
+           hit.arg.rfind("upgrade:", 0) == 0 ||
            hit.arg.rfind("room-buy:", 0) == 0 || hit.arg.rfind("hire:", 0) == 0 ||
            hit.arg.rfind("trade-accept:", 0) == 0);
       const bool acted = PressPanelRow(sim, panelsKind_, hit.arg);

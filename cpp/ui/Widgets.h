@@ -228,9 +228,11 @@ bool PressSystemAction(Simulation& sim, const std::string& statId);
 bool PressInfoAction(Simulation& sim, const std::string& target);
 
 struct StationSelection;
+struct CargoRoomModel;
 TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
                                const WikiView& wiki = WikiView(),
-                               StationSelection* station = nullptr);
+                               StationSelection* station = nullptr,
+                               const CargoRoomModel* cargoRoom = nullptr);
 
 Vignette BuildVignette(const Simulation& sim, const std::string& roomId);
 

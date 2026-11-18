@@ -136,10 +136,10 @@ bool Simulation::BuySupply(const std::string& id) {
     FreeCommit("Medkit purchased");
     return true;
   }
-  if (id == "canister" && state_.shiplets >= 25 && life_.canisters < life_.capacity &&
+  if (id == "canister" && state_.shiplets >= 45 && life_.canisters < life_.capacity &&
       FindOngoing("project-oxygen") == nullptr) {
-    state_.shiplets -= 25;
-    state_.moneySpent += 25;
+    state_.shiplets -= 45;
+    state_.moneySpent += 45;
     life_.canisters += 1;
     FreeCommit("O2 canister purchased");
     return true;
@@ -147,8 +147,8 @@ bool Simulation::BuySupply(const std::string& id) {
   if (id == "rations" && state_.shiplets >= 80 &&
       mess_.rations <= mess_.rationCapacity - 6 &&
       FindOngoing("project-food") == nullptr) {
-    state_.shiplets -= 20;
-    state_.moneySpent += 20;
+    state_.shiplets -= 80;
+    state_.moneySpent += 80;
     mess_.rations += 4;  // dry rations go in the larder; the galley cooks them
     FreeCommit("Rations purchased");
     return true;
@@ -616,17 +616,27 @@ bool Simulation::TradeAccepted(const std::string& mode, const std::string& to,
   return false;
 }
 
-std::vector<TradeRun> Simulation::TradeBoard(const std::string& portId) const {
+std::vector<TradeRun> Simulation::TradeBoard(const std::string& portId,
+                                             const std::string& mode) const {
   std::vector<TradeRun> board;
   const Port* port = catalog_->FindPort(portId);
   const Body* berth = catalog_->FindBody(portId);
   if (port == nullptr || berth == nullptr) { return board; }
   const std::string systemId = catalog_->BodySystem(*berth);
 
-  std::vector<const Body*> destinations;
+  struct Destination {
+    const Body* body;
+    const std::vector<Want>* wants;
+    double bandBonus;
+    double freight;
+  };
+  std::vector<Destination> destinations;
   for (const std::size_t index : catalog_->BodiesInSystem(systemId)) {
     const Body& body = catalog_->bodies[index];
-    if (!WantsOf(TradeRole(body)).empty()) { destinations.push_back(&body); }
+    const std::vector<Want>& wants = WantsOf(TradeRole(body));
+    if (!wants.empty()) {
+      destinations.push_back({&body, &wants, TradeBandBonus(body), TradeFreight(*berth, body)});
+    }
   }
 
   const long long epoch = static_cast<long long>(std::floor(ActionCount() / kTradeEpoch));
@@ -640,8 +650,10 @@ std::vector<TradeRun> Simulation::TradeBoard(const std::string& portId) const {
     std::vector<TradeRun> tier2;
     std::vector<TradeRun> tier3;
 
-    for (const Body* to : destinations) {
-      for (const Want& want : WantsOf(TradeRole(*to))) {
+    for (const Destination& destination : destinations) {
+      const Body* to = destination.body;
+      const double freight = destination.freight;
+      for (const Want& want : *destination.wants) {
         const Good* good = MarketGood(*catalog_, want.good);
         if (good == nullptr) { continue; }
         if (Truthy(state_.spentTrades, TradeKey(modeName, to->id, good->id))) { continue; }
@@ -650,8 +662,7 @@ std::vector<TradeRun> Simulation::TradeBoard(const std::string& portId) const {
             static_cast<int>(kTradeHold / std::max(1.0, static_cast<double>(good->vol)));
         const int byValue = static_cast<int>(kTradeValue / std::max(1.0, good->value));
         const int maxCrates = std::clamp(std::min(byVolume, byValue), 1, 6);
-        const double pays = want.pays + TradeBandBonus(*to);
-        const double freight = TradeFreight(*berth, *to);
+        const double pays = want.pays + destination.bandBonus;
 
         auto buildRun = [&](int crates, double fee) {
           TradeRun run;
@@ -754,8 +765,8 @@ std::vector<TradeRun> Simulation::TradeBoard(const std::string& portId) const {
     takeFrom(tier3, false);
   };
 
-  drawMode("delivery", true);
-  drawMode("freelance", false);
+  if (mode.empty() || mode == "delivery") { drawMode("delivery", true); }
+  if (mode.empty() || mode == "freelance") { drawMode("freelance", false); }
 
   // A run already taken keeps its place: the player is standing on the same
   // board, and the record -- not the draw -- is what it promised.
@@ -777,6 +788,7 @@ std::vector<TradeRun> Simulation::TradeBoard(const std::string& portId) const {
   for (const TradeContract& trade : state_.trades) {
     if (trade.from != portId) { continue; }
     if (trade.mode != "delivery" && trade.mode != "freelance") { continue; }
+    if (!mode.empty() && trade.mode != mode) { continue; }
     const bool listed = std::any_of(board.begin(), board.end(), [&](const TradeRun& run) {
       return run.mode == trade.mode && run.to == trade.to && run.good == trade.good;
     });
@@ -837,7 +849,7 @@ bool Simulation::AcceptTrade(const std::string& mode, const std::string& to,
     // numbers signed are the numbers on it: the draw and the signature cannot
     // disagree.
 
-    const std::vector<TradeRun> board = TradeBoard(map_.here);
+    const std::vector<TradeRun> board = TradeBoard(map_.here, mode);
     const TradeRun* offered = nullptr;
     for (const TradeRun& run : board) {
       if (run.mode == mode && run.to == to && run.good == good) { offered = &run; }
@@ -1045,12 +1057,7 @@ bool Simulation::CargoStowed(const std::string& lotId) const {
   return Truthy(stowed_, lotId);
 }
 
-int Simulation::CargoSortOrder(const std::string& lotId) const {
-  for (std::size_t i = 0; i < stowOrder_.size(); ++i) {
-    if (stowOrder_[i] == lotId) { return static_cast<int>(i + 1); }
-  }
-  return 0;
-}
+const std::vector<std::string>& Simulation::CargoSortOrder() const { return stowOrder_; }
 
 int Simulation::CargoMixEpoch(const std::string& lotId) const {
   const auto it = cargoMixGen_.find(lotId);
@@ -1191,30 +1198,24 @@ void Simulation::CommissionProgress(const std::string& kind, const std::string& 
   LogLine("Commission objective complete. Collect at any station.");
 }
 
-namespace {
-std::string BodyName(const Simulation& sim, const std::string& id) {
-  const Body* const body = sim.FindBodyById(id);
-  return body != nullptr ? body->name : id;
-}
-}  // namespace
-
 std::string CommissionDescription(const Simulation& sim, const Commission& active) {
+  if (active.kind != "visit" && active.kind != "scan") {
+    return "Recover two salvage lots while under way";
+  }
   const Body* const body = sim.FindBodyById(active.target);
   std::string where;
   if (body != nullptr) {
-    const Body* const system = sim.FindBodyById(body->system);
+    const Body* const system = sim.World().FindSystem(body->system);
     if (system != nullptr) {
       where = " (" + system->name;
-      const Body* const region = sim.FindBodyById(system->region);
+      const Body* const region = sim.World().FindRegion(system->region);
       if (region != nullptr) { where += ", " + region->name; }
       where += ")";
     }
   }
-  if (active.kind == "visit") { return "Visit " + BodyName(sim, active.target) + where; }
-  if (active.kind == "scan") {
-    return "Read a deep scan of " + BodyName(sim, active.target) + where;
-  }
-  return "Recover two salvage lots while under way";
+  const std::string& name = body != nullptr ? body->name : active.target;
+  if (active.kind == "visit") { return "Visit " + name + where; }
+  return "Read a deep scan of " + name + where;
 }
 
 std::optional<Commission> Simulation::CommissionOffer(const std::string& kind) const {
@@ -1229,8 +1230,8 @@ std::optional<Commission> Simulation::CommissionOffer(const std::string& kind) c
   offer.reward = CommissionPrice(kind);
 
   if (kind != "salvage") {
-    const Body* here = CurrentSystem();
     const std::string curSysId = CurrentSystemId();
+    const Body* here = catalog_->FindSystem(curSysId);
     std::vector<const Body*> all;
     std::vector<const Body*> local;
     std::vector<const Body*> fresh;
@@ -1278,7 +1279,7 @@ std::optional<Commission> Simulation::CommissionOffer(const std::string& kind) c
     // A region with only two ports needs a nearby alternative rather than the
     // same route forever.
     if (kind == "visit" && local.size() < 2) {
-      const Body* originRegion = here == nullptr ? nullptr : FindBodyById(here->region);
+      const Body* originRegion = here == nullptr ? nullptr : catalog_->FindRegion(here->region);
       while (local.size() < 2 && local.size() < all.size()) {
         const Body* nearest = nullptr;
         double best = 1e18;
@@ -1286,7 +1287,7 @@ std::optional<Commission> Simulation::CommissionOffer(const std::string& kind) c
           if (std::find(local.begin(), local.end(), body) != local.end()) { continue; }
           const Body* system = catalog_->FindSystem(catalog_->BodySystem(*body));
           if (system == nullptr) { continue; }
-          const Body* candidateRegion = FindBodyById(system->region);
+          const Body* candidateRegion = catalog_->FindRegion(system->region);
           double distance = 1e18;
           if (originRegion != nullptr && candidateRegion != nullptr) {
             distance = std::pow(originRegion->x - candidateRegion->x, 2) +

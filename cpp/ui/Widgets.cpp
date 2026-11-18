@@ -531,7 +531,8 @@ ScreenKind ScreenKindFor(const Tab& tab) {
 }
 
 TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
-                               const WikiView& wiki, StationSelection* station) {
+                               const WikiView& wiki, StationSelection* station,
+                               const CargoRoomModel* cargoRoom) {
   if (!DescribeTargetExists(sim, tab.kind, tab.id)) {
     return BuildDescribedScreen(sim, DescribeTarget(sim, tab.kind, tab.id));
   }
@@ -625,7 +626,7 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
     case ScreenKind::Station: {
       StationSelection picked;
       if (station != nullptr) { picked = *station; }
-      const StationScreenModel model = BuildStationScreen(sim, tab.id);
+      const StationScreenModel model = BuildStationScreen(sim, tab.id, &picked);
       NormalizeStationSelection(model, picked);
       if (station != nullptr) { *station = picked; }
 
@@ -809,7 +810,8 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
       return screen;
     }
     case ScreenKind::Cargo: {
-      const CargoRoomModel cargo = BuildCargoRoom(sim);
+      const CargoRoomModel built = cargoRoom == nullptr ? BuildCargoRoom(sim) : CargoRoomModel{};
+      const CargoRoomModel& cargo = cargoRoom == nullptr ? built : *cargoRoom;
       TaskScreenModel screen;
       screen.head = cargo.head;
 

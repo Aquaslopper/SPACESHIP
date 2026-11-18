@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <string_view>
+#include <unordered_map>
 
 #include "core/JsNumber.h"
 #include "ui/Widgets.h"
@@ -165,6 +167,12 @@ CargoRoomModel BuildCargoRoom(const Simulation& sim, CargoSelection* selection) 
   }
 
   // ---- left: inventory cards + middle: visual hold crates ----------------
+  const auto& stowOrder = sim.CargoSortOrder();
+  std::unordered_map<std::string_view, int> sortOrders;
+  sortOrders.reserve(stowOrder.size());
+  for (std::size_t i = 0; i < stowOrder.size(); ++i) {
+    sortOrders.emplace(stowOrder[i], static_cast<int>(i + 1));
+  }
   model.inventoryNote = js::NumToString(static_cast<double>(sim.Goods().size())) + " lots aboard.";
   for (const GoodsLot& lot : sim.Goods()) {
     const bool stowed = sim.CargoStowed(lot.id);
@@ -202,7 +210,8 @@ CargoRoomModel BuildCargoRoom(const Simulation& sim, CargoSelection* selection) 
     block.shortLabel = ShortGoodLabel(sim, lot);
     block.kind = lot.kind;
     block.vol = lot.vol;
-    block.sortOrder = sim.CargoSortOrder(lot.id);
+    const auto order = sortOrders.find(lot.id);
+    if (order != sortOrders.end()) { block.sortOrder = order->second; }
     block.mixEpoch = sim.CargoMixEpoch(lot.id);
     block.stowed = stowed;
     block.selected = selected;

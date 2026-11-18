@@ -208,7 +208,8 @@ class Simulation {
   bool BuyUpgrade(const std::string& upgradeId);
   void ContractProgress(const std::string& goal, const std::string& target);
 
-  std::vector<TradeRun> TradeBoard(const std::string& portId) const;
+  std::vector<TradeRun> TradeBoard(const std::string& portId,
+                                   const std::string& mode = std::string()) const;
   bool EngineClick(const std::string& by = std::string());
   double EngineButtonChargeLeft() const;
   bool TrySpendEngineButton();
@@ -226,7 +227,7 @@ class Simulation {
                    const std::string& good, int priceTier = 0);
   bool StowCargo(const std::string& lotId);
   bool CargoStowed(const std::string& lotId) const;
-  int CargoSortOrder(const std::string& lotId) const;
+  const std::vector<std::string>& CargoSortOrder() const;
   int CargoMixEpoch(const std::string& lotId) const;
   void StepCargoMix();
   bool AcceptTrade(const std::string& mode, const std::string& to,
