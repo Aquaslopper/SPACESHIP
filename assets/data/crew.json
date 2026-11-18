@@ -260,6 +260,27 @@
       "skin": "#e8c8a4",
       "traits": "Warm, keeps the mess in order",
       "wallet": 0
+    },
+    {
+      "activity": "Idle in the corridor",
+      "colour": "#c78a42",
+      "fatigue": 25,
+      "fee": 180,
+      "hair": "#ef9cba",
+      "hair2": "#bf658a",
+      "hairStyle": "bun",
+      "health": 92,
+      "hunger": 20,
+      "id": "moetorial",
+      "morale": 75,
+      "name": "Moetorial",
+      "race": "Human",
+      "role": "Deckhand",
+      "room": "quarters",
+      "sex": "f",
+      "skill": "Untrained",
+      "skin": "#f6cfb5",
+      "traits": "Welcomes visiting crews"
     }
   ],
   "comment": "Starting crew, hire pool, job ladder, order sheet and payroll tuning.",

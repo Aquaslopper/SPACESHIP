@@ -236,9 +236,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
 
   model.head.kind = "STATION";
   model.head.title = model.portName;
-  model.head.sub =
-      "Pick a card, pick an item, then commit. Supplies, the yard and hires cost "
-      "shiplets only; selling, contracts and the bar cost one click.";
+  model.head.sub = "Welcome to " + model.portName + ", Captain!";
 
   const double purse = sim.State().shiplets;
   const double used = sim.CargoUsed();
