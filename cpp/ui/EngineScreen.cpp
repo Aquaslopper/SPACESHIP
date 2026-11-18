@@ -261,7 +261,7 @@ EngineScreenModel BuildEngineScreen(const Simulation& sim) {
   wear.title = "Wear";
   wear.Field("Rate", "1% per " + Num(wearEvery) + " clicks");
   wear.Field("Next step", Num(untilNext) + " click" + (untilNext == 1.0 ? "" : "s"));
-  wear.Field("Full cycle", Num(100.0 * wearEvery) + " clicks");
+  wear.Field("Full cycle", Num(100.0 / sim.GameRules().engine.wearStep * wearEvery) + " clicks");
   screen.left.push_back(wear);
 
   NavPanel drive;
