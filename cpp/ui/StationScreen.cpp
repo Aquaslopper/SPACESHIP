@@ -236,7 +236,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
 
   model.head.kind = "STATION";
   model.head.title = model.portName;
-  model.head.sub = "Moetorial: Welcome to " + model.portName + ", Captain!";
+  model.head.sub = "Welcome to " + model.portName + ", Captain!";
 
   const double purse = sim.State().shiplets;
   const double used = sim.CargoUsed();
