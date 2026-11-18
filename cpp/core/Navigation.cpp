@@ -422,7 +422,7 @@ Simulation::NavMetrics Simulation::MetricsFor(const Body& body) const {
   metrics.dist = distance;
   // One click under way costs one point of fuel. Nothing is paid up front: the
   // tank falls with each click the ship spends flying.
-  metrics.fuel = 1.0;
+  metrics.fuel = 2.0;
   metrics.total = distance + 1;
 
   const double ly = distance * map_.lyPerAction;

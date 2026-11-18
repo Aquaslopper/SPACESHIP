@@ -42,8 +42,8 @@
   "engine": {
     "engineerAt": 60,
     "warnBelow": 50,
-    "wearEvery": 2,
-    "wearStep": 1
+    "wearEvery": 1,
+    "wearStep": 0.25
   },
   "goods": [
     {

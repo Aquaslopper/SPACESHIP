@@ -275,6 +275,7 @@ void Simulation::ProAction(double n) {
   state_.positiveClicks += n;
   AdvanceTasks(n);
   for (auto& entry : state_.charges) {
+    if (entry.first == kEngineButtonChargeKey) { continue; }
     if (entry.first.find("|command:hold:0") != std::string::npos ||
         entry.first.find("|command:change-course:0") != std::string::npos) { continue; }
     Charge& charge = entry.second;

@@ -21,9 +21,16 @@ void Simulation::TickButtonCharges() {
         charge.left = std::min(charge.volume, charge.left + 1);
         charge.refillClicks -= entry.first.find("press:room:warp:") != std::string::npos ? 5 : 2;
       }
-    } else if (entry.first == kEngineButtonChargeKey && state_.engineerRun &&
-               AssignedEngineer() != nullptr) {
-      continue;
+    } else if (entry.first == kEngineButtonChargeKey) {
+      if (state_.engineerRun && AssignedEngineer() != nullptr) { continue; }
+
+      if (charge.left < charge.volume) {
+        charge.refillClicks += 1;
+        if (charge.refillClicks >= 12) {
+          charge.left = std::min(charge.volume, charge.left + 1.0);
+          charge.refillClicks -= 12;
+        }
+      }
     } else {
       charge.left = std::min(charge.volume, charge.left + 1.0);
     }
