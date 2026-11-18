@@ -43,7 +43,7 @@
     "engineerAt": 60,
     "warnBelow": 50,
     "wearEvery": 4,
-    "wearStep": 1
+    "wearStep": 0.25
   },
   "goods": [
     {
