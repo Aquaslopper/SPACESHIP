@@ -8184,6 +8184,26 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
   const float searchTop = layout_.content.y + headerH + 8.0f;
   PaintWikiSearch(Area{layout_.content.x, searchTop, layout_.content.w, 0.0f});
   float top = searchTop + (panelsKind_ == ScreenKind::Wiki ? 38.0f : 0.0f);
+  if (panelsKind_ == ScreenKind::Station) {
+    const Texture2D* mascot = CrewTexture(crewArt_, "moetorial-welcome");
+    const float imageH = mascot != nullptr ? 96.0f : 0.0f;
+    const float imageW = mascot != nullptr ? imageH * mascot->width / mascot->height : 0.0f;
+    if (mascot != nullptr) {
+      DrawTexturePro(*mascot,
+                     Rectangle{0, 0, static_cast<float>(mascot->width),
+                               static_cast<float>(mascot->height)},
+                     Rectangle{left, top, imageW, imageH}, Vector2{0, 0}, 0, WHITE);
+    }
+    const float textX = left + imageW + (mascot != nullptr ? 12.0f : 0.0f);
+    const int size = TypePx(18);
+    float textY = top + TypeStep(8.0f);
+    for (const auto& line : WrapText(screen.head.sub, std::max(1.0f, right - textX),
+                                     size, SelectFont(size, false))) {
+      Text(line.c_str(), static_cast<int>(textX), static_cast<int>(textY), size, ToRay(p.ink));
+      textY += std::max(theme_.LineHeight(), static_cast<float>(size) + 6.0f);
+    }
+    top = std::max(top + imageH, textY) + 8.0f;
+  }
   if (screen.panels.size() == 3 && screen.panels.front().id == "bridge-controls") {
     NavPanel voyagePanel;
     voyagePanel.id = screen.panels[1].id;
