@@ -62,8 +62,6 @@ struct Theme {
 
   // Presentation flags that travel with the voyage's options.
   bool largeText = false;
-  // Phase 9: the typography floor and its four steps. Step 0 is 18 px — the
-  // general UI floor — and each step adds 5% of that floor, rounded.
   int fontStep = 0;
   bool hideCrewLabels = false;
   bool reducedMotion = false;

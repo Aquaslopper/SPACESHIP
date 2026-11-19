@@ -145,3 +145,21 @@ You must append a compressed summary of **every single reply and action you take
 - Named gate (anti-roguelike), proposal only, NOT implemented: the inert-button gate in BuildProgressButton that makes non scan/travel/extract/o2-run/maint tasks unpressable during a run; minimal removal would be dropping the `inert = ...` assignment and its dispatch check, leaving running-state and charge refusals as the only blockers.
 - Not implemented: removal of any gate, any gameplay change, LOGBOOK beyond this entry.
 - Native client run, Windows exe, GPU fill-rate for the shader change and audio output not verified in this sandbox (no display, no audio device); owner must verify on the target machine.
+
+### Entry #009
+- Timestamp: 2026-11-19 UTC.
+- Owner issued a corrected task: remove phase commentary only; the earlier if/else scope was withdrawn.
+- Removed every Phase 0-9 reference from the C++ sources; no other commentary family touched.
+- Deleted the Phase 0/2/3 introduction paragraph from the cpp/app/main.cpp header.
+- Deleted the Phase 9 reading-size note beside theme.fontStep in main.cpp.
+- Deleted the Phase 9 borderless-window note above the fullscreen toggle in main.cpp.
+- Deleted the Phase 9 options note in SaveSystem.cpp's save block.
+- Deleted the Phase 1 section divider in Catalog.cpp and the Phase 1 field note in Catalog.h.
+- Deleted the Phase 1 mark-fall note in Fx.cpp.
+- Deleted the Phase 9 theme-table note in Popups.cpp, the Phase 9 prefs note in Popups.h and the Phase 9 typography note in Theme.h.
+- Eight files changed, eighteen comment lines removed, one comment line shortened; no statement added, removed or reordered.
+- PRESERVED GAMEPLAY / REMOVED gate notes, anti-game file headers and commented-out conditionals were left untouched per owner direction.
+- Remaining "phase" strings are identifiers and animation terms (turbinePhase, corePhase, CrewSeedPhase, two-phase), not development commentary.
+- No build toolchain in sandbox (g++ only, no cmake/raylib); comment-only deletions, no compile verification performed.
+- Named gate (anti-roguelike), proposal only, NOT implemented: the gameOver-empty refusal still absent from BuySupply is the inverse case; the surviving gate worth naming is the `!state_.docked || HerePort() == nullptr` refusal shared by every market transaction; minimal removal would be dropping the `!state_.docked` half in one function only, leaving port existence as the sole blocker.
+- No gameplay, save format, option key or control changed this turn.

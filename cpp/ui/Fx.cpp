@@ -101,7 +101,6 @@ MarkStyle MarkAt(const ActionMark& mark, double now) {
   const double t = (elapsed - FxTiming::kMarkHold) / FxTiming::kMarkDuration;
   if (t >= 1.0) { return style; }
   if (t < 0.0) {
-    // Phase 1: land and stay put, so the player registers where their hand was.
     style.top = mark.y;
     style.opacity = 1.0f;
     style.alive = true;

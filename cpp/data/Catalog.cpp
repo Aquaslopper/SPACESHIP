@@ -437,7 +437,6 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
   catalog.counts.themes = static_cast<int>(Field(content, "themes", "content.json").size());
   catalog.counts.taskTypes = static_cast<int>(catalog.taskTypes.size());
 
-  // ---- crew and survival (counted now, consumed from Phase 1) ------------
   const Json crew = LoadFile(data / "crew.json");
   for (const Json& member : Field(crew, "crew", "crew.json")) {
     catalog.startingCrew.push_back(ReadCrew(member));

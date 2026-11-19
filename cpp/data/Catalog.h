@@ -131,7 +131,6 @@ class Catalog {
   std::map<std::string, std::map<std::string, std::string>> shipFields;  // by class
   std::map<std::string, std::vector<double>> cargoByClass;  // refit levels 0..2
 
-  // starting values and definitions (Phase 1).
   std::vector<CrewDefinition> startingCrew;
   std::vector<StatDefinition> startingStats;
   std::vector<IncidentType> incidentTypes;

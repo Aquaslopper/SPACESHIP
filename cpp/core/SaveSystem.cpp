@@ -172,7 +172,6 @@ std::string Simulation::SaveJson() const {
                       {"glow", Num(state_.options.glow)},
                       {"lensFlare", Num(state_.options.lensFlare)},
                       {"radiationWave", Num(RadiationWaveStrength(state_.options.radiationWave))},
-                      // Phase 9: the reading size and the window travel too.
                       {"fontStep", Num(static_cast<double>(state_.options.fontStep))},
                       {"fullscreen", state_.options.fullscreen}};
 

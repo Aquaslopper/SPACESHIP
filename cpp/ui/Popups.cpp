@@ -15,9 +15,6 @@ namespace ship {
 
 namespace {
 
-// The same five themes the renderer knows, so the settings sheet can never
-// offer a palette the ship has not got (Phase 9 replaced the literal table that
-// used to drift from Theme::Specs()).
 const std::vector<std::pair<std::string, std::string>>& ThemeTable() {
   static const std::vector<std::pair<std::string, std::string>> table = [] {
     std::vector<std::pair<std::string, std::string>> rows;
