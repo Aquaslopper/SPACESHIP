@@ -1172,14 +1172,14 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     }
 
     if (auto it = s.find("options"); it != s.end() && it->is_object()) {
-      state_.options.largeText = GetBool(*it, "largeText");
+      state_.options.largeText = GetBool(*it, "largeText", true);
       state_.options.confirmRisk = GetBool(*it, "confirmRisk");
       state_.options.theme = GetString(*it, "theme", "classic");
       state_.options.soundEffects = GetBool(*it, "soundEffects", true);
       state_.options.music = GetBool(*it, "music", true);
-      state_.options.audioLevel = GetNumber(*it, "audioLevel", 0.8);
-      const double savedGamma = GetNumber(*it, "displayGamma", 1.0);
-      if (GetString(*it, "displayGammaScale") == "relative-1.6" || savedGamma == 1.0) {
+      state_.options.audioLevel = GetNumber(*it, "audioLevel", 4);
+      const double savedGamma = GetNumber(*it, "displayGamma", 1.3);
+      if (GetString(*it, "displayGammaScale") == "relative-1.6" || savedGamma == 1.3) {
         state_.options.displayGamma = DisplayGamma(savedGamma);
       } else {
         state_.options.displayGamma = DisplayGamma(
