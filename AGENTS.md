@@ -31,7 +31,8 @@ into requirements or add unrequested behavior such as automatic loading.
 3. cpp/
 
 ## HARD RULES
--**Do not edit files without the owner's permission.** Wait for explicit approval from the repository owner
+- **Mandatory Reading:** Read [`PROVENANCE_CHECK.md`] at the start of this session before evaluating legacy code, logs, or tests.
+- **Do not edit files without the owner's permission.** Wait for explicit approval from the repository owner
    before creating, changing, moving or deleting any file. If permission is unclear (LOGBOOK anti-roguelike),
    ask and stop; never make the edit first and explain afterwards.  
 - **Do not hide differences.** Do not silently omit content, truncate values, inert a
@@ -45,3 +46,4 @@ Do not write any code or perform any tasks until you have output the answers:
 2. Explain the problem with "commentary in code"?
 3. Why no anti pattern?
 4. Why is the player allowed to discover and live with consequences?
+5. What makes a file "hallucination-contaminated," and what three things must you state before acting when an old file, comment, or test seems to justify a protective rule?
