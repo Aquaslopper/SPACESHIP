@@ -2999,8 +2999,8 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
       const float y = 154 + 1100/(30+depth);
       const bool sun = body.type == "star" || body.type == "system";
       const float r = std::clamp(static_cast<float>((sun ? 2800 : body.type == "moon" ? 650 : 1500)/(28+depth)), 2.0f, 40.0f);
-      const float haze = static_cast<float>(depth / (depth + 260.0));
-      const float opacity = 1.0f - 0.55f*haze;
+      const float haze = static_cast<float>(depth / (depth + 200.0));
+      const float opacity = 0.70f - 0.45f*haze;
       if (body.type == "station" || body.type == "site") {
         DrawRectangleV(V(x-r,y-r*0.35f), {2*r*scale,0.7f*r*scale}, Fade(rule, opacity));
         line(x,y-r,x,y+r,Fade(WHITE, opacity));
@@ -3010,8 +3010,8 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
         const Color light = sun ? Color{244,229,198,255} : Color{164,161,152,255};
         const Vector2 center = V(x,y);
         DrawCircleGradient(center,
-                           (sun ? 2.8f*r : r+2.5f*haze)*scale,
-                           Fade(light, sun ? 0.48f : 0.32f), Fade(light, 0));
+                           (sun ? 4.8f*r : r+2.5f*haze)*scale,
+                           Fade(light, sun ? 0.84f : 0.32f), Fade(light, 0));
         DrawCircleV(center, (r-0.7f*haze)*scale, Fade(light, opacity));
         if (sun) DrawCircleLinesV(V(x,y),(r+2)*scale,Fade(rule, opacity*0.6f));
         if (body.subtype == "gas") line(x-r*1.4f,y+r*0.35f,x+r*1.4f,y-r*0.35f,Fade(rule, opacity));
@@ -3024,10 +3024,10 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
     }
     // A shallow reflection of the sill stays on the glass as the sky turns.
     DrawRectangleGradientV(static_cast<int>(left), static_cast<int>(V(0,254).y),
-                           static_cast<int>(778*scale), static_cast<int>(36*scale),
-                           Fade(paper, 0), Fade(paper, 0.08f));
+                           static_cast<int>(778*scale), static_cast<int>(45*scale),
+                           Fade(paper, 0), Fade(paper, 0.18f));
     for (float x : {109.0f, 851.0f}) {
-      for (int k = 0; k < 5; ++k) line(x-6, 275+2*k, x+6, 275+2*k, Fade(rule, 0.12f));
+      for (int k = 0; k < 5; ++k) line(x-6, 275+2*k, x+6, 275+2*k, Fade(rule, 0.32f));
     }
     EndScissorMode();
     for (int i = 0; i < 2; ++i) {
