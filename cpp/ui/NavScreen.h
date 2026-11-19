@@ -71,6 +71,7 @@ struct NavPoint {
 
 // mapX / mapY: zoom about the centre of the world, then stretch the world onto
 // the live size of the map box.
+NavPoint TravelMarker(const Simulation& sim);
 NavPoint NavProject(const MapView& map, double wx, double wy);
 
 // The same, with the layer's pan applied: what the player actually sees.

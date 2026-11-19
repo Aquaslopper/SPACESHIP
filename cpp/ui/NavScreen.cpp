@@ -92,21 +92,6 @@ std::string BodyClasses(const Body& body, bool selected) {
   return cls;
 }
 
-NavPoint TravelMarker(const Simulation& sim) {
-  const Body* here = sim.FindBodyById(sim.Map().here);
-  NavPoint at{here == nullptr ? 0.0 : here->x, here == nullptr ? 0.0 : here->y};
-  if (sim.Map().inSpace) {
-    const auto origin = sim.Map().flightOrigin.at("system");
-    at = {origin.first, origin.second};
-  }
-  const Task* travel = sim.FindOngoing("travel");
-  if (travel == nullptr || travel->target.empty()) { return at; }
-  const Body* body = sim.FindBodyById(travel->target);
-  if (body == nullptr || body->type == "system") { return at; }
-  const double p = OngoingPercent(*travel) / 100.0;
-  return NavPoint{at.x + (body->x - at.x) * p, at.y + (body->y - at.y) * p};
-}
-
 const CrewMember* NavigatorOf(const Simulation& sim) {
   for (const CrewMember& crew : sim.Crew()) {
     if (crew.job == "navigation" && sim.CrewBusy(crew) == nullptr) { return &crew; }
@@ -191,6 +176,22 @@ std::vector<PanelLine> ScanReadout(const Simulation& sim, const Body& body) {
 }
 
 }  // namespace
+
+NavPoint TravelMarker(const Simulation& sim) {
+  const Body* here = sim.FindBodyById(sim.Map().here);
+  NavPoint at{here == nullptr ? 0.0 : here->x, here == nullptr ? 0.0 : here->y};
+  if (sim.Map().inSpace) {
+    const auto origin = sim.Map().flightOrigin.at("system");
+    at = {origin.first, origin.second};
+  }
+  const Task* travel = sim.FindOngoing("travel");
+  if (travel == nullptr || travel->target.empty()) { return at; }
+  const Body* body = sim.FindBodyById(travel->target);
+  if (body == nullptr || body->type == "system") { return at; }
+  const double p = OngoingPercent(*travel) / 100.0;
+  return NavPoint{at.x + (body->x - at.x) * p, at.y + (body->y - at.y) * p};
+}
+
 
 // ---------------------------------------------------------------------------
 //  Words
