@@ -96,7 +96,7 @@ ExternalAudio ScanExternalAudio(const std::string& assetsDir) {
 
 double MasterGain(const Options& options) {
   const double level = std::isfinite(options.audioLevel) ? options.audioLevel : 0.0;
-  return std::clamp(level, 0.0, 1.0);
+  return std::clamp(level, 1.0, 10.0);
 }
 
 }  // namespace
