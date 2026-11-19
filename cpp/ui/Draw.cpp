@@ -2936,15 +2936,85 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
     plate(77, 26, 806, 276, paper);
     plate(85, 34, 790, 260, glass);
 
-    // Bow glass: keep the field clear of instruments and crossbars.
-    for (int i = 1; i <= 96; ++i) {
-      const float x = 95 + (i * i * 19 + i * 53) % 767;
-      const float y = 44 + (i * i * 37 + i * 23) % 237;
-      DrawCircleV(V(x, y), std::max(0.7f, (i % 7 == 0 ? 1.4f : 0.8f) * scale),
-                  Fade(WHITE, 0.35f + 0.09f * (i % 6)));
+    const Catalog& catalog = sim.World();
+    const Task* trip = sim.FindOngoing("travel");
+    const Body* dest = trip ? sim.FindBodyById(trip->target) : nullptr;
+    const bool sector = dest && dest->type == "system";
+    NavPoint eye = TravelMarker(sim);
+    if (sector) {
+      const auto start = sim.Map().flightOrigin.at("sector");
+      const double part = OngoingPercent(*trip) / 100.0;
+      eye = {start.first + (dest->x - start.first) * part,
+             start.second + (dest->y - start.second) * part};
     }
-    DrawCircleV(V(234, 206), 20 * scale, Color{170, 169, 164, 255});
-    DrawCircleV(V(238, 204), 20 * scale, glass);
+    const auto& local = catalog.BodiesInSystem(sim.CurrentSystemId());
+    const Body* forward = dest;
+    if (!forward && sim.State().navTarget) {
+      const Body* plotted = sim.FindBodyById(*sim.State().navTarget);
+      if (plotted && plotted->type != "system" && catalog.BodySystem(*plotted) == sim.CurrentSystemId()) forward = plotted;
+    }
+    if (!forward || (forward->x == eye.x && forward->y == eye.y)) {
+      double nearest = HUGE_VAL;
+      for (auto index : local) {
+        const Body& body = catalog.bodies[index];
+        const double d = std::hypot(body.x - eye.x, body.y - eye.y);
+        if (body.type == "star" && d > 0 && d < nearest) { nearest = d; forward = &body; }
+      }
+    }
+    const double heading = forward ? std::atan2(forward->y - eye.y, forward->x - eye.x) : 0.0;
+    const double yaw = heading + bridgeLook_ * 2 * PI;
+    const float left = V(91, 0).x, top = std::max(layout_.content.y, V(0, 38).y - contentScroll_);
+    const float bottom = std::min(layout_.content.Bottom(), V(0, 290).y - contentScroll_);
+    BeginScissorMode(static_cast<int>(left), static_cast<int>(top), static_cast<int>(778 * scale),
+                     static_cast<int>(std::max(0.0f, bottom - top)));
+    // A fixed procedural sky, and near particles passing the bow only in flight.
+    for (int i = 1; i <= 360; ++i) {
+      const double az = i * 2.39996323 - yaw;
+      const double z = std::cos(az);
+      if (z < 0.58) continue;
+      const float x = 480 + 330 * std::sin(az) / z;
+      const float y = 164 + ((i*i*37+i*23)%263 - 131) / z;
+      DrawCircleV(V(x,y), std::max(0.7f, (i%7 ? 0.8f : 1.4f)*scale), Fade(WHITE, 0.4f + 0.08f*(i%6)));
+    }
+    if (trip && !reduced) {
+      const float look = bridgeLook_ * 2 * PI;
+      for (int i = 1; i <= 72; ++i) {
+        const float z = 1.0f - std::fmod(i * 0.618034f + tSec * 0.38f, 1.0f);
+        const float dx = ((i*97)%201 - 100)*0.012f, dy = ((i*61)%137 - 68)*0.006f;
+        const float depth = z*std::cos(look) + dx*std::sin(look);
+        const float tail = depth + 0.014f*std::cos(look);
+        if (depth < 0.08f || tail < 0.08f) continue;
+        const float side = dx*std::cos(look) - z*std::sin(look);
+        line(480+330*side/depth, 164+330*dy/depth,
+             480+330*(side-0.014f*std::sin(look))/tail, 164+330*dy/tail, rule);
+      }
+    }
+    const auto drawBody = [&](const Body& body) {
+      const double dx = body.x-eye.x, dy = body.y-eye.y;
+      const double depth = dx*std::cos(yaw) + dy*std::sin(yaw);
+      if (depth <= 0.01) return;
+      const float x = 480 + 330*(dy*std::cos(yaw) - dx*std::sin(yaw))/depth;
+      if (x < 40 || x > 920) return;
+      const float y = 154 + 1100/(30+depth);
+      const bool sun = body.type == "star" || body.type == "system";
+      const float r = std::clamp(static_cast<float>((sun ? 2800 : body.type == "moon" ? 650 : 1500)/(28+depth)), 2.0f, 40.0f);
+      if (body.type == "station" || body.type == "site") {
+        DrawRectangleV(V(x-r,y-r*0.35f), {2*r*scale,0.7f*r*scale}, rule);
+        line(x,y-r,x,y+r,WHITE);
+      } else if (body.type == "belt") {
+        for (int i=0; i<11; ++i) DrawCircleV(V(x+(i-5)*r*0.35f,y+((i*7)%5-2)*r*0.18f), pen, rule);
+      } else {
+        DrawCircleV(V(x,y),r*scale,sun ? Color{232,225,203,255} : Color{164,161,152,255});
+        if (sun) DrawCircleLinesV(V(x,y),(r+2)*scale,rule);
+        if (body.subtype == "gas") line(x-r*1.4f,y+r*0.35f,x+r*1.4f,y-r*0.35f,rule);
+      }
+    };
+    if (sector) {
+      for (const Body& body : catalog.systems) if (body.region == dest->region || body.region == sim.CurrentSystem()->region) drawBody(body);
+    } else {
+      for (auto index : local) drawBody(catalog.bodies[index]);
+    }
+    EndScissorMode();
     for (int i = 0; i < 2; ++i) {
       const float cx = i ? 914 : 46;
       plate(cx - 23, 26, 46, 276, paper);
@@ -2976,7 +3046,9 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
     }
     line(256, 335, 704, 335, rule);
     for (int k = 0; k <= 56; ++k) line(256+k*8, 335, 256+k*8, k%7 ? 330 : 321, ink);
-    DrawTriangle(V(480, 337), V(474, 346), V(486, 346), ink);
+    bridgeBearingBar_ = {V(256,318).x, V(256,318).y, 448*scale, 32*scale};
+    const float pointer = 480 + 448*bridgeLook_;
+    DrawTriangle(V(pointer, 337), V(pointer-6, 346), V(pointer+6, 346), ink);
   }
 
   // --- Priority 2 Overlay: Spinning turbines, rotating core encoder, sweeping needles & coolant loop ---
@@ -8176,6 +8248,12 @@ void ShellView::Drag(Simulation& sim, float x, float y, float dx, float dy, bool
     return;
   }
   const float localY = y + contentScroll_;
+  if (sim.State().activeTab == "room:bridge" && layout_.content.Contains(x,y) &&
+      (draggingBearing_ || (pressed && bridgeBearingBar_.Contains(x,localY)))) {
+    draggingBearing_ = true;
+    bridgeLook_ = std::clamp((x-bridgeBearingBar_.x)/bridgeBearingBar_.w - 0.5f,-0.5f,0.5f);
+    return;
+  }
   if (!draggingChart_) {
     if (!pressed) { return; }
     if (!screenNav_ || !layout_.content.Contains(x, y) ||
@@ -8289,6 +8367,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
                       double nowMs) {
   if (splashActive_) { EndSplash(nowMs); return; }
   if (button == HitButton::Left) {
+    if (draggingBearing_) { draggingBearing_ = false; return; }
     const bool moved = draggingChart_ && chartDragMoved_;
     draggingChart_ = false;
     chartDragMoved_ = false;
@@ -8512,6 +8591,11 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
   }
   const float scrollY = contentScroll_;
 
+  if (button == HitButton::Left && sim.State().activeTab == "room:bridge" &&
+      bridgeBearingBar_.Contains(x, y + scrollY)) {
+    bridgeLook_ = std::clamp((x-bridgeBearingBar_.x)/bridgeBearingBar_.w - 0.5f,-0.5f,0.5f);
+    return;
+  }
   if (y >= actionBandTop_) {
     for (const auto& hit : actionBandHits_) {
       if (!hit.box.Contains(x, y + scrollY)) continue;

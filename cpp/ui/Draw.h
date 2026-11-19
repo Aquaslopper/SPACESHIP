@@ -282,6 +282,9 @@ class ShellView {
   float wikiBodyMaxScroll_ = 0.0f;
   Area wikiIndexBox_{};
   Area wikiBodyBox_{};
+  Area bridgeBearingBar_{};
+  float bridgeLook_ = 0.0f;  // turns from forward, -0.5 to +0.5
+  bool draggingBearing_ = false;
   Area navChartBox_{};
   float navChartScaleX_ = 1.0f;
   float navChartScaleY_ = 1.0f;
