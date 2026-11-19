@@ -2982,11 +2982,12 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
         const float z = 1.0f - std::fmod(i * 0.618034f + tSec * 0.38f, 1.0f);
         const float dx = ((i*97)%201 - 100)*0.012f, dy = ((i*61)%137 - 68)*0.006f;
         const float depth = z*std::cos(look) + dx*std::sin(look);
-        const float tail = depth + 0.014f*std::cos(look);
+        const float trail = 0.052f;
+        const float tail = depth + trail*std::cos(look);
         if (depth < 0.08f || tail < 0.08f) continue;
         const float side = dx*std::cos(look) - z*std::sin(look);
         line(480+330*side/depth, 164+330*dy/depth,
-             480+330*(side-0.014f*std::sin(look))/tail, 164+330*dy/tail, rule);
+             480+330*(side-trail*std::sin(look))/tail, 164+330*dy/tail, rule);
       }
     }
     const auto drawBody = [&](const Body& body) {
@@ -2998,21 +2999,35 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
       const float y = 154 + 1100/(30+depth);
       const bool sun = body.type == "star" || body.type == "system";
       const float r = std::clamp(static_cast<float>((sun ? 2800 : body.type == "moon" ? 650 : 1500)/(28+depth)), 2.0f, 40.0f);
+      const float haze = static_cast<float>(depth / (depth + 260.0));
+      const float opacity = 1.0f - 0.55f*haze;
       if (body.type == "station" || body.type == "site") {
-        DrawRectangleV(V(x-r,y-r*0.35f), {2*r*scale,0.7f*r*scale}, rule);
-        line(x,y-r,x,y+r,WHITE);
+        DrawRectangleV(V(x-r,y-r*0.35f), {2*r*scale,0.7f*r*scale}, Fade(rule, opacity));
+        line(x,y-r,x,y+r,Fade(WHITE, opacity));
       } else if (body.type == "belt") {
-        for (int i=0; i<11; ++i) DrawCircleV(V(x+(i-5)*r*0.35f,y+((i*7)%5-2)*r*0.18f), pen, rule);
+        for (int i=0; i<11; ++i) DrawCircleV(V(x+(i-5)*r*0.35f,y+((i*7)%5-2)*r*0.18f), pen, Fade(rule, opacity));
       } else {
-        DrawCircleV(V(x,y),r*scale,sun ? Color{232,225,203,255} : Color{164,161,152,255});
-        if (sun) DrawCircleLinesV(V(x,y),(r+2)*scale,rule);
-        if (body.subtype == "gas") line(x-r*1.4f,y+r*0.35f,x+r*1.4f,y-r*0.35f,rule);
+        const Color light = sun ? Color{244,229,198,255} : Color{164,161,152,255};
+        const Vector2 center = V(x,y);
+        DrawCircleGradient(center,
+                           (sun ? 2.8f*r : r+2.5f*haze)*scale,
+                           Fade(light, sun ? 0.48f : 0.32f), Fade(light, 0));
+        DrawCircleV(center, (r-0.7f*haze)*scale, Fade(light, opacity));
+        if (sun) DrawCircleLinesV(V(x,y),(r+2)*scale,Fade(rule, opacity*0.6f));
+        if (body.subtype == "gas") line(x-r*1.4f,y+r*0.35f,x+r*1.4f,y-r*0.35f,Fade(rule, opacity));
       }
     };
     if (sector) {
       for (const Body& body : catalog.systems) if (body.region == dest->region || body.region == sim.CurrentSystem()->region) drawBody(body);
     } else {
       for (auto index : local) drawBody(catalog.bodies[index]);
+    }
+    // A shallow reflection of the sill stays on the glass as the sky turns.
+    DrawRectangleGradientV(static_cast<int>(left), static_cast<int>(V(0,254).y),
+                           static_cast<int>(778*scale), static_cast<int>(36*scale),
+                           Fade(paper, 0), Fade(paper, 0.08f));
+    for (float x : {109.0f, 851.0f}) {
+      for (int k = 0; k < 5; ++k) line(x-6, 275+2*k, x+6, 275+2*k, Fade(rule, 0.12f));
     }
     EndScissorMode();
     for (int i = 0; i < 2; ++i) {
