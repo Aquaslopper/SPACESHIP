@@ -1094,11 +1094,10 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
     sideHits_ = SideHits(sim, layout_.sidepanel, layout_.sidefoot, sidebarLine,
                          sideScroll_, &sideContentH_, measureSide);
   }
-  const std::vector<SideHit>& hits = sideHits_;
   const std::vector<SideBlock> blocks = SideBlocks(sim);
   draw->PushClipRect(ImVec2(layout_.sidepanel.x, layout_.sidepanel.y),
                      ImVec2(layout_.sidepanel.Right(), layout_.sidepanel.Bottom()), true);
-  for (const SideHit& hit : hits) {
+  for (SideHit& hit : sideHits_) {
     if (hit.pinned) { continue; } // footer labels are tooltips, never sidebar text
     const Area& box = hit.paintBox;
     auto wrapped = [&](const std::string& text, float y, float width, ImU32 ink) {
@@ -1144,6 +1143,11 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
                     ToIm(p.muted), "Open");
       continue;
     }
+    if (hit.action == SideAction::OpenCrew) {
+      const ImVec2 name = ImGui::CalcTextSize(hit.text.c_str(), nullptr, false, box.w);
+      hit.box.w = std::min(hit.box.w, name.x);
+      hit.box.h = std::max(0.0f, std::min(hit.box.Bottom(), box.y + name.y) - hit.box.y);
+    }
     wrapped(hit.text, box.y, box.w, ToIm(p.ink));
     if (!hit.rightValue.empty()) {
       if (hit.stackValue) {
@@ -1162,7 +1166,7 @@ void ShellView::PaintChrome(Simulation& sim, double nowMs) {
                       ImVec2(layout_.sidefoot.Right(), layout_.sidefoot.Bottom()), ToIm(p.chrome));
   draw->AddLine(ImVec2(0.0f, layout_.sidefoot.y),
                 ImVec2(layout_.sidefoot.Right(), layout_.sidefoot.y), ToIm(p.border));
-  for (const SideHit& hit : hits) {
+  for (const SideHit& hit : sideHits_) {
     if (!hit.pinned) { continue; }
     if (hit.action == SideAction::Manifest || hit.action == SideAction::Log ||
         hit.action == SideAction::Files || hit.action == SideAction::Settings) {
@@ -9029,6 +9033,9 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
     switch (hit.action) {
       case SideAction::Toggle:
         if (hit.key != "indicators") { sim.MutableState().spOpen[hit.key] = !sim.MutableState().spOpen[hit.key]; }
+        return;
+      case SideAction::OpenCrew:
+        if (button == HitButton::Left) { OpenTask(sim, "crew", hit.key, true); }
         return;
       case SideAction::OpenEvent: OpenTask(sim, "event", hit.key, false); return;
       case SideAction::Wiki: OpenTask(sim, "wiki", "main", true); return;

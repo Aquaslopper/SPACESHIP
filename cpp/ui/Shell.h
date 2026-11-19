@@ -65,7 +65,7 @@ struct SideRow {
   bool dim = true;      // sp-val-dim vs sp-val
   bool num = false;
   std::string kind;     // "pair", "long", "event", "dim"
-  std::string id;       // event id, for the Open button
+  std::string id;       // crew member or event id
 };
 
 struct SideBlock {
@@ -90,6 +90,7 @@ std::vector<IndicatorLine> IndicatorLines(const Simulation& sim);
 enum class SideAction {
   None,
   Toggle,       // a block header, or the Wiki/Rewards buttons
+  OpenCrew,
   OpenEvent,    // an event row's Open
   Manifest,
   Log,
