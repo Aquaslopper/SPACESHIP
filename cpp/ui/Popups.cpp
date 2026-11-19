@@ -154,8 +154,10 @@ PopupModel BuildPopup(const Simulation& sim, const std::string& key,
   model.glow = static_cast<float>(options.glow);
   model.lensFlare = static_cast<float>(options.lensFlare);
   model.radiationWave = static_cast<float>(RadiationWaveStrength(options.radiationWave));
-  model.audioChoices = {{"0.18", "Quiet"}, {"0.4", "Standard"},
-                        {"0.65", "Loud"}, {"0.9", "Very loud"}};
+  model.audioChoices = {{"0.1", "0.1"}, {"0.2", "0.2"}, {"0.3", "0.3"},
+                        {"0.4", "0.4"}, {"0.5", "0.5"}, {"0.6", "0.6"},
+                        {"0.7", "0.7"}, {"0.8", "0.8"}, {"0.9", "0.9"},
+                        {"1", "1.0"}};
   model.toggles.push_back(PopupToggle{
       "reducedMotion",
       state.reducedMotion ? "Enable decorative motion" : "Reduce decorative motion",
