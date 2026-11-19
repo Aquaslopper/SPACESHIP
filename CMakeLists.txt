@@ -204,7 +204,6 @@ add_library(spaceship_core STATIC
   cpp/ui/Layout.cpp
   cpp/ui/Describe.cpp
   cpp/ui/Shell.cpp
-  cpp/ui/ShipDiagram.cpp
   cpp/ui/IdleScreen.cpp
   cpp/ui/Fx.cpp
   cpp/ui/Widgets.cpp

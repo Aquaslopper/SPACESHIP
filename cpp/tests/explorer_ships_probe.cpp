@@ -1,5 +1,4 @@
 #include "core/Simulation.h"
-#include "ui/ShipDiagram.h"
 #include "ui/StationScreen.h"
 #include "ui/StoresScreen.h"
 #include <cassert>
@@ -25,7 +24,6 @@ int main() {
     assert(ship::PressStationAction(sim, "ship-buy:" + kind));
     assert(sim.State().shipClass == kind && sim.State().shiplets == 0);
     assert(sim.CargoCapacity() == 20 && sim.Ship().Berths() == 6);
-    assert(&ship::ActivePlan(sim) == &sim.World().wren);
     const auto after = nlohmann::ordered_json::parse(sim.SaveJson());
     for (const char* key : {"rooms", "crew", "goods", "stats", "life", "mess", "map"}) {
       assert(before.at(key) == after.at(key));
@@ -45,7 +43,6 @@ int main() {
     std::string error;
     assert(loaded.LoadJson(sim.SaveJson(), &error));
     assert(loaded.State().shipClass == kind && loaded.CargoCapacity() == 20);
-    assert(&ship::ActivePlan(loaded) == &loaded.World().wren);
     assert(loaded.Rooms().size() == sim.Rooms().size());
     loaded.MutableState().shiplets = 4000;
     assert(loaded.BuyUpgrade("bay") && loaded.CargoCapacity() == 60);
