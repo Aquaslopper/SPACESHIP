@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <array>
 #include <map>
 #include <optional>
 #include <string>
@@ -323,6 +324,7 @@ struct GameState {
   std::string crewSel;
   std::map<std::string, bool> pendingOrders;
   double crewTick = 0;
+  std::array<int, 2> debrisClaimedCycle{{-1, -1}};
   double shiplets = 200;
   double payTick = 0;
   bool docked = false;
