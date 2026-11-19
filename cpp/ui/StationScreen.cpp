@@ -257,8 +257,7 @@ StationScreenModel BuildStationScreen(const Simulation& sim, const std::string& 
   // ---- 1. the market ------------------------------------------------------
   StationColumn market;
   market.id = "market";
-  market.title = "Market - purse " + Num(purse) + " sh";
-  market.badge = "purse " + Num(purse) + " sh";
+  market.title = "Market";
   market.notes.push_back("Buy supplies and cargo. A different port may pay a different price.");
   market.notes.push_back("Shiplets only: no click is spent and nothing is locked.");
 
@@ -889,12 +888,10 @@ bool PressStationActionRaw(Simulation& sim, const std::string& action,
 // ============================================================================
 std::string StationActionCategory(const Simulation& sim, const std::string& action,
                                   const StationScreenModel* model) {
-  // commandRow chooses from the displayed label, except the larger-ship
-  // purchase which the HTA explicitly marks critical.
   if (action == "ship-buy") { return "critical"; }
   if (action.compare(0, 13, "trade-accept:") == 0) { return "routine"; }
   if (action.compare(0, 5, "sell:") == 0 || action.compare(0, 12, "sell-survey:") == 0) {
-    return "routine";  // HTA gives these rows an explicit routine category.
+    return "routine";  
   }
   const StationScreenModel built = model == nullptr ? BuildStationScreen(sim, sim.Map().here)
                                                     : StationScreenModel{};
@@ -921,9 +918,6 @@ const StationRow* FindStationRowById(const StationScreenModel& model, const std:
 }  // namespace
 
 bool PressStationAction(Simulation& sim, const std::string& action, const std::string& arg) {
-  // The shop, the shipyard and a hire are paid in shiplets: money is their whole
-  // gate, so they hold no clicks and start no green. A trade confirmation and
-  // every other commit row is one click of the clock, like the rest of the ship.
   if (action == "ship-disposition:sell" || action == "ship-disposition:park") {
     auto& state = sim.MutableState();
     if (state.previousShip.empty()) return false;
@@ -941,7 +935,6 @@ bool PressStationAction(Simulation& sim, const std::string& action, const std::s
   const StationScreenModel model = BuildStationScreen(sim, sim.Map().here, &selection);
   const StationRow* row = FindStationRowById(model, action);
   if (row != nullptr && row->free) {
-    // Bought with shiplets: no clicks are spent, but the click still counts.
     return PressWithoutCharge(sim, [&]() { return PressStationActionRaw(sim, action, arg); });
   }
   return CommitActionButton(sim, ButtonChargeKey(sim, "press:station:" + action + ":" + arg + ":"),
