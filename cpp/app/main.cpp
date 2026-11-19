@@ -1,8 +1,6 @@
 // ============================================================================
 //  main.cpp — the client.
 //  ---------------------------------------------------------------------------
-//  Everything the shell decides is in cpp/ui's headless view-models; this file
-//  is only the loop that turns a mouse into a verb and a frame into a paint.
 // ============================================================================
 
 #include <algorithm>
