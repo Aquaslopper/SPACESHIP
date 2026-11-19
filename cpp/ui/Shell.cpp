@@ -238,7 +238,7 @@ std::vector<SideBlock> SideBlocks(const Simulation& sim) {
   crew.open = open("crew");
   crew.empty = "No crew aboard.";
   for (const CrewMember& member : sim.Crew()) {
-    crew.rows.push_back({member.name, ShortRole(member.role), true, false, "pair", ""});
+    crew.rows.push_back({member.name, ShortRole(member.role), true, false, "pair", member.id});
   }
   if (!state.passengers.empty()) {
     crew.rows.push_back({"Passengers", Num(static_cast<double>(state.passengers.size())),
@@ -406,6 +406,10 @@ std::vector<SideHit> SideHits(const Simulation& sim, const Area& sidepanel,
       hit.box = Area{sidepanel.x + 12.0f, 0.0f, rowWidth, height};
       if (row.kind == "event") {
         hit.action = SideAction::OpenEvent;
+        hit.key = row.id;
+      }
+      if (block.key == "crew" && !row.id.empty()) {
+        hit.action = SideAction::OpenCrew;
         hit.key = row.id;
       }
       pushInPanel(hit, cursor, height);
