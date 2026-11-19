@@ -607,7 +607,6 @@ int main(int argc, char** argv) {
   ship::Theme theme = ship::Theme::ById(sim.State().options.theme);
   theme.fontStep = sim.State().options.fontStep;
   theme.largeText = sim.State().options.largeText;
-  theme.hideCrewLabels = sim.State().options.hideCrewLabels;
   theme.reducedMotion = sim.State().reducedMotion;
   theme.stageCompact = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta" || sim.State().shipClass == "yamato" || sim.State().shipClass == "arcadia");
 
@@ -706,8 +705,7 @@ int main(int argc, char** argv) {
   std::printf("audio: %zu music file(s), %zu sound file(s)\n",
               audio.External().music.size(), audio.External().sfx.size());
 
-  // Restore the voyage in memory, but always present the title screen — behind
-  // the dev's splash card, which opens the window.
+
   shell.ShowSplash(voyageStarted);
 
   bool fullscreen = sim.State().options.fullscreen;
@@ -785,13 +783,11 @@ int main(int argc, char** argv) {
     ship::Theme nextTheme = ship::Theme::ById(sim.State().options.theme);
     nextTheme.fontStep = sim.State().options.fontStep;
     nextTheme.largeText = sim.State().options.largeText;
-    nextTheme.hideCrewLabels = sim.State().options.hideCrewLabels;
     nextTheme.reducedMotion = sim.State().reducedMotion;
     nextTheme.stageCompact = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta" || sim.State().shipClass == "yamato" || sim.State().shipClass == "arcadia");
     const bool themeChanged = nextTheme.id != theme.id ||
                               nextTheme.fontStep != theme.fontStep ||
                               nextTheme.largeText != theme.largeText ||
-                              nextTheme.hideCrewLabels != theme.hideCrewLabels ||
                               nextTheme.reducedMotion != theme.reducedMotion ||
                               nextTheme.stageCompact != theme.stageCompact;
     const bool resized = IsWindowResized();
