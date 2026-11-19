@@ -55,8 +55,7 @@ bool GetBool(const Json& object, const char* key, bool fallback = false) {
 bool IsObject(const Json& value) { return value.is_object(); }
 bool IsArray(const Json& value) { return value.is_array(); }
 
-// saveNumber(): a finite, non-negative number. The reference uses this for every
-// counter, coordinate and price it later does arithmetic on.
+
 bool SaveNumber(const Json& value) {
   return value.is_number() && std::isfinite(value.get<double>()) && value.get<double>() >= 0;
 }
@@ -172,7 +171,6 @@ std::string Simulation::SaveJson() const {
                       {"glow", Num(state_.options.glow)},
                       {"lensFlare", Num(state_.options.lensFlare)},
                       {"radiationWave", Num(RadiationWaveStrength(state_.options.radiationWave))},
-                      // Phase 9: the reading size and the window travel too.
                       {"fontStep", Num(static_cast<double>(state_.options.fontStep))},
                       {"fullscreen", state_.options.fullscreen}};
 
@@ -842,8 +840,6 @@ bool Simulation::ValidSave(const std::string& text, const Catalog& catalogIn, st
     if (!IsObject(task)) { return fail("a task is unreadable"); }
     const std::string type = GetString(task, "type");
     const std::string id = GetString(task, "id");
-    // Crew work on a report was removed. A save that still holds such a task
-    // loads without it; the report itself stays open.
     if (type == "incident") { continue; }
     if (!typeKnown(type)) { return fail("a task of a type that does not exist"); }
     if (id.empty()) { return fail("a task with no id"); }
@@ -995,7 +991,6 @@ Task ReadTask(const Json& source) {
 }  // namespace
 
 void Simulation::ApplySnapshotDefaults() {
-  // Tabs are de-duplicated, and a dispute with no pair is given one.
   std::vector<Tab> tabs;
   for (const Tab& tab : state_.tabs) {
     bool seen = false;
@@ -1013,8 +1008,6 @@ void Simulation::ApplySnapshotDefaults() {
     }
   }
 
-  // migrateProgression(): every later system is present, and the chronicle is
-  // rebuilt from what the voyage already knows.
   if (state_.options.theme.empty()) { state_.options.theme = "classic"; }
   state_.chronicle.version = 1;
   ApplyShipLayout();
@@ -1031,7 +1024,7 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     return false;
   }
 
-  // Transactional: keep the live voyage, and put it back if anything below fails.
+
   const Simulation before = *this;
 
   try {
@@ -1109,14 +1102,10 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     readBoolMap(s.at("pendingOrders"), &state_.pendingOrders);
     readBoolMap(s.at("upgrades"), &state_.upgrades);
     readBoolMap(s.at("hired"), &state_.hired);
-    // Optional: a save written before the station bar existed has no tally,
-    // and an absent tally simply means nobody has been spoken to yet.
     state_.talked.clear();
     if (auto talkedIt = s.find("talked"); talkedIt != s.end()) {
       readBoolMap(*talkedIt, &state_.talked);
     }
-    // Optional: a save written before the stations kept a roll of visits has
-    // none, and an absent roll simply means the voyage has just begun.
     state_.visitedPorts.clear();
     if (auto it = s.find("visitedPorts"); it != s.end() && it->is_object()) {
       readBoolMap(*it, &state_.visitedPorts);
@@ -1190,8 +1179,6 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
       state_.options.music = GetBool(*it, "music", true);
       state_.options.audioLevel = GetNumber(*it, "audioLevel", 0.4);
       const double savedGamma = GetNumber(*it, "displayGamma", 1.0);
-      // Old saves used the shader exponent directly. Preserve deliberate
-      // non-default choices, while the old default adopts the new baseline.
       if (GetString(*it, "displayGammaScale") == "relative-1.6" || savedGamma == 1.0) {
         state_.options.displayGamma = DisplayGamma(savedGamma);
       } else {
@@ -1231,9 +1218,6 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     }
     state_.nextSystemSerial = static_cast<int>(GetNumber(s, "nextSystemSerial", 1.0));
     if (state_.nextSystemSerial < 1) { state_.nextSystemSerial = 1; }
-    // A save written before this existed still knows which systems were visited:
-    // number them in the order the chronicle holds them, so the tag is never empty
-    // on a voyage that has arrived somewhere.
     for (const auto& entry : state_.chronicle.systems) {
       if (!entry.second) { continue; }
       if (state_.systemSerials.find(entry.first) == state_.systemSerials.end()) {
@@ -1261,7 +1245,7 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
 
     state_.ongoing.clear();
     for (const Json& task : s.at("ongoing")) {
-      if (GetString(task, "type") == "incident") { continue; }  // removed; see the check above
+      if (GetString(task, "type") == "incident") { continue; }  
       state_.ongoing.push_back(ReadTask(task));
     }
 
@@ -1314,8 +1298,6 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
 
     mess_.rack = GetNumber(d.at("mess"), "rack");
     mess_.capacity = GetNumber(d.at("mess"), "capacity");
-    // Older voyages carry no larder: they restore with an empty store, which
-    // is exactly the situation their save describes - they never cooked one.
     const Json& galley = d.at("mess");
     mess_.rations = At(galley, "rations") != nullptr ? GetNumber(galley, "rations") : 0.0;
     if (At(galley, "rationCapacity") != nullptr) {
@@ -1421,9 +1403,7 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
       }
       views_[layer] = view;
     }
-    // The board is a property of the catalogue, not of the file: a save written
-    // before the sector chart widened still loads onto the board the chart is
-    // drawn on now. ApplyChartBoard() leaves the saved zoom alone.
+
     ApplyChartBoard();
 
     events_.clear();
@@ -1471,7 +1451,6 @@ std::string Utf8ToUtf16Le(const std::string& utf8, bool withBom) {
     else if ((lead >> 4) == 0xE) { code = lead & 0x0F; extra = 2; }
     else { code = lead & 0x07; extra = 3; }
     if (index + static_cast<std::size_t>(extra) >= utf8.size() + 0 && extra > 0) {
-      // Truncated sequence: stop rather than invent characters.
       break;
     }
     for (int k = 1; k <= extra; ++k) {

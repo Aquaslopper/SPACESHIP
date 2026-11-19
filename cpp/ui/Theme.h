@@ -1,11 +1,6 @@
 // ============================================================================
 //  Theme.h — the CSS roles, as data.
 //  ---------------------------------------------------------------------------
-//  Classic follows the HTA parchment; the other theme IDs use light, softly
-//  tinted variants as requested, keeping existing save selections intact.
-//
-//  Everything here is presentation. No function in this file can advance the
-//  voyage, and nothing here is saved (the voyage saves the theme's NAME).
 // ============================================================================
 #pragma once
 
@@ -21,8 +16,7 @@ struct Rgb {
   int b = 0;
 };
 
-// The palette the interface is drawn with. Names follow the stylesheet's roles
-// rather than their colours, so a reviewer can compare the two editions.
+
 struct Palette {
   Rgb white;
   Rgb panel;
@@ -39,15 +33,12 @@ struct Palette {
   Rgb sage;
   Rgb amber;
   Rgb titleBackground, titleDialog, titleBorder, titleInk;
-  // Separate source roles: chrome is not a panel; content is not an active tab
-  // texture tint; menu colours are overridden independently in dark themes.
   Rgb content, chrome, hover, control, input, tabInk, activeInk, chart, chartInk;
   Rgb titleMenu, titleMenuInk, titleMenuBorder, titleMenuHover;
   Rgb progressFill;
 };
 
-// One of THEMES: a name, a label for the settings screen, and the ink that the
-// chart raster and every accent are mixed from.
+
 struct ThemeSpec {
   std::string id;
   std::string label;
@@ -62,34 +53,29 @@ struct Theme {
 
   // Presentation flags that travel with the voyage's options.
   bool largeText = false;
-  // Phase 9: the typography floor and its four steps. Step 0 is 18 px — the
-  // general UI floor — and each step adds 5% of that floor, rounded.
   int fontStep = 0;
   bool hideCrewLabels = false;
   bool reducedMotion = false;
 
-  // The compact deck: a Wren is drawn at 600x365, a Kestrel at 1160x460.
+
   bool stageCompact = false;
 
-  // The five themes, in the reference's order.
+ 
   static const std::vector<ThemeSpec>& Specs();
   static Theme ById(const std::string& id);
 
-  // "rgba(139,111,78,0.13)" as the stylesheet writes it, for the raster hairlines.
+
   std::string Ink(float alpha) const;
 
-  // General readability floor; the compact Home information rail has its own
-  // smaller, user-requested sizes and still follows the reading-size settings.
+ 
   static constexpr float kFontFloorPx = 18.0f;
   static float FontPxForStep(int step);
   static float LineHeightForPx(float px);
   float FontPx() const {
     return FontPxForStep(fontStep) + (largeText ? 2.0f : 0.0f);
   }
-  // Source font sizes scale with the chosen reading size, including labels
-  // that previously got stuck at the fixed minimum.
+
   int TextPx(int reference) const;
-  // The narrow sidebar is slightly more compact but follows the same setting.
   float SidebarPx() const { return FontPx() - 2.0f; }
   int HomeInfoLabelPx() const;
   int HomeInfoValuePx() const;

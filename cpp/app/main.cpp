@@ -1,13 +1,6 @@
 // ============================================================================
 //  main.cpp — the client.
 //  ---------------------------------------------------------------------------
-//  Phase 2 turns the Phase 0 skeleton into the cockpit: the window opens at the
-//  reference's size, the catalogue loads, a voyage begins, and ShellView paints
-//  the taskbar, the sidebar, the pinned foot, the status bar and the idle
-//  screen's ship cross-section. Task windows arrive in Phase 3.
-//
-//  Everything the shell decides is in cpp/ui's headless view-models; this file
-//  is only the loop that turns a mouse into a verb and a frame into a paint.
 // ============================================================================
 
 #include <algorithm>
@@ -53,7 +46,7 @@ using ship::Options;
 using ship::Simulation;
 namespace audio = ship::audio;
 
-// The reference opens itself at 1440x940 and centres the window.
+
 constexpr int kDefaultWidth = 1440;
 constexpr int kDefaultHeight = 940;
 
@@ -76,9 +69,7 @@ std::filesystem::path FindAssetDir() {
     const std::filesystem::path besideExecutable = appDir / "assets";
     if (HasCatalog(besideExecutable)) { selected = besideExecutable; }
 
-    // Save slots are relative to the working directory. Explorer may launch an
-    // application with an unrelated current directory, so anchor runtime data
-    // beside the executable before the UI or save system is initialized.
+
     std::error_code ec;
     std::filesystem::current_path(appDir, ec);
   }
@@ -614,7 +605,7 @@ int main(int argc, char** argv) {
   SetExitKey(KEY_NULL);
 
   ship::Theme theme = ship::Theme::ById(sim.State().options.theme);
-  theme.fontStep = sim.State().options.fontStep;   // Phase 9's reading size
+  theme.fontStep = sim.State().options.fontStep;
   theme.largeText = sim.State().options.largeText;
   theme.hideCrewLabels = sim.State().options.hideCrewLabels;
   theme.reducedMotion = sim.State().reducedMotion;
@@ -708,7 +699,7 @@ int main(int argc, char** argv) {
   display.Init(GetScreenWidth(), GetScreenHeight());
   shell.SetDisplayAdjustmentAvailable(display.Ready());
 
-  // Sound is optional: a machine without a device keeps a silent, working ship.
+
   audio::AudioDevice audio;
   const bool audioReady = audio.Start(assets.string(), launchAssets.string());
   audio.Configure(sim.State().options);
@@ -720,7 +711,6 @@ int main(int argc, char** argv) {
   // entered with RESUME, or replaced explicitly.
   shell.ShowSplash(voyageStarted);
 
-  // Phase 9: the borderless window follows Options, whichever way it changes.
   bool fullscreen = sim.State().options.fullscreen;
   if (fullscreen != IsWindowState(FLAG_BORDERLESS_WINDOWED_MODE)) {
     ToggleBorderlessWindowed();
@@ -740,8 +730,7 @@ int main(int argc, char** argv) {
     // raylib drawing frame, matching its documented render-loop contract.
     rlImGuiBegin();
 
-    // Dear ImGui owns a complete press/release gesture. A close button may
-    // remove its window before release, but that release must not hit the ship.
+
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
       leftPointer.Press(ImGui::GetIO().WantCaptureMouse);
     }

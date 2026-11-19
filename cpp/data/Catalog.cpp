@@ -28,7 +28,7 @@ std::string Text(const Json& object, const char* key, const std::string& where,
   if (!it->is_number() && !it->is_boolean()) {
     throw CatalogError(where + ": field '" + key + "' is not text");
   }
-  // The reference stores a few detail values as numbers; keep them printable.
+
   return it->dump();
 }
 
@@ -246,9 +246,7 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
   catalog.map.pxPerAction = Number(map, "pxPerAction", "chart.json/map", 16);
   catalog.map.lyPerAction = Number(map, "lyPerAction", "chart.json/map", 0.42);
 
-  // Every scale is drawn on the board until ExpandChart() widens the
-  // sector one. Keeping the entry here means a catalogue that is never expanded
-  // still answers for all three layers.
+
   for (const std::string& layer : catalog.layerOrder) {
     catalog.layerBoards[layer] = catalog.map;
   }
@@ -437,7 +435,6 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
   catalog.counts.themes = static_cast<int>(Field(content, "themes", "content.json").size());
   catalog.counts.taskTypes = static_cast<int>(catalog.taskTypes.size());
 
-  // ---- crew and survival (counted now, consumed from Phase 1) ------------
   const Json crew = LoadFile(data / "crew.json");
   for (const Json& member : Field(crew, "crew", "crew.json")) {
     catalog.startingCrew.push_back(ReadCrew(member));
@@ -764,10 +761,7 @@ std::vector<std::string> Catalog::Validate() const {
     }
   }
 
-  // ---- every body sits on the drawing board of its own scale --------------
-  // The layers share one coordinate space per scale, not one space overall:
-  // the system chart is the reference's 638x278 board, while the sector board
-  // is the wider one ExpandChart() lays the galaxy out on.
+
   const auto boardFor = [this](const std::string& layer) -> const MapGeometry& {
     auto it = layerBoards.find(layer);
     return it == layerBoards.end() ? map : it->second;

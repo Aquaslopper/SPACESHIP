@@ -15,9 +15,6 @@ namespace ship {
 
 namespace {
 
-// The same five themes the renderer knows, so the settings sheet can never
-// offer a palette the ship has not got (Phase 9 replaced the literal table that
-// used to drift from Theme::Specs()).
 const std::vector<std::pair<std::string, std::string>>& ThemeTable() {
   static const std::vector<std::pair<std::string, std::string>> table = [] {
     std::vector<std::pair<std::string, std::string>> rows;
@@ -29,8 +26,7 @@ const std::vector<std::pair<std::string, std::string>>& ThemeTable() {
   return table;
 }
 
-// slotSummary(): a label, not a machine. Read by loading the file into a
-// throw-away voyage, so a corrupt slot reports Empty rather than lying.
+
 }  // namespace
 
 std::string SaveSlotSummary(const Simulation& sim, int slot, const std::string& saveDir,
@@ -65,7 +61,7 @@ PopupModel BuildBriefPopup(const Simulation& sim, const std::string& kind,
   model.title = description.kindLabel + " - " + description.title;
   model.notice = description.sub;
   PopupSection details;
-  // briefSpec deliberately shows at most five rows; the task has the file.
+
   for (std::size_t i = 0; i < description.rows.size() && i < 5; ++i) {
     details.rows.push_back({description.rows[i].key, description.rows[i].value});
   }
@@ -117,7 +113,7 @@ PopupModel BuildPopup(const Simulation& sim, const std::string& key,
   }
 
   if (key == "log") {
-    // Newest first: the last thing that happened is the thing being asked for.
+   
     for (std::size_t i = sim.State().feed.size(); i-- > 0;) {
       const FeedLine& line = sim.State().feed[i];
       model.lines.push_back(line.stamp.empty() ? line.text
@@ -220,7 +216,7 @@ bool PressPopupAction(Simulation& sim, const std::string& key,
     GameState& state = sim.MutableState();
     Options& options = state.options;
     if (action == "toggle") {
-      // Free: a preference is not a decision the ship has to live with.
+    
       if (arg == "music") { options.music = !options.music; return true; }
       if (arg == "soundEffects") { options.soundEffects = !options.soundEffects; return true; }
       if (arg == "largeText") { options.largeText = !options.largeText; return true; }
@@ -262,15 +258,14 @@ bool PressPopupAction(Simulation& sim, const std::string& key,
       } catch (const std::exception&) { return false; }
     }
     if (action == "font") {
-      // Free, and clamped to the four offered steps rather than trusted.
+   
       const int step = std::stoi(arg.empty() ? "0" : arg);
       if (step < 0 || step > 3) { return false; }
       options.fontStep = step;
       return true;
     }
     if (action == "font-step") {
-      // The keyboard's version of the ladder: one step up or down, stopping at
-      // the ends instead of wrapping past them.
+
       const int delta = arg == "-1" ? -1 : 1;
       const int step = options.fontStep + delta;
       if (step < 0 || step > 3) { return false; }
@@ -304,14 +299,12 @@ bool PressPopupAction(Simulation& sim, const std::string& key,
       return true;
     }
     if (action == "main-menu") {
-      // The shell hides the voyage and shows the menu; nothing here changes the
-      // voyage, so the command is free like every other one on this sheet.
+
       if (message != nullptr) { *message = "Returning to the main menu."; }
       return true;
     }
     if (action == "load") {
-      // LoadSlot validates and rolls back inside SaveSystem: a corrupt file
-      // leaves the voyage exactly as it was.
+
       std::string error;
       std::string directory = saveDir.empty() ? std::string(".") : saveDir;
       if (!sim.LoadSlot(slot, directory, &error)) {
@@ -324,7 +317,6 @@ bool PressPopupAction(Simulation& sim, const std::string& key,
     return false;
   }
 
-  // The manifest and the log are read-only: there is nothing to press.
   return false;
 }
 

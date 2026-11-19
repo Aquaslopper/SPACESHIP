@@ -43,8 +43,7 @@ float DotSpot(const Area& box, bool vertical, bool compact, FxRng& rng) {
     lo = box.y + 16.0f;
     span = box.h - 34.0f;
   } else {
-    // The corridor is 26px of headroom - centre the dot in it rather than
-    // hanging it out of the bottom.
+
     lo = box.y + std::round((box.h - 15.0f) / 2.0f);
     span = 1.0f;
   }
@@ -101,7 +100,6 @@ MarkStyle MarkAt(const ActionMark& mark, double now) {
   const double t = (elapsed - FxTiming::kMarkHold) / FxTiming::kMarkDuration;
   if (t >= 1.0) { return style; }
   if (t < 0.0) {
-    // Phase 1: land and stay put, so the player registers where their hand was.
     style.top = mark.y;
     style.opacity = 1.0f;
     style.alive = true;

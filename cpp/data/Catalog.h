@@ -1,14 +1,6 @@
 // ============================================================================
-//  Catalog.h — loads the extracted catalogues and proves they are complete.
+//  Catalog.h — loads the extracted catalogues.
 //  ---------------------------------------------------------------------------
-//  The JSON under assets/data is generated from Spaceship.hta by
-//  tools/export-data.cjs. This class is the only place that knows the file
-//  layout; the rest of the port asks it questions.
-//
-//  LoadFromAssets() is strict: a missing or malformed file throws, because a
-//  half-loaded catalogue would produce a voyage that quietly differs from the
-//  reference. Validate() is separate and returns every integrity problem it can
-//  find, so the test suite can report them all at once instead of the first.
 // ============================================================================
 #pragma once
 
@@ -26,8 +18,7 @@
 
 namespace ship {
 
-// Voyage-generation knobs. Defaults match the current generator (17 galaxies).
-// More than 25 galaxies is known to exhaust RAM and CPU on the author's machine.
+
 struct ChartSettings {
   std::uint64_t seed = 0x5350414345534849ULL;
   int galaxies = 17;
@@ -74,10 +65,7 @@ class Catalog {
 
   MapGeometry map;
 
-  // The board each scale is drawn on. The system chart keeps the reference's
-  // 638x278 board exactly; ChartExpansion() widens the sector board so every
-  // system can own a position instead of six of them sharing one dot. A layer
-  // with no entry here is drawn on `map`.
+
   std::map<std::string, MapGeometry> layerBoards;
 
   // Set by ExpandChart(). The chart is grown once per catalogue, so a voyage
@@ -94,12 +82,11 @@ class Catalog {
 
   DeckPlan wren;
   DeckPlan kestrel;
-  // ROOM_SCENES, by room id., never computed.
   std::map<std::string, RoomScene> roomScenes;
   // WORLD_HISTORY: two lines per region: its history, then its traffic.
   std::map<std::string, std::vector<std::string>> worldHistory;
 
-  // WIKI: twenty-one handbook entries, in the reference's order.
+
   std::vector<WikiEntry> wiki;
 
   std::vector<Body> regions;
@@ -131,7 +118,6 @@ class Catalog {
   std::map<std::string, std::map<std::string, std::string>> shipFields;  // by class
   std::map<std::string, std::vector<double>> cargoByClass;  // refit levels 0..2
 
-  // starting values and definitions (Phase 1).
   std::vector<CrewDefinition> startingCrew;
   std::vector<StatDefinition> startingStats;
   std::vector<IncidentType> incidentTypes;
