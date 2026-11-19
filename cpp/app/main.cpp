@@ -707,8 +707,7 @@ int main(int argc, char** argv) {
               audio.External().music.size(), audio.External().sfx.size());
 
   // Restore the voyage in memory, but always present the title screen — behind
-  // the dev's splash card, which opens the window. A restored voyage can be
-  // entered with RESUME, or replaced explicitly.
+  // the dev's splash card, which opens the window.
   shell.ShowSplash(voyageStarted);
 
   bool fullscreen = sim.State().options.fullscreen;
