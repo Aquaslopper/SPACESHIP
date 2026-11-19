@@ -153,18 +153,18 @@ struct TradeContract {
 };
 
 struct Options {
-  bool largeText = false;
+  bool largeText = true;
   bool confirmRisk = false;
   std::string theme = "classic";
   bool soundEffects = true;
   bool music = true;
-  double audioLevel = 0.8;
+  double audioLevel = 4;
   double displayGamma = 1.3;
   double displayBrightness = 1.0;
-  double radiationWave = 1.1;
+  double radiationWave = 1.3;
   double colorShift = 0.0;
   double glow = 0.3;
-  double lensFlare = 0.2;
+  double lensFlare = 0.3;
   int fontStep = 2;
   bool fullscreen = true;
 };
