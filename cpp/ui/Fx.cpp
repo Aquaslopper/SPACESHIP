@@ -43,8 +43,7 @@ float DotSpot(const Area& box, bool vertical, bool compact, FxRng& rng) {
     lo = box.y + 16.0f;
     span = box.h - 34.0f;
   } else {
-    // The corridor is 26px of headroom - centre the dot in it rather than
-    // hanging it out of the bottom.
+
     lo = box.y + std::round((box.h - 15.0f) / 2.0f);
     span = 1.0f;
   }
