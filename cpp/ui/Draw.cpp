@@ -521,7 +521,8 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
       layout_.stage = {layout_.content.x + 8.0f, layout_.content.y,
                        std::max(1.0f, layout_.content.w - 16.0f),
                        Metrics::kHomeStageMinH};
-      layout_.stage.h = BuildExteriorLayout(sim, layout_.stage).height;
+      exterior_ = BuildExteriorLayout(sim, layout_.stage);
+      layout_.stage.h = exterior_.height;
     }
   }
 
@@ -531,9 +532,17 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   if (sim.State().activeTab == "home") {
     FxRng seeded = rng_;
     idle_ = BuildIdleScreen(sim, layout_, theme_, theme_.hideCrewLabels, seeded);
-    if (HasWrenExterior(sim)) {
-      exterior_ = BuildExteriorLayout(sim, idle_.stageArea);
+    if (HasWrenExterior(sim) && exteriorView_) {
+      // The callouts above were measured against layout_.stage.y. Home moves
+      // the stage down past the stat rail, so the artwork, every callout and
+      // every anchor follows by that one offset instead of being rebuilt.
       // No tutorial copy or view-switch row is drawn above the ship.
+      const float stageShift = idle_.stageArea.y - layout_.stage.y;
+      exterior_.image.y += stageShift;
+      for (ExteriorCallout& item : exterior_.callouts) {
+        item.box.y += stageShift;
+        item.anchor.y += stageShift;
+      }
     }
     // All six Home cards share one measured height. Grow the whole grid when
     // any wrapped info, navigation, or event text needs additional room.
@@ -939,7 +948,9 @@ void ShellView::PaintLaunchCard(double elapsedMs) {
 }
 
 void ShellView::SyncIdleDots(const Simulation& sim, double nowMs) {
-  const bool compact = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta" || sim.State().shipClass == "yamato" || sim.State().shipClass == "arcadia");
+  // BuildIdleScreen has just classified the hull; do not repeat the five-way
+  // class comparison per frame.
+  const bool compact = idle_.diagram.compact;
   // Reconcile by identity, not just count. Retain cosmetic movement while
   // refreshing its effective room (job, medical, social or corridor) every frame.
   std::vector<DriftDot> current;
@@ -973,14 +984,15 @@ void ShellView::SyncIdleDots(const Simulation& sim, double nowMs) {
     }
     lastDriftMs_ += static_cast<double>(ticks * FxTiming::kDriftMs);
   }
-  for (DiagramCrew& crew : idle_.diagram.crew) {
-    const auto dot = std::find_if(dots_.begin(), dots_.end(),
-                                  [&crew](const DriftDot& d) { return d.id == crew.id; });
-    if (dot == dots_.end()) { continue; }
-    const float dx = dot->x - crew.dot.x;
-    const float dy = dot->y - crew.dot.y;
-    crew.dot.x = dot->x;
-    crew.dot.y = dot->y;
+  // dots_ was folded out of idle_.diagram.crew above, in the same order, so
+  // the two vectors line up index for index; no search by id is needed.
+  for (std::size_t i = 0; i < dots_.size(); ++i) {
+    DiagramCrew& crew = idle_.diagram.crew[i];
+    const DriftDot& dot = dots_[i];
+    const float dx = dot.x - crew.dot.x;
+    const float dy = dot.y - crew.dot.y;
+    crew.dot.x = dot.x;
+    crew.dot.y = dot.y;
     crew.label.x += dx;
     crew.label.y += dy;
   }
