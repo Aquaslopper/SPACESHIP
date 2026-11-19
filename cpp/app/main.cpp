@@ -46,7 +46,7 @@ using ship::Options;
 using ship::Simulation;
 namespace audio = ship::audio;
 
-// The reference opens itself at 1440x940 and centres the window.
+
 constexpr int kDefaultWidth = 1440;
 constexpr int kDefaultHeight = 940;
 
@@ -69,9 +69,7 @@ std::filesystem::path FindAssetDir() {
     const std::filesystem::path besideExecutable = appDir / "assets";
     if (HasCatalog(besideExecutable)) { selected = besideExecutable; }
 
-    // Save slots are relative to the working directory. Explorer may launch an
-    // application with an unrelated current directory, so anchor runtime data
-    // beside the executable before the UI or save system is initialized.
+
     std::error_code ec;
     std::filesystem::current_path(appDir, ec);
   }
@@ -701,7 +699,7 @@ int main(int argc, char** argv) {
   display.Init(GetScreenWidth(), GetScreenHeight());
   shell.SetDisplayAdjustmentAvailable(display.Ready());
 
-  // Sound is optional: a machine without a device keeps a silent, working ship.
+
   audio::AudioDevice audio;
   const bool audioReady = audio.Start(assets.string(), launchAssets.string());
   audio.Configure(sim.State().options);
@@ -732,8 +730,7 @@ int main(int argc, char** argv) {
     // raylib drawing frame, matching its documented render-loop contract.
     rlImGuiBegin();
 
-    // Dear ImGui owns a complete press/release gesture. A close button may
-    // remove its window before release, but that release must not hit the ship.
+
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
       leftPointer.Press(ImGui::GetIO().WantCaptureMouse);
     }
