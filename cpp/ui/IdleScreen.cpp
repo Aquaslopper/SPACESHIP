@@ -193,7 +193,6 @@ IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout
   out.feedBox = Area{layout.content.x + 8.0f, feedY, inner, out.feedHeight};
 
   out.diagram = BuildDiagram(sim, out.stageArea, hideCrewLabels, rng);
-  out.feed = FeedLinesNewestFirst(sim, 200);
   (void)theme;  // the palette travels with the model; the arithmetic does not need it
   return out;
 }

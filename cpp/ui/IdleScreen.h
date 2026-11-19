@@ -55,7 +55,6 @@ struct IdleScreenModel {
   Area eventsBox;
   std::vector<HomeEventCard> events;
   DiagramModel diagram;
-  std::vector<std::string> feed;
   std::string feedHead = "Activity Feed";
   Area feedBox;
   float feedHeight = Metrics::kFeedMin;
