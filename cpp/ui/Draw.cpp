@@ -2967,13 +2967,18 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
     const float bottom = std::min(layout_.content.Bottom(), V(0, 290).y - contentScroll_);
     BeginScissorMode(static_cast<int>(left), static_cast<int>(top), static_cast<int>(778 * scale),
                      static_cast<int>(std::max(0.0f, bottom - top)));
+    const Vector2 pivot = V(480, 164);
+    rlPushMatrix();
+    rlTranslatef(pivot.x, pivot.y, 0);
+    rlRotatef(std::fmod(tSec * 0.30f, 360.0f), 0, 0, 1);
+    rlTranslatef(-pivot.x, -pivot.y, 0);
     // A fixed procedural sky, and near particles passing the bow only in flight.
     for (int i = 1; i <= 360; ++i) {
       const double az = i * 2.39996323 - yaw;
       const double z = std::cos(az);
-      if (z < 0.58) continue;
+      if (z < 0.60) continue;
       const float x = 480 + 330 * std::sin(az) / z;
-      const float y = 164 + ((i*i*37+i*23)%263 - 131) / z;
+      const float y = 164 + ((i*i*37+i*23)%827 - 413) / z;
       DrawCircleV(V(x,y), std::max(0.7f, (i%7 ? 0.8f : 1.4f)*scale), Fade(WHITE, 0.4f + 0.08f*(i%6)));
     }
     if (trip && !reduced) {
@@ -3007,14 +3012,16 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
       } else if (body.type == "belt") {
         for (int i=0; i<11; ++i) DrawCircleV(V(x+(i-5)*r*0.35f,y+((i*7)%5-2)*r*0.18f), pen, Fade(rule, opacity));
       } else {
+        const float visibility = body.type == "planet" || body.type == "moon"
+            ? static_cast<float>(1.0 / (1.0 + (dx*dx + dy*dy) / (150.0*150.0))) : 1.0f;
         const Color light = sun ? Color{244,229,198,255} : Color{164,161,152,255};
         const Vector2 center = V(x,y);
         DrawCircleGradient(center,
                            (sun ? 4.8f*r : r+2.5f*haze)*scale,
-                           Fade(light, sun ? 0.84f : 0.32f), Fade(light, 0));
-        DrawCircleV(center, (r-0.7f*haze)*scale, Fade(light, opacity));
+                           Fade(light, sun ? 0.84f : 0.32f * visibility), Fade(light, 0));
+        DrawCircleV(center, (r-0.7f*haze)*scale, Fade(light, opacity * visibility));
         if (sun) DrawCircleLinesV(V(x,y),(r+2)*scale,Fade(rule, opacity*0.6f));
-        if (body.subtype == "gas") line(x-r*1.4f,y+r*0.35f,x+r*1.4f,y-r*0.35f,Fade(rule, opacity));
+        if (body.subtype == "gas") line(x-r*1.4f,y+r*0.35f,x+r*1.4f,y-r*0.35f,Fade(rule, opacity * visibility));
       }
     };
     if (sector) {
@@ -3022,6 +3029,7 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
     } else {
       for (auto index : local) drawBody(catalog.bodies[index]);
     }
+    rlPopMatrix();
     // A shallow reflection of the sill stays on the glass as the sky turns.
     DrawRectangleGradientV(static_cast<int>(left), static_cast<int>(V(0,254).y),
                            static_cast<int>(778*scale), static_cast<int>(45*scale),
