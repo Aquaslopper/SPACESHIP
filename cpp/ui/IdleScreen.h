@@ -12,7 +12,6 @@
 #include "core/Simulation.h"
 #include "ui/Fx.h"
 #include "ui/Layout.h"
-#include "ui/ShipDiagram.h"
 #include "ui/Theme.h"
 
 namespace ship {
@@ -54,7 +53,6 @@ struct IdleScreenModel {
   Strip nav;
   Area eventsBox;
   std::vector<HomeEventCard> events;
-  DiagramModel diagram;
   std::string feedHead = "Activity Feed";
   Area feedBox;
   float feedHeight = Metrics::kFeedMin;
@@ -70,17 +68,7 @@ std::vector<RailCell> InfoRail(const Simulation& sim, const Area& rail);
 // own label while one is running or waiting to be acknowledged.
 Strip NavStrip(const Simulation& sim, const Area& box);
 
-// The whole screen. `layout` is what Layout.cpp measured; `others` is the
-// height the column needs before the feed, which the shell knows and the tests
-// can state outright.
 IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout,
-                                const Theme& theme, bool hideCrewLabels,
-                                float othersHeight, FxRng& rng);
-
-// Production layout measures its complete built content instead of accepting
-// a guessed non-feed allowance. The explicit-height overload remains available
-// for callers that already measured their surrounding host.
-IdleScreenModel BuildIdleScreen(const Simulation& sim, const ShellLayout& layout,
-                                const Theme& theme, bool hideCrewLabels, FxRng& rng);
+                                const Theme& theme);
 
 }  // namespace ship
