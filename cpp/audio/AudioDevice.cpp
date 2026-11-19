@@ -1,10 +1,5 @@
 // ============================================================================
 //  AudioDevice.cpp — the simple audio system.
-//  ---------------------------------------------------------------------------
-//  No synthesizer. Files in assets/audio/music are streamed and cycled; files
-//  in assets/audio/sfx replace nothing and invent nothing: a missing cue is a
-//  silent cue. master = clamp(audioLevel) * 0.62, one cap for music and
-//  effects alike, each switched by its own option.
 // ============================================================================
 
 #include "audio/AudioDevice.h"
@@ -101,7 +96,7 @@ ExternalAudio ScanExternalAudio(const std::string& assetsDir) {
 
 double MasterGain(const Options& options) {
   const double level = std::isfinite(options.audioLevel) ? options.audioLevel : 0.0;
-  return std::clamp(level, 0.0, 1.0) * 0.62;
+  return std::clamp(level, 1.0, 10.0);
 }
 
 }  // namespace
@@ -123,7 +118,7 @@ bool AudioDevice::Start(const std::string& assetsDir, const std::string& fallbac
   }
   for (std::size_t i = 0; i < kCueCount; ++i) {
     const auto found = external_.sfx.find(kKinds[i]);
-    if (found == external_.sfx.end()) { continue; }  // missing cue stays silent
+    if (found == external_.sfx.end()) { continue; } 
     cues_[i] = LoadSound(found->second.c_str());
     if (cues_[i].frameCount == 0) { std::fprintf(stderr, "spaceship: could not decode sound: %s\n", found->second.c_str()); }
   }
