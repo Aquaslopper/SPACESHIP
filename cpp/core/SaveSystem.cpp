@@ -159,7 +159,6 @@ std::string Simulation::SaveJson() const {
 
   s["options"] = Json{{"largeText", state_.options.largeText},
                       {"confirmRisk", state_.options.confirmRisk},
-                      {"hideCrewLabels", state_.options.hideCrewLabels},
                       {"theme", state_.options.theme},
                       {"soundEffects", state_.options.soundEffects},
                       {"music", state_.options.music},
@@ -1175,11 +1174,10 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     if (auto it = s.find("options"); it != s.end() && it->is_object()) {
       state_.options.largeText = GetBool(*it, "largeText");
       state_.options.confirmRisk = GetBool(*it, "confirmRisk");
-      state_.options.hideCrewLabels = GetBool(*it, "hideCrewLabels");
       state_.options.theme = GetString(*it, "theme", "classic");
       state_.options.soundEffects = GetBool(*it, "soundEffects", true);
       state_.options.music = GetBool(*it, "music", true);
-      state_.options.audioLevel = GetNumber(*it, "audioLevel", 0.4);
+      state_.options.audioLevel = GetNumber(*it, "audioLevel", 0.8);
       const double savedGamma = GetNumber(*it, "displayGamma", 1.0);
       if (GetString(*it, "displayGammaScale") == "relative-1.6" || savedGamma == 1.0) {
         state_.options.displayGamma = DisplayGamma(savedGamma);
