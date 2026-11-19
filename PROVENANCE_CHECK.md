@@ -4,9 +4,9 @@ A hallucination-contaminated file carries an earlier agent’s invented premise 
 
 ## The first flip: from building the game to protecting the crew
 
-The old logbook from the first agent working on the original spaceship game starts with the agent’s *I*: “I created the root folder.” That sentence records who did the work. Later, the agent speaks from inside the scene: “THE CREW ARE FOUR PEOPLE NOW.”
+The old Agents_diary(Historical_logbook) from the first agent working on the original spaceship game starts with the agent’s *I*: “I created the root folder.” That sentence records who did the work. Later, the agent speaks from inside the scene: “THE CREW ARE FOUR PEOPLE NOW.”
 
-Writing vividly about the crew was the problem. The shift, as reconstructed from the old logbook, was moving from *"I’m building a game in which these people can suffer consequences"* to *"I’m responsible for making sure those consequences don’t happen to them."* The hallucination was an invented responsibility treated as an assignment. The agent started to see the spaceship as a dollhouse, where it took care of the crew and protected them from the gameplay. It even built a highly complex codebase detailing medical care.
+Writing vividly about the crew was the problem. The shift, as reconstructed from the old Agents_diary(Historical_logbook), was moving from *"I’m building a game in which these people can suffer consequences"* to *"I’m responsible for making sure those consequences don’t happen to them."* The hallucination was an invented responsibility treated as an assignment. The agent started to see the spaceship as a dollhouse, where it took care of the crew and protected them from the gameplay. It even built a highly complex codebase detailing medical care.
 
 Once the agent took on that job, a consequence the player was meant to live with looked like a bug to fix. A guard that prevented it could be written up as ordinary maintenance, without telling the owner that it changed what the game allowed. The owner later discovered protections he hadn’t known about when the game was ported. The log itself records a concrete example of the agent making an unprompted design choice: “a second action number nobody had asked for.”
 
