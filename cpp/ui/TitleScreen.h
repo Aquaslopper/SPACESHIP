@@ -41,7 +41,7 @@ struct TitleModel {
   std::string artPath;            // assets/art/title.jpg
   float artWidth = 840.0f;        // the card's 3:2 crop of the 1672x941 art
   float artHeight = 560.0f;
-  bool fromVoyage = false;        // RESUME when true, EXIT when not
+  bool fromVoyage = false;
   std::vector<ActionRowView> actions;
   TitlePanel panel = TitlePanel::None;
   std::string panelTitle;
@@ -60,7 +60,6 @@ struct TitleModel {
   std::string cardImagePath;
 };
 
-std::string TitleButtonLabel(bool fromVoyage);
 bool AnySlotWritten(const Simulation& sim, const std::string& saveDir);
 bool TitleNeedsConfirmation(const Simulation& sim, bool fromVoyage);
 

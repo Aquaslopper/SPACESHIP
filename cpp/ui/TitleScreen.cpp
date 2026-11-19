@@ -40,8 +40,6 @@ const std::vector<TutorialCard>& TutorialCards() {
   return cards;
 }
 
-std::string TitleButtonLabel(bool fromVoyage) { return fromVoyage ? "RESUME" : "EXIT"; }
-
 bool AnySlotWritten(const Simulation& sim, const std::string& saveDir) {
   for (int slot = 1; slot <= 3; ++slot) {
     bool written = false;
@@ -78,7 +76,7 @@ TitleModel BuildTitleScreen(const Simulation& sim, bool fromVoyage, TitlePanel p
       {"load", "LOAD VOYAGE", true},
       {"options", "OPTIONS", true},
       {"guide", "HOW TO PLAY", true},
-      {"resume", TitleButtonLabel(fromVoyage), true},
+      {"exit", "EXIT", true},
   };
   for (const Command& command : commands) {
     ActionRowView row;
@@ -217,11 +215,6 @@ bool PressTitleAction(Simulation& sim, const std::string& action, const std::str
   if (action.compare(0, 5, "card:") == 0) {
     if (action == "card:next" || action == "card:prev") { return true; }
     return false;
-  }
-  if (action == "resume") {
-    if (!*fromVoyage) { *panel = TitlePanel::Quit; return true; }
-    if (titleActive != nullptr) { *titleActive = false; }
-    return true;
   }
   if (action == "back") { *panel = TitlePanel::None; return true; }
   if (action.compare(0, 5, "slot:") == 0) {

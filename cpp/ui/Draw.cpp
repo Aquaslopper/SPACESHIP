@@ -8885,13 +8885,7 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
         PageTutorial(hit.action == "card:next" ? 1 : -1, nowMs);
         return;
       }
-      if (hit.action == "resume") {
-        if (!fromVoyage_) { quitRequested_ = true; return; }
-        PressTitleAction(sim, "resume", "", &fromVoyage_, &titlePanel_, &titleSlot_,
-                         saveDir_, &titleMessage_, &titleActive_);
-        HideTitle();
-        return;
-      }
+      if (hit.action == "exit") { quitRequested_ = true; return; }
       if (hit.action == "guide" || hit.action == "tutorial") {
         titleCard_ = 0;
         tutorialDirection_ = 1;
