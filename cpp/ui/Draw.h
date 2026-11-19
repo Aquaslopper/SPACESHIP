@@ -282,6 +282,8 @@ class ShellView {
   float wikiBodyMaxScroll_ = 0.0f;
   Area wikiIndexBox_{};
   Area wikiBodyBox_{};
+  struct DebrisHit { Area box; int click = -1; int reward = 0; int shiplets = 0; };
+  std::array<DebrisHit, 2> debrisHits_{};
   Area bridgeBearingBar_{};
   float bridgeLook_ = 0.0f;  // turns from forward, -0.5 to +0.5
   bool draggingBearing_ = false;

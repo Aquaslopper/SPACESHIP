@@ -17,6 +17,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <random>
 #include <unordered_map>
 
 #include "imgui.h"
@@ -3030,6 +3031,42 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
       for (auto index : local) drawBody(catalog.bodies[index]);
     }
     rlPopMatrix();
+    debrisHits_ = {};
+    const int click = static_cast<int>(sim.ActionCount());
+    const int cycle = click / 10;
+    if (trip && click % 10 >= 5) {
+      // Reconstruct this window from the voyage seed, never roll on a render frame.
+      std::minstd_rand dice(static_cast<unsigned>(catalog.chartSettings.seed) ^
+                            (static_cast<unsigned>(cycle) * 2654435761u));
+      const int count = 1 + dice() % 2;
+      for (int slot = 0; slot < count; ++slot) {
+        const int appears = 5 + dice() % 5;
+        const int reward = dice() % 10;
+        const int coins = 5 + dice() % 16;
+        const float phase = (dice() % 628) * 0.01f;
+        const float bearing = (static_cast<int>(dice() % 37) - 18) * DEG2RAD;
+        if (click % 10 < appears || sim.State().debrisClaimedCycle[slot] == cycle) continue;
+        const float az = bearing + 0.035f * std::sin(phase + tSec * 0.12f) - bridgeLook_ * 2 * PI;
+        if (std::cos(az) < 0.60f) continue;
+        const float dx = 330 * std::tan(az);
+        const float dy = (36 * std::sin(phase) + 8 * std::sin(phase + tSec * 0.16f)) / std::cos(az);
+        const float roll = std::fmod(tSec * 0.30f, 360.0f) * DEG2RAD;
+        const float x = 480 + dx * std::cos(roll) - dy * std::sin(roll);
+        const float y = 164 + dx * std::sin(roll) + dy * std::cos(roll);
+        if (x < 100 || x > 860 || y < 48 || y > 280) continue;
+        const Vector2 center = V(x, y);
+        debrisHits_[slot] = {{center.x-9*scale, center.y-9*scale, 18*scale, 18*scale}, click, reward, coins};
+        rlPushMatrix();
+        rlTranslatef(center.x, center.y, 0);
+        rlRotatef(phase * RAD2DEG + tSec * 6, 0, 0, 1);
+        const Rectangle crate{-5*scale,-4*scale,10*scale,8*scale};
+        DrawRectangleRec(crate, ink);
+        DrawRectangleLinesEx(crate, pen, rule);
+        DrawLineEx({-2*scale,-3*scale},{-2*scale,3*scale},pen,rule);
+        DrawLineEx({2*scale,-3*scale},{2*scale,3*scale},pen,rule);
+        rlPopMatrix();
+      }
+    }
     // A shallow reflection of the sill stays on the glass as the sky turns.
     DrawRectangleGradientV(static_cast<int>(left), static_cast<int>(V(0,254).y),
                            static_cast<int>(778*scale), static_cast<int>(45*scale),
@@ -8614,6 +8651,26 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
   }
   const float scrollY = contentScroll_;
 
+  if (button == HitButton::Left && sim.State().activeTab == "room:bridge" && sim.FindOngoing("travel")) {
+    for (int slot = 0; slot < static_cast<int>(debrisHits_.size()); ++slot) {
+      const auto& hit = debrisHits_[slot];
+      if (hit.click != sim.ActionCount() || !hit.box.Contains(x, y + scrollY)) continue;
+      auto& state = sim.MutableState();
+      if (state.debrisClaimedCycle[slot] == hit.click / 10) continue;
+      std::string item;
+      if (hit.reward < 4) { ++state.repairKits; item = "a repair kit"; }
+      else if (hit.reward < 8) { state.shiplets += hit.shiplets; item = std::to_string(hit.shiplets) + " shiplets"; }
+      else if (hit.reward == 8) { ++state.fuelCells; item = "a fuel cell"; }
+      else {
+        if (sim.Life().canisters >= sim.Life().capacity) { sim.LogLine("Debris: O2 canister rack full."); return; }
+        ++sim.MutableLife().canisters;
+        item = "an O2 canister";
+      }
+      state.debrisClaimedCycle[slot] = hit.click / 10;
+      sim.FreeCommit("Recovered " + item + " from space debris");
+      return;
+    }
+  }
   if (button == HitButton::Left && sim.State().activeTab == "room:bridge" &&
       bridgeBearingBar_.Contains(x, y + scrollY)) {
     bridgeLook_ = std::clamp((x-bridgeBearingBar_.x)/bridgeBearingBar_.w - 0.5f,-0.5f,0.5f);

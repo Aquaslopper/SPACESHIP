@@ -280,6 +280,7 @@ std::string Simulation::SaveJson() const {
   s["pendingOrders"] = pending;
 
   s["crewTick"] = Num(state_.crewTick);
+  s["debrisClaimedCycle"] = state_.debrisClaimedCycle;
   s["shiplets"] = Num(state_.shiplets);
   s["payTick"] = Num(state_.payTick);
   s["docked"] = state_.docked;
@@ -1077,6 +1078,7 @@ bool Simulation::LoadJson(const std::string& text, std::string* error) {
     state_.rackWarnedMess = GetBool(s, "rackWarnedMess");
     state_.crewSel = GetString(s, "crewSel");
     state_.crewTick = GetNumber(s, "crewTick");
+    state_.debrisClaimedCycle = s.value("debrisClaimedCycle", std::array<int, 2>{{-1, -1}});
     state_.shiplets = GetNumber(s, "shiplets");
     state_.payTick = GetNumber(s, "payTick");
     state_.docked = GetBool(s, "docked");
