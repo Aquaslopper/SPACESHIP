@@ -2950,10 +2950,11 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
       } else {
         bayerPx(x, y, (u - 0.45f) / 0.55f, gnd1, gnd2);
       }
-      const unsigned h = static_cast<unsigned>((x * 73856093) ^ (y * 19349663) ^
-                                               (planetSurface_.px * 83492791) ^
-                                               (planetSurface_.py * 2971215073u) ^
-                                               (planetSurface_.dir * 49979687));
+      const unsigned h = (static_cast<unsigned>(x) * 73856093u) ^
+                         (static_cast<unsigned>(y) * 19349663u) ^
+                         (static_cast<unsigned>(planetSurface_.px) * 83492791u) ^
+                         (static_cast<unsigned>(planetSurface_.py) * 2971215073u) ^
+                         (static_cast<unsigned>(planetSurface_.dir) * 49979687u);
       if ((h % 47u) == 0u && y > hy + 4) {
         putPx(x, y, rockDark);
         if ((h & 1u) == 0u) { putPx(x + 1, y - 1, rockHi); }
@@ -2995,9 +2996,10 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     return static_cast<int>(std::lround(5.0f + 42.0f * std::clamp(t, 0.0f, 1.0f)));
   };
   auto paintRoadPx = [&](int x, int y) {
-    const unsigned h = static_cast<unsigned>((x * 29 + y * 53 +
-                                              planetSurface_.px * 13 +
-                                              planetSurface_.py * 37));
+    const unsigned h = static_cast<unsigned>(x) * 29u +
+                       static_cast<unsigned>(y) * 53u +
+                       static_cast<unsigned>(planetSurface_.px) * 13u +
+                       static_cast<unsigned>(planetSurface_.py) * 37u;
     if ((h % 11u) == 0u) {
       putPx(x, y, pathHi);
     } else if ((h % 7u) == 0u || ((x + y) & 1) != 0) {
