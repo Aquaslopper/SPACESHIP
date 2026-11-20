@@ -305,7 +305,8 @@ class ShellView {
     static constexpr int kTexW = 160;
     static constexpr int kTexH = 96;
     std::string planetId;
-    std::uint8_t tiles[kSize * kSize]{};  // 0=open surface, 1=ridge/rock, 2=ship pad
+    std::uint8_t tiles[kSize * kSize]{};    // 0=open surface, 1=obstacle/border, 2=ship pad, 3=trail
+    std::uint8_t variant[kSize * kSize]{};  // deterministic per-tile visual variant (0..7)
     int oreCount = 0;
     int oreX[kMaxOre]{};
     int oreY[kMaxOre]{};
