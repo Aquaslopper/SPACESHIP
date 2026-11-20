@@ -89,5 +89,46 @@ int main() {
   assert(screen.panels[2].lines.front().value.find("Bridge feed clamp probe 11") != std::string::npos);
   assert(split.State().feed.size() == storedFeedSize && storedFeedSize > 4);
   std::cout << "PASS: bounded latest-four Bridge feed with full history retained\n";
+
+  // Planet arrival landing, free Dispatch button between fuel-split and warp, and free ore pickup
+  auto planetSim = ship::Simulation::NewVoyage(catalog);
+  std::string planetId;
+  for (const auto& body : planetSim.World().bodies) {
+    if (body.type == "planet") {
+      planetSim.MutableMap().here = planetSim.World().BodySystem(body);
+      if (const auto* sys = planetSim.World().FindSystem(planetSim.MutableMap().here)) {
+        planetSim.MutableMap().here = sys->entry;
+      }
+      planetId = body.id;
+      break;
+    }
+  }
+  assert(!planetId.empty());
+  assert(!planetSim.LandedOnPlanet());
+  assert(planetSim.SelectTarget(planetId));
+  assert(planetSim.StartTravel());
+  auto* travel = planetSim.FindOngoing("travel");
+  assert(travel != nullptr);
+  travel->left = 0;
+  travel->state = "done";
+  assert(planetSim.Acknowledge("travel"));
+  assert(planetSim.LandedOnPlanet());
+  const auto landedRoom = ship::BuildRoomScreen(planetSim, "bridge");
+  assert(landedRoom.rows.size() == 3);
+  assert(landedRoom.rows[0].id == "fuel-split");
+  assert(landedRoom.rows[1].id == "dispatch");
+  assert(landedRoom.rows[2].id == "warp");
+  const double clicksBefore = planetSim.ActionCount();
+  const double posBefore = planetSim.State().positiveClicks;
+  const std::size_t goodsBefore = planetSim.Goods().size();
+  assert(ship::PressRoomAction(planetSim, "dispatch"));
+  assert(planetSim.CollectPlanetOre(planetId, 0));
+  assert(!planetSim.CollectPlanetOre(planetId, 0));
+  assert(planetSim.Goods().size() == goodsBefore + 1);
+  assert(planetSim.Goods().back().kind == "Bulk metal");
+  assert(planetSim.Goods().back().vol == 1.0);
+  assert(planetSim.ActionCount() == clicksBefore);
+  assert(planetSim.State().positiveClicks == posBefore);
+  std::cout << "PASS: planet arrival auto-lands, dispatch appears between split and warp, ore pickup is free\n";
   std::cout << "PASS: Bridge controls, four WARP uses / 80 fuel / 20 positive clicks, no self-refill, five-click WARP quarter refills, unchanged two-click split refills, cell requirements, persistence and information panels\n";
 }

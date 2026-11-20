@@ -2607,6 +2607,139 @@ Color StageMix(Color a, Color b, float t) {
 }
 }  // namespace
 
+void ShellView::EnsurePlanetSurface(const Simulation& sim) {
+  if (!sim.LandedOnPlanet()) { return; }
+  const Body* here = sim.FindBodyById(sim.Map().here);
+  if (here == nullptr) { return; }
+  if (planetSurface_.planetId == here->id) { return; }
+
+  planetSurface_ = PlanetSurfaceState{};
+  planetSurface_.planetId = here->id;
+  constexpr int N = PlanetSurfaceState::kSize;
+
+  std::uint32_t h = 2166136261u;
+  for (unsigned char c : here->id) {
+    h ^= c;
+    h *= 16777619u;
+  }
+  h ^= static_cast<std::uint32_t>(sim.World().chartSettings.seed * 2654435761u);
+  auto nextRand = [&h]() -> std::uint32_t {
+    h ^= h << 13;
+    h ^= h >> 17;
+    h ^= h << 5;
+    return h ? h : 1u;
+  };
+
+  for (int y = 0; y < N; ++y) {
+    for (int x = 0; x < N; ++x) {
+      planetSurface_.tiles[y * N + x] = (x == 0 || x == N - 1 || y == 0 || y == N - 1) ? 1 : 0;
+    }
+  }
+  planetSurface_.shipX = 4;
+  planetSurface_.shipY = 7;
+  planetSurface_.tiles[7 * N + 4] = 2;
+  planetSurface_.px = 4;
+  planetSurface_.py = 6;
+  planetSurface_.dir = 0;
+
+  auto connected = [&]() -> bool {
+    bool vis[N * N]{};
+    int qx[N * N];
+    int qy[N * N];
+    int head = 0, tail = 0;
+    vis[6 * N + 4] = true;
+    qx[tail] = 4;
+    qy[tail] = 6;
+    ++tail;
+    int openTotal = 0;
+    for (int i = 0; i < N * N; ++i) {
+      if (planetSurface_.tiles[i] != 1) { ++openTotal; }
+    }
+    static constexpr int kDx[4] = {0, 1, 0, -1};
+    static constexpr int kDy[4] = {-1, 0, 1, 0};
+    while (head < tail) {
+      const int cx = qx[head];
+      const int cy = qy[head];
+      ++head;
+      for (int d = 0; d < 4; ++d) {
+        const int nx = cx + kDx[d];
+        const int ny = cy + kDy[d];
+        if (nx < 0 || nx >= N || ny < 0 || ny >= N) { continue; }
+        const int idx = ny * N + nx;
+        if (vis[idx] || planetSurface_.tiles[idx] == 1) { continue; }
+        vis[idx] = true;
+        qx[tail] = nx;
+        qy[tail] = ny;
+        ++tail;
+      }
+    }
+    return tail == openTotal;
+  };
+
+  const int obstacleGoal = 8 + static_cast<int>(nextRand() % 5u);
+  int placed = 0;
+  for (int attempt = 0; attempt < 64 && placed < obstacleGoal; ++attempt) {
+    const int rx = 1 + static_cast<int>(nextRand() % (N - 2));
+    const int ry = 1 + static_cast<int>(nextRand() % (N - 2));
+    if ((rx == 4 && (ry == 7 || ry == 6 || ry == 5)) || planetSurface_.tiles[ry * N + rx] != 0) {
+      continue;
+    }
+    planetSurface_.tiles[ry * N + rx] = 1;
+    if (connected()) {
+      ++placed;
+    } else {
+      planetSurface_.tiles[ry * N + rx] = 0;
+    }
+  }
+
+  int candX[N * N];
+  int candY[N * N];
+  int candCount = 0;
+  for (int y = 1; y < N - 1; ++y) {
+    for (int x = 1; x < N - 1; ++x) {
+      if (planetSurface_.tiles[y * N + x] != 0) { continue; }
+      if (x == planetSurface_.px && y == planetSurface_.py) { continue; }
+      const int dist = std::abs(x - planetSurface_.shipX) + std::abs(y - planetSurface_.shipY);
+      if (dist >= 2) {
+        candX[candCount] = x;
+        candY[candCount] = y;
+        ++candCount;
+      }
+    }
+  }
+  const int wantOre = std::min({candCount, PlanetSurfaceState::kMaxOre,
+                                3 + static_cast<int>(nextRand() % 3u)});
+  for (int i = 0; i < wantOre; ++i) {
+    const int pick = i + static_cast<int>(nextRand() % static_cast<std::uint32_t>(candCount - i));
+    std::swap(candX[i], candX[pick]);
+    std::swap(candY[i], candY[pick]);
+    planetSurface_.oreX[i] = candX[i];
+    planetSurface_.oreY[i] = candY[i];
+    ++planetSurface_.oreCount;
+  }
+}
+
+void ShellView::StepPlanetSurface(int actionKind) {
+  constexpr int N = PlanetSurfaceState::kSize;
+  static constexpr int kDx[4] = {0, 1, 0, -1};
+  static constexpr int kDy[4] = {-1, 0, 1, 0};
+  if (actionKind == 1 || actionKind == 2) {
+    const int sign = actionKind == 1 ? 1 : -1;
+    const int nx = planetSurface_.px + kDx[planetSurface_.dir] * sign;
+    const int ny = planetSurface_.py + kDy[planetSurface_.dir] * sign;
+    if (nx >= 0 && nx < N && ny >= 0 && ny < N && planetSurface_.tiles[ny * N + nx] != 1) {
+      planetSurface_.px = nx;
+      planetSurface_.py = ny;
+    }
+  } else if (actionKind == 3) {
+    planetSurface_.dir = (planetSurface_.dir + 3) % 4;
+  } else if (actionKind == 4) {
+    planetSurface_.dir = (planetSurface_.dir + 1) % 4;
+  } else if (actionKind == 7) {
+    planetSurface_.dir = (planetSurface_.dir + 2) % 4;
+  }
+}
+
 void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const Area& origin) {
   const Palette& p = theme_.palette;
   const bool night = theme_.id.find("-night") != std::string::npos;
@@ -2937,6 +3070,366 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
     plate(77, 26, 806, 276, paper);
     plate(85, 34, 790, 260, glass);
 
+    if (!sim.LandedOnPlanet()) { bridgeDispatch_ = false; }
+    planetHitCount_ = 0;
+
+    if (bridgeDispatch_) {
+      if (!titleActive_ && !floating_.HasConfirmation() && !ImGui::GetIO().WantTextInput) {
+        if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) { StepPlanetSurface(1); }
+        else if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) { StepPlanetSurface(2); }
+        else if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)) { StepPlanetSurface(3); }
+        else if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) { StepPlanetSurface(4); }
+        else if (IsKeyPressed(KEY_R) || IsKeyPressed(KEY_X)) { StepPlanetSurface(7); }
+      }
+      EnsurePlanetSurface(sim);
+      const Body* planet = sim.FindBodyById(sim.Map().here);
+      const std::string subtype = planet ? planet->subtype : std::string();
+      const bool iceWorld = subtype == "ice" || subtype == "ocean";
+      const bool lavaWorld = planet != nullptr &&
+          (planet->klass.find("Lava") != std::string::npos ||
+           planet->klass.find("Volcanic") != std::string::npos ||
+           planet->klass.find("lava") != std::string::npos);
+
+      const Color sky0 = iceWorld ? Color{14, 24, 46, 255}
+                       : lavaWorld ? Color{34, 14, 18, 255}
+                                   : Color{18, 28, 38, 255};
+      const Color sky1 = iceWorld ? Color{22, 42, 72, 255}
+                       : lavaWorld ? Color{56, 22, 24, 255}
+                                   : Color{28, 48, 56, 255};
+      const Color sky2 = iceWorld ? Color{36, 70, 104, 255}
+                       : lavaWorld ? Color{86, 34, 28, 255}
+                                   : Color{42, 74, 74, 255};
+      const Color sky3 = iceWorld ? Color{68, 114, 144, 255}
+                       : lavaWorld ? Color{124, 54, 34, 255}
+                                   : Color{64, 102, 92, 255};
+      const Color gnd0 = iceWorld ? Color{44, 66, 88, 255}
+                       : lavaWorld ? Color{44, 24, 22, 255}
+                                   : Color{36, 56, 36, 255};
+      const Color gnd1 = iceWorld ? Color{56, 82, 108, 255}
+                       : lavaWorld ? Color{58, 30, 26, 255}
+                                   : Color{46, 70, 42, 255};
+      const Color gnd2 = iceWorld ? Color{68, 98, 126, 255}
+                       : lavaWorld ? Color{72, 38, 30, 255}
+                                   : Color{56, 84, 48, 255};
+      const Color pathCol = iceWorld ? Color{28, 40, 56, 255}
+                          : lavaWorld ? Color{26, 16, 16, 255}
+                                      : Color{24, 20, 16, 255};
+      const Color rockFace = iceWorld ? Color{96, 134, 162, 255}
+                           : lavaWorld ? Color{92, 46, 38, 255}
+                                       : Color{84, 92, 66, 255};
+      const Color rockDark = iceWorld ? Color{52, 78, 102, 255}
+                           : lavaWorld ? Color{52, 26, 22, 255}
+                                       : Color{48, 54, 38, 255};
+      const Color rockHi = iceWorld ? Color{144, 184, 210, 255}
+                         : lavaWorld ? Color{138, 72, 52, 255}
+                                     : Color{122, 134, 92, 255};
+
+      const float left = V(91, 0).x, top = std::max(layout_.content.y, V(0, 38).y - contentScroll_);
+      const float bottom = std::min(layout_.content.Bottom(), V(0, 290).y - contentScroll_);
+      BeginScissorMode(static_cast<int>(left), static_cast<int>(top), static_cast<int>(778 * scale),
+                       static_cast<int>(std::max(0.0f, bottom - top)));
+      DrawRectangle(static_cast<int>(V(85, 34).x), static_cast<int>(V(85, 34).y),
+                    static_cast<int>(790 * scale), static_cast<int>(260 * scale), Color{12, 13, 16, 255});
+      for (int s = 0; s < 26; ++s) {
+        const float sx = 96.0f + static_cast<float>((s * 97) % 165) + (s % 2 ? 590.0f : 0.0f);
+        const float sy = 44.0f + static_cast<float>((s * 61) % 236);
+        DrawRectangle(static_cast<int>(V(sx, sy).x), static_cast<int>(V(sx, sy).y),
+                      std::max(1, static_cast<int>(1.5f * scale)),
+                      std::max(1, static_cast<int>(1.5f * scale)), Fade(WHITE, 0.35f));
+      }
+
+      // Centered PC-98 dungeon crawler viewport
+      const float vx = 275.0f, vy = 42.0f, vw = 410.0f, vh = 244.0f;
+      const float hy = 158.0f;
+      const float cxMid = vx + vw * 0.5f;
+      const auto rectS = [&](float x, float y, float w, float h, Color col) {
+        DrawRectangle(static_cast<int>(V(x, y).x), static_cast<int>(V(x, y).y),
+                      std::max(1, static_cast<int>(std::ceil(w * scale))),
+                      std::max(1, static_cast<int>(std::ceil(h * scale))), col);
+      };
+      // Stepped PC-98 sky bands
+      rectS(vx, vy, vw, 30.0f, sky0);
+      rectS(vx, vy + 30.0f, vw, 30.0f, sky1);
+      rectS(vx, vy + 60.0f, vw, 30.0f, sky2);
+      rectS(vx, vy + 90.0f, vw, hy - (vy + 90.0f), sky3);
+      for (int st = 0; st < 14; ++st) {
+        const float sx = vx + 14.0f + static_cast<float>((st * 53 + planetSurface_.dir * 41) % 382);
+        const float sy = vy + 8.0f + static_cast<float>((st * 29) % 52);
+        rectS(sx, sy, 2.0f, 2.0f, Color{220, 230, 236, 200});
+      }
+      // Simple retro pixel cloud / moon band
+      const float cloudX = vx + 84.0f + static_cast<float>((3 - planetSurface_.dir) * 58);
+      rectS(cloudX, vy + 22.0f, 56.0f, 8.0f, Color{150, 174, 186, 200});
+      rectS(cloudX + 10.0f, vy + 16.0f, 36.0f, 6.0f, Color{186, 206, 214, 210});
+      rectS(cloudX - 8.0f, vy + 26.0f, 72.0f, 4.0f, Color{110, 136, 150, 180});
+
+      // Distant horizon mesa strip
+      rectS(vx, hy - 5.0f, vw, 5.0f, rockDark);
+      for (int m = 0; m < 7; ++m) {
+        const float mx = vx + static_cast<float>(m * 64 + ((m * 19 + planetSurface_.dir * 23) % 20));
+        const float mw = 24.0f + static_cast<float>((m * 13) % 20);
+        const float mh = 4.0f + static_cast<float>((m * 7 + planetSurface_.dir) % 6);
+        rectS(mx, hy - 5.0f - mh, mw, mh, rockDark);
+      }
+
+      // Stepped PC-98 ground bands + perspective trail
+      const float gH = vy + vh - hy;
+      rectS(vx, hy, vw, gH * 0.25f, gnd0);
+      rectS(vx, hy + gH * 0.25f, vw, gH * 0.28f, gnd1);
+      rectS(vx, hy + gH * 0.53f, vw, gH * 0.47f, gnd2);
+      DrawTriangle(V(cxMid - 12.0f, hy), V(cxMid - 102.0f, vy + vh), V(cxMid + 102.0f, vy + vh), pathCol);
+      DrawTriangle(V(cxMid - 12.0f, hy), V(cxMid + 102.0f, vy + vh), V(cxMid + 12.0f, hy), pathCol);
+
+      static constexpr int kDx[4] = {0, 1, 0, -1};
+      static constexpr int kDy[4] = {-1, 0, 1, 0};
+      const int fdx = kDx[planetSurface_.dir];
+      const int fdy = kDy[planetSurface_.dir];
+      const int rdx = kDx[(planetSurface_.dir + 1) % 4];
+      const int rdy = kDy[(planetSurface_.dir + 1) % 4];
+      const int ldx = -rdx;
+      const int ldy = -rdy;
+      constexpr int N = PlanetSurfaceState::kSize;
+      auto tileAt = [&](int tx, int ty) -> std::uint8_t {
+        if (tx < 0 || tx >= N || ty < 0 || ty >= N) { return 1; }
+        return planetSurface_.tiles[ty * N + tx];
+      };
+      auto oreAt = [&](int tx, int ty) -> int {
+        if (planet == nullptr) { return -1; }
+        for (int i = 0; i < planetSurface_.oreCount; ++i) {
+          if (planetSurface_.oreX[i] == tx && planetSurface_.oreY[i] == ty) {
+            const std::string key = "planet-ore:" + planet->id + ":" + std::to_string(i);
+            auto it = sim.State().mapMarks.find(key);
+            if (it == sim.State().mapMarks.end() || !it->second) { return i; }
+          }
+        }
+        return -1;
+      };
+
+      // Perspective depth steps d = 3 -> 1
+      auto depthFrac = [](int d) -> float {
+        if (d == 0) { return 1.0f; }
+        if (d == 1) { return 0.56f; }
+        if (d == 2) { return 0.30f; }
+        return 0.16f;
+      };
+      for (int d = 1; d <= 3; ++d) {
+        const float gy = hy + (vy + vh - hy) * depthFrac(d);
+        line(vx, gy, vx + vw, gy, Fade(rockDark, 0.55f));
+      }
+
+      int centerWall = 4;
+      for (int d = 1; d <= 3; ++d) {
+        if (tileAt(planetSurface_.px + fdx * d, planetSurface_.py + fdy * d) == 1) {
+          centerWall = d;
+          break;
+        }
+      }
+
+      const auto addHit = [&](const Area& box, int kind, int arg) {
+        if (planetHitCount_ < static_cast<int>(planetHits_.size())) {
+          planetHits_[planetHitCount_++] = PlanetClickHit{box, kind, arg};
+        }
+      };
+
+      for (int d = 3; d >= 1; --d) {
+        const float fFar = depthFrac(d);
+        const float fNear = depthFrac(d - 1);
+        const float hwFar = 205.0f * fFar;
+        const float hwNear = 205.0f * fNear;
+        const float gyFar = hy + (vy + vh - hy) * fFar;
+        const float gyNear = hy + (vy + vh - hy) * fNear;
+        const float topFar = hy - 74.0f * fFar;
+        const float topNear = hy - 74.0f * fNear;
+
+        const int cx = planetSurface_.px + fdx * d;
+        const int cy = planetSurface_.py + fdy * d;
+
+        // Left rock ridge
+        if (tileAt(cx + ldx, cy + ldy) == 1) {
+          const float lxFar = cxMid - hwFar;
+          const float lxNear = std::max(vx, cxMid - hwNear);
+          DrawTriangle(V(lxNear, topNear), V(lxNear, gyNear), V(lxFar, gyFar), rockFace);
+          DrawTriangle(V(lxNear, topNear), V(lxFar, gyFar), V(lxFar, topFar), rockFace);
+          rectS(vx, topFar, std::max(0.0f, lxFar - vx), gyFar - topFar, rockDark);
+          line(lxNear, topNear, lxFar, topFar, rockHi);
+          line(lxFar, topFar, lxFar, gyFar, rockDark);
+        }
+        // Right rock ridge
+        if (tileAt(cx + rdx, cy + rdy) == 1) {
+          const float rxFar = cxMid + hwFar;
+          const float rxNear = std::min(vx + vw, cxMid + hwNear);
+          DrawTriangle(V(rxFar, topFar), V(rxFar, gyFar), V(rxNear, gyNear), rockFace);
+          DrawTriangle(V(rxFar, topFar), V(rxNear, gyNear), V(rxNear, topNear), rockFace);
+          rectS(rxFar, topFar, std::max(0.0f, (vx + vw) - rxFar), gyFar - topFar, rockDark);
+          line(rxFar, topFar, rxNear, topNear, rockHi);
+          line(rxFar, topFar, rxFar, gyFar, rockDark);
+        }
+
+        if (d == centerWall) {
+          const float w = hwFar * 2.0f;
+          const float h = gyFar - topFar;
+          rectS(cxMid - hwFar, topFar, w, h, rockFace);
+          rectS(cxMid - hwFar + 4.0f * fFar, topFar + 4.0f * fFar,
+                std::max(2.0f, w - 8.0f * fFar), 4.0f * fFar + 2.0f, rockHi);
+          DrawRectangleLinesEx({V(cxMid - hwFar, topFar).x, V(cxMid - hwFar, topFar).y,
+                                w * scale, h * scale}, pen, rockDark);
+        } else if (d < centerWall) {
+          const float objY = hy + (vy + vh - hy) * ((fFar + fNear) * 0.48f);
+          const float s = (fFar + fNear) * 0.55f;
+          // Ship landing spot
+          if (cx == planetSurface_.shipX && cy == planetSurface_.shipY) {
+            const float sw = 76.0f * s;
+            const float sh = 42.0f * s;
+            const Area shipBox{V(cxMid - sw * 0.5f, objY - sh).x,
+                               V(cxMid - sw * 0.5f, objY - sh).y, sw * scale, sh * scale};
+            const bool hov = layout_.content.Contains(mouseX_, mouseY_) &&
+                             shipBox.Contains(mouseX_, mouseY_ + contentScroll_);
+            rectS(cxMid - sw * 0.42f, objY - sh * 0.68f, sw * 0.84f, sh * 0.44f,
+                  Color{188, 184, 174, 255});
+            rectS(cxMid - sw * 0.24f, objY - sh * 0.96f, sw * 0.48f, sh * 0.30f,
+                  Color{150, 148, 140, 255});
+            rectS(cxMid - sw * 0.14f, objY - sh * 0.84f, sw * 0.28f, sh * 0.16f,
+                  Color{84, 196, 214, 255});
+            line(cxMid - sw * 0.36f, objY - sh * 0.24f, cxMid - sw * 0.48f, objY, Color{130, 126, 118, 255});
+            line(cxMid + sw * 0.36f, objY - sh * 0.24f, cxMid + sw * 0.48f, objY, Color{130, 126, 118, 255});
+            if (d == 1) {
+              const int shipPx = std::max(9, static_cast<int>(std::lround(10.0f * scale)));
+              const char* tag = "SHIP";
+              const float tw = TextWidth(tag, shipPx, true);
+              Text(tag, static_cast<int>(V(cxMid, objY).x - tw * 0.5f),
+                   static_cast<int>(V(cxMid, objY - sh - 12.0f * s).y), shipPx,
+                   hov ? Color{255, 224, 130, 255} : Color{226, 232, 236, 255}, true);
+            }
+            if (hov) { DrawRectangleLinesEx({shipBox.x, shipBox.y, shipBox.w, shipBox.h}, pen, Color{255, 220, 110, 255}); }
+            addHit(shipBox, 6, 0);
+          }
+          // Clickable Ore Package
+          const int oreIdx = oreAt(cx, cy);
+          if (oreIdx >= 0) {
+            const float ow = 38.0f * s;
+            const float oh = 28.0f * s;
+            const Area oreBox{V(cxMid - ow * 0.5f, objY - oh).x,
+                              V(cxMid - ow * 0.5f, objY - oh).y, ow * scale, oh * scale};
+            const bool hov = layout_.content.Contains(mouseX_, mouseY_) &&
+                             oreBox.Contains(mouseX_, mouseY_ + contentScroll_);
+            rectS(cxMid - ow * 0.5f, objY - oh, ow, oh, Color{184, 118, 38, 255});
+            rectS(cxMid - ow * 0.42f, objY - oh * 0.88f, ow * 0.84f, oh * 0.28f, Color{236, 176, 68, 255});
+            rectS(cxMid - ow * 0.16f, objY - oh * 0.50f, ow * 0.32f, oh * 0.26f, Color{255, 226, 138, 255});
+            DrawRectangleLinesEx({oreBox.x, oreBox.y, oreBox.w, oreBox.h}, pen,
+                                 hov ? Color{255, 240, 170, 255} : Color{52, 32, 14, 255});
+            if (d == 1) {
+              const int orePx = std::max(9, static_cast<int>(std::lround(10.0f * scale)));
+              const char* tag = "ORE";
+              const float tw = TextWidth(tag, orePx, true);
+              Text(tag, static_cast<int>(V(cxMid, objY).x - tw * 0.5f),
+                   static_cast<int>(V(cxMid, objY - oh - 12.0f * s).y), orePx,
+                   hov ? Color{255, 232, 136, 255} : Color{238, 196, 108, 255}, true);
+            }
+            addHit(oreBox, 5, oreIdx);
+          }
+        }
+      }
+
+      // Standing directly on the ship landing pad: show compact clickable ship badge
+      if (planetSurface_.px == planetSurface_.shipX && planetSurface_.py == planetSurface_.shipY) {
+        const float bw = 96.0f, bh = 22.0f;
+        const Area shipPad{V(cxMid - bw * 0.5f, vy + vh - bh - 8.0f).x,
+                           V(cxMid - bw * 0.5f, vy + vh - bh - 8.0f).y, bw * scale, bh * scale};
+        const bool hov = layout_.content.Contains(mouseX_, mouseY_) &&
+                         shipPad.Contains(mouseX_, mouseY_ + contentScroll_);
+        DrawRectangleRec({shipPad.x, shipPad.y, shipPad.w, shipPad.h},
+                         hov ? Color{54, 72, 84, 240} : Color{26, 34, 42, 228});
+        DrawRectangleLinesEx({shipPad.x, shipPad.y, shipPad.w, shipPad.h}, pen,
+                             hov ? Color{255, 220, 110, 255} : Color{168, 194, 206, 255});
+        const int padPx = std::max(10, static_cast<int>(std::lround(10.0f * scale)));
+        const char* lbl = "BOARD SHIP";
+        const float tw = TextWidth(lbl, padPx, true);
+        Text(lbl, static_cast<int>(shipPad.x + (shipPad.w - tw) * 0.5f),
+             static_cast<int>(shipPad.y + (shipPad.h - static_cast<float>(padPx)) * 0.5f),
+             padPx, Color{240, 242, 238, 255}, true);
+        addHit(shipPad, 6, 0);
+      }
+
+      DrawRectangleLinesEx({V(vx, vy).x, V(vx, vy).y, vw * scale, vh * scale},
+                           pen, Color{196, 198, 194, 255});
+
+      // Right side inside glass: tiny heading/ore readout + 4-way arrow pad
+      const int infoPx = std::max(9, static_cast<int>(std::lround(10.0f * scale)));
+      static const char* kDirNames[4] = {"N", "E", "S", "W"};
+      int oreLeft = 0;
+      if (planet != nullptr) {
+        for (int i = 0; i < planetSurface_.oreCount; ++i) {
+          const std::string key = "planet-ore:" + planet->id + ":" + std::to_string(i);
+          auto it = sim.State().mapMarks.find(key);
+          if (it == sim.State().mapMarks.end() || !it->second) { ++oreLeft; }
+        }
+      }
+      const std::string pTitle = planet ? planet->name : std::string("Surface");
+      Text(pTitle.c_str(), static_cast<int>(V(700, 48).x), static_cast<int>(V(700, 48).y),
+           infoPx, Color{220, 224, 220, 255}, true);
+      const std::string posLine = std::string("DIR ") + kDirNames[planetSurface_.dir] +
+                                  "  (" + std::to_string(planetSurface_.px) + "," +
+                                  std::to_string(planetSurface_.py) + ")";
+      Text(posLine.c_str(), static_cast<int>(V(700, 66).x), static_cast<int>(V(700, 66).y),
+           infoPx, Color{168, 176, 172, 255});
+      const std::string oreLine = "ORE " + std::to_string(oreLeft);
+      Text(oreLine.c_str(), static_cast<int>(V(700, 84).x), static_cast<int>(V(700, 84).y),
+           infoPx, oreLeft > 0 ? Color{236, 184, 82, 255} : Color{130, 140, 134, 255}, true);
+
+      // D-pad inset box on right side (matching mockup)
+      rectS(718.0f, 136.0f, 122.0f, 122.0f, Color{6, 7, 9, 255});
+      DrawRectangleLinesEx({V(718, 136).x, V(718, 136).y, 122.0f * scale, 122.0f * scale},
+                           pen, Color{42, 44, 48, 255});
+      const float btnS = 26.0f;
+      struct PadBtn { float x; float y; int kind; };
+      const PadBtn pads[5] = {
+          {766.0f, 152.0f, 1},  // Up (forward)
+          {766.0f, 216.0f, 2},  // Down (backward)
+          {734.0f, 184.0f, 3},  // Left (turn left 90)
+          {798.0f, 184.0f, 4},  // Right (turn right 90)
+          {766.0f, 184.0f, 7},  // Center (turn around 180)
+      };
+      for (const PadBtn& b : pads) {
+        const Area box{V(b.x, b.y).x, V(b.x, b.y).y, btnS * scale, btnS * scale};
+        const bool hov = layout_.content.Contains(mouseX_, mouseY_) &&
+                         box.Contains(mouseX_, mouseY_ + contentScroll_);
+        const Color btnBg = b.kind == 7
+            ? (hov ? Color{255, 226, 148, 255} : Color{208, 212, 206, 255})
+            : (hov ? Color{255, 226, 148, 255} : Color{244, 244, 240, 255});
+        DrawRectangleRec({box.x, box.y, box.w, box.h}, btnBg);
+        DrawRectangleLinesEx({box.x, box.y, box.w, box.h}, pen, Color{40, 42, 46, 255});
+        const float cx = b.x + btnS * 0.5f;
+        const float cy = b.y + btnS * 0.5f;
+        const Color arr{28, 30, 34, 255};
+        if (b.kind == 1) {
+          DrawTriangle(V(cx, cy - 6.0f), V(cx - 6.0f, cy + 5.0f), V(cx + 6.0f, cy + 5.0f), arr);
+        } else if (b.kind == 2) {
+          DrawTriangle(V(cx - 6.0f, cy - 5.0f), V(cx, cy + 6.0f), V(cx + 6.0f, cy - 5.0f), arr);
+        } else if (b.kind == 3) {
+          DrawTriangle(V(cx - 6.0f, cy), V(cx + 5.0f, cy + 6.0f), V(cx + 5.0f, cy - 6.0f), arr);
+        } else if (b.kind == 4) {
+          DrawTriangle(V(cx + 6.0f, cy), V(cx - 5.0f, cy - 6.0f), V(cx - 5.0f, cy + 6.0f), arr);
+        } else {
+          // 180 turn-around mark (opposing arrows / loop)
+          const int turnPx = std::max(8, static_cast<int>(std::lround(9.0f * scale)));
+          const char* turnTxt = "180";
+          const float tw = TextWidth(turnTxt, turnPx, true);
+          Text(turnTxt, static_cast<int>(box.x + (box.w - tw) * 0.5f),
+               static_cast<int>(box.y + (box.h - static_cast<float>(turnPx)) * 0.5f),
+               turnPx, arr, true);
+        }
+        addHit(box, b.kind, 0);
+      }
+
+      // Subtle CRT scanlines on glass
+      for (int row = 0, sy = 38; sy < 292; sy += 4, ++row) {
+        DrawRectangle(static_cast<int>(left), static_cast<int>(V(0, static_cast<float>(sy)).y),
+                      static_cast<int>(778 * scale), std::max(1, static_cast<int>(pen)),
+                      Fade(ToRay(p.coffeeDark), row % 4 == 0 ? 0.14f : 0.08f));
+      }
+      EndScissorMode();
+    } else {
+
     const Catalog& catalog = sim.World();
     const Task* trip = sim.FindOngoing("travel");
     const Body* dest = trip ? sim.FindBodyById(trip->target) : nullptr;
@@ -3129,6 +3622,7 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
       for (int k = 0; k < 5; ++k) line(x-6, 275+2*k, x+6, 275+2*k, Fade(rule, 0.32f));
     }
     EndScissorMode();
+    }
     for (int i = 0; i < 2; ++i) {
       const float cx = i ? 914 : 46;
       plate(cx - 23, 26, 46, 276, paper);
@@ -7880,18 +8374,23 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
     // The controls live inside the scaled stage image, so their text scales with
     // the image and each box stays clamped inside its socket at every resolution.
     if (!screen.panelRows.empty()) {
-      const float btnW = 422.0f * scale;
+      const bool hasDispatch = screen.panelRows[0].size() == 3;
+      const float sideBtnW = (hasDispatch ? 396.0f : 422.0f) * scale;
+      const float midBtnW = 102.0f * scale;
       const int lblPx = std::max(11, static_cast<int>(std::lround(TypePx(10) * scale)));
       const int badPx = std::max(10, static_cast<int>(std::lround(TypePx(9) * scale)));
       const float btnLine = std::max(14.0f, static_cast<float>(std::lround(lblPx * 1.32f)));
       const float btnPad = 11.0f * scale;
       float buttonH = 48.0f * scale;
-      for (const CommandRowView& row : screen.panelRows[0]) {
+      for (std::size_t r = 0; r < screen.panelRows[0].size(); ++r) {
+        const CommandRowView& row = screen.panelRows[0][r];
+        const bool isMid = hasDispatch && r == 1;
+        const float rowW = isMid ? midBtnW : sideBtnW;
         const std::string cost =
             row.hideCost ? std::string() : (row.displayCost.empty() ? "1 click" : row.displayCost);
         const float badgeW = cost.empty() ? 0.0f : (TextWidth(cost.c_str(), badPx) + 14.0f * scale);
         const float labelW = std::max(60.0f * scale,
-                                      btnW - 2.0f * btnPad - (badgeW > 0.0f ? badgeW + 10.0f * scale : 0.0f));
+                                      rowW - 2.0f * btnPad - (badgeW > 0.0f ? badgeW + 10.0f * scale : 0.0f));
         const auto lines = WrapText(row.label, labelW, lblPx, SelectFont(lblPx, false));
         buttonH = std::max(buttonH,
                            static_cast<float>(lines.size()) * btnLine + 14.0f * scale);
@@ -7906,16 +8405,27 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
 
       for (std::size_t r = 0; r < screen.panelRows[0].size(); ++r) {
         const CommandRowView& row = screen.panelRows[0][r];
-        const float bx = stageX + (r == 0 ? 23.0f : 515.0f) * scale;
-        const Area box{bx, btnY, btnW, buttonH};
+        const bool isMid = hasDispatch && r == 1;
+        const float bx = stageX + (hasDispatch ? (r == 0 ? 23.0f : (r == 1 ? 429.0f : 541.0f))
+                                               : (r == 0 ? 23.0f : 515.0f)) * scale;
+        const float rowW = isMid ? midBtnW : sideBtnW;
+        const Area box{bx, btnY, rowW, buttonH};
         const bool hovered = row.enabled && layout_.content.Contains(mouseX_, mouseY_) &&
                              box.Contains(mouseX_, mouseY_ + contentScroll_);
 
-        FillChamferRay(box, kChamferCard, ToRay(row.enabled ? p.control : p.panel3));
-        if (row.charged) { PaintProgressFill(box, row.chargePercent, p, kChamferCard); }
-        PaintChamferDoubleLinesRay(box, kChamferCard,
-                                   ToRay(hovered ? p.coffeeDark : p.borderDark),
-                                   ToRay(hovered ? p.amber : p.border));
+        if (isMid) {
+          const Color fillCol = bridgeDispatch_ ? ToRay(p.amber) : ToRay(p.terracotta);
+          FillChamferRay(box, kChamferCard, fillCol);
+          PaintChamferDoubleLinesRay(box, kChamferCard,
+                                     ToRay(hovered ? p.coffeeDark : p.borderDark),
+                                     ToRay(hovered ? p.amber : p.border));
+        } else {
+          FillChamferRay(box, kChamferCard, ToRay(row.enabled ? p.control : p.panel3));
+          if (row.charged) { PaintProgressFill(box, row.chargePercent, p, kChamferCard); }
+          PaintChamferDoubleLinesRay(box, kChamferCard,
+                                     ToRay(hovered ? p.coffeeDark : p.borderDark),
+                                     ToRay(hovered ? p.amber : p.border));
+        }
 
         const std::string cost =
             row.hideCost ? std::string() : (row.displayCost.empty() ? "1 click" : row.displayCost);
@@ -7926,8 +8436,13 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
         const float totalTextH = static_cast<float>(lines.size()) * btnLine;
         float textY = box.y + std::max(5.0f * scale, (box.h - totalTextH) * 0.5f);
         for (const std::string& line : lines) {
-          Text(line.c_str(), static_cast<int>(box.x + btnPad), static_cast<int>(textY), lblPx,
-               ToRay(row.enabled ? p.ink : p.muted));
+          const float lineX = isMid
+              ? box.x + (box.w - TextWidth(line.c_str(), lblPx, isMid)) * 0.5f
+              : box.x + btnPad;
+          const Color txtCol = isMid ? Color{252, 248, 240, 255}
+                                     : ToRay(row.enabled ? p.ink : p.muted);
+          Text(line.c_str(), static_cast<int>(lineX), static_cast<int>(textY), lblPx,
+               txtCol, isMid);
           textY += btnLine;
         }
         if (!cost.empty()) {
@@ -8705,6 +9220,21 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
   }
   const float scrollY = contentScroll_;
 
+  if (button == HitButton::Left && sim.State().activeTab == "room:bridge" &&
+      bridgeDispatch_ && sim.LandedOnPlanet()) {
+    for (int i = planetHitCount_ - 1; i >= 0; --i) {
+      const PlanetClickHit& hit = planetHits_[i];
+      if (!hit.box.Contains(x, y + scrollY)) { continue; }
+      if ((hit.kind >= 1 && hit.kind <= 4) || hit.kind == 7) {
+        StepPlanetSurface(hit.kind);
+      } else if (hit.kind == 5) {
+        sim.CollectPlanetOre(sim.Map().here, hit.arg);
+      } else if (hit.kind == 6) {
+        bridgeDispatch_ = false;
+      }
+      return;
+    }
+  }
   if (button == HitButton::Left && sim.State().activeTab == "room:bridge" && sim.FindOngoing("travel")) {
     for (int slot = 0; slot < static_cast<int>(debrisHits_.size()); ++slot) {
       const auto& hit = debrisHits_[slot];
@@ -8821,6 +9351,11 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
   if (screenPanels_) {
     for (const NavHit& hit : navHits_) {
       if (!hit.box.Contains(x, y + scrollY)) { continue; }
+      if (panelsKind_ == ScreenKind::Room && hit.arg == "dispatch" && sim.LandedOnPlanet()) {
+        bridgeDispatch_ = !bridgeDispatch_;
+        if (bridgeDispatch_) { EnsurePlanetSurface(sim); }
+        return;
+      }
       // Read the row's own question before acting: a purchase that cannot be
       // undone asks first when the reader keeps confirmations on.
       const CommandRowView* clickedRow = nullptr;

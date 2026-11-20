@@ -963,8 +963,15 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         view.enabled = row.enabled;
         view.live = row.enabled;
         view.confirm = row.confirm;
-        BindCommandCharge(sim, view, ButtonChargeKey(sim, "press:room:" + row.id + ":"),
+        if (row.id == "dispatch") {
+          view.charged = false;
+          view.actionCost = false;
+          view.hideCost = true;
+          view.spent = false;
+        } else {
+          BindCommandCharge(sim, view, ButtonChargeKey(sim, "press:room:" + row.id + ":"),
                             RoomActionCategory(row.id));
+        }
         rows.push_back(view);
         ids.push_back(row.id);
       }
@@ -1006,7 +1013,8 @@ TaskScreenModel BuildTabScreen(const Simulation& sim, const Tab& tab,
         course.title = "Current location / course and alerts";
         const Body* here = sim.FindBodyById(sim.Map().here);
         course.Field("Location", here == nullptr ? sim.Map().here : here->name);
-        course.Field("Position", sim.InSpace() ? "In space" : sim.State().docked ? "Docked" : "Undocked");
+        course.Field("Position", sim.LandedOnPlanet() ? "Landed"
+                                                      : (sim.InSpace() ? "In space" : sim.State().docked ? "Docked" : "Undocked"));
         const Task* travel = sim.FindOngoing("travel");
         const Body* target = travel != nullptr ? sim.FindBodyById(travel->target) :
             sim.State().navTarget ? sim.FindBodyById(*sim.State().navTarget) : nullptr;
