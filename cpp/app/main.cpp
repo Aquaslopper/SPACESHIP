@@ -17,6 +17,7 @@
 #include "rlImGui.h"
 #include "rlgl.h"
 
+#include "IntroVideo.h"
 #include "audio/AudioDevice.h"
 #include "core/Simulation.h"
 #include "core/AutoSave.h"
@@ -701,7 +702,7 @@ int main(int argc, char** argv) {
 
   audio::AudioDevice audio;
   const bool audioReady = audio.Start(assets.string(), launchAssets.string());
-  audio.Configure(sim.State().options);
+  IntroVideo intro(assets / "video", audioReady);
   std::printf("audio: %zu music file(s), %zu sound file(s)\n",
               audio.External().music.size(), audio.External().sfx.size());
 
@@ -717,9 +718,18 @@ int main(int argc, char** argv) {
   ship::RadiationTelemetry smoothedWave = ship::ComputeRadiationTelemetry(sim);
   float waveTime = 0.0f;
   while (!WindowShouldClose() && !shell.QuitRequested()) {
-    if (IsKeyPressed(KEY_ESCAPE)) { shell.Escape(sim); }
-    if (IsKeyPressed(KEY_LEFT)) { shell.PageTutorial(-1, GetTime() * 1000.0); }
-    if (IsKeyPressed(KEY_RIGHT)) { shell.PageTutorial(1, GetTime() * 1000.0); }
+    const bool splash = shell.SplashActive();
+    const bool introOwnsInput = intro.Pending() && !splash;
+    const bool escape = IsKeyPressed(KEY_ESCAPE);
+    const auto& options = sim.State().options;
+    const double level = std::isfinite(options.audioLevel) ? options.audioLevel : 0.0;
+    intro.Update(splash, escape, options.music ? static_cast<float>(std::clamp(level, 1.0, 10.0)) : 0.0f);
+    if (introOwnsInput) { shell.SuppressSplashTitleFade(); }
+    if (escape && !introOwnsInput) { shell.Escape(sim); }
+    if (!introOwnsInput) {
+      if (IsKeyPressed(KEY_LEFT)) { shell.PageTutorial(-1, GetTime() * 1000.0); }
+      if (IsKeyPressed(KEY_RIGHT)) { shell.PageTutorial(1, GetTime() * 1000.0); }
+    }
     display.Resize(GetScreenWidth(), GetScreenHeight());
     shell.SetDisplayAdjustmentAvailable(display.Ready());
     BeginDrawing();
@@ -728,46 +738,43 @@ int main(int argc, char** argv) {
     rlImGuiBegin();
 
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-      leftPointer.Press(ImGui::GetIO().WantCaptureMouse);
-    }
-    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-      rightPointer.Press(ImGui::GetIO().WantCaptureMouse);
-    }
-    if (IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE)) {
-      middlePointer.Press(ImGui::GetIO().WantCaptureMouse);
-    }
-    const Vector2 pointer = GetMousePosition();
-    shell.Move(pointer.x, pointer.y);
-    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && !leftPointer.UiOwned()) {
-      const Vector2 delta = GetMouseDelta();
-      shell.Drag(sim, pointer.x, pointer.y, delta.x, delta.y, true,
-                 IsMouseButtonPressed(MOUSE_BUTTON_LEFT));
-    }
-    if (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE) && !middlePointer.UiOwned()) {
-      const Vector2 delta = GetMouseDelta();
-      shell.OrbitDrag(sim, pointer.x, pointer.y, delta.x, delta.y, true,
-                      IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE));
-    }
-    const float wheel = GetMouseWheelMove();
-    if (wheel != 0.0f) { shell.Scroll(sim, pointer.x, pointer.y, wheel); }
-    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-      const Vector2 mouse = GetMousePosition();
-      if (!leftPointer.Release()) {
-        shell.Click(sim, mouse.x, mouse.y, ship::HitButton::Left,
-                    static_cast<double>(GetTime()) * 1000.0);
+    const bool capturePointer = introOwnsInput || ImGui::GetIO().WantCaptureMouse;
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) { leftPointer.Press(capturePointer); }
+    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) { rightPointer.Press(capturePointer); }
+    if (IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE)) { middlePointer.Press(capturePointer); }
+    if (!introOwnsInput) {
+      const Vector2 pointer = GetMousePosition();
+      shell.Move(pointer.x, pointer.y);
+      if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && !leftPointer.UiOwned()) {
+        const Vector2 delta = GetMouseDelta();
+        shell.Drag(sim, pointer.x, pointer.y, delta.x, delta.y, true,
+                   IsMouseButtonPressed(MOUSE_BUTTON_LEFT));
       }
-    } else if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT)) {
-      const Vector2 mouse = GetMousePosition();
-      if (!rightPointer.Release()) {
-        shell.Click(sim, mouse.x, mouse.y, ship::HitButton::Right,
-                    static_cast<double>(GetTime()) * 1000.0);
+      if (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE) && !middlePointer.UiOwned()) {
+        const Vector2 delta = GetMouseDelta();
+        shell.OrbitDrag(sim, pointer.x, pointer.y, delta.x, delta.y, true,
+                        IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE));
       }
-    }
-    if (IsMouseButtonReleased(MOUSE_BUTTON_MIDDLE)) {
-      const Vector2 mouse = GetMousePosition();
-      if (!middlePointer.Release()) {
-        shell.OrbitDrag(sim, mouse.x, mouse.y, 0.0f, 0.0f, false, false);
+      const float wheel = GetMouseWheelMove();
+      if (wheel != 0.0f) { shell.Scroll(sim, pointer.x, pointer.y, wheel); }
+      if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+        const Vector2 mouse = GetMousePosition();
+        if (!leftPointer.Release()) {
+          shell.Click(sim, mouse.x, mouse.y, ship::HitButton::Left,
+                      static_cast<double>(GetTime()) * 1000.0);
+        }
+      } else if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT)) {
+        const Vector2 mouse = GetMousePosition();
+        if (!rightPointer.Release()) {
+          shell.Click(sim, mouse.x, mouse.y, ship::HitButton::Right,
+                      static_cast<double>(GetTime()) * 1000.0);
+        }
+      }
+      if (IsMouseButtonReleased(MOUSE_BUTTON_MIDDLE)) {
+        const Vector2 mouse = GetMousePosition();
+        if (!middlePointer.Release()) {
+          shell.OrbitDrag(sim, mouse.x, mouse.y, 0.0f, 0.0f, false, false);
+        }
       }
     }
 
@@ -804,7 +811,9 @@ int main(int argc, char** argv) {
       ToggleBorderlessWindowed();
     }
 
-    audio.Configure(sim.State().options);
+    auto audioOptions = sim.State().options;
+    if (intro.Pending()) { audioOptions.music = false; }
+    audio.Configure(audioOptions);
     audio.Tick(sim);
     shell.SetAudioStatus(audio.Status());
 
@@ -857,6 +866,7 @@ int main(int argc, char** argv) {
                   static_cast<float>(sim.State().options.colorShift),
                   glowScale, flareScale, shell.FlareTargets());
     }
+    intro.Draw();
     EndDrawing();
   }
 
@@ -868,6 +878,7 @@ int main(int argc, char** argv) {
       std::printf("autosaved: %s\n", saved.c_str());
     }
   }
+  intro.Close();
   audio.Shutdown();
   rlImGuiShutdown();
   display.Shutdown();

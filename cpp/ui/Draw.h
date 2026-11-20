@@ -111,6 +111,8 @@ class ShellView {
   void ClosePopup();
 
   void ShowSplash(bool fromVoyage);
+  bool SplashActive() const { return splashActive_; }
+  void SuppressSplashTitleFade() { titleInStartMs_ = -1.0; }
   void ShowTitle(bool fromVoyage);
   void HideTitle();
   bool TitleActive() const { return titleActive_; }
