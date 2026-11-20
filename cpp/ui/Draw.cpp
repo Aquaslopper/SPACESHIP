@@ -3038,14 +3038,100 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
                        : rockWorld  ? Color{232, 168, 106, 255}
                                     : Color{202, 224, 132, 255};
 
+  constexpr int hy = 46;
+  constexpr int kGndH = H - hy;
+  constexpr int cxMid = W / 2;
+  static constexpr float kProjY = 22.0f;
+  static constexpr float kProjX = 84.0f;
+  static constexpr float kHalfRoad = 0.44f;
+
   static constexpr int kBayer4[4][4] = {
       {0, 8, 2, 10},
       {12, 4, 14, 6},
       {3, 11, 1, 9},
       {15, 7, 13, 5},
   };
+  struct FogMaskLut {
+    std::uint8_t row[17][4]{};
+  };
+  static constexpr FogMaskLut kFogMasks = []() constexpr {
+    FogMaskLut m{};
+    for (int thr = 0; thr <= 16; ++thr) {
+      for (int ry = 0; ry < 4; ++ry) {
+        std::uint8_t bits = 0u;
+        for (int rx = 0; rx < 4; ++rx) {
+          if (kBayer4[ry][rx] < thr) {
+            bits = static_cast<std::uint8_t>(bits | (1u << rx));
+          }
+        }
+        m.row[thr][ry] = bits;
+      }
+    }
+    return m;
+  }();
+  struct ScanlineProjLut {
+    float z[kGndH]{};
+    float invScaleX[kGndH]{};
+    std::uint8_t fogStep[kGndH]{};  // 0..32 two-band 4x4 Bayer mist (0..16 -> midHaze, 16..32 -> sky3)
+  };
+  static constexpr ScanlineProjLut kScanLut = []() constexpr {
+    ScanlineProjLut lut{};
+    for (int gy = 0; gy < kGndH; ++gy) {
+      const float denom = (static_cast<float>(gy) + 0.5f) < 0.75f
+                              ? 0.75f
+                              : (static_cast<float>(gy) + 0.5f);
+      const float z = kProjY / denom;
+      lut.z[gy] = z;
+      lut.invScaleX[gy] = z / kProjX;
+      if (z <= 2.40f) {
+        lut.fogStep[gy] = 0u;
+      } else {
+        const float x = (z - 2.40f) * 0.34f;
+        const float expPos = 1.0f + x + 0.5f * x * x + (x * x * x) * (1.0f / 6.0f);
+        const float fog = 1.0f - (1.0f / expPos);
+        const int st = static_cast<int>(fog * 32.0f + 0.5f);
+        lut.fogStep[gy] = static_cast<std::uint8_t>(st > 31 ? 31 : (st < 0 ? 0 : st));
+      }
+    }
+    return lut;
+  }();
+  // Discrete 0..32 atmospheric mist steps for painter depths d = 0..6
+  static constexpr std::uint8_t kDepthFog[7] = {0u, 0u, 0u, 6u, 13u, 20u, 26u};
+
+  const Color fogCol = sky3;
+  int activeFog = 0;  // 0..32 (two 16-step 4x4 Bayer bands: c -> midHaze -> fogCol)
+  Color activeInk = inkOut;
+  auto inkForFog = [&](int fog32) -> Color {
+    if (fog32 <= 6) { return inkOut; }
+    // Unbroken 1px PC-98 silhouette tinted smoothly into atmospheric slate/umber (no dotted holes)
+    const float t = std::clamp(static_cast<float>(fog32 - 6) / 30.0f, 0.0f, 0.72f);
+    return StageMix(inkOut, sky2, t);
+  };
+  auto fogBandPair = [&](Color c, int fog32, Color& cA, Color& cB, int& thr16) {
+    const Color mid = StageMix(c, fogCol, 0.50f);
+    if (fog32 <= 16) {
+      cA = c;
+      cB = mid;
+      thr16 = fog32;
+    } else {
+      cA = mid;
+      cB = fogCol;
+      thr16 = std::min(16, fog32 - 16);
+    }
+  };
+
   auto putPx = [&](int x, int y, Color c) {
     if (x >= 0 && x < W && y >= 0 && y < H) {
+      if (c.r == inkOut.r && c.b == inkOut.b) {
+        planetPixels_[static_cast<std::size_t>(y * W + x)] = activeInk;
+        return;
+      }
+      if (activeFog > 0) {
+        Color cA{}, cB{};
+        int thr16 = 0;
+        fogBandPair(c, activeFog, cA, cB, thr16);
+        c = (((kFogMasks.row[thr16][y & 3] >> (x & 3)) & 1u) != 0u) ? cB : cA;
+      }
       planetPixels_[static_cast<std::size_t>(y * W + x)] = c;
     }
   };
@@ -3058,9 +3144,30 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     const int y0 = std::max(0, y);
     const int x1 = std::min(W, x + w);
     const int y1 = std::min(H, y + h);
-    for (int py = y0; py < y1; ++py) {
-      for (int px = x0; px < x1; ++px) {
-        planetPixels_[static_cast<std::size_t>(py * W + px)] = c;
+    if (c.r == inkOut.r && c.b == inkOut.b) {
+      for (int py = y0; py < y1; ++py) {
+        for (int px = x0; px < x1; ++px) {
+          planetPixels_[static_cast<std::size_t>(py * W + px)] = activeInk;
+        }
+      }
+      return;
+    }
+    if (activeFog <= 0) {
+      for (int py = y0; py < y1; ++py) {
+        for (int px = x0; px < x1; ++px) {
+          planetPixels_[static_cast<std::size_t>(py * W + px)] = c;
+        }
+      }
+    } else {
+      Color cA{}, cB{};
+      int thr16 = 0;
+      fogBandPair(c, activeFog, cA, cB, thr16);
+      for (int py = y0; py < y1; ++py) {
+        const std::uint8_t rowMask = kFogMasks.row[thr16][py & 3];
+        for (int px = x0; px < x1; ++px) {
+          planetPixels_[static_cast<std::size_t>(py * W + px)] =
+              (((rowMask >> (px & 3)) & 1u) != 0u) ? cB : cA;
+        }
       }
     }
   };
@@ -3070,9 +3177,6 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
       fillRect(x + 1, y + 1, w - 2, h - 2, fill);
     }
   };
-
-  constexpr int hy = 46;
-  constexpr int cxMid = W / 2;
 
   // PC-98 4x4 Bayer dithered sky gradient
   for (int y = 0; y < hy; ++y) {
@@ -3114,7 +3218,9 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   drawCloud(36 + ((3 - planetSurface_.dir) * 26) % 70, 10, 26);
   drawCloud(114 - (planetSurface_.dir * 19) % 52, 16, 20);
 
-  // Distant horizon ridges with 1px PC-98 silhouette outline
+  // Distant horizon ridges with atmospheric 1px PC-98 silhouette crest + horizon haze
+  activeFog = 22;
+  activeInk = StageMix(inkOut, sky3, 0.58f);
   for (int x = 0; x < W; ++x) {
     const int phase = x + planetSurface_.dir * 34;
     const int mh = 2 + ((std::abs((phase * 7) % 24 - 12)) * 4) / 12 + ((phase / 19) & 1);
@@ -3125,15 +3231,29 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     }
   }
 
-  // PC-98 4x4 Bayer dithered ground + terrain flecks
+  // PC-98 4x4 Bayer dithered ground + terrain flecks + exponential horizon mist
+  const Color gnd0Mid = StageMix(gnd0, fogCol, 0.50f);
+  const Color gnd1Mid = StageMix(gnd1, fogCol, 0.50f);
   for (int y = hy; y < H; ++y) {
-    const float u = static_cast<float>(y - hy) / static_cast<float>(H - hy);
+    const int gy = y - hy;
+    const int f32 = static_cast<int>(kScanLut.fogStep[gy]);
+    activeFog = f32;
+    activeInk = inkForFog(f32);
+    const std::uint8_t fogMaskRow =
+        (f32 > 0) ? kFogMasks.row[(f32 <= 16) ? f32 : std::min(16, f32 - 16)][y & 3] : 0u;
+    const float u = static_cast<float>(gy) / static_cast<float>(kGndH);
+    const int gradThr = static_cast<int>(
+        std::clamp((u < 0.45f) ? (u / 0.45f) : ((u - 0.45f) / 0.55f), 0.0f, 1.0f) * 16.0f);
     for (int x = 0; x < W; ++x) {
-      if (u < 0.45f) {
-        bayerPx(x, y, u / 0.45f, gnd0, gnd1);
-      } else {
-        bayerPx(x, y, (u - 0.45f) / 0.55f, gnd1, gnd2);
+      const bool pickB = gradThr > kBayer4[y & 3][x & 3];
+      Color gCol = (u < 0.45f) ? (pickB ? gnd1 : gnd0) : (pickB ? gnd2 : gnd1);
+      if (f32 > 0) {
+        const Color gMid = (gCol.r == gnd0.r && gCol.g == gnd0.g) ? gnd0Mid : gnd1Mid;
+        const bool mBit = ((fogMaskRow >> (x & 3)) & 1u) != 0u;
+        gCol = (f32 <= 16) ? (mBit ? gMid : gCol) : (mBit ? fogCol : gMid);
       }
+      planetPixels_[static_cast<std::size_t>(y * W + x)] = gCol;
+
       const unsigned h = (static_cast<unsigned>(x) * 73856093u) ^
                          (static_cast<unsigned>(y) * 19349663u) ^
                          (static_cast<unsigned>(planetSurface_.px) * 83492791u) ^
@@ -3145,6 +3265,8 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
       }
     }
   }
+  activeFog = 0;
+  activeInk = inkOut;
 
   static constexpr int kDx[4] = {0, 1, 0, -1};
   static constexpr int kDy[4] = {-1, 0, 1, 0};
@@ -3184,12 +3306,6 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   };
 
   // True 1/z first-person pinhole projection (camera eye inside d=0, ~88 deg FOV)
-  static constexpr float kProjY = 22.0f;
-  static constexpr float kProjX = 84.0f;
-  static constexpr float kHalfRoad = 0.44f;
-  auto zAtScanline = [&](int y) -> float {
-    return kProjY / std::max(0.75f, static_cast<float>(y - hy) + 0.5f);
-  };
   auto yAtZ = [&](float z) -> int {
     return hy + static_cast<int>(std::lround(kProjY / std::max(0.35f, z) - 0.5f));
   };
@@ -3257,15 +3373,15 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     return true;
   };
 
-  constexpr int kGndH = H - hy;
   std::uint8_t roadBuf[kGndH * W]{};
   for (int y = hy; y < H; ++y) {
-    const float z = zAtScanline(y);
-    const float invScaleX = z / kProjX;
+    const int gy = y - hy;
+    const float z = kScanLut.z[gy];
+    const float invScaleX = kScanLut.invScaleX[gy];
     for (int x = 0; x < W; ++x) {
       const float lat = (static_cast<float>(x) + 0.5f - static_cast<float>(cxMid)) * invScaleX;
       if (isRoadAtSample(z, lat)) {
-        roadBuf[(y - hy) * W + x] = 1;
+        roadBuf[gy * W + x] = 1;
       }
     }
   }
@@ -3273,8 +3389,10 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   const int stepParity = (planetSurface_.px + planetSurface_.py + planetSurface_.dir) & 1;
   for (int y = hy; y < H; ++y) {
     const int gy = y - hy;
-    const float z = zAtScanline(y);
-    const float invScaleX = z / kProjX;
+    const float z = kScanLut.z[gy];
+    const float invScaleX = kScanLut.invScaleX[gy];
+    activeFog = static_cast<int>(kScanLut.fogStep[gy]);
+    activeInk = inkForFog(activeFog);
     for (int x = 0; x < W; ++x) {
       if (roadBuf[gy * W + x] == 0) { continue; }
       const bool up0 = (gy > 0) && roadBuf[(gy - 1) * W + x] == 0;
@@ -3318,6 +3436,8 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
       }
     }
   }
+  activeFog = 0;
+  activeInk = inkOut;
 
   // Diverse PC-98 pixel models (trees, pines, alien canopies, boulders, crystals, vents/reefs, scrub)
   auto drawBroadleafTree = [&](int tx, int gy, float s) {
@@ -3503,6 +3623,8 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
 
   // Back-to-front painter's algorithm across visible lateral columns (s) and depths (d=6..0)
   for (int d = 6; d >= 0; --d) {
+    activeFog = static_cast<int>(kDepthFog[d]);
+    activeInk = inkForFog(activeFog);
     const float zMid = (d == 0) ? 0.54f : static_cast<float>(d);
     const float zFar = (d == 0) ? 0.62f : static_cast<float>(d) + 0.24f;
     const float zNear = (d == 0) ? 0.48f : std::max(0.54f, static_cast<float>(d) - 0.24f);
@@ -3646,6 +3768,8 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
       }
     }
   }
+  activeFog = 0;
+  activeInk = inkOut;
 
   // 1px retro PC-98 bezel inner shadow
   fillRect(0, 0, W, 1, inkOut);
