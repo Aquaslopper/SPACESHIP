@@ -232,6 +232,40 @@ bool Simulation::AtTarget(const Body& body) const {
 bool Simulation::InSpace() const {
   return !state_.docked;
 }
+bool Simulation::LandedOnPlanet() const {
+  if (map_.inSpace) { return false; }
+  const Body* here = FindBodyById(map_.here);
+  return here != nullptr && here->type == "planet";
+}
+
+bool Simulation::CollectPlanetOre(const std::string& planetId, int oreIndex) {
+  if (!LandedOnPlanet() || map_.here != planetId || oreIndex < 0) { return false; }
+  const Body* body = FindBodyById(planetId);
+  if (body == nullptr) { return false; }
+  const std::string markKey = "planet-ore:" + planetId + ":" + std::to_string(oreIndex);
+  auto it = state_.mapMarks.find(markKey);
+  if (it != state_.mapMarks.end() && it->second) { return false; }
+
+  const std::uint64_t h = MapEventHash(markKey);
+  const double vol = 1.0;
+  const double value = 28.0 + static_cast<double>(h % 18ULL);
+  if (CargoUsed() + CargoReserved() + vol > cargo_.capacity + 1e-6) {
+    LogLine("Hold full: cannot stow Planetary Ore (" + body->name + ").");
+    return false;
+  }
+  state_.lotSerial += 1;
+  GoodsLot lot;
+  lot.id = "ore-" + std::to_string(static_cast<long long>(state_.lotSerial));
+  lot.name = "Planetary Ore (" + body->name + ")";
+  lot.kind = "Bulk metal";
+  lot.vol = vol;
+  lot.value = value;
+  lot.risk = false;
+  goods_.push_back(std::move(lot));
+  state_.mapMarks[markKey] = true;
+  LogLine("Collected " + goods_.back().name + " (1 m3) into the cargo hold.");
+  return true;
+}
 
 const Body* Simulation::HomeBody() const {
   // Position at the current map scale, not the region being browsed. The
@@ -808,11 +842,13 @@ void Simulation::ArriveAt(const std::string& bodyId) {
   if (map_.layer == "system") { state_.navTarget = body->id; }
 
   state_.docked = HerePort() != nullptr && HerePort()->id == body->id;
+  const bool landed = LandedOnPlanet();
   RefreshLocationInfo();
   ContractProgress("visit", body->id);
 
   LogLine("Arrived at " + body->name +
-          (state_.docked ? " - docked. Right-click the docked indicator to open the station" : "") + ".");
+          (state_.docked ? " - docked. Right-click the docked indicator to open the station"
+                         : (landed ? " - landed on surface. Open the Bridge to dispatch" : "")) + ".");
   ChronicleVisit(CurrentSystem());
   ResolveMapArrivalEvents(*body, system, prevRegion);
   CommissionProgress("visit", body->id);
@@ -952,6 +988,7 @@ void Simulation::RefreshLocationInfo() {
   const Body* here = FindBodyById(map_.here);
   const std::string name = here == nullptr ? std::string("Unknown") : here->name;
   const bool docked = HerePort() != nullptr;
+  const bool landed = LandedOnPlanet();
   for (InfoRow& row : infos_) {
     if (row.id == "location") {
       // Where the ship is, with the place's own identity beside it: the chart's id
@@ -965,7 +1002,7 @@ void Simulation::RefreshLocationInfo() {
                                        : " #" + std::to_string(serial->second)) +
               "]";
       }
-      row.value = name + (docked ? " - docked" : "") + tag;
+      row.value = name + (docked ? " - docked" : (landed ? " - landed" : "")) + tag;
     } else if (row.id == "contacts") {
       const Body* system = CurrentSystem();
       row.value = docked ? name + " - station contact"

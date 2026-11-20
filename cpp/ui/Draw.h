@@ -9,6 +9,7 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 #include <map>
 #include <string>
 #include <unordered_map>
@@ -207,6 +208,8 @@ class ShellView {
   void PaintPanel(const NavPanel& panel, const Area& box);
   bool PaintScenePart(const MachinePart& part, const Area& origin);
   void PaintStage(const Simulation& sim, const TaskStage& stage, const Area& origin);
+  void EnsurePlanetSurface(const Simulation& sim);
+  void StepPlanetSurface(int actionKind);
   void PaintIdle(Simulation& sim);
   float PaintActionBand(const std::string& title, const std::string& note,
                        const std::vector<ProgressButton>& buttons,
@@ -287,6 +290,29 @@ class ShellView {
   Area bridgeBearingBar_{};
   float bridgeLook_ = 0.0f;  // turns from forward, -0.5 to +0.5
   bool draggingBearing_ = false;
+  bool bridgeDispatch_ = false;
+  struct PlanetSurfaceState {
+    static constexpr int kSize = 9;
+    static constexpr int kMaxOre = 5;
+    std::string planetId;
+    std::uint8_t tiles[kSize * kSize]{};  // 0=open surface, 1=ridge/rock, 2=ship pad
+    int oreCount = 0;
+    int oreX[kMaxOre]{};
+    int oreY[kMaxOre]{};
+    int shipX = 4;
+    int shipY = 7;
+    int px = 4;
+    int py = 6;
+    int dir = 0;  // 0=N, 1=E, 2=S, 3=W
+  };
+  PlanetSurfaceState planetSurface_{};
+  struct PlanetClickHit {
+    Area box;
+    int kind = 0;  // 1=up, 2=down, 3=left, 4=right, 5=ore, 6=ship, 7=turn180
+    int arg = 0;
+  };
+  std::array<PlanetClickHit, 16> planetHits_{};
+  int planetHitCount_ = 0;
   Area navChartBox_{};
   float navChartScaleX_ = 1.0f;
   float navChartScaleY_ = 1.0f;

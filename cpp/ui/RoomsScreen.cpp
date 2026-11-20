@@ -93,6 +93,14 @@ RoomScreenModel BuildRoomScreen(const Simulation& sim, const std::string& roomId
     split.cost = "1 click";
     split.enabled = sim.State().fuelCells > 0 && energy < 100 && sim.StatValue("fuel") < 100;
     model.rows.push_back(split);
+    if (sim.LandedOnPlanet()) {
+      ActionRowView dispatch;
+      dispatch.id = "dispatch";
+      dispatch.label = "Dispatch";
+      dispatch.cost = "free";
+      dispatch.enabled = true;
+      model.rows.push_back(dispatch);
+    }
     ActionRowView warp;
     warp.id = "warp";
     warp.label = "WARP: advance time +5 clicks for 20 fuel";
@@ -274,6 +282,7 @@ std::string RoomActionCategory(const std::string& action) {
 }
 
 bool PressRoomAction(Simulation& sim, const std::string& action, const std::string& arg) {
+  if (action == "dispatch") { return sim.LandedOnPlanet(); }
   return CommitActionButton(
       sim, ButtonChargeKey(sim, "press:room:" + action + ":" + arg),
       RoomActionCategory(action),

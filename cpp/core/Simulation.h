@@ -123,6 +123,8 @@ class Simulation {
   bool InRange(const Body& body) const;
   bool InSpace() const;
   bool AtTarget(const Body& body) const;
+  bool LandedOnPlanet() const;
+  bool CollectPlanetOre(const std::string& planetId, int oreIndex);
   std::string CurrentSystemId() const;
   const Body* CurrentSystem() const;
   const Body* FindBodyById(const std::string& id) const;
