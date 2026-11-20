@@ -2676,12 +2676,12 @@ void ShellView::EnsurePlanetSurface(const Simulation& sim) {
     return tail == openTotal;
   };
 
-  const int obstacleGoal = 4 + static_cast<int>(nextRand() % 3u);
+  const int obstacleGoal = 6 + static_cast<int>(nextRand() % 4u);
   int placed = 0;
-  for (int attempt = 0; attempt < 64 && placed < obstacleGoal; ++attempt) {
+  for (int attempt = 0; attempt < 96 && placed < obstacleGoal; ++attempt) {
     const int rx = 1 + static_cast<int>(nextRand() % (N - 2));
     const int ry = 1 + static_cast<int>(nextRand() % (N - 2));
-    if ((rx == 4 && (ry == 7 || ry == 6 || ry == 5 || ry == 4)) ||
+    if ((rx == 4 && (ry == 7 || ry == 6 || ry == 5)) ||
         planetSurface_.tiles[ry * N + rx] != 0) {
       continue;
     }
@@ -2693,26 +2693,90 @@ void ShellView::EnsurePlanetSurface(const Simulation& sim) {
     }
   }
 
-  // Carve a sparse trail network (3) with a clear crossing; leave the rest as open ground (0)
-  const int crossY = 4 + static_cast<int>(nextRand() % 2u);  // row 4 or 5
-  for (int y = 6; y >= 2; --y) {
-    if (planetSurface_.tiles[y * N + 4] == 1) { break; }
-    planetSurface_.tiles[y * N + 4] = 3;
-  }
-  for (int x = 1; x < N - 1; ++x) {
-    if (planetSurface_.tiles[crossY * N + x] == 0) {
-      planetSurface_.tiles[crossY * N + x] = 3;
-    }
-  }
-  const int spurY = 2 + static_cast<int>(nextRand() % 2u);  // row 2 or 3
-  const int spurDir = (nextRand() & 1u) ? 1 : -1;
-  if (planetSurface_.tiles[spurY * N + 4] == 3) {
-    for (int step = 1; step <= 2; ++step) {
-      const int sx = 4 + spurDir * step;
-      if (sx > 0 && sx < N - 1 && planetSurface_.tiles[spurY * N + sx] == 0) {
-        planetSurface_.tiles[spurY * N + sx] = 3;
+  // Carve a winding trail network (3) with natural bends and branches instead of horizontal bars
+  static constexpr int kWalkDx[4] = {0, 1, 0, -1};
+  static constexpr int kWalkDy[4] = {-1, 0, 1, 0};
+  int trailX[N * N];
+  int trailY[N * N];
+  int trailLen = 0;
+  auto markTrail = [&](int x, int y) {
+    if (planetSurface_.tiles[y * N + x] == 0) {
+      planetSurface_.tiles[y * N + x] = 3;
+      if (trailLen < N * N) {
+        trailX[trailLen] = x;
+        trailY[trailLen] = y;
+        ++trailLen;
       }
     }
+  };
+  auto countAdjTrail = [&](int x, int y) -> int {
+    int c = 0;
+    for (int d = 0; d < 4; ++d) {
+      const int nx = x + kWalkDx[d];
+      const int ny = y + kWalkDy[d];
+      if (nx > 0 && nx < N - 1 && ny > 0 && ny < N - 1 &&
+          planetSurface_.tiles[ny * N + nx] == 3) {
+        ++c;
+      }
+    }
+    return c;
+  };
+
+  markTrail(4, 6);
+  markTrail(4, 5);
+  int wx = 4, wy = 5, wDir = 0;
+  const int mainGoal = 8 + static_cast<int>(nextRand() % 5u);
+  for (int step = 0; step < mainGoal; ++step) {
+    int cands[4];
+    int nCand = 0;
+    for (int d = 0; d < 4; ++d) {
+      if (d == (wDir + 2) % 4) { continue; }
+      const int nx = wx + kWalkDx[d];
+      const int ny = wy + kWalkDy[d];
+      if (nx <= 0 || nx >= N - 1 || ny <= 0 || ny >= N - 1) { continue; }
+      if (planetSurface_.tiles[ny * N + nx] != 0) { continue; }
+      if (countAdjTrail(nx, ny) > 1) { continue; }
+      // Encourage bends rather than endless straight runs
+      const int weight = (d == wDir) ? ((step % 3 == 0) ? 1 : 2) : 2;
+      for (int w = 0; w < weight && nCand < 4; ++w) { cands[nCand++] = d; }
+    }
+    if (nCand == 0) { break; }
+    wDir = cands[nextRand() % static_cast<std::uint32_t>(nCand)];
+    wx += kWalkDx[wDir];
+    wy += kWalkDy[wDir];
+    markTrail(wx, wy);
+  }
+
+  // Add 1-2 short curving side branches off the main trail
+  const int branches = 1 + static_cast<int>(nextRand() % 2u);
+  for (int b = 0; b < branches && trailLen > 2; ++b) {
+    const int seedIdx = 1 + static_cast<int>(nextRand() % static_cast<std::uint32_t>(trailLen - 1));
+    int bx = trailX[seedIdx];
+    int by = trailY[seedIdx];
+    int bDir = static_cast<int>(nextRand() % 4u);
+    const int branchSteps = 3 + static_cast<int>(nextRand() % 3u);
+    for (int step = 0; step < branchSteps; ++step) {
+      int cands[4];
+      int nCand = 0;
+      for (int d = 0; d < 4; ++d) {
+        if (d == (bDir + 2) % 4) { continue; }
+        const int nx = bx + kWalkDx[d];
+        const int ny = by + kWalkDy[d];
+        if (nx <= 0 || nx >= N - 1 || ny <= 0 || ny >= N - 1) { continue; }
+        if (planetSurface_.tiles[ny * N + nx] != 0) { continue; }
+        if (countAdjTrail(nx, ny) > 1) { continue; }
+        cands[nCand++] = d;
+      }
+      if (nCand == 0) { break; }
+      bDir = cands[nextRand() % static_cast<std::uint32_t>(nCand)];
+      bx += kWalkDx[bDir];
+      by += kWalkDy[bDir];
+      markTrail(bx, by);
+    }
+  }
+
+  for (int i = 0; i < N * N; ++i) {
+    planetSurface_.variant[i] = static_cast<std::uint8_t>(nextRand() % 8u);
   }
 
   int candX[N * N];
@@ -2802,61 +2866,115 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   }
 
   const std::string& subtype = planet->subtype;
-  const bool iceWorld = subtype == "ice" || subtype == "ocean";
   const bool lavaWorld =
+      subtype == "lava" ||
       planet->klass.find("Lava") != std::string::npos ||
       planet->klass.find("Volcanic") != std::string::npos ||
       planet->klass.find("lava") != std::string::npos;
+  const bool iceWorld = !lavaWorld && subtype == "ice";
+  const bool oceanWorld = !lavaWorld && subtype == "ocean";
+  const bool rockWorld = !lavaWorld && !iceWorld && !oceanWorld &&
+      (subtype == "rock" ||
+       planet->klass.find("Rugged") != std::string::npos ||
+       planet->klass.find("Barren") != std::string::npos ||
+       planet->klass.find("Crater") != std::string::npos);
 
   const Color inkOut{10, 11, 15, 255};
-  const Color sky0 = iceWorld ? Color{14, 24, 52, 255}
-                   : lavaWorld ? Color{34, 12, 18, 255}
-                               : Color{18, 30, 56, 255};
-  const Color sky1 = iceWorld ? Color{26, 52, 92, 255}
-                   : lavaWorld ? Color{68, 22, 26, 255}
-                               : Color{32, 62, 102, 255};
-  const Color sky2 = iceWorld ? Color{48, 88, 134, 255}
-                   : lavaWorld ? Color{108, 40, 32, 255}
-                               : Color{58, 104, 142, 255};
-  const Color sky3 = iceWorld ? Color{88, 138, 174, 255}
-                   : lavaWorld ? Color{148, 68, 38, 255}
-                               : Color{102, 148, 170, 255};
-  const Color gnd0 = iceWorld ? Color{42, 68, 92, 255}
-                   : lavaWorld ? Color{42, 22, 20, 255}
-                               : Color{34, 62, 34, 255};
-  const Color gnd1 = iceWorld ? Color{60, 92, 120, 255}
-                   : lavaWorld ? Color{60, 32, 26, 255}
-                               : Color{48, 84, 44, 255};
-  const Color gnd2 = iceWorld ? Color{82, 118, 148, 255}
-                   : lavaWorld ? Color{78, 42, 32, 255}
-                               : Color{64, 106, 54, 255};
-  const Color pathDark = iceWorld ? Color{36, 48, 64, 255}
-                       : lavaWorld ? Color{28, 18, 18, 255}
-                                   : Color{56, 40, 26, 255};
-  const Color pathMid = iceWorld ? Color{64, 82, 102, 255}
-                      : lavaWorld ? Color{54, 34, 30, 255}
-                                  : Color{104, 76, 48, 255};
-  const Color pathHi = iceWorld ? Color{112, 134, 154, 255}
-                     : lavaWorld ? Color{92, 58, 46, 255}
-                                 : Color{148, 112, 74, 255};
-  const Color rockDark = iceWorld ? Color{48, 72, 98, 255}
-                       : lavaWorld ? Color{52, 24, 22, 255}
-                                   : Color{44, 52, 42, 255};
-  const Color rockHi = iceWorld ? Color{156, 194, 218, 255}
-                     : lavaWorld ? Color{148, 78, 52, 255}
-                                 : Color{134, 146, 104, 255};
-  const Color trunkCol = iceWorld ? Color{68, 92, 114, 255}
-                       : lavaWorld ? Color{48, 26, 22, 255}
-                                   : Color{92, 60, 36, 255};
-  const Color leaf0 = iceWorld ? Color{56, 98, 132, 255}
-                    : lavaWorld ? Color{72, 32, 26, 255}
-                                : Color{36, 78, 38, 255};
-  const Color leaf1 = iceWorld ? Color{104, 156, 190, 255}
-                    : lavaWorld ? Color{118, 52, 34, 255}
-                                : Color{64, 122, 54, 255};
-  const Color leaf2 = iceWorld ? Color{176, 218, 238, 255}
-                    : lavaWorld ? Color{172, 82, 44, 255}
-                                : Color{112, 168, 82, 255};
+  const Color sky0 = iceWorld   ? Color{14, 24, 54, 255}
+                   : oceanWorld ? Color{18, 40, 74, 255}
+                   : lavaWorld  ? Color{32, 12, 18, 255}
+                   : rockWorld  ? Color{46, 26, 36, 255}
+                                : Color{18, 30, 56, 255};
+  const Color sky1 = iceWorld   ? Color{28, 56, 98, 255}
+                   : oceanWorld ? Color{36, 82, 124, 255}
+                   : lavaWorld  ? Color{68, 22, 26, 255}
+                   : rockWorld  ? Color{88, 48, 52, 255}
+                                : Color{32, 62, 102, 255};
+  const Color sky2 = iceWorld   ? Color{54, 96, 144, 255}
+                   : oceanWorld ? Color{70, 130, 168, 255}
+                   : lavaWorld  ? Color{112, 42, 32, 255}
+                   : rockWorld  ? Color{142, 84, 68, 255}
+                                : Color{58, 104, 142, 255};
+  const Color sky3 = iceWorld   ? Color{98, 150, 186, 255}
+                   : oceanWorld ? Color{122, 184, 206, 255}
+                   : lavaWorld  ? Color{154, 72, 40, 255}
+                   : rockWorld  ? Color{196, 134, 92, 255}
+                                : Color{102, 148, 170, 255};
+  const Color gnd0 = iceWorld   ? Color{46, 76, 104, 255}
+                   : oceanWorld ? Color{28, 72, 82, 255}
+                   : lavaWorld  ? Color{38, 24, 24, 255}
+                   : rockWorld  ? Color{86, 48, 34, 255}
+                                : Color{34, 62, 34, 255};
+  const Color gnd1 = iceWorld   ? Color{72, 110, 138, 255}
+                   : oceanWorld ? Color{44, 104, 112, 255}
+                   : lavaWorld  ? Color{54, 34, 32, 255}
+                   : rockWorld  ? Color{118, 68, 44, 255}
+                                : Color{48, 84, 44, 255};
+  const Color gnd2 = iceWorld   ? Color{104, 146, 174, 255}
+                   : oceanWorld ? Color{78, 134, 128, 255}
+                   : lavaWorld  ? Color{72, 44, 38, 255}
+                   : rockWorld  ? Color{148, 92, 58, 255}
+                                : Color{64, 106, 54, 255};
+  const Color pathDark = iceWorld   ? Color{38, 56, 78, 255}
+                       : oceanWorld ? Color{96, 86, 66, 255}
+                       : lavaWorld  ? Color{26, 20, 22, 255}
+                       : rockWorld  ? Color{64, 44, 34, 255}
+                                    : Color{56, 40, 26, 255};
+  const Color pathMid  = iceWorld   ? Color{74, 102, 128, 255}
+                       : oceanWorld ? Color{146, 132, 102, 255}
+                       : lavaWorld  ? Color{48, 38, 38, 255}
+                       : rockWorld  ? Color{108, 76, 56, 255}
+                                    : Color{104, 76, 48, 255};
+  const Color pathHi   = iceWorld   ? Color{134, 166, 190, 255}
+                       : oceanWorld ? Color{196, 180, 140, 255}
+                       : lavaWorld  ? Color{84, 62, 54, 255}
+                       : rockWorld  ? Color{154, 112, 82, 255}
+                                    : Color{148, 112, 74, 255};
+  const Color rockDark = iceWorld   ? Color{48, 76, 104, 255}
+                       : oceanWorld ? Color{38, 50, 58, 255}
+                       : lavaWorld  ? Color{42, 26, 28, 255}
+                       : rockWorld  ? Color{72, 42, 34, 255}
+                                    : Color{44, 52, 42, 255};
+  const Color rockMid  = iceWorld   ? Color{92, 132, 162, 255}
+                       : oceanWorld ? Color{68, 86, 94, 255}
+                       : lavaWorld  ? Color{76, 48, 46, 255}
+                       : rockWorld  ? Color{122, 72, 50, 255}
+                                    : Color{84, 94, 74, 255};
+  const Color rockHi   = iceWorld   ? Color{178, 214, 236, 255}
+                       : oceanWorld ? Color{126, 148, 152, 255}
+                       : lavaWorld  ? Color{134, 76, 58, 255}
+                       : rockWorld  ? Color{176, 118, 78, 255}
+                                    : Color{134, 146, 104, 255};
+  const Color trunkCol = iceWorld   ? Color{64, 84, 104, 255}
+                       : oceanWorld ? Color{96, 74, 52, 255}
+                       : lavaWorld  ? Color{46, 28, 24, 255}
+                       : rockWorld  ? Color{102, 68, 44, 255}
+                                    : Color{92, 60, 36, 255};
+  const Color leaf0    = iceWorld   ? Color{52, 94, 128, 255}
+                       : oceanWorld ? Color{26, 86, 82, 255}
+                       : lavaWorld  ? Color{74, 30, 24, 255}
+                       : rockWorld  ? Color{84, 82, 42, 255}
+                                    : Color{36, 78, 38, 255};
+  const Color leaf1    = iceWorld   ? Color{102, 156, 190, 255}
+                       : oceanWorld ? Color{44, 132, 116, 255}
+                       : lavaWorld  ? Color{124, 50, 30, 255}
+                       : rockWorld  ? Color{124, 116, 58, 255}
+                                    : Color{64, 122, 54, 255};
+  const Color leaf2    = iceWorld   ? Color{184, 224, 242, 255}
+                       : oceanWorld ? Color{106, 184, 154, 255}
+                       : lavaWorld  ? Color{184, 88, 42, 255}
+                       : rockWorld  ? Color{168, 152, 82, 255}
+                                    : Color{112, 168, 82, 255};
+  const Color accent0  = iceWorld   ? Color{92, 182, 218, 255}
+                       : oceanWorld ? Color{206, 98, 92, 255}
+                       : lavaWorld  ? Color{234, 104, 34, 255}
+                       : rockWorld  ? Color{196, 118, 64, 255}
+                                    : Color{144, 188, 92, 255};
+  const Color accent1  = iceWorld   ? Color{210, 242, 252, 255}
+                       : oceanWorld ? Color{242, 168, 132, 255}
+                       : lavaWorld  ? Color{252, 204, 86, 255}
+                       : rockWorld  ? Color{232, 168, 106, 255}
+                                    : Color{202, 224, 132, 255};
 
   static constexpr int kBayer4[4][4] = {
       {0, 8, 2, 10},
@@ -2911,17 +3029,21 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   for (int st = 0; st < 12; ++st) {
     const int sx = 5 + ((st * 23 + planetSurface_.dir * 17) % (W - 10));
     const int sy = 3 + ((st * 11) % 16);
-    putPx(sx, sy, Color{234, 240, 244, 255});
+    putPx(sx, sy, lavaWorld ? Color{248, 206, 168, 255} : Color{234, 240, 244, 255});
   }
 
   // PC-98 crisp-outlined layered clouds (Might and Magic / Madou style)
   auto drawCloud = [&](int cx, int cy, int cw) {
-    const Color cRim = iceWorld ? Color{226, 238, 248, 255}
-                     : lavaWorld ? Color{230, 174, 134, 255}
-                                 : Color{226, 234, 240, 255};
-    const Color cMid = iceWorld ? Color{156, 186, 212, 255}
-                     : lavaWorld ? Color{176, 108, 82, 255}
-                                 : Color{154, 180, 198, 255};
+    const Color cRim = iceWorld   ? Color{226, 238, 248, 255}
+                     : oceanWorld ? Color{240, 246, 248, 255}
+                     : lavaWorld  ? Color{216, 146, 114, 255}
+                     : rockWorld  ? Color{242, 206, 168, 255}
+                                  : Color{226, 234, 240, 255};
+    const Color cMid = iceWorld   ? Color{156, 186, 212, 255}
+                     : oceanWorld ? Color{176, 208, 222, 255}
+                     : lavaWorld  ? Color{152, 88, 72, 255}
+                     : rockWorld  ? Color{196, 142, 112, 255}
+                                  : Color{154, 180, 198, 255};
     fillRect(cx - cw / 2 - 1, cy + 2, cw + 2, 4, inkOut);
     fillRect(cx - cw / 3 - 1, cy - 1, cw * 2 / 3 + 2, 4, inkOut);
     fillRect(cx - cw / 2, cy + 2, cw, 3, cMid);
@@ -2957,7 +3079,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
                          (static_cast<unsigned>(planetSurface_.dir) * 49979687u);
       if ((h % 47u) == 0u && y > hy + 4) {
         putPx(x, y, rockDark);
-        if ((h & 1u) == 0u) { putPx(x + 1, y - 1, rockHi); }
+        if ((h & 1u) == 0u) { putPx(x + 1, y - 1, lavaWorld && (h % 94u) == 0u ? accent0 : rockHi); }
       }
     }
   }
@@ -2975,6 +3097,16 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     if (tx < 0 || tx >= N || ty < 0 || ty >= N) { return 1; }
     return planetSurface_.tiles[ty * N + tx];
   };
+  auto variantAt = [&](int tx, int ty) -> int {
+    if (tx < 0 || tx >= N || ty < 0 || ty >= N) {
+      return static_cast<int>((static_cast<unsigned>(tx + 16) * 7u +
+                               static_cast<unsigned>(ty + 16) * 13u) % 8u);
+    }
+    return static_cast<int>(planetSurface_.variant[ty * N + tx]);
+  };
+  auto isBorderTile = [&](int tx, int ty) -> bool {
+    return tx <= 0 || tx >= N - 1 || ty <= 0 || ty >= N - 1;
+  };
   auto isPathTile = [&](int tx, int ty) -> bool {
     const std::uint8_t t = tileAt(tx, ty);
     return t == 2 || t == 3;
@@ -2989,11 +3121,14 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     return -1;
   };
 
-  // Discrete perspective floor slice boundaries (d = 3 far -> d = 0 underfoot)
-  static constexpr int kSliceY[5] = {H, 82, 67, 56, 48};
-  auto roadHalfAtY = [&](int y) -> int {
-    const float t = static_cast<float>(y - hy) / static_cast<float>(H - hy);
-    return static_cast<int>(std::lround(5.0f + 42.0f * std::clamp(t, 0.0f, 1.0f)));
+  // True 1-point perspective projection across tiles (s = lateral column, d = depth)
+  static constexpr int kSliceY[5] = {H, 74, 60, 52, 47};
+  auto halfTileAtY = [&](int y) -> float {
+    const float t = std::clamp(static_cast<float>(y - hy) / static_cast<float>(H - hy), 0.0f, 1.0f);
+    return 4.0f + 28.0f * t;
+  };
+  auto tileCenterAtY = [&](int s, int y) -> float {
+    return static_cast<float>(cxMid) + static_cast<float>(s) * 2.0f * halfTileAtY(y);
   };
   auto paintRoadPx = [&](int x, int y) {
     const unsigned h = static_cast<unsigned>(x) * 29u +
@@ -3009,100 +3144,96 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     }
   };
 
-  int centerWall = 4;
-  for (int d = 1; d <= 3; ++d) {
-    if (tileAt(planetSurface_.px + fdx * d, planetSurface_.py + fdy * d) == 1) {
-      centerWall = d;
-      break;
-    }
-  }
-
-  // Paint roads ONLY on road tiles, with visible left/right crossings!
+  // Rasterize true-perspective winding road mask across all visible (s, d) tiles
+  std::array<std::uint8_t, W * H> roadMask{};
   for (int d = 3; d >= 0; --d) {
-    if (d >= centerWall && d > 0) { continue; }
-    const int cx = planetSurface_.px + fdx * d;
-    const int cy = planetSurface_.py + fdy * d;
-    const bool cPath = isPathTile(cx, cy);
-    const bool lPath = isPathTile(cx + ldx, cy + ldy);
-    const bool rPath = isPathTile(cx + rdx, cy + rdy);
-    const bool fPath = (d + 1 < centerWall) && isPathTile(cx + fdx, cy + fdy);
-    const bool bPath = (d == 0) ? isPathTile(cx - fdx, cy - fdy)
-                                : isPathTile(cx - fdx, cy - fdy);
-    if (!cPath && !lPath && !rPath) { continue; }
-
     const int yFar = kSliceY[d + 1];
     const int yNear = kSliceY[d];
-    const int span = std::max(3, yNear - yFar);
-    const int crossTop = yFar + std::max(1, span / 5);
-    const int crossBot = yNear - std::max(1, span / 5);
+    const int maxS = (d == 3) ? 6 : (d == 2 ? 4 : (d == 1 ? 2 : 1));
+    const float span = static_cast<float>(std::max(1, yNear - yFar));
+    for (int s = -maxS; s <= maxS; ++s) {
+      const int tx = planetSurface_.px + fdx * d + rdx * s;
+      const int ty = planetSurface_.py + fdy * d + rdy * s;
+      if (!isPathTile(tx, ty)) { continue; }
+      const bool nF = isPathTile(tx + fdx, ty + fdy);
+      const bool nB = isPathTile(tx - fdx, ty - fdy);
+      const bool nL = isPathTile(tx + ldx, ty + ldy);
+      const bool nR = isPathTile(tx + rdx, ty + rdy);
+      const bool curveBL = nB && nL && !nF && !nR;
+      const bool curveBR = nB && nR && !nF && !nL;
+      const bool curveFL = nF && nL && !nB && !nR;
+      const bool curveFR = nF && nR && !nB && !nL;
 
-    if (lPath && (cPath || d > 0)) {
-      const int xEnd = cPath ? cxMid : (cxMid - roadHalfAtY(crossBot) - 8);
-      for (int y = crossTop; y <= crossBot; ++y) {
-        const int rH = roadHalfAtY(y);
-        const int xStop = cPath ? (cxMid - rH + 1) : xEnd;
-        for (int x = 0; x <= xStop; ++x) {
-          if (y == crossTop || y == crossBot || (!cPath && x == xStop)) {
-            putPx(x, y, inkOut);
-          } else if (y == crossTop + 1) {
-            putPx(x, y, pathHi);
-          } else {
-            paintRoadPx(x, y);
-          }
-        }
-      }
-    }
-    if (rPath && (cPath || d > 0)) {
-      const int xBegOff = cxMid + roadHalfAtY(crossBot) + 8;
-      for (int y = crossTop; y <= crossBot; ++y) {
-        const int rH = roadHalfAtY(y);
-        const int xStart = cPath ? (cxMid + rH - 1) : xBegOff;
-        for (int x = xStart; x < W; ++x) {
-          if (y == crossTop || y == crossBot || (!cPath && x == xStart)) {
-            putPx(x, y, inkOut);
-          } else if (y == crossTop + 1) {
-            putPx(x, y, pathHi);
-          } else {
-            paintRoadPx(x, y);
-          }
-        }
-      }
-    }
-    if (cPath) {
       for (int y = yFar; y < yNear; ++y) {
-        const int rH = roadHalfAtY(y);
-        const bool inCrossRow = (y > crossTop && y < crossBot);
-        const bool capFar = (!fPath && y == yFar);
-        const bool capNear = (!bPath && d > 0 && y == yNear - 1);
-        for (int x = cxMid - rH; x <= cxMid + rH; ++x) {
-          const bool onLeftEdge = (x == cxMid - rH) && !(lPath && inCrossRow);
-          const bool onRightEdge = (x == cxMid + rH) && !(rPath && inCrossRow);
-          if (capFar || capNear || onLeftEdge || onRightEdge) {
-            putPx(x, y, inkOut);
-          } else if (x == cxMid - rH + 1 && !lPath) {
-            putPx(x, y, pathHi);
-          } else if (x == cxMid + rH - 1 && !rPath) {
-            putPx(x, y, pathDark);
+        const float vNorm = ((static_cast<float>(y - yFar) + 0.5f) / span - 0.5f) * 2.0f;
+        const float ht = halfTileAtY(y);
+        const float tcx = tileCenterAtY(s, y);
+        const int x0 = std::max(0, static_cast<int>(std::floor(tcx - ht)));
+        const int x1 = std::min(W - 1, static_cast<int>(std::ceil(tcx + ht)));
+        for (int x = x0; x <= x1; ++x) {
+          const float u = (static_cast<float>(x) + 0.5f - tcx) / ht;
+          if (u < -1.0f || u > 1.0f) { continue; }
+          bool inside = false;
+          if (curveBL) {
+            const float dist = std::hypot(u + 1.0f, vNorm - 1.0f);
+            inside = (dist >= 0.54f && dist <= 1.46f);
+          } else if (curveBR) {
+            const float dist = std::hypot(u - 1.0f, vNorm - 1.0f);
+            inside = (dist >= 0.54f && dist <= 1.46f);
+          } else if (curveFL) {
+            const float dist = std::hypot(u + 1.0f, vNorm + 1.0f);
+            inside = (dist >= 0.54f && dist <= 1.46f);
+          } else if (curveFR) {
+            const float dist = std::hypot(u - 1.0f, vNorm + 1.0f);
+            inside = (dist >= 0.54f && dist <= 1.46f);
           } else {
-            paintRoadPx(x, y);
+            const float rw = 0.46f;
+            if (std::hypot(u, vNorm) <= rw) { inside = true; }
+            if (nF && std::fabs(u) <= rw && vNorm <= 0.0f) { inside = true; }
+            if (nB && std::fabs(u) <= rw && vNorm >= 0.0f) { inside = true; }
+            if (nL && u <= 0.0f && std::fabs(vNorm) <= rw) { inside = true; }
+            if (nR && u >= 0.0f && std::fabs(vNorm) <= rw) { inside = true; }
+          }
+          if (inside) {
+            roadMask[static_cast<std::size_t>(y * W + x)] = 1;
           }
         }
       }
     }
   }
 
-  // PC-98 black-outlined rounded pixel tree (Might and Magic / Madou style)
-  auto drawPixTree = [&](int tx, int gy, float s) {
+  for (int y = hy; y < H; ++y) {
+    for (int x = 0; x < W; ++x) {
+      if (roadMask[static_cast<std::size_t>(y * W + x)] == 0) { continue; }
+      const bool up0 = (y > hy) && roadMask[static_cast<std::size_t>((y - 1) * W + x)] == 0;
+      const bool dn0 = (y + 1 < H) && roadMask[static_cast<std::size_t>((y + 1) * W + x)] == 0;
+      const bool lf0 = (x > 0) && roadMask[static_cast<std::size_t>(y * W + (x - 1))] == 0;
+      const bool rt0 = (x + 1 < W) && roadMask[static_cast<std::size_t>(y * W + (x + 1))] == 0;
+      if (up0 || dn0 || lf0 || rt0) {
+        putPx(x, y, inkOut);
+      } else {
+        const bool upRim = (y > hy + 1) && roadMask[static_cast<std::size_t>((y - 2) * W + x)] == 0;
+        const bool lfRim = (x > 1) && roadMask[static_cast<std::size_t>(y * W + (x - 2))] == 0;
+        const bool rtRim = (x + 2 < W) && roadMask[static_cast<std::size_t>(y * W + (x + 2))] == 0;
+        if (upRim || lfRim) {
+          putPx(x, y, pathHi);
+        } else if (rtRim) {
+          putPx(x, y, pathDark);
+        } else {
+          paintRoadPx(x, y);
+        }
+      }
+    }
+  }
+
+  // Diverse PC-98 pixel models (trees, pines, alien canopies, boulders, crystals, vents/reefs, scrub)
+  auto drawBroadleafTree = [&](int tx, int gy, float s) {
     const int th = std::max(8, static_cast<int>(std::lround(24.0f * s)));
     const int tw = std::max(7, static_cast<int>(std::lround(19.0f * s)));
     const int trunkW = std::max(2, static_cast<int>(std::lround(4.0f * s)));
     const int trunkH = std::max(3, th * 38 / 100);
-    // Ground drop shadow
-    fillRect(tx - tw * 2 / 5, gy - 1, tw * 4 / 5, std::max(1, static_cast<int>(std::lround(2.0f * s))),
-             inkOut);
-    // Outlined trunk
+    fillRect(tx - tw * 2 / 5, gy - 1, tw * 4 / 5, std::max(1, static_cast<int>(std::lround(2.0f * s))), inkOut);
     fillOutlineRect(tx - trunkW / 2 - 1, gy - trunkH, trunkW + 2, trunkH + 1, trunkCol, inkOut);
-    // Outlined canopy silhouette then 3-tone foliage clusters
     const int canBot = gy - trunkH + 2;
     const int canH = th - trunkH + 2;
     const int rLower = tw / 2;
@@ -3114,7 +3245,6 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     fillRect(tx - rLower, canBot - canH * 2 / 3, rLower * 2, canH * 2 / 3, leaf0);
     fillRect(tx - rUpper, canBot - canH + 1, rUpper * 2 - 1, canH * 2 / 3, leaf1);
     fillRect(tx - rUpper + 1, canBot - canH + 1, std::max(2, rUpper), std::max(2, canH / 3), leaf2);
-    // Crisp leaf dither accents
     for (int py = canBot - canH + 2; py < canBot - 1; py += 2) {
       for (int px = tx - rLower + 2; px < tx + rLower - 1; px += 3) {
         if (((px + py) & 1) == 0) { putPx(px, py, leaf1); }
@@ -3122,86 +3252,292 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     }
   };
 
-  auto depthFrac = [](int d) -> float {
-    if (d == 0) { return 1.0f; }
-    if (d == 1) { return 0.56f; }
-    if (d == 2) { return 0.30f; }
-    return 0.16f;
+  auto drawPineTree = [&](int tx, int gy, float s) {
+    const int th = std::max(9, static_cast<int>(std::lround(27.0f * s)));
+    const int tw = std::max(7, static_cast<int>(std::lround(17.0f * s)));
+    const int trunkW = std::max(2, static_cast<int>(std::lround(3.0f * s)));
+    const int trunkH = std::max(2, th * 24 / 100);
+    fillRect(tx - tw / 3, gy - 1, tw * 2 / 3, std::max(1, static_cast<int>(std::lround(2.0f * s))), inkOut);
+    fillOutlineRect(tx - trunkW / 2 - 1, gy - trunkH, trunkW + 2, trunkH + 1, trunkCol, inkOut);
+    const int coneBase = gy - trunkH + 1;
+    const int coneH = std::max(6, th - trunkH);
+    for (int row = 0; row < coneH; ++row) {
+      const int tier = (row * 3) / coneH;
+      const int tierRow = row - (tier * coneH) / 3;
+      const int tierSpan = std::max(2, coneH / 3);
+      const float frac = static_cast<float>(tierRow + 1) / static_cast<float>(tierSpan);
+      const int baseHalf = (tw / 2) * (tier + 2) / 4;
+      const int hw = std::max(1, static_cast<int>(std::lround(static_cast<float>(baseHalf) * frac)));
+      const int py = coneBase - coneH + row;
+      putPx(tx - hw - 1, py, inkOut);
+      putPx(tx + hw + 1, py, inkOut);
+      if (row == 0) { putPx(tx, py - 1, inkOut); }
+      for (int px = tx - hw; px <= tx + hw; ++px) {
+        Color col = leaf0;
+        if (px < tx) {
+          col = (tierRow < tierSpan / 2) ? leaf2 : leaf1;
+        } else if (tierRow < tierSpan / 3) {
+          col = leaf1;
+        }
+        putPx(px, py, col);
+      }
+    }
+    fillRect(tx - tw / 2, coneBase, tw + 1, 1, inkOut);
   };
 
-  for (int d = 3; d >= 1; --d) {
-    const float fFar = depthFrac(d);
-    const float fNear = depthFrac(d - 1);
-    const float fMid = (fFar + fNear) * 0.48f;
-    const int gyMid = hy + static_cast<int>(std::lround((H - hy) * fMid));
-    const float sTree = 0.34f + 0.72f * fMid;
-    const int roadHalfMid = roadHalfAtY(gyMid);
-
-    const int cx = planetSurface_.px + fdx * d;
-    const int cy = planetSurface_.py + fdy * d;
-
-    if (tileAt(cx + ldx, cy + ldy) == 1) {
-      const int lx = std::max(static_cast<int>(10.0f * sTree),
-                              cxMid - roadHalfMid - static_cast<int>(14.0f * sTree));
-      drawPixTree(lx, gyMid, sTree);
+  auto drawUmbrellaTree = [&](int tx, int gy, float s) {
+    const int th = std::max(8, static_cast<int>(std::lround(22.0f * s)));
+    const int tw = std::max(8, static_cast<int>(std::lround(21.0f * s)));
+    const int trunkH = std::max(4, th * 52 / 100);
+    const int lean = ((tx & 1) ? 1 : -1) * std::max(1, tw / 8);
+    fillRect(tx - tw / 3, gy - 1, tw * 2 / 3, 1, inkOut);
+    fillOutlineRect(tx - 1, gy - trunkH / 2, 4, trunkH / 2 + 1, trunkCol, inkOut);
+    fillOutlineRect(tx + lean - 1, gy - trunkH, 4, trunkH / 2 + 2, trunkCol, inkOut);
+    const int cx = tx + lean;
+    const int cy = gy - trunkH;
+    const int capH = std::max(4, th * 42 / 100);
+    if (lavaWorld) {
+      // Petrified dead volcanic branches
+      fillOutlineRect(cx - tw / 2, cy - 2, tw / 2 + 1, 3, trunkCol, inkOut);
+      fillOutlineRect(cx, cy - capH / 2, tw / 2 + 1, 3, trunkCol, inkOut);
+      fillOutlineRect(cx - tw / 3, cy - capH, 3, capH, trunkCol, inkOut);
+      fillOutlineRect(cx + tw / 3 - 2, cy - capH + 1, 3, capH - 1, trunkCol, inkOut);
+    } else {
+      fillOutlineRect(cx - tw / 2 - 1, cy - capH / 2, tw + 2, capH / 2 + 2, leaf0, inkOut);
+      fillOutlineRect(cx - tw * 3 / 8 - 1, cy - capH, tw * 3 / 4 + 2, capH / 2 + 2, leaf1, inkOut);
+      fillRect(cx - tw / 4, cy - capH + 1, tw / 2, std::max(1, capH / 3), leaf2);
     }
-    if (tileAt(cx + rdx, cy + rdy) == 1) {
-      const int rx = std::min(W - static_cast<int>(10.0f * sTree),
-                              cxMid + roadHalfMid + static_cast<int>(14.0f * sTree));
-      drawPixTree(rx, gyMid, sTree);
-    }
+  };
 
-    if (d == centerWall) {
-      const int bw = std::max(10, static_cast<int>(std::lround(28.0f * sTree)));
-      const int bh = std::max(2, static_cast<int>(std::lround(3.0f * sTree)));
-      fillOutlineRect(cxMid - bw / 2, gyMid - bh, bw, bh, rockDark, inkOut);
-      drawPixTree(cxMid - static_cast<int>(9.0f * sTree), gyMid - 1, sTree * 0.92f);
-      drawPixTree(cxMid + static_cast<int>(9.0f * sTree), gyMid - 1, sTree * 0.92f);
-      drawPixTree(cxMid, gyMid, sTree * 1.05f);
-    } else if (d < centerWall) {
-      const float sObj = (fFar + fNear) * 0.55f;
-      // Black-outlined Pixel Ship Lander
-      if (cx == planetSurface_.shipX && cy == planetSurface_.shipY) {
-        const int sw = std::max(12, static_cast<int>(std::lround(30.0f * sObj)));
-        const int sh = std::max(7, static_cast<int>(std::lround(17.0f * sObj)));
-        const int sx = cxMid - sw / 2;
-        const int sy = gyMid - sh;
-        fillRect(sx + 2, gyMid - 1, sw - 4, 2, inkOut);
-        fillOutlineRect(cxMid - sw * 44 / 100, gyMid - sh * 26 / 100, std::max(3, sw * 14 / 100),
-                        sh * 26 / 100, Color{130, 126, 118, 255}, inkOut);
-        fillOutlineRect(cxMid + sw * 30 / 100, gyMid - sh * 26 / 100, std::max(3, sw * 14 / 100),
-                        sh * 26 / 100, Color{130, 126, 118, 255}, inkOut);
-        fillOutlineRect(cxMid - sw * 42 / 100, gyMid - sh * 68 / 100, sw * 84 / 100,
-                        std::max(3, sh * 44 / 100), Color{188, 184, 174, 255}, inkOut);
-        fillOutlineRect(cxMid - sw * 24 / 100, gyMid - sh * 96 / 100, sw * 48 / 100,
-                        std::max(3, sh * 32 / 100), Color{150, 148, 140, 255}, inkOut);
-        fillRect(cxMid - sw * 14 / 100, gyMid - sh * 84 / 100, std::max(2, sw * 28 / 100),
-                 std::max(1, sh * 16 / 100), Color{84, 196, 214, 255});
-        planetSurface_.hasShipSprite = true;
-        planetSurface_.shipUv = Area{
-            static_cast<float>(sx) / static_cast<float>(W),
-            static_cast<float>(sy) / static_cast<float>(H),
-            static_cast<float>(sw) / static_cast<float>(W),
-            static_cast<float>(sh) / static_cast<float>(H)};
+  auto drawBoulderCluster = [&](int tx, int gy, float s) {
+    const int rw = std::max(8, static_cast<int>(std::lround(20.0f * s)));
+    const int rh = std::max(5, static_cast<int>(std::lround(13.0f * s)));
+    fillRect(tx - rw / 2, gy - 1, rw, 2, inkOut);
+    // Primary stepped boulder
+    fillOutlineRect(tx - rw / 2, gy - rh * 7 / 10, rw * 3 / 4, rh * 7 / 10, rockDark, inkOut);
+    fillOutlineRect(tx - rw * 3 / 8, gy - rh, rw * 9 / 16, rh * 5 / 8, rockMid, inkOut);
+    fillRect(tx - rw * 3 / 8 + 1, gy - rh + 1, std::max(2, rw * 3 / 8), std::max(1, rh / 4), rockHi);
+    // Flanking lower slab
+    fillOutlineRect(tx + rw / 8, gy - rh / 2, rw * 3 / 8, rh / 2, rockMid, inkOut);
+    fillRect(tx + rw / 8 + 1, gy - rh / 2 + 1, std::max(1, rw / 5), 1, rockHi);
+  };
+
+  auto drawCrystalSpire = [&](int tx, int gy, float s) {
+    const int cw = std::max(6, static_cast<int>(std::lround(13.0f * s)));
+    const int ch = std::max(8, static_cast<int>(std::lround(23.0f * s)));
+    fillRect(tx - cw / 2, gy - 1, cw, 2, inkOut);
+    const Color body0 = (iceWorld || oceanWorld || lavaWorld) ? accent0 : rockMid;
+    const Color body1 = (iceWorld || oceanWorld || lavaWorld) ? accent1 : rockHi;
+    // Main faceted spire tapering toward tip
+    const int mainW = std::max(4, cw * 55 / 100);
+    for (int row = 0; row < ch; ++row) {
+      const float frac = static_cast<float>(row) / static_cast<float>(ch);
+      const int hw = std::max(1, static_cast<int>(std::lround(
+          static_cast<float>(mainW / 2 + 1) * std::min(1.0f, 0.25f + frac * 1.15f))));
+      const int py = gy - ch + row;
+      putPx(tx - hw - 1, py, inkOut);
+      putPx(tx + hw + 1, py, inkOut);
+      if (row == 0) { putPx(tx, py - 1, inkOut); }
+      for (int px = tx - hw; px <= tx + hw; ++px) {
+        putPx(px, py, (px <= tx - hw / 3) ? body1 : body0);
       }
-      // Black-outlined Pixel Ore Package
-      const int oreIdx = oreAt(cx, cy);
-      if (oreIdx >= 0 && planetSurface_.visOreCount < 3) {
-        const int ow = std::max(7, static_cast<int>(std::lround(15.0f * sObj)));
-        const int oh = std::max(6, static_cast<int>(std::lround(11.0f * sObj)));
-        const int ox = cxMid - ow / 2;
-        const int oy = gyMid - oh;
-        fillRect(ox + 1, gyMid - 1, ow - 2, 2, inkOut);
-        fillOutlineRect(ox, oy, ow, oh, Color{184, 118, 38, 255}, inkOut);
-        fillRect(ox + 2, oy + 2, std::max(1, ow - 4), std::max(1, oh / 3), Color{236, 176, 68, 255});
-        fillRect(ox + ow / 3, oy + oh / 2, std::max(1, ow / 3), std::max(1, oh / 4), Color{255, 226, 138, 255});
-        const int slot = planetSurface_.visOreCount++;
-        planetSurface_.visOreIdx[slot] = oreIdx;
-        planetSurface_.visOreUv[slot] = Area{
-            static_cast<float>(ox) / static_cast<float>(W),
-            static_cast<float>(oy) / static_cast<float>(H),
-            static_cast<float>(ow) / static_cast<float>(W),
-            static_cast<float>(oh) / static_cast<float>(H)};
+    }
+    // Side shard
+    const int sideH = std::max(4, ch * 55 / 100);
+    const int sideOff = ((tx & 1) ? 1 : -1) * std::max(2, cw * 30 / 100);
+    fillOutlineRect(tx + sideOff - 2, gy - sideH, 5, sideH, body0, inkOut);
+    fillRect(tx + sideOff - 1, gy - sideH + 1, 2, std::max(1, sideH / 2), body1);
+  };
+
+  auto drawVentOrReef = [&](int tx, int gy, float s) {
+    const int vw = std::max(7, static_cast<int>(std::lround(17.0f * s)));
+    const int vh = std::max(5, static_cast<int>(std::lround(11.0f * s)));
+    fillRect(tx - vw / 2, gy - 1, vw, 2, inkOut);
+    fillOutlineRect(tx - vw / 2, gy - vh, vw, vh, rockDark, inkOut);
+    fillOutlineRect(tx - vw * 3 / 8, gy - vh + 1, vw * 3 / 4, std::max(3, vh * 6 / 10), rockMid, inkOut);
+    fillRect(tx - vw / 4, gy - vh + 1, std::max(2, vw / 2), std::max(2, vh / 3), accent0);
+    fillRect(tx - vw / 6, gy - vh + 2, std::max(1, vw / 3), 1, accent1);
+  };
+
+  auto drawScrubBush = [&](int tx, int gy, float s) {
+    const int bw = std::max(5, static_cast<int>(std::lround(11.0f * s)));
+    const int bh = std::max(3, static_cast<int>(std::lround(7.0f * s)));
+    fillOutlineRect(tx - bw / 2, gy - bh, bw, bh, leaf0, inkOut);
+    fillRect(tx - bw / 3, gy - bh + 1, std::max(2, bw * 2 / 3), std::max(1, bh / 2), leaf1);
+    putPx(tx - bw / 4, gy - bh + 1, leaf2);
+  };
+
+  auto drawGroundScatter = [&](int tx, int gy, float s, int var) {
+    const int w = std::max(2, static_cast<int>(std::lround(5.0f * s)));
+    if (var & 1) {
+      fillRect(tx - w / 2, gy - 1, w, 1, inkOut);
+      fillRect(tx - w / 2, gy - 2, std::max(2, w - 1), 1, rockHi);
+    } else {
+      putPx(tx - 1, gy - 1, leaf1);
+      putPx(tx, gy - 2, leaf2);
+      putPx(tx + 1, gy - 1, leaf0);
+    }
+  };
+
+  auto drawBiomeProp = [&](int model, int tx, int gy, float s) {
+    if (iceWorld) {
+      if (model == 0) { drawPineTree(tx, gy, s); }
+      else if (model == 1) { drawCrystalSpire(tx, gy, s); }
+      else if (model == 2) { drawBoulderCluster(tx, gy, s); }
+      else { drawScrubBush(tx, gy, s); }
+    } else if (oceanWorld) {
+      if (model == 0) { drawBoulderCluster(tx, gy, s); }
+      else if (model == 1) { drawCrystalSpire(tx, gy, s); }
+      else if (model == 2) { drawVentOrReef(tx, gy, s); }
+      else { drawUmbrellaTree(tx, gy, s * 0.92f); }
+    } else if (lavaWorld) {
+      if (model == 0) { drawCrystalSpire(tx, gy, s); }
+      else if (model == 1) { drawVentOrReef(tx, gy, s); }
+      else if (model == 2) { drawUmbrellaTree(tx, gy, s); }
+      else { drawBoulderCluster(tx, gy, s); }
+    } else if (rockWorld) {
+      if (model == 0) { drawBoulderCluster(tx, gy, s); }
+      else if (model == 1) { drawCrystalSpire(tx, gy, s); }
+      else if (model == 2) { drawUmbrellaTree(tx, gy, s * 0.85f); }
+      else { drawScrubBush(tx, gy, s); }
+    } else {
+      if (model == 0) { drawBroadleafTree(tx, gy, s); }
+      else if (model == 1) { drawPineTree(tx, gy, s); }
+      else if (model == 2) { drawUmbrellaTree(tx, gy, s); }
+      else { drawBoulderCluster(tx, gy, s); }
+    }
+  };
+
+  // Back-to-front painter's algorithm across ALL visible lateral columns (s) and depths (d)
+  for (int d = 3; d >= 0; --d) {
+    const int yFar = kSliceY[d + 1];
+    const int yNear = kSliceY[d];
+    const int gyFar = yFar + (yNear - yFar) * 28 / 100;
+    const int gyMid = yFar + (yNear - yFar) * 58 / 100;
+    const int gyNear = yFar + (yNear - yFar) * 86 / 100;
+    const float fMid = static_cast<float>(gyMid - hy) / static_cast<float>(H - hy);
+    const float sTile = 0.34f + 0.84f * fMid;
+    const float htMid = halfTileAtY(gyMid);
+    const float htNear = halfTileAtY(gyNear);
+    const int maxS = (d == 3) ? 6 : (d == 2 ? 4 : (d == 1 ? 2 : 1));
+
+    for (int k = maxS; k >= 0; --k) {
+      for (int sidePass = 0; sidePass < (k == 0 ? 1 : 2); ++sidePass) {
+        const int s = (k == 0) ? 0 : (sidePass == 0 ? -k : k);
+        if (d == 0 && s == 0) { continue; }
+        const int tx = planetSurface_.px + fdx * d + rdx * s;
+        const int ty = planetSurface_.py + fdy * d + rdy * s;
+        const std::uint8_t tile = tileAt(tx, ty);
+        const int var = variantAt(tx, ty);
+        const float tcxMid = tileCenterAtY(s, gyMid);
+        const float tcxNear = tileCenterAtY(s, gyNear);
+
+        if (tile == 1) {
+          if (isBorderTile(tx, ty)) {
+            // Natural full-width perimeter ridge/grove (angled shoulder, never a flat bar)
+            const int bankW = std::max(8, static_cast<int>(std::lround(htMid * 1.85f)));
+            const int bankH = std::max(2, static_cast<int>(std::lround(6.0f * sTile)));
+            const int bankX = static_cast<int>(std::lround(tcxMid)) - bankW / 2;
+            fillOutlineRect(bankX, gyMid - bankH, bankW, bankH + 1, rockDark, inkOut);
+            fillRect(bankX + 1, gyMid - bankH + 1, std::max(2, bankW * 2 / 3),
+                     std::max(1, bankH / 2), rockMid);
+            const int lx = static_cast<int>(std::lround(tcxMid - htMid * 0.45f));
+            const int rx = static_cast<int>(std::lround(tcxMid + htMid * 0.45f));
+            drawBiomeProp((var + 0) % 4, lx, gyMid, sTile * 0.96f);
+            drawBiomeProp((var + 1) % 4, rx, gyMid + 1, sTile * 0.94f);
+            drawScrubBush(static_cast<int>(std::lround(tcxNear + ((var & 1) ? -0.15f : 0.15f) * htNear)),
+                          gyNear, sTile * 0.72f);
+          } else {
+            // Interior obstacle: asymmetric multi-object cluster spanning left/center/right of tile
+            const float sign = (var & 1) ? -1.0f : 1.0f;
+            const int xMain = static_cast<int>(std::lround(tcxMid + sign * htMid * 0.34f));
+            const int xSec = static_cast<int>(std::lround(tcxMid - sign * htMid * 0.40f));
+            const int xAcc = static_cast<int>(std::lround(tcxNear + sign * htNear * 0.10f));
+            drawBiomeProp((var + 1) % 4, xSec, gyFar + 2, sTile * 0.80f);
+            if (s == 0 && d == 1) {
+              drawBiomeProp((var + 2) % 4, static_cast<int>(std::lround(tcxMid)), gyMid, sTile * 0.92f);
+            }
+            drawBiomeProp(var % 4, xMain, gyMid + 1, sTile * 1.02f);
+            if (var & 2) {
+              drawScrubBush(xAcc, gyNear, sTile * 0.75f);
+            } else {
+              drawBiomeProp(3, xAcc, gyNear, sTile * 0.64f);
+            }
+          }
+          continue;
+        }
+
+        // Non-blocking low ground accents on open tiles (0)
+        if (tile == 0 && (var % 3) == 0 && d >= 1) {
+          const float off = ((var & 1) ? -0.44f : 0.44f) * htMid;
+          drawGroundScatter(static_cast<int>(std::lround(tcxMid + off)), gyMid, sTile, var);
+        }
+
+        // Ship & Ore sprites (visible straight ahead and 1 tile left/right when unobstructed)
+        if (d >= 1 && std::abs(s) <= 1) {
+          const bool occluded = (d >= 2) &&
+              (tileAt(tx - fdx, ty - fdy) == 1 || (s == 0 && tileAt(planetSurface_.px + fdx, planetSurface_.py + fdy) == 1));
+          if (!occluded) {
+            const int objCx = static_cast<int>(std::lround(tcxMid));
+            if (tx == planetSurface_.shipX && ty == planetSurface_.shipY) {
+              const int sw = std::max(12, static_cast<int>(std::lround(28.0f * sTile)));
+              const int sh = std::max(7, static_cast<int>(std::lround(16.0f * sTile)));
+              const int sx = objCx - sw / 2;
+              const int sy = gyMid - sh;
+              if (sx + sw > 2 && sx < W - 2) {
+                fillRect(sx + 2, gyMid - 1, sw - 4, 2, inkOut);
+                fillOutlineRect(objCx - sw * 44 / 100, gyMid - sh * 26 / 100,
+                                std::max(3, sw * 14 / 100), sh * 26 / 100,
+                                Color{130, 126, 118, 255}, inkOut);
+                fillOutlineRect(objCx + sw * 30 / 100, gyMid - sh * 26 / 100,
+                                std::max(3, sw * 14 / 100), sh * 26 / 100,
+                                Color{130, 126, 118, 255}, inkOut);
+                fillOutlineRect(objCx - sw * 42 / 100, gyMid - sh * 68 / 100, sw * 84 / 100,
+                                std::max(3, sh * 44 / 100), Color{188, 184, 174, 255}, inkOut);
+                fillOutlineRect(objCx - sw * 24 / 100, gyMid - sh * 96 / 100, sw * 48 / 100,
+                                std::max(3, sh * 32 / 100), Color{150, 148, 140, 255}, inkOut);
+                fillRect(objCx - sw * 14 / 100, gyMid - sh * 84 / 100, std::max(2, sw * 28 / 100),
+                         std::max(1, sh * 16 / 100), Color{84, 196, 214, 255});
+                const int cx0 = std::clamp(sx, 0, W);
+                const int cx1 = std::clamp(sx + sw, 0, W);
+                if (cx1 > cx0) {
+                  planetSurface_.hasShipSprite = true;
+                  planetSurface_.shipUv = Area{
+                      static_cast<float>(cx0) / static_cast<float>(W),
+                      static_cast<float>(std::max(0, sy)) / static_cast<float>(H),
+                      static_cast<float>(cx1 - cx0) / static_cast<float>(W),
+                      static_cast<float>(sh) / static_cast<float>(H)};
+                }
+              }
+            }
+            const int oreIdx = oreAt(tx, ty);
+            if (oreIdx >= 0 && planetSurface_.visOreCount < 3) {
+              const int ow = std::max(7, static_cast<int>(std::lround(14.0f * sTile)));
+              const int oh = std::max(6, static_cast<int>(std::lround(10.0f * sTile)));
+              const int ox = objCx - ow / 2;
+              const int oy = gyMid - oh;
+              if (ox + ow > 3 && ox < W - 3) {
+                fillRect(ox + 1, gyMid - 1, ow - 2, 2, inkOut);
+                fillOutlineRect(ox, oy, ow, oh, Color{184, 118, 38, 255}, inkOut);
+                fillRect(ox + 2, oy + 2, std::max(1, ow - 4), std::max(1, oh / 3),
+                         Color{236, 176, 68, 255});
+                fillRect(ox + ow / 3, oy + oh / 2, std::max(1, ow / 3), std::max(1, oh / 4),
+                         Color{255, 226, 138, 255});
+                const int cx0 = std::clamp(ox, 0, W);
+                const int cx1 = std::clamp(ox + ow, 0, W);
+                if (cx1 > cx0) {
+                  const int slot = planetSurface_.visOreCount++;
+                  planetSurface_.visOreIdx[slot] = oreIdx;
+                  planetSurface_.visOreUv[slot] = Area{
+                      static_cast<float>(cx0) / static_cast<float>(W),
+                      static_cast<float>(std::max(0, oy)) / static_cast<float>(H),
+                      static_cast<float>(cx1 - cx0) / static_cast<float>(W),
+                      static_cast<float>(oh) / static_cast<float>(H)};
+                }
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -3889,20 +4225,38 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
 
       const Body* planet = sim.FindBodyById(sim.Map().here);
       const std::string subtype = planet ? planet->subtype : std::string();
-      const bool iceWorld = subtype == "ice" || subtype == "ocean";
       const bool lavaWorld = planet != nullptr &&
-          (planet->klass.find("Lava") != std::string::npos ||
+          (subtype == "lava" ||
+           planet->klass.find("Lava") != std::string::npos ||
            planet->klass.find("Volcanic") != std::string::npos ||
            planet->klass.find("lava") != std::string::npos);
-      const Color mmTree0 = iceWorld ? Color{68, 110, 142, 255}
-                          : lavaWorld ? Color{72, 34, 28, 255}
-                                      : Color{42, 86, 44, 255};
-      const Color mmTree1 = iceWorld ? Color{112, 162, 194, 255}
-                          : lavaWorld ? Color{116, 52, 34, 255}
-                                      : Color{66, 120, 56, 255};
-      const Color mmTrail = iceWorld ? Color{56, 76, 98, 255}
-                          : lavaWorld ? Color{62, 38, 32, 255}
-                                      : Color{84, 66, 46, 255};
+      const bool iceWorld = !lavaWorld && subtype == "ice";
+      const bool oceanWorld = !lavaWorld && subtype == "ocean";
+      const bool rockWorld = !lavaWorld && !iceWorld && !oceanWorld && planet != nullptr &&
+          (subtype == "rock" ||
+           planet->klass.find("Rugged") != std::string::npos ||
+           planet->klass.find("Barren") != std::string::npos ||
+           planet->klass.find("Crater") != std::string::npos);
+      const Color mmTree0 = iceWorld   ? Color{68, 110, 142, 255}
+                          : oceanWorld ? Color{36, 94, 96, 255}
+                          : lavaWorld  ? Color{72, 34, 28, 255}
+                          : rockWorld  ? Color{96, 58, 42, 255}
+                                       : Color{42, 86, 44, 255};
+      const Color mmTree1 = iceWorld   ? Color{112, 162, 194, 255}
+                          : oceanWorld ? Color{56, 138, 128, 255}
+                          : lavaWorld  ? Color{144, 64, 38, 255}
+                          : rockWorld  ? Color{148, 92, 62, 255}
+                                       : Color{66, 120, 56, 255};
+      const Color mmTrail = iceWorld   ? Color{56, 76, 98, 255}
+                          : oceanWorld ? Color{118, 108, 84, 255}
+                          : lavaWorld  ? Color{56, 44, 44, 255}
+                          : rockWorld  ? Color{102, 72, 54, 255}
+                                       : Color{84, 66, 46, 255};
+      const char* mmObstLabel = iceWorld   ? "ICE"
+                              : oceanWorld ? "REEF"
+                              : lavaWorld  ? "VENT"
+                              : rockWorld  ? "ROCK"
+                                           : "TREE";
 
       constexpr int N = PlanetSurfaceState::kSize;
       auto tileAt = [&](int tx, int ty) -> std::uint8_t {
@@ -3956,7 +4310,7 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
       Text("PATH", static_cast<int>(V(mmX + 54.0f, legY).x), static_cast<int>(V(mmX + 54.0f, legY).y),
            legPx, Color{186, 190, 184, 255});
       rectS(mmX + 88.0f, legY + 2.0f, 6.0f, 6.0f, mmTree1);
-      Text("TREE", static_cast<int>(V(mmX + 98.0f, legY).x), static_cast<int>(V(mmX + 98.0f, legY).y),
+      Text(mmObstLabel, static_cast<int>(V(mmX + 98.0f, legY).x), static_cast<int>(V(mmX + 98.0f, legY).y),
            legPx, Color{186, 190, 184, 255});
 
       // Right side inside glass: tiny heading/ore readout + 4-way arrow pad
