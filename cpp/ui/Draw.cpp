@@ -2969,6 +2969,8 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
     BeginScissorMode(static_cast<int>(left), static_cast<int>(top), static_cast<int>(778 * scale),
                      static_cast<int>(std::max(0.0f, bottom - top)));
     const Vector2 pivot = V(480, 164);
+    float sunGlassX = 0.0f, sunGlassY = 0.0f, sunGlassR = 0.0f;
+    bool sunOnGlass = false;
     rlPushMatrix();
     rlTranslatef(pivot.x, pivot.y, 0);
     rlRotatef(std::fmod(tSec * 0.30f, 360.0f), 0, 0, 1);
@@ -2981,6 +2983,13 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
       const float x = 480 + 330 * std::sin(az) / z;
       const float y = 164 + ((i*i*37+i*23)%827 - 413) / z;
       DrawCircleV(V(x,y), std::max(0.7f, (i%7 ? 0.8f : 1.4f)*scale), Fade(WHITE, 0.4f + 0.08f*(i%6)));
+      if (i % 19 == 0) {
+        const float tick = 2.6f * scale;
+        line(x - tick, y, x + tick, y, Fade(WHITE, 0.14f));
+        line(x, y - tick, x, y + tick, Fade(WHITE, 0.14f));
+      } else if (i % 47 == 0) {
+        DrawCircleLinesV(V(x, y), 3.2f * scale, Fade(WHITE, 0.10f));
+      }
     }
     if (trip && !reduced) {
       const float look = bridgeLook_ * 2 * PI;
@@ -3021,7 +3030,31 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
                            (sun ? 4.8f*r : r+2.5f*haze)*scale,
                            Fade(light, sun ? 0.84f : 0.32f * visibility), Fade(light, 0));
         DrawCircleV(center, (r-0.7f*haze)*scale, Fade(light, opacity * visibility));
-        if (sun) DrawCircleLinesV(V(x,y),(r+2)*scale,Fade(rule, opacity*0.6f));
+        if (sun) {
+          DrawCircleLinesV(V(x,y),(r+2)*scale,Fade(rule, opacity*0.6f));
+          const unsigned marks = static_cast<unsigned>(static_cast<int>(body.x)) ^
+                                 static_cast<unsigned>(static_cast<int>(body.y));
+          for (int spot = 0; spot < 5; ++spot) {
+            const float a = static_cast<float>((marks * (spot + 3u)) % 628u) * 0.01f;
+            const float d = r * (0.10f + 0.50f * static_cast<float>((marks >> (spot * 2)) & 3u) / 3.0f);
+            const float sr = r * (0.07f + 0.09f * static_cast<float>((marks >> spot) & 1u));
+            DrawCircleV(V(x + d*std::cos(a), y + d*std::sin(a)), sr*scale, Fade(ink, 0.50f * opacity));
+          }
+          for (int ray = 0; ray < 6; ++ray) {
+            const float a = static_cast<float>(marks % 360u) * DEG2RAD +
+                            ray * (PI / 3.0f) + tSec * 0.05f;
+            const float reach = r * (1.9f + 0.35f * (ray % 3));
+            line(x + r*0.9f*std::cos(a), y + r*0.9f*std::sin(a),
+                 x + reach*std::cos(a), y + reach*std::sin(a),
+                 Fade(light, (ray % 2 ? 0.07f : 0.13f) * opacity));
+          }
+          const float roll = std::fmod(tSec * 0.30f, 360.0f) * DEG2RAD;
+          const float ox = V(x,y).x - pivot.x, oy = V(x,y).y - pivot.y;
+          sunGlassX = pivot.x + ox*std::cos(roll) - oy*std::sin(roll);
+          sunGlassY = pivot.y + ox*std::sin(roll) + oy*std::cos(roll);
+          sunGlassR = r*scale;
+          sunOnGlass = true;
+        }
         if (body.subtype == "gas") line(x-r*1.4f,y+r*0.35f,x+r*1.4f,y-r*0.35f,Fade(rule, opacity * visibility));
       }
     };
@@ -3067,10 +3100,31 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
         rlPopMatrix();
       }
     }
-    // A shallow reflection of the sill stays on the glass as the sky turns.
+    // CRT scanlines lie on the glass: the eye finishes what the sky only hints at.
+    for (int row = 0, sy = 38; sy < 292; sy += 4, ++row) {
+      DrawRectangle(static_cast<int>(left), static_cast<int>(V(0, static_cast<float>(sy)).y),
+                    static_cast<int>(778 * scale), std::max(1, static_cast<int>(pen)),
+                    Fade(ToRay(p.coffeeDark), row % 4 == 0 ? 0.18f : 0.11f));
+    }
+    // The glass answers the sky: a soft sun smear, a sheen across the pane, the sill.
+    if (sunOnGlass) {
+      DrawRectangleGradientV(static_cast<int>(sunGlassX - sunGlassR),
+                             static_cast<int>(sunGlassY + sunGlassR),
+                             static_cast<int>(sunGlassR * 2.0f),
+                             static_cast<int>(78.0f * scale),
+                             Fade(paper, 0.18f), Fade(paper, 0));
+    }
+    rlPushMatrix();
+    rlTranslatef(pivot.x, pivot.y, 0);
+    rlRotatef(-22.0f, 0, 0, 1);
+    rlTranslatef(-pivot.x, -pivot.y, 0);
+    DrawRectangleGradientH(static_cast<int>(V(610, 20).x), static_cast<int>(V(0, 20).y),
+                           static_cast<int>(64.0f * scale), static_cast<int>(300.0f * scale),
+                           Fade(paper, 0), Fade(paper, 0.035f));
+    rlPopMatrix();
     DrawRectangleGradientV(static_cast<int>(left), static_cast<int>(V(0,254).y),
                            static_cast<int>(778*scale), static_cast<int>(45*scale),
-                           Fade(paper, 0), Fade(paper, 0.18f));
+                           Fade(paper, 0), Fade(paper, 0.26f));
     for (float x : {109.0f, 851.0f}) {
       for (int k = 0; k < 5; ++k) line(x-6, 275+2*k, x+6, 275+2*k, Fade(rule, 0.32f));
     }
