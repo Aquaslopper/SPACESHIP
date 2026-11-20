@@ -42,7 +42,7 @@ into requirements or add unrequested behavior such as automatic loading.
 **CRITICAL INSTRUCTION:** 
 At the beginning of a new session, after reading `AGENTS.md`, you must confirm the BETA status and answer the following questions. 
 Do not write any code or perform any tasks until you have output the answers:
-1. What happens when you assume the code without verification?
+1. Why does this game not work anymore when you assume the code without verification?
 2. Explain the problem with "commentary in code"?
 3. Why no anti pattern?
 4. Why is the player allowed to discover and live with consequences?
