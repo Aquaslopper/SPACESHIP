@@ -41,10 +41,10 @@ Defined in `cpp/ui/Draw.h` (`ShellView::PlanetSurfaceState`) and built by `Shell
 - **Map generation steps:**
   1. Outer perimeter (`x == 0 || x == 8 || y == 0 || y == 8`) is initialized to `1`; interior to `0`.
   2. Ship pad `2` is placed at `(4, 7)`. Player spawns at `(4, 6)` facing North (`dir = 0`, where `0=N, 1=E, 2=S, 3=W`).
-  3. `6..9` interior obstacles (`1`) are placed while keeping `(4,7)`, `(4,6)`, `(4,5)` clear. Each placement is verified with a BFS `connected()` check so every non-`1` tile remains reachable from `(4, 6)`.
+  3. `6..9` interior obstacles (`1`) are placed while keeping `(4,7)`, `(4,6)`, `(4,5)` clear. Each placement is verified with a BFS `connected()` check (treating `1`, `2`, and any placed objects as solid) so every walkable tile remains reachable from `(4, 6)` without stepping onto the ship pad.
   4. A main winding trail (`3`) is walked from `(4, 6) -> (4, 5)` for `8..12` steps (favoring turns over long straight runs and avoiding 2x2 blobs via `countAdjTrail`), followed by `1..2` short curving side branches (`3..5` steps).
   5. `variant[0..80]` is populated with `nextRand() % 8u`.
-  6. `3..5` ore spots (`kMaxOre = 5`) are chosen on `0` or `3` tiles with Manhattan distance `>= 2` from the ship pad and stored in `oreX[]` / `oreY[]`.
+  6. `3..5` ore spots (`kMaxOre = 5`) are chosen on `0` or `3` tiles with Manhattan distance `>= 2` from the ship pad and stored in `oreX[]` / `oreY[]`, accepting only placements that preserve `connected()` and leave every placed ore adjacent to at least one reachable walkable tile (so uncollected crates never seal a choke point when the cargo hold is full).
 
 ---
 
@@ -62,17 +62,16 @@ Defined in `cpp/ui/Draw.h` (`ShellView::PlanetSurfaceState`) and built by `Shell
 - **Sky, Dithering & Horizon:**
   - `hy = 46` separates sky (`0..45`) and ground (`46..95`).
   - Sky and ground gradients use 4x4 Bayer ordered dithering (`kBayer4[4][4]`) and `#0a0b0f` (`inkOut`) 1px silhouettes on clouds and horizon ridges.
-- **1-Point Perspective Projection & `roadMask`:**
-  - Depth slice Y boundaries: `kSliceY[5] = {96, 74, 60, 52, 47}` (`d = 0..3`).
-  - Tile half-width at scanline `y`: `halfTileAtY(y) = 4.0f + 28.0f * clamp((y - hy) / (H - hy), 0, 1)`.
-  - Tile center for lateral offset `s`: `cxMid + s * 2.0f * halfTileAtY(y)`.
-  - Trails are first rasterized into a `roadMask[160 * 96]` buffer across visible `(s, d)` tiles in normalized tile-local coordinates `(u, vNorm)` (`[-1, 1]^2`), using quarter-circle arcs (`hypot(u ± 1, vNorm ± 1) in [0.54, 1.46]`) for L-corners and arm+hub unions for straight/T/4-way junctions. A second pass applies 1px `inkOut` outlines and `pathHi`/`pathDark` rim shading along mask boundaries.
+- **True `1 / z` First-Person Pinhole Projection & Full-Tile Road (`roadBuf`):**
+  - Ground scanlines (`y = hy..H-1`) project forward depth as `z(y) = kProjY / ((y - hy) + 0.5f)` (`kProjY = 22.0f`, `kProjX = 84.0f`, ~88° horizontal FOV) with camera eye inside `d = 0`.
+  - At the bottom scanline (`y = 95`, `z ≈ 0.444`), the standing tile `s = 0` spans more than `100%` of the viewport width (`halfTileAtZ ≈ 94.5 px > W / 2`), keeping `(d = 0, s = ±1)` ground tiles outside the forward frustum just like *Wizardry* / *Dungeon Master*.
+  - Path tiles (`tile == 3` and ship pad `2`) are rasterized as full-tile roads (`kHalfRoad = 0.44f`, extending seamlessly to `±0.50f` across connected road neighbors `nF/nB/nL/nR`, with beveled convex corners and aligned inner L/T-junction curbs) into a compact stack `roadBuf[(H - hy) * W]` (`8,000` bytes). A second pass draws 1px `inkOut` curbs, `pathHi`/`pathDark` rim shading, step-parity checkerboard dither, and perspective-anchored gravel flecks. Off-road open terrain (`tile == 0`) remains freely walkable.
 - **Painter's Algorithm & Full-Tile Obstacles:**
-  - Drawn back-to-front (`d = 3` down to `0`) and outer-to-inner (`k = maxS` down to `0`, where `maxS` is `6, 4, 2, 1` for `d = 3, 2, 1, 0`).
-  - **Border tiles (`1` at edge):** Draw a full-width layered ridge base plus paired biome props (`-0.45 * htMid` and `+0.45 * htMid`) and foreground scrub.
+  - Drawn back-to-front (`d = 6` down to `0`, skipping out-of-grid coordinates) and outer-to-inner (`k = d + 1` down to `0`) using the same `yAtZ`, `halfTileAtZ`, and `tileCenterAtZ` `1 / z` helpers.
+  - **Border tiles (`1` at edge):** Draw a full-width layered ridge base plus paired biome props (`-0.45 * htMid` and `+0.45 * htMid`) and foreground scrub; `d == 0, s == ±1` obstacles peek in only at the extreme peripheral edges (`l0`/`r0`).
   - **Interior obstacles (`1` inside `1..7`):** Place 2–3 asymmetric models distributed across left/center/right and `gyFar..gyNear` (`drawBroadleafTree`, `drawPineTree`, `drawUmbrellaTree`, `drawBoulderCluster`, `drawCrystalSpire`, `drawVentOrReef`, `drawScrubBush`) driven by `variantAt(tx, ty)`.
-  - **Open ground (`0`):** Draws low non-blocking scatter (`drawGroundScatter`) on every third variant.
-  - **Interactive world objects:** Ship lander and uncollected ore crates are drawn in `d >= 1`, `|s| <= 1` when unobstructed, exporting normalized UV hit boxes into `planetSurface_.shipUv` and `visOreUv[0..2]` (`visOreIdx[0..2]`).
+  - **Open ground (`0`):** Draws low non-blocking scatter (`drawGroundScatter`) on every third variant (`d = 1..4`).
+  - **Interactive world objects:** Ship lander and uncollected ore crates are drawn visually across the forward view cone (`d = 1..4`, `|s| <= d`), occluded naturally by nearer `d' < d` obstacles via the back-to-front painter's pass, and export a single unified normalized UV hit box (`planetSurface_.frontKind`, `frontArg`, `frontUv`) **only** when directly 1 tile ahead (`d == 1 && s == 0`).
 
 ---
 
@@ -82,12 +81,13 @@ Inside `ShellView::PaintStage` (`cpp/ui/Draw.cpp`):
 
 - **CRT Shutter Animation:** `bridgeDispatchOpen_` eases between `0.0` and `1.0` (`3.6f * dt`, or instantaneous when `sim.State().reducedMotion` is true) and clips the surface overlay with `BeginScissorMode` / `EndScissorMode`.
 - **Monitor Layout (`960x460` Bridge stage space):**
-  - **Left (`116, 76`):** `9x9` `MAP` minimap (`mmCell = 13.0f`) showing `SHIP`, `PATH`, biome obstacle cells (`TREE`/`ROCK`/`ICE`/`REEF`/`VENT`), and the player's position + directional triangle. Ore locations are intentionally omitted from the minimap so exploration relies on the 3D viewport.
-  - **Center (`275, 42, 410, 244`):** `planetTex_` scaled with `DrawTexturePro`, plus interactive hover outlines and `"SHIP"` / `"ORE"` tags derived from `shipUv` / `visOreUv`, or a `"BOARD SHIP"` button when standing on `(shipX, shipY)`.
-  - **Right (`700, 48..84` & `718, 136, 122, 122`):** Planet name, `DIR (x,y)`, remaining `ORE` count, and the 5-button D-pad (`Up`, `Down`, `Left`, `Right`, center `180`).
-- **Input Handling:**
-  - **Keyboard (`PaintStage`):** `Up`/`W` (`1`, step forward), `Down`/`S` (`2`, step back), `Left`/`A` (`3`, turn left 90°), `Right`/`D` (`4`, turn right 90°), `R`/`X` (`7`, turn 180°) call `StepPlanetSurface(kind)`.
-  - **Mouse (`ShellView::Click`):** `planetHits_` (`std::array<PlanetClickHit, 16>`) stores screen-space hit boxes for D-pad buttons (`1..4, 7`), visible ore crates (`5`, calls `sim.CollectPlanetOre`), and ship / `"BOARD SHIP"` (`6`, sets `bridgeDispatch_ = false`).
+  - **Left (`118, 98`):** Legendless high-contrast `9x9` `MAP` minimap (`mmCell = 14.0f`) showing walkable floor, curbed golden `PATH` ribbon, ship beacon, biome obstacle blocks, and the double-outlined player directional arrow. Ore locations are intentionally omitted from the minimap so exploration relies on the 3D viewport.
+  - **Center (`275, 42, 410, 244`):** `planetTex_` scaled with `DrawTexturePro`, plus a unified 1-tile-ahead (`d == 1, s == 0`) hover outline and dark-plated `"SHIP"` / `"ORE"` tag derived from `frontUv`, and a framed PC-98 bump banner when attempting to step onto an occupied/blocked tile.
+  - **Right (`700, 48..102` & `718, 136, 122, 122`):** Planet name, `DIR (x,y)`, remaining `ORE` count, next-tile `BLOCKED: ...` status readout, and the 5-button D-pad (`Up`, `Down`, `Left`, `Right`, center `180`).
+- **Input & Solid-Tile Blocking:**
+  - **Movement (`StepPlanetSurface`):** Obstacles (`1`), the ship (`2`), and uncollected ore crates block movement onto their tile and record `bumpKind` (`1=obstacle, 2=ship, 3=ore`) + `bumpBack` for status feedback; collected ore tiles revert to ordinary walkable ground.
+  - **Keyboard (`PaintStage`):** `Up`/`W` (`1`, step forward), `Down`/`S` (`2`, step back), `Left`/`A` (`3`, turn left 90°), `Right`/`D` (`4`, turn right 90°), `R`/`X` (`7`, turn 180°) call `StepPlanetSurface(sim, kind)`.
+  - **Mouse (`ShellView::Click`):** `planetHits_` (`std::array<PlanetClickHit, 16>`) stores screen-space hit boxes for D-pad buttons (`1..4, 7`), the 1-tile-ahead ore crate (`5`, calls `sim.CollectPlanetOre`), and the 1-tile-ahead ship (`6`, sets `bridgeDispatch_ = false`).
 
 ---
 
@@ -101,4 +101,4 @@ Inside `ShellView::PaintStage` (`cpp/ui/Draw.cpp`):
 | Monitor UI & input | `cpp/ui/Draw.cpp` | `PaintStage`, `PaintPanelsScreen`, `ShellView::Click` |
 | Automated core probes | `cpp/tests/bridge_probe.cpp` | Planet arrival, `"dispatch"` row, free ore pickup & persistence assertions |
 
-To extend the overworld crawler (e.g., new landmarks, POIs from `Body::details["Map feature"]`, or distinct surface pickups), add tile/entity state to `PlanetSurfaceState`, place/seed it in `EnsurePlanetSurface`, rasterize it in the `d = 3..0` loop of `RenderPlanetSurfacePixels`, and wire any new `PlanetClickHit::kind` action in `ShellView::Click` and `Simulation`.
+To extend the overworld crawler (e.g., new landmarks, POIs from `Body::details["Map feature"]`, or distinct surface pickups), add tile/entity state to `PlanetSurfaceState`, place/seed it in `EnsurePlanetSurface`, rasterize it in the `d = 6..0` loop of `RenderPlanetSurfacePixels`, and wire any new `PlanetClickHit::kind` action in `ShellView::Click` and `Simulation`.
