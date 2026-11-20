@@ -1,4 +1,4 @@
-# Spaceship Command
+# Spaceship
 
 ![A simulation of decisions — tutorial card 1](assets/art/tutorial/spaceship01.png)
 
