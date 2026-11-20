@@ -598,7 +598,7 @@ int main(int argc, char** argv) {
 
   // ---- window ------------------------------------------------------------
   SetTraceLogLevel(LOG_WARNING);
-  SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT);
+  SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
   InitWindow(kDefaultWidth, kDefaultHeight, "Spaceship Command");
   SetWindowMinSize(1180, 720);
   SetTargetFPS(60);
