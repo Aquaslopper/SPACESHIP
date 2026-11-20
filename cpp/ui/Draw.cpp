@@ -3511,7 +3511,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
               }
             }
             const int oreIdx = oreAt(tx, ty);
-            if (oreIdx >= 0 && planetSurface_.visOreCount < 3) {
+            if (oreIdx >= 0) {
               const int ow = std::max(7, static_cast<int>(std::lround(14.0f * sTile)));
               const int oh = std::max(6, static_cast<int>(std::lround(10.0f * sTile)));
               const int ox = objCx - ow / 2;
@@ -3523,16 +3523,18 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
                          Color{236, 176, 68, 255});
                 fillRect(ox + ow / 3, oy + oh / 2, std::max(1, ow / 3), std::max(1, oh / 4),
                          Color{255, 226, 138, 255});
-                const int cx0 = std::clamp(ox, 0, W);
-                const int cx1 = std::clamp(ox + ow, 0, W);
-                if (cx1 > cx0) {
-                  const int slot = planetSurface_.visOreCount++;
-                  planetSurface_.visOreIdx[slot] = oreIdx;
-                  planetSurface_.visOreUv[slot] = Area{
-                      static_cast<float>(cx0) / static_cast<float>(W),
-                      static_cast<float>(std::max(0, oy)) / static_cast<float>(H),
-                      static_cast<float>(cx1 - cx0) / static_cast<float>(W),
-                      static_cast<float>(oh) / static_cast<float>(H)};
+                if (d == 1 && s == 0 && planetSurface_.visOreCount < 3) {
+                  const int cx0 = std::clamp(ox, 0, W);
+                  const int cx1 = std::clamp(ox + ow, 0, W);
+                  if (cx1 > cx0) {
+                    const int slot = planetSurface_.visOreCount++;
+                    planetSurface_.visOreIdx[slot] = oreIdx;
+                    planetSurface_.visOreUv[slot] = Area{
+                        static_cast<float>(cx0) / static_cast<float>(W),
+                        static_cast<float>(std::max(0, oy)) / static_cast<float>(H),
+                        static_cast<float>(cx1 - cx0) / static_cast<float>(W),
+                        static_cast<float>(oh) / static_cast<float>(H)};
+                  }
                 }
               }
             }
@@ -4190,14 +4192,15 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
           DrawRectangleLinesEx({oreBox.x, oreBox.y, oreBox.w, oreBox.h}, pen,
                                Color{255, 240, 170, 255});
         }
-        if (uv.w > 0.065f) {
-          const int orePx = std::max(9, static_cast<int>(std::lround(10.0f * scale)));
-          const char* tag = "ORE";
-          const float tw = TextWidth(tag, orePx, true);
-          Text(tag, static_cast<int>(oreBox.x + (oreBox.w - tw) * 0.5f),
-               static_cast<int>(oreBox.y - 12.0f * scale), orePx,
-               hov ? Color{255, 232, 136, 255} : Color{238, 196, 108, 255}, true);
-        }
+        const int orePx = std::max(9, static_cast<int>(std::lround(10.0f * scale)));
+        const char* tag = "ORE";
+        const float tw = TextWidth(tag, orePx, true);
+        const int tx = static_cast<int>(oreBox.x + (oreBox.w - tw) * 0.5f);
+        const int ty = static_cast<int>(oreBox.y - 13.0f * scale);
+        DrawRectangle(tx - 3, ty - 1, static_cast<int>(std::ceil(tw)) + 6, orePx + 2,
+                      Color{10, 12, 16, 224});
+        Text(tag, tx, ty, orePx,
+             hov ? Color{255, 236, 148, 255} : Color{248, 208, 104, 255}, true);
         addHit(oreBox, 5, planetSurface_.visOreIdx[s]);
       }
 
@@ -4237,21 +4240,27 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
            planet->klass.find("Rugged") != std::string::npos ||
            planet->klass.find("Barren") != std::string::npos ||
            planet->klass.find("Crater") != std::string::npos);
-      const Color mmTree0 = iceWorld   ? Color{68, 110, 142, 255}
-                          : oceanWorld ? Color{36, 94, 96, 255}
-                          : lavaWorld  ? Color{72, 34, 28, 255}
-                          : rockWorld  ? Color{96, 58, 42, 255}
-                                       : Color{42, 86, 44, 255};
-      const Color mmTree1 = iceWorld   ? Color{112, 162, 194, 255}
-                          : oceanWorld ? Color{56, 138, 128, 255}
-                          : lavaWorld  ? Color{144, 64, 38, 255}
-                          : rockWorld  ? Color{148, 92, 62, 255}
-                                       : Color{66, 120, 56, 255};
-      const Color mmTrail = iceWorld   ? Color{56, 76, 98, 255}
-                          : oceanWorld ? Color{118, 108, 84, 255}
-                          : lavaWorld  ? Color{56, 44, 44, 255}
-                          : rockWorld  ? Color{102, 72, 54, 255}
-                                       : Color{84, 66, 46, 255};
+      const Color mmObstFill = iceWorld   ? Color{84, 138, 250, 255}
+                             : oceanWorld ? Color{42, 212, 148, 255}
+                             : lavaWorld  ? Color{250, 96, 52, 255}
+                             : rockWorld  ? Color{208, 112, 58, 255}
+                                          : Color{58, 192, 76, 255};
+      const Color mmObstHi   = iceWorld   ? Color{208, 230, 255, 255}
+                             : oceanWorld ? Color{176, 250, 220, 255}
+                             : lavaWorld  ? Color{255, 196, 112, 255}
+                             : rockWorld  ? Color{246, 186, 132, 255}
+                                          : Color{164, 242, 152, 255};
+      const Color mmBorderStud = iceWorld   ? Color{56, 78, 122, 255}
+                               : oceanWorld ? Color{42, 92, 82, 255}
+                               : lavaWorld  ? Color{92, 52, 46, 255}
+                               : rockWorld  ? Color{88, 66, 52, 255}
+                                            : Color{52, 82, 56, 255};
+      const Color mmFloor{236, 238, 230, 255};
+      const Color mmWall{14, 17, 22, 255};
+      const Color mmGrid{34, 38, 46, 255};
+      const Color mmRoadFill{248, 190, 56, 255};
+      const Color mmRoadCurb{28, 22, 14, 255};
+      const Color mmShipFill{28, 220, 236, 255};
       const char* mmObstLabel = iceWorld   ? "ICE"
                               : oceanWorld ? "REEF"
                               : lavaWorld  ? "VENT"
@@ -4263,55 +4272,151 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
         if (tx < 0 || tx >= N || ty < 0 || ty >= N) { return 1; }
         return planetSurface_.tiles[ty * N + tx];
       };
+      auto isRoadCell = [&](int tx, int ty) -> bool {
+        const std::uint8_t v = tileAt(tx, ty);
+        return v == 3 || v == 2;
+      };
 
-      // Left side inside glass: crisp 9x9 retro minimap (no ore hints)
+      // Left side inside glass: high-contrast 9x9 dungeon-crawler minimap (no ore hints)
       const int infoPx = std::max(9, static_cast<int>(std::lround(10.0f * scale)));
       const int legPx = std::max(8, static_cast<int>(std::lround(8.5f * scale)));
-      const float mmCell = 13.0f;
-      const float mmX = 116.0f;
-      const float mmY = 76.0f;
-      const float mmW = N * mmCell + 6.0f;
-      Text("MAP", static_cast<int>(V(mmX, 54.0f).x), static_cast<int>(V(mmX, 54.0f).y),
-           infoPx, Color{206, 212, 208, 255}, true);
-      rectS(mmX - 3.0f, mmY - 3.0f, mmW, mmW, Color{6, 7, 9, 255});
-      DrawRectangleLinesEx({V(mmX - 3.0f, mmY - 3.0f).x, V(mmX - 3.0f, mmY - 3.0f).y,
-                            mmW * scale, mmW * scale}, pen, Color{58, 64, 68, 255});
+      const float mmCell = 14.0f;
+      const float mmX = 112.0f;
+      const float mmY = 68.0f;
+      const float mmSpan = N * mmCell;
+      Text("MAP", static_cast<int>(V(mmX - 2.0f, 48.0f).x), static_cast<int>(V(mmX - 2.0f, 48.0f).y),
+           infoPx, Color{240, 242, 236, 255}, true);
+
+      const int gx0 = static_cast<int>(std::lround(V(mmX, mmY).x));
+      const int gy0 = static_cast<int>(std::lround(V(mmX, mmY).y));
+      const int gx1 = static_cast<int>(std::lround(V(mmX + mmSpan, mmY + mmSpan).x));
+      const int gy1 = static_cast<int>(std::lround(V(mmX + mmSpan, mmY + mmSpan).y));
+      const int framePad = std::max(2, static_cast<int>(std::lround(2.5f * scale)));
+      const int rimPx = std::max(1, static_cast<int>(std::lround(scale)));
+      DrawRectangle(gx0 - framePad - rimPx, gy0 - framePad - rimPx,
+                    (gx1 - gx0) + 2 * (framePad + rimPx), (gy1 - gy0) + 2 * (framePad + rimPx),
+                    Color{232, 236, 228, 255});
+      DrawRectangle(gx0 - framePad, gy0 - framePad,
+                    (gx1 - gx0) + 2 * framePad, (gy1 - gy0) + 2 * framePad, mmWall);
+      DrawRectangle(gx0, gy0, gx1 - gx0, gy1 - gy0, mmGrid);
+
+      // Pass 1: high-contrast floor vs wall/obstacle tiles
       for (int my = 0; my < N; ++my) {
+        const int cy0 = static_cast<int>(std::lround(V(0.0f, mmY + my * mmCell).y));
+        const int cy1 = static_cast<int>(std::lround(V(0.0f, mmY + (my + 1) * mmCell).y)) - 1;
+        const int ch = std::max(2, cy1 - cy0);
         for (int mx = 0; mx < N; ++mx) {
-          const float cx = mmX + mx * mmCell;
-          const float cy = mmY + my * mmCell;
+          const int cx0 = static_cast<int>(std::lround(V(mmX + mx * mmCell, 0.0f).x));
+          const int cx1 = static_cast<int>(std::lround(V(mmX + (mx + 1) * mmCell, 0.0f).x)) - 1;
+          const int cw = std::max(2, cx1 - cx0);
           const std::uint8_t t = tileAt(mx, my);
-          Color cellCol = (t == 1) ? mmTree0 : (t == 3 ? mmTrail : Color{22, 26, 30, 255});
-          rectS(cx + 1.0f, cy + 1.0f, mmCell - 2.0f, mmCell - 2.0f, cellCol);
-          if (mx == planetSurface_.shipX && my == planetSurface_.shipY) {
-            rectS(cx + 2.5f, cy + 2.5f, mmCell - 5.0f, mmCell - 5.0f, Color{90, 198, 218, 255});
-          }
-          if (mx == planetSurface_.px && my == planetSurface_.py) {
-            const float pxC = cx + mmCell * 0.5f;
-            const float pyC = cy + mmCell * 0.5f;
-            const Color pCol{248, 246, 236, 255};
-            if (planetSurface_.dir == 0) {
-              DrawTriangle(V(pxC, pyC - 4.5f), V(pxC - 4.0f, pyC + 3.5f), V(pxC + 4.0f, pyC + 3.5f), pCol);
-            } else if (planetSurface_.dir == 1) {
-              DrawTriangle(V(pxC + 4.5f, pyC), V(pxC - 3.5f, pyC - 4.0f), V(pxC - 3.5f, pyC + 4.0f), pCol);
-            } else if (planetSurface_.dir == 2) {
-              DrawTriangle(V(pxC - 4.0f, pyC - 3.5f), V(pxC, pyC + 4.5f), V(pxC + 4.0f, pyC - 3.5f), pCol);
+          if (t == 1) {
+            DrawRectangle(cx0, cy0, cw, ch, mmWall);
+            const bool isEdge = (mx == 0 || mx == N - 1 || my == 0 || my == N - 1);
+            if (isEdge) {
+              const int pad = std::max(2, cw / 3);
+              if (cw > 2 * pad && ch > 2 * pad) {
+                DrawRectangle(cx0 + pad, cy0 + pad, cw - 2 * pad, ch - 2 * pad, mmBorderStud);
+              }
             } else {
-              DrawTriangle(V(pxC - 4.5f, pyC), V(pxC + 3.5f, pyC + 4.0f), V(pxC + 3.5f, pyC - 4.0f), pCol);
+              const int ins = std::max(2, cw / 5);
+              const int iw = std::max(2, cw - 2 * ins);
+              const int ih = std::max(2, ch - 2 * ins);
+              DrawRectangle(cx0 + ins, cy0 + ins, iw, ih, mmObstFill);
+              DrawRectangle(cx0 + ins, cy0 + ins, std::max(1, iw / 2), std::max(1, ih / 3), mmObstHi);
+            }
+          } else {
+            DrawRectangle(cx0, cy0, cw, ch, mmFloor);
+          }
+        }
+      }
+
+      // Pass 2: connected dark-curbed golden trail ribbon across road tiles
+      for (int roadPass = 0; roadPass < 2; ++roadPass) {
+        const Color rCol = (roadPass == 0) ? mmRoadCurb : mmRoadFill;
+        for (int my = 0; my < N; ++my) {
+          const int cy0 = static_cast<int>(std::lround(V(0.0f, mmY + my * mmCell).y));
+          const int cy1 = static_cast<int>(std::lround(V(0.0f, mmY + (my + 1) * mmCell).y)) - 1;
+          const int ch = std::max(2, cy1 - cy0);
+          for (int mx = 0; mx < N; ++mx) {
+            if (tileAt(mx, my) != 3) { continue; }
+            const int cx0 = static_cast<int>(std::lround(V(mmX + mx * mmCell, 0.0f).x));
+            const int cx1 = static_cast<int>(std::lround(V(mmX + (mx + 1) * mmCell, 0.0f).x)) - 1;
+            const int cw = std::max(2, cx1 - cx0);
+            const int mxC = cx0 + cw / 2;
+            const int myC = cy0 + ch / 2;
+            const int curb = (roadPass == 0) ? std::max(1, rimPx) : 0;
+            const int rw = std::max(2, cw * 24 / 100) + curb;
+            const int rh = std::max(2, ch * 24 / 100) + curb;
+            DrawRectangle(mxC - rw, myC - rh, 2 * rw, 2 * rh, rCol);
+            if (isRoadCell(mx, my - 1)) {
+              DrawRectangle(mxC - rw, cy0 - 1, 2 * rw, (myC - cy0) + rh + 1, rCol);
+            }
+            if (isRoadCell(mx, my + 1)) {
+              DrawRectangle(mxC - rw, myC - rh, 2 * rw, (cy1 + 1) - (myC - rh), rCol);
+            }
+            if (isRoadCell(mx - 1, my)) {
+              DrawRectangle(cx0 - 1, myC - rh, (mxC - cx0) + rw + 1, 2 * rh, rCol);
+            }
+            if (isRoadCell(mx + 1, my)) {
+              DrawRectangle(mxC - rw, myC - rh, (cx1 + 1) - (mxC - rw), 2 * rh, rCol);
             }
           }
         }
       }
-      const float legY = mmY + mmW + 8.0f;
-      rectS(mmX, legY + 2.0f, 6.0f, 6.0f, Color{90, 198, 218, 255});
-      Text("SHIP", static_cast<int>(V(mmX + 10.0f, legY).x), static_cast<int>(V(mmX + 10.0f, legY).y),
-           legPx, Color{186, 190, 184, 255});
-      rectS(mmX + 44.0f, legY + 2.0f, 6.0f, 6.0f, mmTrail);
-      Text("PATH", static_cast<int>(V(mmX + 54.0f, legY).x), static_cast<int>(V(mmX + 54.0f, legY).y),
-           legPx, Color{186, 190, 184, 255});
-      rectS(mmX + 88.0f, legY + 2.0f, 6.0f, 6.0f, mmTree1);
-      Text(mmObstLabel, static_cast<int>(V(mmX + 98.0f, legY).x), static_cast<int>(V(mmX + 98.0f, legY).y),
-           legPx, Color{186, 190, 184, 255});
+
+      // Pass 3: ship beacon and bold double-outlined player directional marker
+      {
+        const int sx0 = static_cast<int>(std::lround(V(mmX + planetSurface_.shipX * mmCell, 0.0f).x));
+        const int sx1 = static_cast<int>(std::lround(V(mmX + (planetSurface_.shipX + 1) * mmCell, 0.0f).x)) - 1;
+        const int sy0 = static_cast<int>(std::lround(V(0.0f, mmY + planetSurface_.shipY * mmCell).y));
+        const int sy1 = static_cast<int>(std::lround(V(0.0f, mmY + (planetSurface_.shipY + 1) * mmCell).y)) - 1;
+        const int sw = std::max(4, sx1 - sx0);
+        const int sh = std::max(4, sy1 - sy0);
+        const int sRim = std::max(1, rimPx);
+        const int sPad = std::max(2, sw / 5);
+        DrawRectangle(sx0 + sRim, sy0 + sRim, sw - 2 * sRim, sh - 2 * sRim, mmWall);
+        DrawRectangle(sx0 + sPad, sy0 + sPad, std::max(2, sw - 2 * sPad), std::max(2, sh - 2 * sPad), mmShipFill);
+        DrawRectangle(sx0 + sw / 2 - sRim, sy0 + sh / 2 - sRim, 2 * sRim, 2 * sRim, Color{252, 254, 255, 255});
+
+        const int px0 = static_cast<int>(std::lround(V(mmX + planetSurface_.px * mmCell, 0.0f).x));
+        const int px1 = static_cast<int>(std::lround(V(mmX + (planetSurface_.px + 1) * mmCell, 0.0f).x)) - 1;
+        const int py0 = static_cast<int>(std::lround(V(0.0f, mmY + planetSurface_.py * mmCell).y));
+        const int py1 = static_cast<int>(std::lround(V(0.0f, mmY + (planetSurface_.py + 1) * mmCell).y)) - 1;
+        const float pxC = (static_cast<float>(px0 + px1)) * 0.5f;
+        const float pyC = (static_cast<float>(py0 + py1)) * 0.5f;
+        const float cellPx = static_cast<float>(std::max(4, px1 - px0));
+        auto drawDirTri = [&](float tip, float base, float wing, Color col) {
+          if (planetSurface_.dir == 0) {
+            DrawTriangle(Vector2{pxC, pyC - tip}, Vector2{pxC - wing, pyC + base}, Vector2{pxC + wing, pyC + base}, col);
+          } else if (planetSurface_.dir == 1) {
+            DrawTriangle(Vector2{pxC + tip, pyC}, Vector2{pxC - base, pyC - wing}, Vector2{pxC - base, pyC + wing}, col);
+          } else if (planetSurface_.dir == 2) {
+            DrawTriangle(Vector2{pxC - wing, pyC - base}, Vector2{pxC, pyC + tip}, Vector2{pxC + wing, pyC - base}, col);
+          } else {
+            DrawTriangle(Vector2{pxC - tip, pyC}, Vector2{pxC + base, pyC + wing}, Vector2{pxC + base, pyC - wing}, col);
+          }
+        };
+        drawDirTri(cellPx * 0.48f, cellPx * 0.38f, cellPx * 0.42f, mmWall);
+        drawDirTri(cellPx * 0.27f, cellPx * 0.22f, cellPx * 0.23f, Color{255, 74, 58, 255});
+      }
+
+      const int legY = gy1 + framePad + rimPx + std::max(5, static_cast<int>(std::lround(6.0f * scale)));
+      const int swSize = std::max(6, static_cast<int>(std::lround(7.0f * scale)));
+      const int swGap = std::max(3, static_cast<int>(std::lround(4.0f * scale)));
+      const int itemGap = std::max(7, static_cast<int>(std::lround(9.0f * scale)));
+      int lx = gx0 - framePad;
+      auto drawLegendItem = [&](Color fill, const char* label) {
+        const int sy = legY + std::max(0, (legPx - swSize) / 2);
+        DrawRectangle(lx - 1, sy - 1, swSize + 2, swSize + 2, Color{232, 236, 228, 255});
+        DrawRectangle(lx, sy, swSize, swSize, fill);
+        const int tx = lx + swSize + swGap;
+        Text(label, tx, legY, legPx, Color{234, 238, 232, 255}, true);
+        lx = tx + static_cast<int>(std::ceil(TextWidth(label, legPx, true))) + itemGap;
+      };
+      drawLegendItem(mmShipFill, "SHIP");
+      drawLegendItem(mmRoadFill, "PATH");
+      drawLegendItem(mmObstFill, mmObstLabel);
 
       // Right side inside glass: tiny heading/ore readout + 4-way arrow pad
       static const char* kDirNames[4] = {"N", "E", "S", "W"};
@@ -10009,7 +10114,15 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
       if ((hit.kind >= 1 && hit.kind <= 4) || hit.kind == 7) {
         StepPlanetSurface(hit.kind);
       } else if (hit.kind == 5) {
-        sim.CollectPlanetOre(sim.Map().here, hit.arg);
+        static constexpr int kStepDx[4] = {0, 1, 0, -1};
+        static constexpr int kStepDy[4] = {-1, 0, 1, 0};
+        const int frontX = planetSurface_.px + kStepDx[planetSurface_.dir & 3];
+        const int frontY = planetSurface_.py + kStepDy[planetSurface_.dir & 3];
+        if (hit.arg >= 0 && hit.arg < planetSurface_.oreCount &&
+            planetSurface_.oreX[hit.arg] == frontX &&
+            planetSurface_.oreY[hit.arg] == frontY) {
+          sim.CollectPlanetOre(sim.Map().here, hit.arg);
+        }
       } else if (hit.kind == 6) {
         bridgeDispatch_ = false;
       }
