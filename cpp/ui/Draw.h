@@ -55,7 +55,13 @@ class ShellView {
   ~ShellView();
   // Frees the hull mesh, material and shader. Call while the window, and with
   // it the GL context, still exists; the destructor runs after CloseWindow.
-  void ReleaseGraphics() { ReleaseWrenMesh(); }
+  void ReleaseGraphics() {
+    ReleaseWrenMesh();
+    if (planetTex_.id != 0) {
+      if (IsWindowReady()) { UnloadTexture(planetTex_); }
+      planetTex_ = Texture2D{};
+    }
+  }
   ShellView(const ShellView&) = delete;
   ShellView& operator=(const ShellView&) = delete;
 
@@ -209,6 +215,7 @@ class ShellView {
   bool PaintScenePart(const MachinePart& part, const Area& origin);
   void PaintStage(const Simulation& sim, const TaskStage& stage, const Area& origin);
   void EnsurePlanetSurface(const Simulation& sim);
+  void RenderPlanetSurfacePixels(const Simulation& sim);
   void StepPlanetSurface(int actionKind);
   void PaintIdle(Simulation& sim);
   float PaintActionBand(const std::string& title, const std::string& note,
@@ -291,9 +298,12 @@ class ShellView {
   float bridgeLook_ = 0.0f;  // turns from forward, -0.5 to +0.5
   bool draggingBearing_ = false;
   bool bridgeDispatch_ = false;
+  float bridgeDispatchOpen_ = 0.0f;
   struct PlanetSurfaceState {
     static constexpr int kSize = 9;
     static constexpr int kMaxOre = 5;
+    static constexpr int kTexW = 160;
+    static constexpr int kTexH = 96;
     std::string planetId;
     std::uint8_t tiles[kSize * kSize]{};  // 0=open surface, 1=ridge/rock, 2=ship pad
     int oreCount = 0;
@@ -304,8 +314,22 @@ class ShellView {
     int px = 4;
     int py = 6;
     int dir = 0;  // 0=N, 1=E, 2=S, 3=W
+
+    // Cached render state so the 160x96 buffer only rasterizes on change
+    std::string renderPlanetId;
+    int renderPx = -1;
+    int renderPy = -1;
+    int renderDir = -1;
+    unsigned renderOreMask = 0xFFFFu;
+    bool hasShipSprite = false;
+    Area shipUv{};
+    int visOreCount = 0;
+    int visOreIdx[3]{};
+    Area visOreUv[3]{};
   };
   PlanetSurfaceState planetSurface_{};
+  Texture2D planetTex_{};
+  std::vector<Color> planetPixels_;
   struct PlanetClickHit {
     Area box;
     int kind = 0;  // 1=up, 2=down, 3=left, 4=right, 5=ore, 6=ship, 7=turn180
