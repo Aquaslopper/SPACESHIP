@@ -60,16 +60,17 @@ class IntroVideo {
         PlayMusicStream(music_);
       }
     }
-    const double elapsed = now - start_;
-    if (elapsed >= duration_) { Close(); return; }
-    const float remaining = static_cast<float>(std::clamp(duration_ - elapsed, 0.0, 1.0));
-    opacity_ = remaining * remaining * (3.0f - 2.0f * remaining);
+    elapsed_ = now - start_;
+    if (elapsed_ >= duration_ + kBlackHold + kMenuFade) { Close(); return; }
+    const double fadeStart = std::min(18.0, std::max(0.0, duration_ - 1.0));
+    opacity_ = Ease((duration_ - elapsed_) / (duration_ - fadeStart));
     if (music_.stream.buffer) {
       SetMusicVolume(music_, gain * opacity_);
       UpdateMusicStream(music_);
     }
+    if (elapsed_ >= duration_) { return; }
     plm_frame_t* latest = nullptr;
-    while (!plm_has_ended(decoder_) && frameTime_ + frameStep_ <= elapsed) {
+    while (!plm_has_ended(decoder_) && frameTime_ + frameStep_ <= elapsed_) {
       auto* frame = plm_decode_video(decoder_);
       if (!frame) { break; }
       frameTime_ = frame->time;
@@ -85,16 +86,17 @@ class IntroVideo {
     if (!Pending() || start_ < 0.0) { return; }
     const float width = static_cast<float>(GetScreenWidth());
     const float height = static_cast<float>(GetScreenHeight());
+    if (elapsed_ >= duration_) {
+      const float reveal = Ease((elapsed_ - duration_ - kBlackHold) / kMenuFade);
+      DrawRectangleRec({0, 0, width, height}, Fade(BLACK, 1.0f - reveal));
+      return;
+    }
+    DrawRectangleRec({0, 0, width, height}, BLACK);
     const float tw = static_cast<float>(texture_.width);
     const float th = static_cast<float>(texture_.height);
     const float scale = std::min(width / tw, height / th);
     const Rectangle dest{(width - tw * scale) / 2.0f, (height - th * scale) / 2.0f,
                          tw * scale, th * scale};
-    const Color bars = Fade(BLACK, opacity_);
-    DrawRectangleRec({0, 0, width, dest.y}, bars);
-    DrawRectangleRec({0, dest.y + dest.height, width, dest.y}, bars);
-    DrawRectangleRec({0, dest.y, dest.x, dest.height}, bars);
-    DrawRectangleRec({dest.x + dest.width, dest.y, dest.x, dest.height}, bars);
     DrawTexturePro(texture_, {0, 0, tw, th}, dest, {0, 0}, 0, Fade(WHITE, opacity_));
   }
 
@@ -105,6 +107,14 @@ class IntroVideo {
   }
 
  private:
+  static constexpr double kBlackHold = 0.050;
+  static constexpr double kMenuFade = 1.25;
+
+  static float Ease(double value) {
+    const float t = static_cast<float>(std::clamp(value, 0.0, 1.0));
+    return t * t * (3.0f - 2.0f * t);
+  }
+
   void Convert(plm_frame_t* frame) {
     plm_frame_to_rgba(frame, pixels_.data(), static_cast<int>(frame->width * 4));
   }
@@ -114,6 +124,7 @@ class IntroVideo {
   Music music_{};
   std::vector<unsigned char> pixels_;
   double start_ = -1.0;
+  double elapsed_ = 0.0;
   double duration_ = 0.0;
   double frameStep_ = 0.0;
   double frameTime_ = 0.0;
