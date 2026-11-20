@@ -218,7 +218,7 @@ class ShellView {
   void PaintStage(const Simulation& sim, const TaskStage& stage, const Area& origin);
   void EnsurePlanetSurface(const Simulation& sim);
   void RenderPlanetSurfacePixels(const Simulation& sim);
-  void StepPlanetSurface(int actionKind);
+  void StepPlanetSurface(const Simulation& sim, int actionKind);
   void PaintIdle(Simulation& sim);
   float PaintActionBand(const std::string& title, const std::string& note,
                        const std::vector<ProgressButton>& buttons,
@@ -324,11 +324,11 @@ class ShellView {
     int renderPy = -1;
     int renderDir = -1;
     unsigned renderOreMask = 0xFFFFu;
-    bool hasShipSprite = false;
-    Area shipUv{};
-    int visOreCount = 0;
-    int visOreIdx[3]{};
-    Area visOreUv[3]{};
+    int frontKind = 0;          // 0=none, 5=ore, 6=ship (only at d==1, s==0)
+    int frontArg = 0;
+    Area frontUv{};
+    std::uint8_t bumpKind = 0;  // 0=none, 1=obstacle, 2=ship, 3=ore
+    bool bumpBack = false;
   };
   PlanetSurfaceState planetSurface_{};
   Texture2D planetTex_{};
