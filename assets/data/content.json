@@ -232,7 +232,7 @@
       "id": "power",
       "link": "engine",
       "linkLabel": "Open Engine Room",
-      "text": "The drive loses one percent every four clicks. Run the drive restores ten percent per click and its green bar holds four clicks, recharging as other controls are used. At 60% condition an assigned engineer presses the button at his trained pace until the drive is full or the green bar is empty. A dead drive stops travel. Energy falls over time; powered work pauses at zero. Right-click the energy or fuel gauge to use a fuel cell. The Power Bus and Shield Array exchange energy and shields with conversion loss.",
+      "text": "The drive loses one percent every click.",
       "title": "Power, fuel and drive"
     },
     {

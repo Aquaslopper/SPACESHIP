@@ -576,8 +576,8 @@ Catalog Catalog::LoadFromAssets(const std::filesystem::path& assetDir) {
 
   {
     const Json& engine = Field(survival, "engine", "survival.json");
-    catalog.rules.engine.wearEvery = Number(engine, "wearEvery", "engine", 4);
-    catalog.rules.engine.wearStep = Number(engine, "wearStep", "engine", 1);
+    catalog.rules.engine.wearEvery = Number(engine, "wearEvery", "engine", 1);
+    catalog.rules.engine.wearStep = Number(engine, "wearStep", "engine", 0.25);
     catalog.rules.engine.warnBelow = Number(engine, "warnBelow", "engine", 50);
     catalog.rules.engine.engineerAt = Number(engine, "engineerAt", "engine", 60);
     catalog.rules.engine.dryEnergy = Number(engine, "dryEnergy", "engine", 1);
