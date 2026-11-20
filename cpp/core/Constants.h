@@ -7,8 +7,8 @@
 namespace ship {
 
 struct EngineRules {
-  double wearEvery = 2;
-  double wearStep = 1;
+  double wearEvery = 1;
+  double wearStep = 0.25;
   double warnBelow = 50;
   double engineerAt = 60;
   double dryEnergy = 1;
