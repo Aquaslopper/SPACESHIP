@@ -346,22 +346,23 @@ class ShellView {
       c = static_cast<std::uint8_t>((c & ~0x1Cu) | ((v & 0x07u) << 2));
     }
 
-    // Cached render state so the 160x96 buffer only rasterizes on change
-    std::string renderPlanetId;
+    // Cached render state so the 160x96 buffer only rasterizes on change (0 B heap)
+    std::uint64_t renderPlanetHash = 0;
+    std::size_t renderMarksCount = ~std::size_t{0};
+    int renderLotSerial = -1;
     std::int8_t renderPx = -1;
     std::int8_t renderPy = -1;
     std::int8_t renderDir = -1;
     std::int8_t renderInMine = -1;
-    unsigned renderOreMask = 0xFFFFu;
+    std::uint8_t renderOreMask = 0xFFu;
+    std::uint8_t bumpKind = 0;  // 0=none, 1=prop, 2=ship, 3=ore, 4=cliff/wall
+    bool bumpBack = false;
     int frontKind = 0;          // 0=none, 5=ore, 6=ship, 8=mine/exit (at d==1, s==0)
     int frontArg = 0;
     Area frontUv{};
-    std::uint8_t bumpKind = 0;  // 0=none, 1=prop, 2=ship, 3=ore, 4=cliff/wall
-    bool bumpBack = false;
   };
   PlanetSurfaceState planetSurface_{};
   Texture2D planetTex_{};
-  std::vector<Color> planetPixels_;
   struct PlanetClickHit {
     Area box;
     int kind = 0;  // 1=up, 2=down, 3=left, 4=right, 5=ore, 6=ship, 7=turn180, 8=portal
