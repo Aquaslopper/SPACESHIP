@@ -302,27 +302,45 @@ class ShellView {
   bool bridgeDispatch_ = false;
   float bridgeDispatchOpen_ = 0.0f;
   struct PlanetSurfaceState {
-    static constexpr int kSize = 9;
+    static constexpr int kSize = 16;
+    static constexpr int kSizeShift = 4;
+    static constexpr int kViewSize = 9;
     static constexpr int kMaxOre = 5;
     static constexpr int kTexW = 160;
     static constexpr int kTexH = 96;
     std::string planetId;
-    std::uint8_t tiles[kSize * kSize]{};    // 0=open surface, 1=obstacle/border, 2=ship pad, 3=trail
-    std::uint8_t variant[kSize * kSize]{};  // deterministic per-tile visual variant (0..7)
-    int oreCount = 0;
-    int oreX[kMaxOre]{};
-    int oreY[kMaxOre]{};
-    int shipX = 4;
-    int shipY = 7;
-    int px = 4;
-    int py = 6;
-    int dir = 0;  // 0=N, 1=E, 2=S, 3=W
+    // Packed 16x16 world grid (256 B): bits 0..1 = tile (0=open, 1=obstacle/border,
+    // 2=ship pad, 3=trail), bits 2..4 = deterministic visual variant (0..7).
+    std::uint8_t cells[kSize * kSize]{};
+    std::uint8_t oreCount = 0;
+    std::uint8_t oreX[kMaxOre]{};
+    std::uint8_t oreY[kMaxOre]{};
+    std::uint8_t shipX = 8;
+    std::uint8_t shipY = 14;
+    std::uint8_t px = 8;
+    std::uint8_t py = 13;
+    std::uint8_t dir = 0;  // 0=N, 1=E, 2=S, 3=W
+
+    std::uint8_t Tile(int x, int y) const {
+      return static_cast<std::uint8_t>(cells[(y << kSizeShift) | x] & 0x03u);
+    }
+    int Variant(int x, int y) const {
+      return static_cast<int>((cells[(y << kSizeShift) | x] >> 2) & 0x07u);
+    }
+    void SetTile(int x, int y, std::uint8_t t) {
+      std::uint8_t& c = cells[(y << kSizeShift) | x];
+      c = static_cast<std::uint8_t>((c & ~0x03u) | (t & 0x03u));
+    }
+    void SetVariant(int x, int y, std::uint8_t v) {
+      std::uint8_t& c = cells[(y << kSizeShift) | x];
+      c = static_cast<std::uint8_t>((c & ~0x1Cu) | ((v & 0x07u) << 2));
+    }
 
     // Cached render state so the 160x96 buffer only rasterizes on change
     std::string renderPlanetId;
-    int renderPx = -1;
-    int renderPy = -1;
-    int renderDir = -1;
+    std::int8_t renderPx = -1;
+    std::int8_t renderPy = -1;
+    std::int8_t renderDir = -1;
     unsigned renderOreMask = 0xFFFFu;
     int frontKind = 0;          // 0=none, 5=ore, 6=ship (only at d==1, s==0)
     int frontArg = 0;
