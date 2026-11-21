@@ -1,0 +1,38 @@
+# Direct viewer setup: Garnet II's surface, a blocked tree, and the mine.
+hidetitle
+frames 3
+planet pl-gen-1-world
+open room bridge
+dispatch
+frames 40
+planetmap
+shot overworld-spawn
+planetpos 8 11 0
+frames 2
+shot overworld-blocked
+planetpos 8 12 1
+frames 2
+shot overworld-east
+planetpos 10 11 0
+frames 2
+shot overworld-portal
+planetstep 8
+frames 2
+planetmap
+shot overworld-mine
+planetstep 7
+planetstep 8
+frames 2
+planetmap
+shot overworld-return
+# Collect the ore directly east of (8,12), then return to the ship.
+planetpos 8 12 1
+frames 2
+click 800 365
+frames 2
+shot overworld-collected
+planetpos 8 13 2
+frames 2
+click 800 350
+frames 10
+shot overworld-back-on-bridge

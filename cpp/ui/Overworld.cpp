@@ -1319,8 +1319,9 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     }
   };
 
+  int propClipLeft = 0, propClipRight = W, propClipTop = 0, propClipBottom = H;
   auto putPx = [&](int x, int y, std::uint8_t idx) {
-    if (x >= 0 && x < W && y >= 0 && y < H) {
+    if (x >= propClipLeft && x < propClipRight && y >= propClipTop && y < propClipBottom) {
       if (idx == inkOut) {
         idxBuf[y * W + x] = activeInk;
         return;
@@ -1339,10 +1340,10 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     putPx(x, y, thr > kBayer4[y & 3][x & 3] ? b : a);
   };
   auto fillRect = [&](int x, int y, int w, int h, std::uint8_t idx) {
-    const int x0 = std::max(0, x);
-    const int y0 = std::max(0, y);
-    const int x1 = std::min(W, x + w);
-    const int y1 = std::min(H, y + h);
+    const int x0 = std::max(propClipLeft, x);
+    const int y0 = std::max(propClipTop, y);
+    const int x1 = std::min(propClipRight, x + w);
+    const int y1 = std::min(propClipBottom, y + h);
     if (idx == inkOut) {
       for (int py = y0; py < y1; ++py) {
         for (int px = x0; px < x1; ++px) {
@@ -4115,14 +4116,9 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     activeFog = static_cast<int>(inMine ? kMineDepthFog[d] : kDepthFog[d]);
     activeInk = inkForFog(activeFog);
     const float zMid = (d == 0) ? 0.54f : static_cast<float>(d);
-    const float zFar = (d == 0) ? 0.62f : static_cast<float>(d) + 0.24f;
-    const float zNear = (d == 0) ? 0.48f : std::max(0.54f, static_cast<float>(d) - 0.24f);
-    const int gyFar = yAtZ(zFar);
     const int gyMid = yAtZ(zMid);
-    const int gyNear = yAtZ(zNear);
     const float sTile = ((d == 0) ? 1.35f : (1.02f / zMid)) * static_cast<float>(kResScale);
     const float htMid = halfTileAtZ(zMid);
-    const float htNear = halfTileAtZ(zNear);
     const int maxS = d + 1;
 
     for (int k = maxS; k >= 0; --k) {
@@ -4136,58 +4132,94 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
         const std::uint8_t tile = tileAt(tx, ty);
         const int var = variantAt(tx, ty);
         const float tcxMid = tileCenterAtZ(s, zMid);
-        const float tcxNear = tileCenterAtZ(s, zNear);
 
         if (tile == 1) {
-          // Surface: portal = craggy cave mound; var 7 = ancient stone fortress ruin;
-          // var 4..6 = sloped craggy Clouds of Xeen mountains; var 0..3 = towering forests/groves.
-          // Underground mine: all var 4..7 = full-height beveled World of Xeen dungeon walls.
-          if (!inMine && tx == static_cast<int>(planetSurface_.portalX) &&
+          if (inMine) {
+            drawCliffCell(tx, ty, d, s, var);
+            continue;
+          }
+
+          // A blocked surface cell fills its square: draw its exposed faces
+          // on tile edges instead of centering disconnected props within it.
+          const float nearZ = d == 0 ? 0.35f : static_cast<float>(d) - 0.5f;
+          const float farZ = static_cast<float>(d) + 0.5f;
+          const bool side = (s < 0 && tileAt(tx + rdx, ty + rdy) != 1u) ||
+                            (s > 0 && tileAt(tx + ldx, ty + ldy) != 1u);
+          const bool front = d > 0 && tileAt(tx - fdx, ty - fdy) != 1u;
+          const bool vegetation = biomeIdx == 0 && var < 4;
+          for (int face = 0; face < 2; ++face) {
+            if ((face == 0 && !side) || (face == 1 && !front)) { continue; }
+            int x0, x1, top0, top1, bottom0, bottom1;
+            if (face == 0) {
+              const float lat = static_cast<float>(s) + (s < 0 ? 0.5f : -0.5f);
+              const int nx = cliffX(nearZ, lat), fx = cliffX(farZ, lat);
+              const int nt = cliffYTopScaled(nearZ, 0.85f), ft = cliffYTopScaled(farZ, 0.85f);
+              const int nb = cliffYBot(nearZ), fb = cliffYBot(farZ);
+              x0 = s < 0 ? nx : fx; x1 = s < 0 ? fx : nx;
+              top0 = s < 0 ? nt : ft; top1 = s < 0 ? ft : nt;
+              bottom0 = s < 0 ? nb : fb; bottom1 = s < 0 ? fb : nb;
+            } else {
+              x0 = cliffX(nearZ, static_cast<float>(s) - 0.5f);
+              x1 = cliffX(nearZ, static_cast<float>(s) + 0.5f);
+              top0 = top1 = cliffYTopScaled(nearZ, 0.85f);
+              bottom0 = bottom1 = cliffYBot(nearZ);
+            }
+            const int span = std::max(1, x1 - x0);
+            const int fromX = std::max({0, x0, static_cast<int>(rowX0[d])});
+            const int toX = std::min({W - 1, x1, static_cast<int>(rowX1[d])});
+            for (int x = fromX; x <= toX; ++x) {
+              if (((depthColOcc[d][x >> 5] >> (x & 31)) & 1u) != 0u) { continue; }
+              const int u = (x - x0) * 128 / span;
+              const int top = top0 + (top1 - top0) * (x - x0) / span;
+              const int bottom = bottom0 + (bottom1 - bottom0) * (x - x0) / span;
+              const int height = std::max(1, bottom - top);
+              for (int y = std::max(0, top); y <= std::min(H - 1, bottom); ++y) {
+                const int v = (y - top) * 128 / height;
+                unsigned hash = static_cast<unsigned>(u * 73 + v * 151 + tx * 37 + ty * 91);
+                hash ^= hash >> 7;
+                hash *= 2654435761u;
+                hash ^= hash >> 13;
+                std::uint8_t color;
+                if (vegetation) {
+                  // Overlapping crowns and trunks against dark undergrowth.
+                  const int treeX = (u + (var & 1) * 8) % 32 - 16;
+                  const int crownX = (u + 8 + (var & 1) * 8) % 32 - 16;
+                  const int crownY = v - 40;
+                  const bool crown = treeX * treeX * 3 + crownY * crownY < 1650 ||
+                                     crownX * crownX * 3 + (v - 23) * (v - 23) < 850;
+                  if (v > 58 && std::abs(treeX) < 3) {
+                    color = treeX < 0 ? pathHi : trunkCol;
+                  } else if (crown) {
+                    const unsigned fleck = (hash ^ (hash >> 3)) % 16u;
+                    color = fleck < 3u ? leaf2 : (fleck < 11u ? leaf1 : leaf0);
+                    if (treeX * treeX * 3 + crownY * crownY > 1350 && v > 28) { color = leaf0; }
+                  } else {
+                    color = (hash % 11u < 2u) ? leaf1 : leaf0;
+                  }
+                } else {
+                  const std::uint8_t stone = kCragRockTex.px[((v / 2) + ty * 3) & 31][((u / 2) + tx * 5) & 31];
+                  color = stone == 0u ? rockDark : stone == 3u ? rockHi : rockMid;
+                  if (iceWorld && stone == 3u) { color = accent1; }
+                  if (lavaWorld && stone == 0u && (hash % 13u) == 0u) { color = accent0; }
+                }
+                if (face == 0 && ((x + y) & 1) == 0) { color = vegetation ? leaf0 : rockDark; }
+                if (y == top || y == bottom) { color = inkOut; }
+                putPx(x, y, color);
+              }
+            }
+            if (face == 1 && var < 4 && d <= 4) {
+              propClipLeft = std::clamp(fromX, 0, W);
+              propClipRight = std::clamp(toX + 1, 0, W);
+              propClipTop = std::clamp(top0, 0, H);
+              propClipBottom = std::clamp(bottom0 + 1, 0, H);
+              drawBiomeProp(var % 4, x0 + span / 4, bottom0, sTile * 1.7f);
+              drawBiomeProp((var + 1) % 4, x0 + span * 3 / 4, bottom0, sTile * 1.7f);
+              propClipLeft = 0; propClipRight = W; propClipTop = 0; propClipBottom = H;
+            }
+          }
+          if (tx == static_cast<int>(planetSurface_.portalX) &&
               ty == static_cast<int>(planetSurface_.portalY)) {
             drawCaveMoundPortal(tx, ty, d, s);
-            continue;
-          }
-          if ((var & 4) != 0) {
-            if (inMine || var == 7) {
-              drawCliffCell(tx, ty, d, s, var);
-            } else {
-              drawMountainCell(tx, ty, d, s, var);
-            }
-            continue;
-          }
-          const float groveBoost = (biomeIdx == 0) ? 1.05f : 1.24f;
-          if (d == 0) {
-            // Peripheral l0/r0 foliage/rock peeking in at extreme left/right edge only
-            const int edgeX = (s < 0)
-                ? static_cast<int>(std::lround(tcxMid + htMid * 0.62f))
-                : static_cast<int>(std::lround(tcxMid - htMid * 0.62f));
-            drawBiomeProp(var % 4, edgeX, gyMid, sTile * 0.96f * groveBoost);
-            continue;
-          }
-          if (isBorderTile(tx, ty)) {
-            // Monumental perimeter forest wall / biome crag grove
-            const int lx = static_cast<int>(std::lround(tcxMid - htMid * 0.42f));
-            const int rx = static_cast<int>(std::lround(tcxMid + htMid * 0.42f));
-            drawBiomeProp((var + 0) % 4, lx, gyMid, sTile * 1.04f * groveBoost);
-            drawBiomeProp((var + 1) % 4, rx, gyMid + 1, sTile * 1.02f * groveBoost);
-            drawScrubBush(static_cast<int>(std::lround(tcxNear + ((var & 1) ? -0.15f : 0.15f) * htNear)),
-                          gyNear, sTile * 0.80f);
-          } else {
-            // Dense towering forest grove / monumental biome obstacle cluster
-            const float sign = (var & 1) ? -1.0f : 1.0f;
-            const int xMain = static_cast<int>(std::lround(tcxMid + sign * htMid * 0.28f));
-            const int xSec = static_cast<int>(std::lround(tcxMid - sign * htMid * 0.36f));
-            const int xAcc = static_cast<int>(std::lround(tcxNear + sign * htNear * 0.12f));
-            drawBiomeProp((var + 1) % 4, xSec, gyFar + 1, sTile * 0.92f * groveBoost);
-            if (s == 0 && d == 1) {
-              drawBiomeProp((var + 2) % 4, static_cast<int>(std::lround(tcxMid)), gyMid, sTile * 1.02f * groveBoost);
-            }
-            drawBiomeProp(var % 4, xMain, gyMid + 1, sTile * 1.10f * groveBoost);
-            if (var & 2) {
-              drawScrubBush(xAcc, gyNear, sTile * 0.82f);
-            } else {
-              drawBiomeProp(3, xAcc, gyNear, sTile * 0.74f * groveBoost);
-            }
           }
           continue;
         }

@@ -73,7 +73,11 @@ VIEWER_BIN=build/old/viewer SPACESHIP_REPO=/path/to/tree ./run.sh scripts/machin
 ./run.sh scripts/s07.txt                     # 1440 x 940, Segoe stand-in
 ./run.sh scripts/machine.txt 1440 940 dejavu # the face the repository ships
 ./run.sh scripts/machine.txt 1180 720        # the client's smallest window
+./run.sh scripts/overworld.txt 1440 940 dejavu # Dispatch, mine, ore and return
 ```
+
+The overworld scenario uses 1440 x 940 click coordinates. The viewer draws the
+Dispatch blocker and caches the Bridge background as the client does.
 
 Frames go to `out/` (or `$VIEWER_OUT`). With `textlog on`, each `NAME.png` gets
 a `NAME.text.tsv`: one line per string the game painted, with
@@ -125,6 +129,9 @@ One command per line. `#` starts a comment.
 | `purse N`, `job CREW JOB`, `ack ID`, `layer ID` | Shiplets, a crew job, acknowledge, chart layer. |
 | `target ID`, `travel`, `scan`, `dock`, `undock`, `cook`, `maint`, `seat N`, `bank`, `hire ID`, `stagejob CREW JOB` | The simulation's own verbs. `hire` follows the game's rules: docked at a port, the candidate's own port if one is named, a free berth, the fee in the purse. `stagejob` writes a job on the hand's order sheet, as the job list in the Crew Quarters does; `job` sets it at once. |
 | `theme ID`, `fontstep 0-3`, `largetext 0\|1` | `classic`, `void`, `aurora`, `nebula`, `ember`; reading size. |
+| `planets`, `planet ID` | List planets, or put the viewer's voyage on a planet and generate its surface. |
+| `dispatch`, `planetstep KIND` | Open the Dispatch view, or invoke its movement: 1 forward, 2 backward, 3 left, 4 right, 7 around, 8 portal. Open the Bridge room first. |
+| `planetpos X Y DIR`, `planetmap` | Set the viewer's crawler position and direction (0 north, 1 east, 2 south, 3 west), or print its current layer (`.` obstacle, space open, `S` ship pad, `+` trail, `@` player). Position is set directly and need not be walkable. |
 
 Every scenario after the title screen starts with the lines in
 `scripts/common-launch.txt`. The viewer has no include command, so the scripts
