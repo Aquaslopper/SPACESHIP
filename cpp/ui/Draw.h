@@ -61,6 +61,10 @@ class ShellView {
       if (IsWindowReady()) { UnloadTexture(planetTex_); }
       planetTex_ = Texture2D{};
     }
+    if (planetScanlineTex_.id != 0) {
+      if (IsWindowReady()) { UnloadTexture(planetScanlineTex_); }
+      planetScanlineTex_ = Texture2D{};
+    }
   }
   ShellView(const ShellView&) = delete;
   ShellView& operator=(const ShellView&) = delete;
@@ -311,8 +315,8 @@ class ShellView {
     static constexpr int kSizeShift = 4;
     static constexpr int kViewSize = 9;
     static constexpr int kMaxOre = 5;
-    static constexpr int kTexW = 160;
-    static constexpr int kTexH = 96;
+    static constexpr int kTexW = 240;
+    static constexpr int kTexH = 144;
     std::string planetId;
     // Packed 16x16 world grid (256 B): bits 0..1 = tile (0=open, 1=obstacle/border,
     // 2=ship pad, 3=trail), bits 2..4 = deterministic visual variant (0..7).
@@ -367,6 +371,7 @@ class ShellView {
   };
   PlanetSurfaceState planetSurface_{};
   Texture2D planetTex_{};
+  Texture2D planetScanlineTex_{};
   struct PlanetClickHit {
     Area box;
     int kind = 0;  // 1=up, 2=down, 3=left, 4=right, 5=ore, 6=ship, 7=turn180, 8=portal
