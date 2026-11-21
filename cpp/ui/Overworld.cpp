@@ -34,9 +34,10 @@ void ShellView::LoadPlanetLayer(const Simulation& sim, std::uint8_t targetInMine
   oreHash ^= oreHash << 13;
   oreHash ^= oreHash >> 17;
   oreHash ^= oreHash << 5;
-  const int totalOreGoal = 3 + static_cast<int>(oreHash % 3u);  // 3..5 total per planet
-  const int mineOreGoal = (totalOreGoal >= 4) ? 2 : 1;          // 1..2 in underground mine
-  const int surfOreGoal = totalOreGoal - mineOreGoal;           // 2..3 on planet surface
+  const int density = static_cast<int>((oreHash >> 8) % 4u);
+  const int totalOreGoal = std::min(5, 3 + static_cast<int>(oreHash % 3u) + (density >= 2 ? 1 : 0));
+  const int mineOreGoal = (totalOreGoal >= 4) ? 2 : 1;
+  const int surfOreGoal = totalOreGoal - mineOreGoal;
 
   // Compact 288 B stack BFS (32 B row bitset + 256 B packed (y << 4) | x queue)
   auto connectedFrom = [&](int startX, int startY, std::uint8_t layerBit, bool checkLayerOres) -> bool {
@@ -127,7 +128,7 @@ void ShellView::LoadPlanetLayer(const Simulation& sim, std::uint8_t targetInMine
     planetSurface_.shipY = static_cast<std::uint8_t>(kShipY);
     planetSurface_.SetTile(kSpawnX, kShipY, 2u);
 
-    const int obstacleGoal = 24 + static_cast<int>(nextRand() % 9u);
+    const int obstacleGoal = 24 + static_cast<int>(nextRand() % 9u) + density * 12;
     int placed = 0;
     for (int attempt = 0; attempt < 256 && placed < obstacleGoal; ++attempt) {
       const int rx = 1 + static_cast<int>(nextRand() % (N - 2));
@@ -171,7 +172,7 @@ void ShellView::LoadPlanetLayer(const Simulation& sim, std::uint8_t targetInMine
     markTrail(kSpawnX, kSpawnY);
     markTrail(kSpawnX, kSpawnY - 1);
     int wx = kSpawnX, wy = kSpawnY - 1, wDir = 0;
-    const int mainGoal = 22 + static_cast<int>(nextRand() % 9u);
+    const int mainGoal = 22 + static_cast<int>(nextRand() % 9u) + density * 4;
     for (int step = 0; step < mainGoal; ++step) {
       int cands[8];
       int nCand = 0;
@@ -192,8 +193,8 @@ void ShellView::LoadPlanetLayer(const Simulation& sim, std::uint8_t targetInMine
       markTrail(wx, wy);
     }
 
-    // Add 3-5 curving side branches off the main trail across the 16x16 world
-    const int branches = 3 + static_cast<int>(nextRand() % 3u);
+    // Add curving side branches off the main trail across the 16x16 world
+    const int branches = 3 + static_cast<int>(nextRand() % 3u) + density * 2;
     for (int b = 0; b < branches && trailLen > 2; ++b) {
       const int seedIdx = 1 + static_cast<int>(nextRand() % static_cast<std::uint32_t>(trailLen - 1));
       int bx = static_cast<int>(trailPos[seedIdx] & (N - 1));
@@ -367,7 +368,7 @@ void ShellView::LoadPlanetLayer(const Simulation& sim, std::uint8_t targetInMine
   carveCell(8, 11, 3u);
 
   int cu = 8, cv = 11, cDir = 0;
-  const int aditSteps = 20 + static_cast<int>(nextRand() % 7u);
+  const int aditSteps = 20 + static_cast<int>(nextRand() % 7u) + density * 4;
   for (int step = 0; step < aditSteps; ++step) {
     int cands[8];
     int nCand = 0;
@@ -391,8 +392,8 @@ void ShellView::LoadPlanetLayer(const Simulation& sim, std::uint8_t targetInMine
     carveCell(cu, cv, 3u);
   }
 
-  // Carve 3-4 branching side drifts off the main adit
-  const int driftCount = 3 + static_cast<int>(nextRand() % 2u);
+  // Carve branching side drifts off the main adit
+  const int driftCount = 3 + static_cast<int>(nextRand() % 2u) + density * 2;
   for (int b = 0; b < driftCount && spineLen > 3; ++b) {
     const int seedIdx = 2 + static_cast<int>(nextRand() % static_cast<std::uint32_t>(spineLen - 2));
     int bu = static_cast<int>(spine[seedIdx] & (N - 1));
@@ -419,8 +420,8 @@ void ShellView::LoadPlanetLayer(const Simulation& sim, std::uint8_t targetInMine
     }
   }
 
-  // Excavate 2-3 small 2x2 subterranean pockets anchored on carved drifts for alcoves/chambers
-  const int pocketCount = 2 + static_cast<int>(nextRand() % 2u);
+  // Excavate small 2x2 subterranean pockets anchored on carved drifts for alcoves/chambers
+  const int pocketCount = 2 + static_cast<int>(nextRand() % 2u) + density;
   for (int p = 0; p < pocketCount && spineLen > 4; ++p) {
     const int seedIdx = 3 + static_cast<int>(nextRand() % static_cast<std::uint32_t>(spineLen - 3));
     const int pu = std::clamp(static_cast<int>(spine[seedIdx] & (N - 1)), 1, N - 3);
