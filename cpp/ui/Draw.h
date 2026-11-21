@@ -217,6 +217,7 @@ class ShellView {
   bool PaintScenePart(const MachinePart& part, const Area& origin);
   void PaintStage(const Simulation& sim, const TaskStage& stage, const Area& origin);
   void EnsurePlanetSurface(const Simulation& sim);
+  void LoadPlanetLayer(const Simulation& sim, std::uint8_t targetInMine, bool placeOres);
   void RenderPlanetSurfacePixels(const Simulation& sim);
   void StepPlanetSurface(const Simulation& sim, int actionKind);
   void PaintIdle(Simulation& sim);
@@ -319,7 +320,16 @@ class ShellView {
     std::uint8_t shipY = 14;
     std::uint8_t px = 8;
     std::uint8_t py = 13;
-    std::uint8_t dir = 0;  // 0=N, 1=E, 2=S, 3=W
+    std::uint8_t dir = 0;           // 0=N, 1=E, 2=S, 3=W
+    std::uint8_t inMine = 0;        // 0=surface, 1=underground mine sub-map
+    std::uint8_t oreLayerMask = 0;  // bit i: 0=surface ore, 1=underground mine ore
+    std::uint8_t portalX = 0;       // mine entrance (surface) or exit shaft (mine)
+    std::uint8_t portalY = 0;
+    std::uint8_t portalOutDir = 0;  // outward normal (0..3) toward open approach tile
+    std::uint8_t mineInDir = 0;     // compass heading (0..3) entering the mine from surface
+    std::uint8_t surfPx = 8;        // saved surface coordinates outside mine entrance
+    std::uint8_t surfPy = 13;
+    std::uint8_t surfDir = 0;
 
     std::uint8_t Tile(int x, int y) const {
       return static_cast<std::uint8_t>(cells[(y << kSizeShift) | x] & 0x03u);
@@ -341,11 +351,12 @@ class ShellView {
     std::int8_t renderPx = -1;
     std::int8_t renderPy = -1;
     std::int8_t renderDir = -1;
+    std::int8_t renderInMine = -1;
     unsigned renderOreMask = 0xFFFFu;
-    int frontKind = 0;          // 0=none, 5=ore, 6=ship (only at d==1, s==0)
+    int frontKind = 0;          // 0=none, 5=ore, 6=ship, 8=mine/exit (at d==1, s==0)
     int frontArg = 0;
     Area frontUv{};
-    std::uint8_t bumpKind = 0;  // 0=none, 1=obstacle, 2=ship, 3=ore
+    std::uint8_t bumpKind = 0;  // 0=none, 1=prop, 2=ship, 3=ore, 4=cliff/wall
     bool bumpBack = false;
   };
   PlanetSurfaceState planetSurface_{};
@@ -353,7 +364,7 @@ class ShellView {
   std::vector<Color> planetPixels_;
   struct PlanetClickHit {
     Area box;
-    int kind = 0;  // 1=up, 2=down, 3=left, 4=right, 5=ore, 6=ship, 7=turn180
+    int kind = 0;  // 1=up, 2=down, 3=left, 4=right, 5=ore, 6=ship, 7=turn180, 8=portal
     int arg = 0;
   };
   std::array<PlanetClickHit, 16> planetHits_{};
