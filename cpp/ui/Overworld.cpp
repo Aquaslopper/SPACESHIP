@@ -1170,7 +1170,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   static constexpr std::uint8_t kDepthFog[7] = {0u, 0u, 0u, 6u, 13u, 20u, 26u};
   static constexpr std::uint8_t kMineDepthFog[7] = {0u, 0u, 5u, 12u, 19u, 28u, 32u};
 
-  // Hand-authored 32x32 PC-98 Might & Magic tileable pixel-art textures (3 KB ROM, 0 B heap):
+  // 32x32 PC-98 Might & Magic tileable pixel-art textures (3 KB ROM, 0 B heap):
   // '.'=0 (ink/mortar), ':'=1 (dark bevel/shadow), '+'=2 (mid stone), '#'=3 (sunlit highlight)
   struct TileTex32 {
     std::uint8_t px[32][32]{};
