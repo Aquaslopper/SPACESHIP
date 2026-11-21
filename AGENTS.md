@@ -37,6 +37,7 @@ into requirements or add unrequested behavior such as automatic loading.
    ask and stop; never make the edit first and explain afterwards.  
 - **Do not hide differences.** Do not silently omit content, truncate values, inert a
    control, change a cost, or shrink text to avoid overflow.
+- Read AGENTS.md always when a PR is created and after a PR is merged.
   
 ## Agent Comprehension Check (Q&A)
 **CRITICAL INSTRUCTION:** 
