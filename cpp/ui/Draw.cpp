@@ -2632,20 +2632,23 @@ void ShellView::EnsurePlanetSurface(const Simulation& sim) {
 
   for (int y = 0; y < N; ++y) {
     for (int x = 0; x < N; ++x) {
-      planetSurface_.tiles[y * N + x] = (x == 0 || x == N - 1 || y == 0 || y == N - 1) ? 1 : 0;
+      planetSurface_.SetTile(x, y, (x == 0 || x == N - 1 || y == 0 || y == N - 1) ? 1u : 0u);
     }
   }
-  planetSurface_.shipX = 4;
-  planetSurface_.shipY = 7;
-  planetSurface_.tiles[7 * N + 4] = 2;
-  planetSurface_.px = 4;
-  planetSurface_.py = 6;
-  planetSurface_.dir = 0;
+  constexpr int kSpawnX = N / 2;
+  constexpr int kShipY = N - 2;
+  constexpr int kSpawnY = N - 3;
+  planetSurface_.shipX = static_cast<std::uint8_t>(kSpawnX);
+  planetSurface_.shipY = static_cast<std::uint8_t>(kShipY);
+  planetSurface_.SetTile(kSpawnX, kShipY, 2u);
+  planetSurface_.px = static_cast<std::uint8_t>(kSpawnX);
+  planetSurface_.py = static_cast<std::uint8_t>(kSpawnY);
+  planetSurface_.dir = 0u;
 
   static constexpr int kCardDx[4] = {0, 1, 0, -1};
   static constexpr int kCardDy[4] = {-1, 0, 1, 0};
   auto hasPlacedOreAt = [&](int x, int y) -> bool {
-    for (int oi = 0; oi < planetSurface_.oreCount; ++oi) {
+    for (int oi = 0; oi < static_cast<int>(planetSurface_.oreCount); ++oi) {
       if (planetSurface_.oreX[oi] == x && planetSurface_.oreY[oi] == y) {
         return true;
       }
@@ -2653,18 +2656,16 @@ void ShellView::EnsurePlanetSurface(const Simulation& sim) {
     return false;
   };
   auto isBlockedGen = [&](int x, int y) -> bool {
-    const std::uint8_t t = planetSurface_.tiles[y * N + x];
-    return t == 1 || t == 2 || hasPlacedOreAt(x, y);
+    const std::uint8_t t = planetSurface_.Tile(x, y);
+    return t == 1u || t == 2u || hasPlacedOreAt(x, y);
   };
+  // Compact 288 B stack BFS (32 B row bitset + 256 B packed (y << 4) | x queue)
   auto connected = [&]() -> bool {
-    bool vis[N * N]{};
-    int qx[N * N];
-    int qy[N * N];
+    std::uint16_t visRows[N]{};
+    std::uint8_t queue[N * N];
     int head = 0, tail = 0;
-    vis[6 * N + 4] = true;
-    qx[tail] = 4;
-    qy[tail] = 6;
-    ++tail;
+    visRows[kSpawnY] = static_cast<std::uint16_t>(1u << kSpawnX);
+    queue[tail++] = static_cast<std::uint8_t>((kSpawnY << PlanetSurfaceState::kSizeShift) | kSpawnX);
     int openTotal = 0;
     for (int y = 0; y < N; ++y) {
       for (int x = 0; x < N; ++x) {
@@ -2672,28 +2673,31 @@ void ShellView::EnsurePlanetSurface(const Simulation& sim) {
       }
     }
     while (head < tail) {
-      const int cx = qx[head];
-      const int cy = qy[head];
-      ++head;
+      const std::uint8_t packed = queue[head++];
+      const int cx = static_cast<int>(packed & (N - 1));
+      const int cy = static_cast<int>(packed >> PlanetSurfaceState::kSizeShift);
       for (int d = 0; d < 4; ++d) {
         const int nx = cx + kCardDx[d];
         const int ny = cy + kCardDy[d];
-        if (nx < 0 || nx >= N || ny < 0 || ny >= N) { continue; }
-        const int idx = ny * N + nx;
-        if (vis[idx] || isBlockedGen(nx, ny)) { continue; }
-        vis[idx] = true;
-        qx[tail] = nx;
-        qy[tail] = ny;
-        ++tail;
+        if (static_cast<unsigned>(nx) >= static_cast<unsigned>(N) ||
+            static_cast<unsigned>(ny) >= static_cast<unsigned>(N)) {
+          continue;
+        }
+        const std::uint16_t bit = static_cast<std::uint16_t>(1u << nx);
+        if ((visRows[ny] & bit) != 0u || isBlockedGen(nx, ny)) { continue; }
+        visRows[ny] |= bit;
+        queue[tail++] = static_cast<std::uint8_t>((ny << PlanetSurfaceState::kSizeShift) | nx);
       }
     }
     if (tail != openTotal) { return false; }
-    for (int oi = 0; oi < planetSurface_.oreCount; ++oi) {
+    for (int oi = 0; oi < static_cast<int>(planetSurface_.oreCount); ++oi) {
       bool adjVis = false;
       for (int d = 0; d < 4; ++d) {
-        const int nx = planetSurface_.oreX[oi] + kCardDx[d];
-        const int ny = planetSurface_.oreY[oi] + kCardDy[d];
-        if (nx >= 0 && nx < N && ny >= 0 && ny < N && vis[ny * N + nx]) {
+        const int nx = static_cast<int>(planetSurface_.oreX[oi]) + kCardDx[d];
+        const int ny = static_cast<int>(planetSurface_.oreY[oi]) + kCardDy[d];
+        if (static_cast<unsigned>(nx) < static_cast<unsigned>(N) &&
+            static_cast<unsigned>(ny) < static_cast<unsigned>(N) &&
+            (visRows[ny] & static_cast<std::uint16_t>(1u << nx)) != 0u) {
           adjVis = true;
           break;
         }
@@ -2703,36 +2707,33 @@ void ShellView::EnsurePlanetSurface(const Simulation& sim) {
     return true;
   };
 
-  const int obstacleGoal = 6 + static_cast<int>(nextRand() % 4u);
+  const int obstacleGoal = 24 + static_cast<int>(nextRand() % 9u);
   int placed = 0;
-  for (int attempt = 0; attempt < 96 && placed < obstacleGoal; ++attempt) {
+  for (int attempt = 0; attempt < 256 && placed < obstacleGoal; ++attempt) {
     const int rx = 1 + static_cast<int>(nextRand() % (N - 2));
     const int ry = 1 + static_cast<int>(nextRand() % (N - 2));
-    if ((rx == 4 && (ry == 7 || ry == 6 || ry == 5)) ||
-        planetSurface_.tiles[ry * N + rx] != 0) {
+    if ((rx == kSpawnX && (ry == kShipY || ry == kSpawnY || ry == kSpawnY - 1)) ||
+        planetSurface_.Tile(rx, ry) != 0u) {
       continue;
     }
-    planetSurface_.tiles[ry * N + rx] = 1;
+    planetSurface_.SetTile(rx, ry, 1u);
     if (connected()) {
       ++placed;
     } else {
-      planetSurface_.tiles[ry * N + rx] = 0;
+      planetSurface_.SetTile(rx, ry, 0u);
     }
   }
 
-  // Carve a winding trail network (3) with natural bends and branches instead of horizontal bars
+  // Carve a winding trail network (3) with natural bends and branches across the 16x16 surface
   static constexpr int kWalkDx[4] = {0, 1, 0, -1};
   static constexpr int kWalkDy[4] = {-1, 0, 1, 0};
-  int trailX[N * N];
-  int trailY[N * N];
+  std::uint8_t trailPos[N * N];
   int trailLen = 0;
   auto markTrail = [&](int x, int y) {
-    if (planetSurface_.tiles[y * N + x] == 0) {
-      planetSurface_.tiles[y * N + x] = 3;
+    if (planetSurface_.Tile(x, y) == 0u) {
+      planetSurface_.SetTile(x, y, 3u);
       if (trailLen < N * N) {
-        trailX[trailLen] = x;
-        trailY[trailLen] = y;
-        ++trailLen;
+        trailPos[trailLen++] = static_cast<std::uint8_t>((y << PlanetSurfaceState::kSizeShift) | x);
       }
     }
   };
@@ -2742,30 +2743,30 @@ void ShellView::EnsurePlanetSurface(const Simulation& sim) {
       const int nx = x + kWalkDx[d];
       const int ny = y + kWalkDy[d];
       if (nx > 0 && nx < N - 1 && ny > 0 && ny < N - 1 &&
-          planetSurface_.tiles[ny * N + nx] == 3) {
+          planetSurface_.Tile(nx, ny) == 3u) {
         ++c;
       }
     }
     return c;
   };
 
-  markTrail(4, 6);
-  markTrail(4, 5);
-  int wx = 4, wy = 5, wDir = 0;
-  const int mainGoal = 8 + static_cast<int>(nextRand() % 5u);
+  markTrail(kSpawnX, kSpawnY);
+  markTrail(kSpawnX, kSpawnY - 1);
+  int wx = kSpawnX, wy = kSpawnY - 1, wDir = 0;
+  const int mainGoal = 22 + static_cast<int>(nextRand() % 9u);
   for (int step = 0; step < mainGoal; ++step) {
-    int cands[4];
+    int cands[8];
     int nCand = 0;
     for (int d = 0; d < 4; ++d) {
       if (d == (wDir + 2) % 4) { continue; }
       const int nx = wx + kWalkDx[d];
       const int ny = wy + kWalkDy[d];
       if (nx <= 0 || nx >= N - 1 || ny <= 0 || ny >= N - 1) { continue; }
-      if (planetSurface_.tiles[ny * N + nx] != 0) { continue; }
+      if (planetSurface_.Tile(nx, ny) != 0u) { continue; }
       if (countAdjTrail(nx, ny) > 1) { continue; }
       // Encourage bends rather than endless straight runs
       const int weight = (d == wDir) ? ((step % 3 == 0) ? 1 : 2) : 2;
-      for (int w = 0; w < weight && nCand < 4; ++w) { cands[nCand++] = d; }
+      for (int w = 0; w < weight && nCand < 8; ++w) { cands[nCand++] = d; }
     }
     if (nCand == 0) { break; }
     wDir = cands[nextRand() % static_cast<std::uint32_t>(nCand)];
@@ -2774,14 +2775,14 @@ void ShellView::EnsurePlanetSurface(const Simulation& sim) {
     markTrail(wx, wy);
   }
 
-  // Add 1-2 short curving side branches off the main trail
-  const int branches = 1 + static_cast<int>(nextRand() % 2u);
+  // Add 3-5 curving side branches off the main trail across the 16x16 world
+  const int branches = 3 + static_cast<int>(nextRand() % 3u);
   for (int b = 0; b < branches && trailLen > 2; ++b) {
     const int seedIdx = 1 + static_cast<int>(nextRand() % static_cast<std::uint32_t>(trailLen - 1));
-    int bx = trailX[seedIdx];
-    int by = trailY[seedIdx];
+    int bx = static_cast<int>(trailPos[seedIdx] & (N - 1));
+    int by = static_cast<int>(trailPos[seedIdx] >> PlanetSurfaceState::kSizeShift);
     int bDir = static_cast<int>(nextRand() % 4u);
-    const int branchSteps = 3 + static_cast<int>(nextRand() % 3u);
+    const int branchSteps = 5 + static_cast<int>(nextRand() % 5u);
     for (int step = 0; step < branchSteps; ++step) {
       int cands[4];
       int nCand = 0;
@@ -2790,7 +2791,7 @@ void ShellView::EnsurePlanetSurface(const Simulation& sim) {
         const int nx = bx + kWalkDx[d];
         const int ny = by + kWalkDy[d];
         if (nx <= 0 || nx >= N - 1 || ny <= 0 || ny >= N - 1) { continue; }
-        if (planetSurface_.tiles[ny * N + nx] != 0) { continue; }
+        if (planetSurface_.Tile(nx, ny) != 0u) { continue; }
         if (countAdjTrail(nx, ny) > 1) { continue; }
         cands[nCand++] = d;
       }
@@ -2802,35 +2803,34 @@ void ShellView::EnsurePlanetSurface(const Simulation& sim) {
     }
   }
 
-  for (int i = 0; i < N * N; ++i) {
-    planetSurface_.variant[i] = static_cast<std::uint8_t>(nextRand() % 8u);
+  for (int y = 0; y < N; ++y) {
+    for (int x = 0; x < N; ++x) {
+      planetSurface_.SetVariant(x, y, static_cast<std::uint8_t>(nextRand() & 7u));
+    }
   }
 
-  int candX[N * N];
-  int candY[N * N];
+  std::uint8_t candPos[N * N];
   int candCount = 0;
   for (int y = 1; y < N - 1; ++y) {
     for (int x = 1; x < N - 1; ++x) {
-      const std::uint8_t t = planetSurface_.tiles[y * N + x];
-      if (t != 0 && t != 3) { continue; }
+      const std::uint8_t t = planetSurface_.Tile(x, y);
+      if (t != 0u && t != 3u) { continue; }
       if (x == planetSurface_.px && y == planetSurface_.py) { continue; }
-      const int dist = std::abs(x - planetSurface_.shipX) + std::abs(y - planetSurface_.shipY);
-      if (dist >= 2) {
-        candX[candCount] = x;
-        candY[candCount] = y;
-        ++candCount;
+      const int dist = std::abs(x - static_cast<int>(planetSurface_.shipX)) +
+                       std::abs(y - static_cast<int>(planetSurface_.shipY));
+      if (dist >= 3) {
+        candPos[candCount++] = static_cast<std::uint8_t>((y << PlanetSurfaceState::kSizeShift) | x);
       }
     }
   }
   const int wantOre = std::min({candCount, PlanetSurfaceState::kMaxOre,
                                 3 + static_cast<int>(nextRand() % 3u)});
-  for (int i = 0; i < candCount && planetSurface_.oreCount < wantOre; ++i) {
+  for (int i = 0; i < candCount && static_cast<int>(planetSurface_.oreCount) < wantOre; ++i) {
     const int pick = i + static_cast<int>(nextRand() % static_cast<std::uint32_t>(candCount - i));
-    std::swap(candX[i], candX[pick]);
-    std::swap(candY[i], candY[pick]);
-    const int slot = planetSurface_.oreCount;
-    planetSurface_.oreX[slot] = candX[i];
-    planetSurface_.oreY[slot] = candY[i];
+    std::swap(candPos[i], candPos[pick]);
+    const int slot = static_cast<int>(planetSurface_.oreCount);
+    planetSurface_.oreX[slot] = static_cast<std::uint8_t>(candPos[i] & (N - 1));
+    planetSurface_.oreY[slot] = static_cast<std::uint8_t>(candPos[i] >> PlanetSurfaceState::kSizeShift);
     ++planetSurface_.oreCount;
     if (!connected()) {
       --planetSurface_.oreCount;
@@ -2844,17 +2844,18 @@ void ShellView::StepPlanetSurface(const Simulation& sim, int actionKind) {
   static constexpr int kDy[4] = {-1, 0, 1, 0};
   if (actionKind == 1 || actionKind == 2) {
     const int sign = actionKind == 1 ? 1 : -1;
-    const int nx = planetSurface_.px + kDx[planetSurface_.dir] * sign;
-    const int ny = planetSurface_.py + kDy[planetSurface_.dir] * sign;
+    const int nx = static_cast<int>(planetSurface_.px) + kDx[planetSurface_.dir] * sign;
+    const int ny = static_cast<int>(planetSurface_.py) + kDy[planetSurface_.dir] * sign;
     std::uint8_t blk = 0;
-    if (nx < 0 || nx >= N || ny < 0 || ny >= N ||
-        planetSurface_.tiles[ny * N + nx] == 1) {
+    if (static_cast<unsigned>(nx) >= static_cast<unsigned>(N) ||
+        static_cast<unsigned>(ny) >= static_cast<unsigned>(N) ||
+        planetSurface_.Tile(nx, ny) == 1u) {
       blk = 1;
     } else if (nx == planetSurface_.shipX && ny == planetSurface_.shipY) {
       blk = 2;
     } else {
       const std::string& hereId = sim.Map().here;
-      for (int i = 0; i < planetSurface_.oreCount; ++i) {
+      for (int i = 0; i < static_cast<int>(planetSurface_.oreCount); ++i) {
         if (planetSurface_.oreX[i] == nx && planetSurface_.oreY[i] == ny) {
           const std::string key = "planet-ore:" + hereId + ":" + std::to_string(i);
           auto it = sim.State().mapMarks.find(key);
@@ -2866,8 +2867,8 @@ void ShellView::StepPlanetSurface(const Simulation& sim, int actionKind) {
       }
     }
     if (blk == 0) {
-      planetSurface_.px = nx;
-      planetSurface_.py = ny;
+      planetSurface_.px = static_cast<std::uint8_t>(nx);
+      planetSurface_.py = static_cast<std::uint8_t>(ny);
       planetSurface_.bumpKind = 0;
       planetSurface_.bumpBack = false;
     } else {
@@ -2875,15 +2876,15 @@ void ShellView::StepPlanetSurface(const Simulation& sim, int actionKind) {
       planetSurface_.bumpBack = (actionKind == 2);
     }
   } else if (actionKind == 3) {
-    planetSurface_.dir = (planetSurface_.dir + 3) % 4;
+    planetSurface_.dir = static_cast<std::uint8_t>((planetSurface_.dir + 3u) & 3u);
     planetSurface_.bumpKind = 0;
     planetSurface_.bumpBack = false;
   } else if (actionKind == 4) {
-    planetSurface_.dir = (planetSurface_.dir + 1) % 4;
+    planetSurface_.dir = static_cast<std::uint8_t>((planetSurface_.dir + 1u) & 3u);
     planetSurface_.bumpKind = 0;
     planetSurface_.bumpBack = false;
   } else if (actionKind == 7) {
-    planetSurface_.dir = (planetSurface_.dir + 2) % 4;
+    planetSurface_.dir = static_cast<std::uint8_t>((planetSurface_.dir + 2u) & 3u);
     planetSurface_.bumpKind = 0;
     planetSurface_.bumpBack = false;
   }
@@ -2897,7 +2898,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   if (planet == nullptr) { return; }
 
   unsigned oreMask = 0u;
-  for (int i = 0; i < planetSurface_.oreCount; ++i) {
+  for (int i = 0; i < static_cast<int>(planetSurface_.oreCount); ++i) {
     const std::string key = "planet-ore:" + planet->id + ":" + std::to_string(i);
     auto it = sim.State().mapMarks.find(key);
     if (it == sim.State().mapMarks.end() || !it->second) {
@@ -2907,17 +2908,17 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
 
   if (planetTex_.id != 0 &&
       planetSurface_.renderPlanetId == planet->id &&
-      planetSurface_.renderPx == planetSurface_.px &&
-      planetSurface_.renderPy == planetSurface_.py &&
-      planetSurface_.renderDir == planetSurface_.dir &&
+      planetSurface_.renderPx == static_cast<std::int8_t>(planetSurface_.px) &&
+      planetSurface_.renderPy == static_cast<std::int8_t>(planetSurface_.py) &&
+      planetSurface_.renderDir == static_cast<std::int8_t>(planetSurface_.dir) &&
       planetSurface_.renderOreMask == oreMask) {
     return;
   }
 
   planetSurface_.renderPlanetId = planet->id;
-  planetSurface_.renderPx = planetSurface_.px;
-  planetSurface_.renderPy = planetSurface_.py;
-  planetSurface_.renderDir = planetSurface_.dir;
+  planetSurface_.renderPx = static_cast<std::int8_t>(planetSurface_.px);
+  planetSurface_.renderPy = static_cast<std::int8_t>(planetSurface_.py);
+  planetSurface_.renderDir = static_cast<std::int8_t>(planetSurface_.dir);
   planetSurface_.renderOreMask = oreMask;
   planetSurface_.frontKind = 0;
   planetSurface_.frontArg = 0;
@@ -3360,15 +3361,19 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   const int ldy = -rdy;
 
   auto tileAt = [&](int tx, int ty) -> std::uint8_t {
-    if (tx < 0 || tx >= N || ty < 0 || ty >= N) { return 1; }
-    return planetSurface_.tiles[ty * N + tx];
+    if (static_cast<unsigned>(tx) >= static_cast<unsigned>(N) ||
+        static_cast<unsigned>(ty) >= static_cast<unsigned>(N)) {
+      return 1u;
+    }
+    return planetSurface_.Tile(tx, ty);
   };
   auto variantAt = [&](int tx, int ty) -> int {
-    if (tx < 0 || tx >= N || ty < 0 || ty >= N) {
-      return static_cast<int>((static_cast<unsigned>(tx + 16) * 7u +
-                               static_cast<unsigned>(ty + 16) * 13u) % 8u);
+    if (static_cast<unsigned>(tx) >= static_cast<unsigned>(N) ||
+        static_cast<unsigned>(ty) >= static_cast<unsigned>(N)) {
+      return static_cast<int>((static_cast<unsigned>(tx + 32) * 7u +
+                               static_cast<unsigned>(ty + 32) * 13u) & 7u);
     }
-    return static_cast<int>(planetSurface_.variant[ty * N + tx]);
+    return planetSurface_.Variant(tx, ty);
   };
   auto isBorderTile = [&](int tx, int ty) -> bool {
     return tx <= 0 || tx >= N - 1 || ty <= 0 || ty >= N - 1;
@@ -3378,7 +3383,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     return t == 2 || t == 3;
   };
   auto oreAt = [&](int tx, int ty) -> int {
-    for (int i = 0; i < planetSurface_.oreCount; ++i) {
+    for (int i = 0; i < static_cast<int>(planetSurface_.oreCount); ++i) {
       if ((oreMask & (1u << i)) != 0u &&
           planetSurface_.oreX[i] == tx && planetSurface_.oreY[i] == ty) {
         return i;
@@ -3408,10 +3413,10 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     float lat1;
     std::uint8_t bevelMask;  // bit0=BL, bit1=BR, bit2=FL, bit3=FR outer dead-end/convex corner bevel
   };
-  RoadSpan roadSpans[48]{};
+  RoadSpan roadSpans[64]{};
   int roadSpanCount = 0;
   auto pushRoadSpan = [&](float z0, float z1, float lat0, float lat1, std::uint8_t bevel) {
-    if (z1 <= 0.42f || z0 >= 6.60f || roadSpanCount >= 48) { return; }
+    if (z1 <= 0.42f || z0 >= 6.60f || roadSpanCount >= 64) { return; }
     roadSpans[roadSpanCount++] = RoadSpan{
         std::max(0.42f, z0), std::min(6.60f, z1), lat0, lat1, bevel};
   };
@@ -4100,10 +4105,10 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
         }
 
         // Ship & Ore sprites across forward view cone (clickable only at d==1 && s==0)
-        if (d >= 1 && d <= 4 && std::abs(s) <= d) {
+        if (d >= 1 && d <= 6 && std::abs(s) <= d) {
           const int objCx = static_cast<int>(std::lround(tcxMid));
           if (tx == planetSurface_.shipX && ty == planetSurface_.shipY) {
-            const int sw = std::max(7, static_cast<int>(std::lround(28.0f * sTile)));
+            const int sw = std::max(6, static_cast<int>(std::lround(28.0f * sTile)));
             const int sh = std::max(4, static_cast<int>(std::lround(16.0f * sTile)));
             const int sx = objCx - sw / 2;
             const int sy = gyMid - sh;
@@ -4136,7 +4141,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
               }
             }
           }
-          const int oreIdx = oreAt(tx, ty);
+          const int oreIdx = (d <= 5) ? oreAt(tx, ty) : -1;
           if (oreIdx >= 0) {
             const int ow = std::max(5, static_cast<int>(std::lround(14.0f * sTile)));
             const int oh = std::max(4, static_cast<int>(std::lround(10.0f * sTile)));
@@ -4892,21 +4897,29 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
       const Color mmShipFill{28, 220, 236, 255};
 
       constexpr int N = PlanetSurfaceState::kSize;
+      constexpr int kView = PlanetSurfaceState::kViewSize;
       auto tileAt = [&](int tx, int ty) -> std::uint8_t {
-        if (tx < 0 || tx >= N || ty < 0 || ty >= N) { return 1; }
-        return planetSurface_.tiles[ty * N + tx];
+        if (static_cast<unsigned>(tx) >= static_cast<unsigned>(N) ||
+            static_cast<unsigned>(ty) >= static_cast<unsigned>(N)) {
+          return 1u;
+        }
+        return planetSurface_.Tile(tx, ty);
       };
       auto isRoadCell = [&](int tx, int ty) -> bool {
         const std::uint8_t v = tileAt(tx, ty);
-        return v == 3 || v == 2;
+        return v == 3u || v == 2u;
       };
+
+      // Edge-clamped 9x9 scrolling camera window over the 16x16 planet grid
+      const int camX = std::clamp(static_cast<int>(planetSurface_.px) - kView / 2, 0, N - kView);
+      const int camY = std::clamp(static_cast<int>(planetSurface_.py) - kView / 2, 0, N - kView);
 
       // Left side inside glass: legendless high-contrast 9x9 PC-98 minimap (no ore hints)
       const int infoPx = std::max(9, static_cast<int>(std::lround(10.0f * scale)));
       const float mmCell = 14.0f;
       const float mmX = 118.0f;
       const float mmY = 98.0f;
-      const float mmSpan = N * mmCell;
+      const float mmSpan = kView * mmCell;
       Text("MAP", static_cast<int>(V(mmX - 2.0f, 78.0f).x), static_cast<int>(V(mmX - 2.0f, 78.0f).y),
            infoPx, Color{240, 242, 236, 255}, true);
 
@@ -4923,19 +4936,21 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
                     (gx1 - gx0) + 2 * framePad, (gy1 - gy0) + 2 * framePad, mmWall);
       DrawRectangle(gx0, gy0, gx1 - gx0, gy1 - gy0, mmGrid);
 
-      // Pass 1: high-contrast floor vs wall/obstacle tiles
-      for (int my = 0; my < N; ++my) {
+      // Pass 1: high-contrast floor vs wall/obstacle tiles across 9x9 camera window
+      for (int my = 0; my < kView; ++my) {
+        const int wy = camY + my;
         const int cy0 = static_cast<int>(std::lround(V(0.0f, mmY + my * mmCell).y));
         const int cy1 = static_cast<int>(std::lround(V(0.0f, mmY + (my + 1) * mmCell).y)) - 1;
         const int ch = std::max(2, cy1 - cy0);
-        for (int mx = 0; mx < N; ++mx) {
+        for (int mx = 0; mx < kView; ++mx) {
+          const int wx = camX + mx;
           const int cx0 = static_cast<int>(std::lround(V(mmX + mx * mmCell, 0.0f).x));
           const int cx1 = static_cast<int>(std::lround(V(mmX + (mx + 1) * mmCell, 0.0f).x)) - 1;
           const int cw = std::max(2, cx1 - cx0);
-          const std::uint8_t t = tileAt(mx, my);
-          if (t == 1) {
+          const std::uint8_t t = tileAt(wx, wy);
+          if (t == 1u) {
             DrawRectangle(cx0, cy0, cw, ch, mmWall);
-            const bool isEdge = (mx == 0 || mx == N - 1 || my == 0 || my == N - 1);
+            const bool isEdge = (wx == 0 || wx == N - 1 || wy == 0 || wy == N - 1);
             if (isEdge) {
               const int pad = std::max(2, cw / 3);
               if (cw > 2 * pad && ch > 2 * pad) {
@@ -4954,15 +4969,17 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
         }
       }
 
-      // Pass 2: connected dark-curbed golden trail ribbon across road tiles
+      // Pass 2: connected dark-curbed golden trail ribbon across road tiles in 9x9 window
       for (int roadPass = 0; roadPass < 2; ++roadPass) {
         const Color rCol = (roadPass == 0) ? mmRoadCurb : mmRoadFill;
-        for (int my = 0; my < N; ++my) {
+        for (int my = 0; my < kView; ++my) {
+          const int wy = camY + my;
           const int cy0 = static_cast<int>(std::lround(V(0.0f, mmY + my * mmCell).y));
           const int cy1 = static_cast<int>(std::lround(V(0.0f, mmY + (my + 1) * mmCell).y)) - 1;
           const int ch = std::max(2, cy1 - cy0);
-          for (int mx = 0; mx < N; ++mx) {
-            if (tileAt(mx, my) != 3) { continue; }
+          for (int mx = 0; mx < kView; ++mx) {
+            const int wx = camX + mx;
+            if (tileAt(wx, wy) != 3u) { continue; }
             const int cx0 = static_cast<int>(std::lround(V(mmX + mx * mmCell, 0.0f).x));
             const int cx1 = static_cast<int>(std::lround(V(mmX + (mx + 1) * mmCell, 0.0f).x)) - 1;
             const int cw = std::max(2, cx1 - cx0);
@@ -4972,40 +4989,50 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
             const int rw = std::max(2, cw * 24 / 100) + curb;
             const int rh = std::max(2, ch * 24 / 100) + curb;
             DrawRectangle(mxC - rw, myC - rh, 2 * rw, 2 * rh, rCol);
-            if (isRoadCell(mx, my - 1)) {
-              DrawRectangle(mxC - rw, cy0 - 1, 2 * rw, (myC - cy0) + rh + 1, rCol);
+            if (isRoadCell(wx, wy - 1)) {
+              const int yTop = std::max(gy0, cy0 - 1);
+              DrawRectangle(mxC - rw, yTop, 2 * rw, (myC + rh) - yTop, rCol);
             }
-            if (isRoadCell(mx, my + 1)) {
-              DrawRectangle(mxC - rw, myC - rh, 2 * rw, (cy1 + 1) - (myC - rh), rCol);
+            if (isRoadCell(wx, wy + 1)) {
+              const int yBot = std::min(gy1, cy1 + 1);
+              DrawRectangle(mxC - rw, myC - rh, 2 * rw, yBot - (myC - rh), rCol);
             }
-            if (isRoadCell(mx - 1, my)) {
-              DrawRectangle(cx0 - 1, myC - rh, (mxC - cx0) + rw + 1, 2 * rh, rCol);
+            if (isRoadCell(wx - 1, wy)) {
+              const int xLft = std::max(gx0, cx0 - 1);
+              DrawRectangle(xLft, myC - rh, (mxC + rw) - xLft, 2 * rh, rCol);
             }
-            if (isRoadCell(mx + 1, my)) {
-              DrawRectangle(mxC - rw, myC - rh, (cx1 + 1) - (mxC - rw), 2 * rh, rCol);
+            if (isRoadCell(wx + 1, wy)) {
+              const int xRgt = std::min(gx1, cx1 + 1);
+              DrawRectangle(mxC - rw, myC - rh, xRgt - (mxC - rw), 2 * rh, rCol);
             }
           }
         }
       }
 
-      // Pass 3: ship beacon and bold double-outlined player directional marker
+      // Pass 3: ship beacon (when inside 9x9 window) and bold double-outlined player marker
       {
-        const int sx0 = static_cast<int>(std::lround(V(mmX + planetSurface_.shipX * mmCell, 0.0f).x));
-        const int sx1 = static_cast<int>(std::lround(V(mmX + (planetSurface_.shipX + 1) * mmCell, 0.0f).x)) - 1;
-        const int sy0 = static_cast<int>(std::lround(V(0.0f, mmY + planetSurface_.shipY * mmCell).y));
-        const int sy1 = static_cast<int>(std::lround(V(0.0f, mmY + (planetSurface_.shipY + 1) * mmCell).y)) - 1;
-        const int sw = std::max(4, sx1 - sx0);
-        const int sh = std::max(4, sy1 - sy0);
-        const int sRim = std::max(1, rimPx);
-        const int sPad = std::max(2, sw / 5);
-        DrawRectangle(sx0 + sRim, sy0 + sRim, sw - 2 * sRim, sh - 2 * sRim, mmWall);
-        DrawRectangle(sx0 + sPad, sy0 + sPad, std::max(2, sw - 2 * sPad), std::max(2, sh - 2 * sPad), mmShipFill);
-        DrawRectangle(sx0 + sw / 2 - sRim, sy0 + sh / 2 - sRim, 2 * sRim, 2 * sRim, Color{252, 254, 255, 255});
+        const int sLocalX = static_cast<int>(planetSurface_.shipX) - camX;
+        const int sLocalY = static_cast<int>(planetSurface_.shipY) - camY;
+        if (sLocalX >= 0 && sLocalX < kView && sLocalY >= 0 && sLocalY < kView) {
+          const int sx0 = static_cast<int>(std::lround(V(mmX + sLocalX * mmCell, 0.0f).x));
+          const int sx1 = static_cast<int>(std::lround(V(mmX + (sLocalX + 1) * mmCell, 0.0f).x)) - 1;
+          const int sy0 = static_cast<int>(std::lround(V(0.0f, mmY + sLocalY * mmCell).y));
+          const int sy1 = static_cast<int>(std::lround(V(0.0f, mmY + (sLocalY + 1) * mmCell).y)) - 1;
+          const int sw = std::max(4, sx1 - sx0);
+          const int sh = std::max(4, sy1 - sy0);
+          const int sRim = std::max(1, rimPx);
+          const int sPad = std::max(2, sw / 5);
+          DrawRectangle(sx0 + sRim, sy0 + sRim, sw - 2 * sRim, sh - 2 * sRim, mmWall);
+          DrawRectangle(sx0 + sPad, sy0 + sPad, std::max(2, sw - 2 * sPad), std::max(2, sh - 2 * sPad), mmShipFill);
+          DrawRectangle(sx0 + sw / 2 - sRim, sy0 + sh / 2 - sRim, 2 * sRim, 2 * sRim, Color{252, 254, 255, 255});
+        }
 
-        const int px0 = static_cast<int>(std::lround(V(mmX + planetSurface_.px * mmCell, 0.0f).x));
-        const int px1 = static_cast<int>(std::lround(V(mmX + (planetSurface_.px + 1) * mmCell, 0.0f).x)) - 1;
-        const int py0 = static_cast<int>(std::lround(V(0.0f, mmY + planetSurface_.py * mmCell).y));
-        const int py1 = static_cast<int>(std::lround(V(0.0f, mmY + (planetSurface_.py + 1) * mmCell).y)) - 1;
+        const int pLocalX = static_cast<int>(planetSurface_.px) - camX;
+        const int pLocalY = static_cast<int>(planetSurface_.py) - camY;
+        const int px0 = static_cast<int>(std::lround(V(mmX + pLocalX * mmCell, 0.0f).x));
+        const int px1 = static_cast<int>(std::lround(V(mmX + (pLocalX + 1) * mmCell, 0.0f).x)) - 1;
+        const int py0 = static_cast<int>(std::lround(V(0.0f, mmY + pLocalY * mmCell).y));
+        const int py1 = static_cast<int>(std::lround(V(0.0f, mmY + (pLocalY + 1) * mmCell).y)) - 1;
         const float pxC = (static_cast<float>(px0 + px1)) * 0.5f;
         const float pyC = (static_cast<float>(py0 + py1)) * 0.5f;
         const float cellPx = static_cast<float>(std::max(4, px1 - px0));
