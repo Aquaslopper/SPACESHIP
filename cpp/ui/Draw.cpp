@@ -6029,6 +6029,30 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   } else {
     UpdateTexture(planetTex_, rgbaBuf);
   }
+  if (planetScanlineTex_.id == 0) {
+    // True PC-98 CRT scanline mask: 1 x (H * 4) bilinear beam-gap profile locked 1:1 to all 144 pixel rows.
+    // Built once (2.3 KB VRAM, 0 B persistent heap, 1 DrawTexturePro/frame, moire-free at arbitrary scales).
+    constexpr int kScanSub = 4;
+    constexpr int kScanH = H * kScanSub;
+    static constexpr unsigned char kRowAlpha[kScanSub] = {28u, 0u, 22u, 118u};
+    Color scanBuf[kScanH];
+    for (int y = 0; y < H; ++y) {
+      for (int s = 0; s < kScanSub; ++s) {
+        scanBuf[y * kScanSub + s] = Color{0u, 0u, 0u, kRowAlpha[s]};
+      }
+    }
+    Image scanImg{};
+    scanImg.data = scanBuf;
+    scanImg.width = 1;
+    scanImg.height = kScanH;
+    scanImg.mipmaps = 1;
+    scanImg.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+    planetScanlineTex_ = LoadTextureFromImage(scanImg);
+    if (planetScanlineTex_.id != 0) {
+      SetTextureFilter(planetScanlineTex_, TEXTURE_FILTER_BILINEAR);
+      SetTextureWrap(planetScanlineTex_, TEXTURE_WRAP_CLAMP);
+    }
+  }
 }
 
 void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const Area& origin) {
@@ -6617,6 +6641,10 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
                             static_cast<float>(PlanetSurfaceState::kTexH)};
         const Rectangle dst{V(vx, vy).x, V(vx, vy).y, vw * scale, vh * scale};
         DrawTexturePro(planetTex_, src, dst, Vector2{0.0f, 0.0f}, 0.0f, WHITE);
+        if (planetScanlineTex_.id != 0) {
+          const Rectangle scanSrc{0.0f, 0.0f, 1.0f, static_cast<float>(planetScanlineTex_.height)};
+          DrawTexturePro(planetScanlineTex_, scanSrc, dst, Vector2{0.0f, 0.0f}, 0.0f, WHITE);
+        }
       }
 
       const Body* planet = sim.FindBodyById(sim.Map().here);
