@@ -822,6 +822,48 @@ void ShellView::Draw(Simulation& sim, double nowMs) {
   }
 }
 
+bool ShellView::BlockerActive(const Simulation& sim) const {
+  return !splashActive_ && !titleActive_ && !LossVisible(sim) &&
+         bridgeDispatch_ && sim.LandedOnPlanet() &&
+         sim.State().activeTab == "room:bridge";
+}
+
+void ShellView::DrawBlocker(const Simulation& sim) const {
+  if (!BlockerActive(sim)) { return; }
+  if (bridgeBlockerHole_.w <= 0.0f || bridgeBlockerHole_.h <= 0.0f) { return; }
+  const Texture2D* art = static_cast<const Texture2D*>(blockerArt_);
+  if (art != nullptr && art->id != 0 && art->width > 0 && art->height > 0) {
+    // Transparent opening in assets/art/blocker.png (1920x1078): x=319..1767, y=131..672.
+    constexpr float kHoleX = 319.0f, kHoleY = 131.0f, kHoleW = 1448.0f, kHoleH = 541.0f;
+    const float sx = bridgeBlockerHole_.w / kHoleW;
+    const float sy = bridgeBlockerHole_.h / kHoleH;
+    const float dx = bridgeBlockerHole_.x - kHoleX * sx;
+    const float dy = bridgeBlockerHole_.y - kHoleY * sy;
+    const float dw = static_cast<float>(art->width) * sx;
+    const float dh = static_cast<float>(art->height) * sy;
+    DrawTexturePro(*art,
+                   {0.0f, 0.0f, static_cast<float>(art->width), static_cast<float>(art->height)},
+                   {dx, dy, dw, dh}, {0.0f, 0.0f}, 0.0f, WHITE);
+    const Color margin{0, 0, 0, 155};
+    if (dy > 0.0f) { DrawRectangleRec({0.0f, 0.0f, width_, dy}, margin); }
+    if (dy + dh < height_) { DrawRectangleRec({0.0f, dy + dh, width_, height_ - (dy + dh)}, margin); }
+    const float bandTop = std::max(0.0f, dy);
+    const float bandBot = std::min(height_, dy + dh);
+    if (bandBot > bandTop) {
+      if (dx > 0.0f) { DrawRectangleRec({0.0f, bandTop, dx, bandBot - bandTop}, margin); }
+      if (dx + dw < width_) { DrawRectangleRec({dx + dw, bandTop, width_ - (dx + dw), bandBot - bandTop}, margin); }
+    }
+    return;
+  }
+  const Color dim{0, 0, 0, 155};
+  const float x0 = bridgeBlockerHole_.x, y0 = bridgeBlockerHole_.y;
+  const float x1 = bridgeBlockerHole_.Right(), y1 = bridgeBlockerHole_.Bottom();
+  if (y0 > 0.0f) { DrawRectangleRec({0.0f, 0.0f, width_, y0}, dim); }
+  if (y1 < height_) { DrawRectangleRec({0.0f, y1, width_, height_ - y1}, dim); }
+  if (x0 > 0.0f) { DrawRectangleRec({0.0f, y0, x0, y1 - y0}, dim); }
+  if (x1 < width_) { DrawRectangleRec({x1, y0, width_ - x1, y1 - y0}, dim); }
+}
+
 bool ShellView::LaunchCoverUp(double nowMs) const {
   if (fadeKind_ != 2 || titleActive_) { return false; }
   const double t = nowMs - fadeStartMs_;
@@ -5284,6 +5326,9 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
     plate(10, 10, 940, 352, paper);
     plate(77, 26, 806, 276, paper);
     plate(85, 34, 790, 260, glass);
+    bridgeBlockerHole_ = {V(10.0f, 10.0f).x - 1.5f * scale,
+                          V(10.0f, 10.0f).y - contentScroll_ - 1.5f * scale,
+                          943.0f * scale, 355.0f * scale};
 
     if (!sim.LandedOnPlanet()) {
       bridgeDispatch_ = false;
@@ -11244,9 +11289,10 @@ void ShellView::Move(float x, float y) {
 
 void ShellView::Drag(Simulation& sim, float x, float y, float dx, float dy, bool down, bool pressed) {
   Move(x, y);
-  if (!down) { draggingChart_ = false; draggingFeed_ = false; return; }
+  if (!down) { draggingChart_ = false; draggingFeed_ = false; draggingBearing_ = false; return; }
   if (floating_.HasConfirmation()) { return; }
   if (titleActive_ || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow)) { return; }
+  if (BlockerActive(sim) && !bridgeBlockerHole_.Contains(x, y)) { return; }
   if (feedActive_ && down && (draggingFeed_ ||
       (pressed && layout_.content.Contains(x, y) && feedThumb_.Contains(x, y + contentScroll_)))) {
     if (!draggingFeed_) { draggingFeed_ = true; feedDragOffset_ = y + contentScroll_ - feedThumb_.y; }
@@ -11304,6 +11350,7 @@ void ShellView::OrbitDrag(Simulation& sim, float x, float y, float dx, float dy,
   }
   if (floating_.HasConfirmation()) { return; }
   if (titleActive_ || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow)) { return; }
+  if (BlockerActive(sim) && !bridgeBlockerHole_.Contains(x, y)) { return; }
   const float localY = y + contentScroll_;
   if (!orbitingChart_) {
     if (!pressed) { return; }
@@ -11335,6 +11382,7 @@ void ShellView::Scroll(Simulation& sim, float x, float y, float wheelDelta) {
   Move(x, y);
   if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow)) { return; }
   if (floating_.HasConfirmation()) { return; }
+  if (BlockerActive(sim)) { return; }
   if (!titleActive_ && screenNav_ && navChartBox_.Contains(x, y + contentScroll_)) {
     const int dir = wheelDelta > 0.0f ? 1 : -1;
     sim.ZoomMap(dir);
@@ -11551,6 +11599,8 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
     return;
   }
 
+  if (BlockerActive(sim) && !bridgeBlockerHole_.Contains(x, y)) { return; }
+
   // Floating windows are nonmodal. ImGui owns input only over their actual
   // bounds; exposed ship/chrome controls remain usable, as in the HTA.
 
@@ -11736,8 +11786,12 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
     for (const NavHit& hit : navHits_) {
       if (!hit.box.Contains(x, y + scrollY)) { continue; }
       if (panelsKind_ == ScreenKind::Room && hit.arg == "dispatch" && sim.LandedOnPlanet()) {
-        bridgeDispatch_ = !bridgeDispatch_;
-        if (bridgeDispatch_) { EnsurePlanetSurface(sim); }
+        if (!bridgeDispatch_) {
+          bridgeDispatch_ = true;
+          contentScroll_ = 0.0f;
+          floating_.Panels().clear();
+          EnsurePlanetSurface(sim);
+        }
         return;
       }
       // Read the row's own question before acting: a purchase that cannot be
