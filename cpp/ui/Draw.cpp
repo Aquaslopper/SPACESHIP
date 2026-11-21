@@ -3737,14 +3737,16 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
       (baseG4[inkOut] * 7 + fogG4 * 9 + 8) >> 4,
       (baseB4[inkOut] * 7 + fogB4 * 9 + 8) >> 4);
 
-  // Stack-allocated 240x144 8-bit indexed framebuffer (34,560 B scratch, 0 B heap)
-  std::uint8_t idxBuf[W * H]{};
+  // Static BSS 480x288 8-bit indexed framebuffer (138,240 B static, 0 B heap, 0 B stack)
+  static std::uint8_t idxBuf[W * H];
+  std::memset(idxBuf, 0, sizeof(idxBuf));
 
-  constexpr int hy = 69;
+  constexpr int kResScale = W / 240;  // 2 at 480x288 (PC-98 Clouds of Xeen 432x280 class!)
+  constexpr int hy = 69 * kResScale;
   constexpr int kGndH = H - hy;
   constexpr int cxMid = W / 2;
-  static constexpr float kProjY = 33.0f;
-  static constexpr float kProjX = 126.0f;
+  static constexpr float kProjY = 33.0f * static_cast<float>(kResScale);
+  static constexpr float kProjX = 126.0f * static_cast<float>(kResScale);
   static constexpr float kHalfRoad = 0.44f;
 
   static constexpr int kBayer4[4][4] = {
@@ -3778,9 +3780,10 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   };
   static constexpr ScanlineProjLut kScanLut = []() constexpr {
     ScanlineProjLut lut{};
+    constexpr float kMinDenom = 1.125f * static_cast<float>(kResScale);
     for (int gy = 0; gy < kGndH; ++gy) {
-      const float denom = (static_cast<float>(gy) + 0.5f) < 1.125f
-                              ? 1.125f
+      const float denom = (static_cast<float>(gy) + 0.5f) < kMinDenom
+                              ? kMinDenom
                               : (static_cast<float>(gy) + 0.5f);
       const float z = kProjY / denom;
       lut.z[gy] = z;
@@ -3862,12 +3865,12 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
       "::.++++++.::::.+++++++.:::.++++.",
       ":::......::::::.......:::::....:",
       "::::::::::::::::::::::::::::::::",
-      "####.:::::.########.::::.#######",
-      "++++.::::.##########.::.########",
-      "+++..::::.#+++++++++.::.#+++++++",
-      "++..:::::.#+++#+++++.::.#++#++++",
-      "...:::::::.+++++++++.:::.+++++++",
-      ":::::::::::.........:::::.......",
+      "####.:::::.########.::::.#####.:",
+      "++++.::::.##########.::.######.:",
+      "+++..::::.#+++++++++.::.#+++++.:",
+      "++..:::::.#+++#+++++.::.#++#++.:",
+      "...:::::::.+++++++++.:::.+++++.:",
+      ":::::::::::.........:::::.....::",
       "::::::::::::::::::::::::::::::::",
       "::.######.::::.#######.::::.###.",
       ":.########.::.#########.::.#####",
@@ -3876,12 +3879,12 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
       "::.+++++++.:::.++++++++.:::.++++",
       ":::.......:::::........:::::....",
       "::::::::::::::::::::::::::::::::",
-      "#####.::::.######.::::.#######.:",
-      "+++++.:::.########.::.#########.",
-      "++++..:::.#+++++++.::.#++++++++.",
-      "+++..::::.#++#++++.::.#+++#++++.",
-      "....::::::.+++++++.:::.++++++++.",
-      ":::::::::::.......:::::........:",
+      "#####.::::.######.::::.######.::",
+      "+++++.:::.########.::.#######.::",
+      "++++..:::.#+++++++.::.#++++++.::",
+      "+++..::::.#++#++++.::.#+++#++.::",
+      "....::::::.+++++++.:::.++++++.::",
+      ":::::::::::.......:::::......:::",
       "::::::::::::::::::::::::::::::::",
       "::.#######.::::.######.::::.###.",
       ":.#########.::.########.::.#####",
@@ -4201,8 +4204,8 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   std::uint64_t vis[2]{};         // 16 B stack bitset: frustum slots d=0..6, s=-(d+2)..+(d+2)
   std::uint32_t colOcc[kOccWords]{};
   std::uint32_t depthColOcc[7][kOccWords]{};
-  std::uint8_t rowX0[7]{};
-  std::uint8_t rowX1[7]{};
+  std::int16_t rowX0[7]{};
+  std::int16_t rowX1[7]{};
   int xlower = 0;
   int xupper = W - 1;
   int maxVisD = 0;
@@ -4280,8 +4283,8 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     for (int w = 0; w < kOccWords; ++w) {
       depthColOcc[d][w] = colOcc[w];
     }
-    rowX0[d] = static_cast<std::uint8_t>(xlower);
-    rowX1[d] = static_cast<std::uint8_t>(xupper);
+    rowX0[d] = static_cast<std::int16_t>(xlower);
+    rowX1[d] = static_cast<std::int16_t>(xupper);
 
     const int maxSRoad = d + 2;
     if (d == 0) {
@@ -4295,8 +4298,8 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
       for (int s = -maxSRoad; s <= maxSRoad; ++s) {
         const float latL = static_cast<float>(s) - 0.50f;
         const float latR = static_cast<float>(s) + 0.50f;
-        const int xMin = std::min(cliffX(zNearCell, latL), cliffX(zFarCell, latL)) - 9;
-        const int xMax = std::max(cliffX(zNearCell, latR), cliffX(zFarCell, latR)) + 9;
+        const int xMin = std::min(cliffX(zNearCell, latL), cliffX(zFarCell, latL)) - 9 * kResScale;
+        const int xMax = std::max(cliffX(zNearCell, latR), cliffX(zFarCell, latR)) + 9 * kResScale;
         if (hasUnoccludedCol(depthColOcc[d], xlower, xupper, xMin, xMax)) {
           setVis(d, s);
           maxVisD = d;
@@ -4321,7 +4324,8 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
         if (!inMine && occTopScale < 0.85f) { continue; }
         if (d == 0) {
           if (std::abs(s) == 1) {
-            markColSpan((s < 0) ? 0 : (W - 9), (s < 0) ? 8 : (W - 1), 0.50f);
+            const int cheekW = 9 * kResScale;
+            markColSpan((s < 0) ? 0 : (W - cheekW), (s < 0) ? (cheekW - 1) : (W - 1), 0.50f);
           }
           continue;
         }
@@ -4388,11 +4392,14 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     }
 
     // Starfield (dense 2-tone + twinkling crosses on airless/night worlds, subtle upper-sky stars by day)
-    const int starCount = airlessWorld ? 72 : nightSky ? 46 : duskSky ? 26 : 14;
-    const int starMaxY  = airlessWorld ? (hy - 6) : nightSky ? (hy - 14) : duskSky ? 34 : 22;
+    const int starCount = (airlessWorld ? 72 : nightSky ? 46 : duskSky ? 26 : 14) * 3 / 2;
+    const int starMaxY  = airlessWorld ? (hy - 6 * kResScale)
+                        : nightSky     ? (hy - 14 * kResScale)
+                        : duskSky      ? (34 * kResScale)
+                                       : (22 * kResScale);
     for (int st = 0; st < starCount; ++st) {
       const unsigned sh = static_cast<unsigned>(st) * 2654435761u ^ pSeed;
-      const int sx = 3 + static_cast<int>((sh + static_cast<unsigned>(planetSurface_.dir) * 59u) %
+      const int sx = 3 + static_cast<int>((sh + static_cast<unsigned>(planetSurface_.dir) * 118u) %
                                           static_cast<unsigned>(W - 6));
       const int sy = 2 + static_cast<int>((sh >> 8) % static_cast<unsigned>(std::max(8, starMaxY)));
       const std::uint8_t sCol =
@@ -4410,20 +4417,21 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
 
     // Ice sub-biome 1: sweeping PC-98 Aurora Borealis vertical curtains across night sky
     if (iceWorld && subBiome == 1) {
-      for (int x = 6; x < W - 6; ++x) {
-        const float af = static_cast<float>(x + planetSurface_.dir * 52 + static_cast<int>(pSeed & 31u));
+      for (int x = 6 * kResScale; x < W - 6 * kResScale; ++x) {
+        const float af = static_cast<float>(x) / static_cast<float>(kResScale)
+                       + static_cast<float>(planetSurface_.dir * 52 + static_cast<int>(pSeed & 31u));
         const float w1 = std::sin(af * 0.042f);
         const float w2 = std::sin(af * 0.095f + 1.4f);
         const float env = 0.55f + 0.45f * std::sin(af * 0.021f + 0.6f);
-        const int baseY = 9 + static_cast<int>(std::lround((w1 * 5.0f + w2 * 3.0f) + 7.0f));
-        const int ribbonH = 8 + static_cast<int>(std::lround(env * 14.0f));
+        const int baseY = (9 + static_cast<int>(std::lround((w1 * 5.0f + w2 * 3.0f) + 7.0f))) * kResScale;
+        const int ribbonH = (8 + static_cast<int>(std::lround(env * 14.0f))) * kResScale;
         for (int k = 0; k < ribbonH; ++k) {
           const int py = baseY + k;
-          if (py < 2 || py >= hy - 14) { continue; }
+          if (py < 2 || py >= hy - 14 * kResScale) { continue; }
           const int distEdge = std::min(k + 1, ribbonH - k);
           const int density = std::min(15, (distEdge * 22) / std::max(1, ribbonH));
           if (kBayer4[py & 3][x & 3] < density && ((x + (py >> 2)) & 1) == 0) {
-            putPx(x, py, (k < 4) ? leaf2 : (k < ribbonH * 2 / 3) ? leaf1 : accent1);
+            putPx(x, py, (k < 4 * kResScale) ? leaf2 : (k < ribbonH * 2 / 3) ? leaf1 : accent1);
           }
         }
       }
@@ -4431,19 +4439,19 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
 
     // Celestial landmarks with compass parallax (ringed gas giant, cratered moon, coronal sun, twin moons)
     {
-      const int celX = 28 + ((static_cast<int>(pSeed >> 14) + (3 - planetSurface_.dir) * 56) % (W - 56));
-      const int celY = 16 + static_cast<int>((pSeed >> 18) % 14u);
+      const int celX = (28 + ((static_cast<int>(pSeed >> 14) + (3 - planetSurface_.dir) * 56) % (240 - 56))) * kResScale;
+      const int celY = (16 + static_cast<int>((pSeed >> 18) % 14u)) * kResScale;
       const std::uint8_t celHi  = (lavaWorld || duskSky) ? kIdxWarmGleam : kIdxStarCool;
       const std::uint8_t celMid = (lavaWorld || duskSky) ? sky3 : kIdxCloudCool;
       const std::uint8_t celShd = sky0;
 
       if (celestialKind == 0) {
         // Ringed gas giant: back ring -> full sphere (lit bands + shaded night hemisphere) -> front ring
-        const int r = 11 + static_cast<int>((pSeed >> 20) & 3u);
-        const int ringRx = r * 2 + 5;
+        const int r = (11 + static_cast<int>((pSeed >> 20) & 3u)) * kResScale;
+        const int ringRx = r * 2 + 5 * kResScale;
         for (int rx = -ringRx; rx <= ringRx; ++rx) {
-          const int ryBack = celY - (rx * 3) / 10 - 2;
-          if (rx * rx > (r - 1) * (r - 1) && ryBack >= 1 && ryBack < hy - 6) {
+          const int ryBack = celY - (rx * 3) / 10 - 2 * kResScale;
+          if (rx * rx > (r - 1) * (r - 1) && ryBack >= 1 && ryBack < hy - 6 * kResScale) {
             putPx(celX + rx, ryBack, celMid);
             putPx(celX + rx, ryBack - 1, ((rx & 1) == 0) ? sky2 : celMid);
           }
@@ -4451,12 +4459,12 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
         const int r2 = r * r;
         for (int dy = -r; dy <= r; ++dy) {
           const int py = celY + dy;
-          if (py < 1 || py >= hy - 8) { continue; }
+          if (py < 1 || py >= hy - 8 * kResScale) { continue; }
           for (int dx = -r; dx <= r; ++dx) {
             if (dx * dx + dy * dy > r2) { continue; }
             const int px = celX + dx;
             const int lit = (-dx * 10 - dy * 3) + r * 4;  // upper-left sunlight
-            const int band = ((dy + r) / 3) & 1;
+            const int band = ((dy + r) / (3 * kResScale)) & 1;
             if (lit < 0) {
               putPx(px, py, (kBayer4[py & 3][px & 3] < 4) ? sky1 : celShd);
             } else if (lit < r * 4) {
@@ -4469,61 +4477,64 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
           }
         }
         for (int rx = -ringRx; rx <= ringRx; ++rx) {
-          const int ryFront = celY - (rx * 3) / 10 + 1;
-          if (ryFront >= 1 && ryFront < hy - 6) {
+          const int ryFront = celY - (rx * 3) / 10 + 1 * kResScale;
+          if (ryFront >= 1 && ryFront < hy - 6 * kResScale) {
             putPx(celX + rx, ryFront, celHi);
             putPx(celX + rx, ryFront + 1, ((rx & 1) == 0) ? celMid : sky2);
           }
         }
       } else if (celestialKind == 1) {
         // Curved crescent / gibbous moon with offset-circle shadow cutout + crater detail
-        const int r = 10 + static_cast<int>((pSeed >> 20) & 3u);
+        const int r = (10 + static_cast<int>((pSeed >> 20) & 3u)) * kResScale;
         const int r2 = r * r;
         const int shOffX = r * 55 / 100;
         const int shOffY = -r / 6;
         const int shR2 = (r * 92 / 100) * (r * 92 / 100);
         for (int dy = -r; dy <= r; ++dy) {
           const int py = celY + dy;
-          if (py < 1 || py >= hy - 8) { continue; }
+          if (py < 1 || py >= hy - 8 * kResScale) { continue; }
           for (int dx = -r; dx <= r; ++dx) {
             if (dx * dx + dy * dy > r2) { continue; }
             const int px = celX + dx;
             const int sdx = dx - shOffX;
             const int sdy = dy - shOffY;
             const int dSh = sdx * sdx + sdy * sdy;
-            if (dSh < shR2 - r * 3) {
+            if (dSh < shR2 - r * 3 * kResScale) {
               if (airlessWorld && kBayer4[py & 3][px & 3] < 4) { putPx(px, py, sky1); }
               continue;
             }
-            if (dSh < shR2 + r * 2) {
+            if (dSh < shR2 + r * 2 * kResScale) {
               putPx(px, py, (kBayer4[py & 3][px & 3] < 9) ? celMid : sky1);
               continue;
             }
-            const bool crater = ((dx + 4) * (dx + 4) + (dy - 2) * (dy - 2) <= 4) ||
-                                ((dx + 2) * (dx + 2) + (dy + 4) * (dy + 4) <= 3);
+            const int c1x = dx + 4 * kResScale;
+            const int c1y = dy - 2 * kResScale;
+            const int c2x = dx + 2 * kResScale;
+            const int c2y = dy + 4 * kResScale;
+            const bool crater = (c1x * c1x + c1y * c1y <= 4 * kResScale * kResScale) ||
+                                (c2x * c2x + c2y * c2y <= 3 * kResScale * kResScale);
             putPx(px, py, crater ? celMid : celHi);
           }
         }
       } else if (celestialKind == 2) {
         // Low sun with horizontal PC-98 interlace corona (plus binary companion on odd seeds)
-        const int sunY = std::min(hy - 18, celY + 10);
-        const int r = 7;
-        fillDitherDisc(celX, sunY, r + 7, r + 5, sky2, sky3, 9);
-        fillDitherDisc(celX, sunY, r + 3, r + 2, sky3, celHi, 10);
+        const int sunY = std::min(hy - 18 * kResScale, celY + 10 * kResScale);
+        const int r = 7 * kResScale;
+        fillDitherDisc(celX, sunY, r + 7 * kResScale, r + 5 * kResScale, sky2, sky3, 9);
+        fillDitherDisc(celX, sunY, r + 3 * kResScale, r + 2 * kResScale, sky3, celHi, 10);
         fillDisc(celX, sunY, r, r, celHi);
         if ((pSeed & 1u) != 0u) {
-          fillDitherDisc(celX + 16, sunY - 7, 5, 5, sky3, kIdxWarmGleam, 8);
-          fillDisc(celX + 16, sunY - 7, 3, 3, kIdxWarmGleam);
+          fillDitherDisc(celX + 16 * kResScale, sunY - 7 * kResScale, 5 * kResScale, 5 * kResScale, sky3, kIdxWarmGleam, 8);
+          fillDisc(celX + 16 * kResScale, sunY - 7 * kResScale, 3 * kResScale, 3 * kResScale, kIdxWarmGleam);
         }
       } else {
         // Twin moons (primary cratered disc + distant companion moonlet)
-        const int r = 8;
+        const int r = 8 * kResScale;
         fillDitherDisc(celX, celY, r, r, celMid, celHi, 10);
-        fillDisc(celX - 2, celY - 2, r - 3, r - 3, celHi);
-        fillDisc(celX + 2, celY + 2, 2, 2, celMid);
-        fillDisc(celX + 18, celY - 5, 3, 3, celMid);
-        putPx(celX + 17, celY - 6, celHi);
-        putPx(celX + 18, celY - 6, celHi);
+        fillDisc(celX - 2 * kResScale, celY - 2 * kResScale, r - 3 * kResScale, r - 3 * kResScale, celHi);
+        fillDisc(celX + 2 * kResScale, celY + 2 * kResScale, 2 * kResScale, 2 * kResScale, celMid);
+        fillDisc(celX + 18 * kResScale, celY - 5 * kResScale, 3 * kResScale, 3 * kResScale, celMid);
+        fillDisc(celX + 17 * kResScale, celY - 6 * kResScale, std::max(1, kResScale), std::max(1, kResScale), celHi);
       }
     }
 
@@ -4540,28 +4551,28 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
       const std::uint8_t cBot = nightSky ? sky1 : sky2;
       auto drawCloudBank = [&](int cx, int cy, int cw, int ch, unsigned seed) {
         // Flat horizontal wispy cloud-bank base + asymmetric multi-lobe billowing cumulus tops
-        // (cloudStyle == 1 produces sleeker stretched wind-swept cumulus banks, never thin bars)
-        const int effCh = (cloudStyle == 1) ? std::max(3, ch * 65 / 100) : ch;
-        const int effCw = (cloudStyle == 1) ? (cw + 14) : cw;
+        const int effCh = (cloudStyle == 1) ? std::max(3 * kResScale, ch * 65 / 100) : ch;
+        const int effCw = (cloudStyle == 1) ? (cw + 14 * kResScale) : cw;
         const int baseY = cy + effCh;
-        const int lobes = 5;
+        const int lobes = 7;
         for (int i = 0; i < lobes; ++i) {
-          const int lx = cx - effCw * 38 / 100 + (i * effCw * 76 / 100) / (lobes - 1)
-                       + static_cast<int>(((seed + static_cast<unsigned>(i) * 13u) % 5u)) - 2;
+          const int lx = cx - effCw * 40 / 100 + (i * effCw * 80 / 100) / (lobes - 1)
+                       + (static_cast<int>(((seed + static_cast<unsigned>(i) * 13u) % 5u)) - 2) * kResScale;
           const int distEdge = std::min(i + 1, lobes - i);
-          const int rx = std::max(5, effCw / 5 + distEdge * 2);
-          const int ry = std::max(2, (effCh * (distEdge + 1)) / 3 + static_cast<int>((seed >> (i * 2)) & 3u));
+          const int rx = std::max(5 * kResScale, effCw / 6 + distEdge * 2 * kResScale);
+          const int ry = std::max(2 * kResScale, (effCh * (distEdge + 1)) / 4 +
+                                  static_cast<int>((seed >> (i * 2)) & 3u) * kResScale);
           const int ly = baseY - ry * 7 / 10;
-          fillDisc(lx, ly + 1, rx + 1, ry, cBot);
+          fillDisc(lx, ly + kResScale, rx + kResScale, ry, cBot);
           fillDisc(lx, ly, rx, ry, cMid);
-          fillDisc(lx - 1, ly - 1, std::max(3, rx - 2), std::max(2, ry - 1), cRim);
+          fillDisc(lx - kResScale, ly - kResScale, std::max(3, rx - 2 * kResScale), std::max(2, ry - kResScale), cRim);
         }
         // Crisp flat cumulus underside trimmed with horizontal PC-98 interlace dither
-        for (int py = baseY + 1; py <= baseY + 3; ++py) {
-          if (py >= hy - 6) { break; }
+        for (int py = baseY + 1; py <= baseY + 3 * kResScale; ++py) {
+          if (py >= hy - 6 * kResScale) { break; }
           const int shrink = (py - baseY) * 4;
-          for (int px = cx - effCw / 2 - 4 + shrink; px <= cx + effCw / 2 + 4 - shrink; ++px) {
-            if (py == baseY + 1) {
+          for (int px = cx - effCw / 2 - 4 * kResScale + shrink; px <= cx + effCw / 2 + 4 * kResScale - shrink; ++px) {
+            if (py <= baseY + kResScale) {
               putPx(px, py, (((px + py) & 1) == 0) ? cMid : cBot);
             } else if (((px + py) & 3) == 0) {
               putPx(px, py, cBot);
@@ -4569,19 +4580,22 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
           }
         }
         // Trailing wispy PC-98 cloud tails extending left/right along the underside
-        drawHLine(cx - effCw / 2 - 14, cx - effCw / 3, baseY, cRim);
-        drawHLine(cx - effCw / 2 - 10, cx - effCw / 4, baseY + 1, cMid);
-        drawHLine(cx + effCw / 3, cx + effCw / 2 + 12, baseY, cRim);
-        drawHLine(cx + effCw / 4, cx + effCw / 2 + 8, baseY + 1, cMid);
+        drawHLine(cx - effCw / 2 - 16 * kResScale, cx - effCw / 3, baseY, cRim);
+        drawHLine(cx - effCw / 2 - 11 * kResScale, cx - effCw / 4, baseY + 1, cMid);
+        drawHLine(cx + effCw / 3, cx + effCw / 2 + 14 * kResScale, baseY, cRim);
+        drawHLine(cx + effCw / 4, cx + effCw / 2 + 9 * kResScale, baseY + 1, cMid);
       };
       const int cOff = (3 - planetSurface_.dir) * 52;
-      drawCloudBank(38 + (cOff + static_cast<int>(pSeed & 31u)) % 120, 12, 68, 7, pSeed);
-      drawCloudBank(182 - ((planetSurface_.dir * 37 + static_cast<int>((pSeed >> 4) & 31u)) % 96), 21, 56, 6, pSeed >> 3);
-      drawCloudBank(96 + ((planetSurface_.dir * 43 + static_cast<int>((pSeed >> 7) & 31u)) % 88), 33, 44, 5, pSeed >> 7);
+      drawCloudBank((38 + (cOff + static_cast<int>(pSeed & 31u)) % 120) * kResScale,
+                    12 * kResScale, 68 * kResScale, 7 * kResScale, pSeed);
+      drawCloudBank((182 - ((planetSurface_.dir * 37 + static_cast<int>((pSeed >> 4) & 31u)) % 96)) * kResScale,
+                    21 * kResScale, 56 * kResScale, 6 * kResScale, pSeed >> 3);
+      drawCloudBank((96 + ((planetSurface_.dir * 43 + static_cast<int>((pSeed >> 7) & 31u)) % 88)) * kResScale,
+                    33 * kResScale, 44 * kResScale, 5 * kResScale, pSeed >> 7);
     }
 
     // Two-layer parallax horizon silhouettes varied by biome & planet horizonStyle
-    // Uses incommensurate integer triangle waves (no repeating shark-tooth pattern)
+    // Uses incommensurate integer triangle waves scaled smoothly to W (no stair-step aliasing)
     auto triWave = [](int v, int period) -> int {
       const int m = ((v % period) + period) % period;
       const int half = period / 2;
@@ -4590,36 +4604,37 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     // Layer 1: Far atmospheric range blended softly toward sky3
     activeFog = 24;
     activeInk = kInkFogBase + 4u;
-    int prevFarH = 6;
+    int prevFarH = 6 * kResScale;
     for (int x = 0; x < W; ++x) {
-      const int ph = x + planetSurface_.dir * 64 + static_cast<int>((pSeed >> 6) & 127u);
-      int farH = 6;
+      const int ph = x + (planetSurface_.dir * 64 + static_cast<int>((pSeed >> 6) & 127u)) * kResScale;
+      int farH = 6 * kResScale;
       if (horizonStyle == 1 || (rockWorld && horizonStyle != 2)) {
         // Irregular flat-topped mesas & broad canyon gaps
-        const int seg = (ph / 46);
-        const int r = ph % 46;
-        const int mesaW = 18 + ((seg * 7 + static_cast<int>(pSeed & 7u)) % 14);
-        const int mesaH = 10 + ((seg * 5) % 7);
-        if (r >= 6 && r <= 6 + mesaW) {
-          farH = (r < 9 || r > 3 + mesaW) ? (mesaH - 3) : mesaH;
+        const int segW = 46 * kResScale;
+        const int seg = ph / segW;
+        const int r = ph % segW;
+        const int mesaW = (18 + ((seg * 7 + static_cast<int>(pSeed & 7u)) % 14)) * kResScale;
+        const int mesaH = (10 + ((seg * 5) % 7)) * kResScale;
+        if (r >= 6 * kResScale && r <= 6 * kResScale + mesaW) {
+          farH = (r < 9 * kResScale || r > 3 * kResScale + mesaW) ? (mesaH - 3 * kResScale) : mesaH;
         } else {
-          farH = 4 + (triWave(ph, 37) * 3) / 18;
+          farH = 4 * kResScale + (triWave(ph, 37 * kResScale) * 3) / 18;
         }
       } else if (horizonStyle == 2 || lavaWorld || iceWorld) {
         // Sweeping asymmetric alpine peaks & volcanic calderas
-        const int w1 = triWave(ph, 86);
-        const int w2 = triWave(ph + 29, 54);
-        const int w3 = triWave(ph * 2 + 13, 38);
-        farH = 4 + (w1 * 12) / 43 + (w2 * 6) / 27 + (w3 * 3) / 19;
+        const int w1 = triWave(ph, 86 * kResScale);
+        const int w2 = triWave(ph + 29 * kResScale, 54 * kResScale);
+        const int w3 = triWave(ph * 2 + 13 * kResScale, 38 * kResScale);
+        farH = 4 * kResScale + (w1 * 12) / 43 + (w2 * 6) / 27 + (w3 * 3) / 19;
       } else {
         // Broad rolling highlands / coastal ridges
-        const int w1 = triWave(ph, 98);
-        const int w2 = triWave(ph + 41, 62);
-        const int w3 = triWave(ph + 19, 34);
-        farH = 4 + (w1 * 9) / 49 + (w2 * 5) / 31 + (w3 * 2) / 17;
+        const int w1 = triWave(ph, 98 * kResScale);
+        const int w2 = triWave(ph + 41 * kResScale, 62 * kResScale);
+        const int w3 = triWave(ph + 19 * kResScale, 34 * kResScale);
+        farH = 4 * kResScale + (w1 * 9) / 49 + (w2 * 5) / 31 + (w3 * 2) / 17;
       }
-      if (oceanWorld) { farH = std::max(2, farH - 5); }
-      const int yTop = std::max(8, hy - farH);
+      if (oceanWorld) { farH = std::max(2 * kResScale, farH - 5 * kResScale); }
+      const int yTop = std::max(8 * kResScale, hy - farH);
       const bool litFar = (farH >= prevFarH);
       prevFarH = farH;
       putPx(x, yTop - 1, sky2);
@@ -4630,78 +4645,76 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
 
     // Distant Might & Magic-style overworld horizon landmarks (compass-anchored per planet)
     {
-      const int lmX = 36 + ((static_cast<int>(pSeed >> 9) + (3 - planetSurface_.dir) * 62) % (W - 72));
+      const int lmX = (36 + ((static_cast<int>(pSeed >> 9) + (3 - planetSurface_.dir) * 62) % (240 - 72))) * kResScale;
+      const int sc = kResScale;
       activeFog = 22;
       activeInk = kInkFogBase + 4u;
       if (lavaWorld) {
         // Smoking caldera cone + distant obsidian spire
-        for (int k = 0; k < 16; ++k) {
-          const int py = hy - 14 - k;
-          const int drift = (k * k) / 14;
-          const int rw = 2 + k / 3;
-          fillDitherDisc(lmX + drift, py, rw, 2, sky1, rockDark, 8);
+        for (int k = 0; k < 16 * sc; ++k) {
+          const int py = hy - 14 * sc - k;
+          const int drift = (k * k) / (14 * sc);
+          const int rw = 2 * sc + k / 3;
+          fillDitherDisc(lmX + drift, py, rw, 2 * sc, sky1, rockDark, 8);
         }
-        // Jagged obsidian citadel spire beside the ridge
-        const int sx = (lmX > W / 2) ? (lmX - 42) : (lmX + 42);
-        fillRect(sx - 4, hy - 16, 9, 16, rockDark);
-        fillRect(sx - 2, hy - 23, 5, 8, rockDark);
-        fillRect(sx - 1, hy - 28, 3, 6, rockMid);
-        putPx(sx, hy - 29, accent0);
-        putPx(sx, hy - 19, kIdxWarmGleam);  // distant beacon window
+        const int sx = (lmX > W / 2) ? (lmX - 42 * sc) : (lmX + 42 * sc);
+        fillRect(sx - 4 * sc, hy - 16 * sc, 9 * sc, 16 * sc, rockDark);
+        fillRect(sx - 2 * sc, hy - 23 * sc, 5 * sc, 8 * sc, rockDark);
+        fillRect(sx - 1 * sc, hy - 28 * sc, 3 * sc, 6 * sc, rockMid);
+        fillRect(sx, hy - 29 * sc, sc, sc, accent0);
+        fillRect(sx, hy - 19 * sc, sc, sc, kIdxWarmGleam);
       } else if (biomeIdx == 0) {
         // Distant ruined castle keep & watchtower perched on a hilltop
-        fillRect(lmX - 10, hy - 14, 21, 14, rockDark);
-        fillRect(lmX - 9, hy - 13, 8, 12, rockMid);
-        // Left keep tower + crenels
-        fillRect(lmX - 10, hy - 22, 7, 9, rockDark);
-        fillRect(lmX - 9, hy - 21, 3, 7, rockMid);
-        putPx(lmX - 10, hy - 23, rockHi);
-        putPx(lmX - 7, hy - 23, rockHi);
-        putPx(lmX - 4, hy - 23, rockHi);
-        // Right broken watchtower + glowing window
-        fillRect(lmX + 4, hy - 19, 6, 6, rockDark);
-        putPx(lmX + 5, hy - 20, rockHi);
-        putPx(lmX + 8, hy - 20, rockHi);
-        putPx(lmX - 7, hy - 18, kIdxWarmGleam);
-        putPx(lmX + 6, hy - 16, kIdxWarmGleam);
+        fillRect(lmX - 10 * sc, hy - 14 * sc, 21 * sc, 14 * sc, rockDark);
+        fillRect(lmX - 9 * sc, hy - 13 * sc, 8 * sc, 12 * sc, rockMid);
+        // Left keep tower + crisp crenels
+        fillRect(lmX - 10 * sc, hy - 22 * sc, 7 * sc, 9 * sc, rockDark);
+        fillRect(lmX - 9 * sc, hy - 21 * sc, 3 * sc, 7 * sc, rockMid);
+        fillRect(lmX - 10 * sc, hy - 23 * sc, sc, sc, rockHi);
+        fillRect(lmX - 7 * sc, hy - 23 * sc, sc, sc, rockHi);
+        fillRect(lmX - 4 * sc, hy - 23 * sc, sc, sc, rockHi);
+        // Right broken watchtower + glowing windows
+        fillRect(lmX + 4 * sc, hy - 19 * sc, 6 * sc, 6 * sc, rockDark);
+        fillRect(lmX + 5 * sc, hy - 20 * sc, sc, sc, rockHi);
+        fillRect(lmX + 8 * sc, hy - 20 * sc, sc, sc, rockHi);
+        fillRect(lmX - 7 * sc, hy - 18 * sc, sc, sc, kIdxWarmGleam);
+        fillRect(lmX + 6 * sc, hy - 16 * sc, sc, sc, kIdxWarmGleam);
       } else if (iceWorld) {
         // Towering glacial crystal citadel spire on the distant horizon
-        for (int row = 0; row < 22; ++row) {
-          const int hw = std::max(1, (22 - row) / 3);
-          drawHLine(lmX - hw, lmX + hw, hy - 4 - row, (row > 14) ? rockHi : rockMid);
-          drawHLine(lmX, lmX + hw, hy - 4 - row, rockDark);
+        for (int row = 0; row < 22 * sc; ++row) {
+          const int hw = std::max(1, (22 * sc - row) / 3);
+          drawHLine(lmX - hw, lmX + hw, hy - 4 * sc - row, (row > 14 * sc) ? rockHi : rockMid);
+          drawHLine(lmX, lmX + hw, hy - 4 * sc - row, rockDark);
         }
-        putPx(lmX, hy - 27, accent1);
-        fillRect(lmX - 11, hy - 15, 4, 15, rockMid);
-        fillRect(lmX + 8, hy - 13, 4, 13, rockDark);
-        putPx(lmX - 10, hy - 16, accent1);
+        fillRect(lmX, hy - 27 * sc, sc, sc, accent1);
+        fillRect(lmX - 11 * sc, hy - 15 * sc, 4 * sc, 15 * sc, rockMid);
+        fillRect(lmX + 8 * sc, hy - 13 * sc, 4 * sc, 13 * sc, rockDark);
+        fillRect(lmX - 10 * sc, hy - 16 * sc, sc, sc, accent1);
       } else if (oceanWorld) {
         // Distant sunken coastal aqueduct arches & sea-beacon lighthouse
         for (int a = 0; a < 3; ++a) {
-          const int ax = lmX - 14 + a * 9;
-          fillRect(ax, hy - 11, 9, 3, rockMid);
-          fillRect(ax, hy - 8, 2, 8, rockDark);
-          fillRect(ax + 7, hy - 8, 2, 8, rockDark);
+          const int ax = lmX - 14 * sc + a * 9 * sc;
+          fillRect(ax, hy - 11 * sc, 9 * sc, 3 * sc, rockMid);
+          fillRect(ax, hy - 8 * sc, 2 * sc, 8 * sc, rockDark);
+          fillRect(ax + 7 * sc, hy - 8 * sc, 2 * sc, 8 * sc, rockDark);
         }
-        fillRect(lmX + 15, hy - 18, 4, 18, rockMid);
-        fillRect(lmX + 17, hy - 18, 2, 18, rockDark);
-        putPx(lmX + 16, hy - 19, kIdxWarmGleam);
-        putPx(lmX + 17, hy - 19, kIdxWarmGleam);
+        fillRect(lmX + 15 * sc, hy - 18 * sc, 4 * sc, 18 * sc, rockMid);
+        fillRect(lmX + 17 * sc, hy - 18 * sc, 2 * sc, 18 * sc, rockDark);
+        fillRect(lmX + 16 * sc, hy - 19 * sc, 2 * sc, sc, kIdxWarmGleam);
       } else {
         // Rock / Badlands: colossal stepped desert ziggurat / alien obelisk silhouette
         if ((pSeed & 1u) == 0u) {
-          fillRect(lmX - 15, hy - 7, 31, 7, rockDark);
-          fillRect(lmX - 11, hy - 12, 23, 5, rockMid);
-          fillRect(lmX - 7, hy - 17, 15, 5, rockDark);
-          fillRect(lmX - 3, hy - 21, 7, 4, rockHi);
-          putPx(lmX, hy - 22, accent1);
+          fillRect(lmX - 15 * sc, hy - 7 * sc, 31 * sc, 7 * sc, rockDark);
+          fillRect(lmX - 11 * sc, hy - 12 * sc, 23 * sc, 5 * sc, rockMid);
+          fillRect(lmX - 7 * sc, hy - 17 * sc, 15 * sc, 5 * sc, rockDark);
+          fillRect(lmX - 3 * sc, hy - 21 * sc, 7 * sc, 4 * sc, rockHi);
+          fillRect(lmX, hy - 22 * sc, sc, sc, accent1);
         } else {
-          // Tall needle monolith obelisk
-          fillRect(lmX - 3, hy - 24, 7, 24, rockDark);
-          fillRect(lmX - 3, hy - 24, 3, 24, rockMid);
-          drawHLine(lmX - 2, lmX + 2, hy - 25, rockHi);
-          drawHLine(lmX - 1, lmX + 1, hy - 26, accent1);
-          putPx(lmX, hy - 27, accent1);
+          fillRect(lmX - 3 * sc, hy - 24 * sc, 7 * sc, 24 * sc, rockDark);
+          fillRect(lmX - 3 * sc, hy - 24 * sc, 3 * sc, 24 * sc, rockMid);
+          fillRect(lmX - 2 * sc, hy - 25 * sc, 5 * sc, sc, rockHi);
+          fillRect(lmX - 1 * sc, hy - 26 * sc, 3 * sc, sc, accent1);
+          fillRect(lmX, hy - 27 * sc, sc, sc, accent1);
         }
       }
     }
@@ -4709,25 +4722,28 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     // Layer 2: Nearer detailed horizon ridge with sunlit/shadowed facets & 1px atmospheric crest
     activeFog = 18;
     activeInk = kInkFogBase + 4u;
-    int prevNearH = 4;
+    int prevNearH = 4 * kResScale;
     for (int x = 0; x < W; ++x) {
-      const int ph = x + planetSurface_.dir * 84 + static_cast<int>((pSeed >> 11) & 63u);
-      int nearH = 4;
+      const int ph = x + (planetSurface_.dir * 84 + static_cast<int>((pSeed >> 11) & 63u)) * kResScale;
+      int nearH = 4 * kResScale;
       if (rockWorld && horizonStyle == 1) {
-        const int blk = (ph / 38);
-        const int rem = ph % 38;
-        nearH = ((blk % 3) == 0 && rem > 5 && rem < 28) ? 9 : 3 + (triWave(ph, 29) * 3) / 14;
+        const int blkW = 38 * kResScale;
+        const int blk = ph / blkW;
+        const int rem = ph % blkW;
+        nearH = ((blk % 3) == 0 && rem > 5 * kResScale && rem < 28 * kResScale)
+                    ? (9 * kResScale)
+                    : (3 * kResScale + (triWave(ph, 29 * kResScale) * 3) / 14);
       } else if (oceanWorld) {
-        const int w1 = triWave(ph, 72);
-        const int w2 = triWave(ph + 19, 36);
-        nearH = (w1 > 24) ? (3 + (w1 - 24) / 2 + w2 / 9) : 2;
+        const int w1 = triWave(ph, 72 * kResScale);
+        const int w2 = triWave(ph + 19 * kResScale, 36 * kResScale);
+        nearH = (w1 > 24 * kResScale) ? (3 * kResScale + (w1 - 24 * kResScale) / 2 + w2 / 9) : (2 * kResScale);
       } else {
-        const int p1 = triWave(ph, 68);
-        const int p2 = triWave(ph + 23, 42);
-        const int p3 = triWave(ph + 7, 22);
-        nearH = 3 + (p1 * 6) / 34 + (p2 * 4) / 21 + (p3 * 2) / 11;
+        const int p1 = triWave(ph, 68 * kResScale);
+        const int p2 = triWave(ph + 23 * kResScale, 42 * kResScale);
+        const int p3 = triWave(ph + 7 * kResScale, 22 * kResScale);
+        nearH = 3 * kResScale + (p1 * 6) / 34 + (p2 * 4) / 21 + (p3 * 2) / 11;
       }
-      const int yTop = std::max(14, hy - nearH);
+      const int yTop = std::max(14 * kResScale, hy - nearH);
       putPx(x, yTop - 1, inkOut);
       const bool litSlope = (nearH >= prevNearH);
       prevNearH = nearH;
@@ -4735,7 +4751,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
         std::uint8_t col = rockDark;
         if (k == 0 && litSlope) {
           col = (iceWorld || (biomeIdx == 0 && subBiome == 1)) ? leaf2 : rockHi;
-        } else if (k <= 2 && litSlope && ((x + k) & 1) == 0) {
+        } else if (k <= 2 * kResScale && litSlope && ((x + k) & 1) == 0) {
           col = rockMid;
         }
         putPx(x, yTop + k, col);
@@ -4802,16 +4818,16 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     // Subtle corner stalactites / damp mineral drips tucked between rafters
     activeFog = 0;
     activeInk = inkOut;
-    if (ceilEndY > 14) {
-      for (int st = 0; st < 7; ++st) {
+    if (ceilEndY > 14 * kResScale) {
+      for (int st = 0; st < 10; ++st) {
         const unsigned sh = static_cast<unsigned>(st) * 374761393u ^
                             (static_cast<unsigned>(planetSurface_.px) * 668265263u) ^
                             (static_cast<unsigned>(planetSurface_.py) * 2147483647u) ^
                             (static_cast<unsigned>(planetSurface_.dir) * 1274126177u);
-        const int sx = 14 + static_cast<int>(sh % static_cast<unsigned>(W - 28));
-        const int len = 4 + static_cast<int>((sh >> 8) % 6u);
-        const int halfW = 1 + static_cast<int>((sh >> 12) % 2u);
-        if (len >= ceilEndY - 4) { continue; }
+        const int sx = 14 * kResScale + static_cast<int>(sh % static_cast<unsigned>(W - 28 * kResScale));
+        const int len = (4 + static_cast<int>((sh >> 8) % 6u)) * kResScale;
+        const int halfW = (1 + static_cast<int>((sh >> 12) % 2u)) * kResScale;
+        if (len >= ceilEndY - 4 * kResScale) { continue; }
         for (int dy = 0; dy < len; ++dy) {
           const int hw = std::max(0, halfW - (dy * (halfW + 1)) / len);
           putPx(sx - hw - 1, dy, inkOut);
@@ -4847,14 +4863,15 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     const bool detailRow = (z < 3.5f);
     std::int32_t wx_fp = 0, wy_fp = 0, dwx_fp = 0, dwy_fp = 0;
     if (detailRow) {
+      constexpr float kGndTexScale = 16.0f * static_cast<float>(kResScale);
       const float invScaleX = kScanLut.invScaleX[gy];
       const float lat0 = (0.5f - static_cast<float>(cxMid)) * invScaleX;
-      const float wx0 = (gndBaseWx + static_cast<float>(fdx) * z + static_cast<float>(rdx) * lat0) * 16.0f;
-      const float wy0 = (gndBaseWy + static_cast<float>(fdy) * z + static_cast<float>(rdy) * lat0) * 16.0f;
+      const float wx0 = (gndBaseWx + static_cast<float>(fdx) * z + static_cast<float>(rdx) * lat0) * kGndTexScale;
+      const float wy0 = (gndBaseWy + static_cast<float>(fdy) * z + static_cast<float>(rdy) * lat0) * kGndTexScale;
       wx_fp  = static_cast<std::int32_t>(std::lround(wx0 * 65536.0f));
       wy_fp  = static_cast<std::int32_t>(std::lround(wy0 * 65536.0f));
-      dwx_fp = static_cast<std::int32_t>(std::lround(static_cast<float>(rdx) * invScaleX * 16.0f * 65536.0f));
-      dwy_fp = static_cast<std::int32_t>(std::lround(static_cast<float>(rdy) * invScaleX * 16.0f * 65536.0f));
+      dwx_fp = static_cast<std::int32_t>(std::lround(static_cast<float>(rdx) * invScaleX * kGndTexScale * 65536.0f));
+      dwy_fp = static_cast<std::int32_t>(std::lround(static_cast<float>(rdy) * invScaleX * kGndTexScale * 65536.0f));
     }
 
     for (int x = 0; x < W; ++x, wx_fp += dwx_fp, wy_fp += dwy_fp) {
@@ -4869,8 +4886,10 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
         const unsigned cellH = static_cast<unsigned>(gx) * 73856093u ^
                                static_cast<unsigned>(gcy) * 19349663u;
         if (inMine) {
-          // World of Xeen irregular rounded dungeon floor flagstones
-          const std::uint8_t st = kCobbleRoadTex.px[(gcy * 2 + (fy >> 3)) & 31][(gx * 2 + (fx >> 3)) & 31];
+          // World of Xeen irregular rounded dungeon floor flagstones (128 texels/tile matching road!)
+          const int cobU = (wx_fp >> (16 - kResScale)) & 31;
+          const int cobV = (wy_fp >> (16 - kResScale)) & 31;
+          const std::uint8_t st = kCobbleRoadTex.px[cobV][cobU];
           gIdx = (st == 0u) ? inkOut : (st == 1u) ? rockDark : (st == 2u) ? rockMid : rockHi;
         } else if (lavaWorld) {
           // Cracked basalt crust with glowing magma seams near camera
@@ -5072,15 +5091,18 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     const bool allowPebble = (z < 3.4f);
 
     const float lat0 = (static_cast<float>(xStart) + 0.5f - static_cast<float>(cxMid)) * invScaleX;
-    // 64 texels/tile (2x2 cobble repeats per cell -> authentic Clouds of Xeen cobblestone density!)
-    const float wx0 = (baseWx + static_cast<float>(fdx) * z + static_cast<float>(rdx) * lat0) * 64.0f;
-    const float wy0 = (baseWy + static_cast<float>(fdy) * z + static_cast<float>(rdy) * lat0) * 64.0f;
+    // 128 texels/tile at 480x288 (4x4 cobble repeats per cell -> crisp 1:1 PC-98 Clouds of Xeen stones!)
+    constexpr float kRoadTexScale = 64.0f * static_cast<float>(kResScale);
+    constexpr int kRailShift = (kResScale == 2) ? 2 : 1;
+    constexpr int kCellShift = (kResScale == 2) ? 7 : 6;
+    const float wx0 = (baseWx + static_cast<float>(fdx) * z + static_cast<float>(rdx) * lat0) * kRoadTexScale;
+    const float wy0 = (baseWy + static_cast<float>(fdy) * z + static_cast<float>(rdy) * lat0) * kRoadTexScale;
     std::int32_t sx32_fp = static_cast<std::int32_t>(std::lround(wx0 * 65536.0f));
     std::int32_t sy32_fp = static_cast<std::int32_t>(std::lround(wy0 * 65536.0f));
     const std::int32_t dsx32_fp =
-        static_cast<std::int32_t>(std::lround(static_cast<float>(rdx) * invScaleX * 64.0f * 65536.0f));
+        static_cast<std::int32_t>(std::lround(static_cast<float>(rdx) * invScaleX * kRoadTexScale * 65536.0f));
     const std::int32_t dsy32_fp =
-        static_cast<std::int32_t>(std::lround(static_cast<float>(rdy) * invScaleX * 64.0f * 65536.0f));
+        static_cast<std::int32_t>(std::lround(static_cast<float>(rdy) * invScaleX * kRoadTexScale * 65536.0f));
 
     for (int x = xStart; x <= xEnd; ++x, sx32_fp += dsx32_fp, sy32_fp += dsy32_fp) {
       if (idxBuf[y * W + x] != kRoadSentinel) { continue; }
@@ -5097,15 +5119,15 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
         // Power-of-two cobble coords (0..31) & rail coords (0..31 per world tile): zero divisions
         const int cobX = gx & 31;
         const int cobY = gcy & 31;
-        const int tx32 = (gx >> 1) & 31;
-        const int ty32 = (gcy >> 1) & 31;
+        const int tx32 = (gx >> kRailShift) & 31;
+        const int ty32 = (gcy >> kRailShift) & 31;
         const unsigned h = static_cast<unsigned>(gx) * 73856093u ^
                            static_cast<unsigned>(gcy) * 19349663u;
         const std::uint8_t cob = kCobbleRoadTex.px[cobY][cobX];
         if (inMine) {
           // Underground minecart tracks laid over chunky World of Xeen dungeon flagstones
-          const int cellX = gx >> 6;
-          const int cellY = gcy >> 6;
+          const int cellX = gx >> kCellShift;
+          const int cellY = gcy >> kCellShift;
           const bool connNS = isPathTile(cellX, cellY - 1) || isPathTile(cellX, cellY + 1);
           const bool connEW = isPathTile(cellX - 1, cellY) || isPathTile(cellX + 1, cellY);
           const bool doNS = connNS || !connEW;
@@ -5701,17 +5723,17 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     int edgeDrop = 0;
     if (var != 7) {
       if (!adjStart && uPermille < 170) {
-        edgeDrop = ((170 - uPermille) * std::clamp(spanW / 8, 2, 7)) / 170;
+        edgeDrop = ((170 - uPermille) * std::clamp(spanW / 8, 2 * kResScale, 7 * kResScale)) / 170;
       } else if (!adjEnd && uPermille > 830) {
-        edgeDrop = ((uPermille - 830) * std::clamp(spanW / 8, 2, 7)) / 170;
+        edgeDrop = ((uPermille - 830) * std::clamp(spanW / 8, 2 * kResScale, 7 * kResScale)) / 170;
       }
     } else if ((cellH & 2u) != 0u) {
       // Crumbled ruin corner decay
       if (!adjStart && uPermille < 200) {
-        edgeDrop = ((200 - uPermille) * std::clamp(spanW / 9, 2, 6)) / 200;
+        edgeDrop = ((200 - uPermille) * std::clamp(spanW / 9, 2 * kResScale, 6 * kResScale)) / 200;
       }
     }
-    const int maxLift = std::clamp(spanW / 6, 2, 11);
+    const int maxLift = std::clamp(spanW / 6, 2 * kResScale, 11 * kResScale);
     int lift = 0;
     if (var == 7) {
       // Might & Magic castle merlons, broken parapets, temple pediments & corner turrets
@@ -5789,10 +5811,11 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     // Peripheral d == 0 cheek wall when standing directly beside a cliff (s == -1 or s == +1)
     if (d == 0) {
       if (std::abs(s) != 1) { return; }
-      const int x0 = (s < 0) ? 0 : (W - 9);
-      const int x1 = (s < 0) ? 8 : (W - 1);
+      const int cheekW = 9 * kResScale;
+      const int x0 = (s < 0) ? 0 : (W - cheekW);
+      const int x1 = (s < 0) ? (cheekW - 1) : (W - 1);
       const int yTopInner = cliffYTopScaled(0.50f, cellTopScale);
-      const int yTopOuter = inMine ? 0 : std::max(0, yTopInner - 10);
+      const int yTopOuter = inMine ? 0 : std::max(0, yTopInner - 10 * kResScale);
       const int yBotOuter = H - 1;
       const int yBotInner = cliffYBot(0.50f);
       const int yT0 = (s < 0) ? yTopOuter : yTopInner;
@@ -5948,50 +5971,50 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
 
         // Might & Magic corridor side-wall dressing (underground torches, barred alcoves, surface runes)
         const int visSpanW = endX - startX + 1;
-        if (visSpanW >= 10 && d <= 4) {
+        if (visSpanW >= 10 * kResScale && d <= 4) {
           const int smx = (x0 + x1) / 2;
-          if (smx >= startX + 3 && smx <= endX - 3 &&
+          if (smx >= startX + 3 * kResScale && smx <= endX - 3 * kResScale &&
               ((depthColOcc[d][smx >> 5] >> (smx & 31)) & 1u) == 0u) {
             const int syT = (yT0 + yT1) / 2;
             const int syB = (yB0 + yB1) / 2;
             const int sH = syB - syT;
-            if (inMine && sH >= 16) {
+            if (inMine && sH >= 16 * kResScale) {
               if ((cellH % 3u) == 0u) {
                 // Foreshortened side-wall glowing torch sconce lining the dark mine corridor
                 const int tyC = syT + sH * 42 / 100;
-                const int haloR = std::clamp(std::min(visSpanW / 3, sH / 6), 3, 9);
+                const int haloR = std::clamp(std::min(visSpanW / 3, sH / 6), 3 * kResScale, 9 * kResScale);
                 const int savedFog = activeFog;
                 activeFog = std::max(0, savedFog - 14);
-                fillDitherDisc(smx, tyC - 1, haloR, haloR, rockDark, pathHi, 7);
-                fillDitherDisc(smx, tyC - 1, std::max(2, haloR / 2), std::max(2, haloR / 2),
+                fillDitherDisc(smx, tyC - kResScale, haloR, haloR, rockDark, pathHi, 7);
+                fillDitherDisc(smx, tyC - kResScale, std::max(2, haloR / 2), std::max(2, haloR / 2),
                                pathHi, kIdxOreGold, 6);
-                fillRect(smx - 1, tyC + 1, 2, std::max(3, sH / 10), inkOut);
-                putPx(smx, tyC + 2, trunkCol);
-                fillDisc(smx, tyC - 1, std::max(1, haloR / 5), std::max(2, haloR / 4), kIdxOreGold);
-                putPx(smx, tyC - 1, kIdxWarmGleam);
-                putPx(smx, tyC - 2, kIdxWarmGleam);
+                fillRect(smx - kResScale, tyC + kResScale, 2 * kResScale, std::max(3 * kResScale, sH / 10), inkOut);
+                fillRect(smx, tyC + 2 * kResScale, std::max(1, kResScale / 2), std::max(2 * kResScale, sH / 12), trunkCol);
+                fillDisc(smx, tyC - kResScale, std::max(1, haloR / 5), std::max(2, haloR / 4), kIdxOreGold);
+                fillDisc(smx, tyC - kResScale, std::max(1, haloR / 9), std::max(1, haloR / 7), kIdxWarmGleam);
                 activeFog = savedFog;
-              } else if (var == 7 && (cellH % 3u) == 1u && visSpanW >= 14 && sH >= 22) {
+              } else if (var == 7 && (cellH % 3u) == 1u && visSpanW >= 14 * kResScale && sH >= 22 * kResScale) {
                 // Recessed dungeon iron-barred alcove on corridor side wall
-                const int aw = std::clamp(visSpanW / 3, 4, 10);
-                const int ah = std::clamp(sH * 36 / 100, 7, 20);
+                const int aw = std::clamp(visSpanW / 3, 4 * kResScale, 10 * kResScale);
+                const int ah = std::clamp(sH * 36 / 100, 7 * kResScale, 20 * kResScale);
                 const int ax = smx - aw / 2;
                 const int ay = syT + sH * 30 / 100;
                 fillOutlineRect(ax, ay, aw, ah, inkOut, rockMid);
-                for (int bx = ax + 2; bx < ax + aw - 1; bx += 2) {
+                const int barStep = std::max(2, 2 * kResScale);
+                for (int bx = ax + barStep; bx < ax + aw - 1; bx += barStep) {
                   fillRect(bx, ay + 1, 1, ah - 2, kIdxShipDark);
                 }
-                if (ah >= 10) {
+                if (ah >= 10 * kResScale) {
                   drawHLine(ax + 1, ax + aw - 2, ay + ah / 2, kIdxShipDark);
                 }
               }
-            } else if (!inMine && var == 7 && visSpanW >= 14 && sH >= 18 && (cellH & 1u) == 0u) {
+            } else if (!inMine && var == 7 && visSpanW >= 14 * kResScale && sH >= 18 * kResScale && (cellH & 1u) == 0u) {
               // Recessed gothic arrow-slit / dark window slit on surface ruin side wall
-              const int sw = std::clamp(visSpanW / 5, 3, 6);
-              const int sh = std::clamp(sH / 3, 5, 14);
+              const int sw = std::clamp(visSpanW / 5, 3 * kResScale, 6 * kResScale);
+              const int sh = std::clamp(sH / 3, 5 * kResScale, 14 * kResScale);
               fillOutlineRect(smx - sw / 2, syT + sH * 28 / 100, sw, sh, inkOut, rockMid);
               if (lavaWorld) {
-                putPx(smx, syT + sH * 28 / 100 + sh / 2, accent0);
+                fillRect(smx, syT + sH * 28 / 100 + sh / 2, kResScale, kResScale, accent0);
               }
             }
           }
@@ -6012,7 +6035,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
         const int cx1 = std::min(clipR, xR);
 
         if (cx0 <= cx1) {
-          const int maxLiftBound = std::clamp(faceW / 6, 2, 11) + 2;
+          const int maxLiftBound = std::clamp(faceW / 6, 2 * kResScale, 11 * kResScale) + 2 * kResScale;
           const int yRowStart = std::max(0, yTBase - maxLiftBound);
           std::int8_t rowV32[H]{};
           for (int y = yRowStart; y <= yB; ++y) {
@@ -6050,19 +6073,19 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
             idxBuf[yB * W + x] = activeInk;
             const std::uint8_t colFogMask = colFogBitsForX(x);
             const int uTex = ((uPerm * 64) / 1000 + static_cast<int>((cellH & 3u) * 8u)) & 31;
-            const int capDrop = (!inMine && baseH >= 14)
-                                    ? (1 + static_cast<int>((static_cast<unsigned>(x) * 3u + cellH) % 3u))
+            const int capDrop = (!inMine && baseH >= 14 * kResScale)
+                                    ? ((1 + static_cast<int>((static_cast<unsigned>(x) * 3u + cellH) % 3u)) * kResScale)
                                     : 0;
-            const bool pilasterL = (!inMine && var == 7 && faceW >= 24 && uPerm > 15 && uPerm < 105);
-            const bool pilasterR = (!inMine && var == 7 && faceW >= 24 && uPerm > 895 && uPerm < 985);
-            const int vineDrop = (!inMine && biomeIdx == 0 && baseH >= 16)
+            const bool pilasterL = (!inMine && var == 7 && faceW >= 24 * kResScale && uPerm > 15 && uPerm < 105);
+            const bool pilasterR = (!inMine && var == 7 && faceW >= 24 * kResScale && uPerm > 895 && uPerm < 985);
+            const int vineDrop = (!inMine && biomeIdx == 0 && baseH >= 16 * kResScale)
                                      ? (((static_cast<unsigned>(x) * 11u + cellH) % 9u) == 0u
                                             ? (baseH * (24 + static_cast<int>((static_cast<unsigned>(x) * 7u + cellH) % 34u)) / 100)
                                             : 0)
                                      : 0;
-            const int icicleDrop = (!inMine && iceWorld && baseH >= 16)
+            const int icicleDrop = (!inMine && iceWorld && baseH >= 16 * kResScale)
                                        ? (((static_cast<unsigned>(x) * 7u + cellH) % 11u) == 0u
-                                              ? (3 + static_cast<int>((static_cast<unsigned>(x) * 5u + cellH) % 7u))
+                                              ? ((3 + static_cast<int>((static_cast<unsigned>(x) * 5u + cellH) % 7u)) * kResScale)
                                               : 0)
                                        : 0;
 
@@ -6145,38 +6168,38 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
              fdx == -kDx[pOut] && fdy == -kDy[pOut]);
 
         // Might & Magic storytelling front-wall dressing (recessed arches, iron grates, glowing rune tablets, vents)
-        if (!inMine && !isPortalFront && faceW >= 20 && baseH >= 16 && d <= 4) {
+        if (!inMine && !isPortalFront && faceW >= 20 * kResScale && baseH >= 16 * kResScale && d <= 4) {
           const int fcx = (xL + xR) / 2;
           const int fcy = yTBase + baseH * 52 / 100;
           if (var == 7) {
             const unsigned dress = (cellH >> 1) & 3u;
             if (dress == 0u) {
               // Recessed arched dungeon/ruin alcove with iron grate bars & faint inner gleam
-              const int aw = std::clamp(faceW * 32 / 100, 7, 22);
-              const int ah = std::clamp(baseH * 46 / 100, 8, 26);
+              const int aw = std::clamp(faceW * 32 / 100, 7 * kResScale, 22 * kResScale);
+              const int ah = std::clamp(baseH * 46 / 100, 8 * kResScale, 26 * kResScale);
               const int ax = fcx - aw / 2;
-              const int ay = std::clamp(yB - ah - 1, yTBase + 4, yB - 6);
+              const int ay = std::clamp(yB - ah - 1, yTBase + 4 * kResScale, yB - 6 * kResScale);
               // Stone arch surround + dark interior
-              fillOutlineRect(ax - 1, ay + 2, aw + 2, ah - 1, inkOut, rockHi);
-              fillOutlineRect(ax + 1, ay, aw - 2, 4, inkOut, rockHi);
-              fillRect(ax, ay + 2, aw, ah - 2, inkOut);
+              fillOutlineRect(ax - 1, ay + 2 * kResScale, aw + 2, ah - 1, inkOut, rockHi);
+              fillOutlineRect(ax + kResScale, ay, aw - 2 * kResScale, 4 * kResScale, inkOut, rockHi);
+              fillRect(ax, ay + 2 * kResScale, aw, ah - 2 * kResScale, inkOut);
               // Vertical wrought-iron grate bars + cross-bar
-              const int stepB = std::max(2, aw / 4);
-              for (int bx = ax + 2; bx <= ax + aw - 3; bx += stepB) {
-                fillRect(bx, ay + 2, 1, ah - 3, kIdxShipDark);
-                if (ah >= 12) { putPx(bx, ay + 4, kIdxShipLight); }
+              const int stepB = std::max(2 * kResScale, aw / 4);
+              for (int bx = ax + 2 * kResScale; bx <= ax + aw - 3 * kResScale; bx += stepB) {
+                fillRect(bx, ay + 2 * kResScale, 1, ah - 3 * kResScale, kIdxShipDark);
+                if (ah >= 12 * kResScale) { putPx(bx, ay + 4 * kResScale, kIdxShipLight); }
               }
               drawHLine(ax + 1, ax + aw - 2, ay + ah / 2, kIdxShipDark);
               // Faint mysterious gleam inside the barred recess
-              if (aw >= 10 && ah >= 11) {
+              if (aw >= 10 * kResScale && ah >= 11 * kResScale) {
                 const std::uint8_t glint = lavaWorld ? accent0 : (iceWorld ? accent1 : kIdxWarmGleam);
-                putPx(fcx - 1, ay + ah * 3 / 5, glint);
-                putPx(fcx + 1, ay + ah * 3 / 5, glint);
+                fillRect(fcx - kResScale, ay + ah * 3 / 5, kResScale, kResScale, glint);
+                fillRect(fcx + kResScale, ay + ah * 3 / 5, kResScale, kResScale, glint);
               }
             } else if (dress == 1u) {
               // Carved glowing ancient rune plaque / alien monolith tablet
-              const int pw = std::clamp(faceW * 34 / 100, 8, 20);
-              const int ph = std::clamp(baseH * 34 / 100, 7, 16);
+              const int pw = std::clamp(faceW * 34 / 100, 8 * kResScale, 20 * kResScale);
+              const int ph = std::clamp(baseH * 34 / 100, 7 * kResScale, 16 * kResScale);
               const int px = fcx - pw / 2;
               const int py = fcy - ph / 2;
               fillOutlineRect(px - 1, py - 1, pw + 2, ph + 2, rockDark, rockHi);
@@ -6186,119 +6209,112 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
                                          : lavaWorld       ? accent0
                                                            : kIdxShipVisor;
               // Crisp geometric PC-98 glyphs inside plaque
-              drawHLine(px + 2, px + pw - 3, py + 2, runeCol);
-              fillRect(fcx, py + 2, 1, ph - 4, runeCol);
-              if (pw >= 12) {
-                fillRect(px + 3, py + 3, 1, std::max(2, ph - 6), runeCol);
-                fillRect(px + pw - 4, py + 3, 1, std::max(2, ph - 6), runeCol);
-                drawHLine(px + 3, px + pw - 4, py + ph - 3, accent1);
+              drawHLine(px + 2 * kResScale, px + pw - 3 * kResScale, py + 2 * kResScale, runeCol);
+              fillRect(fcx, py + 2 * kResScale, 1, ph - 4 * kResScale, runeCol);
+              if (pw >= 12 * kResScale) {
+                fillRect(px + 3 * kResScale, py + 3 * kResScale, 1, std::max(2, ph - 6 * kResScale), runeCol);
+                fillRect(px + pw - 4 * kResScale, py + 3 * kResScale, 1, std::max(2, ph - 6 * kResScale), runeCol);
+                drawHLine(px + 3 * kResScale, px + pw - 4 * kResScale, py + ph - 3 * kResScale, accent1);
               }
             } else if (dress == 2u) {
               // Biome-themed wall emblem / banner / brazier grate / drainage arch
-              const int bw = std::clamp(faceW * 22 / 100, 5, 13);
-              const int bh = std::clamp(baseH * 42 / 100, 7, 22);
+              const int bw = std::clamp(faceW * 22 / 100, 5 * kResScale, 13 * kResScale);
+              const int bh = std::clamp(baseH * 42 / 100, 7 * kResScale, 22 * kResScale);
               const int bx = fcx - bw / 2;
-              const int by = yTBase + std::max(3, baseH * 22 / 100);
+              const int by = yTBase + std::max(3 * kResScale, baseH * 22 / 100);
               if (lavaWorld) {
-                // Glowing recessed forge brazier grate
                 fillOutlineRect(bx, by + bh / 3, bw, std::max(4, bh / 2), accent0, inkOut);
                 fillRect(bx + 1, by + bh / 3 + 1, std::max(1, bw - 2), std::max(2, bh / 4), kIdxWarmGleam);
-                for (int gx = bx + 2; gx < bx + bw - 1; gx += 2) {
+                for (int gx = bx + 2 * kResScale; gx < bx + bw - 1; gx += 2 * kResScale) {
                   fillRect(gx, by + bh / 3, 1, std::max(4, bh / 2), inkOut);
                 }
               } else if (oceanWorld) {
-                // Carved sea-drainage arch spilling foaming water down the wall
                 fillOutlineRect(bx, by, bw, std::max(5, bh / 2), inkOut, rockHi);
-                fillRect(fcx - 1, by + bh / 3, 3, std::max(3, yB - (by + bh / 3) - 1), sky3);
-                fillRect(fcx, by + bh / 3, 1, std::max(3, yB - (by + bh / 3) - 1), kIdxStarCool);
+                fillRect(fcx - kResScale, by + bh / 3, 3 * kResScale, std::max(3, yB - (by + bh / 3) - 1), sky3);
+                fillRect(fcx, by + bh / 3, kResScale, std::max(3, yB - (by + bh / 3) - 1), kIdxStarCool);
               } else {
-                // Weathered wall tapestry / guild banner / carved crest
                 const std::uint8_t banCol = (biomeIdx == 0) ? accent0
                                           : iceWorld        ? accent1
                                                             : kIdxOreBody;
                 drawHLine(bx - 1, bx + bw, by, kIdxOreGold);
                 fillOutlineRect(bx, by + 1, bw, bh, banCol, inkOut);
-                fillRect(fcx, by + 3, 1, std::max(2, bh - 6), kIdxWarmGleam);
-                if (bw >= 7) { drawHLine(bx + 2, bx + bw - 3, by + bh / 2, kIdxWarmGleam); }
+                fillRect(fcx, by + 3 * kResScale, 1, std::max(2, bh - 6 * kResScale), kIdxWarmGleam);
+                if (bw >= 7 * kResScale) { drawHLine(bx + 2 * kResScale, bx + bw - 3 * kResScale, by + bh / 2, kIdxWarmGleam); }
               }
             }
           } else if (var == 4 || var == 5) {
-            // Natural cliff storytelling accents (grotto hollow, lava weep, frost crystal pocket)
-            if (lavaWorld && (cellH & 1u) == 0u && faceW >= 24) {
-              // Glowing weeping magma vent trickling down basalt columns
+            if (lavaWorld && (cellH & 1u) == 0u && faceW >= 24 * kResScale) {
               const int vx = fcx + (((cellH & 2u) != 0u) ? -faceW / 6 : faceW / 6);
               const int vy = yTBase + baseH * 38 / 100;
-              fillDisc(vx, vy, 2, 2, accent0);
+              fillDisc(vx, vy, 2 * kResScale, 2 * kResScale, accent0);
               putPx(vx, vy, kIdxWarmGleam);
               for (int py = vy + 1; py < yB - 1; ++py) {
                 const int jx = vx + (((py / 3) & 1) ? 1 : 0);
                 putPx(jx, py, ((py & 1) == 0) ? accent0 : accent1);
               }
-            } else if (oceanWorld && (cellH & 1u) == 0u && faceW >= 24 && baseH >= 18) {
-              // Wave-carved dark sea-grotto arch at the cliff waterline
-              const int gw = std::clamp(faceW * 28 / 100, 6, 16);
-              const int gh = std::clamp(baseH * 34 / 100, 5, 14);
+            } else if (oceanWorld && (cellH & 1u) == 0u && faceW >= 24 * kResScale && baseH >= 18 * kResScale) {
+              const int gw = std::clamp(faceW * 28 / 100, 6 * kResScale, 16 * kResScale);
+              const int gh = std::clamp(baseH * 34 / 100, 5 * kResScale, 14 * kResScale);
               fillOutlineRect(fcx - gw / 2, yB - gh, gw, gh, inkOut, rockDark);
               drawHLine(fcx - gw / 2 + 1, fcx + gw / 2 - 1, yB - 1, sky3);
-            } else if (rockWorld && (cellH % 3u) == 0u && faceW >= 24 && baseH >= 18) {
-              // Wind-carved stepped sandstone cave hollow at the base of the canyon wall
-              const int aw = std::clamp(faceW * 28 / 100, 7, 16);
-              const int ah = std::clamp(baseH * 36 / 100, 6, 15);
+            } else if (rockWorld && (cellH % 3u) == 0u && faceW >= 24 * kResScale && baseH >= 18 * kResScale) {
+              const int aw = std::clamp(faceW * 28 / 100, 7 * kResScale, 16 * kResScale);
+              const int ah = std::clamp(baseH * 36 / 100, 6 * kResScale, 15 * kResScale);
               const int ax = fcx - aw / 2;
               const int ay = yB - ah;
-              fillRect(ax + 2, ay, aw - 4, 2, inkOut);
-              fillRect(ax + 1, ay + 2, aw - 2, 2, inkOut);
-              fillRect(ax, ay + 4, aw, std::max(2, ah - 4), inkOut);
-              drawHLine(ax + 2, ax + aw - 3, ay - 1, rockHi);
-              drawHLine(ax + 1, ax + aw - 2, ay + 1, rockDark);
-              if (aw >= 10 && ah >= 9) {
-                putPx(fcx, ay + ah / 2, accent0);
+              fillRect(ax + 2 * kResScale, ay, aw - 4 * kResScale, 2 * kResScale, inkOut);
+              fillRect(ax + kResScale, ay + 2 * kResScale, aw - 2 * kResScale, 2 * kResScale, inkOut);
+              fillRect(ax, ay + 4 * kResScale, aw, std::max(2, ah - 4 * kResScale), inkOut);
+              drawHLine(ax + 2 * kResScale, ax + aw - 3 * kResScale, ay - 1, rockHi);
+              drawHLine(ax + kResScale, ax + aw - 2 * kResScale, ay + 1, rockDark);
+              if (aw >= 10 * kResScale && ah >= 9 * kResScale) {
+                fillRect(fcx, ay + ah / 2, kResScale, kResScale, accent0);
               }
             }
           }
         }
 
         // Shored wooden mine-shaft timbers + arched vault header + glowing wall torches on underground var == 7 bays
-        if (inMine && var == 7 && !isPortalFront && faceW >= 12 && baseH >= 12) {
-          const int postW = std::clamp(faceW / 11, 2, 4);
-          const int beamH = std::clamp(baseH / 13, 2, 4);
+        if (inMine && var == 7 && !isPortalFront && faceW >= 12 * kResScale && baseH >= 12 * kResScale) {
+          const int postW = std::clamp(faceW / 11, 2 * kResScale, 4 * kResScale);
+          const int beamH = std::clamp(baseH / 13, 2 * kResScale, 4 * kResScale);
           fillOutlineRect(xL + 1, yTBase + 1, postW + 2, baseH - 1, trunkCol, inkOut);
           fillOutlineRect(xR - postW - 2, yTBase + 1, postW + 2, baseH - 1, trunkCol, inkOut);
           fillOutlineRect(xL + 1, yTBase + 1, faceW - 2, beamH + 2, pathHi, inkOut);
           // Diagonal timber knee-braces + iron corner plates
-          if (faceW >= 22) {
-            for (int kb = 0; kb < std::min(5, faceW / 8); ++kb) {
-              putPx(xL + postW + 2 + kb, yTBase + beamH + 5 - kb, trunkCol);
-              putPx(xR - postW - 3 - kb, yTBase + beamH + 5 - kb, trunkCol);
+          if (faceW >= 22 * kResScale) {
+            const int braceLen = std::min(5 * kResScale, faceW / 8);
+            for (int kb = 0; kb < braceLen; ++kb) {
+              putPx(xL + postW + 2 + kb, yTBase + beamH + braceLen - kb, trunkCol);
+              putPx(xR - postW - 3 - kb, yTBase + beamH + braceLen - kb, trunkCol);
             }
-            putPx(xL + postW + 1, yTBase + beamH + 1, kIdxShipDark);
-            putPx(xR - postW - 2, yTBase + beamH + 1, kIdxShipDark);
+            fillRect(xL + postW + 1, yTBase + beamH + 1, kResScale, kResScale, kIdxShipDark);
+            fillRect(xR - postW - 2, yTBase + beamH + 1, kResScale, kResScale, kIdxShipDark);
           }
           // Glowing wall torch sconce with warm dithered radial halo contained inside timber bay
-          if ((cellH & 1u) == 0u && faceW >= 18 && baseH >= 18 && d <= 4) {
+          if ((cellH & 1u) == 0u && faceW >= 18 * kResScale && baseH >= 18 * kResScale && d <= 4) {
             const int tcx = (xL + xR) / 2;
             const int tcy = yTBase + baseH * 48 / 100;
-            const int maxR = std::max(2, tcy - (yTBase + beamH + 4));
-            const int haloR = std::min(std::clamp(faceW / 5, 3, 10), maxR);
+            const int maxR = std::max(2 * kResScale, tcy - (yTBase + beamH + 4 * kResScale));
+            const int haloR = std::min(std::clamp(faceW / 5, 3 * kResScale, 10 * kResScale), maxR);
             const int savedFog = activeFog;
             activeFog = std::max(0, savedFog - 12);
-            fillDitherDisc(tcx, tcy - 1, haloR, haloR, rockMid, pathHi, 7);
-            fillDitherDisc(tcx, tcy - 1, std::max(2, haloR / 2), std::max(2, haloR / 2), pathHi, kIdxOreGold, 6);
-            // Iron sconce bracket + wooden handle + multi-tone flame
-            fillRect(tcx - 1, tcy + 1, 3, std::max(3, baseH / 8), inkOut);
-            fillRect(tcx, tcy + 2, 1, std::max(2, baseH / 10), trunkCol);
-            fillDisc(tcx, tcy - 1, std::max(1, haloR / 5), std::max(2, haloR / 4), kIdxOreGold);
-            putPx(tcx, tcy - 1, kIdxWarmGleam);
-            putPx(tcx, tcy - 2, kIdxWarmGleam);
+            fillDitherDisc(tcx, tcy - kResScale, haloR, haloR, rockMid, pathHi, 7);
+            fillDitherDisc(tcx, tcy - kResScale, std::max(2, haloR / 2), std::max(2, haloR / 2), pathHi, kIdxOreGold, 6);
+            fillRect(tcx - kResScale, tcy + kResScale, 2 * kResScale + 1, std::max(3 * kResScale, baseH / 8), inkOut);
+            fillRect(tcx, tcy + 2 * kResScale, std::max(1, kResScale / 2), std::max(2 * kResScale, baseH / 10), trunkCol);
+            fillDisc(tcx, tcy - kResScale, std::max(1, haloR / 5), std::max(2, haloR / 4), kIdxOreGold);
+            fillDisc(tcx, tcy - kResScale, std::max(1, haloR / 9), std::max(1, haloR / 7), kIdxWarmGleam);
             activeFog = savedFog;
-          } else if ((cellH & 1u) != 0u && faceW >= 24 && baseH >= 20 && d <= 4) {
+          } else if ((cellH & 1u) != 0u && faceW >= 24 * kResScale && baseH >= 20 * kResScale && d <= 4) {
             // Alternate mine bay: barred dungeon niche / recessed drainage grate
-            const int aw = std::clamp(faceW * 30 / 100, 7, 18);
-            const int ah = std::clamp(baseH * 36 / 100, 7, 18);
+            const int aw = std::clamp(faceW * 30 / 100, 7 * kResScale, 18 * kResScale);
+            const int ah = std::clamp(baseH * 36 / 100, 7 * kResScale, 18 * kResScale);
             const int ax = (xL + xR) / 2 - aw / 2;
             const int ay = yTBase + baseH * 34 / 100;
             fillOutlineRect(ax, ay, aw, ah, inkOut, rockHi);
-            for (int bx = ax + 2; bx < ax + aw - 1; bx += 3) {
+            const int barStep = std::max(2, 3 * kResScale);
+            for (int bx = ax + 2 * kResScale; bx < ax + aw - 1; bx += barStep) {
               fillRect(bx, ay + 1, 1, ah - 2, kIdxShipDark);
             }
             drawHLine(ax + 1, ax + aw - 2, ay + ah / 2, kIdxShipDark);
@@ -6306,15 +6322,15 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
         }
 
         // Enterable PC-98 timbered mine entrance (surface) or daylight exit shaft (mine)
-        if (isPortalFront && faceW >= 9 && baseH >= 8) {
-          const int pW = std::max(8, faceW * 48 / 100);
+        if (isPortalFront && faceW >= 9 * kResScale && baseH >= 8 * kResScale) {
+          const int pW = std::max(8 * kResScale, faceW * 48 / 100);
           const int pTopTarget = hy - static_cast<int>(std::lround(kProjY * 0.28f / zNearW));
-          const int pY = std::clamp(pTopTarget, yTBase + 3, yB - 6);
-          const int pH = std::max(6, yB - pY);
+          const int pY = std::clamp(pTopTarget, yTBase + 3 * kResScale, yB - 6 * kResScale);
+          const int pH = std::max(6 * kResScale, yB - pY);
           const int pX = xL + (faceW - pW) / 2;
-          const int postW = std::max(2, std::min(5, pW / 6));
-          const int lintelH = std::max(2, std::min(5, pH / 6));
-          fillOutlineRect(pX - 2, pY - lintelH, pW + 4, lintelH + 2, pathHi, inkOut);
+          const int postW = std::max(2 * kResScale, std::min(5 * kResScale, pW / 6));
+          const int lintelH = std::max(2 * kResScale, std::min(5 * kResScale, pH / 6));
+          fillOutlineRect(pX - 2 * kResScale, pY - lintelH, pW + 4 * kResScale, lintelH + 2, pathHi, inkOut);
           if (!inMine) {
             fillRect(pX, pY, pW, pH, inkOut);
             // Deep recessed timber struts inside the mine tunnel
@@ -6405,17 +6421,17 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     if (d == 0) {
       if (std::abs(s) != 1) { return; }
       const bool onLeft = (s < 0);
-      const int flankW = 30;
+      const int flankW = 30 * kResScale;
       const int xStart = onLeft ? 0 : (W - flankW);
       const int xEnd   = onLeft ? (flankW - 1) : (W - 1);
       int prevYT = -1;
       for (int x = xStart; x <= xEnd; ++x) {
         const int frac = onLeft ? ((x * 1000) / flankW) : (((xEnd - x) * 1000) / flankW);
         // Organic craggy stepped mountain shoulder (not a straight ruler diagonal!)
-        const int cragLedge = (frac > 300 && frac < 520) ? -7 : (frac > 680 ? 5 : 0);
-        const int jag = static_cast<int>(((static_cast<unsigned>(x) * 7u + cellH) % 5u)) - 2;
-        const int yT = std::clamp(8 + (frac * (hy + 22)) / 1000 + cragLedge + jag, 0, H - 1);
-        const int yB = std::clamp(H - 1 - (frac * 18) / 1000, yT, H - 1);
+        const int cragLedge = (frac > 300 && frac < 520) ? (-7 * kResScale) : (frac > 680 ? (5 * kResScale) : 0);
+        const int jag = (static_cast<int>(((static_cast<unsigned>(x / kResScale) * 7u + cellH) % 5u)) - 2) * kResScale;
+        const int yT = std::clamp(8 * kResScale + (frac * (hy + 22 * kResScale)) / 1000 + cragLedge + jag, 0, H - 1);
+        const int yB = std::clamp(H - 1 - (frac * 18 * kResScale) / 1000, yT, H - 1);
         const int outlineBot = (prevYT >= 0 && yT > prevYT + 1) ? yT : yT;
         const int outlineTop = (prevYT >= 0 && prevYT > yT + 1) ? yT : ((prevYT >= 0) ? std::min(yT, prevYT) : yT);
         for (int oy = outlineTop; oy <= outlineBot; ++oy) {
@@ -6545,16 +6561,21 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
       idxBuf[yColB * W + x] = activeInk;
 
       const std::uint8_t colFogMask = colFogBitsForX(x);
-      // Scale crag texture density proportionally so close d=1 mountains stay crisp 1:1 PC-98 pixel art!
-      const int uScale = std::clamp(spanW, 32, 112);
-      const int uTex = ((uPerm * uScale) / 1000 + texUOff) & 31;
-      const int vScale = std::clamp(peakH, 28, 64);
+      // Scale crag texture density proportionally + per-32px cell mirror/jitter to eliminate tiling rhythm!
+      const int uScale = std::clamp(spanW, 32 * kResScale, 112 * kResScale);
+      const int uRaw = (uPerm * uScale) / 1000 + texUOff;
+      const int vScale = std::clamp(peakH, 28 * kResScale, 64 * kResScale);
       const std::uint32_t invPeakH =
           ((1u << 20) + static_cast<std::uint32_t>(peakH) - 1u) / static_cast<std::uint32_t>(peakH);
+      const int tileU = uRaw >> 5;
 
       for (int y = yT + 1; y < yColB; ++y) {
         const int vFromPeak = static_cast<int>((static_cast<std::uint32_t>((y - yPeak) << 5) * invPeakH) >> 20);
-        const int vTex = (((y - yPeak) * vScale) / std::max(1, peakH) + texVOff) & 31;
+        const int vRaw = ((y - yPeak) * vScale) / std::max(1, peakH) + texVOff;
+        const int tileV = vRaw >> 5;
+        const int uLocal = ((tileU ^ tileV) & 1) ? (31 - (uRaw & 31)) : (uRaw & 31);
+        const int uTex = (uLocal + ((tileV * 13) & 31)) & 31;
+        const int vTex = (vRaw + ((tileU * 7) & 31)) & 31;
         const int v16 = std::clamp(vFromPeak >> 1, 0, 15);
         // Winding 3D diagonal mountain spine ridge splitting sunlit left face from shadowed right face!
         const int ridgeWobble = (((vFromPeak / 4 + static_cast<int>(cellH & 3u)) & 1) ? 35 : -30);
@@ -6696,11 +6717,16 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
       prevYT = yT;
       idxBuf[yB * W + x] = activeInk;
       const std::uint8_t colFogMask = colFogBitsForX(x);
-      const int uScale = std::clamp(spanW, 32, 104);
-      const int uTex = ((uPerm * uScale) / 1000) & 31;
-      const int vScale = std::clamp(peakH, 28, 56);
+      const int uScale = std::clamp(spanW, 32 * kResScale, 104 * kResScale);
+      const int uRaw = (uPerm * uScale) / 1000;
+      const int tileU = uRaw >> 5;
+      const int vScale = std::clamp(peakH, 28 * kResScale, 56 * kResScale);
       for (int y = yT + 1; y < yB; ++y) {
-        const int vTex = (((y - yPeak) * vScale) / std::max(1, peakH)) & 31;
+        const int vRaw = ((y - yPeak) * vScale) / std::max(1, peakH);
+        const int tileV = vRaw >> 5;
+        const int uLocal = ((tileU ^ tileV) & 1) ? (31 - (uRaw & 31)) : (uRaw & 31);
+        const int uTex = (uLocal + ((tileV * 13) & 31)) & 31;
+        const int vTex = (vRaw + ((tileU * 7) & 31)) & 31;
         const std::uint8_t cr = kCragRockTex.px[vTex][uTex];
         const bool shadeRight = (uPerm > 580);
         std::uint8_t cIdx = shadeRight
@@ -6722,36 +6748,36 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     const int pOut = static_cast<int>(planetSurface_.portalOutDir & 3u);
     const bool isPortalFront = (fdx == -kDx[pOut] && fdy == -kDy[pOut]);
     if (isPortalFront && tileW >= 10 && peakH >= 10) {
-      const int pW = std::max(8, tileW * 44 / 100);
+      const int pW = std::max(8 * kResScale, tileW * 44 / 100);
       const int pTopTarget = hy - static_cast<int>(std::lround(kProjY * 0.28f / zNearW));
-      const int pY = std::clamp(pTopTarget, yPeak + std::max(4, peakH / 4), yB - 6);
-      const int pH = std::max(6, yB - pY);
+      const int pY = std::clamp(pTopTarget, yPeak + std::max(4 * kResScale, peakH / 4), yB - 6 * kResScale);
+      const int pH = std::max(6 * kResScale, yB - pY);
       const int pX = (xL + xR - pW) / 2;
-      const int postW = std::max(2, std::min(5, pW / 6));
-      const int lintelH = std::max(2, std::min(5, pH / 6));
+      const int postW = std::max(2 * kResScale, std::min(5 * kResScale, pW / 6));
+      const int lintelH = std::max(2 * kResScale, std::min(5 * kResScale, pH / 6));
       // Heavy rough-hewn timber crossbeam lintel + black cave maw + interior support frame
-      fillOutlineRect(pX - 2, pY - lintelH, pW + 4, lintelH + 2, pathHi, inkOut);
+      fillOutlineRect(pX - 2 * kResScale, pY - lintelH, pW + 4 * kResScale, lintelH + 2, pathHi, inkOut);
       fillRect(pX, pY, pW, pH, inkOut);
-      if (pW >= 14 && pH >= 12) {
-        const int inW = pW - postW * 2 - 4;
-        const int inH = pH - 4;
+      if (pW >= 14 * kResScale && pH >= 12 * kResScale) {
+        const int inW = pW - postW * 2 - 4 * kResScale;
+        const int inH = pH - 4 * kResScale;
         if (inW >= 6 && inH >= 6) {
-          fillOutlineRect(pX + postW + 2, pY + 2, inW, inH, inkOut, rockDark);
+          fillOutlineRect(pX + postW + 2 * kResScale, pY + 2 * kResScale, inW, inH, inkOut, rockDark);
         }
       }
       fillOutlineRect(pX, pY, postW + 1, pH, trunkCol, inkOut);
       fillOutlineRect(pX + pW - postW - 1, pY, postW + 1, pH, trunkCol, inkOut);
-      if (pW >= 12 && pH >= 10) {
-        putPx(pX + postW + 1, pY + 2, pathHi);
-        putPx(pX + pW - postW - 2, pY + 2, pathHi);
+      if (pW >= 12 * kResScale && pH >= 10 * kResScale) {
+        fillRect(pX + postW + 1, pY + 2 * kResScale, kResScale, kResScale, pathHi);
+        fillRect(pX + pW - postW - 2, pY + 2 * kResScale, kResScale, kResScale, pathHi);
         const int lx = pX + pW / 2;
-        const int ly = pY + std::max(2, std::min(12, pH / 5));
-        const int lHalo = std::clamp(pW / 11, 2, 7);
+        const int ly = pY + std::max(2 * kResScale, std::min(12 * kResScale, pH / 5));
+        const int lHalo = std::clamp(pW / 11, 2 * kResScale, 7 * kResScale);
         fillRect(lx, pY, 1, ly - pY, kIdxShipDark);
-        fillDitherDisc(lx, ly + 2, lHalo, lHalo, inkOut, kIdxOreBody, 6);
-        fillOutlineRect(lx - 2, ly, 5, 5, kIdxOreGold, inkOut);
-        fillRect(lx - 1, ly + 1, 3, 3, kIdxWarmGleam);
-        drawHLine(lx - 2, lx + 2, ly - 1, kIdxShipDark);
+        fillDitherDisc(lx, ly + 2 * kResScale, lHalo, lHalo, inkOut, kIdxOreBody, 6);
+        fillOutlineRect(lx - 2 * kResScale, ly, 4 * kResScale + 1, 4 * kResScale + 1, kIdxOreGold, inkOut);
+        fillRect(lx - kResScale, ly + kResScale, 2 * kResScale + 1, 2 * kResScale + 1, kIdxWarmGleam);
+        drawHLine(lx - 2 * kResScale, lx + 2 * kResScale, ly - 1, kIdxShipDark);
       }
       if (d == 1 && s == 0) {
         const int ux0 = std::clamp(pX - 1, 0, W);
@@ -6781,7 +6807,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     const int gyFar = yAtZ(zFar);
     const int gyMid = yAtZ(zMid);
     const int gyNear = yAtZ(zNear);
-    const float sTile = (d == 0) ? 1.35f : (1.02f / zMid);
+    const float sTile = ((d == 0) ? 1.35f : (1.02f / zMid)) * static_cast<float>(kResScale);
     const float htMid = halfTileAtZ(zMid);
     const float htNear = halfTileAtZ(zNear);
     const int maxS = d + 1;
@@ -6979,32 +7005,38 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   fillRect(0, 0, W, 1, inkOut);
   fillRect(0, 0, 1, H, inkOut);
 
-  // Single linear RGB4 (4-4-4) palette resolve pass from L1-resident idxBuf into transient stack RGBA8 buffer (0 B heap)
-  Color rgbaBuf[W * H];
-  for (int i = 0; i < W * H; ++i) {
-    rgbaBuf[i] = resolvedLut[idxBuf[i]];
-  }
-
+  // Create GPU texture once (540 KB VRAM at 480x288, 0 B persistent heap), then stream RGB4 palette
+  // resolves through an L1-cache-resident 16-row stack strip (30 KB stack, 0 B heap allocations/step).
   if (planetTex_.id == 0) {
-    Image img{};
-    img.data = rgbaBuf;
-    img.width = W;
-    img.height = H;
-    img.mipmaps = 1;
-    img.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
-    planetTex_ = LoadTextureFromImage(img);
+    Image blank = GenImageColor(W, H, BLACK);
+    planetTex_ = LoadTextureFromImage(blank);
+    UnloadImage(blank);
     if (planetTex_.id != 0) {
       SetTextureFilter(planetTex_, TEXTURE_FILTER_POINT);
     }
-  } else {
-    UpdateTexture(planetTex_, rgbaBuf);
+  }
+  if (planetTex_.id != 0) {
+    constexpr int kStripH = 16;
+    Color stripRgba[W * kStripH];
+    for (int y0 = 0; y0 < H; y0 += kStripH) {
+      const int rows = std::min(kStripH, H - y0);
+      const int count = rows * W;
+      const std::uint8_t* srcRow = idxBuf + y0 * W;
+      for (int i = 0; i < count; ++i) {
+        stripRgba[i] = resolvedLut[srcRow[i]];
+      }
+      UpdateTextureRec(
+          planetTex_,
+          Rectangle{0.0f, static_cast<float>(y0), static_cast<float>(W), static_cast<float>(rows)},
+          stripRgba);
+    }
   }
   if (planetScanlineTex_.id == 0) {
-    // True PC-98 CRT scanline mask: 1 x (H * 4) bilinear beam-gap profile locked 1:1 to all 144 pixel rows.
-    // Built once (2.3 KB VRAM, 0 B persistent heap, 1 DrawTexturePro/frame, moire-free at arbitrary scales).
+    // True PC-98 24 kHz CRT scanline mask: 1 x (H * 4) bilinear beam-gap profile locked 1:1 to all H rows.
+    // Built once (4.5 KB VRAM at H=288, 0 B persistent heap, 1 DrawTexturePro/frame, moire-free at arbitrary scales).
     constexpr int kScanSub = 4;
     constexpr int kScanH = H * kScanSub;
-    static constexpr unsigned char kRowAlpha[kScanSub] = {28u, 0u, 22u, 118u};
+    static constexpr unsigned char kRowAlpha[kScanSub] = {18u, 0u, 14u, 88u};
     Color scanBuf[kScanH];
     for (int y = 0; y < H; ++y) {
       for (int s = 0; s < kScanSub; ++s) {
