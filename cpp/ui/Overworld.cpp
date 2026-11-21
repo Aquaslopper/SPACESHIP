@@ -2564,9 +2564,9 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
 
   // Handcrafted PC-98 Clouds of Xeen towering multi-trunk leafy forest grove
   auto drawForestGrove = [&](int tx, int gy, float s) {
-    const int th = std::max(16, static_cast<int>(std::lround(52.0f * s)));
-    const int tw = std::max(16, static_cast<int>(std::lround(46.0f * s)));
-    const int trunkH = std::max(7, th * 38 / 100);
+    const int th = std::max(16, static_cast<int>(std::lround(76.0f * s)));
+    const int tw = std::max(16, static_cast<int>(std::lround(56.0f * s)));
+    const int trunkH = std::max(7, th * 48 / 100);
     // Lush dark undergrowth shadow + mossy grass bank at grove base
     fillDisc(tx, gy, std::max(5, tw * 48 / 100), std::max(2, static_cast<int>(std::lround(3.0f * s))), inkOut);
     fillOutlinedDisc(tx - tw / 5, gy - std::max(2, th / 14), std::max(4, tw * 32 / 100), std::max(2, th / 11), leaf0, inkOut);
@@ -2652,10 +2652,10 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   };
 
   auto drawPineTree = [&](int tx, int gy, float s) {
-    const int th = std::max(12, static_cast<int>(std::lround(40.0f * s)));
-    const int tw = std::max(9, static_cast<int>(std::lround(26.0f * s)));
+    const int th = std::max(12, static_cast<int>(std::lround(60.0f * s)));
+    const int tw = std::max(9, static_cast<int>(std::lround(32.0f * s)));
     const int trunkW = std::max(2, static_cast<int>(std::lround(4.5f * s)));
-    const int trunkH = std::max(3, th * 20 / 100);
+    const int trunkH = std::max(3, th * 30 / 100);
     fillDisc(tx, gy, std::max(3, tw * 38 / 100), std::max(1, static_cast<int>(std::lround(2.0f * s))), inkOut);
     fillOutlineRect(tx - trunkW / 2 - 1, gy - trunkH, trunkW + 2, trunkH + 1, trunkCol, inkOut);
     const int coneBase = gy - trunkH + 1;
