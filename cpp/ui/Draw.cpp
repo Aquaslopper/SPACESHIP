@@ -3398,122 +3398,180 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     return static_cast<float>(cxMid) + static_cast<float>(s) * (kProjX / std::max(0.35f, z));
   };
 
-  auto isRoadAtSample = [&](float fwd, float lat) -> bool {
-    if (fwd > 6.6f) { return false; }
-    const int d = static_cast<int>(std::floor(fwd + 0.5f));
-    const int s = static_cast<int>(std::floor(lat + 0.5f));
-    const int tx = planetSurface_.px + fdx * d + rdx * s;
-    const int ty = planetSurface_.py + fdy * d + rdy * s;
-    if (!isPathTile(tx, ty)) { return false; }
-
-    const float v = fwd - static_cast<float>(d);
-    const float u = lat - static_cast<float>(s);
-    const bool nF = isPathTile(tx + fdx, ty + fdy);
-    const bool nB = isPathTile(tx - fdx, ty - fdy);
-    const bool nL = isPathTile(tx + ldx, ty + ldy);
-    const bool nR = isPathTile(tx + rdx, ty + rdy);
-
-    const float wx = (static_cast<float>(planetSurface_.px) + 0.5f) +
-                     static_cast<float>(fdx) * fwd + static_cast<float>(rdx) * lat;
-    const float wy = (static_cast<float>(planetSurface_.py) + 0.5f) +
-                     static_cast<float>(fdy) * fwd + static_cast<float>(rdy) * lat;
-    const int ix = static_cast<int>(std::floor(wx * 14.0f));
-    const int iy = static_cast<int>(std::floor(wy * 14.0f));
-    const unsigned eh = static_cast<unsigned>(ix) * 73u + static_cast<unsigned>(iy) * 151u;
-    const float lim = kHalfRoad - (((eh & 3u) == 0u) ? 0.020f : 0.0f);
-
-    if (!nL && u < -lim) { return false; }
-    if (!nR && u >  lim) { return false; }
-    if (!nB && v < -lim) { return false; }
-    if (!nF && v >  lim) { return false; }
-
-    // Bevel outer convex corners where two non-road sides meet
-    constexpr float kCornerIn = 0.35f;
-    constexpr float kCornerR2 = 0.09f * 0.09f;
-    if (!nL && !nF && u < -kCornerIn && v > kCornerIn) {
-      const float du = -kCornerIn - u, dv = v - kCornerIn;
-      if (du * du + dv * dv > kCornerR2) { return false; }
-    }
-    if (!nR && !nF && u > kCornerIn && v > kCornerIn) {
-      const float du = u - kCornerIn, dv = v - kCornerIn;
-      if (du * du + dv * dv > kCornerR2) { return false; }
-    }
-    if (!nL && !nB && u < -kCornerIn && v < -kCornerIn) {
-      const float du = -kCornerIn - u, dv = -kCornerIn - v;
-      if (du * du + dv * dv > kCornerR2) { return false; }
-    }
-    if (!nR && !nB && u > kCornerIn && v < -kCornerIn) {
-      const float du = u - kCornerIn, dv = -kCornerIn - v;
-      if (du * du + dv * dv > kCornerR2) { return false; }
-    }
-
-    // Keep inner L/T-junction corners aligned with adjacent road tile curbs
-    if (nB && nR && u > lim && v < -lim && !isPathTile(tx - fdx + rdx, ty - fdy + rdy)) { return false; }
-    if (nB && nL && u < -lim && v < -lim && !isPathTile(tx - fdx + ldx, ty - fdy + ldy)) { return false; }
-    if (nF && nR && u > lim && v > lim && !isPathTile(tx + fdx + rdx, ty + fdy + rdy)) { return false; }
-    if (nF && nL && u < -lim && v > lim && !isPathTile(tx + fdx + ldx, ty + fdy + ldy)) { return false; }
-    return true;
+  // Integer 16.16 fixed-point DDA trapezoid road rasterizer (rec98 make_linework / draw_trapezoid style).
+  // Replaces 8,000 B roadBuf + 8,000 per-pixel float isRoadAtSample evaluations with exact projected
+  // world-space road spans for visible path cells only.
+  struct RoadSpan {
+    float z0;
+    float z1;
+    float lat0;
+    float lat1;
+    std::uint8_t bevelMask;  // bit0=BL, bit1=BR, bit2=FL, bit3=FR outer dead-end/convex corner bevel
+  };
+  RoadSpan roadSpans[48]{};
+  int roadSpanCount = 0;
+  auto pushRoadSpan = [&](float z0, float z1, float lat0, float lat1, std::uint8_t bevel) {
+    if (z1 <= 0.42f || z0 >= 6.60f || roadSpanCount >= 48) { return; }
+    roadSpans[roadSpanCount++] = RoadSpan{
+        std::max(0.42f, z0), std::min(6.60f, z1), lat0, lat1, bevel};
   };
 
-  std::uint8_t roadBuf[kGndH * W]{};
-  for (int y = hy; y < H; ++y) {
-    const int gy = y - hy;
-    const float z = kScanLut.z[gy];
-    const float invScaleX = kScanLut.invScaleX[gy];
-    for (int x = 0; x < W; ++x) {
-      const float lat = (static_cast<float>(x) + 0.5f - static_cast<float>(cxMid)) * invScaleX;
-      if (isRoadAtSample(z, lat)) {
-        roadBuf[gy * W + x] = 1;
+  for (int d = 0; d <= 6; ++d) {
+    const int maxSRoad = d + 2;
+    for (int s = -maxSRoad; s <= maxSRoad; ++s) {
+      const int tx = planetSurface_.px + fdx * d + rdx * s;
+      const int ty = planetSurface_.py + fdy * d + rdy * s;
+      if (!isPathTile(tx, ty)) { continue; }
+      const bool nF = isPathTile(tx + fdx, ty + fdy);
+      const bool nB = isPathTile(tx - fdx, ty - fdy);
+      const bool nL = isPathTile(tx + ldx, ty + ldy);
+      const bool nR = isPathTile(tx + rdx, ty + rdy);
+      const float dc = static_cast<float>(d);
+      const float sc = static_cast<float>(s);
+
+      // Lateral pad + optional left/right arms across [d - kHalfRoad, d + kHalfRoad]
+      std::uint8_t bevH = 0u;
+      if (!nB && !nL) { bevH |= 1u; }
+      if (!nB && !nR) { bevH |= 2u; }
+      if (!nF && !nL) { bevH |= 4u; }
+      if (!nF && !nR) { bevH |= 8u; }
+      pushRoadSpan(dc - kHalfRoad, dc + kHalfRoad,
+                   nL ? (sc - 0.50f) : (sc - kHalfRoad),
+                   nR ? (sc + 0.50f) : (sc + kHalfRoad),
+                   bevH);
+
+      // Forward/backward connector arms across [s - kHalfRoad, s + kHalfRoad]
+      if (nB || nF) {
+        std::uint8_t bevV = 0u;
+        if (!nB && !nL) { bevV |= 1u; }
+        if (!nB && !nR) { bevV |= 2u; }
+        if (!nF && !nL) { bevV |= 4u; }
+        if (!nF && !nR) { bevV |= 8u; }
+        pushRoadSpan(nB ? (dc - 0.50f) : (dc - kHalfRoad),
+                     nF ? (dc + 0.50f) : (dc + kHalfRoad),
+                     sc - kHalfRoad, sc + kHalfRoad,
+                     bevV);
       }
     }
   }
 
+  constexpr std::uint8_t kRoadSentinel = 254u;
+  constexpr float kSlopeScale = (kProjX / kProjY) * 65536.0f;
+  std::int16_t roadRowMinX[kGndH];
+  std::int16_t roadRowMaxX[kGndH];
+  for (int gy = 0; gy < kGndH; ++gy) {
+    roadRowMinX[gy] = static_cast<std::int16_t>(W);
+    roadRowMaxX[gy] = -1;
+  }
+
+  // Pass 1 (curb) & Pass 2 (sentinel interior): pure 16.16 fixed-point scanline edge walking
+  for (int pass = 0; pass < 2; ++pass) {
+    const int pad = (pass == 0) ? 1 : 0;
+    for (int i = 0; i < roadSpanCount; ++i) {
+      const RoadSpan& sp = roadSpans[i];
+      const int gyTopRaw = static_cast<int>(std::ceil(kProjY / sp.z1 - 0.5f));
+      const int gyBotRaw = static_cast<int>(std::floor(kProjY / sp.z0 - 0.5f));
+      if (gyTopRaw > gyBotRaw) { continue; }
+      const int gy0 = std::max(0, gyTopRaw - pad);
+      const int gy1 = std::min(kGndH - 1, gyBotRaw + pad);
+      if (gy0 > gy1) { continue; }
+
+      const std::int32_t dXL_fp = static_cast<std::int32_t>(std::lround(sp.lat0 * kSlopeScale));
+      const std::int32_t dXR_fp = static_cast<std::int32_t>(std::lround(sp.lat1 * kSlopeScale));
+      std::int32_t xL_fp = (cxMid << 16) +
+          static_cast<std::int32_t>(std::lround(sp.lat0 * kSlopeScale * (static_cast<float>(gy0) + 0.5f)));
+      std::int32_t xR_fp = (cxMid << 16) +
+          static_cast<std::int32_t>(std::lround(sp.lat1 * kSlopeScale * (static_cast<float>(gy0) + 0.5f)));
+
+      for (int gy = gy0; gy <= gy1; ++gy) {
+        int x0 = ((xL_fp + 32768) >> 16) - pad;
+        int x1 = ((xR_fp + 32768) >> 16) - 1 + pad;
+        xL_fp += dXL_fp;
+        xR_fp += dXR_fp;
+
+        // Subtle 1px outer convex corner bevel on road dead-ends / L-turns
+        if (x1 - x0 >= 4 && (gy1 - gy0) >= 2) {
+          if (gy == gy0) {
+            if ((sp.bevelMask & 4u) != 0u) { ++x0; }
+            if ((sp.bevelMask & 8u) != 0u) { --x1; }
+          } else if (gy == gy1) {
+            if ((sp.bevelMask & 1u) != 0u) { ++x0; }
+            if ((sp.bevelMask & 2u) != 0u) { --x1; }
+          }
+        }
+
+        const int cx0 = std::max(0, x0);
+        const int cx1 = std::min(W - 1, x1);
+        if (cx0 > cx1) { continue; }
+        const int y = hy + gy;
+        if (pass == 0) {
+          const std::uint8_t curbInk = inkForFog(static_cast<int>(kScanLut.fogStep[gy]));
+          for (int x = cx0; x <= cx1; ++x) {
+            idxBuf[y * W + x] = curbInk;
+          }
+        } else {
+          if (cx0 < roadRowMinX[gy]) { roadRowMinX[gy] = static_cast<std::int16_t>(cx0); }
+          if (cx1 > roadRowMaxX[gy]) { roadRowMaxX[gy] = static_cast<std::int16_t>(cx1); }
+          for (int x = cx0; x <= cx1; ++x) {
+            idxBuf[y * W + x] = kRoadSentinel;
+          }
+        }
+      }
+    }
+  }
+
+  // Pass 3: Shade road bevel rims + world-anchored pebbles/dither in 16.16 fixed-point along active spans
+  auto isCurbInk = [&](std::uint8_t v) -> bool {
+    return v == inkOut || (v >= kInkFogBase && v <= kInkFogBase + 4u);
+  };
   const int stepParity = (planetSurface_.px + planetSurface_.py + planetSurface_.dir) & 1;
-  for (int y = hy; y < H; ++y) {
-    const int gy = y - hy;
+  const float baseWx = static_cast<float>(planetSurface_.px) + 0.5f;
+  const float baseWy = static_cast<float>(planetSurface_.py) + 0.5f;
+  for (int gy = 0; gy < kGndH; ++gy) {
+    const int xStart = roadRowMinX[gy];
+    const int xEnd = roadRowMaxX[gy];
+    if (xStart > xEnd) { continue; }
+    const int y = hy + gy;
     const float z = kScanLut.z[gy];
     const float invScaleX = kScanLut.invScaleX[gy];
     activeFog = static_cast<int>(kScanLut.fogStep[gy]);
     activeInk = inkForFog(activeFog);
-    for (int x = 0; x < W; ++x) {
-      if (roadBuf[gy * W + x] == 0) { continue; }
-      const bool up0 = (gy > 0) && roadBuf[(gy - 1) * W + x] == 0;
-      const bool dn0 = (gy + 1 < kGndH) && roadBuf[(gy + 1) * W + x] == 0;
-      const bool lf0 = (x > 0) && roadBuf[gy * W + (x - 1)] == 0;
-      const bool rt0 = (x + 1 < W) && roadBuf[gy * W + (x + 1)] == 0;
-      if (up0 || dn0 || lf0 || rt0) {
-        putPx(x, y, inkOut);
+    const bool allowPebble = (z < 3.4f);
+
+    const float lat0 = (static_cast<float>(xStart) + 0.5f - static_cast<float>(cxMid)) * invScaleX;
+    const float wx0 = (baseWx + static_cast<float>(fdx) * z + static_cast<float>(rdx) * lat0) * 36.0f;
+    const float wy0 = (baseWy + static_cast<float>(fdy) * z + static_cast<float>(rdy) * lat0) * 36.0f;
+    std::int32_t sx36_fp = static_cast<std::int32_t>(std::lround(wx0 * 65536.0f));
+    std::int32_t sy36_fp = static_cast<std::int32_t>(std::lround(wy0 * 65536.0f));
+    const std::int32_t dsx36_fp =
+        static_cast<std::int32_t>(std::lround(static_cast<float>(rdx) * invScaleX * 36.0f * 65536.0f));
+    const std::int32_t dsy36_fp =
+        static_cast<std::int32_t>(std::lround(static_cast<float>(rdy) * invScaleX * 36.0f * 65536.0f));
+
+    for (int x = xStart; x <= xEnd; ++x, sx36_fp += dsx36_fp, sy36_fp += dsy36_fp) {
+      if (idxBuf[y * W + x] != kRoadSentinel) { continue; }
+      const bool upRim = (gy > 0) && isCurbInk(idxBuf[(y - 1) * W + x]);
+      const bool lfRim = (x > 0) && isCurbInk(idxBuf[y * W + (x - 1)]);
+      const bool rtRim = (x + 1 < W) && isCurbInk(idxBuf[y * W + (x + 1)]);
+      if (upRim || lfRim) {
+        putPx(x, y, pathHi);
+      } else if (rtRim) {
+        putPx(x, y, pathDark);
       } else {
-        const bool upRim = (gy > 1) && roadBuf[(gy - 2) * W + x] == 0;
-        const bool lfRim = (x > 1) && roadBuf[gy * W + (x - 2)] == 0;
-        const bool rtRim = (x + 2 < W) && roadBuf[gy * W + (x + 2)] == 0;
-        if (upRim || lfRim) {
+        const int gx = sx36_fp >> 16;
+        const int gcy = sy36_fp >> 16;
+        const int fx16 = sx36_fp & 0xFFFF;
+        const int fy16 = sy36_fp & 0xFFFF;
+        const unsigned h = static_cast<unsigned>(gx) * 73856093u ^
+                           static_cast<unsigned>(gcy) * 19349663u;
+        const bool pebble = allowPebble && ((h % 17u) == 0u) &&
+                            (fx16 > 15728 && fx16 < 48496 && fy16 > 15728 && fy16 < 48496);
+        if (pebble) {
           putPx(x, y, pathHi);
-        } else if (rtRim) {
+        } else if (((x + y + stepParity) & 1) != 0 || ((h % 11u) == 0u && fy16 >= 32768)) {
           putPx(x, y, pathDark);
         } else {
-          const float lat = (static_cast<float>(x) + 0.5f - static_cast<float>(cxMid)) * invScaleX;
-          const float wx = (static_cast<float>(planetSurface_.px) + 0.5f) +
-                           static_cast<float>(fdx) * z + static_cast<float>(rdx) * lat;
-          const float wy = (static_cast<float>(planetSurface_.py) + 0.5f) +
-                           static_cast<float>(fdy) * z + static_cast<float>(rdy) * lat;
-          const float sx36 = wx * 36.0f;
-          const float sy36 = wy * 36.0f;
-          const int gx = static_cast<int>(std::floor(sx36));
-          const int gcy = static_cast<int>(std::floor(sy36));
-          const float fx = sx36 - static_cast<float>(gx);
-          const float fy = sy36 - static_cast<float>(gcy);
-          const unsigned h = static_cast<unsigned>(gx) * 73856093u ^
-                             static_cast<unsigned>(gcy) * 19349663u;
-          const bool pebble = (z < 3.4f) && ((h % 17u) == 0u) &&
-                              (fx > 0.24f && fx < 0.74f && fy > 0.24f && fy < 0.74f);
-          if (pebble) {
-            putPx(x, y, pathHi);
-          } else if (((x + y + stepParity) & 1) != 0 || ((h % 11u) == 0u && fy >= 0.5f)) {
-            putPx(x, y, pathDark);
-          } else {
-            putPx(x, y, pathMid);
-          }
+          putPx(x, y, pathMid);
         }
       }
     }
@@ -3703,6 +3761,263 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     }
   };
 
+  auto isCliffCell = [&](int x, int y) -> bool {
+    if (x < 0 || x >= N || y < 0 || y >= N) { return false; }
+    return tileAt(x, y) == 1 && (variantAt(x, y) & 4) != 0;
+  };
+  constexpr float kCliffHeight = 1.38f;
+  auto cliffX = [&](float z, float lat) -> int {
+    return cxMid + static_cast<int>(std::lround(lat * (kProjX / z)));
+  };
+  auto cliffYBot = [&](float z) -> int {
+    return hy + static_cast<int>(std::lround(kProjY / z - 0.5f));
+  };
+  auto cliffYTop = [&](float z) -> int {
+    return hy - static_cast<int>(std::lround(kProjY * (kCliffHeight - 1.0f) / z));
+  };
+  auto cliffCrownLift = [&](int uPermille, int spanW, int var, unsigned cellH) -> int {
+    if (spanW < 6 || uPermille <= 130 || uPermille >= 870) { return 0; }
+    const int maxLift = (spanW >= 24) ? 2 : 1;
+    if (var == 4) {
+      return (uPermille >= 220 && uPermille <= 780) ? 1 : 0;
+    }
+    if (var == 5) {
+      const unsigned seg = static_cast<unsigned>(uPermille / 145) + (cellH & 3u);
+      return static_cast<int>((seg * 5u + (cellH >> 2)) % static_cast<unsigned>(maxLift + 2));
+    }
+    if (var == 6) {
+      return ((cellH & 1u) != 0u) ? (uPermille < 520 ? maxLift : 0)
+                                  : (uPermille > 480 ? maxLift : 0);
+    }
+    // var == 7: weathered cut-stone parapet crenels
+    return (((uPermille / 160) & 1) == 0) ? 1 : 0;
+  };
+
+  auto drawCliffCell = [&](int tx, int ty, int d, int s, int var) {
+    const unsigned cellH = static_cast<unsigned>(tx * 37 + ty * 91 + var * 13);
+    const bool adjNear  = isCliffCell(tx - fdx, ty - fdy);
+    const bool adjFar   = isCliffCell(tx + fdx, ty + fdy);
+    const bool adjLeft  = isCliffCell(tx + ldx, ty + ldy);
+    const bool adjRight = isCliffCell(tx + rdx, ty + rdy);
+
+    // Peripheral d == 0 cheek wall when standing directly beside a cliff (s == -1 or s == +1)
+    if (d == 0) {
+      if (std::abs(s) != 1) { return; }
+      const int x0 = (s < 0) ? 0 : (W - 6);
+      const int x1 = (s < 0) ? 5 : (W - 1);
+      const int yTopOuter = 23, yBotOuter = H - 1;
+      const int yTopInner = cliffYTop(0.50f), yBotInner = cliffYBot(0.50f);
+      const int yT0 = (s < 0) ? yTopOuter : yTopInner;
+      const int yT1 = (s < 0) ? yTopInner : yTopOuter;
+      const int yB0 = (s < 0) ? yBotOuter : yBotInner;
+      const int yB1 = (s < 0) ? yBotInner : yBotOuter;
+      const int dx = std::max(1, x1 - x0);
+      std::int32_t yT_fp = yT0 << 16;
+      std::int32_t yB_fp = yB0 << 16;
+      const std::int32_t dYT_fp = ((yT1 - yT0) << 16) / dx;
+      const std::int32_t dYB_fp = ((yB1 - yB0) << 16) / dx;
+      const int innerEdgeX = (s < 0) ? x1 : x0;
+      for (int x = x0; x <= x1; ++x, yT_fp += dYT_fp, yB_fp += dYB_fp) {
+        const int yT = std::max(0, yT_fp >> 16);
+        const int yB = std::min(H - 1, yB_fp >> 16);
+        if (yT > yB) { continue; }
+        if (x == innerEdgeX && !adjFar) {
+          fillRect(x, yT, 1, yB - yT + 1, inkOut);
+          continue;
+        }
+        putPx(x, yT, inkOut);
+        putPx(x, yB, inkOut);
+        for (int y = yT + 1; y < yB; ++y) {
+          const int rel = (y - yT) * 16 / std::max(1, yB - yT);
+          putPx(x, y, (rel == 1 || rel == 6 || rel == 11) ? rockMid : rockDark);
+        }
+      }
+      return;
+    }
+
+    const float zNearW = static_cast<float>(d) - 0.50f;
+    const float zFarW  = static_cast<float>(d) + 0.50f;
+
+    // 1. Quadrant-culled receding side face (defold sign rule: s < 0 -> right face, s > 0 -> left face)
+    bool drawSide = false;
+    float sideLat = 0.0f;
+    if (s < 0 && !adjRight) {
+      drawSide = true;
+      sideLat = static_cast<float>(s) + 0.50f;
+    } else if (s > 0 && !adjLeft) {
+      drawSide = true;
+      sideLat = static_cast<float>(s) - 0.50f;
+    }
+
+    if (drawSide) {
+      const int xNear = cliffX(zNearW, sideLat);
+      const int xFar  = cliffX(zFarW, sideLat);
+      const int yTopN = cliffYTop(zNearW);
+      const int yBotN = cliffYBot(zNearW);
+      const int yTopF = cliffYTop(zFarW);
+      const int yBotF = cliffYBot(zFarW);
+
+      const bool nearLeft = (s < 0);
+      const int x0 = nearLeft ? xNear : xFar;
+      const int x1 = nearLeft ? xFar  : xNear;
+      const int yT0 = nearLeft ? yTopN : yTopF;
+      const int yT1 = nearLeft ? yTopF : yTopN;
+      const int yB0 = nearLeft ? yBotN : yBotF;
+      const int yB1 = nearLeft ? yBotF : yBotN;
+
+      if (x1 >= 0 && x0 < W && x1 >= x0) {
+        const int spanW = std::max(1, x1 - x0);
+        std::int32_t yT_fp = yT0 << 16;
+        std::int32_t yB_fp = yB0 << 16;
+        const std::int32_t dYT_fp = ((yT1 - yT0) << 16) / spanW;
+        const std::int32_t dYB_fp = ((yB1 - yB0) << 16) / spanW;
+        int startX = x0;
+        if (startX < 0) {
+          const int skip = -startX;
+          yT_fp += dYT_fp * skip;
+          yB_fp += dYB_fp * skip;
+          startX = 0;
+        }
+        const int endX = std::min(W - 1, x1);
+        for (int x = startX; x <= endX; ++x, yT_fp += dYT_fp, yB_fp += dYB_fp) {
+          const int uPerm = ((x - x0) * 1000) / spanW;
+          const int lift = cliffCrownLift(uPerm, spanW, var, cellH);
+          const int yT = std::clamp((yT_fp >> 16) - lift, 0, H - 1);
+          const int yB = std::clamp(yB_fp >> 16, 0, H - 1);
+          if (yT > yB) { continue; }
+          if ((x == xNear && !adjNear) || (x == xFar && !adjFar)) {
+            fillRect(x, yT, 1, yB - yT + 1, inkOut);
+            continue;
+          }
+          putPx(x, yT, inkOut);
+          putPx(x, yB, inkOut);
+          const int colH = std::max(1, yB - yT);
+          for (int y = yT + 1; y < yB; ++y) {
+            const int v16 = ((y - yT) * 16) / colH;
+            std::uint8_t cIdx = rockDark;
+            if (y == yT + 1) {
+              cIdx = rockMid;
+            } else if (var == 6 && v16 == 9) {
+              cIdx = accent0;
+            } else if (var == 7) {
+              if (v16 == 5 || v16 == 10) {
+                cIdx = inkOut;
+              } else if (((x + (v16 >= 5 ? 2 : 0)) % 5) == 0 && colH >= 8) {
+                cIdx = rockMid;
+              }
+            } else if (v16 == 5 || v16 == 11) {
+              cIdx = (((x + y) & 1) == 0) ? rockMid : rockDark;
+            } else if (v16 < 4 && kBayer4[y & 3][x & 3] < 6) {
+              cIdx = rockMid;
+            }
+            putPx(x, y, cIdx);
+          }
+        }
+      }
+    }
+
+    // 2. Front-facing cliff / canyon / ruin-mine facade at zNearW (culled if nearer cell is also cliff)
+    if (!adjNear) {
+      const int xL = cliffX(zNearW, static_cast<float>(s) - 0.50f);
+      const int xR = cliffX(zNearW, static_cast<float>(s) + 0.50f);
+      const int yTBase = cliffYTop(zNearW);
+      const int yB = std::clamp(cliffYBot(zNearW), 0, H - 1);
+      if (xR >= 0 && xL < W && xR >= xL && yTBase < yB) {
+        const int faceW = std::max(1, xR - xL);
+        const int baseH = std::max(1, yB - yTBase);
+        const int cx0 = std::max(0, xL);
+        const int cx1 = std::min(W - 1, xR);
+        const int crackU1 = 260 + static_cast<int>((cellH * 17u) % 200u);
+        const int crackU2 = 580 + static_cast<int>((cellH * 31u) % 200u);
+
+        for (int x = cx0; x <= cx1; ++x) {
+          const int uPerm = ((x - xL) * 1000) / faceW;
+          const int lift = cliffCrownLift(uPerm, faceW, var, cellH);
+          const int yT = std::clamp(yTBase - lift, 0, H - 1);
+          if (yT > yB) { continue; }
+          if ((x == xL && !adjLeft) || (x == xR && !adjRight)) {
+            fillRect(x, yT, 1, yB - yT + 1, inkOut);
+            continue;
+          }
+          putPx(x, yT, inkOut);
+          putPx(x, yB, inkOut);
+          for (int y = yT + 1; y < yB; ++y) {
+            const int v16 = ((y - yTBase) * 16) / baseH;
+            const int prevV16 = ((y - 1 - yTBase) * 16) / baseH;
+            std::uint8_t cIdx = rockMid;
+            if (y == yT + 1) {
+              cIdx = rockHi;
+            } else if (var == 7) {
+              // Crisp 1px cut-stone ashlar courses + 1px staggered vertical joints
+              const int course = ((y - yTBase) * 4) / std::max(4, baseH);
+              const int prevCourse = ((y - 1 - yTBase) * 4) / std::max(4, baseH);
+              const int shift = (course & 1) ? 125 : 0;
+              const int prevU = (((x - 1 - xL) * 1000) / faceW + shift) / 250;
+              const int currU = (uPerm + shift) / 250;
+              const bool hMortar = (baseH >= 8) && (course != prevCourse);
+              const bool vMortar = (faceW >= 12) && (x > xL + 1) && (currU != prevU);
+              if (hMortar || vMortar) {
+                cIdx = rockDark;
+              } else if (baseH >= 12 && y > yT + 2 &&
+                         (((y - 2 - yTBase) * 4) / std::max(4, baseH) != prevCourse)) {
+                cIdx = rockHi;
+              } else if (v16 < 4) {
+                cIdx = (kBayer4[y & 3][x & 3] < 9) ? rockHi : rockMid;
+              } else if (v16 > 12) {
+                cIdx = (kBayer4[y & 3][x & 3] < 8) ? rockDark : rockMid;
+              }
+            } else {
+              const int seg = (uPerm / 170 + static_cast<int>(cellH & 3u)) % 4;
+              const bool ledgeA = (v16 == 5 && v16 != prevV16 && seg != 1);
+              const bool ledgeB = (v16 == 10 && v16 != prevV16 && seg != 3);
+              if (v16 < 4) {
+                cIdx = (kBayer4[y & 3][x & 3] < 10) ? rockHi : rockMid;
+              } else if (ledgeA || ledgeB) {
+                cIdx = rockDark;
+              } else if ((prevV16 == 5 && seg != 1) || (prevV16 == 10 && seg != 3 && var == 4)) {
+                cIdx = rockHi;
+              } else if (v16 >= 13) {
+                cIdx = (kBayer4[y & 3][x & 3] < 10) ? rockDark : rockMid;
+              }
+              if (var == 6 && std::abs((v16 * 55) + (uPerm / 4) - 560) < 38) {
+                cIdx = ((x + y) & 1) ? accent0 : accent1;
+              } else if (faceW >= 10) {
+                const int jag1 = ((v16 - 3) * 14) - ((v16 & 2) ? 18 : 0);
+                const int jag2 = -((v16 - 6) * 12) + ((v16 & 2) ? 16 : 0);
+                const int xCr1 = xL + ((crackU1 + jag1) * faceW) / 1000;
+                const int xCr2 = xL + ((crackU2 + jag2) * faceW) / 1000;
+                if ((x == xCr1 && v16 >= 3 && v16 <= 11) ||
+                    (x == xCr2 && v16 >= 6 && v16 <= 14)) {
+                  cIdx = rockDark;
+                } else if ((x == xCr1 + 1 && v16 >= 4 && v16 <= 9) && faceW >= 18) {
+                  cIdx = rockHi;
+                }
+              }
+            }
+            putPx(x, y, cIdx);
+          }
+        }
+
+        // Recessed PC-98 timbered mine / stone ruin portal on interior var == 7 facades
+        if (var == 7 && !isBorderTile(tx, ty) && faceW >= 9 && baseH >= 7) {
+          const int pW = std::max(5, faceW * 42 / 100);
+          const int pH = std::max(4, baseH * 60 / 100);
+          const int pX = xL + (faceW - pW) / 2;
+          const int pY = yB - pH;
+          const int postW = std::max(1, std::min(4, pW / 6));
+          const int lintelH = std::max(1, std::min(4, pH / 6));
+          fillOutlineRect(pX - 1, pY - lintelH, pW + 2, lintelH + 2, pathHi, inkOut);
+          fillRect(pX, pY, pW, pH, inkOut);
+          fillOutlineRect(pX, pY, postW + 1, pH, trunkCol, inkOut);
+          fillOutlineRect(pX + pW - postW - 1, pY, postW + 1, pH, trunkCol, inkOut);
+          if (pW >= 7 && pH >= 6) {
+            putPx(pX + pW / 2, pY + pH * 2 / 3, accent0);
+          }
+        }
+      }
+    }
+  };
+
   // Back-to-front painter's algorithm across visible lateral columns (s) and depths (d=6..0)
   for (int d = 6; d >= 0; --d) {
     activeFog = static_cast<int>(kDepthFog[d]);
@@ -3731,6 +4046,11 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
         const float tcxNear = tileCenterAtZ(s, zNear);
 
         if (tile == 1) {
+          // 50/50 world-seeded split: var 4..7 = 3D cliff/canyon/ruin-mine block; var 0..3 = natural biome props
+          if ((var & 4) != 0) {
+            drawCliffCell(tx, ty, d, s, var);
+            continue;
+          }
           if (d == 0) {
             // Peripheral l0/r0 foliage/rock peeking in at extreme left/right edge only
             const int edgeX = (s < 0)
