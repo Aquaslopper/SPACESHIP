@@ -202,6 +202,17 @@ Texture2D LoadSplashTexture(const std::filesystem::path& assets) {
   return texture;
 }
 
+Texture2D LoadBlockerTexture(const std::filesystem::path& assets) {
+  const std::filesystem::path path = assets / "art" / "blocker.png";
+  if (!std::filesystem::exists(path)) { return Texture2D{}; }
+  Texture2D texture = LoadTexture(path.string().c_str());
+  if (texture.id != 0) {
+    SetTextureFilter(texture, TEXTURE_FILTER_BILINEAR);
+    SetTextureWrap(texture, TEXTURE_WRAP_CLAMP);
+  }
+  return texture;
+}
+
 // The calibrated default needs the shader. Only an identity transform can
 // bypass the render target. The shader and target cover the complete frame
 // (including ImGui, title art and popups), rather than changing the theme.
@@ -623,6 +634,7 @@ int main(int argc, char** argv) {
   Texture2D titleTexture = LoadTitleTexture(assets);
   Texture2D setupTexture = LoadSetupTexture(assets);
   Texture2D splashTexture = LoadSplashTexture(assets);
+  Texture2D blockerTexture = LoadBlockerTexture(assets);
   Texture2D wrenExterior{};
   Image wrenImage{};
   const auto exteriorPath = assets / "art" / "ships" / "wren-exterior.png";
@@ -684,6 +696,7 @@ int main(int argc, char** argv) {
   shell.SetTitleTexture(&titleTexture);
   shell.SetSetupTexture(&setupTexture);
   shell.SetSplashTexture(&splashTexture);
+  shell.SetBlockerTexture(&blockerTexture);
   shell.SetWrenExteriorTexture(&wrenExterior);
   if (wrenImage.data != nullptr) {
     shell.SetWrenExteriorImage(&wrenImage);
@@ -860,6 +873,13 @@ int main(int argc, char** argv) {
     if (!shell.TitleActive()) voyageStarted = true;
     rlImGuiEnd();
     if (adjusted) {
+      rlSetBlendFactorsSeparate(RL_SRC_ALPHA, RL_ONE_MINUS_SRC_ALPHA,
+                                RL_ONE, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD, RL_FUNC_ADD);
+      BeginBlendMode(BLEND_CUSTOM_SEPARATE);
+    }
+    shell.DrawBlocker(sim);
+    if (adjusted) { EndBlendMode(); }
+    if (adjusted) {
       display.End(sim.State().options.displayGamma, sim.State().options.displayBrightness,
                   waveTime, smoothedWave.waveDirX, smoothedWave.waveDirY,
                   smoothedWave.baseIntensity, waveScale, smoothedWave.warmBias,
@@ -886,6 +906,7 @@ int main(int argc, char** argv) {
   if (titleTexture.id != 0) { UnloadTexture(titleTexture); }
   if (setupTexture.id != 0) { UnloadTexture(setupTexture); }
   if (splashTexture.id != 0) { UnloadTexture(splashTexture); }
+  if (blockerTexture.id != 0) { UnloadTexture(blockerTexture); }
   if (wrenExterior.id != 0) { UnloadTexture(wrenExterior); }
   for (auto& entry : cargoExteriors) { if (entry.second.id != 0) UnloadTexture(entry.second); }
   for (auto texture : tutorialTextures) { if (texture.id != 0) { UnloadTexture(texture); } }

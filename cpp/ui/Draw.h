@@ -74,6 +74,7 @@ class ShellView {
   void SetTitleTexture(void* texture) { titleArt_ = texture; }
   void SetSetupTexture(void* texture) { setupArt_ = texture; }
   void SetSplashTexture(void* texture) { splashArt_ = texture; }
+  void SetBlockerTexture(void* texture) { blockerArt_ = texture; }
   void SetAudioStatus(std::string status) { audioStatus_ = std::move(status); }
   void SetWrenExteriorTexture(void* texture,
       const std::string& path = "art/ships/wren-exterior.png");
@@ -88,6 +89,8 @@ class ShellView {
   void SetOthersHeight(float others) { others_ = others; }
 
   void Draw(Simulation& sim, double nowMs);
+  void DrawBlocker(const Simulation& sim) const;
+  bool BlockerActive(const Simulation& sim) const;
   void Click(Simulation& sim, float x, float y, HitButton button, double nowMs);
   void Move(float x, float y);
   void Drag(Simulation& sim, float x, float y, float dx, float dy, bool down, bool pressed);
@@ -302,6 +305,7 @@ class ShellView {
   bool draggingBearing_ = false;
   bool bridgeDispatch_ = false;
   float bridgeDispatchOpen_ = 0.0f;
+  Area bridgeBlockerHole_{};
   struct PlanetSurfaceState {
     static constexpr int kSize = 16;
     static constexpr int kSizeShift = 4;
@@ -480,6 +484,7 @@ class ShellView {
   void* titleArt_ = nullptr;
   void* splashArt_ = nullptr;
   void* setupArt_ = nullptr;
+  void* blockerArt_ = nullptr;
   ChartSettings setupSettings_{};
   ChartPreview setupPreview_{};
   std::string setupLayer_ = "galaxy";
