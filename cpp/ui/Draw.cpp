@@ -3279,17 +3279,44 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   const Body* planet = sim.FindBodyById(sim.Map().here);
   if (planet == nullptr) { return; }
 
-  unsigned oreMask = 0u;
-  for (int i = 0; i < static_cast<int>(planetSurface_.oreCount); ++i) {
-    const std::string key = "planet-ore:" + planet->id + ":" + std::to_string(i);
-    auto it = sim.State().mapMarks.find(key);
-    if (it == sim.State().mapMarks.end() || !it->second) {
-      oreMask |= (1u << i);
+  std::uint64_t pHash = 14695981039346656037ULL;
+  for (unsigned char ch : planet->id) {
+    pHash ^= static_cast<std::uint64_t>(ch);
+    pHash *= 1099511628211ULL;
+  }
+  if (pHash == 0ULL) { pHash = 1ULL; }
+
+  const std::size_t marksCount = sim.State().mapMarks.size();
+  const int lotSerial = static_cast<int>(sim.State().lotSerial);
+  std::uint8_t oreMask = planetSurface_.renderOreMask;
+  if (planetSurface_.renderPlanetHash != pHash ||
+      planetSurface_.renderMarksCount != marksCount ||
+      planetSurface_.renderLotSerial != lotSerial ||
+      oreMask == 0xFFu) {
+    oreMask = 0u;
+    char keyBuf[96];
+    for (int i = 0; i < static_cast<int>(planetSurface_.oreCount); ++i) {
+      const int n = std::snprintf(keyBuf, sizeof(keyBuf), "planet-ore:%s:%d",
+                                  planet->id.c_str(), i);
+      bool collected = false;
+      if (n > 0 && static_cast<std::size_t>(n) < sizeof(keyBuf)) {
+        auto it = sim.State().mapMarks.find(std::string(keyBuf, static_cast<std::size_t>(n)));
+        collected = (it != sim.State().mapMarks.end() && it->second);
+      } else {
+        const std::string key = "planet-ore:" + planet->id + ":" + std::to_string(i);
+        auto it = sim.State().mapMarks.find(key);
+        collected = (it != sim.State().mapMarks.end() && it->second);
+      }
+      if (!collected) {
+        oreMask = static_cast<std::uint8_t>(oreMask | (1u << i));
+      }
     }
+    planetSurface_.renderMarksCount = marksCount;
+    planetSurface_.renderLotSerial = lotSerial;
   }
 
   if (planetTex_.id != 0 &&
-      planetSurface_.renderPlanetId == planet->id &&
+      planetSurface_.renderPlanetHash == pHash &&
       planetSurface_.renderPx == static_cast<std::int8_t>(planetSurface_.px) &&
       planetSurface_.renderPy == static_cast<std::int8_t>(planetSurface_.py) &&
       planetSurface_.renderDir == static_cast<std::int8_t>(planetSurface_.dir) &&
@@ -3298,7 +3325,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     return;
   }
 
-  planetSurface_.renderPlanetId = planet->id;
+  planetSurface_.renderPlanetHash = pHash;
   planetSurface_.renderPx = static_cast<std::int8_t>(planetSurface_.px);
   planetSurface_.renderPy = static_cast<std::int8_t>(planetSurface_.py);
   planetSurface_.renderDir = static_cast<std::int8_t>(planetSurface_.dir);
@@ -3307,10 +3334,6 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   planetSurface_.frontKind = 0;
   planetSurface_.frontArg = 0;
   planetSurface_.frontUv = Area{};
-
-  if (planetPixels_.size() != static_cast<std::size_t>(W * H)) {
-    planetPixels_.assign(static_cast<std::size_t>(W * H), Color{0, 0, 0, 255});
-  }
 
   const std::string& subtype = planet->subtype;
   const bool lavaWorld =
@@ -3653,6 +3676,239 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     }
   };
 
+  static constexpr int kDx[4] = {0, 1, 0, -1};
+  static constexpr int kDy[4] = {-1, 0, 1, 0};
+  const int fdx = kDx[planetSurface_.dir];
+  const int fdy = kDy[planetSurface_.dir];
+  const int rdx = kDx[(planetSurface_.dir + 1) % 4];
+  const int rdy = kDy[(planetSurface_.dir + 1) % 4];
+  const int ldx = -rdx;
+  const int ldy = -rdy;
+
+  auto tileAt = [&](int tx, int ty) -> std::uint8_t {
+    if (static_cast<unsigned>(tx) >= static_cast<unsigned>(N) ||
+        static_cast<unsigned>(ty) >= static_cast<unsigned>(N)) {
+      return 1u;
+    }
+    return planetSurface_.Tile(tx, ty);
+  };
+  auto variantAt = [&](int tx, int ty) -> int {
+    if (static_cast<unsigned>(tx) >= static_cast<unsigned>(N) ||
+        static_cast<unsigned>(ty) >= static_cast<unsigned>(N)) {
+      return static_cast<int>((static_cast<unsigned>(tx + 32) * 7u +
+                               static_cast<unsigned>(ty + 32) * 13u) & 7u);
+    }
+    return planetSurface_.Variant(tx, ty);
+  };
+  auto isBorderTile = [&](int tx, int ty) -> bool {
+    return tx <= 0 || tx >= N - 1 || ty <= 0 || ty >= N - 1;
+  };
+  auto isPathTile = [&](int tx, int ty) -> bool {
+    const std::uint8_t t = tileAt(tx, ty);
+    return t == 2 || t == 3;
+  };
+  auto oreAt = [&](int tx, int ty) -> int {
+    for (int i = 0; i < static_cast<int>(planetSurface_.oreCount); ++i) {
+      if ((oreMask & (1u << i)) != 0u &&
+          ((planetSurface_.oreLayerMask >> i) & 1u) == planetSurface_.inMine &&
+          planetSurface_.oreX[i] == tx && planetSurface_.oreY[i] == ty) {
+        return i;
+      }
+    }
+    return -1;
+  };
+  auto isCliffCell = [&](int x, int y) -> bool {
+    if (static_cast<unsigned>(x) >= static_cast<unsigned>(N) ||
+        static_cast<unsigned>(y) >= static_cast<unsigned>(N)) {
+      return false;
+    }
+    return tileAt(x, y) == 1 && (variantAt(x, y) & 4) != 0;
+  };
+
+  // True 1/z first-person pinhole projection (camera eye inside d=0, ~88 deg FOV)
+  auto yAtZ = [&](float z) -> int {
+    return hy + static_cast<int>(std::lround(kProjY / std::max(0.35f, z) - 0.5f));
+  };
+  auto halfTileAtZ = [&](float z) -> float {
+    return (0.5f * kProjX) / std::max(0.35f, z);
+  };
+  auto tileCenterAtZ = [&](int s, float z) -> float {
+    return static_cast<float>(cxMid) + static_cast<float>(s) * (kProjX / std::max(0.35f, z));
+  };
+  constexpr float kCliffHeight = 1.38f;
+  const float cliffTopScale = inMine ? 1.00f : (kCliffHeight - 1.0f);
+  auto cliffX = [&](float z, float lat) -> int {
+    return cxMid + static_cast<int>(std::lround(lat * (kProjX / z)));
+  };
+  auto cliffYBot = [&](float z) -> int {
+    return hy + static_cast<int>(std::lround(kProjY / z - 0.5f));
+  };
+  auto cliffYTop = [&](float z) -> int {
+    return hy - static_cast<int>(std::lround(kProjY * cliffTopScale / z - (inMine ? 0.5f : 0.0f)));
+  };
+
+  // Item 5: Front-to-back 1D horizontal occlusion ([xlower, xupper] + 20 B 160-bit column mask)
+  // and 16 B stack-bitset LOS (uint64_t vis[2] covering all 77 frustum cells, 0 B heap).
+  std::uint64_t vis[2]{};         // 16 B stack bitset: frustum slots d=0..6, s=-(d+2)..+(d+2)
+  std::uint32_t colOcc[5]{};      // 20 B active 160-bit screen-column occlusion mask
+  std::uint32_t depthColOcc[7][5]{};
+  std::uint8_t rowX0[7]{};
+  std::uint8_t rowX1[7]{};
+  int xlower = 0;
+  int xupper = W - 1;
+  int maxVisD = 0;
+  bool viewSealed = false;
+  float maxSealZ = 0.50f;
+
+  auto frustumBit = [](int d, int s) -> int {
+    return d * d + 4 * d + (s + d + 2);
+  };
+  auto setVis = [&](int d, int s) {
+    const int b = frustumBit(d, s);
+    vis[b >> 6] |= (std::uint64_t{1} << (b & 63));
+  };
+  auto isVis = [&](int d, int s) -> bool {
+    const int b = frustumBit(d, s);
+    return ((vis[b >> 6] >> (b & 63)) & 1ULL) != 0ULL;
+  };
+  auto hasUnoccludedCol = [&](const std::uint32_t occ[5], int clipL, int clipR,
+                              int x0, int x1) -> bool {
+    x0 = std::max(clipL, x0);
+    x1 = std::min(clipR, x1);
+    if (x0 > x1) { return false; }
+    const int w0 = x0 >> 5;
+    const int w1 = x1 >> 5;
+    const std::uint32_t m0 = ~0u << (x0 & 31);
+    const std::uint32_t m1 = ~0u >> (31 - (x1 & 31));
+    if (w0 == w1) {
+      return ((~occ[w0]) & (m0 & m1)) != 0u;
+    }
+    if (((~occ[w0]) & m0) != 0u) { return true; }
+    for (int w = w0 + 1; w < w1; ++w) {
+      if (~occ[w] != 0u) { return true; }
+    }
+    return ((~occ[w1]) & m1) != 0u;
+  };
+  auto markColSpan = [&](int x0, int x1, float zDepth) {
+    x0 = std::max(0, x0);
+    x1 = std::min(W - 1, x1);
+    if (x0 > x1) { return; }
+    const int w0 = x0 >> 5;
+    const int w1 = x1 >> 5;
+    const std::uint32_t m0 = ~0u << (x0 & 31);
+    const std::uint32_t m1 = ~0u >> (31 - (x1 & 31));
+    bool addedNew = false;
+    if (w0 == w1) {
+      const std::uint32_t mask = m0 & m1;
+      addedNew = ((~colOcc[w0]) & mask) != 0u;
+      colOcc[w0] |= mask;
+    } else {
+      if (((~colOcc[w0]) & m0) != 0u) { addedNew = true; }
+      colOcc[w0] |= m0;
+      for (int w = w0 + 1; w < w1; ++w) {
+        if (~colOcc[w] != 0u) { addedNew = true; }
+        colOcc[w] = ~0u;
+      }
+      if (((~colOcc[w1]) & m1) != 0u) { addedNew = true; }
+      colOcc[w1] |= m1;
+    }
+    if (addedNew && zDepth > maxSealZ) {
+      maxSealZ = zDepth;
+    }
+    while (xlower <= xupper && ((colOcc[xlower >> 5] >> (xlower & 31)) & 1u) != 0u) {
+      ++xlower;
+    }
+    while (xlower <= xupper && ((colOcc[xupper >> 5] >> (xupper & 31)) & 1u) != 0u) {
+      --xupper;
+    }
+  };
+
+  for (int d = 0; d <= 6; ++d) {
+    if (xlower > xupper) {
+      viewSealed = true;
+      break;
+    }
+    for (int w = 0; w < 5; ++w) {
+      depthColOcc[d][w] = colOcc[w];
+    }
+    rowX0[d] = static_cast<std::uint8_t>(xlower);
+    rowX1[d] = static_cast<std::uint8_t>(xupper);
+
+    const int maxSRoad = d + 2;
+    if (d == 0) {
+      for (int s = -maxSRoad; s <= maxSRoad; ++s) {
+        setVis(0, s);
+      }
+      maxVisD = 0;
+    } else {
+      const float zNearCell = static_cast<float>(d) - 0.50f;
+      const float zFarCell  = static_cast<float>(d) + 0.50f;
+      for (int s = -maxSRoad; s <= maxSRoad; ++s) {
+        const float latL = static_cast<float>(s) - 0.50f;
+        const float latR = static_cast<float>(s) + 0.50f;
+        const int xMin = std::min(cliffX(zNearCell, latL), cliffX(zFarCell, latL)) - 6;
+        const int xMax = std::max(cliffX(zNearCell, latR), cliffX(zFarCell, latR)) + 6;
+        if (hasUnoccludedCol(depthColOcc[d], xlower, xupper, xMin, xMax)) {
+          setVis(d, s);
+          maxVisD = d;
+        }
+      }
+    }
+
+    // Full-height wall occluders narrow [xlower, xupper] and set colOcc bits for deeper layers
+    const bool canOccludeDeeper = inMine ? (d <= 5) : (d >= 1 && d <= 2);
+    if (canOccludeDeeper) {
+      const int maxSOcc = d + 1;
+      for (int s = -maxSOcc; s <= maxSOcc; ++s) {
+        if (d == 0 && s == 0) { continue; }
+        if (!isVis(d, s)) { continue; }
+        const int tx = planetSurface_.px + fdx * d + rdx * s;
+        const int ty = planetSurface_.py + fdy * d + rdy * s;
+        if (!isCliffCell(tx, ty)) { continue; }
+        if (d == 0) {
+          if (std::abs(s) == 1) {
+            markColSpan((s < 0) ? 0 : (W - 6), (s < 0) ? 5 : (W - 1), 0.50f);
+          }
+          continue;
+        }
+        const float zNearW = static_cast<float>(d) - 0.50f;
+        const float zFarW  = static_cast<float>(d) + 0.50f;
+        if (!isCliffCell(tx - fdx, ty - fdy)) {
+          const int xL = cliffX(zNearW, static_cast<float>(s) - 0.50f);
+          const int xR = cliffX(zNearW, static_cast<float>(s) + 0.50f);
+          const int yTBase = cliffYTop(zNearW);
+          const int yB = std::clamp(cliffYBot(zNearW), 0, H - 1);
+          if (xR >= 0 && xL < W && xR >= xL && yTBase < yB) {
+            markColSpan(xL, xR, zNearW);
+          }
+        }
+        if (inMine) {
+          if (s < 0 && !isCliffCell(tx + rdx, ty + rdy)) {
+            const int xNear = cliffX(zNearW, static_cast<float>(s) + 0.50f);
+            const int xFar  = cliffX(zFarW, static_cast<float>(s) + 0.50f);
+            markColSpan(xNear, xFar - 1, zFarW);
+          } else if (s > 0 && !isCliffCell(tx + ldx, ty + ldy)) {
+            const int xNear = cliffX(zNearW, static_cast<float>(s) - 0.50f);
+            const int xFar  = cliffX(zFarW, static_cast<float>(s) - 0.50f);
+            markColSpan(xFar + 1, xNear, zFarW);
+          }
+        }
+      }
+      if (xlower > xupper) {
+        viewSealed = true;
+        break;
+      }
+    }
+  }
+
+  // When full-height mine walls seal all 160 columns at maxSealZ, skip 100%-overwritten ceiling/floor rows
+  const int ceilEndY = (inMine && viewSealed)
+                           ? std::clamp(cliffYTop(maxSealZ) + 1, 0, hy)
+                           : hy;
+  const int floorStartY = (inMine && viewSealed)
+                              ? std::clamp(cliffYBot(maxSealZ), hy, H)
+                              : hy;
+
   if (!inMine) {
     // PC-98 4x4 Bayer dithered sky gradient
     for (int y = 0; y < hy; ++y) {
@@ -3706,7 +3962,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     // Underground foreshortened cavern ceiling reusing kScanLut mirrored above hy (0 B extra LUTs)
     const std::uint8_t ceilDarkMid = static_cast<std::uint8_t>(rockDark | kMidFogBit);
     const std::uint8_t ceilLitMid = static_cast<std::uint8_t>(rockMid | kMidFogBit);
-    for (int y = 0; y < hy; ++y) {
+    for (int y = 0; y < ceilEndY; ++y) {
       const int cy = (hy - 1) - y;
       const int baseFog = static_cast<int>(kScanLut.fogStep[cy]);
       const int f32 = (baseFog > 0) ? std::min(31, baseFog + 5) : 0;
@@ -3745,7 +4001,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   const std::uint8_t floorC = inMine ? rockMid  : gnd2;
   const std::uint8_t floorAMid = static_cast<std::uint8_t>(floorA | kMidFogBit);
   const std::uint8_t floorBMid = static_cast<std::uint8_t>(floorB | kMidFogBit);
-  for (int y = hy; y < H; ++y) {
+  for (int y = floorStartY; y < H; ++y) {
     const int gy = y - hy;
     const int baseFog = static_cast<int>(kScanLut.fogStep[gy]);
     const int f32 = (inMine && baseFog > 0) ? std::min(31, baseFog + 4) : baseFog;
@@ -3782,59 +4038,6 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   activeFog = 0;
   activeInk = inkOut;
 
-  static constexpr int kDx[4] = {0, 1, 0, -1};
-  static constexpr int kDy[4] = {-1, 0, 1, 0};
-  const int fdx = kDx[planetSurface_.dir];
-  const int fdy = kDy[planetSurface_.dir];
-  const int rdx = kDx[(planetSurface_.dir + 1) % 4];
-  const int rdy = kDy[(planetSurface_.dir + 1) % 4];
-  const int ldx = -rdx;
-  const int ldy = -rdy;
-
-  auto tileAt = [&](int tx, int ty) -> std::uint8_t {
-    if (static_cast<unsigned>(tx) >= static_cast<unsigned>(N) ||
-        static_cast<unsigned>(ty) >= static_cast<unsigned>(N)) {
-      return 1u;
-    }
-    return planetSurface_.Tile(tx, ty);
-  };
-  auto variantAt = [&](int tx, int ty) -> int {
-    if (static_cast<unsigned>(tx) >= static_cast<unsigned>(N) ||
-        static_cast<unsigned>(ty) >= static_cast<unsigned>(N)) {
-      return static_cast<int>((static_cast<unsigned>(tx + 32) * 7u +
-                               static_cast<unsigned>(ty + 32) * 13u) & 7u);
-    }
-    return planetSurface_.Variant(tx, ty);
-  };
-  auto isBorderTile = [&](int tx, int ty) -> bool {
-    return tx <= 0 || tx >= N - 1 || ty <= 0 || ty >= N - 1;
-  };
-  auto isPathTile = [&](int tx, int ty) -> bool {
-    const std::uint8_t t = tileAt(tx, ty);
-    return t == 2 || t == 3;
-  };
-  auto oreAt = [&](int tx, int ty) -> int {
-    for (int i = 0; i < static_cast<int>(planetSurface_.oreCount); ++i) {
-      if ((oreMask & (1u << i)) != 0u &&
-          ((planetSurface_.oreLayerMask >> i) & 1u) == planetSurface_.inMine &&
-          planetSurface_.oreX[i] == tx && planetSurface_.oreY[i] == ty) {
-        return i;
-      }
-    }
-    return -1;
-  };
-
-  // True 1/z first-person pinhole projection (camera eye inside d=0, ~88 deg FOV)
-  auto yAtZ = [&](float z) -> int {
-    return hy + static_cast<int>(std::lround(kProjY / std::max(0.35f, z) - 0.5f));
-  };
-  auto halfTileAtZ = [&](float z) -> float {
-    return (0.5f * kProjX) / std::max(0.35f, z);
-  };
-  auto tileCenterAtZ = [&](int s, float z) -> float {
-    return static_cast<float>(cxMid) + static_cast<float>(s) * (kProjX / std::max(0.35f, z));
-  };
-
   // Integer 16.16 fixed-point DDA trapezoid road rasterizer (rec98 make_linework / draw_trapezoid style).
   // Replaces 8,000 B roadBuf + 8,000 per-pixel float isRoadAtSample evaluations with exact projected
   // world-space road spans for visible path cells only.
@@ -3853,9 +4056,16 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
         std::max(0.42f, z0), std::min(6.60f, z1), lat0, lat1, bevel};
   };
 
-  for (int d = 0; d <= 6; ++d) {
+  for (int d = 0; d <= maxVisD; ++d) {
     const int maxSRoad = d + 2;
     for (int s = -maxSRoad; s <= maxSRoad; ++s) {
+      if (!isVis(d, s) &&
+          (s == -maxSRoad || !isVis(d, s - 1)) &&
+          (s == maxSRoad || !isVis(d, s + 1)) &&
+          (d == 0 || std::abs(s) > d + 1 || !isVis(d - 1, s)) &&
+          (d == maxVisD || !isVis(d + 1, s))) {
+        continue;
+      }
       const int tx = planetSurface_.px + fdx * d + rdx * s;
       const int ty = planetSurface_.py + fdy * d + rdy * s;
       if (!isPathTile(tx, ty)) { continue; }
@@ -4199,21 +4409,6 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     }
   };
 
-  auto isCliffCell = [&](int x, int y) -> bool {
-    if (x < 0 || x >= N || y < 0 || y >= N) { return false; }
-    return tileAt(x, y) == 1 && (variantAt(x, y) & 4) != 0;
-  };
-  constexpr float kCliffHeight = 1.38f;
-  const float cliffTopScale = inMine ? 1.00f : (kCliffHeight - 1.0f);
-  auto cliffX = [&](float z, float lat) -> int {
-    return cxMid + static_cast<int>(std::lround(lat * (kProjX / z)));
-  };
-  auto cliffYBot = [&](float z) -> int {
-    return hy + static_cast<int>(std::lround(kProjY / z - 0.5f));
-  };
-  auto cliffYTop = [&](float z) -> int {
-    return hy - static_cast<int>(std::lround(kProjY * cliffTopScale / z - (inMine ? 0.5f : 0.0f)));
-  };
   auto cliffCrownLift = [&](int uPermille, int spanW, int var, unsigned cellH) -> int {
     if (inMine || spanW < 6 || uPermille <= 130 || uPermille >= 870) { return 0; }
     const int maxLift = (spanW >= 24) ? 2 : 1;
@@ -4238,6 +4433,19 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     const bool adjFar   = isCliffCell(tx + fdx, ty + fdy);
     const bool adjLeft  = isCliffCell(tx + ldx, ty + ldy);
     const bool adjRight = isCliffCell(tx + rdx, ty + rdy);
+
+    const bool fogActive = (activeFog > 0);
+    const bool fogHighBand = (activeFog > 16);
+    const int wallThr16 = fogHighBand ? std::min(16, activeFog - 16) : activeFog;
+    auto colFogBitsForX = [&](int x) -> std::uint8_t {
+      if (!fogActive) { return 0u; }
+      const int rx = x & 3;
+      return static_cast<std::uint8_t>(
+          (((kFogMasks.row[wallThr16][0] >> rx) & 1u) << 0) |
+          (((kFogMasks.row[wallThr16][1] >> rx) & 1u) << 1) |
+          (((kFogMasks.row[wallThr16][2] >> rx) & 1u) << 2) |
+          (((kFogMasks.row[wallThr16][3] >> rx) & 1u) << 3));
+    };
 
     // Peripheral d == 0 cheek wall when standing directly beside a cliff (s == -1 or s == +1)
     if (d == 0) {
@@ -4264,11 +4472,14 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
           fillRect(x, yT, 1, yB - yT + 1, inkOut);
           continue;
         }
-        putPx(x, yT, inkOut);
-        putPx(x, yB, inkOut);
+        idxBuf[yT * W + x] = inkOut;
+        idxBuf[yB * W + x] = inkOut;
+        const int colH = std::max(1, yB - yT);
+        const std::uint32_t invColH =
+            ((1u << 20) + static_cast<std::uint32_t>(colH) - 1u) / static_cast<std::uint32_t>(colH);
         for (int y = yT + 1; y < yB; ++y) {
-          const int rel = (y - yT) * 16 / std::max(1, yB - yT);
-          putPx(x, y, (rel == 1 || rel == 6 || rel == 11) ? rockMid : rockDark);
+          const int rel = static_cast<int>((static_cast<std::uint32_t>((y - yT) << 4) * invColH) >> 20);
+          idxBuf[y * W + x] = (rel == 1 || rel == 6 || rel == 11) ? rockMid : rockDark;
         }
       }
       return;
@@ -4276,6 +4487,8 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
 
     const float zNearW = static_cast<float>(d) - 0.50f;
     const float zFarW  = static_cast<float>(d) + 0.50f;
+    const int clipL = std::max(0, static_cast<int>(rowX0[d]));
+    const int clipR = std::min(W - 1, static_cast<int>(rowX1[d]));
 
     // 1. Quadrant-culled receding side face (defold sign rule: s < 0 -> right face, s > 0 -> left face)
     bool drawSide = false;
@@ -4304,21 +4517,22 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
       const int yB0 = nearLeft ? yBotN : yBotF;
       const int yB1 = nearLeft ? yBotF : yBotN;
 
-      if (x1 >= 0 && x0 < W && x1 >= x0) {
+      if (x1 >= clipL && x0 <= clipR && x1 >= x0) {
         const int spanW = std::max(1, x1 - x0);
         std::int32_t yT_fp = yT0 << 16;
         std::int32_t yB_fp = yB0 << 16;
         const std::int32_t dYT_fp = ((yT1 - yT0) << 16) / spanW;
         const std::int32_t dYB_fp = ((yB1 - yB0) << 16) / spanW;
         int startX = x0;
-        if (startX < 0) {
-          const int skip = -startX;
+        if (startX < clipL) {
+          const int skip = clipL - startX;
           yT_fp += dYT_fp * skip;
           yB_fp += dYB_fp * skip;
-          startX = 0;
+          startX = clipL;
         }
-        const int endX = std::min(W - 1, x1);
+        const int endX = std::min(clipR, x1);
         for (int x = startX; x <= endX; ++x, yT_fp += dYT_fp, yB_fp += dYB_fp) {
+          if (((depthColOcc[d][x >> 5] >> (x & 31)) & 1u) != 0u) { continue; }
           const int uPerm = ((x - x0) * 1000) / spanW;
           const int lift = cliffCrownLift(uPerm, spanW, var, cellH);
           const int yT = std::clamp((yT_fp >> 16) - lift, 0, H - 1);
@@ -4328,11 +4542,14 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
             fillRect(x, yT, 1, yB - yT + 1, inkOut);
             continue;
           }
-          putPx(x, yT, inkOut);
-          putPx(x, yB, inkOut);
+          idxBuf[yT * W + x] = activeInk;
+          idxBuf[yB * W + x] = activeInk;
           const int colH = std::max(1, yB - yT);
+          const std::uint32_t invColH =
+              ((1u << 20) + static_cast<std::uint32_t>(colH) - 1u) / static_cast<std::uint32_t>(colH);
+          const std::uint8_t colFogMask = colFogBitsForX(x);
           for (int y = yT + 1; y < yB; ++y) {
-            const int v16 = ((y - yT) * 16) / colH;
+            const int v16 = static_cast<int>((static_cast<std::uint32_t>((y - yT) << 4) * invColH) >> 20);
             std::uint8_t cIdx = rockDark;
             if (y == yT + 1) {
               cIdx = rockMid;
@@ -4349,7 +4566,15 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
             } else if (v16 < 4 && kBayer4[y & 3][x & 3] < 6) {
               cIdx = rockMid;
             }
-            putPx(x, y, cIdx);
+            if (!fogActive) {
+              idxBuf[y * W + x] = cIdx;
+            } else if (cIdx == inkOut) {
+              idxBuf[y * W + x] = activeInk;
+            } else {
+              const std::uint8_t mid = static_cast<std::uint8_t>(cIdx | kMidFogBit);
+              const bool mBit = ((colFogMask >> (y & 3)) & 1u) != 0u;
+              idxBuf[y * W + x] = fogHighBand ? (mBit ? fogTargetIdx : mid) : (mBit ? mid : cIdx);
+            }
           }
         }
       }
@@ -4364,76 +4589,113 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
       if (xR >= 0 && xL < W && xR >= xL && yTBase < yB) {
         const int faceW = std::max(1, xR - xL);
         const int baseH = std::max(1, yB - yTBase);
-        const int cx0 = std::max(0, xL);
-        const int cx1 = std::min(W - 1, xR);
+        const int cx0 = std::max(clipL, xL);
+        const int cx1 = std::min(clipR, xR);
         const int crackU1 = 260 + static_cast<int>((cellH * 17u) % 200u);
         const int crackU2 = 580 + static_cast<int>((cellH * 31u) % 200u);
 
-        for (int x = cx0; x <= cx1; ++x) {
-          const int uPerm = ((x - xL) * 1000) / faceW;
-          const int lift = cliffCrownLift(uPerm, faceW, var, cellH);
-          const int yT = std::clamp(yTBase - lift, 0, H - 1);
-          if (yT > yB) { continue; }
-          if ((x == xL && !adjLeft) || (x == xR && !adjRight)) {
-            fillRect(x, yT, 1, yB - yT + 1, inkOut);
-            continue;
+        if (cx0 <= cx1) {
+          const int yRowStart = std::max(0, yTBase - 2);
+          std::int8_t rowV16[H]{};
+          std::int8_t rowPrevV16[H]{};
+          std::int8_t rowCourse[H]{};
+          std::int8_t rowPrevCourse[H]{};
+          std::int8_t rowPrev2Course[H]{};
+          const int courseDen = std::max(4, baseH);
+          for (int y = yRowStart; y <= yB; ++y) {
+            rowV16[y] = static_cast<std::int8_t>(((y - yTBase) * 16) / baseH);
+            rowPrevV16[y] = static_cast<std::int8_t>(((y - 1 - yTBase) * 16) / baseH);
+            if (var == 7) {
+              rowCourse[y] = static_cast<std::int8_t>(((y - yTBase) * 4) / courseDen);
+              rowPrevCourse[y] = static_cast<std::int8_t>(((y - 1 - yTBase) * 4) / courseDen);
+              rowPrev2Course[y] = static_cast<std::int8_t>(((y - 2 - yTBase) * 4) / courseDen);
+            }
           }
-          putPx(x, yT, inkOut);
-          putPx(x, yB, inkOut);
-          for (int y = yT + 1; y < yB; ++y) {
-            const int v16 = ((y - yTBase) * 16) / baseH;
-            const int prevV16 = ((y - 1 - yTBase) * 16) / baseH;
-            std::uint8_t cIdx = rockMid;
-            if (y == yT + 1) {
-              cIdx = rockHi;
-            } else if (var == 7) {
-              // Crisp 1px cut-stone ashlar courses + 1px staggered vertical joints
-              const int course = ((y - yTBase) * 4) / std::max(4, baseH);
-              const int prevCourse = ((y - 1 - yTBase) * 4) / std::max(4, baseH);
-              const int shift = (course & 1) ? 125 : 0;
-              const int prevU = (((x - 1 - xL) * 1000) / faceW + shift) / 250;
-              const int currU = (uPerm + shift) / 250;
-              const bool hMortar = (baseH >= 8) && (course != prevCourse);
-              const bool vMortar = (faceW >= 12) && (x > xL + 1) && (currU != prevU);
-              if (hMortar || vMortar) {
-                cIdx = rockDark;
-              } else if (baseH >= 12 && y > yT + 2 &&
-                         (((y - 2 - yTBase) * 4) / std::max(4, baseH) != prevCourse)) {
+          std::int16_t xCr1Lut[16]{};
+          std::int16_t xCr2Lut[16]{};
+          if (var != 7 && faceW >= 10) {
+            for (int v = 0; v < 16; ++v) {
+              const int jag1 = ((v - 3) * 14) - ((v & 2) ? 18 : 0);
+              const int jag2 = -((v - 6) * 12) + ((v & 2) ? 16 : 0);
+              xCr1Lut[v] = static_cast<std::int16_t>(xL + ((crackU1 + jag1) * faceW) / 1000);
+              xCr2Lut[v] = static_cast<std::int16_t>(xL + ((crackU2 + jag2) * faceW) / 1000);
+            }
+          }
+
+          for (int x = cx0; x <= cx1; ++x) {
+            if (((depthColOcc[d][x >> 5] >> (x & 31)) & 1u) != 0u) { continue; }
+            const int uPerm = ((x - xL) * 1000) / faceW;
+            const int lift = cliffCrownLift(uPerm, faceW, var, cellH);
+            const int yT = std::clamp(yTBase - lift, 0, H - 1);
+            if (yT > yB) { continue; }
+            if ((x == xL && !adjLeft) || (x == xR && !adjRight)) {
+              fillRect(x, yT, 1, yB - yT + 1, inkOut);
+              continue;
+            }
+            idxBuf[yT * W + x] = activeInk;
+            idxBuf[yB * W + x] = activeInk;
+            const std::uint8_t colFogMask = colFogBitsForX(x);
+            const int prevUPerm = ((x - 1 - xL) * 1000) / faceW;
+            const bool vMortarEven =
+                (var == 7) && (faceW >= 12) && (x > xL + 1) && ((uPerm / 250) != (prevUPerm / 250));
+            const bool vMortarOdd =
+                (var == 7) && (faceW >= 12) && (x > xL + 1) &&
+                (((uPerm + 125) / 250) != ((prevUPerm + 125) / 250));
+            const int seg = (var != 7) ? ((uPerm / 170 + static_cast<int>(cellH & 3u)) % 4) : 0;
+            const int uQuarter = uPerm / 4;
+
+            for (int y = yT + 1; y < yB; ++y) {
+              const int v16 = rowV16[y];
+              const int prevV16 = rowPrevV16[y];
+              std::uint8_t cIdx = rockMid;
+              if (y == yT + 1) {
                 cIdx = rockHi;
-              } else if (v16 < 4) {
-                cIdx = (kBayer4[y & 3][x & 3] < 9) ? rockHi : rockMid;
-              } else if (v16 > 12) {
-                cIdx = (kBayer4[y & 3][x & 3] < 8) ? rockDark : rockMid;
-              }
-            } else {
-              const int seg = (uPerm / 170 + static_cast<int>(cellH & 3u)) % 4;
-              const bool ledgeA = (v16 == 5 && v16 != prevV16 && seg != 1);
-              const bool ledgeB = (v16 == 10 && v16 != prevV16 && seg != 3);
-              if (v16 < 4) {
-                cIdx = (kBayer4[y & 3][x & 3] < 10) ? rockHi : rockMid;
-              } else if (ledgeA || ledgeB) {
-                cIdx = rockDark;
-              } else if ((prevV16 == 5 && seg != 1) || (prevV16 == 10 && seg != 3 && var == 4)) {
-                cIdx = rockHi;
-              } else if (v16 >= 13) {
-                cIdx = (kBayer4[y & 3][x & 3] < 10) ? rockDark : rockMid;
-              }
-              if (var == 6 && std::abs((v16 * 55) + (uPerm / 4) - 560) < 38) {
-                cIdx = ((x + y) & 1) ? accent0 : accent1;
-              } else if (faceW >= 10) {
-                const int jag1 = ((v16 - 3) * 14) - ((v16 & 2) ? 18 : 0);
-                const int jag2 = -((v16 - 6) * 12) + ((v16 & 2) ? 16 : 0);
-                const int xCr1 = xL + ((crackU1 + jag1) * faceW) / 1000;
-                const int xCr2 = xL + ((crackU2 + jag2) * faceW) / 1000;
-                if ((x == xCr1 && v16 >= 3 && v16 <= 11) ||
-                    (x == xCr2 && v16 >= 6 && v16 <= 14)) {
+              } else if (var == 7) {
+                // Crisp 1px cut-stone ashlar courses + 1px staggered vertical joints
+                const int course = rowCourse[y];
+                const int prevCourse = rowPrevCourse[y];
+                const bool hMortar = (baseH >= 8) && (course != prevCourse);
+                const bool vMortar = (course & 1) ? vMortarOdd : vMortarEven;
+                if (hMortar || vMortar) {
                   cIdx = rockDark;
-                } else if ((x == xCr1 + 1 && v16 >= 4 && v16 <= 9) && faceW >= 18) {
+                } else if (baseH >= 12 && y > yT + 2 && (rowPrev2Course[y] != prevCourse)) {
                   cIdx = rockHi;
+                } else if (v16 < 4) {
+                  cIdx = (kBayer4[y & 3][x & 3] < 9) ? rockHi : rockMid;
+                } else if (v16 > 12) {
+                  cIdx = (kBayer4[y & 3][x & 3] < 8) ? rockDark : rockMid;
+                }
+              } else {
+                const bool ledgeA = (v16 == 5 && v16 != prevV16 && seg != 1);
+                const bool ledgeB = (v16 == 10 && v16 != prevV16 && seg != 3);
+                if (v16 < 4) {
+                  cIdx = (kBayer4[y & 3][x & 3] < 10) ? rockHi : rockMid;
+                } else if (ledgeA || ledgeB) {
+                  cIdx = rockDark;
+                } else if ((prevV16 == 5 && seg != 1) || (prevV16 == 10 && seg != 3 && var == 4)) {
+                  cIdx = rockHi;
+                } else if (v16 >= 13) {
+                  cIdx = (kBayer4[y & 3][x & 3] < 10) ? rockDark : rockMid;
+                }
+                if (var == 6 && std::abs((v16 * 55) + uQuarter - 560) < 38) {
+                  cIdx = ((x + y) & 1) ? accent0 : accent1;
+                } else if (faceW >= 10) {
+                  if ((v16 >= 3 && v16 <= 11 && x == xCr1Lut[v16]) ||
+                      (v16 >= 6 && v16 <= 14 && x == xCr2Lut[v16])) {
+                    cIdx = rockDark;
+                  } else if (faceW >= 18 && v16 >= 4 && v16 <= 9 && x == xCr1Lut[v16] + 1) {
+                    cIdx = rockHi;
+                  }
                 }
               }
+              if (!fogActive) {
+                idxBuf[y * W + x] = cIdx;
+              } else {
+                const std::uint8_t mid = static_cast<std::uint8_t>(cIdx | kMidFogBit);
+                const bool mBit = ((colFogMask >> (y & 3)) & 1u) != 0u;
+                idxBuf[y * W + x] = fogHighBand ? (mBit ? fogTargetIdx : mid) : (mBit ? mid : cIdx);
+              }
             }
-            putPx(x, y, cIdx);
           }
         }
 
@@ -4511,8 +4773,8 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     }
   };
 
-  // Back-to-front painter's algorithm across visible lateral columns (s) and depths (d=6..0)
-  for (int d = 6; d >= 0; --d) {
+  // Back-to-front painter's algorithm across visible cells (culled by vis[2] + depthColOcc)
+  for (int d = maxVisD; d >= 0; --d) {
     activeFog = static_cast<int>(inMine ? kMineDepthFog[d] : kDepthFog[d]);
     activeInk = inkForFog(activeFog);
     const float zMid = (d == 0) ? 0.54f : static_cast<float>(d);
@@ -4530,6 +4792,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
       for (int sidePass = 0; sidePass < (k == 0 ? 1 : 2); ++sidePass) {
         const int s = (k == 0) ? 0 : (sidePass == 0 ? -k : k);
         if (d == 0 && s == 0) { continue; }
+        if (!isVis(d, s)) { continue; }
         const int tx = planetSurface_.px + fdx * d + rdx * s;
         const int ty = planetSurface_.py + fdy * d + rdy * s;
         if (tx < 0 || tx >= N || ty < 0 || ty >= N) { continue; }
@@ -4670,14 +4933,15 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   fillRect(0, 0, W, 1, inkOut);
   fillRect(0, 0, 1, H, inkOut);
 
-  // Single linear RGB4 (4-4-4) palette resolve pass from L1-resident idxBuf into RGBA8 texture buffer
+  // Single linear RGB4 (4-4-4) palette resolve pass from L1-resident idxBuf into transient stack RGBA8 buffer (0 B heap)
+  Color rgbaBuf[W * H];
   for (int i = 0; i < W * H; ++i) {
-    planetPixels_[static_cast<std::size_t>(i)] = resolvedLut[idxBuf[i]];
+    rgbaBuf[i] = resolvedLut[idxBuf[i]];
   }
 
   if (planetTex_.id == 0) {
     Image img{};
-    img.data = planetPixels_.data();
+    img.data = rgbaBuf;
     img.width = W;
     img.height = H;
     img.mipmaps = 1;
@@ -4687,7 +4951,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
       SetTextureFilter(planetTex_, TEXTURE_FILTER_POINT);
     }
   } else {
-    UpdateTexture(planetTex_, planetPixels_.data());
+    UpdateTexture(planetTex_, rgbaBuf);
   }
 }
 
@@ -5283,7 +5547,8 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
       }
 
       const Body* planet = sim.FindBodyById(sim.Map().here);
-      const std::string subtype = planet ? planet->subtype : std::string();
+      static const std::string kEmptySubtype;
+      const std::string& subtype = planet ? planet->subtype : kEmptySubtype;
       const bool lavaWorld = planet != nullptr &&
           (subtype == "lava" ||
            planet->klass.find("Lava") != std::string::npos ||
@@ -5424,15 +5689,20 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
       const float mmCell = 14.0f;
       const float mmX = 118.0f;
       const float mmY = 98.0f;
-      const float mmSpan = kView * mmCell;
       Text(inMine ? "MINE" : "MAP",
            static_cast<int>(V(mmX - 2.0f, 78.0f).x), static_cast<int>(V(mmX - 2.0f, 78.0f).y),
            infoPx, Color{240, 242, 236, 255}, true);
 
-      const int gx0 = static_cast<int>(std::lround(V(mmX, mmY).x));
-      const int gy0 = static_cast<int>(std::lround(V(mmX, mmY).y));
-      const int gx1 = static_cast<int>(std::lround(V(mmX + mmSpan, mmY + mmSpan).x));
-      const int gy1 = static_cast<int>(std::lround(V(mmX + mmSpan, mmY + mmSpan).y));
+      int mmColX[kView + 1];
+      int mmRowY[kView + 1];
+      for (int i = 0; i <= kView; ++i) {
+        mmColX[i] = static_cast<int>(std::lround(V(mmX + static_cast<float>(i) * mmCell, 0.0f).x));
+        mmRowY[i] = static_cast<int>(std::lround(V(0.0f, mmY + static_cast<float>(i) * mmCell).y));
+      }
+      const int gx0 = mmColX[0];
+      const int gy0 = mmRowY[0];
+      const int gx1 = mmColX[kView];
+      const int gy1 = mmRowY[kView];
       const int framePad = std::max(2, static_cast<int>(std::lround(2.5f * scale)));
       const int rimPx = std::max(1, static_cast<int>(std::lround(scale)));
       DrawRectangle(gx0 - framePad - rimPx, gy0 - framePad - rimPx,
@@ -5445,13 +5715,13 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
       // Pass 1: high-contrast floor vs wall/obstacle tiles across 9x9 camera window
       for (int my = 0; my < kView; ++my) {
         const int wy = camY + my;
-        const int cy0 = static_cast<int>(std::lround(V(0.0f, mmY + my * mmCell).y));
-        const int cy1 = static_cast<int>(std::lround(V(0.0f, mmY + (my + 1) * mmCell).y)) - 1;
+        const int cy0 = mmRowY[my];
+        const int cy1 = mmRowY[my + 1] - 1;
         const int ch = std::max(2, cy1 - cy0);
         for (int mx = 0; mx < kView; ++mx) {
           const int wx = camX + mx;
-          const int cx0 = static_cast<int>(std::lround(V(mmX + mx * mmCell, 0.0f).x));
-          const int cx1 = static_cast<int>(std::lround(V(mmX + (mx + 1) * mmCell, 0.0f).x)) - 1;
+          const int cx0 = mmColX[mx];
+          const int cx1 = mmColX[mx + 1] - 1;
           const int cw = std::max(2, cx1 - cx0);
           const std::uint8_t t = tileAt(wx, wy);
           if (t == 1u) {
@@ -5484,14 +5754,14 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
         const Color rCol = (roadPass == 0) ? mmRoadCurb : mmRoadFill;
         for (int my = 0; my < kView; ++my) {
           const int wy = camY + my;
-          const int cy0 = static_cast<int>(std::lround(V(0.0f, mmY + my * mmCell).y));
-          const int cy1 = static_cast<int>(std::lround(V(0.0f, mmY + (my + 1) * mmCell).y)) - 1;
+          const int cy0 = mmRowY[my];
+          const int cy1 = mmRowY[my + 1] - 1;
           const int ch = std::max(2, cy1 - cy0);
           for (int mx = 0; mx < kView; ++mx) {
             const int wx = camX + mx;
             if (tileAt(wx, wy) != 3u) { continue; }
-            const int cx0 = static_cast<int>(std::lround(V(mmX + mx * mmCell, 0.0f).x));
-            const int cx1 = static_cast<int>(std::lround(V(mmX + (mx + 1) * mmCell, 0.0f).x)) - 1;
+            const int cx0 = mmColX[mx];
+            const int cx1 = mmColX[mx + 1] - 1;
             const int cw = std::max(2, cx1 - cx0);
             const int mxC = cx0 + cw / 2;
             const int myC = cy0 + ch / 2;
@@ -5525,10 +5795,10 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
           const int sLocalX = static_cast<int>(planetSurface_.shipX) - camX;
           const int sLocalY = static_cast<int>(planetSurface_.shipY) - camY;
           if (sLocalX >= 0 && sLocalX < kView && sLocalY >= 0 && sLocalY < kView) {
-            const int sx0 = static_cast<int>(std::lround(V(mmX + sLocalX * mmCell, 0.0f).x));
-            const int sx1 = static_cast<int>(std::lround(V(mmX + (sLocalX + 1) * mmCell, 0.0f).x)) - 1;
-            const int sy0 = static_cast<int>(std::lround(V(0.0f, mmY + sLocalY * mmCell).y));
-            const int sy1 = static_cast<int>(std::lround(V(0.0f, mmY + (sLocalY + 1) * mmCell).y)) - 1;
+            const int sx0 = mmColX[sLocalX];
+            const int sx1 = mmColX[sLocalX + 1] - 1;
+            const int sy0 = mmRowY[sLocalY];
+            const int sy1 = mmRowY[sLocalY + 1] - 1;
             const int sw = std::max(4, sx1 - sx0);
             const int sh = std::max(4, sy1 - sy0);
             const int sRim = std::max(1, rimPx);
@@ -5542,10 +5812,10 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
         const int mLocalX = static_cast<int>(planetSurface_.portalX) - camX;
         const int mLocalY = static_cast<int>(planetSurface_.portalY) - camY;
         if (mLocalX >= 0 && mLocalX < kView && mLocalY >= 0 && mLocalY < kView) {
-          const int mx0 = static_cast<int>(std::lround(V(mmX + mLocalX * mmCell, 0.0f).x));
-          const int mx1 = static_cast<int>(std::lround(V(mmX + (mLocalX + 1) * mmCell, 0.0f).x)) - 1;
-          const int my0 = static_cast<int>(std::lround(V(0.0f, mmY + mLocalY * mmCell).y));
-          const int my1 = static_cast<int>(std::lround(V(0.0f, mmY + (mLocalY + 1) * mmCell).y)) - 1;
+          const int mx0 = mmColX[mLocalX];
+          const int mx1 = mmColX[mLocalX + 1] - 1;
+          const int my0 = mmRowY[mLocalY];
+          const int my1 = mmRowY[mLocalY + 1] - 1;
           const int mw = std::max(4, mx1 - mx0);
           const int mh = std::max(4, my1 - my0);
           const int mRim = std::max(1, rimPx);
@@ -5559,10 +5829,10 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
 
         const int pLocalX = static_cast<int>(planetSurface_.px) - camX;
         const int pLocalY = static_cast<int>(planetSurface_.py) - camY;
-        const int px0 = static_cast<int>(std::lround(V(mmX + pLocalX * mmCell, 0.0f).x));
-        const int px1 = static_cast<int>(std::lround(V(mmX + (pLocalX + 1) * mmCell, 0.0f).x)) - 1;
-        const int py0 = static_cast<int>(std::lround(V(0.0f, mmY + pLocalY * mmCell).y));
-        const int py1 = static_cast<int>(std::lround(V(0.0f, mmY + (pLocalY + 1) * mmCell).y)) - 1;
+        const int px0 = mmColX[pLocalX];
+        const int px1 = mmColX[pLocalX + 1] - 1;
+        const int py0 = mmRowY[pLocalY];
+        const int py1 = mmRowY[pLocalY + 1] - 1;
         const float pxC = (static_cast<float>(px0 + px1)) * 0.5f;
         const float pyC = (static_cast<float>(py0 + py1)) * 0.5f;
         const float cellPx = static_cast<float>(std::max(4, px1 - px0));
@@ -5605,10 +5875,9 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
         }
       }
       if (planet != nullptr) {
+        const unsigned activeOres = planetSurface_.renderOreMask;
         for (int i = 0; i < planetSurface_.oreCount; ++i) {
-          const std::string key = "planet-ore:" + planet->id + ":" + std::to_string(i);
-          auto it = sim.State().mapMarks.find(key);
-          if (it == sim.State().mapMarks.end() || !it->second) {
+          if ((activeOres & (1u << i)) != 0u) {
             ++oreLeft;
             if (((planetSurface_.oreLayerMask >> i) & 1u) == planetSurface_.inMine &&
                 planetSurface_.oreX[i] == fx && planetSurface_.oreY[i] == fy) {
@@ -5617,17 +5886,20 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
           }
         }
       }
-      const std::string pTitle = planet ? planet->name : std::string("Surface");
-      Text(pTitle.c_str(), static_cast<int>(V(700, 48).x), static_cast<int>(V(700, 48).y),
+      const char* pTitle = planet ? planet->name.c_str() : "Surface";
+      Text(pTitle, static_cast<int>(V(700, 48).x), static_cast<int>(V(700, 48).y),
            infoPx, Color{220, 224, 220, 255}, true);
-      const std::string posLine = std::string(inMine ? "MINE " : "DIR ") +
-                                  kDirNames[planetSurface_.dir] + " (" +
-                                  std::to_string(planetSurface_.px) + "," +
-                                  std::to_string(planetSurface_.py) + ")";
-      Text(posLine.c_str(), static_cast<int>(V(700, 66).x), static_cast<int>(V(700, 66).y),
+      char posBuf[32];
+      std::snprintf(posBuf, sizeof(posBuf), "%s %s (%u,%u)",
+                    inMine ? "MINE" : "DIR",
+                    kDirNames[planetSurface_.dir & 3u],
+                    static_cast<unsigned>(planetSurface_.px),
+                    static_cast<unsigned>(planetSurface_.py));
+      Text(posBuf, static_cast<int>(V(700, 66).x), static_cast<int>(V(700, 66).y),
            infoPx, Color{168, 176, 172, 255});
-      const std::string oreLine = "ORE " + std::to_string(oreLeft);
-      Text(oreLine.c_str(), static_cast<int>(V(700, 84).x), static_cast<int>(V(700, 84).y),
+      char oreBuf[16];
+      std::snprintf(oreBuf, sizeof(oreBuf), "ORE %d", oreLeft);
+      Text(oreBuf, static_cast<int>(V(700, 84).x), static_cast<int>(V(700, 84).y),
            infoPx, oreLeft > 0 ? Color{236, 184, 82, 255} : Color{130, 140, 134, 255}, true);
       if (frontBlk != 0 || planetSurface_.bumpKind != 0) {
         const bool bumped = (planetSurface_.bumpKind != 0);
