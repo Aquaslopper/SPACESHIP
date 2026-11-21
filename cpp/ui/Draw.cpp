@@ -4173,9 +4173,8 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
       return base + static_cast<float>(h % 4u) * 0.09f;  // 0.56 .. 0.95
     }
     if (var == 7) {
-      // Ancient keeps, ruined parapets & temple walls (low crumbled half-walls to tall battlements)
-      static constexpr float kRuinH[4] = {0.26f, 0.42f, 0.54f, 0.66f};
-      return kRuinH[h & 3u] + (border ? 0.10f : 0.0f);
+      // Uniform architectural height for connected ruined stone fortress walls (no erratic step jumps!)
+      return 0.46f + static_cast<float>(pSeed & 1u) * 0.04f;
     }
     if (var == 6) {
       // Mineral-veined / overgrown cliff faces
@@ -4323,7 +4322,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
         const float occTopScale = cliffTopScaleFor(tx, ty, occVar);
         if (!inMine && occTopScale < 0.85f) { continue; }
         if (d == 0) {
-          if (std::abs(s) == 1) {
+          if (inMine && std::abs(s) == 1) {
             const int cheekW = 9 * kResScale;
             markColSpan((s < 0) ? 0 : (W - cheekW), (s < 0) ? (cheekW - 1) : (W - 1), 0.50f);
           }
@@ -5716,74 +5715,30 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     }
   };
 
-  auto cliffCrownLift = [&](int uPermille, int spanW, int var, unsigned cellH,
+  auto cliffCrownLift = [&](int uPermille, int spanW, int colBaseH, int var, unsigned cellH,
                             bool adjStart, bool adjEnd) -> int {
-    if (inMine || spanW < 7) { return 0; }
-    // Taper exposed outer corners on natural cliffs so they never read like flat concrete boxes
-    int edgeDrop = 0;
-    if (var != 7) {
-      if (!adjStart && uPermille < 170) {
-        edgeDrop = ((170 - uPermille) * std::clamp(spanW / 8, 2 * kResScale, 7 * kResScale)) / 170;
-      } else if (!adjEnd && uPermille > 830) {
-        edgeDrop = ((uPermille - 830) * std::clamp(spanW / 8, 2 * kResScale, 7 * kResScale)) / 170;
-      }
-    } else if ((cellH & 2u) != 0u) {
-      // Crumbled ruin corner decay
-      if (!adjStart && uPermille < 200) {
-        edgeDrop = ((200 - uPermille) * std::clamp(spanW / 9, 2 * kResScale, 6 * kResScale)) / 200;
-      }
-    }
-    const int maxLift = std::clamp(spanW / 6, 2 * kResScale, 11 * kResScale);
-    int lift = 0;
+    if (inMine || spanW < 8 || colBaseH < 8) { return 0; }
     if (var == 7) {
-      // Might & Magic castle merlons, broken parapets, temple pediments & corner turrets
-      const unsigned style = cellH & 3u;
-      if (style == 0u) {
-        // Bold fortress battlements (merlons & embrasures)
-        lift = (((uPermille / 167) & 1) == 0) ? std::max(2, maxLift * 2 / 3) : 0;
-      } else if (style == 1u) {
-        // Weathered broken ruin wall (stepped missing blocks)
-        const int blk = uPermille / 180;
-        lift = ((blk + static_cast<int>(cellH >> 2)) % 3 == 0) ? maxLift
-             : ((blk & 1) ? std::max(1, maxLift / 3) : 0);
-      } else if (style == 2u) {
-        // Stepped temple gable / ziggurat pediment rising toward center
-        const int distMid = std::abs(uPermille - 500);
-        lift = (distMid < 140) ? maxLift : (distMid < 310) ? (maxLift * 2 / 3) : (maxLift / 3);
-      } else {
-        // Twin corner watch-turrets framing a dipped parapet
-        lift = (uPermille < 240 || uPermille > 760) ? maxLift : std::max(1, maxLift / 4);
-      }
-    } else if (var == 5) {
-      if (lavaWorld) {
-        // Stepped hexagonal basalt organ-pipe columns
-        const unsigned col = static_cast<unsigned>(uPermille / 142) + (cellH & 3u);
-        lift = static_cast<int>(((col * 5u + (cellH >> 2)) % 5u) * static_cast<unsigned>(maxLift)) / 4;
-      } else if (iceWorld) {
-        // Sharp asymmetric glacial crystal peak
-        const int peakU = ((cellH & 1u) != 0u) ? 340 : 660;
-        const int dPeak = std::abs(uPermille - peakU);
-        lift = std::max(0, maxLift - (dPeak * maxLift) / 480);
-      } else if (rockWorld) {
-        // Flat-topped canyon mesa with overhanging caprock step
-        lift = (uPermille >= 180 && uPermille <= 820) ? maxLift
-             : (uPermille >= 90 && uPermille <= 910) ? (maxLift / 2) : 0;
-      } else {
-        // Organic rocky crag / twin-peaked bluff
-        const int p1 = std::max(0, 320 - std::abs(uPermille - 330));
-        const int p2 = std::max(0, 260 - std::abs(uPermille - 700));
-        lift = ((p1 + p2 / 2) * maxLift) / 360;
-      }
-    } else if (var == 6) {
-      // Sloped mineral ridge or stepped outcrop
-      const int peakU = ((cellH & 1u) != 0u) ? 280 : 720;
-      const int dPeak = std::abs(uPermille - peakU);
-      lift = std::max(0, (maxLift * 3 / 4) - (dPeak * maxLift) / 620);
-    } else {
-      // var == 4: organic rolling rock bluff
-      const int dMid = std::abs(uPermille - (420 + static_cast<int>((cellH & 3u) * 50u)));
-      lift = std::max(0, (maxLift * 2 / 3) - (dMid * maxLift) / 560);
+      // Clean perspective-true castle battlements: corners (u < 120 or u > 880) ALWAYS stay flush at yTBase
+      // so adjacent front & receding side walls meet at the exact same roofline height!
+      if (uPermille < 120 || uPermille > 880) { return 0; }
+      const int merlonH = std::max(2, (colBaseH * 11) / 100);
+      // 3 crisp evenly-spaced merlons across each wall bay (perspective-consistent across all depths)
+      const bool isMerlon = (uPermille >= 150 && uPermille <= 320) ||
+                            (uPermille >= 415 && uPermille <= 585) ||
+                            (uPermille >= 680 && uPermille <= 850);
+      return isMerlon ? merlonH : 0;
     }
+    // Natural cliff crown fallback (unused on surface since var 4..6 route to drawMountainCell)
+    int edgeDrop = 0;
+    if (!adjStart && uPermille < 170) {
+      edgeDrop = ((170 - uPermille) * std::clamp(spanW / 8, 2 * kResScale, 7 * kResScale)) / 170;
+    } else if (!adjEnd && uPermille > 830) {
+      edgeDrop = ((uPermille - 830) * std::clamp(spanW / 8, 2 * kResScale, 7 * kResScale)) / 170;
+    }
+    const int maxLift = std::clamp(colBaseH / 8, 2 * kResScale, 10 * kResScale);
+    const int dMid = std::abs(uPermille - (420 + static_cast<int>((cellH & 3u) * 50u)));
+    const int lift = std::max(0, (maxLift * 2 / 3) - (dMid * maxLift) / 560);
     return lift - edgeDrop;
   };
 
@@ -5808,9 +5763,9 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
           (((kFogMasks.row[wallThr16][3] >> rx) & 1u) << 3));
     };
 
-    // Peripheral d == 0 cheek wall when standing directly beside a cliff (s == -1 or s == +1)
+    // Peripheral d == 0 cheek wall ONLY in underground mines (outdoor lat=+-0.50 at z=0.50 lies outside the frustum)
     if (d == 0) {
-      if (std::abs(s) != 1) { return; }
+      if (!inMine || std::abs(s) != 1) { return; }
       const int cheekW = 9 * kResScale;
       const int x0 = (s < 0) ? 0 : (W - cheekW);
       const int x1 = (s < 0) ? (cheekW - 1) : (W - 1);
@@ -5905,9 +5860,11 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
         for (int x = startX; x <= endX; ++x, yT_fp += dYT_fp, yB_fp += dYB_fp) {
           if (((depthColOcc[d][x >> 5] >> (x & 31)) & 1u) != 0u) { continue; }
           const int uPerm = ((x - x0) * 1000) / spanW;
-          const int lift = cliffCrownLift(uPerm, spanW, var, cellH, adjSideStart, adjSideEnd);
-          const int yT = std::clamp((yT_fp >> 16) - lift, 0, H - 1);
+          const int yTBaseCol = std::clamp(yT_fp >> 16, 0, H - 1);
           const int yB = std::clamp(yB_fp >> 16, 0, H - 1);
+          const int colBaseH = std::max(1, yB - yTBaseCol);
+          const int lift = cliffCrownLift(uPerm, spanW, colBaseH, var, cellH, adjSideStart, adjSideEnd);
+          const int yT = std::clamp(yTBaseCol - lift, 0, H - 1);
           if (yT > yB) { continue; }
           if ((x == xNear && !adjNear) || (x == xFar && !adjFar)) {
             fillRect(x, yT, 1, yB - yT + 1, inkOut);
@@ -5919,7 +5876,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
           const std::uint32_t invColH =
               ((1u << 20) + static_cast<std::uint32_t>(colH) - 1u) / static_cast<std::uint32_t>(colH);
           const std::uint8_t colFogMask = colFogBitsForX(x);
-          const bool sidePilaster = (var == 7 && spanW >= 12 && (uPerm < 110 || uPerm > 890));
+          const bool sidePilaster = (inMine && var == 7 && spanW >= 12 * kResScale && (uPerm < 90 || uPerm > 910));
           const int vineLen = (!inMine && biomeIdx == 0 && colH >= 12)
                                   ? static_cast<int>(((static_cast<unsigned>(x) * 13u + cellH) % 7u) == 0u
                                                          ? (colH * (25 + static_cast<int>((x * 7 + cellH) % 30u)) / 100)
@@ -5932,9 +5889,8 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
             const std::uint8_t st = kStoneWallTex.px[v32][uTexSide];
             std::uint8_t cIdx = (st == 0u) ? inkOut : (st == 3u) ? rockMid : rockDark;
             if (sidePilaster) {
-              // Vertical stone pilaster / mine timber post framing receding bay edges
-              cIdx = inMine ? ((uPerm < 60 || uPerm > 940) ? trunkCol : pathHi)
-                            : ((v16 == 1 || v16 == 14) ? rockHi : rockMid);
+              // Mine timber post framing receding bay edges
+              cIdx = (uPerm < 50 || uPerm > 950) ? trunkCol : pathHi;
             } else if (!inMine && oceanWorld && y >= yB - 2 && ((x + y) & 1) == 0) {
               cIdx = sky3;  // surf foam collar along sea-cliff side
             } else if (!inMine && biomeIdx == 0 && y <= yT + vineLen) {
@@ -6035,12 +5991,14 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
         const int cx1 = std::min(clipR, xR);
 
         if (cx0 <= cx1) {
-          const int maxLiftBound = std::clamp(faceW / 6, 2 * kResScale, 11 * kResScale) + 2 * kResScale;
+          const int maxLiftBound = std::max(4 * kResScale, (baseH * 14) / 100) + 4;
           const int yRowStart = std::max(0, yTBase - maxLiftBound);
           std::int8_t rowV32[H]{};
           for (int y = yRowStart; y <= yB; ++y) {
             const int dy = y - yTBase;
-            rowV32[y] = static_cast<std::int8_t>(std::clamp((dy * 32) / baseH, 0, 31));
+            // Sample solid beveled stone courses for merlons above yTBase (avoiding row 30..31/0 mortar seam!)
+            const int vRaw = (dy >= 0) ? ((dy * 32) / baseH) : (2 + (((-dy) * 28) / baseH));
+            rowV32[y] = static_cast<std::int8_t>(vRaw & 31);
           }
 
           const int leftNeighYT = adjLeft
@@ -6054,7 +6012,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
           for (int x = cx0; x <= cx1; ++x) {
             if (((depthColOcc[d][x >> 5] >> (x & 31)) & 1u) != 0u) { continue; }
             const int uPerm = ((x - xL) * 1000) / faceW;
-            const int lift = cliffCrownLift(uPerm, faceW, var, cellH, adjLeft, adjRight);
+            const int lift = cliffCrownLift(uPerm, faceW, baseH, var, cellH, adjLeft, adjRight);
             const int yT = std::clamp(yTBase - lift, 0, H - 1);
             if (yT > yB) { continue; }
             if ((x == xL && !adjLeft) || (x == xR && !adjRight)) {
@@ -6076,8 +6034,6 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
             const int capDrop = (!inMine && baseH >= 14 * kResScale)
                                     ? ((1 + static_cast<int>((static_cast<unsigned>(x) * 3u + cellH) % 3u)) * kResScale)
                                     : 0;
-            const bool pilasterL = (!inMine && var == 7 && faceW >= 24 * kResScale && uPerm > 15 && uPerm < 105);
-            const bool pilasterR = (!inMine && var == 7 && faceW >= 24 * kResScale && uPerm > 895 && uPerm < 985);
             const int vineDrop = (!inMine && biomeIdx == 0 && baseH >= 16 * kResScale)
                                      ? (((static_cast<unsigned>(x) * 11u + cellH) % 9u) == 0u
                                             ? (baseH * (24 + static_cast<int>((static_cast<unsigned>(x) * 7u + cellH) % 34u)) / 100)
@@ -6098,19 +6054,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
                                 : (st == 2u) ? rockMid
                                              : rockHi;
 
-              if (pilasterL || pilasterR) {
-                const bool edgeShadow = (pilasterL && uPerm >= 85) || (pilasterR && uPerm <= 915);
-                const bool edgeLit    = (pilasterL && uPerm <= 42) || (pilasterR && uPerm >= 958);
-                if (y <= yT + 2 || y >= yB - 2) {
-                  cIdx = rockHi;
-                } else if (edgeShadow) {
-                  cIdx = rockDark;
-                } else if (edgeLit) {
-                  cIdx = rockHi;
-                } else {
-                  cIdx = ((y & 3) == 0) ? rockDark : rockMid;
-                }
-              } else if (!inMine && y <= yT + capDrop) {
+              if (!inMine && y <= yT + capDrop) {
                 if (iceWorld) {
                   cIdx = (y == yT + 1) ? accent1 : rockHi;
                 } else if (biomeIdx == 0) {
@@ -6118,7 +6062,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
                 } else if (lavaWorld) {
                   cIdx = (y == yT + 1) ? rockHi : rockDark;
                 } else {
-                  cIdx = rockHi;
+                  cIdx = (y == yT + 1) ? rockHi : rockMid;
                 }
               } else if (!inMine && biomeIdx == 0 && vineDrop > 0 && y <= yT + vineDrop) {
                 cIdx = (y == yT + vineDrop) ? leaf0 : (((x + y) & 1) ? leaf2 : leaf1);
@@ -6197,24 +6141,20 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
                 fillRect(fcx + kResScale, ay + ah * 3 / 5, kResScale, kResScale, glint);
               }
             } else if (dress == 1u) {
-              // Carved glowing ancient rune plaque / alien monolith tablet
-              const int pw = std::clamp(faceW * 34 / 100, 8 * kResScale, 20 * kResScale);
-              const int ph = std::clamp(baseH * 34 / 100, 7 * kResScale, 16 * kResScale);
+              // Weathered carved stone embrasure / arrow-slit recessed into masonry (pure stone tones, no neon!)
+              const int pw = std::clamp(faceW * 20 / 100, 6 * kResScale, 16 * kResScale);
+              const int ph = std::clamp(baseH * 28 / 100, 7 * kResScale, 18 * kResScale);
               const int px = fcx - pw / 2;
               const int py = fcy - ph / 2;
-              fillOutlineRect(px - 1, py - 1, pw + 2, ph + 2, rockDark, rockHi);
-              fillOutlineRect(px, py, pw, ph, inkOut, rockDark);
-              const std::uint8_t runeCol = (biomeIdx == 0) ? leaf2
-                                         : iceWorld        ? accent1
-                                         : lavaWorld       ? accent0
-                                                           : kIdxShipVisor;
-              // Crisp geometric PC-98 glyphs inside plaque
-              drawHLine(px + 2 * kResScale, px + pw - 3 * kResScale, py + 2 * kResScale, runeCol);
-              fillRect(fcx, py + 2 * kResScale, 1, ph - 4 * kResScale, runeCol);
-              if (pw >= 12 * kResScale) {
-                fillRect(px + 3 * kResScale, py + 3 * kResScale, 1, std::max(2, ph - 6 * kResScale), runeCol);
-                fillRect(px + pw - 4 * kResScale, py + 3 * kResScale, 1, std::max(2, ph - 6 * kResScale), runeCol);
-                drawHLine(px + 3 * kResScale, px + pw - 4 * kResScale, py + ph - 3 * kResScale, accent1);
+              // Beveled stone lintel & sill framing a recessed dark stone niche
+              fillOutlineRect(px, py, pw, ph, rockDark, inkOut);
+              drawHLine(px - 1, px + pw, py - 1, rockHi);
+              drawHLine(px - 1, px + pw, py + ph, rockMid);
+              // Recessed arrow-slit opening
+              const int slitW = std::max(2, kResScale);
+              fillRect(fcx - slitW / 2, py + 2 * kResScale, slitW, std::max(3, ph - 4 * kResScale), inkOut);
+              if (pw >= 10 * kResScale && ph >= 10 * kResScale) {
+                drawHLine(fcx - 2 * kResScale, fcx + 2 * kResScale, fcy, inkOut);
               }
             } else if (dress == 2u) {
               // Biome-themed wall emblem / banner / brazier grate / drainage arch
@@ -6229,9 +6169,10 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
                   fillRect(gx, by + bh / 3, 1, std::max(4, bh / 2), inkOut);
                 }
               } else if (oceanWorld) {
-                fillOutlineRect(bx, by, bw, std::max(5, bh / 2), inkOut, rockHi);
-                fillRect(fcx - kResScale, by + bh / 3, 3 * kResScale, std::max(3, yB - (by + bh / 3) - 1), sky3);
-                fillRect(fcx, by + bh / 3, kResScale, std::max(3, yB - (by + bh / 3) - 1), kIdxStarCool);
+                // Weathered coastal stone drainage arch with muted tidal water cascade
+                fillOutlineRect(bx, by, bw, std::max(5, bh / 2), inkOut, rockMid);
+                fillRect(fcx - kResScale, by + bh / 3, 2 * kResScale + 1, std::max(3, yB - (by + bh / 3) - 1), sky2);
+                fillRect(fcx, by + bh / 3, kResScale, std::max(3, yB - (by + bh / 3) - 1), sky3);
               } else {
                 const std::uint8_t banCol = (biomeIdx == 0) ? accent0
                                           : iceWorld        ? accent1
@@ -6417,11 +6358,12 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
           (((kFogMasks.row[mtnThr16][3] >> rx) & 1u) << 3));
     };
 
-    // Peripheral d == 0 looming sloped mountain flank at left/right edge (Might & Magic III style!)
+    // Peripheral d == 0 looming sloped mountain flank at left/right edge (tucked outside road curb!)
     if (d == 0) {
       if (std::abs(s) != 1) { return; }
       const bool onLeft = (s < 0);
-      const int flankW = 30 * kResScale;
+      const bool onRoad = isPathTile(planetSurface_.px, planetSurface_.py);
+      const int flankW = (onRoad ? 14 : 26) * kResScale;
       const int xStart = onLeft ? 0 : (W - flankW);
       const int xEnd   = onLeft ? (flankW - 1) : (W - 1);
       int prevYT = -1;
@@ -6460,10 +6402,13 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     const int baseL = cliffX(zNearW, static_cast<float>(s) - 0.50f);
     const int baseR = cliffX(zNearW, static_cast<float>(s) + 0.50f);
     const int tileW = std::max(6, baseR - baseL);
-    // Wide overlapping rocky skirt so neighboring mountain tiles merge into continuous ridges!
-    const int skirt = (tileW * 28) / 100 + 2;
-    const int xL = baseL - skirt;
-    const int xR = baseR + skirt;
+    // Only expand overlapping mountain skirts toward adjacent blocking tiles — NEVER spill over open roads!
+    const bool adjBlockL = (tileAt(tx + ldx, ty + ldy) == 1);
+    const bool adjBlockR = (tileAt(tx + rdx, ty + rdy) == 1);
+    const int skirtL = adjBlockL ? ((tileW * 26) / 100 + 2) : 0;
+    const int skirtR = adjBlockR ? ((tileW * 26) / 100 + 2) : 0;
+    const int xL = baseL - skirtL;
+    const int xR = baseR + skirtR;
     const int spanW = std::max(6, xR - xL);
     const int yB = std::clamp(cliffYBot(zNearW) + 1, hy + 2, H - 1);
 
@@ -6673,9 +6618,10 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     const int baseL = cliffX(zNearW, static_cast<float>(s) - 0.50f);
     const int baseR = cliffX(zNearW, static_cast<float>(s) + 0.50f);
     const int tileW = std::max(8, baseR - baseL);
-    const int skirt = tileW * 16 / 100;
-    const int xL = baseL - skirt;
-    const int xR = baseR + skirt;
+    const int skirtL = (tileAt(tx + ldx, ty + ldy) == 1) ? (tileW * 16 / 100) : 0;
+    const int skirtR = (tileAt(tx + rdx, ty + rdy) == 1) ? (tileW * 16 / 100) : 0;
+    const int xL = baseL - skirtL;
+    const int xR = baseR + skirtR;
     const int spanW = std::max(8, xR - xL);
     const int yB = std::clamp(cliffYBot(zNearW) + 1, hy + 2, H - 1);
     const int yPeak = std::clamp(cliffYTopScaled(zNearW, 0.70f), 6, yB - 10);
