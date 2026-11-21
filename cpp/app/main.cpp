@@ -729,6 +729,7 @@ int main(int argc, char** argv) {
 
   ship::PointerOwnership leftPointer, rightPointer, middlePointer;
   ship::RadiationTelemetry smoothedWave = ship::ComputeRadiationTelemetry(sim);
+  RenderTexture2D dispatchBackground{};
   float waveTime = 0.0f;
   while (!WindowShouldClose() && !shell.QuitRequested()) {
     const bool splash = shell.SplashActive();
@@ -856,6 +857,29 @@ int main(int argc, char** argv) {
          ship::DisplayBrightness(sim.State().options.displayBrightness) != 1.0 ||
          waveScale > 0.001f || sim.State().options.colorShift != 0.0 ||
          glowScale > 0.0f);
+    const bool dispatchActive = shell.BlockerActive(sim);
+    if ((!dispatchActive || resized || themeChanged) && dispatchBackground.id != 0) {
+      UnloadRenderTexture(dispatchBackground);
+      dispatchBackground = {};
+    }
+    bool capturedDispatch = false;
+    if (dispatchActive && dispatchBackground.id == 0) {
+      dispatchBackground = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
+      if (IsRenderTextureValid(dispatchBackground)) {
+        BeginTextureMode(dispatchBackground);
+        if (adjusted) {
+          ImGui::GetIO().DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
+          rlSetBlendFactorsSeparate(RL_SRC_ALPHA, RL_ONE_MINUS_SRC_ALPHA,
+                                    RL_ONE, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD, RL_FUNC_ADD);
+          BeginBlendMode(BLEND_CUSTOM_SEPARATE);
+        }
+        shell.Draw(sim, static_cast<double>(GetTime()) * 1000.0);
+        if (adjusted) { EndBlendMode(); }
+        rlImGuiEnd();
+        EndTextureMode();
+        capturedDispatch = true;
+      }
+    }
     if (adjusted) {
       display.Begin();
       // The offscreen texture uses logical screen pixels even on Retina
@@ -868,10 +892,28 @@ int main(int argc, char** argv) {
                                 RL_ONE, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD, RL_FUNC_ADD);
       BeginBlendMode(BLEND_CUSTOM_SEPARATE);
     }
-    shell.Draw(sim, static_cast<double>(GetTime()) * 1000.0);
+    if (dispatchActive && IsRenderTextureValid(dispatchBackground)) {
+      if (adjusted) {
+        rlSetBlendFactorsSeparate(RL_ONE, RL_ZERO, RL_ONE, RL_ZERO, RL_FUNC_ADD, RL_FUNC_ADD);
+        BeginBlendMode(BLEND_CUSTOM_SEPARATE);
+      }
+      DrawTexturePro(dispatchBackground.texture,
+                     {0, 0, static_cast<float>(dispatchBackground.texture.width),
+                      -static_cast<float>(dispatchBackground.texture.height)},
+                     {0, 0, static_cast<float>(GetScreenWidth()), static_cast<float>(GetScreenHeight())},
+                     {0, 0}, 0, WHITE);
+      if (adjusted) {
+        rlSetBlendFactorsSeparate(RL_SRC_ALPHA, RL_ONE_MINUS_SRC_ALPHA,
+                                  RL_ONE, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD, RL_FUNC_ADD);
+        BeginBlendMode(BLEND_CUSTOM_SEPARATE);
+      }
+      if (!capturedDispatch) { shell.Draw(sim, static_cast<double>(GetTime()) * 1000.0, true); }
+    } else {
+      shell.Draw(sim, static_cast<double>(GetTime()) * 1000.0);
+    }
     if (adjusted) { EndBlendMode(); }
     if (!shell.TitleActive()) voyageStarted = true;
-    rlImGuiEnd();
+    if (!capturedDispatch) { rlImGuiEnd(); }
     if (adjusted) {
       rlSetBlendFactorsSeparate(RL_SRC_ALPHA, RL_ONE_MINUS_SRC_ALPHA,
                                 RL_ONE, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD, RL_FUNC_ADD);
@@ -898,6 +940,7 @@ int main(int argc, char** argv) {
       std::printf("autosaved: %s\n", saved.c_str());
     }
   }
+  if (dispatchBackground.id != 0) { UnloadRenderTexture(dispatchBackground); }
   intro.Close();
   audio.Shutdown();
   rlImGuiShutdown();

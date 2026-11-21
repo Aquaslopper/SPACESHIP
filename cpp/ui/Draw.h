@@ -92,7 +92,7 @@ class ShellView {
   void PageTutorial(int direction, double nowMs);
   void SetOthersHeight(float others) { others_ = others; }
 
-  void Draw(Simulation& sim, double nowMs);
+  void Draw(Simulation& sim, double nowMs, bool dispatchOnly = false);
   void DrawBlocker(const Simulation& sim) const;
   bool BlockerActive(const Simulation& sim) const;
   void Click(Simulation& sim, float x, float y, HitButton button, double nowMs);
@@ -222,7 +222,8 @@ class ShellView {
   void PaintCrewRecord(const Simulation& sim);
   void PaintPanel(const NavPanel& panel, const Area& box);
   bool PaintScenePart(const MachinePart& part, const Area& origin);
-  void PaintStage(const Simulation& sim, const TaskStage& stage, const Area& origin);
+  void PaintStage(const Simulation& sim, const TaskStage& stage, const Area& origin,
+                  bool dispatchOnly = false);
   void EnsurePlanetSurface(const Simulation& sim);
   void LoadPlanetLayer(const Simulation& sim, std::uint8_t targetInMine, bool placeOres);
   void RenderPlanetSurfacePixels(const Simulation& sim);
@@ -310,6 +311,8 @@ class ShellView {
   bool bridgeDispatch_ = false;
   float bridgeDispatchOpen_ = 0.0f;
   Area bridgeBlockerHole_{};
+  TaskStage bridgeCachedStage_{};
+  Area bridgeCachedOrigin_{};
   struct PlanetSurfaceState {
     static constexpr int kSize = 16;
     static constexpr int kSizeShift = 4;

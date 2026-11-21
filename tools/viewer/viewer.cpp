@@ -169,7 +169,6 @@ int main(int argc, char** argv) {
   ship::Theme theme = ship::Theme::ById(sim.State().options.theme);
   theme.fontStep = sim.State().options.fontStep;
   theme.largeText = sim.State().options.largeText;
-  theme.hideCrewLabels = sim.State().options.hideCrewLabels;
   theme.reducedMotion = sim.State().reducedMotion;
   theme.stageCompact = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta" || sim.State().shipClass == "yamato" || sim.State().shipClass == "arcadia");
 
@@ -222,6 +221,8 @@ int main(int argc, char** argv) {
   if (setupTexture.id != 0) { SetTextureFilter(setupTexture, TEXTURE_FILTER_BILINEAR); }
   Texture2D splashTexture = LoadTexture("assets/art/splash.png");
   if (splashTexture.id != 0) { SetTextureFilter(splashTexture, TEXTURE_FILTER_BILINEAR); }
+  Texture2D blockerTexture = LoadTexture("assets/art/blocker.png");
+  if (blockerTexture.id != 0) { SetTextureFilter(blockerTexture, TEXTURE_FILTER_BILINEAR); }
   Texture2D wrenExterior = LoadTexture("assets/art/ships/wren-exterior.png");
   if (wrenExterior.id != 0) { SetTextureFilter(wrenExterior, TEXTURE_FILTER_BILINEAR); }
   std::map<std::string, Texture2D> cargoExteriors;
@@ -257,6 +258,7 @@ int main(int argc, char** argv) {
   shell.SetTitleTexture(&titleTexture);
   shell.SetSetupTexture(&setupTexture);
   shell.SetSplashTexture(&splashTexture);
+  shell.SetBlockerTexture(&blockerTexture);
   shell.SetWrenExteriorTexture(&wrenExterior);
   for (std::size_t i = 0; i < tutorialTextures.size(); ++i) { shell.SetTutorialTexture(i, &tutorialTextures[i]); }
   for (auto& picture : crewTextures) { shell.SetCrewTexture(picture.first, &picture.second); }
@@ -264,6 +266,7 @@ int main(int argc, char** argv) {
   shell.SetDisplayAdjustmentAvailable(false);
   shell.SetAudioStatus("viewer: no audio device");
 
+  RenderTexture2D dispatchBackground{};
   double nowMs = 1000.0;
   float mouseX = -1.0f, mouseY = -1.0f;
   int imButton = -1;  // -1 none, 1 press this frame, 0 release this frame
@@ -287,7 +290,6 @@ int main(int argc, char** argv) {
     ship::Theme next = ship::Theme::ById(sim.State().options.theme);
     next.fontStep = sim.State().options.fontStep;
     next.largeText = sim.State().options.largeText;
-    next.hideCrewLabels = sim.State().options.hideCrewLabels;
     next.reducedMotion = sim.State().reducedMotion;
     next.stageCompact = (sim.State().shipClass == "wren" || sim.State().shipClass == "explorer-needle" || sim.State().shipClass == "explorer-manta" || sim.State().shipClass == "yamato" || sim.State().shipClass == "arcadia");
     const bool changed = next.id != theme.id || next.fontStep != theme.fontStep ||
@@ -302,8 +304,32 @@ int main(int argc, char** argv) {
     }
     selectImGuiFont(sim.State().options.fontStep, sim.State().options.largeText);
     g_text.clear();
-    shell.Draw(sim, nowMs);
-    rlImGuiEnd();
+    const bool dispatchActive = shell.BlockerActive(sim);
+    if ((!dispatchActive || changed) && dispatchBackground.id != 0) {
+      UnloadRenderTexture(dispatchBackground);
+      dispatchBackground = {};
+    }
+    bool capturedDispatch = false;
+    if (dispatchActive && dispatchBackground.id == 0) {
+      dispatchBackground = LoadRenderTexture(width, height);
+      if (IsRenderTextureValid(dispatchBackground)) {
+        BeginTextureMode(dispatchBackground);
+        shell.Draw(sim, nowMs);
+        rlImGuiEnd();
+        EndTextureMode();
+        capturedDispatch = true;
+      }
+    }
+    if (dispatchActive && IsRenderTextureValid(dispatchBackground)) {
+      DrawTexturePro(dispatchBackground.texture,
+                     {0, 0, static_cast<float>(width), -static_cast<float>(height)},
+                     {0, 0, static_cast<float>(width), static_cast<float>(height)}, {0, 0}, 0, WHITE);
+      if (!capturedDispatch) { shell.Draw(sim, nowMs, true); }
+    } else {
+      shell.Draw(sim, nowMs);
+    }
+    if (!capturedDispatch) { rlImGuiEnd(); }
+    shell.DrawBlocker(sim);
     EndDrawing();
   };
 
@@ -652,6 +678,39 @@ int main(int argc, char** argv) {
       sim.MutableState().options.fontStep = static_cast<int>(num(1, 0));
     } else if (c == "largetext" && p.size() >= 2) {
       sim.MutableState().options.largeText = num(1, 0) != 0;
+    } else if (c == "planet" && p.size() >= 2) {
+      const auto* body = sim.FindBodyById(p[1]);
+      if (body == nullptr || body->type != "planet") {
+        std::printf("line %d: no planet %s\n", lineNo, p[1].c_str()); ++problems;
+      } else {
+        sim.MutableMap().here = body->id;
+        sim.MutableMap().inSpace = false;
+        shell.EnsurePlanetSurface(sim);
+        std::printf("planet %s: %s (%s)\n", body->id.c_str(), body->name.c_str(), body->subtype.c_str());
+      }
+    } else if (c == "planets") {
+      for (const auto& body : sim.World().bodies) {
+        if (body.type == "planet") { std::printf("planet %s: %s (%s)\n", body.id.c_str(), body.name.c_str(), body.subtype.c_str()); }
+      }
+    } else if (c == "dispatch") {
+      shell.bridgeDispatch_ = true;
+    } else if (c == "planetstep" && p.size() >= 2) {
+      shell.StepPlanetSurface(sim, static_cast<int>(num(1, 0)));
+    } else if (c == "planetpos" && p.size() >= 4) {
+      shell.planetSurface_.px = static_cast<std::uint8_t>(num(1, 0));
+      shell.planetSurface_.py = static_cast<std::uint8_t>(num(2, 0));
+      shell.planetSurface_.dir = static_cast<std::uint8_t>(num(3, 0));
+    } else if (c == "planetmap") {
+      std::printf("portal %d,%d outward=%d layer=%d\n", shell.planetSurface_.portalX,
+                  shell.planetSurface_.portalY, shell.planetSurface_.portalOutDir,
+                  shell.planetSurface_.inMine);
+      for (int y = 0; y < ship::ShellView::PlanetSurfaceState::kSize; ++y) {
+        for (int x = 0; x < ship::ShellView::PlanetSurfaceState::kSize; ++x) {
+          const auto& surface = shell.planetSurface_;
+          std::printf("%c", x == surface.px && y == surface.py ? '@' : " .S+"[surface.Tile(x, y)]);
+        }
+        std::printf("\n");
+      }
     } else if (c == "target" && p.size() >= 2) {
       sim.SelectTarget(p[1]);
     } else if (c == "travel") { sim.StartTravel();
@@ -699,6 +758,7 @@ int main(int argc, char** argv) {
     std::fflush(stdout);
   }
 
+  if (dispatchBackground.id != 0) { UnloadRenderTexture(dispatchBackground); }
   rlImGuiShutdown();
   CloseWindow();
   if (problems > 0) { std::printf("viewer: %d script line(s) could not be carried out\n", problems); }

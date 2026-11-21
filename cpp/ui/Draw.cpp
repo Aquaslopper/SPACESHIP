@@ -502,9 +502,16 @@ void ShellView::Configure(float width, float height, const Theme& theme) {
 
 void ShellView::ResetContentScroll() { contentScroll_ = 0.0f; }
 
-void ShellView::Draw(Simulation& sim, double nowMs) {
+void ShellView::Draw(Simulation& sim, double nowMs, bool dispatchOnly) {
   frameTimeMs_ = nowMs;
   if (!titleActive_ && !splashActive_) sim.MutableState().playedSeconds += GetFrameTime();
+  if (dispatchOnly) {
+    Camera2D scrollCam{{0.0f, 0.0f}, {0.0f, contentScroll_}, 0.0f, 1.0f};
+    BeginMode2D(scrollCam);
+    PaintStage(sim, bridgeCachedStage_, bridgeCachedOrigin_, true);
+    EndMode2D();
+    return;
+  }
   const float contentH = height_ - Metrics::kContentTop - Metrics::kStatusH;
   layout_ = ComputeLayout(width_, height_, contentH, others_, theme_.stageCompact);
 
@@ -2650,7 +2657,8 @@ Color StageMix(Color a, Color b, float t) {
 }  // namespace
 
 
-void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const Area& origin) {
+void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const Area& origin,
+                           bool dispatchOnly) {
   const Palette& p = theme_.palette;
   const bool night = theme_.id.find("-night") != std::string::npos;
   const bool darkHousing = night || (theme_.id != "classic" && stage.id != "machine");
@@ -2658,7 +2666,7 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
   const Color edge = darkHousing ? ToRay(p.borderDark) : (night ? ToRay(p.borderDark) : HexColor("#8c6f4e", ToRay(p.borderDark)));
   const float scale = StageScale(stage, theme_);
   const Area stageFrame{origin.x, origin.y, stage.width * scale, stage.height * scale};
-  PaintChamferBoxRay(stageFrame, kChamferPanel, housing, edge, ToRay(p.border));
+  if (!dispatchOnly) { PaintChamferBoxRay(stageFrame, kChamferPanel, housing, edge, ToRay(p.border)); }
 
   const bool reduced = sim.State().reducedMotion;
   const float tSec = reduced ? 0.0f : static_cast<float>(frameTimeMs_ * 0.001);
@@ -2694,6 +2702,7 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
 
   MachinePart grown;
   for (const MachinePart& drawn : stage.parts) {
+    if (dispatchOnly) { break; }
     if (scale != 1.0f) {
       grown = drawn;
       grown.box = Area{drawn.box.x * scale, drawn.box.y * scale,
@@ -2976,9 +2985,11 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
       PaintChamferBoxRay({V(x,y).x, V(x,y).y, w * scale, h * scale},
                          5 * scale, fill, rule, ink);
     };
-    plate(10, 10, 940, 352, paper);
-    plate(77, 26, 806, 276, paper);
-    plate(85, 34, 790, 260, glass);
+    if (!dispatchOnly) {
+      plate(10, 10, 940, 352, paper);
+      plate(77, 26, 806, 276, paper);
+      plate(85, 34, 790, 260, glass);
+    }
     bridgeBlockerHole_ = {V(10.0f, 10.0f).x - 1.5f * scale,
                           V(10.0f, 10.0f).y - contentScroll_ - 1.5f * scale,
                           943.0f * scale, 355.0f * scale};
@@ -3681,6 +3692,7 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
         line(92.0f, std::min(290.0f, openBot), 868.0f, std::min(290.0f, openBot), beam);
       }
     }
+    if (!dispatchOnly) {
     for (int i = 0; i < 2; ++i) {
       const float cx = i ? 914 : 46;
       plate(cx - 23, 26, 46, 276, paper);
@@ -3715,6 +3727,7 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
     bridgeBearingBar_ = {V(256,318).x, V(256,318).y, 448*scale, 32*scale};
     const float pointer = 480 + 448*bridgeLook_;
     DrawTriangle(V(pointer, 337), V(pointer-6, 346), V(pointer+6, 346), ink);
+    }
   }
 
   // --- Priority 2 Overlay: Spinning turbines, rotating core encoder, sweeping needles & coolant loop ---
@@ -8426,7 +8439,9 @@ void ShellView::PaintPanelsScreen(Simulation& sim) {
     const float stageH = bridgeStage.height * scale;
     const float stageX = left + (availW - stageW) * 0.5f;
 
-    PaintStage(sim, bridgeStage, Area{stageX, imageTop, stageW, stageH});
+    bridgeCachedStage_ = bridgeStage;
+    bridgeCachedOrigin_ = Area{stageX, imageTop, stageW, stageH};
+    PaintStage(sim, bridgeStage, bridgeCachedOrigin_);
 
     // Embed the two live gameplay controls inside the lower Command Bay sockets.
     // The controls live inside the scaled stage image, so their text scales with
