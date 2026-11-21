@@ -2941,102 +2941,188 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
        planet->klass.find("Barren") != std::string::npos ||
        planet->klass.find("Crater") != std::string::npos);
 
-  const Color inkOut{10, 11, 15, 255};
-  const Color sky0 = iceWorld   ? Color{14, 24, 54, 255}
-                   : oceanWorld ? Color{18, 40, 74, 255}
-                   : lavaWorld  ? Color{32, 12, 18, 255}
-                   : rockWorld  ? Color{46, 26, 36, 255}
-                                : Color{18, 30, 56, 255};
-  const Color sky1 = iceWorld   ? Color{28, 56, 98, 255}
-                   : oceanWorld ? Color{36, 82, 124, 255}
-                   : lavaWorld  ? Color{68, 22, 26, 255}
-                   : rockWorld  ? Color{88, 48, 52, 255}
-                                : Color{32, 62, 102, 255};
-  const Color sky2 = iceWorld   ? Color{54, 96, 144, 255}
-                   : oceanWorld ? Color{70, 130, 168, 255}
-                   : lavaWorld  ? Color{112, 42, 32, 255}
-                   : rockWorld  ? Color{142, 84, 68, 255}
-                                : Color{58, 104, 142, 255};
-  const Color sky3 = iceWorld   ? Color{98, 150, 186, 255}
-                   : oceanWorld ? Color{122, 184, 206, 255}
-                   : lavaWorld  ? Color{154, 72, 40, 255}
-                   : rockWorld  ? Color{196, 134, 92, 255}
-                                : Color{102, 148, 170, 255};
-  const Color gnd0 = iceWorld   ? Color{46, 76, 104, 255}
-                   : oceanWorld ? Color{28, 72, 82, 255}
-                   : lavaWorld  ? Color{38, 24, 24, 255}
-                   : rockWorld  ? Color{86, 48, 34, 255}
-                                : Color{34, 62, 34, 255};
-  const Color gnd1 = iceWorld   ? Color{72, 110, 138, 255}
-                   : oceanWorld ? Color{44, 104, 112, 255}
-                   : lavaWorld  ? Color{54, 34, 32, 255}
-                   : rockWorld  ? Color{118, 68, 44, 255}
-                                : Color{48, 84, 44, 255};
-  const Color gnd2 = iceWorld   ? Color{104, 146, 174, 255}
-                   : oceanWorld ? Color{78, 134, 128, 255}
-                   : lavaWorld  ? Color{72, 44, 38, 255}
-                   : rockWorld  ? Color{148, 92, 58, 255}
-                                : Color{64, 106, 54, 255};
-  const Color pathDark = iceWorld   ? Color{38, 56, 78, 255}
-                       : oceanWorld ? Color{96, 86, 66, 255}
-                       : lavaWorld  ? Color{26, 20, 22, 255}
-                       : rockWorld  ? Color{64, 44, 34, 255}
-                                    : Color{56, 40, 26, 255};
-  const Color pathMid  = iceWorld   ? Color{74, 102, 128, 255}
-                       : oceanWorld ? Color{146, 132, 102, 255}
-                       : lavaWorld  ? Color{48, 38, 38, 255}
-                       : rockWorld  ? Color{108, 76, 56, 255}
-                                    : Color{104, 76, 48, 255};
-  const Color pathHi   = iceWorld   ? Color{134, 166, 190, 255}
-                       : oceanWorld ? Color{196, 180, 140, 255}
-                       : lavaWorld  ? Color{84, 62, 54, 255}
-                       : rockWorld  ? Color{154, 112, 82, 255}
-                                    : Color{148, 112, 74, 255};
-  const Color rockDark = iceWorld   ? Color{48, 76, 104, 255}
-                       : oceanWorld ? Color{38, 50, 58, 255}
-                       : lavaWorld  ? Color{42, 26, 28, 255}
-                       : rockWorld  ? Color{72, 42, 34, 255}
-                                    : Color{44, 52, 42, 255};
-  const Color rockMid  = iceWorld   ? Color{92, 132, 162, 255}
-                       : oceanWorld ? Color{68, 86, 94, 255}
-                       : lavaWorld  ? Color{76, 48, 46, 255}
-                       : rockWorld  ? Color{122, 72, 50, 255}
-                                    : Color{84, 94, 74, 255};
-  const Color rockHi   = iceWorld   ? Color{178, 214, 236, 255}
-                       : oceanWorld ? Color{126, 148, 152, 255}
-                       : lavaWorld  ? Color{134, 76, 58, 255}
-                       : rockWorld  ? Color{176, 118, 78, 255}
-                                    : Color{134, 146, 104, 255};
-  const Color trunkCol = iceWorld   ? Color{64, 84, 104, 255}
-                       : oceanWorld ? Color{96, 74, 52, 255}
-                       : lavaWorld  ? Color{46, 28, 24, 255}
-                       : rockWorld  ? Color{102, 68, 44, 255}
-                                    : Color{92, 60, 36, 255};
-  const Color leaf0    = iceWorld   ? Color{52, 94, 128, 255}
-                       : oceanWorld ? Color{26, 86, 82, 255}
-                       : lavaWorld  ? Color{74, 30, 24, 255}
-                       : rockWorld  ? Color{84, 82, 42, 255}
-                                    : Color{36, 78, 38, 255};
-  const Color leaf1    = iceWorld   ? Color{102, 156, 190, 255}
-                       : oceanWorld ? Color{44, 132, 116, 255}
-                       : lavaWorld  ? Color{124, 50, 30, 255}
-                       : rockWorld  ? Color{124, 116, 58, 255}
-                                    : Color{64, 122, 54, 255};
-  const Color leaf2    = iceWorld   ? Color{184, 224, 242, 255}
-                       : oceanWorld ? Color{106, 184, 154, 255}
-                       : lavaWorld  ? Color{184, 88, 42, 255}
-                       : rockWorld  ? Color{168, 152, 82, 255}
-                                    : Color{112, 168, 82, 255};
-  const Color accent0  = iceWorld   ? Color{92, 182, 218, 255}
-                       : oceanWorld ? Color{206, 98, 92, 255}
-                       : lavaWorld  ? Color{234, 104, 34, 255}
-                       : rockWorld  ? Color{196, 118, 64, 255}
-                                    : Color{144, 188, 92, 255};
-  const Color accent1  = iceWorld   ? Color{210, 242, 252, 255}
-                       : oceanWorld ? Color{242, 168, 132, 255}
-                       : lavaWorld  ? Color{252, 204, 86, 255}
-                       : rockWorld  ? Color{232, 168, 106, 255}
-                                    : Color{202, 224, 132, 255};
+  const int biomeIdx = iceWorld ? 1 : oceanWorld ? 2 : lavaWorld ? 3 : rockWorld ? 4 : 0;
+
+  // PC-98 .GTA-style 12-bit RGB4 (4-4-4, 0..15 * 17) nibble-packed biome palettes:
+  // 16 colors * 12 bits = 24 B per biome, 120 B total across all 5 biomes.
+  struct PackedBiomePalettes {
+    std::uint8_t bytes[5][24]{};
+  };
+  static constexpr PackedBiomePalettes kBiomePalettes = []() constexpr {
+    PackedBiomePalettes p{};
+    auto setPair = [&](int b, int pairIdx,
+                       int r0, int g0, int b0,
+                       int r1, int g1, int b1) constexpr {
+      const int o = pairIdx * 3;
+      p.bytes[b][o + 0] = static_cast<std::uint8_t>(((r0 & 0xF) << 4) | (g0 & 0xF));
+      p.bytes[b][o + 1] = static_cast<std::uint8_t>(((b0 & 0xF) << 4) | (r1 & 0xF));
+      p.bytes[b][o + 2] = static_cast<std::uint8_t>(((g1 & 0xF) << 4) | (b1 & 0xF));
+    };
+    // 0: Temperate (garden / charted)
+    setPair(0, 0,  1, 1, 1,   1, 2, 3);   // 0:ink,      1:sky0
+    setPair(0, 1,  2, 4, 6,   3, 6, 8);   // 2:sky1,     3:sky2
+    setPair(0, 2,  6, 9,10,   2, 4, 2);   // 4:sky3,     5:gnd0
+    setPair(0, 3,  3, 5, 3,   4, 6, 3);   // 6:gnd1,     7:gnd2
+    setPair(0, 4,  3, 3, 2,   6, 4, 3);   // 8:pathDark, 9:pathMid
+    setPair(0, 5,  9, 7, 4,   5, 6, 4);   // 10:pathHi,  11:rockMid
+    setPair(0, 6,  8, 9, 6,   2, 5, 2);   // 12:rockHi,  13:leaf0
+    setPair(0, 7,  4, 7, 3,   7,10, 5);   // 14:leaf1,   15:leaf2
+    // 1: Ice (glacial / outer)
+    setPair(1, 0,  1, 1, 1,   1, 1, 3);
+    setPair(1, 1,  2, 3, 6,   3, 6, 9);
+    setPair(1, 2,  6, 9,11,   3, 4, 6);
+    setPair(1, 3,  4, 6, 8,   6, 8,10);
+    setPair(1, 4,  2, 3, 5,   4, 6, 7);
+    setPair(1, 5,  8,10,11,   5, 8,10);
+    setPair(1, 6, 10,13,14,   3, 6, 8);
+    setPair(1, 7,  6,10,12,  12,14,15);
+    // 2: Ocean (pelagic / reef)
+    setPair(2, 0,  1, 1, 1,   1, 2, 4);
+    setPair(2, 1,  2, 5, 7,   4, 8,10);
+    setPair(2, 2,  7,11,12,   2, 4, 5);
+    setPair(2, 3,  3, 6, 7,   5, 8, 8);
+    setPair(2, 4,  6, 5, 4,   9, 8, 6);
+    setPair(2, 5, 12,11, 8,   4, 5, 6);
+    setPair(2, 6,  7, 9, 9,   2, 5, 5);
+    setPair(2, 7,  4, 9, 8,  12, 6, 5);
+    // 3: Lava (volcanic / magma)
+    setPair(3, 0,  1, 1, 1,   2, 0, 1);
+    setPair(3, 1,  4, 1, 2,   7, 2, 2);
+    setPair(3, 2,  9, 4, 2,   2, 1, 1);
+    setPair(3, 3,  3, 2, 1,   4, 3, 2);
+    setPair(3, 4,  2, 1, 2,   3, 2, 2);
+    setPair(3, 5,  5, 4, 3,   5, 3, 3);
+    setPair(3, 6,  8, 5, 3,   4, 2, 1);
+    setPair(3, 7, 14, 6, 2,  15,12, 5);
+    // 4: Rock (barren / rugged / crater)
+    setPair(4, 0,  1, 1, 1,   3, 2, 2);
+    setPair(4, 1,  5, 3, 3,   8, 5, 4);
+    setPair(4, 2, 12, 8, 5,   5, 3, 2);
+    setPair(4, 3,  7, 4, 3,   9, 5, 3);
+    setPair(4, 4,  4, 2, 2,   6, 4, 3);
+    setPair(4, 5,  9, 7, 5,   7, 4, 2);
+    setPair(4, 6, 10, 7, 5,   5, 5, 2);
+    setPair(4, 7,  7, 7, 3,  10, 9, 5);
+    return p;
+  }();
+  static_assert(sizeof(kBiomePalettes) == 120, "5 * 24 B packed PC-98 RGB4 biome palettes");
+
+  // Shared 12-bit RGB4 sprite bank (indices 16..25: stars/clouds, ship hull/visor, 3-tone ore crate)
+  struct PackedSpritePalette {
+    std::uint8_t bytes[15]{};
+  };
+  static constexpr PackedSpritePalette kSharedSpritePalette = []() constexpr {
+    PackedSpritePalette p{};
+    auto setPair = [&](int pairIdx, int r0, int g0, int b0, int r1, int g1, int b1) constexpr {
+      const int o = pairIdx * 3;
+      p.bytes[o + 0] = static_cast<std::uint8_t>(((r0 & 0xF) << 4) | (g0 & 0xF));
+      p.bytes[o + 1] = static_cast<std::uint8_t>(((b0 & 0xF) << 4) | (r1 & 0xF));
+      p.bytes[o + 2] = static_cast<std::uint8_t>(((g1 & 0xF) << 4) | (b1 & 0xF));
+    };
+    setPair(0, 14,14,15,   9,11,12);  // 16:starCool,  17:cloudCool
+    setPair(1, 15,13, 9,   8, 7, 7);  // 18:warmGleam, 19:shipDark
+    setPair(2,  9, 9, 8,  11,11,10);  // 20:shipMid,   21:shipLight
+    setPair(3,  5,12,13,  11, 7, 2);  // 22:shipVisor, 23:oreBody
+    setPair(4, 14,10, 4,  13, 9, 7);  // 24:oreGold,   25:lavaCloudRim
+    return p;
+  }();
+
+  constexpr std::uint8_t inkOut   = 0u;
+  constexpr std::uint8_t sky0     = 1u;
+  constexpr std::uint8_t sky1     = 2u;
+  constexpr std::uint8_t sky2     = 3u;
+  constexpr std::uint8_t sky3     = 4u;
+  constexpr std::uint8_t gnd0     = 5u;
+  constexpr std::uint8_t gnd1     = 6u;
+  constexpr std::uint8_t gnd2     = 7u;
+  constexpr std::uint8_t pathDark = 8u;
+  constexpr std::uint8_t pathMid  = 9u;
+  constexpr std::uint8_t pathHi   = 10u;
+  const std::uint8_t rockDark     = oceanWorld ? gnd0 : pathDark;
+  constexpr std::uint8_t rockMid  = 11u;
+  constexpr std::uint8_t rockHi   = 12u;
+  const std::uint8_t trunkCol     = oceanWorld ? pathDark : pathMid;
+  constexpr std::uint8_t leaf0    = 13u;
+  constexpr std::uint8_t leaf1    = 14u;
+  const std::uint8_t leaf2        = oceanWorld ? sky3 : static_cast<std::uint8_t>(15u);
+  const std::uint8_t accent0      = iceWorld   ? leaf1
+                                  : oceanWorld ? static_cast<std::uint8_t>(15u)
+                                  : lavaWorld  ? leaf1
+                                               : rockHi;
+  const std::uint8_t accent1      = iceWorld   ? static_cast<std::uint8_t>(15u)
+                                  : oceanWorld ? static_cast<std::uint8_t>(18u)
+                                  : lavaWorld  ? static_cast<std::uint8_t>(15u)
+                                               : static_cast<std::uint8_t>(18u);
+  constexpr std::uint8_t kIdxStarCool  = 16u;
+  constexpr std::uint8_t kIdxCloudCool = 17u;
+  constexpr std::uint8_t kIdxWarmGleam = 18u;
+  constexpr std::uint8_t kIdxShipDark  = 19u;
+  constexpr std::uint8_t kIdxShipMid   = 20u;
+  constexpr std::uint8_t kIdxShipLight = 21u;
+  constexpr std::uint8_t kIdxShipVisor = 22u;
+  constexpr std::uint8_t kIdxOreBody   = 23u;
+  constexpr std::uint8_t kIdxOreGold   = 24u;
+  constexpr std::uint8_t kIdxLavaRim   = 25u;
+  constexpr int kBaseColorCount = 26;
+  constexpr std::uint8_t kMidFogBit = 32u;  // 32..57: RGB4 midpoint blend toward sky3
+  constexpr std::uint8_t kInkFogBase = 64u; // 64..68: discrete RGB4 atmospheric silhouette inks
+
+  // Unpack active 4-4-4 RGB4 palette + pre-quantized RGB4 mid-haze and silhouette entries
+  auto unpackNibbleRgb = [](const std::uint8_t* packed, int slot, int& r4, int& g4, int& b4) {
+    const int base = (slot >> 1) * 3;
+    if ((slot & 1) == 0) {
+      r4 = (packed[base + 0] >> 4) & 0x0F;
+      g4 =  packed[base + 0]       & 0x0F;
+      b4 = (packed[base + 1] >> 4) & 0x0F;
+    } else {
+      r4 =  packed[base + 1]       & 0x0F;
+      g4 = (packed[base + 2] >> 4) & 0x0F;
+      b4 =  packed[base + 2]       & 0x0F;
+    }
+  };
+  auto rgb4ToColor = [](int r4, int g4, int b4) -> Color {
+    return Color{static_cast<unsigned char>(std::clamp(r4, 0, 15) * 17),
+                 static_cast<unsigned char>(std::clamp(g4, 0, 15) * 17),
+                 static_cast<unsigned char>(std::clamp(b4, 0, 15) * 17),
+                 255};
+  };
+
+  int baseR4[kBaseColorCount]{};
+  int baseG4[kBaseColorCount]{};
+  int baseB4[kBaseColorCount]{};
+  for (int i = 0; i < 16; ++i) {
+    unpackNibbleRgb(kBiomePalettes.bytes[biomeIdx], i, baseR4[i], baseG4[i], baseB4[i]);
+  }
+  for (int i = 0; i < 10; ++i) {
+    unpackNibbleRgb(kSharedSpritePalette.bytes, i, baseR4[16 + i], baseG4[16 + i], baseB4[16 + i]);
+  }
+
+  Color resolvedLut[72]{};
+  const int fogR4 = baseR4[sky3];
+  const int fogG4 = baseG4[sky3];
+  const int fogB4 = baseB4[sky3];
+  for (int i = 0; i < kBaseColorCount; ++i) {
+    resolvedLut[i] = rgb4ToColor(baseR4[i], baseG4[i], baseB4[i]);
+    resolvedLut[kMidFogBit + i] = rgb4ToColor((baseR4[i] + fogR4 + 1) >> 1,
+                                              (baseG4[i] + fogG4 + 1) >> 1,
+                                              (baseB4[i] + fogB4 + 1) >> 1);
+  }
+  // 4 stepped RGB4 silhouette inks toward sky2 (d=4..6) + 1 horizon ridge crest toward sky3
+  static constexpr int kInkWeights[4] = {4, 7, 9, 12};  // out of 16
+  for (int k = 0; k < 4; ++k) {
+    const int w = kInkWeights[k];
+    resolvedLut[kInkFogBase + k] = rgb4ToColor(
+        (baseR4[inkOut] * (16 - w) + baseR4[sky2] * w + 8) >> 4,
+        (baseG4[inkOut] * (16 - w) + baseG4[sky2] * w + 8) >> 4,
+        (baseB4[inkOut] * (16 - w) + baseB4[sky2] * w + 8) >> 4);
+  }
+  resolvedLut[kInkFogBase + 4] = rgb4ToColor(
+      (baseR4[inkOut] * 7 + fogR4 * 9 + 8) >> 4,
+      (baseG4[inkOut] * 7 + fogG4 * 9 + 8) >> 4,
+      (baseB4[inkOut] * 7 + fogB4 * 9 + 8) >> 4);
+
+  // L1-resident 160x96 8-bit indexed framebuffer (15,360 B scratch, 4x less overdraw bandwidth)
+  std::uint8_t idxBuf[W * H]{};
 
   constexpr int hy = 46;
   constexpr int kGndH = H - hy;
@@ -3098,56 +3184,57 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   // Discrete 0..32 atmospheric mist steps for painter depths d = 0..6
   static constexpr std::uint8_t kDepthFog[7] = {0u, 0u, 0u, 6u, 13u, 20u, 26u};
 
-  const Color fogCol = sky3;
-  int activeFog = 0;  // 0..32 (two 16-step 4x4 Bayer bands: c -> midHaze -> fogCol)
-  Color activeInk = inkOut;
-  auto inkForFog = [&](int fog32) -> Color {
+  int activeFog = 0;  // 0..32 (two 16-step 4x4 Bayer bands in index space)
+  std::uint8_t activeInk = inkOut;
+  auto inkForFog = [&](int fog32) -> std::uint8_t {
     if (fog32 <= 6) { return inkOut; }
-    // Unbroken 1px PC-98 silhouette tinted smoothly into atmospheric slate/umber (no dotted holes)
-    const float t = std::clamp(static_cast<float>(fog32 - 6) / 30.0f, 0.0f, 0.72f);
-    return StageMix(inkOut, sky2, t);
+    if (fog32 <= 13) { return kInkFogBase + 0u; }
+    if (fog32 <= 19) { return kInkFogBase + 1u; }
+    if (fog32 <= 24) { return kInkFogBase + 2u; }
+    return kInkFogBase + 3u;
   };
-  auto fogBandPair = [&](Color c, int fog32, Color& cA, Color& cB, int& thr16) {
-    const Color mid = StageMix(c, fogCol, 0.50f);
+  auto fogIndexPair = [&](std::uint8_t idx, int fog32,
+                          std::uint8_t& idxA, std::uint8_t& idxB, int& thr16) {
+    const std::uint8_t mid = static_cast<std::uint8_t>(idx | kMidFogBit);
     if (fog32 <= 16) {
-      cA = c;
-      cB = mid;
+      idxA = idx;
+      idxB = mid;
       thr16 = fog32;
     } else {
-      cA = mid;
-      cB = fogCol;
+      idxA = mid;
+      idxB = sky3;
       thr16 = std::min(16, fog32 - 16);
     }
   };
 
-  auto putPx = [&](int x, int y, Color c) {
+  auto putPx = [&](int x, int y, std::uint8_t idx) {
     if (x >= 0 && x < W && y >= 0 && y < H) {
-      if (c.r == inkOut.r && c.b == inkOut.b) {
-        planetPixels_[static_cast<std::size_t>(y * W + x)] = activeInk;
+      if (idx == inkOut) {
+        idxBuf[y * W + x] = activeInk;
         return;
       }
       if (activeFog > 0) {
-        Color cA{}, cB{};
+        std::uint8_t idxA = idx, idxB = idx;
         int thr16 = 0;
-        fogBandPair(c, activeFog, cA, cB, thr16);
-        c = (((kFogMasks.row[thr16][y & 3] >> (x & 3)) & 1u) != 0u) ? cB : cA;
+        fogIndexPair(idx, activeFog, idxA, idxB, thr16);
+        idx = (((kFogMasks.row[thr16][y & 3] >> (x & 3)) & 1u) != 0u) ? idxB : idxA;
       }
-      planetPixels_[static_cast<std::size_t>(y * W + x)] = c;
+      idxBuf[y * W + x] = idx;
     }
   };
-  auto bayerPx = [&](int x, int y, float t, Color a, Color b) {
+  auto bayerPx = [&](int x, int y, float t, std::uint8_t a, std::uint8_t b) {
     const int thr = static_cast<int>(std::clamp(t, 0.0f, 1.0f) * 16.0f);
     putPx(x, y, thr > kBayer4[y & 3][x & 3] ? b : a);
   };
-  auto fillRect = [&](int x, int y, int w, int h, Color c) {
+  auto fillRect = [&](int x, int y, int w, int h, std::uint8_t idx) {
     const int x0 = std::max(0, x);
     const int y0 = std::max(0, y);
     const int x1 = std::min(W, x + w);
     const int y1 = std::min(H, y + h);
-    if (c.r == inkOut.r && c.b == inkOut.b) {
+    if (idx == inkOut) {
       for (int py = y0; py < y1; ++py) {
         for (int px = x0; px < x1; ++px) {
-          planetPixels_[static_cast<std::size_t>(py * W + px)] = activeInk;
+          idxBuf[py * W + px] = activeInk;
         }
       }
       return;
@@ -3155,23 +3242,22 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     if (activeFog <= 0) {
       for (int py = y0; py < y1; ++py) {
         for (int px = x0; px < x1; ++px) {
-          planetPixels_[static_cast<std::size_t>(py * W + px)] = c;
+          idxBuf[py * W + px] = idx;
         }
       }
     } else {
-      Color cA{}, cB{};
+      std::uint8_t idxA = idx, idxB = idx;
       int thr16 = 0;
-      fogBandPair(c, activeFog, cA, cB, thr16);
+      fogIndexPair(idx, activeFog, idxA, idxB, thr16);
       for (int py = y0; py < y1; ++py) {
         const std::uint8_t rowMask = kFogMasks.row[thr16][py & 3];
         for (int px = x0; px < x1; ++px) {
-          planetPixels_[static_cast<std::size_t>(py * W + px)] =
-              (((rowMask >> (px & 3)) & 1u) != 0u) ? cB : cA;
+          idxBuf[py * W + px] = (((rowMask >> (px & 3)) & 1u) != 0u) ? idxB : idxA;
         }
       }
     }
   };
-  auto fillOutlineRect = [&](int x, int y, int w, int h, Color fill, Color rim) {
+  auto fillOutlineRect = [&](int x, int y, int w, int h, std::uint8_t fill, std::uint8_t rim) {
     fillRect(x, y, w, h, rim);
     if (w > 2 && h > 2) {
       fillRect(x + 1, y + 1, w - 2, h - 2, fill);
@@ -3195,21 +3281,17 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   for (int st = 0; st < 12; ++st) {
     const int sx = 5 + ((st * 23 + planetSurface_.dir * 17) % (W - 10));
     const int sy = 3 + ((st * 11) % 16);
-    putPx(sx, sy, lavaWorld ? Color{248, 206, 168, 255} : Color{234, 240, 244, 255});
+    putPx(sx, sy, lavaWorld ? kIdxWarmGleam : kIdxStarCool);
   }
 
   // PC-98 crisp-outlined layered clouds (Might and Magic / Madou style)
   auto drawCloud = [&](int cx, int cy, int cw) {
-    const Color cRim = iceWorld   ? Color{226, 238, 248, 255}
-                     : oceanWorld ? Color{240, 246, 248, 255}
-                     : lavaWorld  ? Color{216, 146, 114, 255}
-                     : rockWorld  ? Color{242, 206, 168, 255}
-                                  : Color{226, 234, 240, 255};
-    const Color cMid = iceWorld   ? Color{156, 186, 212, 255}
-                     : oceanWorld ? Color{176, 208, 222, 255}
-                     : lavaWorld  ? Color{152, 88, 72, 255}
-                     : rockWorld  ? Color{196, 142, 112, 255}
-                                  : Color{154, 180, 198, 255};
+    const std::uint8_t cRim = lavaWorld ? kIdxLavaRim
+                            : rockWorld ? kIdxWarmGleam
+                                        : kIdxStarCool;
+    const std::uint8_t cMid = lavaWorld ? sky3
+                            : rockWorld ? sky3
+                                        : kIdxCloudCool;
     fillRect(cx - cw / 2 - 1, cy + 2, cw + 2, 4, inkOut);
     fillRect(cx - cw / 3 - 1, cy - 1, cw * 2 / 3 + 2, 4, inkOut);
     fillRect(cx - cw / 2, cy + 2, cw, 3, cMid);
@@ -3220,7 +3302,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
 
   // Distant horizon ridges with atmospheric 1px PC-98 silhouette crest + horizon haze
   activeFog = 22;
-  activeInk = StageMix(inkOut, sky3, 0.58f);
+  activeInk = kInkFogBase + 4u;
   for (int x = 0; x < W; ++x) {
     const int phase = x + planetSurface_.dir * 34;
     const int mh = 2 + ((std::abs((phase * 7) % 24 - 12)) * 4) / 12 + ((phase / 19) & 1);
@@ -3232,8 +3314,8 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   }
 
   // PC-98 4x4 Bayer dithered ground + terrain flecks + exponential horizon mist
-  const Color gnd0Mid = StageMix(gnd0, fogCol, 0.50f);
-  const Color gnd1Mid = StageMix(gnd1, fogCol, 0.50f);
+  constexpr std::uint8_t gnd0Mid = static_cast<std::uint8_t>(gnd0 | kMidFogBit);
+  constexpr std::uint8_t gnd1Mid = static_cast<std::uint8_t>(gnd1 | kMidFogBit);
   for (int y = hy; y < H; ++y) {
     const int gy = y - hy;
     const int f32 = static_cast<int>(kScanLut.fogStep[gy]);
@@ -3246,13 +3328,13 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
         std::clamp((u < 0.45f) ? (u / 0.45f) : ((u - 0.45f) / 0.55f), 0.0f, 1.0f) * 16.0f);
     for (int x = 0; x < W; ++x) {
       const bool pickB = gradThr > kBayer4[y & 3][x & 3];
-      Color gCol = (u < 0.45f) ? (pickB ? gnd1 : gnd0) : (pickB ? gnd2 : gnd1);
+      std::uint8_t gIdx = (u < 0.45f) ? (pickB ? gnd1 : gnd0) : (pickB ? gnd2 : gnd1);
       if (f32 > 0) {
-        const Color gMid = (gCol.r == gnd0.r && gCol.g == gnd0.g) ? gnd0Mid : gnd1Mid;
+        const std::uint8_t gMid = (gIdx == gnd0) ? gnd0Mid : gnd1Mid;
         const bool mBit = ((fogMaskRow >> (x & 3)) & 1u) != 0u;
-        gCol = (f32 <= 16) ? (mBit ? gMid : gCol) : (mBit ? fogCol : gMid);
+        gIdx = (f32 <= 16) ? (mBit ? gMid : gIdx) : (mBit ? sky3 : gMid);
       }
-      planetPixels_[static_cast<std::size_t>(y * W + x)] = gCol;
+      idxBuf[y * W + x] = gIdx;
 
       const unsigned h = (static_cast<unsigned>(x) * 73856093u) ^
                          (static_cast<unsigned>(y) * 19349663u) ^
@@ -3486,7 +3568,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
       putPx(tx + hw + 1, py, inkOut);
       if (row == 0) { putPx(tx, py - 1, inkOut); }
       for (int px = tx - hw; px <= tx + hw; ++px) {
-        Color col = leaf0;
+        std::uint8_t col = leaf0;
         if (px < tx) {
           col = (tierRow < tierSpan / 2) ? leaf2 : leaf1;
         } else if (tierRow < tierSpan / 3) {
@@ -3539,8 +3621,8 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     const int cw = std::max(6, static_cast<int>(std::lround(13.0f * s)));
     const int ch = std::max(8, static_cast<int>(std::lround(23.0f * s)));
     fillRect(tx - cw / 2, gy - 1, cw, 2, inkOut);
-    const Color body0 = (iceWorld || oceanWorld || lavaWorld) ? accent0 : rockMid;
-    const Color body1 = (iceWorld || oceanWorld || lavaWorld) ? accent1 : rockHi;
+    const std::uint8_t body0 = (iceWorld || oceanWorld || lavaWorld) ? accent0 : rockMid;
+    const std::uint8_t body1 = (iceWorld || oceanWorld || lavaWorld) ? accent1 : rockHi;
     // Main faceted spire tapering toward tip
     const int mainW = std::max(4, cw * 55 / 100);
     for (int row = 0; row < ch; ++row) {
@@ -3709,16 +3791,16 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
               fillRect(sx + 2, gyMid - 1, sw - 4, 2, inkOut);
               fillOutlineRect(objCx - sw * 44 / 100, gyMid - sh * 26 / 100,
                               std::max(2, sw * 14 / 100), std::max(2, sh * 26 / 100),
-                              Color{130, 126, 118, 255}, inkOut);
+                              kIdxShipDark, inkOut);
               fillOutlineRect(objCx + sw * 30 / 100, gyMid - sh * 26 / 100,
                               std::max(2, sw * 14 / 100), std::max(2, sh * 26 / 100),
-                              Color{130, 126, 118, 255}, inkOut);
+                              kIdxShipDark, inkOut);
               fillOutlineRect(objCx - sw * 42 / 100, gyMid - sh * 68 / 100, sw * 84 / 100,
-                              std::max(2, sh * 44 / 100), Color{188, 184, 174, 255}, inkOut);
+                              std::max(2, sh * 44 / 100), kIdxShipLight, inkOut);
               fillOutlineRect(objCx - sw * 24 / 100, gyMid - sh * 96 / 100, sw * 48 / 100,
-                              std::max(2, sh * 32 / 100), Color{150, 148, 140, 255}, inkOut);
+                              std::max(2, sh * 32 / 100), kIdxShipMid, inkOut);
               fillRect(objCx - sw * 14 / 100, gyMid - sh * 84 / 100, std::max(2, sw * 28 / 100),
-                       std::max(1, sh * 16 / 100), Color{84, 196, 214, 255});
+                       std::max(1, sh * 16 / 100), kIdxShipVisor);
               if (d == 1 && s == 0) {
                 const int cx0 = std::clamp(sx, 0, W);
                 const int cx1 = std::clamp(sx + sw, 0, W);
@@ -3742,13 +3824,13 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
             const int oy = gyMid - oh;
             if (ox + ow > 2 && ox < W - 2) {
               fillRect(ox + 1, gyMid - 1, ow - 2, std::max(1, oh / 5), inkOut);
-              fillOutlineRect(ox, oy, ow, oh, Color{184, 118, 38, 255}, inkOut);
+              fillOutlineRect(ox, oy, ow, oh, kIdxOreBody, inkOut);
               if (ow >= 7) {
                 fillRect(ox + 2, oy + 2, std::max(1, ow - 4), std::max(1, oh / 3),
-                         Color{236, 176, 68, 255});
+                         kIdxOreGold);
               }
               fillRect(ox + ow / 3, oy + oh / 2, std::max(1, ow / 3), std::max(1, oh / 4),
-                       Color{255, 226, 138, 255});
+                       kIdxWarmGleam);
               if (d == 1 && s == 0) {
                 const int cx0 = std::clamp(ox, 0, W);
                 const int cx1 = std::clamp(ox + ow, 0, W);
@@ -3774,6 +3856,11 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   // 1px retro PC-98 bezel inner shadow
   fillRect(0, 0, W, 1, inkOut);
   fillRect(0, 0, 1, H, inkOut);
+
+  // Single linear RGB4 (4-4-4) palette resolve pass from L1-resident idxBuf into RGBA8 texture buffer
+  for (int i = 0; i < W * H; ++i) {
+    planetPixels_[static_cast<std::size_t>(i)] = resolvedLut[idxBuf[i]];
+  }
 
   if (planetTex_.id == 0) {
     Image img{};
