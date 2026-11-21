@@ -262,7 +262,8 @@ if(SPACESHIP_GUI)
   add_executable(spaceship
     cpp/app/main.cpp
     cpp/audio/AudioDevice.cpp
-    cpp/ui/Draw.cpp)
+    cpp/ui/Draw.cpp
+    cpp/ui/Overworld.cpp)
 
   target_link_libraries(spaceship PRIVATE spaceship_core spaceship_imgui raylib)
   set_target_properties(spaceship PROPERTIES WIN32_EXECUTABLE TRUE)

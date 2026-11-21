@@ -1,8 +1,8 @@
 # Spaceship headless viewer
 
 Renders the Spaceship client to PNG on a machine with no display, no GPU and
-no sound device. It compiles the game's own presentation code (`cpp/ui/Draw.cpp`
-and everything under it) against raylib's software renderer, drives the real
+no sound device. It compiles the game's own presentation code (`cpp/ui/Draw.cpp`,
+`cpp/ui/Overworld.cpp`, and everything under them) against raylib's software renderer, drives the real
 `ShellView` from a small command script, and writes frames.
 
 Nothing here is built by CMake or CI. The game's files are only read:
