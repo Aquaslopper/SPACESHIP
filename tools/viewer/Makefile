@@ -23,12 +23,13 @@ CXXFLAGS := -std=c++17 -O1 -g0 -w -MMD -MP -DSPACESHIP_ASSET_DIR=\"assets\" \
   -I$(REPO)/cpp -I$(JSON) -I$(RAYLIB) -I$(IMGUI) -I$(RLIMGUI) -I$(RLIMGUI)/extras
 
 # The game side is read out of the repository's CMakeLists.txt, so the viewer
-# compiles what the client compiles: the spaceship_core list plus ui/Draw.cpp.
+# compiles what the client compiles: the spaceship_core list plus ui/Draw.cpp
+# and ui/Overworld.cpp.
 # Left out on purpose: cpp/app/main.cpp (the viewer is the main loop here) and
 # cpp/audio/AudioDevice.cpp (no sound device).
 CORE_SRC := $(shell sed -n '/^add_library(spaceship_core/,/)/p' $(REPO)/CMakeLists.txt \
               | grep -o 'cpp/[A-Za-z0-9_/]*\.cpp')
-GAME_SRC := $(CORE_SRC) cpp/ui/Draw.cpp
+GAME_SRC := $(CORE_SRC) cpp/ui/Draw.cpp cpp/ui/Overworld.cpp
 GAME_OBJS := $(patsubst cpp/%.cpp,$(B)/obj/%.o,$(GAME_SRC))
 IMGUI_OBJS := $(addprefix $(B)/obj/imgui/,imgui.o imgui_draw.o imgui_tables.o imgui_widgets.o rlImGui.o)
 OBJS := $(GAME_OBJS) $(IMGUI_OBJS) $(B)/obj/viewer.o

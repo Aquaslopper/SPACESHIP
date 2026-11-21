@@ -18,7 +18,7 @@ fi
 mkdir -p "$BUILD/draw-probe"
 "${CXX:-c++}" -std=c++17 -O0 -I"$IMGUI" -I"$RAYLIB" -I"$RLIMGUI" -I"$ROOT/cpp" \
   -I"$BUILD/_deps/nlohmann_json-src/include" \
-  "$ROOT/cpp/tests/draw_probe.cpp" "$ROOT/cpp/ui/Draw.cpp" \
+  "$ROOT/cpp/tests/draw_probe.cpp" "$ROOT/cpp/ui/Draw.cpp" "$ROOT/cpp/ui/Overworld.cpp" \
   "$IMGUI/imgui.cpp" "$IMGUI/imgui_draw.cpp" "$IMGUI/imgui_tables.cpp" "$IMGUI/imgui_widgets.cpp" \
   "$BUILD/libspaceship_core.a" -o "$BUILD/draw-probe/probe"
 cd "$ROOT"
