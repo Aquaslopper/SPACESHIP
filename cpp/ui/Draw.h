@@ -315,8 +315,8 @@ class ShellView {
     static constexpr int kSizeShift = 4;
     static constexpr int kViewSize = 9;
     static constexpr int kMaxOre = 5;
-    static constexpr int kTexW = 240;
-    static constexpr int kTexH = 144;
+    static constexpr int kTexW = 480;
+    static constexpr int kTexH = 288;
     std::string planetId;
     // Packed 16x16 world grid (256 B): bits 0..1 = tile (0=open, 1=obstacle/border,
     // 2=ship pad, 3=trail), bits 2..4 = deterministic visual variant (0..7).
