@@ -1222,41 +1222,43 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
       "................................",
   };
   static constexpr TileTex32 kStoneWallTex = TileTex32::FromArt(kStoneWallArt);
-  // Clouds of Xeen irregular rounded riverstone / cobblestone road tiles
-  // ('.'=crisp dark stone outline, ':'=warm earth mortar, '+'=stone face, '#'=sunlit stone crown)
+  // 242-row surface roads and underground flagstones: four staggered courses of
+  // wide slabs, each course a stone face with a shadowed underside and one ink
+  // seam row ('.'=ink joint, ':'=shadow under the slab above, '+'=stone face,
+  // '#'=chipped sunlit rim)
   static constexpr char kCobbleRoadArt[32][33] = {
-      "::.#####.:::::.######.::::.###.:",
-      ":.#######.:::.########.::.#####.",
-      ":.#++++++.:.:.#+++++++.::.#++++.",
-      ":.#++#+++.:::.#+++#+++.::.#++++.",
-      "::.++++++.::::.+++++++.:::.++++.",
-      ":::......::::::.......:::::....:",
-      "::::::::::::::::::::::::::::::::",
-      "####.:::::.########.::::.#####.:",
-      "++++.::::.##########.::.######.:",
-      "+++..::::.#+++++++++.::.#+++++.:",
-      "++..:::::.#+++#+++++.::.#++#++.:",
-      "...:::::::.+++++++++.:::.+++++.:",
-      ":::::::::::.........:::::.....::",
-      "::::::::::::::::::::::::::::::::",
-      "::.######.::::.#######.::::.###.",
-      ":.########.::.#########.::.#####",
-      ":.#+++++++.::.#++++++++.::.#++++",
-      ":.#++#++++.::.#+++#++++.::.#++++",
-      "::.+++++++.:::.++++++++.:::.++++",
-      ":::.......:::::........:::::....",
-      "::::::::::::::::::::::::::::::::",
-      "#####.::::.######.::::.######.::",
-      "+++++.:::.########.::.#######.::",
-      "++++..:::.#+++++++.::.#++++++.::",
-      "+++..::::.#++#++++.::.#+++#++.::",
-      "....::::::.+++++++.:::.++++++.::",
-      ":::::::::::.......:::::......:::",
-      "::::::::::::::::::::::::::::::::",
-      "::.#######.::::.######.::::.###.",
-      ":.#########.::.########.::.#####",
-      ":.#++++++++.::.#+++++++.::.#++++",
-      "::.++++++++.:::.+++++++.:::.++++",
+      ".++++#++++++.++#++++#++:+.++++++",
+      ".+++++++++++.++++:+++++++.++++++",
+      ".+++:+++++++.:+++++++++++.++++++",
+      ".+++++++++++.++++++++++++.++++++",
+      ".++:++++++++.++++++:+++++.++++++",
+      ".+++++++++++.++:+++++++++.++++++",
+      ".::::::::::+.:::::::::::+.::::::",
+      "................................",
+      ".++++++++.+#++++#++++++.++#+++++",
+      ".+:++++++.++++++++:++++.++++++++",
+      ".++++++:+.+++++++++++++.++++++:+",
+      ".+++++++:.:++++++++++++.++++++++",
+      ".++++++++.+++++++++++++.++++++++",
+      ".++++++++.+++++++++++++.++++++++",
+      ".:::::::+.::::::::::::+.::::::::",
+      "................................",
+      ".++++.+#++++#++++.++++#:+:++++.+",
+      ".++++.+++++++++++.++++++++++++.+",
+      ".++++.:++++++:+++.++++++++++++.+",
+      ".++++.++++++++++:.++++++++++++.+",
+      ".++++.++++++++:++.++++++++++++.+",
+      ".:+++.+++++++++++.++++++++++++.+",
+      ".:::+.::::::::::+.:::::::::::+.:",
+      "................................",
+      ".++#++++#+++++.+++#++++#++++.++:",
+      ".+++++:+++++++.+++++++++++++.:++",
+      ".+++++++++++++.+:+++++++++++.+++",
+      ".+++++++++++++.++:++++++++:+.+++",
+      ".+++++++++++++.:++++++:+++++.:++",
+      ".+++++++++++++.+++++++++++++.+++",
+      ".::::::::::::+.::::::::::::+.:::",
+      "................................",
   };
   static constexpr TileTex32 kCobbleRoadTex = TileTex32::FromArt(kCobbleRoadArt);
   // Clouds of Xeen jagged faceted craggy mountain / boulder rock texture
@@ -2439,11 +2441,10 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     }
   }
 
-  // Pass 3: Shade road bevel rims + world-anchored pebbles/dither in 16.16 fixed-point along active spans
+  // Pass 3: Shade road bevel rims and lay the stone tile in 16.16 fixed point along active spans
   auto isCurbInk = [&](std::uint8_t v) -> bool {
     return v == inkOut || (v >= kInkFogBase && v <= kInkFogBase + 4u);
   };
-  const int stepParity = (planetSurface_.px + planetSurface_.py + planetSurface_.dir) & 1;
   const float baseWx = static_cast<float>(planetSurface_.px) + 0.5f;
   const float baseWy = static_cast<float>(planetSurface_.py) + 0.5f;
   for (int gy = 0; gy < kGndH; ++gy) {
@@ -2455,7 +2456,6 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     const float invScaleX = kScanLut.invScaleX[gy];
     activeFog = static_cast<int>(kScanLut.fogStep[gy]);
     activeInk = inkForFog(activeFog);
-    const bool allowPebble = (z < 3.4f);
 
     const float lat0 = (static_cast<float>(xStart) + 0.5f - static_cast<float>(cxMid)) * invScaleX;
     // 128 texels/tile at 480x288 (4x4 cobble repeats per cell -> crisp 1:1 PC-98 Clouds of Xeen stones!)
@@ -2524,38 +2524,38 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
           } else {
             putPx(x, y, pathHi);
           }
-        } else if (biomeIdx == 0 || oceanWorld) {
-          // Classic PC-98 Clouds of Xeen rounded stone cobblestones set in rich earthy mortar!
-          if (cob == 0u) {
-            putPx(x, y, (z < 2.6f) ? inkOut : pathDark);
-          } else if (cob == 1u) {
-            putPx(x, y, (biomeIdx == 0) ? pathDark : rockDark);
-          } else if (cob == 2u) {
-            putPx(x, y, (roadStyle == 0) ? rockMid : pathMid);
-          } else {
-            putPx(x, y, (roadStyle == 0) ? rockHi : pathHi);
-          }
-        } else if (iceWorld) {
-          // Frost-rimmed glacier cobblestones
-          if (cob == 0u) {
-            putPx(x, y, (z < 2.5f) ? inkOut : pathDark);
-          } else if (cob == 1u) {
-            putPx(x, y, pathDark);
-          } else if (cob == 2u) {
-            putPx(x, y, pathMid);
-          } else {
-            putPx(x, y, accent1);
-          }
         } else {
-          // Rock / Badlands: sun-baked rounded desert flagstones set in warm canyon dust
+          // 242-row roads: four staggered courses of wide slabs laid across
+          // the receding bands of the lane. Rows 7, 15, 23 and 31 of the tile
+          // are the cross joints, so the joints march toward the horizon; the
+          // column of ink in each course is a saw-cut end joint.
           if (cob == 0u) {
-            putPx(x, y, (z < 2.5f) ? inkOut : pathDark);
+            // Joint: black up close, mixed to the ground before the fog.
+            putPx(x, y, (z < 2.6f) ? inkOut : inkForFog(activeFog));
           } else if (cob == 1u) {
-            putPx(x, y, pathDark);
+            // Shadow under the far edge of the slab above.
+            putPx(x, y, (biomeIdx == 0 || iceWorld) ? pathDark : rockDark);
           } else if (cob == 2u) {
-            putPx(x, y, (allowPebble || ((x + y + stepParity) & 1) == 0) ? pathMid : rockMid);
+            // Slab body: one flat value, broken only by sparse pitting so the
+            // lanes read as dressed stone rather than a checkerboard.
+            const unsigned pit = (static_cast<unsigned>(gx) * 2654435761u) ^
+                                 (static_cast<unsigned>(gcy) * 40503u);
+            if ((pit & 63u) == 0u) {
+              putPx(x, y, rockDark);
+            } else if (iceWorld) {
+              // Ice: alternate courses carry the glacier's deeper blue so the
+              // slabs separate where pathMid and rockMid are the same value.
+              putPx(x, y, ((cobY >> 3) & 1) == 0 ? pathHi : pathMid);
+            } else {
+              putPx(x, y, pathMid);
+            }
+          } else if ((gx % 5) != 0) {
+            // Sunlit top rim, chipped every fifth texel so a worn edge reads
+            // instead of a painted stripe running to the horizon. roadStyle
+            // decides whether the slabs keep a bright or a weathered face.
+            putPx(x, y, iceWorld ? pathHi : (roadStyle == 0 ? pathHi : rockHi));
           } else {
-            putPx(x, y, rockHi);
+            putPx(x, y, pathMid);
           }
         }
       }
