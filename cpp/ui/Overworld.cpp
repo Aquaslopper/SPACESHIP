@@ -802,8 +802,8 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     setPair(0, 1,  2, 4, 7,   4, 7,10);   // 2:sky1,     3:sky2
     setPair(0, 2,  7,11,12,   2, 4, 2);   // 4:sky3,     5:gnd0
     setPair(0, 3,  3, 6, 3,   5, 8, 3);   // 6:gnd1,     7:gnd2
-    setPair(0, 4,  4, 3, 2,   7, 5, 3);   // 8:pathDark, 9:pathMid
-    setPair(0, 5, 10, 8, 5,   5, 6, 5);   // 10:pathHi,  11:rockMid
+    setPair(0, 4,  4, 4, 5,   7, 7, 8);   // 8:stone shadow, 9:stone face
+    setPair(0, 5, 11,11,11,   8, 8, 9);   // 10:stone lit,    11:stone mid
     setPair(0, 6,  9,10, 8,   1, 4, 2);   // 12:rockHi,  13:leaf0
     setPair(0, 7,  3, 8, 3,   7,11, 4);   // 14:leaf1,   15:leaf2
     // 1: Temperate 1 — Golden Autumn Highlands
@@ -876,8 +876,8 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     setPair(8, 1,  2, 6, 9,   5, 9,12);
     setPair(8, 2,  8,13,14,   1, 5, 6);
     setPair(8, 3,  2, 7, 8,   4,10,10);
-    setPair(8, 4,  6, 5, 4,  10, 9, 6);
-    setPair(8, 5, 13,12, 9,   4, 5, 6);
+    setPair(8, 4,  4, 4, 5,   7, 7, 8);
+    setPair(8, 5, 11,11,11,   8, 8, 9);
     setPair(8, 6,  7, 9,10,   1, 5, 5);
     setPair(8, 7,  3, 9, 8,  14, 6, 5);
     // 9: Ocean 1 — Stormy Sea-Stack Dusk
@@ -886,7 +886,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     setPair(9, 2,  7, 8, 9,   1, 3, 4);
     setPair(9, 3,  2, 4, 5,   3, 6, 7);
     setPair(9, 4,  3, 3, 4,   5, 6, 6);
-    setPair(9, 5,  8, 9, 9,   3, 4, 5);
+    setPair(9, 5,  8, 9, 9,   5, 6, 7);
     setPair(9, 6,  6, 7, 8,   2, 4, 3);
     setPair(9, 7,  4, 7, 5,  13, 9, 4);
     // 10: Ocean 2 — Golden Sunset Atoll
@@ -894,8 +894,8 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     setPair(10, 1, 6, 3, 5,  10, 5, 5);
     setPair(10, 2,14, 9, 6,   2, 3, 5);
     setPair(10, 3, 3, 5, 7,   5, 7, 8);
-    setPair(10, 4, 7, 5, 3,  10, 8, 5);
-    setPair(10, 5,14,11, 7,   5, 4, 5);
+    setPair(10, 4, 4, 3, 3,   7, 6, 5);
+    setPair(10, 5,10, 9, 8,   8, 7, 6);
     setPair(10, 6, 9, 7, 7,   2, 5, 5);
     setPair(10, 7, 5, 8, 7,  15, 7, 6);
     // 11: Ocean 3 — Bioluminescent Lagoon
@@ -923,8 +923,8 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     setPair(13, 2,10, 5, 5,   2, 1, 2);
     setPair(13, 3, 3, 2, 3,   5, 3, 4);
     setPair(13, 4, 4, 3, 4,   6, 5, 6);
-    setPair(13, 5, 9, 8, 8,   5, 3, 5);
-    setPair(13, 6, 8, 6, 7,   6, 2, 4);
+    setPair(13, 5, 9, 8, 8,   6, 3, 4);
+    setPair(13, 6, 8, 6, 7,   7, 2, 3);
     setPair(13, 7,13, 4, 6,  15,10, 5);
     // 14: Lava 2 — Sulfur Yellow Badlands
     setPair(14, 0, 1, 1, 0,   2, 2, 1);
@@ -932,8 +932,8 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     setPair(14, 2,12,10, 3,   2, 2, 1);
     setPair(14, 3, 4, 3, 1,   5, 4, 2);
     setPair(14, 4, 4, 3, 1,   6, 5, 2);
-    setPair(14, 5, 9, 8, 4,   5, 4, 2);
-    setPair(14, 6, 8, 7, 4,   5, 4, 1);
+    setPair(14, 5, 9, 8, 4,   7, 5, 3);
+    setPair(14, 6, 8, 7, 4,   6, 4, 2);
     setPair(14, 7,13,11, 1,  15,15, 6);
     // 15: Lava 3 — Blue-Core Obsidian Rift
     setPair(15, 0, 0, 0, 1,   1, 1, 2);
@@ -951,17 +951,17 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     setPair(16, 2,13, 9, 6,   5, 2, 1);
     setPair(16, 3, 7, 4, 2,  10, 5, 3);
     setPair(16, 4, 4, 2, 2,   7, 5, 3);
-    setPair(16, 5,11, 8, 5,   8, 4, 2);
-    setPair(16, 6,12, 7, 4,   4, 4, 2);
+    setPair(16, 5,11, 8, 5,   9, 5, 3);
+    setPair(16, 6,12, 7, 4,   5, 4, 2);
     setPair(16, 7, 6, 7, 3,  10,10, 5);
     // 17: Rock 1 — Airless Starlit Crater World
     setPair(17, 0, 0, 0, 1,   0, 0, 1);
     setPair(17, 1, 0, 0, 1,   1, 1, 2);
     setPair(17, 2, 2, 3, 4,   3, 3, 4);
     setPair(17, 3, 5, 5, 6,   7, 7, 8);
-    setPair(17, 4, 4, 4, 5,   7, 7, 8);
-    setPair(17, 5,10,10,11,   6, 6, 7);
-    setPair(17, 6,10,10,11,   3, 4, 5);
+    setPair(17, 4, 4, 4, 5,   8, 7, 7);
+    setPair(17, 5,12,11, 9,   7, 6, 5);
+    setPair(17, 6,10, 9, 7,   3, 4, 5);
     setPair(17, 7, 6, 7, 8,  11,12,13);
     // 18: Rock 2 — Copper-Rust Badlands
     setPair(18, 0, 1, 0, 1,   3, 2, 3);
@@ -969,8 +969,8 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     setPair(18, 2,12, 8, 6,   4, 2, 2);
     setPair(18, 3, 6, 3, 2,   8, 5, 3);
     setPair(18, 4, 5, 4, 3,   8, 7, 5);
-    setPair(18, 5,11,10, 8,   7, 4, 3);
-    setPair(18, 6,10, 7, 5,   2, 5, 4);
+    setPair(18, 5,11,10, 8,   8, 4, 3);
+    setPair(18, 6,10, 7, 5,   3, 5, 4);
     setPair(18, 7, 4, 9, 7,   8,12,10);
     // 19: Rock 3 — Golden Steppe Monoliths
     setPair(19, 0, 1, 1, 1,   2, 4, 6);
@@ -978,8 +978,8 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     setPair(19, 2,11,12,11,   6, 5, 3);
     setPair(19, 3, 8, 7, 4,  11, 9, 5);
     setPair(19, 4, 5, 4, 3,   8, 7, 5);
-    setPair(19, 5,12,11, 8,   8, 7, 5);
-    setPair(19, 6,12,11, 8,   4, 5, 2);
+    setPair(19, 5,12,11, 8,   9, 7, 1);
+    setPair(19, 6,12,11, 8,   5, 4, 1);
     setPair(19, 7, 6, 7, 3,  10,10, 4);
     return p;
   }();
@@ -1189,37 +1189,37 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   // World of Xeen chunky rounded beveled dungeon / castle ashlar stone blocks
   static constexpr char kStoneWallArt[32][33] = {
       "................................",
-      ".#########.#######..##########..",
-      ".#++++++:#.#+++++:#.#++++++++:#.",
-      ".#+:+++:+:.#++#++::.#+++#++:++:.",
-      ".#+++++:::.#++:+++:.#+++++::++:.",
-      ".#++:++:::.#+++++::.#++:++++++:.",
-      ".::::::::...::::::..::::::::::..",
+      ".#########.#########.#########.#",
+      ".#+:+++++:.#+++++++:.#+:+++++:.#",
+      ".#+++++++:.#+++++++:.#+++++++:.#",
+      ".#+++++++:.#+++:+++:.#+++++++:.#",
+      ".#+++++++:.#+++++++:.#+++++++:.#",
+      ".#+++++++:.#+++++++:.#+++++++:.#",
+      ".:::::::::.:::::::::.:::::::::.:",
       "................................",
-      "#####..###########..#########.##",
-      "++++:#.#+++++++++:#.#+++++++:.#+",
-      "++:++:.#++#+++:++::.#++#+++::.#+",
-      "++++::.#++++:++++::.#++++++::.#+",
-      "++:+::.#++:++++++::.#++:+:+::.#+",
-      "+++:::..#++++++++:.##++++++::.#:",
-      ":::::...::::::::::..:::::::::.::",
+      "##.#############.###########.###",
+      "+:.#+++++++++++:.#+++++++++:.#++",
+      "+:.#++:++++++++:.#+++++++++:.#++",
+      "+:.#+++++++++++:.#+++++++++:.#++",
+      "+:.#+++++++++++:.#++++++:++:.#++",
+      "+:.#+++++++++++:.#+++++++++:.#++",
+      "::.:::::::::::::.:::::::::::.:::",
       "................................",
-      ".##########..########..########.",
-      ".#++++++++:#.#++++++:#.#++++++:.",
-      ".#++#+++++::.#+++#++::.#++#+++:.",
-      ".#++++:+++::.#+++++:++.#++++:+:.",
-      ".#++:+++++::.#++:++++:.#++:+++:.",
-      ".#+++++++:::.:++++++::.#++++++:.",
-      ".::::::::::..::::::::..::::::::.",
+      "######.###########.##########.##",
+      "+++++:.#+++:+++++:.#++++:+++:.#+",
+      "+++++:.#+++++++++:.#++++++++:.#+",
+      "+:+++:.#+++++++++:.#++++++++:.#+",
+      "+++++:.#+++++++++:.#++++++++:.#+",
+      "+++++:.#+++++++++:.#++++++++:.#+",
+      "::::::.:::::::::::.::::::::::.::",
       "................................",
-      "#######..#########..##########.#",
-      "++++++:#.#+++++++:#.#++++++++:.#",
-      "++#+++::.#++#+++:+:.#+++#+++::.#",
-      "++++:+::.#++++:++::.#++++:++::.#",
-      "++:+++::.#++:++++::.#++:++++::.#",
-      "+++++:::.#+++++++::.#+++++++::.#",
-      ":::::::..:::::::::..::::::::::.:",
-      "................................",
+      "#######.#############.##########",
+      "++++++:.#+:+++++++++:.#+++++++++",
+      "++++++:.#+++++++++++:.#+++++++++",
+      "++++++:.#+++++++++++:.#+:+++++++",
+      "+++:++:.#+++++++++++:.#+++++++++",
+      "++++++:.#+++++++++++:.#+++++++++",
+      ":::::::.:::::::::::::.::::::::::",
   };
   static constexpr TileTex32 kStoneWallTex = TileTex32::FromArt(kStoneWallArt);
   // Clouds of Xeen irregular rounded riverstone / cobblestone road tiles
@@ -1259,6 +1259,91 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
       "::.++++++++.:::.+++++++.:::.++++",
   };
   static constexpr TileTex32 kCobbleRoadTex = TileTex32::FromArt(kCobbleRoadArt);
+
+  // ---- PC-98 road stone field ----------------------------------------------
+  // Generated once, 128x128 texels, sampled 1:1 against the world so the road
+  // never shows a repeating tile. Jittered feature points are welded into
+  // stones by their F2-F1 distance, giving joints that meet at odd angles
+  // instead of a brick grid; each stone gets its own tone, then a lit rim on
+  // the upper left and a shadow rim on the lower right, with near-black mortar
+  // in the gaps. 0 = mortar, 1 = shadow, 2 = face, 3 = lit.
+  struct StoneField { std::uint8_t v[128][128]{}; };
+  static const StoneField kStoneField = []() {
+    StoneField f;
+    auto mix = [](unsigned n) {
+      n ^= n >> 16; n *= 0x7FEB352Du;
+      n ^= n >> 15; n *= 0x846CA68Bu;
+      n ^= n >> 16;
+      return n;
+    };
+    auto feat = [&](int cx, int cy, int k) {
+      return mix((static_cast<unsigned>(cx & 7) << 9) ^
+                 (static_cast<unsigned>(cy & 7) << 4) ^
+                 static_cast<unsigned>(k * 37 + 11));
+    };
+    // Low-frequency warp of the sample point. Without it the cell lattice
+    // shows through as rows of stones of the same width; with it the rows
+    // wander and the stones come out in irregular sizes.
+    auto warp = [&](int x, int y, int salt) {
+      constexpr int kW = 32;
+      const int lx = x / kW, ly = y / kW;
+      const int fx = ((x % kW) * 256) / kW, fy = ((y % kW) * 256) / kW;
+      const int a00 = static_cast<int>(feat(lx, ly, salt) & 63u);
+      const int a10 = static_cast<int>(feat(lx + 1, ly, salt) & 63u);
+      const int a01 = static_cast<int>(feat(lx, ly + 1, salt) & 63u);
+      const int a11 = static_cast<int>(feat(lx + 1, ly + 1, salt) & 63u);
+      const int top = a00 + (((a10 - a00) * fx) >> 8);
+      const int bot = a01 + (((a11 - a01) * fx) >> 8);
+      return ((top + (((bot - top) * fy) >> 8)) * 9) / 64 - 4;   // -4..+5 texels
+    };
+    constexpr int kCell = 16;            // 8 stones across the field
+    for (int y = 0; y < 128; ++y) {
+      for (int x = 0; x < 128; ++x) {
+        const int xw = x + warp(x, y, 5);
+        const int yw = y + warp(x, y, 6);
+        const int cx0 = (xw - kCell / 2) / kCell;
+        const int cy0 = (yw - kCell / 2) / kCell;
+        int bestD = 1 << 22, nextD = 1 << 22, bx = 0, by = 0;
+        for (int oy = 0; oy <= 1; ++oy) {
+          for (int ox = 0; ox <= 1; ++ox) {
+            const int cx = cx0 + ox;
+            const int cy = cy0 + oy;
+            // Jitter stays near the cell centre: enough to make the joints
+            // wander and meet at odd angles, not enough to collapse cells into
+            // slivers the way full-cell jitter does.
+            const int jx = cx * kCell + kCell / 2 + static_cast<int>(feat(cx, cy, 1) % 5u) - 2;
+            const int jy = cy * kCell + kCell / 2 + static_cast<int>(feat(cx, cy, 2) % 5u) - 2;
+            int dx = xw - jx, dy = yw - jy;
+            if (dx > 64) { dx -= 128; } else if (dx < -64) { dx += 128; }
+            if (dy > 64) { dy -= 128; } else if (dy < -64) { dy += 128; }
+            // Stones are generated taller than they are wide, because the
+            // perspective compresses rows on screen: this keeps them reading
+            // as rounded cobbles instead of wide horizontal bars.
+            const int d = dx * dx + (dy * dy * 39) / 100;
+            if (d < bestD) { nextD = bestD; bestD = d; bx = cx; by = cy; }
+            else if (d < nextD) { nextD = d; }
+          }
+        }
+        const float edge = std::sqrt(static_cast<float>(nextD)) -
+                           std::sqrt(static_cast<float>(bestD));
+        if (edge < 1.25f) { f.v[y][x] = 0u; continue; }  // mortar seam
+        const unsigned tone = feat(bx, by, 3) % 10u;
+        f.v[y][x] = static_cast<std::uint8_t>(tone < 2u ? 1u : (tone < 9u ? 2u : 3u));
+      }
+    }
+    // Relief, light from above: the top of each stone catches it and the
+    // bottom falls away into shadow. The sides are left alone on purpose -
+    // rimming them turns a round cobble back into a rectangular chip.
+    for (int y = 0; y < 128; ++y) {
+      for (int x = 0; x < 128; ++x) {
+        if (f.v[y][x] == 0u) { continue; }
+        if (f.v[(y + 127) & 127][x] == 0u) { f.v[y][x] = 3u; continue; }
+        if (f.v[(y + 1) & 127][x] == 0u) { f.v[y][x] = 1u; continue; }
+        if (f.v[y][(x + 1) & 127] == 0u) { f.v[y][x] = 1u; }
+      }
+    }
+    return f;
+  }();
   // Clouds of Xeen jagged faceted craggy mountain / boulder rock texture
   static constexpr char kCragRockArt[32][33] = {
       "##++::..###++:..##+++::.###+::..",
@@ -1295,6 +1380,48 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
       ".##++::..####+:..##++::..####+:.",
   };
   static constexpr TileTex32 kCragRockTex = TileTex32::FromArt(kCragRockArt);
+
+  // ---- PC-98 ground field ---------------------------------------------------
+  // Smooth value noise at three scales, sampled 1:1 with the world, so open
+  // ground reads as patches of deeper and drier cover with dithered borders
+  // instead of one flat dither everywhere. Stored raw 0..255: the sampling
+  // side does the quantising, so the level count stays a rendering decision.
+  struct GroundField { std::uint8_t v[128][128]{}; };
+  static const GroundField kGroundField = []() {
+    GroundField f;
+    auto mix = [](unsigned n) {
+      n ^= n >> 16; n *= 0x7FEB352Du;
+      n ^= n >> 15; n *= 0x846CA68Bu;
+      n ^= n >> 16;
+      return n;
+    };
+    auto lattice = [&](int lx, int ly, int period, int salt) {
+      return static_cast<int>(mix((static_cast<unsigned>(lx & 31) * 73856093u) ^
+                                  (static_cast<unsigned>(ly & 31) * 19349663u) ^
+                                  static_cast<unsigned>(period * 7919 + salt)) & 0xFFu);
+    };
+    auto smooth = [](int t) { return (t * t * (3 * 256 - 2 * t)) / (256 * 256); };
+    static constexpr int kPeriods[3] = {8, 21, 47};
+    static constexpr int kWeights[3] = {2, 3, 3};
+    for (int y = 0; y < 128; ++y) {
+      for (int x = 0; x < 128; ++x) {
+        int acc = 0, wsum = 0;
+        for (int o = 0; o < 3; ++o) {
+          const int p = kPeriods[o];
+          const int lx = x / p, ly = y / p;
+          const int sx = smooth(((x % p) * 256) / p), sy = smooth(((y % p) * 256) / p);
+          const int a00 = lattice(lx, ly, p, o), a10 = lattice(lx + 1, ly, p, o);
+          const int a01 = lattice(lx, ly + 1, p, o), a11 = lattice(lx + 1, ly + 1, p, o);
+          const int top = a00 + ((a10 - a00) * sx) / 256;
+          const int bot = a01 + ((a11 - a01) * sx) / 256;
+          acc += (top + ((bot - top) * sy) / 256) * kWeights[o];
+          wsum += kWeights[o];
+        }
+        f.v[y][x] = static_cast<std::uint8_t>(acc / wsum);   // 0..255 raw
+      }
+    }
+    return f;
+  }();
 
   int activeFog = 0;  // 0..32 (two 16-step 4x4 Bayer bands in index space)
   std::uint8_t activeInk = inkOut;
@@ -2210,9 +2337,12 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
 
   // World-anchored PC-98 4x4 Bayer dithered ground + biome-specific perspective surface textures
   // (pure 16.16 fixed-point horizontal stepping — zero inner-loop float math or division)
+  const int gFieldOffX = static_cast<int>(pSeed & 127u);
+  const int gFieldOffY = static_cast<int>((pSeed >> 7) & 127u);
   const std::uint8_t floorA = inMine ? rockDark : gnd0;
   const std::uint8_t floorB = inMine ? rockMid  : gnd1;
   const std::uint8_t floorC = inMine ? rockMid  : gnd2;
+  const std::uint8_t floorD = inMine ? rockMid  : leaf0;
   const float gndBaseWx = static_cast<float>(planetSurface_.px) + 0.5f;
   const float gndBaseWy = static_cast<float>(planetSurface_.py) + 0.5f;
   for (int y = floorStartY; y < H; ++y) {
@@ -2242,8 +2372,20 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     }
 
     for (int x = 0; x < W; ++x, wx_fp += dwx_fp, wy_fp += dwy_fp) {
-      const bool pickB = gradThr > kBayer4[(y + (inMine ? 2 : 0)) & 3][(x + (inMine ? 1 : 0)) & 3];
-      std::uint8_t gIdx = (u < 0.45f) ? (pickB ? floorB : floorA) : (pickB ? floorC : floorB);
+      // Ground clumps come from the noise field; the 4x4 Bayer order only
+      // feathers the switch between levels. The threshold has to be scaled to
+      // the field's own range, or whole Bayer rows flip at once and the
+      // terrain picks up horizontal banding instead of stipple.
+      const int fgx = ((wx_fp >> 17) + gFieldOffX) & 127;
+      const int fgy = ((wy_fp >> 17) + gFieldOffY) & 127;
+      // Hard quantise, no dither: the clumps are the dither. A per-pixel
+      // Bayer here lays a fine grid over the whole meadow.
+      static constexpr std::uint8_t kBandEdges[4] = {88u, 130u, 172u, 255u};
+      const int gn = static_cast<int>(kGroundField.v[fgy][fgx]);
+      const int gBand = (gn < kBandEdges[0]) ? 0 : (gn < kBandEdges[1]) ? 1
+                      : (gn < kBandEdges[2]) ? 2 : 3;
+      std::uint8_t gIdx = (gBand == 0) ? floorA : (gBand == 1) ? floorB
+                        : (gBand == 2) ? floorC : floorD;
 
       if (detailRow) {
         const int gx = wx_fp >> 16;
@@ -2253,11 +2395,13 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
         const unsigned cellH = static_cast<unsigned>(gx) * 73856093u ^
                                static_cast<unsigned>(gcy) * 19349663u;
         if (inMine) {
-          // World of Xeen irregular rounded dungeon floor flagstones (128 texels/tile matching road!)
-          const int cobU = (wx_fp >> (16 - kResScale)) & 31;
-          const int cobV = (wy_fp >> (16 - kResScale)) & 31;
-          const std::uint8_t st = kCobbleRoadTex.px[cobV][cobU];
-          gIdx = (st == 0u) ? inkOut : (st == 1u) ? rockDark : (st == 2u) ? rockMid : rockHi;
+          // Mine floor beside the track: broken dark rock and grit, caught by
+          // the lamp only where the stone stands proud. Not the road surface.
+          const std::uint8_t st = kStoneField.v[(gcy + 37) & 127][(gx + 91) & 127];
+          const bool mineStone = st >= 2u && (cellH & 15u) < 3u;
+          gIdx = (st >= 2u && st <= 2u) ? pathDark
+                 : mineStone ? rockMid
+                             : pathDark;
         } else if (lavaWorld) {
           // Cracked basalt crust with glowing magma seams near camera
           const int seam = (gx * 3 + gcy * 5) & 7;
@@ -2290,10 +2434,12 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
             gIdx = (fy == 6) ? rockHi : rockDark;
           }
         } else {
-          // Clouds of Xeen lush dappled meadow grass tufts & wildflowers
-          if ((cellH % 5u) == 0u && fy >= 4 && fy <= 9 && fx >= 4 && fx <= 10) {
-            gIdx = (fy <= 5) ? leaf2 : (fy <= 7 ? leaf1 : leaf0);
-          } else if ((cellH % 29u) == 0u && fx == 7 && fy == 6) {
+          // Clouds of Xeen dappled meadow: a tuft is a small round clump with
+          // a lit top, so the meadow dots instead of striping.
+          const int tdx = fx - 7, tdy = fy - 7;
+          if ((cellH % 13u) == 0u && (tdx * tdx + tdy * tdy) < 5) {
+            gIdx = (tdy <= -1) ? leaf2 : (tdy == 0 ? leaf1 : leaf0);
+          } else if ((cellH % 29u) == 0u && fx == 7 && fy == 7) {
             gIdx = (subBiome == 1 || subBiome == 3) ? leaf2 : kIdxWarmGleam;
           }
         }
@@ -2483,16 +2629,16 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
       } else {
         const int gx = sx32_fp >> 16;
         const int gcy = sy32_fp >> 16;
-        // Power-of-two cobble coords (0..31) & rail coords (0..31 per world tile): zero divisions
-        const int cobX = gx & 31;
-        const int cobY = gcy & 31;
+        // Rail coords (0..31 per world tile) and the stone field, sampled 1:1
+        // against the world so the road never shows a repeating tile.
         const int tx32 = (gx >> kRailShift) & 31;
         const int ty32 = (gcy >> kRailShift) & 31;
         const unsigned h = static_cast<unsigned>(gx) * 73856093u ^
                            static_cast<unsigned>(gcy) * 19349663u;
-        const std::uint8_t cob = kCobbleRoadTex.px[cobY][cobX];
+        const std::uint8_t st = kStoneField.v[(gcy + 64) & 127][(gx + 64) & 127];
         if (inMine) {
-          // Underground minecart tracks laid over chunky World of Xeen dungeon flagstones
+          // Minecart track: rails and split-timber sleepers on dark ballast.
+          // The mine floor is its own surface, not the road in the dark.
           const int cellX = gx >> kCellShift;
           const int cellY = gcy >> kCellShift;
           const bool connNS = isPathTile(cellX, cellY - 1) || isPathTile(cellX, cellY + 1);
@@ -2508,59 +2654,68 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
                                  (railEW && (ty32 == 10 || ty32 == 20));
             putPx(x, y, railLit ? kIdxShipLight : kIdxShipDark);
           } else if (tieNS || tieEW) {
+            // Split timber sleepers, warm against the cold rock.
             const bool tieLit = (tieNS && (ty32 & 7) == 1) || (tieEW && (tx32 & 7) == 1);
-            putPx(x, y, tieLit ? pathHi : pathMid);
+            putPx(x, y, tieLit ? kIdxOreBody : pathDark);
           } else {
-            putPx(x, y, (cob == 0u) ? inkOut : (cob == 1u) ? rockDark : (cob == 2u) ? rockMid : rockHi);
+            // Ballast and broken rock: flat dark bed with a scatter of loose
+            // stones for texture. A full stone field here reads as paving,
+            // which is exactly what this floor must not be.
+            const bool looseStone = st >= 2u && (h & 15u) < 3u;
+            putPx(x, y, (st == 2u) ? pathDark
+                                   : looseStone ? rockMid
+                                                : pathDark);
           }
         } else if (lavaWorld) {
-          // Dark rounded volcanic flagstones with glowing ember mortar seams
-          if (cob == 0u) {
+          // Volcanic flagstones: black basalt with ember light in the seams.
+          if (st == 0u) {
             putPx(x, y, (z < 2.2f && (h & 7u) == 0u) ? accent0 : inkOut);
-          } else if (cob == 1u) {
+          } else if (st == 1u) {
             putPx(x, y, rockDark);
-          } else if (cob == 2u) {
+          } else if (st == 2u) {
             putPx(x, y, pathMid);
           } else {
             putPx(x, y, pathHi);
           }
         } else if (biomeIdx == 0 || oceanWorld) {
-          // Classic PC-98 Clouds of Xeen rounded stone cobblestones set in rich earthy mortar!
-          if (cob == 0u) {
+          // Clouds of Xeen road: irregular rounded stones, a tone per stone,
+          // lit crown up-left and shadow down-right, set in dark earth mortar.
+          if (st == 0u) {
             putPx(x, y, (z < 2.6f) ? inkOut : pathDark);
-          } else if (cob == 1u) {
-            putPx(x, y, (biomeIdx == 0) ? pathDark : rockDark);
-          } else if (cob == 2u) {
+          } else if (st == 1u) {
+            putPx(x, y, (biomeIdx == 0) ? pathMid : rockDark);
+          } else if (st == 2u) {
             putPx(x, y, (roadStyle == 0) ? rockMid : pathMid);
           } else {
-            putPx(x, y, (roadStyle == 0) ? rockHi : pathHi);
+            putPx(x, y, (roadStyle == 0) ? pathHi : pathHi);
           }
         } else if (iceWorld) {
-          // Frost-rimmed glacier cobblestones
-          if (cob == 0u) {
+          // Frost-rimmed glacier stone: pale faces, blue shadow in the joints.
+          if (st == 0u) {
             putPx(x, y, (z < 2.5f) ? inkOut : pathDark);
-          } else if (cob == 1u) {
-            putPx(x, y, pathDark);
-          } else if (cob == 2u) {
+          } else if (st == 1u) {
+            putPx(x, y, rockMid);
+          } else if (st == 2u) {
             putPx(x, y, pathMid);
           } else {
-            putPx(x, y, accent1);
+            putPx(x, y, pathHi);
           }
         } else {
-          // Rock / Badlands: sun-baked rounded desert flagstones set in warm canyon dust
-          if (cob == 0u) {
+          // Rock / Badlands: sun-baked flagstone in warm dust.
+          if (st == 0u) {
             putPx(x, y, (z < 2.5f) ? inkOut : pathDark);
-          } else if (cob == 1u) {
-            putPx(x, y, pathDark);
-          } else if (cob == 2u) {
-            putPx(x, y, (allowPebble || ((x + y + stepParity) & 1) == 0) ? pathMid : rockMid);
+          } else if (st == 1u) {
+            putPx(x, y, rockDark);
+          } else if (st == 2u) {
+            putPx(x, y, pathMid);
           } else {
-            putPx(x, y, rockHi);
+            putPx(x, y, pathHi);
           }
         }
       }
     }
   }
+
   activeFog = 0;
   activeInk = inkOut;
 
@@ -3164,7 +3319,12 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
         const int colH = std::max(1, yB - yT);
         const std::uint32_t invColH =
             ((1u << 20) + static_cast<std::uint32_t>(colH) - 1u) / static_cast<std::uint32_t>(colH);
-        const int uTex = ((x - x0) * 3) & 31;
+        // Texel coords track screen pixels 1:1 horizontally: any horizontal
+        // scale here shears the courses into diagonal streaks instead of
+        // leaving them reading as stacked ashlar.
+        // Magnify the courses (2 screen px per texel) so a block stays big
+        // enough to read; sampling at 1:1 here makes the wall a mosaic.
+        const int uTex = (x >> 1) & 31;
         for (int y = yT + 1; y < yB; ++y) {
           const int v32 = static_cast<int>((static_cast<std::uint32_t>((y - yT) << 5) * invColH) >> 20) & 31;
           const std::uint8_t st = kStoneWallTex.px[v32][uTex];
@@ -3250,12 +3410,25 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
                                                          ? (colH * (25 + static_cast<int>((x * 7 + cellH) % 30u)) / 100)
                                                          : 2)
                                   : 0;
-          const int uTexSide = ((uPerm * 48) / 1000 + static_cast<int>(cellH & 15u)) & 31;
+          // No per-cell U offset: offsetting each bay breaks the courses at
+          // every depth step and the wall reads as a zigzag chevron.
+          const int uTexSide = ((uPerm * 48) / 1000) & 31;
           for (int y = yT + 1; y < yB; ++y) {
             const int v32 = static_cast<int>((static_cast<std::uint32_t>((y - yT) << 5) * invColH) >> 20) & 31;
             const int v16 = v32 >> 1;
             const std::uint8_t st = kStoneWallTex.px[v32][uTexSide];
-            std::uint8_t cIdx = (st == 0u) ? inkOut : (st == 3u) ? rockMid : rockDark;
+            // Ice worlds get snow-capped stone: lit courses white, faces the
+            // cold rock blue, joints the darkest tone. Reusing the generic
+            // rock/mortar pair here just gives a field of teal blotches.
+            // Ice worlds: snow-capped stone. Rock worlds: a sandstone cliff,
+            // so faces and shadows stay one tone apart and only the lit
+            // course and the joints carry contrast.
+            std::uint8_t cIdx = iceWorld
+                                    ? ((st == 0u) ? inkOut : (st == 3u) ? pathHi
+                                                   : (st == 2u) ? pathDark : rockMid)
+                                : rockWorld
+                                    ? ((st == 0u) ? inkOut : (st == 3u) ? rockMid : rockDark)
+                                    : ((st == 0u) ? inkOut : (st == 3u) ? rockMid : rockDark);
             if (sidePilaster) {
               // Mine timber post framing receding bay edges
               cIdx = (uPerm < 50 || uPerm > 950) ? trunkCol : pathHi;
@@ -3264,7 +3437,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
             } else if (!inMine && biomeIdx == 0 && y <= yT + vineLen) {
               cIdx = (y == yT + 1) ? leaf1 : leaf0;  // hanging forest moss/ivy tendrils
             } else if (!inMine && iceWorld && y <= yT + 2) {
-              cIdx = (y == yT + 1) ? accent1 : rockMid;
+              cIdx = (y == yT + 1) ? rockHi : rockMid;   // snow cap, not mint
             } else if (var == 6 && inMine && st == 3u && std::abs((v16 * 55) + (uPerm / 4) - 560) < 38) {
               cIdx = (((x + y) & 1) == 0) ? accent0 : accent1;  // diagonal glowing ore vein in mine stone
             } else if (st == 0u) {
@@ -3276,10 +3449,10 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
               } else {
                 cIdx = inkOut;
               }
-            } else if (st == 2u && kBayer4[y & 3][x & 3] < 5) {
+            } else if (st == 2u && kBayer4[y & 3][x & 3] < (inMine ? 2 : 3)) {
               cIdx = rockMid;
             } else if (st == 3u && !inMine && iceWorld) {
-              cIdx = accent1;
+              cIdx = rockHi;
             }
             if (!fogActive) {
               idxBuf[y * W + x] = cIdx;
@@ -3418,13 +3591,15 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
               const int v16 = v32 >> 1;
               const std::uint8_t st = kStoneWallTex.px[v32][uTex];
               std::uint8_t cIdx = (st == 0u) ? inkOut
-                                : (st == 1u) ? rockDark
-                                : (st == 2u) ? rockMid
-                                             : rockHi;
+                                : iceWorld
+                                    ? ((st == 1u) ? rockMid : (st == 2u) ? pathDark : pathHi)
+                                : rockWorld
+                                    ? ((st == 1u) ? rockDark : (st == 2u) ? rockMid : rockHi)
+                                    : ((st == 1u) ? rockDark : (st == 2u) ? rockMid : rockHi);
 
               if (!inMine && y <= yT + capDrop) {
                 if (iceWorld) {
-                  cIdx = (y == yT + 1) ? accent1 : rockHi;
+                  cIdx = (y == yT + 1) ? rockHi : rockMid;   // snow cap
                 } else if (biomeIdx == 0) {
                   cIdx = (y == yT + 1) ? leaf2 : leaf1;
                 } else if (lavaWorld) {
@@ -3435,7 +3610,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
               } else if (!inMine && biomeIdx == 0 && vineDrop > 0 && y <= yT + vineDrop) {
                 cIdx = (y == yT + vineDrop) ? leaf0 : (((x + y) & 1) ? leaf2 : leaf1);
               } else if (!inMine && iceWorld && icicleDrop > 0 && y <= yT + capDrop + icicleDrop) {
-                cIdx = (y == yT + capDrop + icicleDrop) ? accent1 : rockHi;
+                cIdx = (y == yT + capDrop + icicleDrop) ? rockHi : rockMid;
               } else if (!inMine && oceanWorld && y >= yB - 3 && ((x + y) & 1) == 0) {
                 cIdx = sky3;
               } else if (st == 0u) {
@@ -3452,12 +3627,18 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
                          ((uTex + v32 * 3 + static_cast<int>(cellH)) % 11) == 0) {
                 // Dappled green dungeon moss clinging to stone block edges (just like World of Xeen!)
                 cIdx = (v32 & 1) ? leaf1 : leaf0;
+              } else if (inMine) {
+                // Underground the stone sits in shadow: mortar goes to ink,
+                // faces to deep rock, and only some crowns catch the lamps.
+                cIdx = (st == 0u) ? inkOut
+                     : (st == 3u && ((uTex * 3 + v32 * 5 + static_cast<int>(cellH)) % 5) == 0u) ? rockMid
+                     : rockDark;
               } else if (inMine && var == 6 && st == 3u && std::abs((v16 * 55) + (uPerm / 4) - 560) < 46) {
                 cIdx = ((x + y) & 1) ? accent0 : accent1;  // sparkling mineral vein in dungeon stone
               } else if (!inMine && rockWorld && baseH >= 16 && v16 == 3) {
                 cIdx = (((uPerm / 65) & 1) == 0) ? rockHi : rockDark;  // carved sandstone temple frieze
               } else if (!inMine && iceWorld && st == 3u) {
-                cIdx = accent1;
+                cIdx = rockHi;
               }
 
               if (!fogActive) {
