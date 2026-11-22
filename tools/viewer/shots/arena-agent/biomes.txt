@@ -1,0 +1,44 @@
+# One frame per overworld crawler biome on the Bridge monitor, plus the mine.
+# Kept in tools/viewer/shots/arena-agent/. Re-render with ./render.sh.
+#
+# Each surface frame is the monitor's centre viewport plus the map, the D-pad
+# and the planet readout: 740 x 308 at 1440 x 940.
+#
+# The bodies are the ones this build's chart actually carries a biome for.
+# There is no lava world: no body has subtype "lava" or a class containing
+# Lava / Volcanic, so the lava palette set has nothing to show.
+
+hidetitle
+frames 3
+
+# Temperate - Garnet II (pl-gen-1-world), a "Charted world".
+planet pl-gen-1-world
+open room bridge
+dispatch
+frames 30
+shot overworld-temperate 550 164 740 308
+
+# Ice - Bastion Cobalt (pl-gen-2-outer), "Outer ice world".
+planet pl-gen-2-outer
+frames 30
+shot overworld-ice 550 164 740 308
+
+# Ocean - Cinder Upland (pl-gen-3-outer), "Temperate ocean world".
+planet pl-gen-3-outer
+frames 30
+shot overworld-ocean 550 164 740 308
+
+# Rock - Dawn Salt (pl-gen-4-outer), "Rugged terrestrial world".
+planet pl-gen-4-outer
+frames 30
+shot overworld-rock 550 164 740 308
+
+# Mine - the underground layer under Garnet II. Its portal is at (10,10)
+# facing south, approached from (10,11) heading north.
+planet pl-gen-1-world
+frames 10
+planetpos 10 11 0
+frames 3
+planetstep 1
+frames 10
+shot overworld-mine 550 164 740 308
