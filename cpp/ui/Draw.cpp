@@ -2657,7 +2657,7 @@ Color StageMix(Color a, Color b, float t) {
 }  // namespace
 
 
-void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const Area& origin,
+void ShellView::PaintStage(Simulation& sim, const TaskStage& stage, const Area& origin,
                            bool dispatchOnly) {
   const Palette& p = theme_.palette;
   const bool night = theme_.id.find("-night") != std::string::npos;
@@ -3209,6 +3209,10 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
         else if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)) { StepPlanetSurface(sim, 3); }
         else if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) { StepPlanetSurface(sim, 4); }
         else if (IsKeyPressed(KEY_R) || IsKeyPressed(KEY_X)) { StepPlanetSurface(sim, 7); }
+        else if (planetSurface_.inMine >= 1u &&
+                 (IsKeyPressed(KEY_E) || IsKeyPressed(KEY_SPACE))) {
+          StepPlanetSurface(sim, 9);
+        }
       }
       EnsurePlanetSurface(sim);
       RenderPlanetSurfacePixels(sim);
@@ -3294,7 +3298,18 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
                                                     : Color{255, 240, 170, 255});
         }
         const int tagPx = std::max(9, static_cast<int>(std::lround(10.0f * scale)));
-        const char* tag = isShip ? "SHIP" : isPortal ? (inMine ? "EXIT" : "MINE") : "ORE";
+        const char* tag = isShip ? "SHIP"
+                        : isPortal ? (inMine ? "EXIT" : "MINE")
+                        : (planetSurface_.frontKind == 10) ? "BULKHEAD"
+                        : (planetSurface_.frontKind == 11) ? "PORTCULLIS"
+                        : (planetSurface_.frontKind == 12) ? "LEVER"
+                        : (planetSurface_.frontKind == 13) ? "STAIRS UP"
+                        : (planetSurface_.frontKind == 14) ? "STAIRS DOWN"
+                        : (planetSurface_.frontKind == 15) ? "HAZARD"
+                        : (planetSurface_.frontKind == 16) ? "VAULT"
+                        : (planetSurface_.frontKind == 17) ? "MONOLITH"
+                        : (planetSurface_.frontKind == 18) ? "SENTRY"
+                                                          : "ORE";
         const float tw = TextWidth(tag, tagPx, true);
         const int tx = static_cast<int>(frontBox.x + (frontBox.w - tw) * 0.5f);
         const int ty = static_cast<int>(frontBox.y - 13.0f * scale);
@@ -3317,6 +3332,9 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
                   : (planetSurface_.bumpKind == 3) ? "BLOCKED - ORE BEHIND"
                   : (planetSurface_.bumpKind == 4) ? (inMine ? "BLOCKED - WALL BEHIND"
                                                              : "BLOCKED - CLIFF BEHIND")
+                  : (planetSurface_.bumpKind == 5) ? "SEALED BULKHEAD BEHIND"
+                  : (planetSurface_.bumpKind == 6) ? "SEALED PORTCULLIS BEHIND"
+                  : (planetSurface_.bumpKind == 7) ? "SENTRY AT YOUR BACK"
                                                    : "BLOCKED BEHIND";
         } else if (planetSurface_.bumpKind == 2) {
           bumpTxt = "BLOCKED - SHIP AHEAD";
@@ -3324,6 +3342,12 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
           bumpTxt = "BLOCKED - ORE AHEAD";
         } else if (planetSurface_.bumpKind == 4) {
           bumpTxt = inMine ? "BLOCKED - WALL AHEAD" : "BLOCKED - CLIFF AHEAD";
+        } else if (planetSurface_.bumpKind == 5) {
+          bumpTxt = "SEALED BULKHEAD";
+        } else if (planetSurface_.bumpKind == 6) {
+          bumpTxt = "SEALED PORTCULLIS";
+        } else if (planetSurface_.bumpKind == 7) {
+          bumpTxt = "SENTRY IN THE WAY";
         } else {
           bumpTxt = iceWorld   ? "BLOCKED - ICE AHEAD"
                   : oceanWorld ? "BLOCKED - REEF AHEAD"
@@ -3396,7 +3420,9 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
       const float mmCell = 14.0f;
       const float mmX = 118.0f;
       const float mmY = 98.0f;
-      Text(inMine ? "MINE" : "MAP",
+      Text(inMine ? (planetSurface_.inMine == 1u ? "B1"
+                     : planetSurface_.inMine == 2u ? "B2" : "B3")
+                   : "MAP",
            static_cast<int>(V(mmX - 2.0f, 78.0f).x), static_cast<int>(V(mmX - 2.0f, 78.0f).y),
            infoPx, Color{240, 242, 236, 255}, true);
 
@@ -3431,6 +3457,11 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
           const int cx1 = mmColX[mx + 1] - 1;
           const int cw = std::max(2, cx1 - cx0);
           const std::uint8_t t = tileAt(wx, wy);
+          if (inMine && (planetSurface_.exploredRows[planetSurface_.inMine - 1][wy] &
+                         static_cast<std::uint16_t>(1u << wx)) == 0u) {
+            DrawRectangle(cx0, cy0, cw, ch, Color{26, 29, 35, 255});
+            continue;
+          }
           if (t == 1u) {
             DrawRectangle(cx0, cy0, cw, ch, mmWall);
             const bool isEdge = (wx == 0 || wx == N - 1 || wy == 0 || wy == N - 1);
@@ -3534,6 +3565,59 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
                         inMine ? Color{248, 252, 255, 255} : mmWall);
         }
 
+        if (inMine) {
+          const int floorIx = static_cast<int>(planetSurface_.inMine) - 1;
+          auto exploredAt = [&](int tx, int ty) -> bool {
+            return (planetSurface_.exploredRows[floorIx][ty] &
+                    static_cast<std::uint16_t>(1u << tx)) != 0u;
+          };
+          auto fixtureMark = [&](int tx, int ty, Color col, int shape) {
+            const int lx = tx - camX;
+            const int ly = ty - camY;
+            if (lx < 0 || lx >= kView || ly < 0 || ly >= kView) { return; }
+            if (!exploredAt(tx, ty)) { return; }
+            const int fx0 = mmColX[lx];
+            const int fx1 = mmColX[lx + 1] - 1;
+            const int fy0 = mmRowY[ly];
+            const int fy1 = mmRowY[ly + 1] - 1;
+            const int fw = std::max(3, fx1 - fx0);
+            const int fh = std::max(3, fy1 - fy0);
+            const int cxi = fx0 + fw / 2;
+            const int cyi = fy0 + fh / 2;
+            if (shape == 0) {  // diamond marker
+              DrawTriangle(Vector2{static_cast<float>(cxi), static_cast<float>(cyi - fh / 3)},
+                           Vector2{static_cast<float>(cxi - fw / 3), static_cast<float>(cyi)},
+                           Vector2{static_cast<float>(cxi), static_cast<float>(cyi + fh / 3)}, col);
+              DrawTriangle(Vector2{static_cast<float>(cxi), static_cast<float>(cyi - fh / 3)},
+                           Vector2{static_cast<float>(cxi + fw / 3), static_cast<float>(cyi)},
+                           Vector2{static_cast<float>(cxi), static_cast<float>(cyi + fh / 3)}, col);
+            } else {  // bar marker
+              DrawRectangle(cxi - fw / 3, cyi - std::max(1, fh / 8), std::max(2, 2 * fw / 3),
+                            std::max(2, fh / 4), col);
+            }
+          };
+          fixtureMark(static_cast<int>(planetSurface_.stairX[0]),
+                      static_cast<int>(planetSurface_.stairY[0]), Color{120, 226, 244, 255}, 0);
+          fixtureMark(static_cast<int>(planetSurface_.stairX[1]),
+                      static_cast<int>(planetSurface_.stairY[1]), Color{250, 190, 110, 255}, 0);
+          fixtureMark(static_cast<int>(planetSurface_.leverX),
+                      static_cast<int>(planetSurface_.leverY), Color{246, 208, 122, 255}, 0);
+          if (planetSurface_.gateX != 255u && planetSurface_.gateOpen == 0u) {
+            fixtureMark(static_cast<int>(planetSurface_.gateX),
+                        static_cast<int>(planetSurface_.gateY), Color{214, 118, 84, 255}, 1);
+          }
+          for (int i = 0; i < static_cast<int>(planetSurface_.doorCount); ++i) {
+            if (planetSurface_.doorOpen[i] != 0u) { continue; }
+            fixtureMark(static_cast<int>(planetSurface_.doorX[i]),
+                        static_cast<int>(planetSurface_.doorY[i]), Color{198, 112, 82, 255}, 1);
+          }
+          for (int i = 0; i < static_cast<int>(planetSurface_.chestCount); ++i) {
+            if (planetSurface_.chestOpened[i] != 0u) { continue; }
+            fixtureMark(static_cast<int>(planetSurface_.chestX[i]),
+                        static_cast<int>(planetSurface_.chestY[i]), Color{248, 196, 96, 255}, 0);
+          }
+        }
+
         const int pLocalX = static_cast<int>(planetSurface_.px) - camX;
         const int pLocalY = static_cast<int>(planetSurface_.py) - camY;
         const int px0 = mmColX[pLocalX];
@@ -3594,20 +3678,54 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
         }
       }
       const char* pTitle = planet ? planet->name.c_str() : "Surface";
-      Text(pTitle, static_cast<int>(V(700, 48).x), static_cast<int>(V(700, 48).y),
+      const char* floorName = planetSurface_.inMine == 1u ? "B1 UPPER WORKS"
+                            : planetSurface_.inMine == 2u ? "B2 UNDERCROFT"
+                            : planetSurface_.inMine == 3u ? "B3 CORE STRATA"
+                                                          : nullptr;
+      Text(pTitle, static_cast<int>(V(700, inMine ? 32 : 48).x),
+           static_cast<int>(V(700, inMine ? 32 : 48).y),
            infoPx, Color{220, 224, 220, 255}, true);
+      if (floorName != nullptr) {
+        Text(floorName, static_cast<int>(V(700, 48).x), static_cast<int>(V(700, 48).y),
+             infoPx, Color{196, 232, 240, 255}, true);
+      }
       char posBuf[32];
       std::snprintf(posBuf, sizeof(posBuf), "%s %s (%u,%u)",
-                    inMine ? "MINE" : "DIR",
+                    inMine ? "FLOOR" : "DIR",
                     kDirNames[planetSurface_.dir & 3u],
                     static_cast<unsigned>(planetSurface_.px),
                     static_cast<unsigned>(planetSurface_.py));
       Text(posBuf, static_cast<int>(V(700, 66).x), static_cast<int>(V(700, 66).y),
            infoPx, Color{168, 176, 172, 255});
-      char oreBuf[16];
+      char oreBuf[32];
       std::snprintf(oreBuf, sizeof(oreBuf), "ORE %d", oreLeft);
       Text(oreBuf, static_cast<int>(V(700, 84).x), static_cast<int>(V(700, 84).y),
            infoPx, oreLeft > 0 ? Color{236, 184, 82, 255} : Color{130, 140, 134, 255}, true);
+      if (inMine) {
+        const CrewMember* lead = sim.DungeonLead();
+        char leadBuf[48];
+        if (lead != nullptr) {
+          std::snprintf(leadBuf, sizeof(leadBuf), "%s HP %d", lead->name.c_str(),
+                        static_cast<int>(std::lround(lead->health)));
+        } else {
+          std::snprintf(leadBuf, sizeof(leadBuf), "NO HAND ABOARD");
+        }
+        char kitBuf[32];
+        std::snprintf(kitBuf, sizeof(kitBuf), "KITS %d", static_cast<int>(sim.State().repairKits));
+        const int vaultsOpen = planetSurface_.chestOpened[0] + planetSurface_.chestOpened[1] +
+                               (planetSurface_.mobCount > 0 ? 0 : 0);
+        char vaultBuf[40];
+        std::snprintf(vaultBuf, sizeof(vaultBuf), "VAULTS %d/%d", vaultsOpen,
+                      static_cast<int>(planetSurface_.chestCount));
+        const int vx = static_cast<int>(V(700, 100).x);
+        Text(leadBuf, vx, static_cast<int>(V(700, 100).y), infoPx,
+             (lead != nullptr && lead->health > 30.0) ? Color{196, 232, 200, 255}
+                                                      : Color{255, 132, 104, 255}, true);
+        Text(kitBuf, static_cast<int>(V(760, 100).x), static_cast<int>(V(700, 100).y), infoPx,
+             sim.State().repairKits >= 1.0 ? Color{236, 214, 150, 255} : Color{130, 140, 134, 255},
+             true);
+        Text(vaultBuf, vx, static_cast<int>(V(700, 114).y), infoPx, Color{236, 184, 82, 255}, true);
+      }
       if (frontBlk != 0 || planetSurface_.bumpKind != 0) {
         const bool bumped = (planetSurface_.bumpKind != 0);
         const char* blkLine = "";
@@ -3624,6 +3742,12 @@ void ShellView::PaintStage(const Simulation& sim, const TaskStage& stage, const 
             blkLine = "BLOCKED: ORE";
           } else if (shown == 4) {
             blkLine = inMine ? "BLOCKED: WALL" : "BLOCKED: CLIFF";
+          } else if (shown == 5) {
+            blkLine = "BLOCKED: BULKHEAD";
+          } else if (shown == 6) {
+            blkLine = "BLOCKED: PORTCULLIS";
+          } else if (shown == 7) {
+            blkLine = "BLOCKED: SENTRY";
           } else {
             blkLine = iceWorld   ? "BLOCKED: ICE"
                     : oceanWorld ? "BLOCKED: REEF"
@@ -9316,6 +9440,8 @@ void ShellView::Click(Simulation& sim, float x, float y, HitButton button,
       if (!hit.box.Contains(x, y + scrollY)) { continue; }
       if ((hit.kind >= 1 && hit.kind <= 4) || hit.kind == 7 || hit.kind == 8) {
         StepPlanetSurface(sim, hit.kind);
+      } else if (hit.kind >= 10 && hit.kind <= 18) {
+        StepPlanetSurface(sim, 9);  // every dungeon fixture is used from the tile in front
       } else if (hit.kind == 5) {
         if (sim.CollectPlanetOre(sim.Map().here, hit.arg)) {
           planetSurface_.bumpKind = 0;

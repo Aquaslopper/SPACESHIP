@@ -267,6 +267,263 @@ bool Simulation::CollectPlanetOre(const std::string& planetId, int oreIndex) {
   return true;
 }
 
+// ---------------------------------------------------------------------------
+// Subterranean dungeon (Dispatch B1..B3)
+// ---------------------------------------------------------------------------
+// Permanent dungeon state is written only to state_.mapMarks with the prefix
+// "planet-dng:<planetId>:". The UI generates the layout deterministically from
+// the same prefix, so a save reload re-derives every floor in place.
+
+namespace {
+
+std::string DungeonMarkKey(const std::string& planetId, int floor, const std::string& what) {
+  return "planet-dng:" + planetId + ":f" + std::to_string(floor) + ":" + what;
+}
+
+bool DungeonMarkSet(const std::map<std::string, bool>& marks, const std::string& key) {
+  auto it = marks.find(key);
+  return it != marks.end() && it->second;
+}
+
+}  // namespace
+
+CrewMember* Simulation::DungeonLead() {
+  if (!state_.crewSel.empty()) {
+    for (CrewMember& crew : crew_) {
+      if (crew.id == state_.crewSel && crew.health > 0) { return &crew; }
+    }
+  }
+  for (CrewMember& crew : crew_) {
+    if (crew.health > 0) { return &crew; }
+  }
+  return nullptr;
+}
+
+const CrewMember* Simulation::DungeonLead() const {
+  if (!state_.crewSel.empty()) {
+    for (const CrewMember& crew : crew_) {
+      if (crew.id == state_.crewSel && crew.health > 0) { return &crew; }
+    }
+  }
+  for (const CrewMember& crew : crew_) {
+    if (crew.health > 0) { return &crew; }
+  }
+  return nullptr;
+}
+
+bool Simulation::DungeonClaimLever(const std::string& planetId, int floor) {
+  if (!LandedOnPlanet() || map_.here != planetId) { return false; }
+  if (floor < 1 || floor > 3) { return false; }
+  const Body* body = FindBodyById(planetId);
+  if (body == nullptr) { return false; }
+  const std::string key = DungeonMarkKey(planetId, floor, "lever");
+  if (DungeonMarkSet(state_.mapMarks, key)) { return false; }
+  state_.mapMarks[key] = true;
+  LogLine(std::string("Wall lever thrown on B") + std::to_string(floor) + " of " +
+          body->name + " - the portcullis grinds up.");
+  return true;
+}
+
+bool Simulation::DungeonForceGate(const std::string& planetId, int floor) {
+  if (!LandedOnPlanet() || map_.here != planetId) { return false; }
+  if (floor < 1 || floor > 3) { return false; }
+  const Body* body = FindBodyById(planetId);
+  if (body == nullptr) { return false; }
+  const std::string key = DungeonMarkKey(planetId, floor, "gate");
+  if (DungeonMarkSet(state_.mapMarks, key)) { return false; }
+  if (state_.repairKits < 1) {
+    LogLine("No repair kits left to force the portcullis.");
+    return false;
+  }
+  state_.repairKits -= 1;
+  state_.mapMarks[key] = true;
+  LogLine(body->name + " B" + std::to_string(floor) +
+          ": portcullis mechanism forced with a repair kit.");
+  return true;
+}
+
+bool Simulation::DungeonTriggerHazard(const std::string& planetId, int floor, int trapIndex,
+                                     int trapKind) {
+  if (!LandedOnPlanet() || map_.here != planetId) { return false; }
+  if (floor < 1 || floor > 3 || trapIndex < 0) { return false; }
+  const Body* body = FindBodyById(planetId);
+  if (body == nullptr) { return false; }
+  const std::string key = DungeonMarkKey(planetId, floor, "trap:" + std::to_string(trapIndex));
+  if (DungeonMarkSet(state_.mapMarks, key)) { return false; }
+
+  const double damage = 8.0 + 4.0 * static_cast<double>(floor);
+  const double strain = 6.0 + 2.0 * static_cast<double>(floor);
+  const bool vent = trapKind == 2 || trapKind == 4;  // brine vent / spore fissure
+  if (vent) { state_.airHold = std::max(0.0, state_.airHold - 1.5); }
+
+  CrewMember* lead = DungeonLead();
+  state_.mapMarks[key] = true;
+  if (lead != nullptr) {
+    lead->health = std::max(0.0, lead->health - damage);
+    lead->fatigue = std::min(100.0, lead->fatigue + strain);
+    LogLine(std::string("B") + std::to_string(floor) + " hazard on " + body->name + ": " +
+            lead->name + " took " + js::NumToString(damage) + " damage, " +
+            js::NumToString(strain) + " fatigue." +
+            (vent ? " Cabin air vented." : ""));
+  } else {
+    ClampStat("hull", -damage * 0.5);
+    LogLine(std::string("B") + std::to_string(floor) + " hazard on " + body->name +
+            ": no hand aboard, the hull took the blow.");
+  }
+  CheckLoss();
+  return true;
+}
+
+bool Simulation::DungeonStrikeSentry(const std::string& planetId, int floor, int mobIndex,
+                                     int mobHpRemaining, bool* defeated) {
+  if (defeated != nullptr) { *defeated = false; }
+  if (!LandedOnPlanet() || map_.here != planetId) { return false; }
+  if (floor < 1 || floor > 3 || mobIndex < 0) { return false; }
+  const Body* body = FindBodyById(planetId);
+  if (body == nullptr) { return false; }
+  const std::string key = DungeonMarkKey(planetId, floor, "mob:" + std::to_string(mobIndex));
+  if (DungeonMarkSet(state_.mapMarks, key)) { return false; }
+
+  const int hp = std::max(1, std::min(3, mobHpRemaining));
+  CrewMember* lead = DungeonLead();
+  int dealt = 1;
+  if (lead != nullptr) {
+    const std::string& role = lead->job.empty() ? lead->role : lead->job;
+    const std::string& skill = lead->skill;
+    const bool apt = role == "filters" || role == "maintenance" || role == "navigation" ||
+                     skill == "Trained" || skill == "Practised";
+    dealt += apt ? 1 : 0;
+    if (lead->health > 0) { dealt += 1; }
+    const double blow = 6.0 + static_cast<double>((mobIndex * 3 + floor * 4) % 9);
+    lead->health = std::max(0.0, lead->health - blow);
+    lead->fatigue = std::min(100.0, lead->fatigue + 4.0 + static_cast<double>(floor));
+  }
+  const int left = hp - dealt;
+  if (left <= 0) {
+    state_.mapMarks[key] = true;
+    if (defeated != nullptr) { *defeated = true; }
+    const std::uint64_t h = MapEventHash(key + "#salvage");
+    const double shiplets = 12.0 + static_cast<double>(h % 17ULL);
+    state_.shiplets += shiplets;
+    if (h % 7ULL == 0ULL) {
+      ++state_.repairKits;
+      LogLine("Sentry destroyed on " + body->name + " B" + std::to_string(floor) +
+              " - salvage: a repair kit.");
+    } else if (h % 7ULL == 1ULL) {
+      ++state_.fuelCells;
+      LogLine("Sentry destroyed on " + body->name + " B" + std::to_string(floor) +
+              " - salvage: a fuel cell.");
+    } else {
+      LogLine("Sentry destroyed on " + body->name + " B" + std::to_string(floor) +
+              " - salvage: " + js::NumToString(shiplets) + " shiplets.");
+    }
+  } else if (lead != nullptr) {
+    LogLine("Clash with a sentry on B" + std::to_string(floor) + ": " + lead->name +
+            " struck it for " + js::NumToString(dealt) + ".");
+  } else {
+    LogLine("Clash with a sentry on B" + std::to_string(floor) +
+            ": nobody aboard to swing.");
+  }
+  CheckLoss();
+  return true;
+}
+
+bool Simulation::DungeonLootChest(const std::string& planetId, int floor, int chestIndex) {
+  if (!LandedOnPlanet() || map_.here != planetId) { return false; }
+  if (floor < 1 || floor > 3 || chestIndex < 0 || chestIndex > 1) { return false; }
+  const Body* body = FindBodyById(planetId);
+  if (body == nullptr) { return false; }
+  const std::string key = DungeonMarkKey(planetId, floor, "chest:" + std::to_string(chestIndex));
+  if (DungeonMarkSet(state_.mapMarks, key)) { return false; }
+
+  const std::uint64_t h = MapEventHash(key);
+  const double vol = 1.0;
+  if (CargoUsed() + CargoReserved() + vol > cargo_.capacity + 1e-6) {
+    LogLine("Hold full: cannot stow the " + body->name + " B" + std::to_string(floor) +
+            " vault haul.");
+    return false;
+  }
+  state_.lotSerial += 1;
+  GoodsLot lot;
+  lot.id = "relic-" + std::to_string(static_cast<long long>(state_.lotSerial));
+  lot.kind = (h & 1ULL) != 0ULL ? "Relic" : "Rare ore";
+  lot.name = "Subterranean Relic (" + body->name + " B" + std::to_string(floor) + ")";
+  lot.vol = vol;
+  lot.value = 55.0 + 28.0 * static_cast<double>(floor) + static_cast<double>(h % 25ULL);
+  lot.risk = false;
+  goods_.push_back(std::move(lot));
+  state_.mapMarks[key] = true;
+  CommissionProgress("salvage", body->id);
+  LogLine("Stowed " + goods_.back().name + " (" + js::NumToString(vol) + " m3).");
+
+  // A deeper floor's sealed cache may also hold one supply ration.
+  if (chestIndex == 1 || floor >= 2) {
+    const unsigned cache = static_cast<unsigned>((h >> 8) % 4ULL);
+    if (cache == 0u) {
+      ++state_.medkits;
+      LogLine("Cache: +1 medkit.");
+    } else if (cache == 1u) {
+      ++state_.repairKits;
+      LogLine("Cache: +1 repair kit.");
+    } else if (cache == 2u) {
+      ++state_.fuelCells;
+      LogLine("Cache: +1 fuel cell.");
+    } else {
+      const double shiplets = 35.0 + static_cast<double>((h >> 16) % 41ULL);
+      state_.shiplets += shiplets;
+      LogLine("Cache: " + js::NumToString(shiplets) + " shiplets.");
+    }
+  }
+  return true;
+}
+
+bool Simulation::DungeonFileMonolith(const std::string& planetId) {
+  if (!LandedOnPlanet() || map_.here != planetId) { return false; }
+  const Body* body = FindBodyById(planetId);
+  if (body == nullptr) { return false; }
+  const std::string key = "planet-dng:" + planetId + ":monolith";
+  if (DungeonMarkSet(state_.mapMarks, key)) { return false; }
+
+  const std::string recordId = "sv-abyss-" + planetId;
+  bool held = false;
+  for (const SurveyRecord& record : survey_) {
+    if (record.id == recordId) { held = true; }
+  }
+  if (!held) {
+    SurveyRecord record;
+    record.id = recordId;
+    record.name = body->name + " Core Strata";
+    record.src = "Deep delve";
+    record.value = 145.0;
+    record.state = "filed";
+    survey_.push_back(record);
+  }
+  state_.mapMarks[key] = true;
+
+  // The monolith's inscription charts one unscanned peer body in this system.
+  const std::string system = catalog_->BodySystem(*body);
+  int revealed = 0;
+  for (std::size_t idx : catalog_->BodiesInSystem(system)) {
+    if (idx >= catalog_->bodies.size()) { continue; }
+    const Body& peer = catalog_->bodies[idx];
+    if (peer.id == body->id) { continue; }
+    if (peer.type != "planet" && peer.type != "moon" && peer.type != "belt") { continue; }
+    const bool seen = state_.scanned.count(peer.id) != 0 && state_.scanned.at(peer.id);
+    if (seen) { continue; }
+    state_.scanned[peer.id] = true;
+    ++revealed;
+    LogLine("Monolith charted " + peer.name + " without a scan pass.");
+    break;
+  }
+  if (revealed == 0) {
+    LogLine("Monolith filed: " + body->name + " Core Strata (no new peer body to chart).");
+  } else {
+    LogLine("Monolith filed: " + body->name + " Core Strata.");
+  }
+  return true;
+}
+
+
 const Body* Simulation::HomeBody() const {
   // Position at the current map scale, not the region being browsed. The
   // sector chart paints every system, so the ship's own system is always on it

@@ -125,6 +125,22 @@ class Simulation {
   bool AtTarget(const Body& body) const;
   bool LandedOnPlanet() const;
   bool CollectPlanetOre(const std::string& planetId, int oreIndex);
+
+  // ---- subterranean dungeon (Dispatch, depths B1..B3) ---------------------
+  // Permanent bits live only in state_.mapMarks under "planet-dng:<planetId>:...".
+  // Crew damage is real: no protective floor, no reset on travel or dock.
+  bool DungeonForceGate(const std::string& planetId, int floor);
+  bool DungeonTriggerHazard(const std::string& planetId, int floor, int trapIndex,
+                            int trapKind);
+  bool DungeonStrikeSentry(const std::string& planetId, int floor, int mobIndex,
+                           int mobHpRemaining, bool* defeated);
+  bool DungeonLootChest(const std::string& planetId, int floor, int chestIndex);
+  bool DungeonFileMonolith(const std::string& planetId);
+  bool DungeonClaimLever(const std::string& planetId, int floor);
+  // The away lead: state_.crewSel when that hand is aboard and alive, else the
+  // first living hand, else nullptr (the ship itself takes the hit).
+  CrewMember* DungeonLead();
+  const CrewMember* DungeonLead() const;
   std::string CurrentSystemId() const;
   const Body* CurrentSystem() const;
   const Body* FindBodyById(const std::string& id) const;

@@ -42,6 +42,12 @@
 
 namespace ship {
 
+// Test-only observer: the deterministic dungeon generator is exercised headless
+// by cpp/tests/bridge_probe.cpp without a window or a graphics device.
+namespace detail {
+struct PlanetSurfaceProbeState;  // defined at the bottom of this header
+}
+
 enum class HitButton { None, Left, Right };
 
 struct FlareTarget {
@@ -137,6 +143,8 @@ class ShellView {
   const Theme& CurrentTheme() const { return theme_; }
   void SetTheme(const Theme& theme) { theme_ = theme; }
 
+  friend struct detail::PlanetSurfaceProbeState;
+
  private:
   struct NavHit {
     Area box;
@@ -222,12 +230,16 @@ class ShellView {
   void PaintCrewRecord(const Simulation& sim);
   void PaintPanel(const NavPanel& panel, const Area& box);
   bool PaintScenePart(const MachinePart& part, const Area& origin);
-  void PaintStage(const Simulation& sim, const TaskStage& stage, const Area& origin,
+  void PaintStage(Simulation& sim, const TaskStage& stage, const Area& origin,
                   bool dispatchOnly = false);
-  void EnsurePlanetSurface(const Simulation& sim);
-  void LoadPlanetLayer(const Simulation& sim, std::uint8_t targetInMine, bool placeOres);
-  void RenderPlanetSurfacePixels(const Simulation& sim);
-  void StepPlanetSurface(const Simulation& sim, int actionKind);
+  void EnsurePlanetSurface(Simulation& sim);
+  void LoadPlanetLayer(Simulation& sim, std::uint8_t targetInMine, bool placeOres);
+  void RenderPlanetSurfacePixels(Simulation& sim);
+  void StepPlanetSurface(Simulation& sim, int actionKind);
+  // Dungeon helpers (Overworld.cpp): fog-of-war marks, sentry steps, hazard pay.
+  void MarkDungeonExplored(int floorNo, int x, int y, int dir);
+  void TickDungeonSentries();
+  void ActivateDungeonTrap(Simulation& sim, int trapIndex);
   void PaintIdle(Simulation& sim);
   float PaintActionBand(const std::string& title, const std::string& note,
                        const std::vector<ProgressButton>& buttons,
@@ -320,9 +332,22 @@ class ShellView {
     static constexpr int kMaxOre = 5;
     static constexpr int kTexW = 480;
     static constexpr int kTexH = 288;
+    // Subterranean dungeon floors B1..B3 share the same 16x16 grid; the floor
+    // number is inMine - 1. Every permanent bit of dungeon state lives in
+    // state_.mapMarks under "planet-dng:<planetId>:..." so the save format is
+    // untouched; these fixed arrays are only the current generator's readout.
+    static constexpr int kStairs = 2;     // 0 = ascent (up), 1 = descent (down)
+    static constexpr int kMaxDoors = 3;
+    static constexpr int kMaxTraps = 4;
+    static constexpr int kMaxMobs = 3;
+    static constexpr int kMaxChests = 2;
+    static constexpr int kMaxChambers = 5;
+    static constexpr int kMaxAlcoves = 3;
+    static constexpr int kMaxMobHp = 3;
+
     std::string planetId;
-    // Packed 16x16 world grid (256 B): bits 0..1 = tile (0=open, 1=obstacle/border,
-    // 2=ship pad, 3=trail), bits 2..4 = deterministic visual variant (0..7).
+    // Packed 16x16 world grid (256 B): bits 0..1 = tile (0=open stone, 1=obstacle/wall,
+    // 2=ship pad, 3=flagstone track), bits 2..4 = deterministic visual variant (0..7).
     std::uint8_t cells[kSize * kSize]{};
     std::uint8_t oreCount = 0;
     std::uint8_t oreX[kMaxOre]{};
@@ -332,15 +357,63 @@ class ShellView {
     std::uint8_t px = 8;
     std::uint8_t py = 13;
     std::uint8_t dir = 0;           // 0=N, 1=E, 2=S, 3=W
-    std::uint8_t inMine = 0;        // 0=surface, 1=underground mine sub-map
+    std::uint8_t inMine = 0;        // 0=surface, 1=B1, 2=B2, 3=B3
     std::uint8_t oreLayerMask = 0;  // bit i: 0=surface ore, 1=underground mine ore
-    std::uint8_t portalX = 0;       // mine entrance (surface) or exit shaft (mine)
+    std::uint8_t portalX = 0;       // mine entrance (surface) or exit shaft (B1)
     std::uint8_t portalY = 0;
     std::uint8_t portalOutDir = 0;  // outward normal (0..3) toward open approach tile
     std::uint8_t mineInDir = 0;     // compass heading (0..3) entering the mine from surface
     std::uint8_t surfPx = 8;        // saved surface coordinates outside mine entrance
     std::uint8_t surfPy = 13;
     std::uint8_t surfDir = 0;
+    // B1 surface exit shaft arrival tile (approach belongs to the active floor).
+    std::uint8_t shaftX = 0;
+    std::uint8_t shaftY = 0;
+    // Ascent / descent stairwells on the active floor: the step tile is solid
+    // (wall variant 7); stepX/stepY is the walkable arrival tile in front.
+    std::uint8_t stairX[kStairs]{};    // ascent in [0], descent in [1]
+    std::uint8_t stairY[kStairs]{};
+    std::uint8_t stairX2[kStairs]{};   // arrival tile (outside the step)
+    std::uint8_t stairY2[kStairs]{};
+    std::uint8_t stairDir[kStairs]{};  // outward facing of the arrival tile
+    // Bulkhead doors: occupancy is cells[tile] == 2 (ship-pad code re-used as
+    // "door" underground). doorX[] is the threshold tile itself.
+    std::uint8_t doorCount = 0;
+    std::uint8_t doorX[kMaxDoors]{};
+    std::uint8_t doorY[kMaxDoors]{};
+    std::uint8_t doorOpen[kMaxDoors]{};
+    // Locked portcullis + wall lever (one each per floor).
+    std::uint8_t gateX = 0, gateY = 0;
+    std::uint8_t gateApproachX = 0, gateApproachY = 0, gateApproachDir = 0;
+    std::uint8_t gateOpen = 0;
+    std::uint8_t leverX = 0, leverY = 0;      // lever's cell (solid wall)
+    std::uint8_t leverFaceX = 0, leverFaceY = 0, leverFaceDir = 0;  // approach tile + facing
+    std::uint8_t leverOn = 0;
+    // Floor hazards.
+    std::uint8_t trapCount = 0;
+    std::uint8_t trapX[kMaxTraps]{};
+    std::uint8_t trapY[kMaxTraps]{};
+    std::uint8_t trapKind[kMaxTraps]{};    // 0 magma, 1 cryo, 2 brine, 3 dart, 4 spore
+    std::uint8_t trapSprung[kMaxTraps]{};
+    // Step-synced subterranean sentries.
+    std::uint8_t mobCount = 0;
+    std::uint8_t mobX[kMaxMobs]{};
+    std::uint8_t mobY[kMaxMobs]{};
+    std::uint8_t mobHp[kMaxMobs]{};
+    std::uint8_t mobKind[kMaxMobs]{};      // 0 automaton, 1 carapace, 2 warden
+    std::uint8_t mobPhase[kMaxMobs]{};     // patrol phase seed so turns alternate
+    // Vault chests and the B3 survey monolith.
+    std::uint8_t chestCount = 0;
+    std::uint8_t chestX[kMaxChests]{};
+    std::uint8_t chestY[kMaxChests]{};
+    std::uint8_t chestOpened[kMaxChests]{};
+    std::uint8_t monolithX = 0, monolithY = 0;
+    std::uint8_t monolithActive = 0;
+    // Explored fog-of-war rows for all three dungeon floors (48 B).
+    std::uint16_t exploredRows[3][kSize]{};
+    // Dungeon signature folded into the dirty-check (doors, lever, traps,
+    // chests, monolith, sentry positions/HP, explored bits, floor).
+    std::uint64_t renderDungeonSig = 0;
 
     std::uint8_t Tile(int x, int y) const {
       return static_cast<std::uint8_t>(cells[(y << kSizeShift) | x] & 0x03u);
@@ -356,8 +429,7 @@ class ShellView {
       std::uint8_t& c = cells[(y << kSizeShift) | x];
       c = static_cast<std::uint8_t>((c & ~0x1Cu) | ((v & 0x07u) << 2));
     }
-
-    // Cached render state so the 160x96 buffer only rasterizes on change (0 B heap)
+    // Cached render state so the 480x288 buffer only rasterizes on change (0 B heap)
     std::uint64_t renderPlanetHash = 0;
     std::size_t renderMarksCount = ~std::size_t{0};
     int renderLotSerial = -1;
@@ -366,9 +438,13 @@ class ShellView {
     std::int8_t renderDir = -1;
     std::int8_t renderInMine = -1;
     std::uint8_t renderOreMask = 0xFFu;
-    std::uint8_t bumpKind = 0;  // 0=none, 1=prop, 2=ship, 3=ore, 4=cliff/wall
+    std::uint64_t renderDungeonSeen = ~std::uint64_t{0};
+    std::uint8_t bumpKind = 0;  // 0=none, 1=prop, 2=ship, 3=ore, 4=cliff/wall,
+                                // 5=bulkhead, 6=portcullis, 7=sentry
     bool bumpBack = false;
-    int frontKind = 0;          // 0=none, 5=ore, 6=ship, 8=mine/exit (at d==1, s==0)
+    int frontKind = 0;          // 0=none, 5=ore, 6=ship, 8=mine/exit, 10=door,
+                                // 11=gate, 12=lever, 13=stairs up, 14=stairs down,
+                                // 15=trap, 16=chest, 17=monolith, 18=sentry
     int frontArg = 0;
     Area frontUv{};
   };
@@ -537,5 +613,32 @@ class ShellView {
   std::vector<NavHit> lossHits_;
   std::vector<FlareTarget> flareTargets_;
 };
+
+// ---------------------------------------------------------------------------
+// Headless test hook. The dungeon generator and the fixture readout are private
+// to ShellView by design; bridge_probe.cpp drives them through this observer so
+// it can assert on layout invariants without a window or a graphics device.
+// ---------------------------------------------------------------------------
+namespace detail {
+struct PlanetSurfaceProbeState {
+  using StateType = ShellView::PlanetSurfaceState;
+  static const StateType& State(const ShellView& view) { return view.planetSurface_; }
+  static StateType& Mutable(ShellView& view) { return view.planetSurface_; }
+  static void Bind(ShellView& view, Simulation& sim, const std::string& planetId, int floor) {
+    sim.MutableMap().here = planetId;
+    view.LoadPlanetLayer(sim, static_cast<std::uint8_t>(floor), floor == 1);
+  }
+  // Rasterize one frame of the software viewport and hand back the exported
+  // front-tile metadata, so a probe can sweep every tile and heading.
+  static void Render(ShellView& view, Simulation& sim) { view.RenderPlanetSurfacePixels(sim); }
+  // Frames the requested floor into the caller's view so a probe can assert on
+  // the exact readout the renderer would consume.
+  static void Load(ShellView& view, Simulation& sim, const std::string& planetId, int floor) {
+    view.planetSurface_.planetId.clear();  // force a fresh generator pass
+    view.planetSurface_ = StateType{};
+    Bind(view, sim, planetId, floor);
+  }
+};
+}  // namespace detail
 
 }  // namespace ship

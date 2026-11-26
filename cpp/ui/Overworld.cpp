@@ -15,7 +15,7 @@
 
 namespace ship {
 
-void ShellView::LoadPlanetLayer(const Simulation& sim, std::uint8_t targetInMine, bool placeOres) {
+void ShellView::LoadPlanetLayer(Simulation& sim, std::uint8_t targetInMine, bool placeOres) {
   const Body* here = sim.FindBodyById(sim.Map().here);
   if (here == nullptr) { return; }
   constexpr int N = PlanetSurfaceState::kSize;
@@ -322,8 +322,18 @@ void ShellView::LoadPlanetLayer(const Simulation& sim, std::uint8_t targetInMine
     return;
   }
 
-  // targetInMine == 1: carve deterministic underground mine sub-map into cells[256] in place
-  std::uint32_t h = baseSeed ^ 0x85EBCA6Bu;
+  // ==========================================================================
+  //  Subterranean dungeon floors B1..B3 (targetInMine == 1..3)
+  //  ------------------------------------------------------------------------
+  //  Room-and-corridor layout with bulkhead doors, one locked portcullis and
+  //  its wall lever, biome-keyed depth hazards, step-synced sentries, sealed
+  //  vault chests and the B3 survey monolith. Every permanent bit is keyed in
+  //  state_.mapMarks as "planet-dng:<planetId>:..." so the save format is
+  //  untouched; the seed below re-derives the identical floor on entry/reload.
+  // ==========================================================================
+  const int floor = static_cast<int>(targetInMine);
+  std::uint32_t h = baseSeed ^ 0x85EBCA6Bu ^
+                    (static_cast<std::uint32_t>(floor) * 0x9E3779B9u);
   if (h == 0u) { h = 1u; }
   auto nextRand = [&h]() -> std::uint32_t {
     h ^= h << 13;
@@ -332,131 +342,740 @@ void ShellView::LoadPlanetLayer(const Simulation& sim, std::uint8_t targetInMine
     return h ? h : 1u;
   };
 
+  // Per-floor readout reset (cells[] and the shared ore slot table are not
+  // touched: the surface owns those while inMine == 0, ores span both layers).
+  for (int i = 0; i < PlanetSurfaceState::kStairs; ++i) {
+    planetSurface_.stairX[i] = planetSurface_.stairY[i] = 0;
+    planetSurface_.stairX2[i] = planetSurface_.stairY2[i] = 0;
+    planetSurface_.stairDir[i] = 0;
+  }
+  planetSurface_.doorCount = 0;  // doors beyond the reported count are ignored
+  for (int i = 0; i < PlanetSurfaceState::kMaxDoors; ++i) {
+    planetSurface_.doorX[i] = planetSurface_.doorY[i] = planetSurface_.doorOpen[i] = 0;
+  }
+  planetSurface_.trapCount = 0;
+  for (int i = 0; i < PlanetSurfaceState::kMaxTraps; ++i) {
+    planetSurface_.trapX[i] = planetSurface_.trapY[i] = 0;
+    planetSurface_.trapKind[i] = planetSurface_.trapSprung[i] = 0;
+  }
+  planetSurface_.mobCount = 0;
+  for (int i = 0; i < PlanetSurfaceState::kMaxMobs; ++i) {
+    planetSurface_.mobX[i] = planetSurface_.mobY[i] = 0;
+    planetSurface_.mobHp[i] = planetSurface_.mobKind[i] = planetSurface_.mobPhase[i] = 0;
+  }
+  planetSurface_.chestCount = 0;
+  for (int i = 0; i < PlanetSurfaceState::kMaxChests; ++i) {
+    planetSurface_.chestX[i] = planetSurface_.chestY[i] = planetSurface_.chestOpened[i] = 0;
+  }
+  planetSurface_.gateX = planetSurface_.gateY = 0;
+  planetSurface_.gateApproachX = planetSurface_.gateApproachY = 0;
+  planetSurface_.gateApproachDir = planetSurface_.gateOpen = 0;
+  planetSurface_.leverX = planetSurface_.leverY = 0;
+  planetSurface_.leverFaceX = planetSurface_.leverFaceY = 0;
+  planetSurface_.leverFaceDir = planetSurface_.leverOn = 0;
+  planetSurface_.monolithX = planetSurface_.monolithY = planetSurface_.monolithActive = 0;
+  planetSurface_.shaftX = planetSurface_.shaftY = 0;
+
+  auto markAt = [&](const std::string& suffix) -> bool {
+    const std::string key = "planet-dng:" + here->id + ":f" + std::to_string(floor) +
+                            ":" + suffix;
+    auto it = sim.State().mapMarks.find(key);
+    return it != sim.State().mapMarks.end() && it->second;
+  };
+  auto monolithMarked = [&]() -> bool {
+    auto it = sim.State().mapMarks.find("planet-dng:" + here->id + ":monolith");
+    return it != sim.State().mapMarks.end() && it->second;
+  };
+
+  // Tile codes underground: 0 stone chamber floor, 1 rock wall, 2 threshold
+  // (bulkhead / portcullis), 3 corridor flagstone and rail track.
   std::uint8_t mTile[N * N];
   std::memset(mTile, 1, sizeof(mTile));
   auto mAt = [&](int u, int v) -> std::uint8_t& {
     return mTile[(v << PlanetSurfaceState::kSizeShift) | u];
   };
-  auto countOpenAdj = [&](int u, int v) -> int {
-    int c = 0;
+
+  struct Chamber { int x, y, w, h, cx, cy; };
+  Chamber rooms[PlanetSurfaceState::kMaxChambers]{};
+  int nRooms = 0;
+  auto clashesRoom = [&](int x, int y, int w, int hh) -> bool {
+    for (int r = 0; r < nRooms; ++r) {
+      const Chamber& o = rooms[r];
+      if (x + w + 1 <= o.x || o.x + o.w + 1 <= x) { continue; }
+      if (y + hh + 1 <= o.y || o.y + o.h + 1 <= y) { continue; }
+      return true;
+    }
+    return false;
+  };
+  auto addRoom = [&](int x, int y, int w, int hh) {
+    for (int dv = 0; dv < hh; ++dv) {
+      for (int du = 0; du < w; ++du) { mAt(x + du, y + dv) = 0u; }
+    }
+    // Round masonry pillar in 4x4 / 5x4 halls: real corner sightlines in 3D.
+    if (w >= 4 && hh >= 4) { mAt(x + w / 2, y + hh / 2) = 1u; }
+    rooms[nRooms++] = Chamber{x, y, w, hh, x + w / 2, y + hh / 2};
+  };
+
+  const int wantRooms = 3 + static_cast<int>(nextRand() % 3u);  // 3..5 chambers
+  for (int attempt = 0; attempt < 260 && nRooms < wantRooms; ++attempt) {
+    const int w = 3 + static_cast<int>(nextRand() % 3u);
+    const int hh = 3 + static_cast<int>(nextRand() % 2u);
+    const int x = 1 + static_cast<int>(nextRand() % static_cast<std::uint32_t>(N - 2 - w));
+    const int y = 1 + static_cast<int>(nextRand() % static_cast<std::uint32_t>(N - 2 - hh));
+    if (floor == 1 && x - 1 <= 9 && x + w >= 7 && y - 1 <= 14 && y + hh >= 9) { continue; }
+    if (clashesRoom(x, y, w, hh)) { continue; }
+    addRoom(x, y, w, hh);
+  }
+  static constexpr int kFallbackRooms[5][4] = {
+      {2, 2, 3, 3}, {11, 2, 3, 3}, {2, 11, 3, 3}, {11, 11, 3, 3}, {6, 7, 4, 4}};
+  for (int f = 0; f < 5 && nRooms < 3; ++f) {
+    const int x = kFallbackRooms[f][0], y = kFallbackRooms[f][1];
+    const int w = kFallbackRooms[f][2], hh = kFallbackRooms[f][3];
+    if (clashesRoom(x, y, w, hh)) { continue; }
+    addRoom(x, y, w, hh);
+  }
+
+  auto carveH = [&](int u0, int u1, int v) {
+    if (u0 > u1) { std::swap(u0, u1); }
+    for (int u = u0; u <= u1; ++u) {
+      if (u >= 1 && u < N - 1 && v >= 1 && v < N - 1 && mAt(u, v) == 1u) { mAt(u, v) = 3u; }
+    }
+  };
+  auto carveV = [&](int v0, int v1, int u) {
+    if (v0 > v1) { std::swap(v0, v1); }
+    for (int v = v0; v <= v1; ++v) {
+      if (u >= 1 && u < N - 1 && v >= 1 && v < N - 1 && mAt(u, v) == 1u) { mAt(u, v) = 3u; }
+    }
+  };
+  auto connect = [&](int ax, int ay, int bx, int by, bool horizFirst) {
+    if (horizFirst) {
+      carveH(ax, bx, ay);
+      carveV(ay, by, bx);
+    } else {
+      carveV(ay, by, ax);
+      carveH(ax, bx, by);
+    }
+  };
+
+  constexpr int kEntryU = 8;
+  constexpr int kEntryV = 13;
+  if (floor == 1 && nRooms > 0) {
+    carveV(10, 13, kEntryU);  // entrance vestibule straight off the daylight shaft
+    connect(kEntryU, 10, rooms[0].cx, rooms[0].cy, (nextRand() & 1u) != 0u);
+  }
+  for (int r = 1; r < nRooms; ++r) {
+    connect(rooms[r - 1].cx, rooms[r - 1].cy, rooms[r].cx, rooms[r].cy,
+            (nextRand() & 1u) != 0u);
+  }
+  // 1..2 secondary loops so there are flanking routes, never one hallway.
+  const int loops = 1 + static_cast<int>(nextRand() % 2u);
+  for (int l = 0; l < loops && nRooms >= 2; ++l) {
+    const int a = static_cast<int>(nextRand() % static_cast<std::uint32_t>(nRooms));
+    int b = static_cast<int>(nextRand() % static_cast<std::uint32_t>(nRooms));
+    if (b == a) { b = (a + 1) % nRooms; }
+    connect(rooms[a].cx, rooms[a].cy, rooms[b].cx, rooms[b].cy,
+            (nextRand() & 1u) == 0u);
+  }
+
+  auto isRoomFloor = [&](int u, int v) -> bool {
+    for (int r = 0; r < nRooms; ++r) {
+      const Chamber& c = rooms[r];
+      if (u >= c.x && u < c.x + c.w && v >= c.y && v < c.y + c.h && mAt(u, v) == 0u) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // 2..3 dead-end vault alcoves: two-tile passage into a 1x1 end chamber.
+  int alcoveMouthU[PlanetSurfaceState::kMaxAlcoves]{};
+  int alcoveMouthV[PlanetSurfaceState::kMaxAlcoves]{};
+  int alcoveEndU[PlanetSurfaceState::kMaxAlcoves]{};
+  int alcoveEndV[PlanetSurfaceState::kMaxAlcoves]{};
+  int nAlcoves = 0;
+  std::uint8_t alcoveUsed[N * N]{};
+  const int wantAlcoves = 2 + static_cast<int>(nextRand() % 2u);
+  // A vault alcove is a solid two-tile passage into a 1x1 end chamber. `drop`
+  // is 1 for the short form (mouth + end) when a two-tile passage cannot fit.
+  auto carveAlcove = [&](int ux, int uy, int d, int drop) -> bool {
+    if (mAt(ux, uy) != 3u && mAt(ux, uy) != 0u) { return false; }
+    if (alcoveUsed[(uy << PlanetSurfaceState::kSizeShift) | ux] != 0u) { return false; }
+    if (isRoomFloor(ux, uy)) { return false; }
+    const int u1 = ux + kCardDx[d], v1 = uy + kCardDy[d];
+    const int u2 = u1 + kCardDx[d] * drop, v2 = v1 + kCardDy[d] * drop;
+    const int u3 = u2 + kCardDx[d], v3 = v2 + kCardDy[d];
+    if (u1 < 1 || u1 >= N - 1 || v1 < 1 || v1 >= N - 1) { return false; }
+    if (u3 < 1 || u3 >= N - 1 || v3 < 1 || v3 >= N - 1) { return false; }
+    if (mAt(u1, v1) != 1u) { return false; }
+    if (drop == 1 && mAt(u2, v2) != 1u) { return false; }
+    if (mAt(u3, v3) != 1u) { return false; }
+    // The passage and the end must be enclosed sideways: a true dead end.
+    for (int step = 0; step <= drop; ++step) {
+      const int cu = u1 + kCardDx[d] * step, cv = v1 + kCardDy[d] * step;
+      for (int k = 0; k < 4; ++k) {
+        const int nu = cu + kCardDx[k], nv = cv + kCardDy[k];
+        if ((nu == ux && nv == uy) || (nu == u3 && nv == v3)) { continue; }
+        if (nu >= 1 && nu < N - 1 && nv >= 1 && nv < N - 1 && mAt(nu, nv) != 1u) { return false; }
+      }
+    }
+    mAt(u1, v1) = 2u;  // threshold: alcove 0 carries the locked portcullis
+    for (int step = 1; step <= drop; ++step) {
+      mAt(u1 + kCardDx[d] * step, v1 + kCardDy[d] * step) = 3u;
+    }
+    mAt(u3, v3) = 0u;
+    for (int step = 0; step <= drop; ++step) {
+      const int cu = u1 + kCardDx[d] * step, cv = v1 + kCardDy[d] * step;
+      alcoveUsed[(cv << PlanetSurfaceState::kSizeShift) | cu] = 1u;
+    }
+    alcoveUsed[(v3 << PlanetSurfaceState::kSizeShift) | u3] = 1u;
+    alcoveMouthU[nAlcoves] = u1;
+    alcoveMouthV[nAlcoves] = v1;
+    alcoveEndU[nAlcoves] = u3;
+    alcoveEndV[nAlcoves] = v3;
+    ++nAlcoves;
+    return true;
+  };
+  for (int attempt = 0; attempt < 600 && nAlcoves < wantAlcoves; ++attempt) {
+    const int ux = 1 + static_cast<int>(nextRand() % static_cast<std::uint32_t>(N - 2));
+    const int uy = 1 + static_cast<int>(nextRand() % static_cast<std::uint32_t>(N - 2));
+    const int d = static_cast<int>(nextRand() % 4u);
+    carveAlcove(ux, uy, d, 1);
+  }
+  // Deterministic exhaustive top-up: the spec asks for 2..3 vault alcoves and
+  // the locked portcullis needs at least one.
+  for (int drop = 1; drop >= 0 && nAlcoves < wantAlcoves; --drop) {
+    for (int v = 1; v < N - 1 && nAlcoves < wantAlcoves; ++v) {
+      for (int u = 1; u < N - 1 && nAlcoves < wantAlcoves; ++u) {
+        if (mAt(u, v) == 1u || mAt(u, v) == 2u) { continue; }
+        for (int d = 0; d < 4 && nAlcoves < wantAlcoves; ++d) {
+          carveAlcove(u, v, d, drop);
+        }
+      }
+    }
+  }
+
+  // Stairwells: a solid wall cell with exactly one open approach tile.
+  struct StairCand { int sU, sV, aU, aV, dir; };
+  static StairCand stairCands[N * N * 4];  // 16 KB BSS: worst case four approaches per wall
+  int nStairCands = 0;
+  for (int v = 1; v < N - 1; ++v) {
+    for (int u = 1; u < N - 1; ++u) {
+      if (mAt(u, v) != 1u) { continue; }
+      for (int d = 0; d < 4; ++d) {
+        const int au = u + kCardDx[d], av = v + kCardDy[d];
+        if (au < 1 || au >= N - 1 || av < 1 || av >= N - 1) { continue; }
+        const std::uint8_t nt = mAt(au, av);
+        if (nt == 1u || nt == 2u) { continue; }
+        if (nStairCands >= N * N * 4) { continue; }
+        stairCands[nStairCands++] = StairCand{u, v, au, av, d};
+      }
+    }
+  }
+  int upStairU = -1, upStairV = -1, upArriveU = -1, upArriveV = -1, upDir = 0;
+  int downStairU = -1, downStairV = -1, downArriveU = -1, downArriveV = -1, downDir = 0;
+  auto pickStair = [&](int refU, int refV, int minDist, int avoidU, int avoidV,
+                       int& sU, int& sV, int& aU, int& aV, int& aDir) {
+    int seen = 0, pickIdx = -1;
+    for (int i = 0; i < nStairCands; ++i) {
+      const StairCand& c = stairCands[i];
+      if ((c.sU == upStairU && c.sV == upStairV) ||
+          (c.sU == downStairU && c.sV == downStairV)) {
+        continue;
+      }
+      if (std::abs(c.aU - refU) + std::abs(c.aV - refV) < minDist) { continue; }
+      if (avoidU >= 0 && std::abs(c.aU - avoidU) + std::abs(c.aV - avoidV) < 2) { continue; }
+      ++seen;
+      if (nextRand() % static_cast<std::uint32_t>(seen) == 0u) { pickIdx = i; }
+    }
+    if (pickIdx < 0) { return; }
+    const StairCand& c = stairCands[pickIdx];
+    sU = c.sU; sV = c.sV; aU = c.aU; aV = c.aV; aDir = c.dir;
+  };
+  if (floor == 1) {
+    upStairU = 8;
+    upStairV = 14;
+    upArriveU = kEntryU;
+    upArriveV = kEntryV;
+    upDir = 0;  // canonical outward normal (rotated with mineInDir when written)
+    pickStair(8, 13, 6, -1, -1, downStairU, downStairV, downArriveU, downArriveV, downDir);
+  } else {
+    pickStair(8, 8, 0, -1, -1, upStairU, upStairV, upArriveU, upArriveV, upDir);
+    pickStair(upArriveU, upArriveV, 4, upStairU, upStairV,
+              downStairU, downStairV, downArriveU, downArriveV, downDir);
+  }
+  for (int i = 0; i < nStairCands && downStairU < 0; ++i) {
+    const StairCand& c = stairCands[i];
+    if (c.sU == upStairU && c.sV == upStairV) { continue; }
+    downStairU = c.sU; downStairV = c.sV;
+    downArriveU = c.aU; downArriveV = c.aV; downDir = c.dir;
+  }
+
+  auto isStairCell = [&](int u, int v) -> bool {
+    return (u == upStairU && v == upStairV) || (u == downStairU && v == downStairV);
+  };
+
+  // Deterministic room-wall vaults: a chamber wall cell becomes the threshold
+  // and the solid rock behind it becomes a 1x1 vault end. This guarantees the
+  // locked portcullis vault and the deeper-floor second vault even when no
+  // dead-end corridor structure exists on the floor.
+  if (nAlcoves < wantAlcoves) {
+    std::uint8_t roomVaultApproach[N * N]{};
+    for (int r = 0; r < nRooms && nAlcoves < wantAlcoves; ++r) {
+      const Chamber& c = rooms[r];
+      for (int dv = 0; dv < c.h && nAlcoves < wantAlcoves; ++dv) {
+        for (int du = 0; du < c.w && nAlcoves < wantAlcoves; ++du) {
+          const int u = c.x + du, v = c.y + dv;
+          if (mAt(u, v) != 0u) { continue; }
+          if (roomVaultApproach[(v << PlanetSurfaceState::kSizeShift) | u] != 0u) { continue; }
+          for (int d = 0; d < 4 && nAlcoves < wantAlcoves; ++d) {
+            const int wu = u + kCardDx[d], wv = v + kCardDy[d];
+            const int eu = wu + kCardDx[d], ev = wv + kCardDy[d];
+            if (wu < 1 || wu >= N - 1 || wv < 1 || wv >= N - 1) { continue; }
+            if (eu < 1 || eu >= N - 1 || ev < 1 || ev >= N - 1) { continue; }
+            if (mAt(wu, wv) != 1u || mAt(eu, ev) != 1u) { continue; }
+            if (isStairCell(wu, wv) || isStairCell(eu, ev)) { continue; }
+            bool openSide = false;
+            for (int k = 0; k < 4; ++k) {
+              if (k == (d + 2) % 4) { continue; }
+              const int nu = eu + kCardDx[k], nv = ev + kCardDy[k];
+              if (nu >= 1 && nu < N - 1 && nv >= 1 && nv < N - 1 && mAt(nu, nv) != 1u) {
+                openSide = true;
+              }
+            }
+            if (openSide) { continue; }
+            mAt(wu, wv) = 2u;
+            mAt(eu, ev) = 0u;
+            roomVaultApproach[(v << PlanetSurfaceState::kSizeShift) | u] = 1u;
+            alcoveMouthU[nAlcoves] = wu;
+            alcoveMouthV[nAlcoves] = wv;
+            alcoveEndU[nAlcoves] = eu;
+            alcoveEndV[nAlcoves] = ev;
+            ++nAlcoves;
+          }
+        }
+      }
+    }
+  }
+
+  const int gateU = nAlcoves > 0 ? alcoveMouthU[0] : -1;
+  const int gateV = nAlcoves > 0 ? alcoveMouthV[0] : -1;
+  // Bulkhead doors at chamber thresholds / straight chokes, 2..3 per floor
+  // (alcove mouths beyond the locked portcullis come first).
+  int doorU[PlanetSurfaceState::kMaxDoors]{};
+  int doorV[PlanetSurfaceState::kMaxDoors]{};
+  int nDoors = 0;
+  const int wantDoors = 2 + static_cast<int>(nextRand() % 2u);
+  for (int a = 1; a < nAlcoves && nDoors < PlanetSurfaceState::kMaxDoors; ++a) {
+    doorU[nDoors] = alcoveMouthU[a];
+    doorV[nDoors] = alcoveMouthV[a];
+    ++nDoors;
+  }
+  auto isDoorCell = [&](int u, int v) -> bool {
+    for (int i = 0; i < nDoors; ++i) {
+      if (doorU[i] == u && doorV[i] == v) { return true; }
+    }
+    return false;
+  };
+  auto isStairArrival = [&](int u, int v) -> bool {
+    return (u == upArriveU && v == upArriveV) || (u == downArriveU && v == downArriveV);
+  };
+  for (int pass = 0; pass < 2 && nDoors < wantDoors; ++pass) {
+    for (int v = 1; v < N - 1 && nDoors < wantDoors; ++v) {
+      for (int u = 1; u < N - 1 && nDoors < wantDoors; ++u) {
+        if (mAt(u, v) == 1u || mAt(u, v) == 2u) { continue; }
+        if (isStairCell(u, v) || isStairArrival(u, v)) { continue; }
+        if (floor == 1 && u == 8 && v >= 12) { continue; }
+        const bool hOpen = u - 1 >= 1 && u + 1 < N - 1 &&
+                           mAt(u - 1, v) != 1u && mAt(u + 1, v) != 1u;
+        const bool vOpen = v - 1 >= 1 && v + 1 < N - 1 &&
+                           mAt(u, v - 1) != 1u && mAt(u, v + 1) != 1u;
+        const bool hSide = u - 1 >= 1 && u + 1 < N - 1 &&
+                           mAt(u - 1, v) == 1u && mAt(u + 1, v) == 1u;
+        const bool vSide = v - 1 >= 1 && v + 1 < N - 1 &&
+                           mAt(u, v - 1) == 1u && mAt(u, v + 1) == 1u;
+        if (!((hOpen && vSide) || (vOpen && hSide))) { continue; }
+        if (pass == 0 && !isRoomFloor(u - 1, v) && !isRoomFloor(u + 1, v) &&
+            !isRoomFloor(u, v - 1) && !isRoomFloor(u, v + 1)) {
+          continue;
+        }
+        bool near = false;
+        for (int i = 0; i < nDoors; ++i) {
+          if (std::abs(doorU[i] - u) + std::abs(doorV[i] - v) < 2) { near = true; }
+        }
+        if (near) { continue; }
+        doorU[nDoors] = u;
+        doorV[nDoors] = v;
+        mAt(u, v) = 2u;
+        ++nDoors;
+      }
+    }
+  }
+
+  // Deterministic chamber-threshold bulkheads: the first carved corridor cell
+  // outside a chamber, chosen floor by floor so every floor reaches 2 doors.
+  for (int r = 0; r < nRooms && nDoors < wantDoors; ++r) {
+    const Chamber& c = rooms[r];
+    bool placedForRoom = false;
+    for (int dv = -1; dv <= c.h && !placedForRoom; ++dv) {
+      for (int du = -1; du <= c.w && !placedForRoom; ++du) {
+        const int u = c.x + du, v = c.y + dv;
+        const bool onRing = (du < 0 || du >= c.w || dv < 0 || dv >= c.h);
+        if (!onRing) { continue; }
+        if (u < 1 || u >= N - 1 || v < 1 || v >= N - 1) { continue; }
+        if (mAt(u, v) != 3u) { continue; }
+        if (isStairCell(u, v) || isStairArrival(u, v)) { continue; }
+        if (u == gateU && v == gateV) { continue; }
+        bool near = false;
+        for (int i = 0; i < nDoors; ++i) {
+          if (std::abs(doorU[i] - u) + std::abs(doorV[i] - v) < 2) { near = true; }
+        }
+        if (near) { continue; }
+        doorU[nDoors] = u;
+        doorV[nDoors] = v;
+        mAt(u, v) = 2u;
+        ++nDoors;
+        placedForRoom = true;
+      }
+    }
+  }
+
+  // Wall lever: an iron bracket on a corridor/chamber wall elsewhere on the floor.
+  int leverU = -1, leverV = -1, leverFaceU = -1, leverFaceV = -1, leverFaceDir = 0;
+  {
+    int seen = 0, pickIdx = -1;
+    for (int i = 0; i < nStairCands; ++i) {
+      const StairCand& c = stairCands[i];
+      if (isStairCell(c.sU, c.sV)) { continue; }
+      if (gateU >= 0 && std::abs(c.sU - gateU) + std::abs(c.sV - gateV) < 4) { continue; }
+      if (isStairArrival(c.aU, c.aV)) { continue; }
+      if (c.sU == upStairU && c.sV == upStairV) { continue; }
+      if (floor == 1 && std::abs(c.aU - kEntryU) + std::abs(c.aV - kEntryV) < 3) { continue; }
+      ++seen;
+      if (nextRand() % static_cast<std::uint32_t>(seen) == 0u) { pickIdx = i; }
+    }
+    if (pickIdx < 0) {
+      for (int i = 0; i < nStairCands && pickIdx < 0; ++i) {
+        const StairCand& c = stairCands[i];
+        if (isStairCell(c.sU, c.sV)) { continue; }
+        pickIdx = i;
+      }
+    }
+    if (pickIdx >= 0) {
+      const StairCand& c = stairCands[pickIdx];
+      leverU = c.sU; leverV = c.sV;
+      leverFaceU = c.aU; leverFaceV = c.aV;
+      leverFaceDir = c.dir;  // from the approach tile toward the lever
+    }
+    // The bracket must be dressed masonry, never a stairwell arch or a vault mouth.
+    if (leverU >= 0) {
+      int clash = 0;
+      if (mAt(leverU, leverV) != 1u) { clash = 1; }
+      for (int i = 0; i < nDoors; ++i) {
+        if (doorU[i] == leverU && doorV[i] == leverV) { clash = 1; }
+      }
+      if (clash != 0) {
+        int fixIdx = -1;
+        for (int i = 0; i < nStairCands && fixIdx < 0; ++i) {
+          const StairCand& c = stairCands[i];
+          if (mAt(c.sU, c.sV) != 1u) { continue; }
+          if (isStairCell(c.sU, c.sV)) { continue; }
+          if (isStairArrival(c.aU, c.aV)) { continue; }
+          if (gateU >= 0 && std::abs(c.sU - gateU) + std::abs(c.sV - gateV) < 3) { continue; }
+          bool doorClash = false;
+          for (int k = 0; k < nDoors; ++k) {
+            if (doorU[k] == c.sU && doorV[k] == c.sV) { doorClash = true; }
+          }
+          if (doorClash) { continue; }
+          fixIdx = i;
+        }
+        if (fixIdx >= 0) {
+          const StairCand& c = stairCands[fixIdx];
+          leverU = c.sU; leverV = c.sV;
+          leverFaceU = c.aU; leverFaceV = c.aV;
+          leverFaceDir = c.dir;
+        } else {
+          leverU = leverV = leverFaceU = leverFaceV = -1;
+          leverFaceDir = 0;
+        }
+      }
+    }
+  }
+
+  // Survey monolith on B3: mounted in a chamber wall away from the entry stair.
+  int monoU = -1, monoV = -1, monoFaceU = -1, monoFaceV = -1;
+  if (floor == 3) {
+    int seen = 0, pickIdxU = -1, pickIdxV = -1, pickIdxFU = -1, pickIdxFV = -1;
+    for (int r = 0; r < nRooms; ++r) {
+      const Chamber& c = rooms[r];
+      for (int dv = 0; dv < c.h; ++dv) {
+        for (int du = 0; du < c.w; ++du) {
+          const int u = c.x + du, v = c.y + dv;
+          if (mAt(u, v) != 0u) { continue; }
+          for (int d = 0; d < 4; ++d) {
+            const int wu = u + kCardDx[d], wv = v + kCardDy[d];
+            if (wu < 1 || wu >= N - 1 || wv < 1 || wv >= N - 1) { continue; }
+            if (mAt(wu, wv) != 1u || isStairCell(wu, wv)) { continue; }
+            if (wu == leverU && wv == leverV) { continue; }
+            if (isStairArrival(u, v)) { continue; }
+            if (std::abs(u - upArriveU) + std::abs(v - upArriveV) < 3) { continue; }
+            ++seen;
+            if (nextRand() % static_cast<std::uint32_t>(seen) != 0u) { continue; }
+            pickIdxU = wu; pickIdxV = wv;
+            pickIdxFU = u; pickIdxFV = v;
+          }
+        }
+      }
+    }
+    monoU = pickIdxU; monoV = pickIdxV;
+    monoFaceU = pickIdxFU; monoFaceV = pickIdxFV;
+  }
+
+  // Biome-keyed depth hazards: 2..4 armed plates in chambers / loop corridors.
+  int trapU[PlanetSurfaceState::kMaxTraps]{};
+  int trapV[PlanetSurfaceState::kMaxTraps]{};
+  int trapKind[PlanetSurfaceState::kMaxTraps]{};
+  int nTraps = 0;
+  {
+    const bool lavaW = here->subtype == "lava" ||
+                       here->klass.find("Lava") != std::string::npos ||
+                       here->klass.find("Volcanic") != std::string::npos;
+    const bool iceW = !lavaW && here->subtype == "ice";
+    const bool oceanW = !lavaW && !iceW && here->subtype == "ocean";
+    const bool rockW = !lavaW && !iceW && !oceanW &&
+                       (here->subtype == "rock" ||
+                        here->klass.find("Rugged") != std::string::npos ||
+                        here->klass.find("Barren") != std::string::npos ||
+                        here->klass.find("Crater") != std::string::npos);
+    const int kind = lavaW ? 0 : iceW ? 1 : oceanW ? 2 : rockW ? 3 : 4;
+    const int wantTraps = 2 + static_cast<int>(nextRand() % 3u);
+    for (int attempt = 0; attempt < 700 && nTraps < wantTraps; ++attempt) {
+      const int u = 1 + static_cast<int>(nextRand() % static_cast<std::uint32_t>(N - 2));
+      const int v = 1 + static_cast<int>(nextRand() % static_cast<std::uint32_t>(N - 2));
+      if (mAt(u, v) != 0u && mAt(u, v) != 3u) { continue; }
+      if (isDoorCell(u, v) || (u == gateU && v == gateV) || isStairCell(u, v)) { continue; }
+      if (isStairArrival(u, v)) { continue; }
+      if (floor == 1 && std::abs(u - kEntryU) + std::abs(v - kEntryV) < 3) { continue; }
+      bool used = false;
+      for (int i = 0; i < nTraps; ++i) {
+        if (std::abs(trapU[i] - u) + std::abs(trapV[i] - v) < 2) { used = true; }
+      }
+      for (int a = 0; a < nAlcoves; ++a) {
+        if (u == alcoveEndU[a] && v == alcoveEndV[a]) { used = true; }
+      }
+      if (used) { continue; }
+      trapU[nTraps] = u;
+      trapV[nTraps] = v;
+      trapKind[nTraps] = kind;
+      ++nTraps;
+    }
+  }
+
+  // Step-synced subterranean sentries at Manhattan distance >= 4 from entry.
+  const int entryRefU = (floor == 1) ? kEntryU : upArriveU;
+  const int entryRefV = (floor == 1) ? kEntryV : upArriveV;
+  int wantMobs = 1;
+  if (floor == 2) { wantMobs = 2; }
+  if (floor == 3) { wantMobs = 2 + static_cast<int>(nextRand() % 2u); }
+  int mobU[PlanetSurfaceState::kMaxMobs]{};
+  int mobV[PlanetSurfaceState::kMaxMobs]{};
+  int nMobs = 0;
+  for (int attempt = 0; attempt < 700 && nMobs < wantMobs; ++attempt) {
+    const int u = 1 + static_cast<int>(nextRand() % static_cast<std::uint32_t>(N - 2));
+    const int v = 1 + static_cast<int>(nextRand() % static_cast<std::uint32_t>(N - 2));
+    if (mAt(u, v) != 0u && mAt(u, v) != 3u) { continue; }
+    if (std::abs(u - entryRefU) + std::abs(v - entryRefV) < 4) { continue; }
+    if (isDoorCell(u, v) || (u == gateU && v == gateV) || isStairCell(u, v)) { continue; }
+    if (isStairArrival(u, v)) { continue; }
+    bool used = false;
+    for (int i = 0; i < nMobs; ++i) {
+      if (std::abs(mobU[i] - u) + std::abs(mobV[i] - v) < 2) { used = true; }
+    }
+    for (int a = 0; a < nAlcoves; ++a) {
+      if (u == alcoveEndU[a] && v == alcoveEndV[a]) { used = true; }
+    }
+    for (int t = 0; t < nTraps; ++t) {
+      if (u == trapU[t] && v == trapV[t]) { used = true; }
+    }
+    if (used) { continue; }
+    mobU[nMobs] = u;
+    mobV[nMobs] = v;
+    ++nMobs;
+  }
+
+  // Sealed vault chests: the locked alcove end plus a deeper-floor second vault.
+  int chestU[PlanetSurfaceState::kMaxChests]{};
+  int chestV[PlanetSurfaceState::kMaxChests]{};
+  int nChests = 0;
+  for (int a = 0; a < nAlcoves && nChests < PlanetSurfaceState::kMaxChests; ++a) {
+    if (a >= 1 && floor < 2) { break; }
+    chestU[nChests] = alcoveEndU[a];
+    chestV[nChests] = alcoveEndV[a];
+    ++nChests;
+  }
+
+  // B1 mine ore keeps the shared "planet-ore:<planetId>:<idx>" mark scheme.
+  int oreU[PlanetSurfaceState::kMaxOre]{};
+  int oreV[PlanetSurfaceState::kMaxOre]{};
+  int nOreCand = 0;
+  if (placeOres && floor == 1) {
+    for (int attempt = 0; attempt < 700 && nOreCand < mineOreGoal; ++attempt) {
+      const int u = 1 + static_cast<int>(nextRand() % static_cast<std::uint32_t>(N - 2));
+      const int v = 1 + static_cast<int>(nextRand() % static_cast<std::uint32_t>(N - 2));
+      if (mAt(u, v) != 0u && mAt(u, v) != 3u) { continue; }
+      if (std::abs(u - kEntryU) + std::abs(v - kEntryV) < 5) { continue; }
+      if (isStairCell(u, v) || isDoorCell(u, v) || (u == gateU && v == gateV)) { continue; }
+      bool used = false;
+      for (int i = 0; i < nOreCand; ++i) {
+        if (std::abs(oreU[i] - u) + std::abs(oreV[i] - v) < 2) { used = true; }
+      }
+      for (int c = 0; c < nChests; ++c) {
+        if (u == chestU[c] && v == chestV[c]) { used = true; }
+      }
+      for (int t = 0; t < nTraps; ++t) {
+        if (u == trapU[t] && v == trapV[t]) { used = true; }
+      }
+      if (used) { continue; }
+      oreU[nOreCand] = u;
+      oreV[nOreCand] = v;
+      ++nOreCand;
+    }
+  }
+
+  // ---- stack-only connectivity passes (uint16_t rows + uint8_t queue) ------
+  std::uint16_t reachRows[N]{};
+  std::uint8_t queue[N * N];
+  auto flood = [&](int startU, int startV, bool gateOpen, int blockU, int blockV) -> int {
+    std::memset(reachRows, 0, sizeof(reachRows));
+    int head = 0, tail = 0, count = 0;
+    auto walk = [&](int u, int v) -> bool {
+      if (u < 1 || u >= N - 1 || v < 1 || v >= N - 1) { return false; }
+      if (u == blockU && v == blockV) { return false; }
+      const std::uint8_t t = mAt(u, v);
+      if (t == 1u) { return false; }
+      // Bulkheads are openable; the portcullis is a wall until it is raised.
+      if (t == 2u && !gateOpen && u == gateU && v == gateV) { return false; }
+      return true;
+    };
+    if (!walk(startU, startV)) { return 0; }
+    reachRows[startV] = static_cast<std::uint16_t>(1u << startU);
+    queue[tail++] = static_cast<std::uint8_t>((startV << PlanetSurfaceState::kSizeShift) | startU);
+    ++count;
+    while (head < tail) {
+      const std::uint8_t packed = queue[head++];
+      const int u = static_cast<int>(packed & (N - 1));
+      const int v = static_cast<int>(packed >> PlanetSurfaceState::kSizeShift);
+      for (int d = 0; d < 4; ++d) {
+        const int nu = u + kCardDx[d], nv = v + kCardDy[d];
+        if (!walk(nu, nv)) { continue; }
+        const std::uint16_t bit = static_cast<std::uint16_t>(1u << nu);
+        if ((reachRows[nv] & bit) != 0u) { continue; }
+        reachRows[nv] |= bit;
+        queue[tail++] = static_cast<std::uint8_t>((nv << PlanetSurfaceState::kSizeShift) | nu);
+        ++count;
+      }
+    }
+    return count;
+  };
+  auto reached = [&](int u, int v) -> bool {
+    if (u < 1 || u >= N - 1 || v < 1 || v >= N - 1) { return false; }
+    return ((reachRows[v] >> u) & 1u) != 0u;
+  };
+
+  const int spawnU = (floor == 1) ? kEntryU : upArriveU;
+  const int spawnV = (floor == 1) ? kEntryV : upArriveV;
+
+  // Invariant 1: portcullis shut (bulkheads are openable) - the lever's
+  // approach tile must be reachable from the floor's entry spawn.
+  flood(spawnU, spawnV, false, -1, -1);
+  if (leverFaceU >= 0 && !reached(leverFaceU, leverFaceV)) {
+    int fixIdx = -1;
+    for (int i = 0; i < nStairCands && fixIdx < 0; ++i) {
+      const StairCand& c = stairCands[i];
+      if (isStairCell(c.sU, c.sV)) { continue; }
+      if (!reached(c.aU, c.aV)) { continue; }
+      fixIdx = i;
+    }
+    if (fixIdx >= 0) {
+      const StairCand& c = stairCands[fixIdx];
+      leverU = c.sU; leverV = c.sV;
+      leverFaceU = c.aU; leverFaceV = c.aV;
+      leverFaceDir = c.dir;
+    } else {
+      leverU = leverV = leverFaceU = leverFaceV = -1;
+    }
+  }
+
+  // Invariant 2: portcullis open - the descent stairwell, the monolith and every
+  // chest / ore approach must be reachable.
+  flood(spawnU, spawnV, true, -1, -1);
+  auto approachReached = [&](int u, int v) -> bool {
+    if (reached(u, v)) { return true; }
     for (int d = 0; d < 4; ++d) {
-      const int nu = u + kCardDx[d];
-      const int nv = v + kCardDy[d];
-      if (nu > 0 && nu < N - 1 && nv > 0 && nv < N - 1 && mAt(nu, nv) != 1u) {
-        ++c;
-      }
+      if (reached(u + kCardDx[d], v + kCardDy[d])) { return true; }
     }
-    return c;
+    return false;
   };
-
-  std::uint8_t spine[N * N];
-  int spineLen = 0;
-  auto carveCell = [&](int u, int v, std::uint8_t kind) {
-    if (mAt(u, v) == 1u) {
-      mAt(u, v) = kind;
-      if (spineLen < N * N) {
-        spine[spineLen++] = static_cast<std::uint8_t>((v << PlanetSurfaceState::kSizeShift) | u);
-      }
-    } else if (kind == 3u && mAt(u, v) == 0u) {
-      mAt(u, v) = 3u;
-    }
-  };
-
-  // Canonical entrance shaft at (8,14) -> (8,13..11) heading North; rotated to match mineInDir
-  carveCell(8, 13, 3u);
-  carveCell(8, 12, 3u);
-  carveCell(8, 11, 3u);
-
-  int cu = 8, cv = 11, cDir = 0;
-  const int aditSteps = 20 + static_cast<int>(nextRand() % 7u) + density * 4;
-  for (int step = 0; step < aditSteps; ++step) {
-    int cands[8];
-    int nCand = 0;
-    for (int pass = 0; pass < 2 && nCand == 0; ++pass) {
-      const int maxAdj = (pass == 0) ? 1 : 2;
-      for (int d = 0; d < 4; ++d) {
-        if (d == (cDir + 2) % 4) { continue; }
-        if (step < 3 && d == 2) { continue; }
-        const int nu = cu + kCardDx[d];
-        const int nv = cv + kCardDy[d];
-        if (nu <= 0 || nu >= N - 1 || nv <= 0 || nv >= N - 2) { continue; }
-        if (mAt(nu, nv) != 1u || countOpenAdj(nu, nv) > maxAdj) { continue; }
-        const int weight = (d == cDir) ? ((step % 3 == 0) ? 1 : 2) : 2;
-        for (int w = 0; w < weight && nCand < 8; ++w) { cands[nCand++] = d; }
-      }
-    }
-    if (nCand == 0) { break; }
-    cDir = cands[nextRand() % static_cast<std::uint32_t>(nCand)];
-    cu += kCardDx[cDir];
-    cv += kCardDy[cDir];
-    carveCell(cu, cv, 3u);
+  for (int c = 0; c < nChests; ++c) {
+    if (!approachReached(chestU[c], chestV[c])) { chestU[c] = chestV[c] = -1; }
   }
-
-  // Carve branching side drifts off the main adit
-  const int driftCount = 3 + static_cast<int>(nextRand() % 2u) + density * 2;
-  for (int b = 0; b < driftCount && spineLen > 3; ++b) {
-    const int seedIdx = 2 + static_cast<int>(nextRand() % static_cast<std::uint32_t>(spineLen - 2));
-    int bu = static_cast<int>(spine[seedIdx] & (N - 1));
-    int bv = static_cast<int>(spine[seedIdx] >> PlanetSurfaceState::kSizeShift);
-    int bDir = static_cast<int>(nextRand() % 4u);
-    const int driftSteps = 5 + static_cast<int>(nextRand() % 5u);
-    for (int step = 0; step < driftSteps; ++step) {
-      int cands[4];
-      int nCand = 0;
-      const int maxAdj = (b == 0 && step + 1 == driftSteps) ? 2 : 1;
-      for (int d = 0; d < 4; ++d) {
-        if (d == (bDir + 2) % 4) { continue; }
-        const int nu = bu + kCardDx[d];
-        const int nv = bv + kCardDy[d];
-        if (nu <= 0 || nu >= N - 1 || nv <= 0 || nv >= N - 2) { continue; }
-        if (mAt(nu, nv) != 1u || countOpenAdj(nu, nv) > maxAdj) { continue; }
-        cands[nCand++] = d;
-      }
-      if (nCand == 0) { break; }
-      bDir = cands[nextRand() % static_cast<std::uint32_t>(nCand)];
-      bu += kCardDx[bDir];
-      bv += kCardDy[bDir];
-      carveCell(bu, bv, (step < 3) ? 3u : 0u);
-    }
+  for (int oi = 0; oi < nOreCand; ++oi) {
+    if (oreU[oi] < 0) { continue; }
+    if (!approachReached(oreU[oi], oreV[oi])) { oreU[oi] = oreV[oi] = -1; }
   }
-
-  // Excavate small 2x2 subterranean pockets anchored on carved drifts for alcoves/chambers
-  const int pocketCount = 2 + static_cast<int>(nextRand() % 2u) + density;
-  for (int p = 0; p < pocketCount && spineLen > 4; ++p) {
-    const int seedIdx = 3 + static_cast<int>(nextRand() % static_cast<std::uint32_t>(spineLen - 3));
-    const int pu = std::clamp(static_cast<int>(spine[seedIdx] & (N - 1)), 1, N - 3);
-    const int pv = std::clamp(static_cast<int>(spine[seedIdx] >> PlanetSurfaceState::kSizeShift), 1, N - 4);
-    for (int dv = 0; dv < 2; ++dv) {
-      for (int du = 0; du < 2; ++du) {
-        carveCell(pu + du, pv + dv, 0u);
+  if (monoU >= 0 && !approachReached(monoFaceU, monoFaceV)) {
+    monoU = monoV = monoFaceU = monoFaceV = -1;
+  }
+  if (floor == 3) {
+    // The monolith must exist on B3: fall back to any reached wall bracket.
+    if (monoU < 0) {
+      for (int i = 0; i < nStairCands && monoU < 0; ++i) {
+        const StairCand& c = stairCands[i];
+        if (isStairCell(c.sU, c.sV) || (c.sU == leverU && c.sV == leverV)) { continue; }
+        if (!reached(c.aU, c.aV)) { continue; }
+        monoU = c.sU; monoV = c.sV;
+        monoFaceU = c.aU; monoFaceV = c.aV;
       }
     }
   }
-
-  // Ensure every planet's underground mine has a generous network (>= 32 walkable cells)
-  for (int extra = 0; extra < 32 && spineLen < 34 && spineLen > 2; ++extra) {
-    const int seedIdx = 1 + static_cast<int>(nextRand() % static_cast<std::uint32_t>(spineLen - 1));
-    int eu = static_cast<int>(spine[seedIdx] & (N - 1));
-    int ev = static_cast<int>(spine[seedIdx] >> PlanetSurfaceState::kSizeShift);
-    int eDir = static_cast<int>(nextRand() % 4u);
-    for (int step = 0; step < 5 && spineLen < 34; ++step) {
-      int cands[4];
-      int nCand = 0;
-      for (int d = 0; d < 4; ++d) {
-        const int nu = eu + kCardDx[d];
-        const int nv = ev + kCardDy[d];
-        if (nu <= 0 || nu >= N - 1 || nv <= 0 || nv >= N - 2) { continue; }
-        if (mAt(nu, nv) != 1u || countOpenAdj(nu, nv) > 1) { continue; }
-        cands[nCand++] = d;
+  if (downArriveU >= 0 && !approachReached(downArriveU, downArriveV)) {
+    // Re-pick the descent stair from a candidate the open floor can reach.
+    bool fixed = false;
+    for (int i = 0; i < nStairCands && !fixed; ++i) {
+      const StairCand& c = stairCands[i];
+      if (c.sU == upStairU && c.sV == upStairV) { continue; }
+      if (!reached(c.aU, c.aV)) { continue; }
+      downStairU = c.sU; downStairV = c.sV;
+      downArriveU = c.aU; downArriveV = c.aV; downDir = c.dir;
+      fixed = true;
+    }
+  }
+  // A solid uncollected chest / ore must not seal a one-tile choke point: with
+  // that tile treated as solid the reachable set may lose it and nothing more.
+  {
+    const int openCount = flood(spawnU, spawnV, true, -1, -1);
+    auto sealsChoke = [&](int u, int v) -> bool {
+      if (u < 0) { return false; }
+      flood(spawnU, spawnV, true, -1, -1);
+      if (!reached(u, v)) { return false; }
+      return openCount - flood(spawnU, spawnV, true, u, v) > 1;
+    };
+    for (int c = 0; c < nChests; ++c) {
+      if (sealsChoke(chestU[c], chestV[c])) { chestU[c] = chestV[c] = -1; }
+    }
+    for (int oi = 0; oi < nOreCand; ++oi) {
+      if (sealsChoke(oreU[oi], oreV[oi])) { oreU[oi] = oreV[oi] = -1; }
+    }
+    for (int c = 0; c < nChests;) {
+      if (chestU[c] != -1) { ++c; continue; }
+      for (int k = c; k < nChests - 1; ++k) {
+        chestU[k] = chestU[k + 1];
+        chestV[k] = chestV[k + 1];
       }
-      if (nCand == 0) { break; }
-      eDir = cands[nextRand() % static_cast<std::uint32_t>(nCand)];
-      eu += kCardDx[eDir];
-      ev += kCardDy[eDir];
-      carveCell(eu, ev, (step < 2) ? 3u : 0u);
+      --nChests;
     }
   }
 
+  // ---- write the grid, variants and entity coordinates --------------------
   const int rot = static_cast<int>(planetSurface_.mineInDir & 3u);
   auto mapCoord = [rot](int u, int v, int& xOut, int& yOut) {
     if (rot == 0) {
@@ -473,86 +1092,144 @@ void ShellView::LoadPlanetLayer(const Simulation& sim, std::uint8_t targetInMine
       yOut = (N - 1) - u;
     }
   };
+  auto rotDir = [rot](int d) -> int { return (d + rot) & 3; };
+  auto toX = [&](int u, int v) { int x = 0, y = 0; mapCoord(u, v, x, y); (void)y; return x; };
+  auto toY = [&](int u, int v) { int x = 0, y = 0; mapCoord(u, v, x, y); (void)x; return y; };
+  auto isPillar = [&](int u, int v) -> bool {
+    for (int r = 0; r < nRooms; ++r) {
+      const Chamber& c = rooms[r];
+      if (c.w >= 4 && c.h >= 4 && u == c.x + c.w / 2 && v == c.y + c.h / 2 &&
+          mAt(u, v) == 1u) {
+        return true;
+      }
+    }
+    return false;
+  };
 
   for (int v = 0; v < N; ++v) {
     for (int u = 0; u < N; ++u) {
-      int x = 0, y = 0;
-      mapCoord(u, v, x, y);
+      const int x = toX(u, v);
+      const int y = toY(u, v);
       const std::uint8_t t = mAt(u, v);
       planetSurface_.SetTile(x, y, t);
+      const bool stairStep = (u == upStairU && v == upStairV) ||
+                             (u == downStairU && v == downStairV);
       if (t == 1u) {
-        // 100% of underground walls are 3D rock/vein/shored-timber faces (variants 4..7)
-        planetSurface_.SetVariant(x, y, static_cast<std::uint8_t>(4u + (nextRand() & 3u)));
+        // Every underground wall is a 3D rock face; stair arches and pillars use
+        // the dressed masonry variant so their silhouette reads as built stone.
+        planetSurface_.SetVariant(x, y, (stairStep || isPillar(u, v))
+                                            ? 7u
+                                            : static_cast<std::uint8_t>(4u + (nextRand() & 3u)));
       } else {
         planetSurface_.SetVariant(x, y, static_cast<std::uint8_t>(nextRand() & 7u));
       }
     }
   }
 
-  int mPortalX = 0, mPortalY = 0, mSpawnX = 0, mSpawnY = 0, mShaftX = 0, mShaftY = 0;
-  mapCoord(8, 14, mPortalX, mPortalY);
-  mapCoord(8, 13, mSpawnX, mSpawnY);
-  mapCoord(8, 12, mShaftX, mShaftY);
-  planetSurface_.portalX = static_cast<std::uint8_t>(mPortalX);
-  planetSurface_.portalY = static_cast<std::uint8_t>(mPortalY);
-  planetSurface_.portalOutDir = static_cast<std::uint8_t>(rot);
-  planetSurface_.SetVariant(mPortalX, mPortalY, 7u);
-
-  if (placeOres) {
-    std::uint8_t tierA[N * N], tierB[N * N];
-    int nA = 0, nB = 0;
-    for (int y = 1; y < N - 1; ++y) {
-      for (int x = 1; x < N - 1; ++x) {
-        const std::uint8_t t = planetSurface_.Tile(x, y);
-        if (t != 0u && t != 3u) { continue; }
-        if ((x == mSpawnX && y == mSpawnY) || (x == mShaftX && y == mShaftY)) { continue; }
-        const int dist = std::abs(x - mSpawnX) + std::abs(y - mSpawnY);
-        int openDeg = 0;
-        for (int d = 0; d < 4; ++d) {
-          const std::uint8_t nt = planetSurface_.Tile(x + kCardDx[d], y + kCardDy[d]);
-          if (nt == 0u || nt == 3u) { ++openDeg; }
-        }
-        const std::uint8_t packed = static_cast<std::uint8_t>((y << PlanetSurfaceState::kSizeShift) | x);
-        if (dist >= 5 && (openDeg == 1 || t == 0u)) {
-          tierA[nA++] = packed;
-        } else if (dist >= 2) {
-          tierB[nB++] = packed;
-        }
-      }
+  // Gate, doors, stairs, lever and monolith in real (rotated) coordinates.
+  if (gateU >= 0) {
+    planetSurface_.gateX = static_cast<std::uint8_t>(toX(gateU, gateV));
+    planetSurface_.gateY = static_cast<std::uint8_t>(toY(gateU, gateV));
+    for (int d = 0; d < 4; ++d) {
+      const int nu = gateU + kCardDx[d], nv = gateV + kCardDy[d];
+      if (nu < 1 || nu >= N - 1 || nv < 1 || nv >= N - 1) { continue; }
+      if (mAt(nu, nv) == 1u || mAt(nu, nv) == 2u) { continue; }
+      const int bu = gateU - kCardDx[d], bv = gateV - kCardDy[d];
+      if (bu >= 1 && bu < N - 1 && bv >= 1 && bv < N - 1 && mAt(bu, bv) != 1u) { continue; }
+      planetSurface_.gateApproachX = static_cast<std::uint8_t>(toX(nu, nv));
+      planetSurface_.gateApproachY = static_cast<std::uint8_t>(toY(nu, nv));
+      planetSurface_.gateApproachDir = static_cast<std::uint8_t>(rotDir(d));
+      break;
     }
-    for (int i = 0; i < nA; ++i) {
-      const int pick = i + static_cast<int>(nextRand() % static_cast<std::uint32_t>(nA - i));
-      std::swap(tierA[i], tierA[pick]);
-    }
-    for (int i = 0; i < nB; ++i) {
-      const int pick = i + static_cast<int>(nextRand() % static_cast<std::uint32_t>(nB - i));
-      std::swap(tierB[i], tierB[pick]);
-    }
-    std::uint8_t candPos[N * N];
-    int candCount = 0;
-    for (int i = 0; i < nA; ++i) { candPos[candCount++] = tierA[i]; }
-    for (int i = 0; i < nB; ++i) { candPos[candCount++] = tierB[i]; }
-
-    int placedMineOres = 0;
-    for (int i = 0; i < candCount &&
-                    placedMineOres < mineOreGoal &&
-                    static_cast<int>(planetSurface_.oreCount) < PlanetSurfaceState::kMaxOre; ++i) {
-      const int slot = static_cast<int>(planetSurface_.oreCount);
-      planetSurface_.oreX[slot] = static_cast<std::uint8_t>(candPos[i] & (N - 1));
-      planetSurface_.oreY[slot] = static_cast<std::uint8_t>(candPos[i] >> PlanetSurfaceState::kSizeShift);
-      planetSurface_.oreLayerMask = static_cast<std::uint8_t>(planetSurface_.oreLayerMask | (1u << slot));
-      ++planetSurface_.oreCount;
-      if (connectedFrom(mSpawnX, mSpawnY, 1u, /*checkLayerOres=*/true)) {
-        ++placedMineOres;
-      } else {
-        planetSurface_.oreLayerMask = static_cast<std::uint8_t>(planetSurface_.oreLayerMask & ~(1u << slot));
-        --planetSurface_.oreCount;
-      }
-    }
+    planetSurface_.gateOpen = (markAt("gate") || markAt("lever")) ? 1u : 0u;
   }
+  planetSurface_.doorCount = static_cast<std::uint8_t>(nDoors);
+  for (int i = 0; i < nDoors; ++i) {
+    planetSurface_.doorX[i] = static_cast<std::uint8_t>(toX(doorU[i], doorV[i]));
+    planetSurface_.doorY[i] = static_cast<std::uint8_t>(toY(doorU[i], doorV[i]));
+    planetSurface_.doorOpen[i] = markAt("door:" + std::to_string(i)) ? 1u : 0u;
+  }
+  if (upStairU >= 0) {
+    // The B1 ascent is the surface portal itself; its stair variant/mark is set below.
+    planetSurface_.stairX[0] = static_cast<std::uint8_t>(toX(upStairU, upStairV));
+    planetSurface_.stairY[0] = static_cast<std::uint8_t>(toY(upStairU, upStairV));
+    planetSurface_.stairX2[0] = static_cast<std::uint8_t>(toX(upArriveU, upArriveV));
+    planetSurface_.stairY2[0] = static_cast<std::uint8_t>(toY(upArriveU, upArriveV));
+    planetSurface_.stairDir[0] = static_cast<std::uint8_t>(rotDir(upDir));
+  }
+  if (downStairU >= 0) {
+    planetSurface_.stairX[1] = static_cast<std::uint8_t>(toX(downStairU, downStairV));
+    planetSurface_.stairY[1] = static_cast<std::uint8_t>(toY(downStairU, downStairV));
+    planetSurface_.stairX2[1] = static_cast<std::uint8_t>(toX(downArriveU, downArriveV));
+    planetSurface_.stairY2[1] = static_cast<std::uint8_t>(toY(downArriveU, downArriveV));
+    planetSurface_.stairDir[1] = static_cast<std::uint8_t>(rotDir(downDir));
+  }
+  if (leverU >= 0) {
+    planetSurface_.leverX = static_cast<std::uint8_t>(toX(leverU, leverV));
+    planetSurface_.leverY = static_cast<std::uint8_t>(toY(leverU, leverV));
+    planetSurface_.leverFaceX = static_cast<std::uint8_t>(toX(leverFaceU, leverFaceV));
+    planetSurface_.leverFaceY = static_cast<std::uint8_t>(toY(leverFaceU, leverFaceV));
+    planetSurface_.leverFaceDir = static_cast<std::uint8_t>(rotDir(leverFaceDir));
+    planetSurface_.leverOn = markAt("lever") ? 1u : 0u;
+    if (planetSurface_.leverOn != 0u) { planetSurface_.gateOpen = 1u; }
+  }
+  if (monoU >= 0) {
+    planetSurface_.monolithX = static_cast<std::uint8_t>(toX(monoU, monoV));
+    planetSurface_.monolithY = static_cast<std::uint8_t>(toY(monoU, monoV));
+    planetSurface_.monolithActive = monolithMarked() ? 1u : 0u;
+  }
+  planetSurface_.trapCount = static_cast<std::uint8_t>(nTraps);
+  for (int i = 0; i < nTraps; ++i) {
+    planetSurface_.trapX[i] = static_cast<std::uint8_t>(toX(trapU[i], trapV[i]));
+    planetSurface_.trapY[i] = static_cast<std::uint8_t>(toY(trapU[i], trapV[i]));
+    planetSurface_.trapKind[i] = static_cast<std::uint8_t>(trapKind[i]);
+    planetSurface_.trapSprung[i] = markAt("trap:" + std::to_string(i)) ? 1u : 0u;
+  }
+  planetSurface_.mobCount = static_cast<std::uint8_t>(nMobs);
+  for (int i = 0; i < nMobs; ++i) {
+    planetSurface_.mobX[i] = static_cast<std::uint8_t>(toX(mobU[i], mobV[i]));
+    planetSurface_.mobY[i] = static_cast<std::uint8_t>(toY(mobU[i], mobV[i]));
+    planetSurface_.mobKind[i] = static_cast<std::uint8_t>(std::min(2, floor - 1));
+    planetSurface_.mobHp[i] = markAt("mob:" + std::to_string(i))
+                                  ? 0u
+                                  : static_cast<std::uint8_t>(floor >= 2 ? 3 : 2);
+    planetSurface_.mobPhase[i] = static_cast<std::uint8_t>((i * 3 + floor) & 7u);
+  }
+  planetSurface_.chestCount = static_cast<std::uint8_t>(nChests);
+  for (int i = 0; i < nChests; ++i) {
+    planetSurface_.chestX[i] = static_cast<std::uint8_t>(toX(chestU[i], chestV[i]));
+    planetSurface_.chestY[i] = static_cast<std::uint8_t>(toY(chestU[i], chestV[i]));
+    planetSurface_.chestOpened[i] = markAt("chest:" + std::to_string(i)) ? 1u : 0u;
+  }
+
+  for (int i = 0; i < nOreCand; ++i) {
+    if (oreU[i] < 0) { continue; }
+    if (static_cast<int>(planetSurface_.oreCount) >= PlanetSurfaceState::kMaxOre) { break; }
+    const int slot = static_cast<int>(planetSurface_.oreCount);
+    planetSurface_.oreX[slot] = static_cast<std::uint8_t>(toX(oreU[i], oreV[i]));
+    planetSurface_.oreY[slot] = static_cast<std::uint8_t>(toY(oreU[i], oreV[i]));
+    planetSurface_.oreLayerMask = static_cast<std::uint8_t>(planetSurface_.oreLayerMask |
+                                                            (1u << slot));
+    ++planetSurface_.oreCount;
+  }
+
+  // The B1 daylight exit shaft is the surface portal; B2/B3 have no surface mouth.
+  if (floor == 1) {
+    planetSurface_.portalX = planetSurface_.stairX[0];
+    planetSurface_.portalY = planetSurface_.stairY[0];
+    planetSurface_.portalOutDir = planetSurface_.stairDir[0];
+    planetSurface_.SetVariant(planetSurface_.portalX, planetSurface_.portalY, 7u);
+    planetSurface_.shaftX = planetSurface_.stairX2[0];
+    planetSurface_.shaftY = planetSurface_.stairY2[0];
+  } else {
+    planetSurface_.portalX = 255u;
+    planetSurface_.portalY = 255u;
+    planetSurface_.portalOutDir = 0u;
+  }
+  planetSurface_.inMine = static_cast<std::uint8_t>(floor);
 }
 
-void ShellView::EnsurePlanetSurface(const Simulation& sim) {
+void ShellView::EnsurePlanetSurface(Simulation& sim) {
   if (!sim.LandedOnPlanet()) { return; }
   const Body* here = sim.FindBodyById(sim.Map().here);
   if (here == nullptr) { return; }
@@ -562,8 +1239,8 @@ void ShellView::EnsurePlanetSurface(const Simulation& sim) {
   planetSurface_.planetId = here->id;
   constexpr int N = PlanetSurfaceState::kSize;
 
-  // Build surface & place surface ores, then build mine once to place underground ores,
-  // then restore surface cells in-place (0 B extra persistent map buffer).
+  // Build surface & place surface ores, then build B1 once to place underground
+  // ores, then restore surface cells in-place (0 B extra persistent map buffer).
   LoadPlanetLayer(sim, 0u, /*placeOres=*/true);
   std::uint8_t surfCells[N * N];
   std::memcpy(surfCells, planetSurface_.cells, sizeof(surfCells));
@@ -583,12 +1260,143 @@ void ShellView::EnsurePlanetSurface(const Simulation& sim) {
   planetSurface_.dir = 0u;
 }
 
-void ShellView::StepPlanetSurface(const Simulation& sim, int actionKind) {
+// Mark the 3x3 around a tile plus up to two tiles down an unoccluded sightline
+// as explored on the given dungeon floor.
+void ShellView::MarkDungeonExplored(int floorNo, int x, int y, int dir) {
+  if (floorNo < 1 || floorNo > 3) { return; }
+  constexpr int N = PlanetSurfaceState::kSize;
+  auto set = [&](int cx, int cy) {
+    if (cx < 0 || cx >= N || cy < 0 || cy >= N) { return; }
+    planetSurface_.exploredRows[floorNo - 1][cy] =
+        static_cast<std::uint16_t>(planetSurface_.exploredRows[floorNo - 1][cy] |
+                                   (1u << static_cast<unsigned>(cx)));
+  };
+  for (int dy = -1; dy <= 1; ++dy) {
+    for (int dx = -1; dx <= 1; ++dx) { set(x + dx, y + dy); }
+  }
+  static constexpr int kDx[4] = {0, 1, 0, -1};
+  static constexpr int kDy[4] = {-1, 0, 1, 0};
+  const int d = dir & 3;
+  for (int step = 1; step <= 2; ++step) {
+    const int cx = x + kDx[d] * step;
+    const int cy = y + kDy[d] * step;
+    if (cx < 0 || cx >= N || cy < 0 || cy >= N) { break; }
+    set(cx, cy);
+    if (planetSurface_.Tile(cx, cy) == 1u) { break; }
+  }
+}
+
+// Tick every living sentry on the floor by exactly one grid step. Closed
+// bulkheads and raised portcullises are solid to them; they never use stairs.
+void ShellView::TickDungeonSentries() {
+  if (planetSurface_.inMine < 1u) { return; }
   constexpr int N = PlanetSurfaceState::kSize;
   static constexpr int kDx[4] = {0, 1, 0, -1};
   static constexpr int kDy[4] = {-1, 0, 1, 0};
+  auto doorBlocks = [&](int x, int y) -> bool {
+    for (int i = 0; i < static_cast<int>(planetSurface_.doorCount); ++i) {
+      if (planetSurface_.doorX[i] == x && planetSurface_.doorY[i] == y &&
+          planetSurface_.doorOpen[i] == 0u) {
+        return true;
+      }
+    }
+    return planetSurface_.gateX == x && planetSurface_.gateY == y &&
+           planetSurface_.gateOpen == 0u;
+  };
+  auto stairCell = [&](int x, int y) -> bool {
+    for (int s = 0; s < PlanetSurfaceState::kStairs; ++s) {
+      if (planetSurface_.stairX2[s] == x && planetSurface_.stairY2[s] == y &&
+          planetSurface_.stairX[s] == planetSurface_.stairX2[s]) {
+        return true;
+      }
+    }
+    return false;
+  };
+  for (int i = 0; i < static_cast<int>(planetSurface_.mobCount); ++i) {
+    if (planetSurface_.mobHp[i] == 0u) { continue; }
+    const int mx = planetSurface_.mobX[i];
+    const int my = planetSurface_.mobY[i];
+    const int manhattan = std::abs(mx - static_cast<int>(planetSurface_.px)) +
+                          std::abs(my - static_cast<int>(planetSurface_.py));
+    int stepDx = 0, stepDy = 0;
+    if (manhattan <= 4) {
+      // Close on the away lead along the dominant open axis.
+      const int dx = static_cast<int>(planetSurface_.px) - mx;
+      const int dy = static_cast<int>(planetSurface_.py) - my;
+      if (std::abs(dx) >= std::abs(dy) && dx != 0) {
+        stepDx = dx > 0 ? 1 : -1;
+      } else if (dy != 0) {
+        stepDy = dy > 0 ? 1 : -1;
+      }
+    } else {
+      const int phase = (planetSurface_.mobPhase[i] + manhattan) & 3;
+      stepDx = kDx[phase];
+      stepDy = kDy[phase];
+    }
+    const int nx = mx + stepDx;
+    const int ny = my + stepDy;
+    if (nx < 1 || nx >= N - 1 || ny < 1 || ny >= N - 1) { continue; }
+    if (planetSurface_.Tile(nx, ny) == 1u) { continue; }
+    if (doorBlocks(nx, ny) || stairCell(nx, ny)) { continue; }
+    if (nx == static_cast<int>(planetSurface_.px) && ny == static_cast<int>(planetSurface_.py)) {
+      continue;
+    }
+    bool occupied = false;
+    for (int j = 0; j < static_cast<int>(planetSurface_.mobCount); ++j) {
+      if (j != i && planetSurface_.mobHp[j] != 0u && planetSurface_.mobX[j] == nx &&
+          planetSurface_.mobY[j] == ny) {
+        occupied = true;
+      }
+    }
+    if (occupied) { continue; }
+    planetSurface_.mobX[i] = static_cast<std::uint8_t>(nx);
+    planetSurface_.mobY[i] = static_cast<std::uint8_t>(ny);
+  }
+}
 
+void ShellView::ActivateDungeonTrap(Simulation& sim, int trapIndex) {
+  if (trapIndex < 0 || trapIndex >= static_cast<int>(planetSurface_.trapCount)) { return; }
+  if (planetSurface_.trapSprung[trapIndex] != 0u) { return; }
+  const int kind = static_cast<int>(planetSurface_.trapKind[trapIndex]);
+  if (sim.DungeonTriggerHazard(sim.Map().here, static_cast<int>(planetSurface_.inMine),
+                               trapIndex, kind)) {
+    planetSurface_.trapSprung[trapIndex] = 1u;
+    planetSurface_.bumpKind = 0;
+    planetSurface_.bumpBack = false;
+  }
+}
+
+void ShellView::StepPlanetSurface(Simulation& sim, int actionKind) {
+  constexpr int N = PlanetSurfaceState::kSize;
+  static constexpr int kDx[4] = {0, 1, 0, -1};
+  static constexpr int kDy[4] = {-1, 0, 1, 0};
+  const bool inMine = planetSurface_.inMine >= 1u;
+  const int floorNo = static_cast<int>(planetSurface_.inMine);
+  const std::string& hereId = sim.Map().here;
+
+  auto doorMark = [&](int i) {
+    return "planet-dng:" + hereId + ":f" + std::to_string(floorNo) + ":door:" +
+           std::to_string(i);
+  };
+  auto trapMark = [&](int i) {
+    return "planet-dng:" + hereId + ":f" + std::to_string(floorNo) + ":trap:" +
+           std::to_string(i);
+  };
+
+  auto switchFloor = [&](int target, int arriveFromBelow) {
+    LoadPlanetLayer(sim, static_cast<std::uint8_t>(target), /*placeOres=*/false);
+    planetSurface_.inMine = static_cast<std::uint8_t>(target);
+    const int slot = arriveFromBelow ? 1 : 0;
+    planetSurface_.px = planetSurface_.stairX2[slot];
+    planetSurface_.py = planetSurface_.stairY2[slot];
+    planetSurface_.dir = planetSurface_.stairDir[slot];
+    planetSurface_.bumpKind = 0;
+    planetSurface_.bumpBack = false;
+    MarkDungeonExplored(target, planetSurface_.px, planetSurface_.py, planetSurface_.dir);
+    TickDungeonSentries();
+  };
   auto canTraversePortal = [&](int fromX, int fromY, int toX, int toY) -> bool {
+    if (planetSurface_.inMine > 1u) { return false; }
     const int pOut = static_cast<int>(planetSurface_.portalOutDir & 3u);
     return toX == static_cast<int>(planetSurface_.portalX) &&
            toY == static_cast<int>(planetSurface_.portalY) &&
@@ -602,10 +1410,10 @@ void ShellView::StepPlanetSurface(const Simulation& sim, int actionKind) {
       planetSurface_.surfDir = static_cast<std::uint8_t>(planetSurface_.portalOutDir & 3u);
       LoadPlanetLayer(sim, 1u, /*placeOres=*/false);
       planetSurface_.inMine = 1u;
-      const int mOut = static_cast<int>(planetSurface_.portalOutDir & 3u);
-      planetSurface_.px = static_cast<std::uint8_t>(static_cast<int>(planetSurface_.portalX) + kDx[mOut]);
-      planetSurface_.py = static_cast<std::uint8_t>(static_cast<int>(planetSurface_.portalY) + kDy[mOut]);
-      planetSurface_.dir = static_cast<std::uint8_t>(mOut);
+      planetSurface_.px = planetSurface_.shaftX;
+      planetSurface_.py = planetSurface_.shaftY;
+      planetSurface_.dir = planetSurface_.stairDir[0];
+      MarkDungeonExplored(1, planetSurface_.px, planetSurface_.py, planetSurface_.dir);
     } else {
       LoadPlanetLayer(sim, 0u, /*placeOres=*/false);
       planetSurface_.inMine = 0u;
@@ -616,12 +1424,148 @@ void ShellView::StepPlanetSurface(const Simulation& sim, int actionKind) {
     planetSurface_.bumpKind = 0;
     planetSurface_.bumpBack = false;
   };
+  auto takeStairs = [&](int kind) {  // 0 = ascent, 1 = descent
+    if (kind == 0) {
+      if (planetSurface_.inMine == 1u) {
+        traversePortal();
+        return;
+      }
+      switchFloor(floorNo - 1, 1);
+    } else {
+      if (floorNo >= 3) { return; }
+      switchFloor(floorNo + 1, 0);
+    }
+  };
+
+  const int fx = static_cast<int>(planetSurface_.px) + kDx[planetSurface_.dir & 3u];
+  const int fy = static_cast<int>(planetSurface_.py) + kDy[planetSurface_.dir & 3u];
+
+  auto chestAt = [&](int x, int y) -> int {
+    for (int i = 0; i < static_cast<int>(planetSurface_.chestCount); ++i) {
+      if (planetSurface_.chestX[i] == x && planetSurface_.chestY[i] == y &&
+          planetSurface_.chestOpened[i] == 0u) {
+        return i;
+      }
+    }
+    return -1;
+  };
+  auto mobAt = [&](int x, int y) -> int {
+    for (int i = 0; i < static_cast<int>(planetSurface_.mobCount); ++i) {
+      if (planetSurface_.mobHp[i] != 0u && planetSurface_.mobX[i] == x &&
+          planetSurface_.mobY[i] == y) {
+        return i;
+      }
+    }
+    return -1;
+  };
+  auto doorAt = [&](int x, int y) -> int {
+    for (int i = 0; i < static_cast<int>(planetSurface_.doorCount); ++i) {
+      if (planetSurface_.doorX[i] == x && planetSurface_.doorY[i] == y &&
+          planetSurface_.doorOpen[i] == 0u) {
+        return i;
+      }
+    }
+    return -1;
+  };
+  auto trapAt = [&](int x, int y) -> int {
+    for (int i = 0; i < static_cast<int>(planetSurface_.trapCount); ++i) {
+      if (planetSurface_.trapSprung[i] == 0u && planetSurface_.trapX[i] == x &&
+          planetSurface_.trapY[i] == y) {
+        return i;
+      }
+    }
+    return -1;
+  };
+  auto strikeMob = [&](int index) {
+    const int hp = static_cast<int>(planetSurface_.mobHp[index]);
+    bool defeated = false;
+    if (!sim.DungeonStrikeSentry(hereId, floorNo, index, hp, &defeated)) { return; }
+    planetSurface_.mobHp[index] =
+        defeated ? 0u : static_cast<std::uint8_t>(std::max(1, hp - 2));
+    TickDungeonSentries();
+  };
+
+  // Interact with whatever stands directly ahead (E / Space or a click).
+  auto interactFront = [&]() {
+    if (!inMine) { return; }
+    const int chest = chestAt(fx, fy);
+    if (chest >= 0) {
+      if (sim.DungeonLootChest(hereId, floorNo, chest)) {
+        planetSurface_.chestOpened[chest] = 1u;
+      }
+      TickDungeonSentries();
+      return;
+    }
+    const int mob = mobAt(fx, fy);
+    if (mob >= 0) {
+      strikeMob(mob);
+      return;
+    }
+    if (planetSurface_.leverX == fx && planetSurface_.leverY == fy &&
+        planetSurface_.leverOn == 0u) {
+      if (sim.DungeonClaimLever(hereId, floorNo)) {
+        planetSurface_.leverOn = 1u;
+        planetSurface_.gateOpen = 1u;
+      }
+      TickDungeonSentries();
+      return;
+    }
+    if (planetSurface_.gateX == fx && planetSurface_.gateY == fy &&
+        planetSurface_.gateOpen == 0u) {
+      if (sim.State().repairKits >= 1.0) {
+        if (sim.DungeonForceGate(hereId, floorNo)) { planetSurface_.gateOpen = 1u; }
+      } else {
+        sim.LogLine("Sealed portcullis: find the wall lever, or a repair kit to force it.");
+      }
+      TickDungeonSentries();
+      return;
+    }
+    const int door = doorAt(fx, fy);
+    if (door >= 0) {
+      sim.MutableState().mapMarks[doorMark(door)] = true;
+      planetSurface_.doorOpen[door] = 1u;
+      sim.LogLine("Bulkhead unlatched on B" + std::to_string(floorNo) + ".");
+      TickDungeonSentries();
+      return;
+    }
+    if (planetSurface_.monolithX == fx && planetSurface_.monolithY == fy &&
+        planetSurface_.monolithActive == 0u) {
+      if (sim.DungeonFileMonolith(hereId)) { planetSurface_.monolithActive = 1u; }
+      TickDungeonSentries();
+      return;
+    }
+    if (planetSurface_.stairX[0] == fx && planetSurface_.stairY[0] == fy) {
+      takeStairs(0);
+      return;
+    }
+    if (planetSurface_.stairX[1] == fx && planetSurface_.stairY[1] == fy) {
+      takeStairs(1);
+      return;
+    }
+    const int trap = trapAt(fx, fy);
+    if (trap >= 0) {
+      if (sim.State().repairKits >= 1.0) {
+        sim.MutableState().repairKits -= 1.0;
+        sim.MutableState().mapMarks[trapMark(trap)] = true;
+        planetSurface_.trapSprung[trap] = 1u;
+        sim.LogLine("Hazard jammed with a repair kit.");
+      } else {
+        ActivateDungeonTrap(sim, trap);
+      }
+      TickDungeonSentries();
+    }
+  };
+
+  if (actionKind == 9) {  // E / Space: interact with the tile directly ahead
+    interactFront();
+    return;
+  }
 
   if (actionKind == 8) {
-    const int fx = static_cast<int>(planetSurface_.px) + kDx[planetSurface_.dir & 3u];
-    const int fy = static_cast<int>(planetSurface_.py) + kDy[planetSurface_.dir & 3u];
     if (canTraversePortal(planetSurface_.px, planetSurface_.py, fx, fy)) {
       traversePortal();
+    } else {
+      interactFront();
     }
     return;
   }
@@ -635,16 +1579,32 @@ void ShellView::StepPlanetSurface(const Simulation& sim, int actionKind) {
       return;
     }
     std::uint8_t blk = 0;
+    int sentryAhead = -1;
     if (static_cast<unsigned>(nx) >= static_cast<unsigned>(N) ||
         static_cast<unsigned>(ny) >= static_cast<unsigned>(N)) {
-      blk = (planetSurface_.inMine != 0u) ? 4u : 1u;
+      blk = inMine ? 4u : 1u;
     } else if (planetSurface_.Tile(nx, ny) == 1u) {
-      blk = ((planetSurface_.inMine != 0u) || ((planetSurface_.Variant(nx, ny) & 4) != 0)) ? 4u : 1u;
-    } else if (planetSurface_.inMine == 0u &&
-               nx == planetSurface_.shipX && ny == planetSurface_.shipY) {
+      blk = (inMine || ((planetSurface_.Variant(nx, ny) & 4) != 0)) ? 4u : 1u;
+    } else if (!inMine && nx == planetSurface_.shipX && ny == planetSurface_.shipY) {
       blk = 2u;
-    } else {
-      const std::string& hereId = sim.Map().here;
+    } else if (inMine) {
+      // Every dungeon fixture occupies its tile; crossing it needs an interact.
+      if ((planetSurface_.stairX[0] == nx && planetSurface_.stairY[0] == ny) ||
+          (planetSurface_.stairX[1] == nx && planetSurface_.stairY[1] == ny)) {
+        blk = 4u;
+      } else if (chestAt(nx, ny) >= 0) {
+        blk = 1u;
+      } else if (doorAt(nx, ny) >= 0) {
+        blk = 5u;
+      } else if (planetSurface_.gateX == nx && planetSurface_.gateY == ny &&
+                 planetSurface_.gateOpen == 0u) {
+        blk = 6u;
+      } else if (mobAt(nx, ny) >= 0) {
+        blk = 7u;
+        sentryAhead = mobAt(nx, ny);
+      }
+    }
+    if (blk == 0) {
       for (int i = 0; i < static_cast<int>(planetSurface_.oreCount); ++i) {
         if (((planetSurface_.oreLayerMask >> i) & 1u) == planetSurface_.inMine &&
             planetSurface_.oreX[i] == nx && planetSurface_.oreY[i] == ny) {
@@ -662,26 +1622,42 @@ void ShellView::StepPlanetSurface(const Simulation& sim, int actionKind) {
       planetSurface_.py = static_cast<std::uint8_t>(ny);
       planetSurface_.bumpKind = 0;
       planetSurface_.bumpBack = false;
+      if (inMine) {
+        MarkDungeonExplored(floorNo, nx, ny, planetSurface_.dir);
+        const int trap = trapAt(nx, ny);
+        if (trap >= 0) { ActivateDungeonTrap(sim, trap); }
+        TickDungeonSentries();
+      }
     } else {
       planetSurface_.bumpKind = blk;
       planetSurface_.bumpBack = (actionKind == 2);
+      if (inMine && actionKind == 1 && sentryAhead >= 0) {
+        strikeMob(sentryAhead);  // bumping forward trades blows
+      }
     }
   } else if (actionKind == 3) {
     planetSurface_.dir = static_cast<std::uint8_t>((planetSurface_.dir + 3u) & 3u);
     planetSurface_.bumpKind = 0;
     planetSurface_.bumpBack = false;
+    if (inMine) { TickDungeonSentries(); }
   } else if (actionKind == 4) {
     planetSurface_.dir = static_cast<std::uint8_t>((planetSurface_.dir + 1u) & 3u);
     planetSurface_.bumpKind = 0;
     planetSurface_.bumpBack = false;
+    if (inMine) { TickDungeonSentries(); }
   } else if (actionKind == 7) {
     planetSurface_.dir = static_cast<std::uint8_t>((planetSurface_.dir + 2u) & 3u);
     planetSurface_.bumpKind = 0;
     planetSurface_.bumpBack = false;
+    if (inMine) { TickDungeonSentries(); }
+  }
+
+  if (inMine) {
+    MarkDungeonExplored(floorNo, planetSurface_.px, planetSurface_.py, planetSurface_.dir);
   }
 }
 
-void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
+void ShellView::RenderPlanetSurfacePixels(Simulation& sim) {
   constexpr int W = PlanetSurfaceState::kTexW;
   constexpr int H = PlanetSurfaceState::kTexH;
   constexpr int N = PlanetSurfaceState::kSize;
@@ -694,6 +1670,38 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     pHash *= 1099511628211ULL;
   }
   if (pHash == 0ULL) { pHash = 1ULL; }
+
+  // Dungeon state signature: cheap to fold, and it only has to be non-zero
+  // underground so the early-return cache never serves a stale fixture frame
+  // (a fixture cannot change without the player moving, which is already
+  // part of the cache key).
+  std::uint64_t dungeonSig = 14695981039346656037ULL;
+  if (planetSurface_.inMine >= 1u) {
+    const auto mix = [&](std::uint64_t v) {
+      dungeonSig ^= v + 0x9E3779B97F4A7C15ULL + (dungeonSig << 6) + (dungeonSig >> 2);
+    };
+    mix(planetSurface_.inMine);
+    mix(planetSurface_.gateOpen);
+    mix(planetSurface_.leverOn);
+    mix(planetSurface_.monolithActive);
+    for (int i = 0; i < static_cast<int>(planetSurface_.doorCount); ++i) {
+      mix(planetSurface_.doorOpen[i] + 2u * static_cast<std::uint64_t>(i));
+    }
+    for (int i = 0; i < static_cast<int>(planetSurface_.trapCount); ++i) {
+      mix(planetSurface_.trapSprung[i] + 3u * static_cast<std::uint64_t>(i));
+    }
+    for (int i = 0; i < static_cast<int>(planetSurface_.chestCount); ++i) {
+      mix(planetSurface_.chestOpened[i] + 5u * static_cast<std::uint64_t>(i));
+    }
+    for (int i = 0; i < static_cast<int>(planetSurface_.mobCount); ++i) {
+      mix(static_cast<std::uint64_t>(planetSurface_.mobX[i]) |
+          (static_cast<std::uint64_t>(planetSurface_.mobY[i]) << 8) |
+          (static_cast<std::uint64_t>(planetSurface_.mobHp[i]) << 16) |
+          (7u * static_cast<std::uint64_t>(i) << 24));
+    }
+  } else {
+    dungeonSig = 0ULL;
+  }
 
   const std::size_t marksCount = sim.State().mapMarks.size();
   const int lotSerial = static_cast<int>(sim.State().lotSerial);
@@ -725,6 +1733,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   }
 
   if (planetTex_.id != 0 &&
+      planetSurface_.renderDungeonSig == dungeonSig &&
       planetSurface_.renderPlanetHash == pHash &&
       planetSurface_.renderPx == static_cast<std::int8_t>(planetSurface_.px) &&
       planetSurface_.renderPy == static_cast<std::int8_t>(planetSurface_.py) &&
@@ -740,6 +1749,7 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
   planetSurface_.renderDir = static_cast<std::int8_t>(planetSurface_.dir);
   planetSurface_.renderInMine = static_cast<std::int8_t>(planetSurface_.inMine);
   planetSurface_.renderOreMask = oreMask;
+  planetSurface_.renderDungeonSig = dungeonSig;
   planetSurface_.frontKind = 0;
   planetSurface_.frontArg = 0;
   planetSurface_.frontUv = Area{};
@@ -1685,7 +2695,20 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
         if (!isVis(d, s)) { continue; }
         const int tx = planetSurface_.px + fdx * d + rdx * s;
         const int ty = planetSurface_.py + fdy * d + rdy * s;
-        if (!isCliffCell(tx, ty)) { continue; }
+        // A sealed bulkhead is a full-height occluder exactly like rock: nothing
+        // deeper may leak around it. An open one is a pair of jambs. The
+        // portcullis never occludes: its bars leave real gaps you can see and
+        // walk a sightline through until the lever raises it.
+        bool closedBulkhead = false;
+        if (inMine && tileAt(tx, ty) == 2u) {
+          for (int di = 0; di < static_cast<int>(planetSurface_.doorCount); ++di) {
+            if (planetSurface_.doorX[di] == tx && planetSurface_.doorY[di] == ty &&
+                planetSurface_.doorOpen[di] == 0u) {
+              closedBulkhead = true;
+            }
+          }
+        }
+        if (!isCliffCell(tx, ty) && !closedBulkhead) { continue; }
         const int occVar = variantAt(tx, ty);
         const float occTopScale = cliffTopScaleFor(tx, ty, occVar);
         if (!inMine && occTopScale < 0.85f) { continue; }
@@ -3148,8 +4171,10 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
       const int dx = std::max(1, x1 - x0);
       std::int32_t yT_fp = yT0 << 16;
       std::int32_t yB_fp = yB0 << 16;
-      const std::int32_t dYT_fp = ((yT1 - yT0) << 16) / dx;
-      const std::int32_t dYB_fp = ((yB1 - yB0) << 16) / dx;
+      const std::int32_t dYT_fp = static_cast<std::int32_t>(
+          static_cast<std::uint32_t>(yT1 - yT0) << 16) / dx;
+      const std::int32_t dYB_fp = static_cast<std::int32_t>(
+          static_cast<std::uint32_t>(yB1 - yB0) << 16) / dx;
       const int innerEdgeX = (s < 0) ? x1 : x0;
       for (int x = x0; x <= x1; ++x, yT_fp += dYT_fp, yB_fp += dYB_fp) {
         const int yT = std::max(0, yT_fp >> 16);
@@ -3215,8 +4240,12 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
         const int spanW = std::max(1, x1 - x0);
         std::int32_t yT_fp = yT0 << 16;
         std::int32_t yB_fp = yB0 << 16;
-        const std::int32_t dYT_fp = ((yT1 - yT0) << 16) / spanW;
-        const std::int32_t dYB_fp = ((yB1 - yB0) << 16) / spanW;
+        // Deltas may be negative: shift the magnitude through uint32_t so the
+        // 2's-complement bits are identical without left-shifting a negative int.
+        const std::int32_t dYT_fp = static_cast<std::int32_t>(
+            static_cast<std::uint32_t>(yT1 - yT0) << 16) / spanW;
+        const std::int32_t dYB_fp = static_cast<std::int32_t>(
+            static_cast<std::uint32_t>(yB1 - yB0) << 16) / spanW;
         int startX = x0;
         if (startX < clipL) {
           const int skip = clipL - startX;
@@ -4111,6 +5140,399 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
     }
   };
 
+  // ---- PC-98 World-of-Xeen dungeon painters (B1..B3) ----------------------
+  // Every fixture is drawn at its own tile plane and clipped by the
+  // already-computed rowX0/rowX1 window plus the per-column occlusion mask,
+  // so nothing bleeds through a nearer wall. Stack state only, 0 B heap.
+  const int rs = kResScale;
+  auto dPx = [&](int dd, int x, int y, std::uint8_t idx) {
+    if (dd < 0 || dd > 6 || y < 0 || y >= H || x < 0 || x >= W) { return; }
+    if (x < static_cast<int>(rowX0[dd]) || x > static_cast<int>(rowX1[dd])) { return; }
+    if (((depthColOcc[dd][x >> 5] >> (x & 31)) & 1u) != 0u) { return; }
+    putPx(x, y, idx);
+  };
+  auto dRect = [&](int dd, int x0, int y0, int w, int h, std::uint8_t idx) {
+    for (int y = y0; y < y0 + h; ++y) {
+      for (int x = x0; x < x0 + w; ++x) { dPx(dd, x, y, idx); }
+    }
+  };
+  auto dHL = [&](int dd, int x0, int x1, int y, std::uint8_t idx) {
+    for (int x = x0; x <= x1; ++x) { dPx(dd, x, y, idx); }
+  };
+  auto dVL = [&](int dd, int x, int y0, int y1, std::uint8_t idx) {
+    for (int y = y0; y <= y1; ++y) { dPx(dd, x, y, idx); }
+  };
+  auto dRing = [&](int dd, int cx, int cy, int rx, int ry, std::uint8_t idx) {
+    for (int i = 0; i < 30; ++i) {
+      const float a = static_cast<float>(i) * 6.2831853f / 30.0f;
+      dPx(dd, cx + static_cast<int>(std::lround(std::cos(a) * static_cast<float>(rx))),
+          cy + static_cast<int>(std::lround(std::sin(a) * static_cast<float>(ry))), idx);
+    }
+  };
+  auto setFront = [&](int kind, int arg, int x0, int y0, int x1, int y1) {
+    const int fx0 = std::clamp(x0, 0, W);
+    const int fx1 = std::clamp(x1, 0, W);
+    const int fy0 = std::clamp(y0, 0, H);
+    const int fy1 = std::clamp(y1, 0, H);
+    if (fx1 <= fx0) { return; }
+    planetSurface_.frontKind = kind;
+    planetSurface_.frontArg = arg;
+    planetSurface_.frontUv = Area{
+        static_cast<float>(fx0) / static_cast<float>(W),
+        static_cast<float>(fy0) / static_cast<float>(H),
+        static_cast<float>(fx1 - fx0) / static_cast<float>(W),
+        static_cast<float>(fy1 - fy0) / static_cast<float>(H)};
+  };
+
+  // Dwelling index lookups (<= 4 entries each, only walked underground).
+  auto doorIndexAt = [&](int tx, int ty) -> int {
+    for (int i = 0; i < static_cast<int>(planetSurface_.doorCount); ++i) {
+      if (planetSurface_.doorX[i] == tx && planetSurface_.doorY[i] == ty) { return i; }
+    }
+    return -1;
+  };
+  auto stairIndexAt = [&](int tx, int ty) -> int {
+    for (int i = 0; i < PlanetSurfaceState::kStairs; ++i) {
+      if (planetSurface_.stairX[i] == tx && planetSurface_.stairY[i] == ty) { return i; }
+    }
+    return -1;
+  };
+  auto trapIndexAt = [&](int tx, int ty) -> int {
+    for (int i = 0; i < static_cast<int>(planetSurface_.trapCount); ++i) {
+      if (planetSurface_.trapX[i] == tx && planetSurface_.trapY[i] == ty) { return i; }
+    }
+    return -1;
+  };
+  auto mobIndexAt = [&](int tx, int ty) -> int {
+    for (int i = 0; i < static_cast<int>(planetSurface_.mobCount); ++i) {
+      if (planetSurface_.mobX[i] == tx && planetSurface_.mobY[i] == ty) { return i; }
+    }
+    return -1;
+  };
+  auto chestIndexAt = [&](int tx, int ty) -> int {
+    for (int i = 0; i < static_cast<int>(planetSurface_.chestCount); ++i) {
+      if (planetSurface_.chestX[i] == tx && planetSurface_.chestY[i] == ty) { return i; }
+    }
+    return -1;
+  };
+
+  // Riveted bulkhead slab: a full-height occluder that can be opened in place.
+  auto drawBulkhead = [&](int dd, int cx, int gy, int hw, int yTop, bool open) {
+    const int x0 = cx - hw;
+    const int x1 = cx + hw;
+    const int w = std::max(4, x1 - x0 + 1);
+    const int h = std::max(6, gy - yTop + 1);
+    const int lintel = std::max(2, h / 10);
+    if (open) {
+      const int jw = std::max(2, w / 7);
+      dRect(dd, x0, yTop, jw, h, pathMid);
+      dVL(dd, x0, yTop, gy, inkOut);
+      dVL(dd, x0 + jw - 1, yTop, gy, pathDark);
+      dRect(dd, x1 - jw + 1, yTop, jw, h, pathMid);
+      dVL(dd, x1, yTop, gy, inkOut);
+      dVL(dd, x1 - jw + 1, yTop, gy, pathDark);
+      dRect(dd, x0, yTop, w, lintel, pathMid);
+      dHL(dd, x0, x1, yTop, pathHi);
+      dHL(dd, x0, x1, yTop + lintel - 1, inkOut);
+      dHL(dd, x0 + jw, x1 - jw, gy - std::max(1, h / 16), pathDark);  // worn sill
+      for (int bx = x0 + jw + rs; bx < x1 - jw; bx += 3 * rs) {       // retracted bars
+        dVL(dd, bx, yTop + 1, yTop + std::max(2, h / 7), kIdxShipDark);
+      }
+      return;
+    }
+    dRect(dd, x0, yTop, w, h, kIdxShipDark);
+    dHL(dd, x0, x1, yTop, kIdxShipLight);
+    dVL(dd, x0, yTop, gy, inkOut);
+    dVL(dd, x1, yTop, gy, inkOut);
+    dRect(dd, x0 + 1, yTop + 1, w - 2, std::max(2, h / 12), kIdxShipMid);  // lit bevel
+    const int seam = cx;
+    dVL(dd, seam, yTop + 1, gy - 1, inkOut);
+    if (w >= 14) { dVL(dd, seam + 1, yTop + 1, gy - 1, kIdxShipMid); }
+    const int riv = std::max(3, h / 9);
+    for (int ry0 = yTop + riv; ry0 < gy - 1; ry0 += riv) {
+      for (int rx0 = x0 + 2; rx0 <= x1 - 2; rx0 += std::max(5, w / 6)) {
+        if (rx0 <= seam + 1 && rx0 + 1 >= seam) { continue; }
+        dPx(dd, rx0, ry0, kIdxShipLight);
+        dPx(dd, rx0 + 1, ry0, pathMid);
+      }
+    }
+    // Spoked locking wheel + sealed lamp
+    const int wy = yTop + h / 3;
+    const int wr = std::max(2, std::min(w / 5, h / 8));
+    dRing(dd, cx, wy, wr, wr, kIdxOreGold);
+    dRing(dd, cx, wy, std::max(1, wr - 2), std::max(1, wr - 2), kIdxShipMid);
+    for (int k = 0; k <= wr; ++k) {
+      dPx(dd, cx - k, wy, kIdxOreGold);
+      dPx(dd, cx + k, wy, kIdxOreGold);
+      dPx(dd, cx, wy - k, kIdxOreGold);
+      dPx(dd, cx, wy + k, kIdxOreGold);
+    }
+    dPx(dd, cx, wy, kIdxWarmGleam);
+    dRect(dd, cx - wr, wy + wr + 2, 2 * wr + 1, 2, inkOut);
+    dRect(dd, cx - wr + 1, wy + wr + 3, 2 * wr - 1, 1, accent0);
+  };
+
+  // Portcullis: vertical bars with real gaps between them, so the corridor
+  // behind stays visible. Never a full occluder.
+  auto drawPortcullis = [&](int dd, int cx, int gy, int hw, int yTop, bool open) {
+    const int x0 = cx - hw;
+    const int x1 = cx + hw;
+    const int w = std::max(4, x1 - x0 + 1);
+    const int h = std::max(8, gy - yTop + 1);
+    const int jw = std::max(2, w / 9);
+    const int lintel = std::max(2, h / 9);
+    dRect(dd, x0, yTop, jw, h, pathMid);
+    dVL(dd, x0, yTop, gy, inkOut);
+    dVL(dd, x0 + jw - 1, yTop, gy, pathDark);
+    dRect(dd, x1 - jw + 1, yTop, jw, h, pathMid);
+    dVL(dd, x1, yTop, gy, inkOut);
+    dVL(dd, x1 - jw + 1, yTop, gy, pathDark);
+    dRect(dd, x0, yTop, w, lintel, pathMid);
+    dHL(dd, x0, x1, yTop, pathHi);
+    dHL(dd, x0, x1, yTop + lintel - 1, inkOut);
+    const int inner = std::max(4, w - 2 * jw);
+    const int bars = std::max(2, inner / (4 * rs));
+    const int by0 = yTop + lintel;
+    const int by1 = open ? by0 + std::max(2, h / 8) : gy - 1;
+    for (int b = 0; b < bars; ++b) {
+      const int bx = x0 + jw + (inner * (2 * b + 1)) / (2 * bars);
+      dVL(dd, bx, by0, by1, kIdxShipDark);
+      dVL(dd, bx + 1, by0, by1, kIdxShipMid);  // 1px lit edge; the next column stays open
+      dPx(dd, bx, by0, kIdxShipLight);
+      if (!open) {
+        dPx(dd, bx, gy, inkOut);
+        dPx(dd, bx + 1, gy, inkOut);
+      }
+    }
+    if (!open) {
+      const int br0 = yTop + h / 3;
+      const int br1 = yTop + 2 * h / 3;
+      dHL(dd, x0 + jw, x1 - jw, br0, kIdxShipMid);
+      dHL(dd, x0 + jw, x1 - jw, br0 + 1, inkOut);
+      dHL(dd, x0 + jw, x1 - jw, br1, kIdxShipMid);
+      dHL(dd, x0 + jw, x1 - jw, br1 + 1, inkOut);
+    } else {
+      dHL(dd, x0 + jw, x1 - jw, gy, pathDark);  // raised sill
+    }
+  };
+
+  // Wall lever: bracket plate, iron handle UP (live circuit) / DOWN (thrown),
+  // amber pip while the portcullis is shut, cyan once it is raised.
+  auto drawLever = [&](int dd, int cx, int gy, int hw, int yTop, bool thrown) {
+    const int h = std::max(10, gy - yTop + 1);
+    const int pw = std::max(3, std::min(hw, h / 3));
+    const int px0 = cx - pw / 2;
+    const int py0 = yTop + h / 5;
+    const int ph = std::max(6, h / 2);
+    dRect(dd, px0, py0, pw, ph, pathMid);
+    dVL(dd, px0, py0, py0 + ph - 1, pathHi);
+    dVL(dd, px0 + pw - 1, py0, py0 + ph - 1, inkOut);
+    dPx(dd, px0, py0, kIdxShipLight);
+    dPx(dd, px0 + pw - 1, py0, kIdxShipLight);
+    const int pivX = cx;
+    const int pivY = py0 + ph / 2;
+    const int arm = std::max(4, ph / 2 + rs);
+    const int tipY = thrown ? pivY + arm : pivY - arm;
+    for (int y = std::min(pivY, tipY); y <= std::max(pivY, tipY); ++y) { dPx(dd, pivX, y, kIdxOreGold); }
+    dPx(dd, pivX - 1, pivY, inkOut);
+    dPx(dd, pivX + 1, pivY, inkOut);
+    dRect(dd, pivX - 1, tipY - 1, 3, 3, thrown ? kIdxStarCool : kIdxWarmGleam);
+    dPx(dd, pivX, tipY, inkOut);
+    dRect(dd, cx - 2, yTop + 2, 5, 3, inkOut);
+    dRect(dd, cx - 1, yTop + 3, 3, 1, thrown ? kIdxStarCool : accent0);
+  };
+
+  // Carved stair arch: sunlit ascent / shadowed descent with a timber handrail.
+  auto drawStairArch = [&](int dd, int cx, int gy, int hw, int yTop, bool up) {
+    const int aw = std::max(6, (hw * 3) / 2);
+    const int half = aw / 2;
+    const int aTop = yTop + std::max(3, (gy - yTop) / 5);
+    const std::uint8_t inner = up ? pathHi : inkOut;
+    for (int y = aTop; y <= gy; ++y) {
+      const int grow = std::min(half, (y - aTop) * 2 + rs);
+      dHL(dd, cx - grow, cx + grow, y, inner);
+      dPx(dd, cx - grow - 1, y, pathMid);
+      dPx(dd, cx + grow + 1, y, pathMid);
+      dPx(dd, cx - grow - 2, y, pathDark);
+      dPx(dd, cx + grow + 2, y, pathDark);
+      if (up && y < aTop + std::max(2, (gy - aTop) / 5)) {
+        dPx(dd, cx - grow + 1, y, kIdxWarmGleam);  // daylight spilling down the shaft
+      }
+    }
+    for (int k = 0; k < 4; ++k) {  // treads
+      const int y = gy - k * std::max(1, (gy - aTop) / 7);
+      const int inset = half - (half * (k + 1)) / 6;
+      dHL(dd, cx - inset, cx + inset, y, up ? pathMid : rockDark);
+      if (up) { dHL(dd, cx - inset, cx + inset, y - 1, kIdxWarmGleam); }
+    }
+    // timber handrail on the lit side
+    const int rx = cx + half + 2;
+    dVL(dd, rx, gy - (gy - aTop) / 2, gy, trunkCol);
+    dPx(dd, rx, gy, inkOut);
+    dPx(dd, rx, gy - (gy - aTop) / 2, pathHi);
+  };
+
+  // Inlaid floor hazard plate, one silhouette per biome kind.
+  auto drawTrapPlate = [&](int dd, int cx, int gy, int hw, int kind, bool sprung) {
+    const int rx = std::max(4, (hw * 3) / 5);
+    const int ry = std::max(2, rx / 3);
+    auto span = [&](int yy) -> int {
+      const int num = rx * rx * (ry * ry - yy * yy);
+      const int den = std::max(1, ry * ry);
+      if (num <= 0) { return 0; }
+      int lo = 0, hi = rx;
+      while (lo < hi) {
+        const int mid = (lo + hi + 1) / 2;
+        if (mid * mid * den <= num) { lo = mid; } else { hi = mid - 1; }
+      }
+      return lo;
+    };
+    for (int yy = -ry; yy <= ry; ++yy) {
+      const int sp = span(yy);
+      if (sp <= 0) { continue; }
+      const bool edge = (yy <= -ry + 1 || yy >= ry - 1 || sp <= 1);
+      dHL(dd, cx - sp, cx + sp, gy + yy, edge ? pathDark : (sprung ? inkOut : pathMid));
+    }
+    if (sprung) {
+      dHL(dd, cx - rx / 2, cx + rx / 2, gy, accent0);
+      dPx(dd, cx - rx / 3, gy + 1, accent1);
+      dPx(dd, cx + rx / 3, gy - 1, accent1);
+      return;
+    }
+    switch (kind) {
+      case 0:  // magma grate
+        for (int x = cx - rx + 2; x <= cx + rx - 2; x += 3) { dVL(dd, x, gy - ry + 1, gy + ry - 1, inkOut); }
+        dHL(dd, cx - rx / 2, cx + rx / 2, gy, kIdxWarmGleam);
+        dPx(dd, cx, gy, accent1);
+        break;
+      case 1:  // cryo spike bed
+        for (int x = cx - rx + 2; x <= cx + rx - 2; x += 4) {
+          dPx(dd, x, gy, kIdxStarCool);
+          dPx(dd, x, gy - 1, kIdxStarCool);
+          dPx(dd, x + 1, gy, kIdxShipLight);
+        }
+        break;
+      case 2:  // brine vent
+        dRing(dd, cx, gy, std::max(2, rx / 2), std::max(1, ry - 1), kIdxStarCool);
+        dPx(dd, cx - rx / 3, gy - 1, kIdxStarCool);
+        dPx(dd, cx + rx / 4, gy + 1, kIdxStarCool);
+        break;
+      case 3:  // dart grille
+        for (int yy = -1; yy <= 1; ++yy) {
+          for (int xx = -1; xx <= 1; ++xx) {
+            dRect(dd, cx + xx * 3 - 1, gy + yy - 1, 3, 2, inkOut);
+            dPx(dd, cx + xx * 3 - 1, gy + yy, kIdxShipLight);
+          }
+        }
+        break;
+      default:  // spore fissure
+        for (int x = cx - rx + 2; x <= cx + rx - 2; x += 3) {
+          dPx(dd, x, gy + ((x >> 1) & 1), inkOut);
+          dPx(dd, x, gy - 2 + ((x >> 1) & 1), leaf0);
+        }
+        break;
+    }
+  };
+
+  auto drawChest = [&](int dd, int cx, int gy, int hw, bool opened) {
+    const int w = std::max(8, hw);
+    const int h = std::max(6, (w * 2) / 3);
+    const int x0 = cx - w / 2;
+    const int y0 = gy - h;
+    dRect(dd, x0, y0, w, h, kIdxOreBody);
+    dRect(dd, x0 + 1, y0 + 1, std::max(2, w - 2), std::max(2, h / 3), kIdxOreGold);
+    dHL(dd, x0, x0 + w - 1, y0, kIdxWarmGleam);
+    dHL(dd, x0, x0 + w - 1, gy - 1, inkOut);
+    dHL(dd, x0 + 1, x0 + w - 2, gy - 2, pathDark);
+    dVL(dd, x0, y0, gy - 1, inkOut);
+    dVL(dd, x0 + w - 1, y0, gy - 1, inkOut);
+    for (int bx = x0 + w / 4; bx < x0 + w - 1; bx += std::max(4, w / 3)) {
+      dVL(dd, bx, y0 + 1, gy - 2, kIdxShipDark);
+    }
+    const int lx = cx - 1;
+    const int ly = y0 + h / 2;
+    dRect(dd, lx, ly - 1, 3, 3, kIdxShipDark);
+    dPx(dd, lx + 1, ly, opened ? inkOut : kIdxStarCool);
+    if (opened) {
+      dRect(dd, x0 + 1, y0, std::max(2, w - 2), std::max(2, h / 4), inkOut);
+      dHL(dd, x0 + 1, x0 + w - 2, y0, pathMid);
+      dHL(dd, x0 + 2, x0 + w - 3, y0 - 1, pathHi);  // lid thrown back
+      dPx(dd, x0 + w / 3, y0 + 1, kIdxShipLight);
+    }
+  };
+
+  auto drawMonolith = [&](int dd, int cx, int gy, int hw, int yTop, bool filed) {
+    const int w = std::max(6, hw);
+    const int h = std::max(12, 3 * (gy - yTop) / 2);
+    const int x0 = cx - w / 2;
+    const int y0 = gy - h;
+    dRect(dd, x0 + 1, y0 + 1, w - 2, h - 1, pathDark);
+    dRect(dd, x0, y0, w, std::max(3, h / 6), pathMid);   // stepped crown
+    dHL(dd, x0, x0 + w - 1, y0, pathHi);
+    dVL(dd, x0, y0, gy - 1, inkOut);
+    dVL(dd, x0 + w - 1, y0, gy - 1, inkOut);
+    dHL(dd, x0, x0 + w - 1, gy - 1, inkOut);
+    const std::uint8_t rune = filed ? pathMid : kIdxStarCool;
+    for (int y = y0 + h / 5; y < gy - 2; y += std::max(3, h / 12)) {
+      const int wob = ((y - y0) / 3) & 1;
+      dHL(dd, x0 + 2 + wob, x0 + w - 3 - wob, y, rune);
+      dPx(dd, x0 + w / 2, y + 1, rune);
+    }
+    dRect(dd, cx - 2, gy - 3, 5, 2, pathHi);  // plinth under the stele
+  };
+
+  // Dungeon sentry: hovering construct, one lamp eye, HP pips above it.
+  auto drawSentry = [&](int dd, int cx, int gy, int hw, int kind, int hp) {
+    const int bodyR = std::max(3, hw / 2);
+    const int bodyY = gy - std::max(6, hw);
+    const std::uint8_t shell = (kind == 0) ? kIdxOreGold : (kind == 1) ? leaf1 : accent1;
+    const std::uint8_t shellDark = (kind == 0) ? kIdxShipDark : (kind == 1) ? pathDark : trunkCol;
+    dRing(dd, cx, bodyY, bodyR, bodyR, inkOut);
+    for (int yy = -bodyR + 1; yy <= bodyR - 1; ++yy) {
+      const int sp = std::max(0, bodyR - ((yy * yy) / std::max(1, bodyR)));
+      dHL(dd, cx - sp, cx + sp, bodyY + yy, (yy < 0) ? shell : shellDark);
+    }
+    dPx(dd, cx - 1, bodyY - 1, pathHi);
+    dRect(dd, cx - 1, bodyY, 3, 2, inkOut);
+    dPx(dd, cx, bodyY, kIdxWarmGleam);  // lamp eye
+    // Thrusters / dangling manipulators under the shell
+    dPx(dd, cx - bodyR, bodyY + bodyR, pathMid);
+    dPx(dd, cx + bodyR, bodyY + bodyR, pathMid);
+    dVL(dd, cx, bodyY + bodyR, gy - 1, (kind == 2) ? accent1 : pathMid);
+    // HP pips: one per point of remaining integrity
+    for (int i = 0; i < PlanetSurfaceState::kMaxMobHp; ++i) {
+      dRect(dd, cx - 4 + i * 3, bodyY - bodyR - 3, 2, 2, (i < hp) ? accent1 : inkOut);
+    }
+  };
+
+  // Wall-mounted fixtures only read as such when the cell's front face is the
+  // exposed one (the cell straight ahead is open).
+  auto wallFaceVisible = [&](int tx, int ty) -> bool {
+    return !isCliffCell(tx - fdx, ty - fdy);
+  };
+  auto drawWallFixture = [&](int tx, int ty, int dd, int ss, int stIx) {
+    if (!wallFaceVisible(tx, ty)) { return; }
+    const float zNear = std::max(0.50f, static_cast<float>(dd) - 0.50f);
+    const int cx = cliffX(zNear, static_cast<float>(ss));
+    const int gy = std::clamp(cliffYBot(zNear), 0, H - 1);
+    const int hw = std::max(4, static_cast<int>(std::lround(halfTileAtZ(zNear))));
+    const int yTop = std::clamp(cliffYTop(zNear), 0, std::max(0, gy - 6));
+    if (stIx >= 0) {
+      drawStairArch(dd, cx, gy, hw, yTop, stIx == 0);
+      if (dd == 1 && ss == 0) { setFront(stIx == 0 ? 13 : 14, stIx, cx - hw, yTop, cx + hw, gy); }
+    } else if (tx == static_cast<int>(planetSurface_.leverX) &&
+               ty == static_cast<int>(planetSurface_.leverY) &&
+               (planetSurface_.leverX | planetSurface_.leverY) != 0) {
+      drawLever(dd, cx, gy, hw, yTop, planetSurface_.leverOn != 0u);
+      if (dd == 1 && ss == 0) { setFront(12, planetSurface_.leverOn, cx - hw, yTop, cx + hw, gy); }
+    } else if (tx == static_cast<int>(planetSurface_.monolithX) &&
+               ty == static_cast<int>(planetSurface_.monolithY) &&
+               (planetSurface_.monolithX | planetSurface_.monolithY) != 0) {
+      drawMonolith(dd, cx, gy, hw, yTop, planetSurface_.monolithActive != 0u);
+      if (dd == 1 && ss == 0) { setFront(17, planetSurface_.monolithActive, cx - hw, yTop - 4, cx + hw, gy); }
+    }
+  };
+
   // Back-to-front painter's algorithm across visible cells (culled by vis[2] + depthColOcc)
   for (int d = maxVisD; d >= 0; --d) {
     activeFog = static_cast<int>(inMine ? kMineDepthFog[d] : kDepthFog[d]);
@@ -4132,6 +5554,49 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
         const std::uint8_t tile = tileAt(tx, ty);
         const int var = variantAt(tx, ty);
         const float tcxMid = tileCenterAtZ(s, zMid);
+
+        // ---- dungeon fixtures on their own tile plane -----------------------
+        if (inMine) {
+          const int stIx = stairIndexAt(tx, ty);
+          if (tile == 1 && stIx >= 0) {
+            drawCliffCell(tx, ty, d, s, var);
+            drawWallFixture(tx, ty, d, s, stIx);
+            continue;
+          }
+          if (tile == 1 && d <= 5) {
+            drawCliffCell(tx, ty, d, s, var);
+            drawWallFixture(tx, ty, d, s, -1);
+            continue;
+          }
+          if (tile == 2) {
+            const int doorIdx = doorIndexAt(tx, ty);
+            const bool isGate = (tx == static_cast<int>(planetSurface_.gateX) &&
+                                 ty == static_cast<int>(planetSurface_.gateY));
+            if (doorIdx >= 0 || isGate) {
+              const float zNear = std::max(0.50f, static_cast<float>(d) - 0.50f);
+              const int fcx = cliffX(zNear, static_cast<float>(s));
+              const int fgy = std::clamp(cliffYBot(zNear), 0, H - 1);
+              const int fhw = std::max(4, static_cast<int>(std::lround(halfTileAtZ(zNear))));
+              const int fyTop = std::clamp(cliffYTop(zNear), 0, std::max(0, fgy - 8));
+              if (isGate) {
+                drawPortcullis(d, fcx, fgy, fhw, fyTop, planetSurface_.gateOpen != 0u);
+                if (d == 1 && s == 0) {
+                  setFront(11, planetSurface_.gateOpen, fcx - fhw, fyTop, fcx + fhw, fgy);
+                }
+              } else {
+                const bool open = planetSurface_.doorOpen[doorIdx] != 0u;
+                drawBulkhead(d, fcx, fgy, fhw, fyTop, open);
+                if (d == 1 && s == 0) { setFront(10, doorIdx, fcx - fhw, fyTop, fcx + fhw, fgy); }
+              }
+              if (!(doorIdx >= 0 && planetSurface_.doorOpen[doorIdx] != 0u) &&
+                  !(isGate && planetSurface_.gateOpen != 0u)) {
+                continue;  // shut: a solid full-height slab, nothing behind it reads
+              }
+              if (isGate && planetSurface_.gateOpen == 0u) { continue; }
+              continue;  // open: the slab was drawn as two jambs only
+            }
+          }
+        }
 
         if (tile == 1) {
           if (inMine) {
@@ -4222,6 +5687,43 @@ void ShellView::RenderPlanetSurfacePixels(const Simulation& sim) {
             drawCaveMoundPortal(tx, ty, d, s);
           }
           continue;
+        }
+
+        if (inMine && tile == 0) {
+          if (d <= 4) {
+            const int tIx = trapIndexAt(tx, ty);
+            if (tIx >= 0) {
+              drawTrapPlate(d, static_cast<int>(std::lround(tcxMid)), gyMid,
+                            std::max(3, static_cast<int>(std::lround(halfTileAtZ(static_cast<float>(d))))),
+                            planetSurface_.trapKind[tIx], planetSurface_.trapSprung[tIx] != 0u);
+              if (d == 1 && s == 0) {
+                setFront(15, tIx, static_cast<int>(tcxMid) - 8, gyMid - 5,
+                         static_cast<int>(tcxMid) + 8, gyMid + 1);
+              }
+            }
+          }
+          if (d <= 5) {
+            const int cIx = chestIndexAt(tx, ty);
+            if (cIx >= 0) {
+              drawChest(d, static_cast<int>(std::lround(tcxMid)), gyMid,
+                        std::max(6, static_cast<int>(std::lround(24.0f * sTile))),
+                        planetSurface_.chestOpened[cIx] != 0u);
+              if (d == 1 && s == 0) {
+                setFront(16, cIx, static_cast<int>(tcxMid) - 12, gyMid - 18,
+                         static_cast<int>(tcxMid) + 12, gyMid);
+              }
+            }
+            const int mIx = mobIndexAt(tx, ty);
+            if (mIx >= 0 && planetSurface_.mobHp[mIx] != 0u) {
+              drawSentry(d, static_cast<int>(std::lround(tcxMid)), gyMid,
+                         std::max(5, static_cast<int>(std::lround(20.0f * sTile))),
+                         planetSurface_.mobKind[mIx], planetSurface_.mobHp[mIx]);
+              if (d == 1 && s == 0) {
+                setFront(18, mIx, static_cast<int>(tcxMid) - 10, gyMid - 26,
+                         static_cast<int>(tcxMid) + 10, gyMid);
+              }
+            }
+          }
         }
 
         // Non-blocking low ground accents on open tiles (0)
